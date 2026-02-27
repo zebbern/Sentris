@@ -66,7 +66,7 @@ export class InboundWebhookController {
         headers: normalizedHeaders,
       });
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       // Always return 200 to prevent retries, but log error
       this.logger.error(`Webhook processing failed for path ${path}: ${error}`);
       throw error;

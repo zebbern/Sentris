@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import { McpGroupsRepository, type McpGroupUpdateData } from './mcp-groups.repository';
+import {
+  McpGroupsRepository,
+  type McpGroupUpdateData,
+  type McpGroupServerRow,
+} from './mcp-groups.repository';
 import { McpGroupsSeedingService } from './mcp-groups-seeding.service';
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -27,6 +31,15 @@ import type {
 } from './dto/mcp-groups.dto';
 import type { McpGroupRecord } from '../database/schema';
 import type { TemplateSyncResult } from './mcp-groups-seeding.service';
+
+/** Template server shape including optional runtime ID (not in Zod schema but may exist at runtime) */
+interface McpTemplateServer {
+  id?: string;
+  name: string;
+  command?: string;
+  args?: string[];
+  endpoint?: string;
+}
 
 // Redis injection token - must match the one in mcp-servers.service.ts
 const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
@@ -51,7 +64,7 @@ export class McpGroupsService implements OnModuleInit {
     try {
       await this.seedingService.syncAllTemplates();
       this.logger.log('MCP group templates synced on startup.');
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('Failed to sync MCP group templates on startup', error);
     }
   }
@@ -71,41 +84,21 @@ export class McpGroupsService implements OnModuleInit {
     };
   }
 
-  private mapGroupServerToResponse(
-    record: ReturnType<typeof this.repository.findServersByGroup> extends Promise<infer T>
-      ? T extends (infer R)[]
-        ? R
-        : never
-      : never,
-  ): McpGroupServerResponse {
-    const transportType =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
-      (record as any).transportType ?? (record as any).transport_type ?? record.transportType;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
-    const toolCount = (record as any).toolCount ?? (record as any).tool_count ?? 0;
-    const healthStatus =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
-      (record as any).lastHealthStatus ??
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
-      (record as any).last_health_status ??
-      record.lastHealthStatus ??
-      'unknown';
-
+  private mapGroupServerToResponse(record: McpGroupServerRow): McpGroupServerResponse {
     return {
       id: record.id,
       serverName: record.name,
       name: record.name, // Keep for backwards compatibility
       description: record.description,
-      transportType: transportType as 'http' | 'stdio' | 'sse' | 'websocket',
+      transportType: record.transport_type as 'http' | 'stdio' | 'sse' | 'websocket',
       endpoint: record.endpoint,
       command: record.command,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
-      args: (record as any).args ?? null,
+      args: record.args ?? null,
       enabled: record.enabled,
-      healthStatus: healthStatus as 'healthy' | 'unhealthy' | 'unknown',
-      toolCount,
+      healthStatus: (record.last_health_status ?? 'unknown') as 'healthy' | 'unhealthy' | 'unknown',
+      toolCount: Number(record.tool_count),
       recommended: record.recommended,
-      defaultSelected: record.defaultSelected,
+      defaultSelected: record.default_selected,
     };
   }
 
@@ -179,8 +172,7 @@ export class McpGroupsService implements OnModuleInit {
               );
               await this.mcpServersRepository.upsertTools(
                 server.id,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK tool cache is untyped
-                cached.tools.map((tool: any) => ({
+                cached.tools.map((tool) => ({
                   toolName: tool.name,
                   description: tool.description ?? null,
                   inputSchema: tool.inputSchema ?? null,
@@ -191,7 +183,7 @@ export class McpGroupsService implements OnModuleInit {
               // Mark server healthy when discovery completed (even if tool count is 0)
               await this.mcpServersRepository.updateHealthStatus(server.id, 'healthy', {});
             }
-          } catch (error) {
+          } catch (error: unknown) {
             this.logger.warn(`Failed to load cached tools for server '${server.name}':`, error);
           }
         }
@@ -434,8 +426,9 @@ export class McpGroupsService implements OnModuleInit {
     }
 
     // Search for server by ID (primary) or name (fallback)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Template server type is untyped
-    const server = template.servers.find((s: any) => s.id === serverId || s.name === serverId);
+    const server = (template.servers as McpTemplateServer[]).find(
+      (s) => s.id === serverId || s.name === serverId,
+    );
     if (!server) {
       throw new BadRequestException(`Server '${serverId}' not found in group '${groupSlug}'`);
     }

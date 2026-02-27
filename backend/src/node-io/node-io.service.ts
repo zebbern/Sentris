@@ -129,7 +129,7 @@ export class NodeIOService {
         try {
           const buffer = await this.storage.downloadFile(inputsStorageRef);
           inputs = JSON.parse(buffer.toString('utf8'));
-        } catch (err) {
+        } catch (err: unknown) {
           this.logger.error(`Failed to fetch spilled inputs from ${inputsStorageRef}`, err);
           inputs = { error: 'Failed to fetch full data' };
         }
@@ -139,7 +139,7 @@ export class NodeIOService {
           const buffer = await this.storage.downloadFilePreview(inputsStorageRef, 2048);
           inputs = buffer.toString('utf8').slice(0, 1000) + '\n... (truncated)';
           inputsTruncated = true;
-        } catch (err) {
+        } catch (err: unknown) {
           this.logger.warn(`Failed to fetch preview for inputs from ${inputsStorageRef}`, err);
           inputs = '(Data too large to display, click View Full to load)';
           inputsTruncated = true;
@@ -153,7 +153,7 @@ export class NodeIOService {
         try {
           const buffer = await this.storage.downloadFile(outputsStorageRef);
           outputs = JSON.parse(buffer.toString('utf8'));
-        } catch (err) {
+        } catch (err: unknown) {
           this.logger.error(`Failed to fetch spilled outputs from ${outputsStorageRef}`, err);
           outputs = { error: 'Failed to fetch full data' };
         }
@@ -162,7 +162,7 @@ export class NodeIOService {
           const buffer = await this.storage.downloadFilePreview(outputsStorageRef, 2048);
           outputs = buffer.toString('utf8').slice(0, 1000) + '\n... (truncated)';
           outputsTruncated = true;
-        } catch (err) {
+        } catch (err: unknown) {
           this.logger.warn(`Failed to fetch preview for outputs from ${outputsStorageRef}`, err);
           outputs = '(Data too large to display, click View Full to load)';
           outputsTruncated = true;

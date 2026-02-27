@@ -24,8 +24,11 @@ export class WorkflowsBootstrapService implements OnModuleInit {
       this.logger.log(
         `Bootstrapped Temporal demo run ${run.runId} (workflow=${workflowId}, queue=${run.taskQueue})`,
       );
-    } catch (error) {
-      this.logger.error('Failed to bootstrap Temporal demo workflow', error as Error);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Failed to bootstrap Temporal demo workflow',
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

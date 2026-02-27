@@ -69,7 +69,7 @@ export class TraceRepository implements OnModuleDestroy {
           client.release();
         }
       };
-    } catch (error) {
+    } catch (error: unknown) {
       client.release();
       throw error;
     }
@@ -95,7 +95,7 @@ export class TraceRepository implements OnModuleDestroy {
         timestamp: event.timestamp,
       });
       await this.notifyRun(event.runId, payload);
-    } catch (error) {
+    } catch (error: unknown) {
       // Log error but don't fail the append operation
       this.logger.error('Failed to notify trace subscribers:', error);
     }

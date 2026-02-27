@@ -9,7 +9,6 @@ import {
   type McpGroupRecord,
   type NewMcpGroupRecord,
   type McpGroupServerRecord,
-  type McpServerRecord,
 } from '../database/schema';
 
 export interface McpGroupQueryOptions {
@@ -23,6 +22,30 @@ export interface McpGroupUpdateData {
   credentialMapping?: Record<string, string> | null;
   defaultDockerImage?: string | null;
   enabled?: boolean;
+}
+
+/** Row shape from raw PostgreSQL queries joining mcp_servers with group metadata and tool counts */
+export interface McpGroupServerRow {
+  id: string;
+  name: string;
+  description: string | null;
+  transport_type: string;
+  endpoint: string | null;
+  command: string | null;
+  args: string[] | null;
+  headers: unknown;
+  enabled: boolean;
+  health_check_url: string | null;
+  last_health_check: Date | null;
+  last_health_status: string | null;
+  group_id: string | null;
+  organization_id: string | null;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+  recommended: boolean;
+  default_selected: boolean;
+  tool_count: number | string;
 }
 
 @Injectable()
@@ -131,12 +154,7 @@ export class McpGroupsRepository {
 
   // Group-Server relationship methods
 
-  async findAllServersGrouped(): Promise<
-    Map<
-      string,
-      (McpServerRecord & { recommended: boolean; defaultSelected: boolean; toolCount: number })[]
-    >
-  > {
+  async findAllServersGrouped(): Promise<Map<string, McpGroupServerRow[]>> {
     const query = sql`
       SELECT
         gs.group_id,
@@ -171,12 +189,8 @@ export class McpGroupsRepository {
     `;
 
     const result = await this.db.execute(query);
-    const grouped = new Map<
-      string,
-      (McpServerRecord & { recommended: boolean; defaultSelected: boolean; toolCount: number })[]
-    >();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL returns untyped rows
-    for (const row of result.rows as any[]) {
+    const grouped = new Map<string, McpGroupServerRow[]>();
+    for (const row of result.rows as McpGroupServerRow[]) {
       const groupId = row.group_id;
       if (!grouped.has(groupId)) {
         grouped.set(groupId, []);
@@ -186,11 +200,7 @@ export class McpGroupsRepository {
     return grouped;
   }
 
-  async findServersByGroup(
-    groupId: string,
-  ): Promise<
-    (McpServerRecord & { recommended: boolean; defaultSelected: boolean; toolCount: number })[]
-  > {
+  async findServersByGroup(groupId: string): Promise<McpGroupServerRow[]> {
     // Use raw SQL for complex query with tool count
     const query = sql`
       SELECT
@@ -226,11 +236,7 @@ export class McpGroupsRepository {
     `;
 
     const result = await this.db.execute(query);
-    return result.rows as (McpServerRecord & {
-      recommended: boolean;
-      defaultSelected: boolean;
-      toolCount: number;
-    })[];
+    return result.rows as McpGroupServerRow[];
   }
 
   async addServerToGroup(

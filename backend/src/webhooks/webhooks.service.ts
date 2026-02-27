@@ -10,6 +10,7 @@ import {
 import {
   type WebhookConfiguration,
   type WebhookDelivery,
+  type WebhookInputDefinition,
   type TestWebhookScriptResponse,
   type WebhookUrlResponse,
 } from '@shipsec/shared';
@@ -90,8 +91,7 @@ export class WebhooksService {
       description: dto.description ?? null,
       webhookPath,
       parsingScript: dto.parsingScript,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle JSON column type mismatch
-      expectedInputs: dto.expectedInputs as any,
+      expectedInputs: dto.expectedInputs as WebhookInputDefinition[],
       status: 'active',
       organizationId,
       createdBy: auth?.userId ?? 'system',
@@ -152,8 +152,7 @@ export class WebhooksService {
         name: dto.name,
         description: dto.description !== undefined ? dto.description : undefined,
         parsingScript: dto.parsingScript,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle JSON column type mismatch
-        expectedInputs: dto.expectedInputs as any,
+        expectedInputs: dto.expectedInputs as WebhookInputDefinition[] | undefined,
         status: dto.status,
       },
       { organizationId: auth?.organizationId },
@@ -281,8 +280,7 @@ export class WebhooksService {
           organizationId: auth?.organizationId,
         });
         if (webhook) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle JSON column type mismatch
-          validationErrors = this.validateParsedData(webhook.expectedInputs as any, parsedData);
+          validationErrors = this.validateParsedData(webhook.expectedInputs, parsedData);
         }
       }
 
@@ -292,7 +290,7 @@ export class WebhooksService {
         errorMessage: null,
         validationErrors,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(`Parsing script test failed: ${error}`);
       return {
         success: false,
@@ -357,8 +355,7 @@ export class WebhooksService {
       webhookId: webhook.id,
       workflowRunId: null,
       status: 'processing',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express request body is untyped
-      payload: typeof req.body === 'object' ? (req.body as any) : {},
+      payload: typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {},
       headers: req.headers,
       parsedData: null,
       errorMessage: null,
@@ -372,14 +369,12 @@ export class WebhooksService {
       // Execute parsing script
       const parsedData = await this.executeParsingScript(
         webhook.parsingScript,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express request body is untyped
-        typeof req.body === 'object' ? (req.body as any) : {},
+        typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {},
         req.headers,
       );
 
       // Validate parsed data against expected inputs
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle JSON column type mismatch
-      const validationErrors = this.validateParsedData(webhook.expectedInputs as any, parsedData);
+      const validationErrors = this.validateParsedData(webhook.expectedInputs, parsedData);
       if (validationErrors.length > 0) {
         throw new BadRequestException(
           `Parsed data validation failed: ${validationErrors.map((e) => e.message).join(', ')}`,
@@ -426,7 +421,7 @@ export class WebhooksService {
       );
 
       return { status: 'delivered', runId: runResult.runId };
-    } catch (error) {
+    } catch (error: unknown) {
       // Update delivery as failed
       const errorMessage = error instanceof Error ? error.message : String(error);
       await this.deliveryRepository.update(delivery.id, {
@@ -559,8 +554,7 @@ export class WebhooksService {
       description: record.description ?? null,
       webhookPath: record.webhookPath,
       parsingScript: record.parsingScript,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle JSON column type mismatch
-      expectedInputs: record.expectedInputs as any,
+      expectedInputs: record.expectedInputs as WebhookInputDefinition[],
       status: record.status,
       organizationId: record.organizationId ?? null,
       createdBy: record.createdBy,

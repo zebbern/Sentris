@@ -289,7 +289,7 @@ export class WorkflowsService {
     // Validate workflow graph before saving (including port connections)
     try {
       compileWorkflowGraph(input);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Error) {
         throw new BadRequestException(`Workflow validation failed: ${error.message}`);
       }
@@ -314,7 +314,7 @@ export class WorkflowsService {
           organizationId,
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       await this.repository.delete(record.id, { organizationId });
       throw error;
     }
@@ -346,7 +346,7 @@ export class WorkflowsService {
     // Validate workflow graph before saving (including port connections)
     try {
       compileWorkflowGraph(input);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Error) {
         throw new BadRequestException(`Workflow validation failed: ${error.message}`);
       }
@@ -545,7 +545,7 @@ export class WorkflowsService {
           },
         };
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to get component ${componentId} for port resolution: ${error}`);
       return node;
     }
@@ -671,7 +671,7 @@ export class WorkflowsService {
             )
             .catch((err) => this.logger.warn(`Failed to cache status for ${run.runId}: ${err}`));
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // If Temporal can't find the workflow, infer status for display only — do NOT cache
         if (this.isNotFoundError(error)) {
           currentStatus = this.inferStatusFromTraceEvents({
@@ -946,7 +946,7 @@ export class WorkflowsService {
         status: 'RUNNING',
         taskQueue: temporalRun.taskQueue,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       if (temporalRunId) {
         this.logger.warn(
           `Temporal workflow ${prepared.runId} reported error after start: ${
@@ -1250,7 +1250,7 @@ export class WorkflowsService {
             )
             .catch((err) => this.logger.warn(`Failed to cache status for ${run.runId}: ${err}`));
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // If Temporal can't find the workflow, infer status from trace events
         if (this.isNotFoundError(error)) {
           const inferredStatus = this.inferStatusFromTraceEvents({
@@ -1552,7 +1552,7 @@ export class WorkflowsService {
       if (value && typeof value === 'object') {
         return Buffer.byteLength(JSON.stringify(value), 'utf8');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to estimate payload size: ${error}`);
     }
     return 0;

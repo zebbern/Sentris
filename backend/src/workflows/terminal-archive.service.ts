@@ -51,7 +51,7 @@ export class TerminalArchiveService {
           });
           results.push(result);
           archivedKeys.add(dedupeKey);
-        } catch (error) {
+        } catch (error: unknown) {
           this.logger.warn(`Failed to archive terminal for ${runId}/${nodeRef}/${stream}`, error);
         }
       }
@@ -237,7 +237,7 @@ export class TerminalArchiveService {
           origin: 'archive',
           runnerKind: 'docker',
         });
-      } catch (error) {
+      } catch (error: unknown) {
         this.logger.warn('Failed to parse cast payload', error);
       }
     }

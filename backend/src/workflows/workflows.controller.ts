@@ -609,7 +609,7 @@ export class WorkflowsController {
   async commit(@Param('id') id: string, @CurrentAuth() auth: AuthContext | null) {
     try {
       return await this.workflowsService.commit(id, auth);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof HttpException) throw error;
       const message = error instanceof Error ? error.message : 'Commit failed';
       // Surface compile/validation details to the client for better UX
@@ -679,7 +679,7 @@ export class WorkflowsController {
       );
 
       return await this.workflowsService.startPreparedRun(prepared);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof HttpException) throw error;
 
       // Extract detailed error information
@@ -972,7 +972,7 @@ export class WorkflowsController {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flush
           (res as any).flush();
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // Connection closed or error writing
         this.logger.warn(`Failed to send SSE event ${event}:`, error);
         if (!active) {
@@ -997,7 +997,7 @@ export class WorkflowsController {
       if (unsubscribe) {
         try {
           await unsubscribe();
-        } catch (error) {
+        } catch (error: unknown) {
           this.logger.error('Error unsubscribing from trace events:', error);
         }
       }
@@ -1065,7 +1065,7 @@ export class WorkflowsController {
           lastLogCursor = nextCursor ?? lastLogCursor;
           send('logs', { logs: newLogs, cursor: lastLogCursor });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         send('error', { message: 'trace_fetch_failed', detail: String(error) });
       }
 
@@ -1083,7 +1083,7 @@ export class WorkflowsController {
             cleanup();
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         send('error', { message: 'status_fetch_failed', detail: String(error) });
       }
     };
@@ -1137,7 +1137,7 @@ export class WorkflowsController {
                 }
               }
             }
-          } catch (error) {
+          } catch (error: unknown) {
             send('error', { message: 'notification_parse_failed', detail: String(error) });
           }
         });
@@ -1148,7 +1148,7 @@ export class WorkflowsController {
       } else {
         throw new Error('Repository does not support LISTEN/NOTIFY');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Fallback to polling mode if LISTEN/NOTIFY fails
       this.logger.warn(
         `[Stream] Failed to set up LISTEN/NOTIFY for run ${runId}, falling back to polling:`,
@@ -1259,7 +1259,7 @@ export class WorkflowsController {
         cursor: query.cursor,
       });
       return { runId, ...archived };
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to replay archived terminal for ${runId}`, error);
       return { runId, ...result };
     }

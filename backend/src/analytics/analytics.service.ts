@@ -71,7 +71,7 @@ export class AnalyticsService implements OnModuleInit {
           trigger_label: properties.triggerLabel,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to track workflow started: ${error}`);
     }
   }
@@ -101,7 +101,7 @@ export class AnalyticsService implements OnModuleInit {
           failure_reason: properties.failureReason,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to track workflow completed: ${error}`);
     }
   }
@@ -134,7 +134,7 @@ export class AnalyticsService implements OnModuleInit {
           user_id: properties.userId,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to track API call: ${error}`);
     }
   }
@@ -165,7 +165,7 @@ export class AnalyticsService implements OnModuleInit {
           output_size: properties.outputSize,
         },
       });
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to track component executed: ${error}`);
     }
   }
@@ -181,7 +181,7 @@ export class AnalyticsService implements OnModuleInit {
         event: `backend_${event}`,
         properties,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.warn(`Failed to track event ${event}: ${error}`);
     }
   }

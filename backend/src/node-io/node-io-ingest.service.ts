@@ -66,8 +66,11 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    this.connectToKafka().catch((error) => {
-      this.logger.error('Failed to initialize Kafka node I/O ingestion', error as Error);
+    this.connectToKafka().catch((error: unknown) => {
+      this.logger.error(
+        'Failed to initialize Kafka node I/O ingestion',
+        error instanceof Error ? error.stack : String(error),
+      );
     });
   }
 
@@ -104,10 +107,10 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
               `Processing node I/O event: runId=${payload.runId}, nodeRef=${payload.nodeRef}, type=${payload.type}, offset=${messageOffset}`,
             );
             await this.persistEvent(payload);
-          } catch (error) {
+          } catch (error: unknown) {
             this.logger.error(
               `Failed to process node I/O event from Kafka (topic=${topic}, partition=${partition}, offset=${messageOffset})`,
-              error as Error,
+              error instanceof Error ? error.stack : String(error),
             );
           }
         },
@@ -115,8 +118,11 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `Kafka node I/O ingestion connected (${this.kafkaBrokers.join(', ')}) topic=${this.kafkaTopic}`,
       );
-    } catch (error) {
-      this.logger.error('Failed to connect to Kafka node I/O ingestion', error as Error);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Failed to connect to Kafka node I/O ingestion',
+        error instanceof Error ? error.stack : String(error),
+      );
       // Don't throw here to avoid crashing the whole backend if Kafka is just temporarily down
     }
   }
@@ -124,8 +130,11 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.consumer) {
       this.logger.log('Disconnecting Kafka consumer...');
-      await this.consumer.disconnect().catch((error) => {
-        this.logger.error('Failed to disconnect Kafka consumer', error as Error);
+      await this.consumer.disconnect().catch((error: unknown) => {
+        this.logger.error(
+          'Failed to disconnect Kafka consumer',
+          error instanceof Error ? error.stack : String(error),
+        );
       });
       this.logger.log('Kafka consumer disconnected');
     }

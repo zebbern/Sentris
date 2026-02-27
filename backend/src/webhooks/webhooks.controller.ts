@@ -126,7 +126,7 @@ export class WebhooksController {
       if (!resourcePerms || !resourcePerms[action]) {
         throw new ForbiddenException(`API key missing permission: ${String(resource)}.${action}`);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof ForbiddenException) throw error;
       throw new ForbiddenException('Failed to validate API key permissions');
     }
