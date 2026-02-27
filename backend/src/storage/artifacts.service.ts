@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import type { AuthContext } from '../auth/types';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ArtifactsRepository } from './artifacts.repository';
@@ -22,6 +22,8 @@ interface ListArtifactFilters {
 
 @Injectable()
 export class ArtifactsService {
+  private readonly logger = new Logger(ArtifactsService.name);
+
   constructor(
     private readonly repository: ArtifactsRepository,
     private readonly filesService: FilesService,
@@ -118,7 +120,10 @@ export class ArtifactsService {
       await this.filesService.deleteFile(auth, artifact.fileId);
     } catch (error) {
       // Log but don't fail if file is already deleted
-      console.warn(`Failed to delete file ${artifact.fileId} for artifact ${artifactId}:`, error);
+      this.logger.warn(
+        `Failed to delete file ${artifact.fileId} for artifact ${artifactId}:`,
+        error,
+      );
     }
 
     // Delete the artifact record

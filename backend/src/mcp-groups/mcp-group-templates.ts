@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,6 +77,7 @@ export function computeTemplateHash(template: McpGroupTemplate): string {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const TEMPLATE_DIR = join(__dirname, 'templates');
+const logger = new Logger('McpGroupTemplates');
 
 function loadTemplates(): Record<string, McpGroupTemplate> {
   try {
@@ -89,13 +91,13 @@ function loadTemplates(): Record<string, McpGroupTemplate> {
         const slug = raw.slug || file.replace(/\.json$/, '');
         templates[slug] = { ...raw, slug };
       } catch (fileError) {
-        console.error(`[loadTemplates] ERROR loading ${file}:`, fileError);
+        logger.error(`[loadTemplates] ERROR loading ${file}:`, fileError);
         throw fileError;
       }
     }
     return templates;
   } catch (e) {
-    console.error('[loadTemplates] FATAL ERROR:', e);
+    logger.error('[loadTemplates] FATAL ERROR:', e);
     throw e;
   }
 }

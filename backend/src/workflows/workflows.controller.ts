@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Patch,
   Post,
@@ -239,6 +240,8 @@ const runConfigSchema = {
 @ApiTags('workflows')
 @Controller('workflows')
 export class WorkflowsController {
+  private readonly logger = new Logger(WorkflowsController.name);
+
   constructor(
     private readonly workflowsService: WorkflowsService,
     private readonly traceService: TraceService,
@@ -694,7 +697,7 @@ export class WorkflowsController {
     const result = await this.workflowsService.getRunStatus(runId, query.temporalRunId, auth);
     if (TERMINAL_COMPLETION_STATUSES.has(result.status)) {
       this.terminalArchiveService.archiveRun(auth, runId).catch((error) => {
-        console.warn(`Failed to archive terminal after status fetch for run ${runId}`, error);
+        this.logger.warn(`Failed to archive terminal after status fetch for run ${runId}`, error);
       });
     }
     return result;
@@ -928,7 +931,7 @@ export class WorkflowsController {
         }
       } catch (error) {
         // Connection closed or error writing
-        console.warn(`Failed to send SSE event ${event}:`, error);
+        this.logger.warn(`Failed to send SSE event ${event}:`, error);
         if (!active) {
           return;
         }
@@ -952,11 +955,11 @@ export class WorkflowsController {
         try {
           await unsubscribe();
         } catch (error) {
-          console.error('Error unsubscribing from trace events:', error);
+          this.logger.error('Error unsubscribing from trace events:', error);
         }
       }
       await this.workflowsService.releaseFlowContext(runId).catch((error) => {
-        console.warn('Failed to clear flow context:', error);
+        this.logger.warn('Failed to clear flow context:', error);
       });
       res.end();
     };
@@ -1031,7 +1034,7 @@ export class WorkflowsController {
           send('status', status);
           if (TERMINAL_COMPLETION_STATUSES.has(status.status)) {
             this.terminalArchiveService.archiveRun(auth, runId).catch((error) => {
-              console.warn(`Failed to archive terminal for run ${runId}`, error);
+              this.logger.warn(`Failed to archive terminal for run ${runId}`, error);
             });
             send('complete', { runId, status: status.status });
             cleanup();
@@ -1096,14 +1099,14 @@ export class WorkflowsController {
         });
 
         useRealtime = true;
-        console.log(`[Stream] Setting up realtime mode for run ${runId}`);
+        this.logger.log(`[Stream] Setting up realtime mode for run ${runId}`);
         send('ready', { mode: 'realtime', runId });
       } else {
         throw new Error('Repository does not support LISTEN/NOTIFY');
       }
     } catch (error) {
       // Fallback to polling mode if LISTEN/NOTIFY fails
-      console.warn(
+      this.logger.warn(
         `[Stream] Failed to set up LISTEN/NOTIFY for run ${runId}, falling back to polling:`,
         error,
       );
@@ -1114,7 +1117,7 @@ export class WorkflowsController {
     }
 
     await pump();
-    console.log(
+    this.logger.log(
       `[Stream] Initial pump completed for run ${runId}, mode: ${useRealtime ? 'realtime' : 'polling'}`,
     );
 
@@ -1124,7 +1127,7 @@ export class WorkflowsController {
       intervalId = setInterval(() => {
         void pump();
       }, 1000);
-      console.log(`[Stream] Started backup polling interval for run ${runId}`);
+      this.logger.log(`[Stream] Started backup polling interval for run ${runId}`);
     }
 
     heartbeatId = setInterval(() => {
@@ -1211,7 +1214,7 @@ export class WorkflowsController {
       });
       return { runId, ...archived };
     } catch (error) {
-      console.warn(`Failed to replay archived terminal for ${runId}`, error);
+      this.logger.warn(`Failed to replay archived terminal for ${runId}`, error);
       return { runId, ...result };
     }
   }

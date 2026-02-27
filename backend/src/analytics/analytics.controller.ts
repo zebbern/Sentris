@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  Logger,
   Post,
   Put,
   UnauthorizedException,
@@ -37,6 +38,7 @@ function isValidNonNegativeInt(value: unknown): value is number {
 @ApiTags('analytics')
 @Controller('analytics')
 export class AnalyticsController {
+  private readonly logger = new Logger(AnalyticsController.name);
   private readonly internalServiceToken: string;
 
   constructor(
@@ -274,7 +276,7 @@ export class AnalyticsController {
     // Validate internal service token
     if (!this.internalServiceToken) {
       // Token not configured - allow in dev mode but log warning
-      console.warn('[ensureTenant] INTERNAL_SERVICE_TOKEN not configured');
+      this.logger.warn('INTERNAL_SERVICE_TOKEN not configured');
     } else if (internalToken !== this.internalServiceToken) {
       throw new UnauthorizedException('Invalid internal service token');
     }

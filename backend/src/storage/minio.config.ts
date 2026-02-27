@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Client } from 'minio';
 
 @Injectable()
 export class MinioConfig {
+  private readonly logger = new Logger(MinioConfig.name);
   private client: Client;
   private readonly bucketName = 'shipsec-files';
 
@@ -39,10 +40,10 @@ export class MinioConfig {
       const exists = await this.client.bucketExists(this.bucketName);
       if (!exists) {
         await this.client.makeBucket(this.bucketName, 'us-east-1');
-        console.log(`✅ Created MinIO bucket: ${this.bucketName}`);
+        this.logger.log(`Created MinIO bucket: ${this.bucketName}`);
       }
     } catch (error) {
-      console.error(`❌ Failed to ensure MinIO bucket exists:`, error);
+      this.logger.error(`Failed to ensure MinIO bucket exists:`, error);
     }
   }
 

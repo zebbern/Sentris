@@ -145,17 +145,36 @@ INTEGRATION_STORE_MASTER_KEY=your-32-character-integ-key!!!!!
 
 ```
 src/
-├── workflows/          # Workflow CRUD and compilation
-├── storage/            # File and artifact management
-├── secrets/            # Encrypted secrets storage
-├── integrations/       # OAuth provider orchestration
+├── agent-trace/        # Agent execution trace capture
+├── agents/             # AI agent orchestration
+├── analytics/          # Usage analytics and metrics
+├── api-keys/           # API key management
+├── audit/              # Audit event logging
+├── auth/               # Clerk authentication integration
+├── common/             # Shared utilities and helpers
 ├── components/         # Component registry API
-├── trace/              # Event management and timeline
-├── logging/            # Log ingestion and processing
-├── events/             # Event processing service
-├── temporal/           # Temporal client wrapper
+├── config/             # Application configuration
 ├── database/           # Database schemas and migrations
-└── auth/               # Clerk authentication integration
+├── dsl/                # Workflow DSL compiler
+├── events/             # Event processing service
+├── human-inputs/       # Human-in-the-loop input handling
+├── integrations/       # OAuth provider orchestration
+├── logging/            # Log ingestion and processing
+├── mcp/                # Model Context Protocol core
+├── mcp-groups/         # MCP server group management
+├── mcp-servers/        # MCP server registry and lifecycle
+├── node-io/            # Workflow node I/O handling
+├── schedules/          # Scheduled workflow execution
+├── secrets/            # Encrypted secrets storage
+├── storage/            # File and artifact management
+├── studio-mcp/         # Studio MCP server integration
+├── templates/          # Workflow template library
+├── temporal/           # Temporal client wrapper
+├── terminal/           # Terminal streaming and PTY management
+├── testing/            # Test utilities and fixtures
+├── trace/              # Event management and timeline
+├── webhooks/           # Webhook delivery and management
+└── workflows/          # Workflow CRUD and compilation
 ```
 
 ## Development Workflow
@@ -168,6 +187,6 @@ src/
 
 ## Where To Read More
 
-- **[Architecture Overview](../docs/architecture.md)** - Complete system design and data flows
-- **[Component Development](../docs/component-development.md)** - Building security components
-- **[Getting Started](../docs/getting-started.md)** - Development setup and configuration
+- **[Architecture Overview](../docs/architecture.mdx)** - Complete system design and data flows
+- **[Component Development](../docs/development/component-development.mdx)** - Building security components
+- **[Getting Started](../docs/quickstart.mdx)** - Development setup and configuration

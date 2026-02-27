@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param, Post, Body } from '@nestjs/common';
+import { Controller, Get, Logger, NotFoundException, Param, Post, Body } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
 // Ensure all worker components are registered before accessing the registry
@@ -55,6 +55,8 @@ function serializeComponent(entry: CachedComponentMetadata) {
 @ApiTags('components')
 @Controller('components')
 export class ComponentsController {
+  private readonly logger = new Logger(ComponentsController.name);
+
   @Get()
   @ApiOkResponse({
     description: 'List all registered components',
@@ -402,7 +404,7 @@ export class ComponentsController {
       };
     } catch (error: any) {
       // Fallback to static on error
-      console.error(`Error resolving ports for ${id}:`, error);
+      this.logger.error(`Error resolving ports for ${id}:`, error);
       return {
         inputs: baseInputs,
         outputs: baseOutputs,

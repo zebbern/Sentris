@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
@@ -76,7 +77,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/v1/docs', app, cleaned);
 
   await app.listen(port, host);
-  console.log(`🚀 ShipSec backend listening on http://${host}:${port}`);
+  Logger.log(`🚀 ShipSec backend listening on http://${host}:${port}`, 'Bootstrap');
 }
 
 async function enforceVersionCheck() {

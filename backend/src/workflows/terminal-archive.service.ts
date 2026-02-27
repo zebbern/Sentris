@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/types';
 import { DEFAULT_ROLES } from '../auth/types';
 import {
@@ -14,6 +14,7 @@ import { TerminalArchiveRequestDto } from './dto/terminal-record.dto';
 
 @Injectable()
 export class TerminalArchiveService {
+  private readonly logger = new Logger(TerminalArchiveService.name);
   private readonly archivingRuns = new Set<string>();
 
   constructor(
@@ -51,12 +52,12 @@ export class TerminalArchiveService {
           results.push(result);
           archivedKeys.add(dedupeKey);
         } catch (error) {
-          console.warn(`Failed to archive terminal for ${runId}/${nodeRef}/${stream}`, error);
+          this.logger.warn(`Failed to archive terminal for ${runId}/${nodeRef}/${stream}`, error);
         }
       }
       if (results.length > 0) {
         await this.terminalStreamService.deleteStreams(runId).catch((error) => {
-          console.warn(`Failed to delete Redis terminal streams for run ${runId}`, error);
+          this.logger.warn(`Failed to delete Redis terminal streams for run ${runId}`, error);
         });
       }
       return results;
@@ -237,7 +238,7 @@ export class TerminalArchiveService {
           runnerKind: 'docker',
         });
       } catch (error) {
-        console.warn('Failed to parse cast payload', error);
+        this.logger.warn('Failed to parse cast payload', error);
       }
     }
     return { chunks, nextOffset: offset + chunks.length };

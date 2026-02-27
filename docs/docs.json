@@ -15,17 +15,17 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": [
-              "index",
-              "quickstart",
-              "installation",
-              "command-reference"
-            ]
+            "pages": ["index", "quickstart", "installation", "command-reference", "user-guide"]
           },
           {
             "group": "Architecture",
             "pages": [
-              "architecture"
+              "architecture",
+              "architecture/workflow-compilation",
+              "architecture/temporal-orchestration",
+              "architecture/streaming-pipelines",
+              "architecture/human-in-the-loop",
+              "audit-logging"
             ]
           },
           {
@@ -44,7 +44,18 @@
               "development/isolated-volumes",
               "development/workflow-analytics",
               "development/analytics",
-              "development/release-process"
+              "development/release-process",
+              "version-check"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "aws-credentials",
+              "analytics",
+              "mcp-library",
+              "workflows/execution-status",
+              "workflows/mcp-library-example"
             ]
           }
         ]

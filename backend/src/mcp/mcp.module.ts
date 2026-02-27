@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import Redis from 'ioredis';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from './tool-registry.service';
 import { McpGatewayService } from './mcp-gateway.service';
@@ -43,7 +43,7 @@ import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
         // Use the same Redis URL as terminal or a dedicated one
         const url = process.env.TOOL_REGISTRY_REDIS_URL ?? process.env.TERMINAL_REDIS_URL;
         if (!url) {
-          console.warn('[MCP] Redis URL not set; tool registry disabled');
+          new Logger('McpModule').warn('Redis URL not set; tool registry disabled');
         }
         if (!url) {
           return null;

@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { eq, and, gt, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -25,6 +25,7 @@ export interface PersistedTraceEvent {
 
 @Injectable()
 export class TraceRepository implements OnModuleDestroy {
+  private readonly logger = new Logger(TraceRepository.name);
   private pool: Pool;
 
   constructor(
@@ -96,7 +97,7 @@ export class TraceRepository implements OnModuleDestroy {
       await this.notifyRun(event.runId, payload);
     } catch (error) {
       // Log error but don't fail the append operation
-      console.error('Failed to notify trace subscribers:', error);
+      this.logger.error('Failed to notify trace subscribers:', error);
     }
   }
 

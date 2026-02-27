@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 import { LogStreamRepository } from './log-stream.repository';
 import type { WorkflowLogStreamRecord } from '../database/schema';
@@ -24,6 +29,7 @@ interface LokiEntry {
 
 @Injectable()
 export class LogStreamService {
+  private readonly logger = new Logger(LogStreamService.name);
   private readonly baseUrl?: string;
   private readonly tenantId?: string;
   private readonly username?: string;
@@ -39,7 +45,7 @@ export class LogStreamService {
 
   async fetch(runId: string, auth: AuthContext | null, options: FetchLogsOptions = {}) {
     if (!this.baseUrl) {
-      console.warn(`[LogStreamService] Loki not configured (LOKI_URL not set) for runId: ${runId}`);
+      this.logger.warn(`Loki not configured (LOKI_URL not set) for runId: ${runId}`);
       throw new ServiceUnavailableException('Loki integration is not configured');
     }
 
@@ -85,9 +91,7 @@ export class LogStreamService {
     if (options.level) selectorLabels.level = options.level;
 
     const selector = this.buildSelector(selectorLabels);
-    console.log(
-      `[LogStreamService] Fetching logs for runId: ${runId}, selector: ${selector}, limit: ${limit}`,
-    );
+    this.logger.log(`Fetching logs for runId: ${runId}, selector: ${selector}, limit: ${limit}`);
 
     // Query Loki - use time range if provided (for timeline scrubbing), otherwise use pagination
     const entries =
@@ -95,7 +99,7 @@ export class LogStreamService {
         ? await this.queryLokiTimeRange(selector, startTime, endTime, limit)
         : await this.queryLokiRange(selector, limit, options.cursor);
 
-    console.log(`[LogStreamService] Found ${entries.length} log entries for runId: ${runId}`);
+    this.logger.log(`Found ${entries.length} log entries for runId: ${runId}`);
 
     // Transform to flat log list
     const logs = entries.map((entry, index) => ({
@@ -296,7 +300,7 @@ export class LogStreamService {
     }
 
     const url = this.resolveUrl(`/loki/api/v1/query_range?${params.toString()}`);
-    console.log(`[LogStreamService] Querying Loki: ${url}`);
+    this.logger.log(`Querying Loki: ${url}`);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -305,8 +309,8 @@ export class LogStreamService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
-        `[LogStreamService] Loki query failed: ${response.status} ${response.statusText} - ${errorText}`,
+      this.logger.error(
+        `Loki query failed: ${response.status} ${response.statusText} - ${errorText}`,
       );
       throw new ServiceUnavailableException(
         `Loki query failed: ${response.status} ${response.statusText} - ${errorText}`,
@@ -322,8 +326,8 @@ export class LogStreamService {
       };
     };
 
-    console.log(
-      `[LogStreamService] Loki response: ${JSON.stringify({
+    this.logger.log(
+      `Loki response: ${JSON.stringify({
         resultCount: payload.data?.result?.length ?? 0,
         totalValues:
           payload.data?.result?.reduce((sum, r) => sum + (r.values?.length ?? 0), 0) ?? 0,

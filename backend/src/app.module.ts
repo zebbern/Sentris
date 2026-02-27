@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
 import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
@@ -35,6 +35,8 @@ import { HumanInputsModule } from './human-inputs/human-inputs.module';
 import { McpServersModule } from './mcp-servers/mcp-servers.module';
 import { McpGroupsModule } from './mcp-groups/mcp-groups.module';
 import { TemplatesModule } from './templates/templates.module';
+import { AllExceptionsFilter } from './common/filters';
+import { LoggingInterceptor } from './common/interceptors';
 
 const coreModules = [
   AgentsModule,
@@ -106,6 +108,14 @@ function getEnvFilePaths(): string[] {
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
     {
       provide: APP_GUARD,
       useClass: AuthGuard,

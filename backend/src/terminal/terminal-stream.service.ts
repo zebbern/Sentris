@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type Redis from 'ioredis';
 
 export const TERMINAL_REDIS = Symbol('TERMINAL_REDIS');
@@ -35,6 +35,8 @@ export interface TerminalStreamDescriptor {
 
 @Injectable()
 export class TerminalStreamService implements OnModuleDestroy {
+  private readonly logger = new Logger(TerminalStreamService.name);
+
   constructor(@Inject(TERMINAL_REDIS) private readonly redis: Redis | null) {}
 
   async onModuleDestroy() {
@@ -192,27 +194,13 @@ export class TerminalStreamService implements OnModuleDestroy {
               if (prevRedisTimestamp && redisTimestamp > prevRedisTimestamp) {
                 const oldDeltaMs = deltaMs;
                 deltaMs = redisTimestamp - prevRedisTimestamp;
-                console.log(
-                  `[TerminalStreamService] Fixed timestamp and deltaMs for chunk ${data.chunkIndex}`,
-                  {
-                    oldRecordedAt,
-                    newRecordedAt: recordedAt,
-                    oldDeltaMs,
-                    newDeltaMs: deltaMs,
-                    redisTimestamp,
-                    prevRedisTimestamp,
-                  },
+                this.logger.debug(
+                  `Fixed timestamp and deltaMs for chunk ${data.chunkIndex}: oldRecordedAt=${oldRecordedAt}, newRecordedAt=${recordedAt}, oldDeltaMs=${oldDeltaMs}, newDeltaMs=${deltaMs}`,
                 );
               }
             } else {
-              console.log(
-                `[TerminalStreamService] Fixed timestamp for chunk ${data.chunkIndex} (first chunk)`,
-                {
-                  oldRecordedAt,
-                  newRecordedAt: recordedAt,
-                  redisTimestamp,
-                  storedTimestamp,
-                },
+              this.logger.debug(
+                `Fixed timestamp for chunk ${data.chunkIndex} (first chunk): oldRecordedAt=${oldRecordedAt}, newRecordedAt=${recordedAt}, redisTs=${redisTimestamp}, storedTs=${storedTimestamp}`,
               );
             }
           }
@@ -229,7 +217,7 @@ export class TerminalStreamService implements OnModuleDestroy {
           runnerKind: data.runnerKind,
         };
       } catch (error) {
-        console.warn('Failed to parse terminal chunk payload', error);
+        this.logger.warn('Failed to parse terminal chunk payload', error);
         return null;
       }
     }

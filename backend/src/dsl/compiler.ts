@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { WorkflowGraphDto, WorkflowNodeDto } from '../workflows/dto/workflow-graph.dto';
 // Ensure all worker components are registered before accessing the registry
 import '../../../worker/src/components';
@@ -15,6 +16,8 @@ import {
   WorkflowNodeMetadata,
 } from './types';
 import { validateWorkflowGraph } from './validator';
+
+const compilerLogger = new Logger('WorkflowCompiler');
 
 function topoSort(nodes: string[], edges: { source: string; target: string }[]): string[] {
   const incoming = new Map<string, number>();
@@ -176,7 +179,7 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
         }
       } catch (e) {
         // Log but fallback to static inputs
-        console.warn(`Failed to resolve ports for node ${id} during compilation`, e);
+        compilerLogger.warn(`Failed to resolve ports for node ${id} during compilation`, e);
       }
     }
 
@@ -285,9 +288,9 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
 
   // Log warnings for user information
   if (validationResult.warnings.length > 0) {
-    console.warn(`Workflow validation warnings for ${graph.name}:`);
+    compilerLogger.warn(`Workflow validation warnings for ${graph.name}:`);
     validationResult.warnings.forEach((w) => {
-      console.warn(
+      compilerLogger.warn(
         `  [${w.node}] ${w.field}: ${w.message}${w.suggestion ? ' (Suggestion: ' + w.suggestion + ')' : ''}`,
       );
     });

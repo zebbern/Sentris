@@ -69,17 +69,17 @@ export class McpGatewayService {
         ? `${runId}:${allowedNodeIds.sort().map(escapeNodeId).join(',')}`
         : runId;
 
-    this.logger.log(
+    this.logger.debug(
       `[getServerForRun] runId=${runId}, cacheKey=${cacheKey}, allowedNodeIds=${JSON.stringify(allowedNodeIds)}`,
     );
 
     const existing = this.servers.get(cacheKey);
     if (existing) {
-      this.logger.log(`[getServerForRun] Returning cached server for cacheKey=${cacheKey}`);
+      this.logger.debug(`[getServerForRun] Returning cached server for cacheKey=${cacheKey}`);
       return existing;
     }
 
-    this.logger.log(`[getServerForRun] Creating NEW server for cacheKey=${cacheKey}`);
+    this.logger.debug(`[getServerForRun] Creating NEW server for cacheKey=${cacheKey}`);
     const server = new McpServer({
       name: 'shipsec-studio-gateway',
       version: '1.0.0',
@@ -88,9 +88,7 @@ export class McpGatewayService {
     const toolSet = new Set<string>();
     this.registeredToolNames.set(cacheKey, toolSet);
     await this.registerTools(server, runId, allowedTools, allowedNodeIds, toolSet);
-    this.logger.log(
-      `[getServerForRun] After registerTools, toolSet has ${toolSet.size} tools: ${[...toolSet].join(', ')}`,
-    );
+    this.logger.log(`[getServerForRun] Registered ${toolSet.size} tools for run ${runId}`);
     this.servers.set(cacheKey, server);
 
     return server;
@@ -121,12 +119,6 @@ export class McpGatewayService {
   }
 
   private async validateRunAccess(runId: string, organizationId?: string | null) {
-    console.log('[DEBUG] McpGatewayService this:', !!this);
-    console.log('[DEBUG] McpGatewayService toolRegistry:', !!this.toolRegistry);
-    console.log('[DEBUG] McpGatewayService temporalService:', !!this.temporalService);
-    console.log('[DEBUG] McpGatewayService workflowRunRepository:', !!this.workflowRunRepository);
-    console.log('[DEBUG] McpGatewayService traceRepository:', !!this.traceRepository);
-    console.log('[DEBUG] McpGatewayService mcpServersRepository:', !!this.mcpServersRepository);
     const run = await this.workflowRunRepository.findByRunId(runId);
     if (!run) {
       throw new NotFoundException(`Workflow run ${runId} not found`);
@@ -181,13 +173,13 @@ export class McpGatewayService {
     allowedNodeIds?: string[],
     registeredToolNames?: Set<string>,
   ) {
-    this.logger.log(
+    this.logger.debug(
       `[registerTools] START: runId=${runId}, allowedNodeIds=${JSON.stringify(allowedNodeIds)}`,
     );
     const allRegistered = await this.toolRegistry.getToolsForRun(runId, allowedNodeIds);
-    this.logger.log(`[registerTools] getToolsForRun returned ${allRegistered.length} tools:`);
+    this.logger.debug(`[registerTools] getToolsForRun returned ${allRegistered.length} tools`);
     for (const t of allRegistered) {
-      this.logger.log(
+      this.logger.debug(
         `[registerTools]   nodeId=${t.nodeId}, toolName=${t.toolName}, type=${t.type}, status=${t.status}, endpoint=${t.endpoint?.substring(0, 80) ?? 'none'}, exposedToAgent=${t.exposedToAgent}`,
       );
     }
@@ -340,21 +332,21 @@ export class McpGatewayService {
           })
         : externalSources;
 
-    this.logger.log(`[registerTools] Processing ${filteredSources.length} external sources...`);
+    this.logger.debug(`[registerTools] Processing ${filteredSources.length} external sources...`);
     for (const source of filteredSources) {
       try {
         let tools: any[] = [];
 
         // First, check Redis for pre-discovered tools (from registerMcpServer API)
-        this.logger.log(
+        this.logger.debug(
           `[registerTools] External source: nodeId=${source.nodeId}, toolName=${source.toolName}, type=${source.type}, endpoint=${source.endpoint?.substring(0, 80) ?? 'none'}`,
         );
         const preDiscoveredTools = await this.toolRegistry.getServerTools(runId, source.nodeId);
-        this.logger.log(
+        this.logger.debug(
           `[registerTools]   preDiscoveredTools from Redis: ${preDiscoveredTools ? preDiscoveredTools.length : 'null'}`,
         );
         if (preDiscoveredTools && preDiscoveredTools.length > 0) {
-          this.logger.log(
+          this.logger.debug(
             `[registerTools]   Using ${preDiscoveredTools.length} pre-discovered tools from Redis for ${source.toolName}`,
           );
           tools = preDiscoveredTools;
@@ -366,15 +358,15 @@ export class McpGatewayService {
             );
             continue;
           }
-          this.logger.log(
+          this.logger.debug(
             `[registerTools]   FALLBACK: Discovering tools from endpoint: ${source.endpoint}`,
           );
           tools = await this.discoverToolsFromEndpoint(source.endpoint);
-          this.logger.log(
+          this.logger.debug(
             `[registerTools]   FALLBACK result: discovered ${tools.length} tools from ${source.toolName}`,
           );
           if (tools.length > 0) {
-            this.logger.log(
+            this.logger.debug(
               `[registerTools]   FALLBACK tool names: ${tools.map((t: any) => t.name).join(', ')}`,
             );
           }
@@ -386,15 +378,15 @@ export class McpGatewayService {
             );
             continue;
           }
-          this.logger.log(
+          this.logger.debug(
             `[registerTools]   Loading pre-discovered tools from DB for serverId=${source.serverId}`,
           );
           tools = await this.getPreDiscoveredTools(source.serverId);
-          this.logger.log(`[registerTools]   DB result: ${tools.length} tools`);
+          this.logger.debug(`[registerTools]   DB result: ${tools.length} tools`);
         }
 
         const prefix = source.toolName;
-        this.logger.log(
+        this.logger.debug(
           `[registerTools]   Registering ${tools.length} tools with prefix '${prefix}'`,
         );
 
@@ -402,16 +394,16 @@ export class McpGatewayService {
           const proxiedName = `${prefix}__${t.name}`;
 
           if (allowedTools && allowedTools.length > 0 && !allowedTools.includes(proxiedName)) {
-            this.logger.log(`[registerTools]   Skipping ${proxiedName} - not in allowedTools`);
+            this.logger.debug(`[registerTools]   Skipping ${proxiedName} - not in allowedTools`);
             continue;
           }
 
           if (registeredToolNames?.has(proxiedName)) {
-            this.logger.log(`[registerTools]   Skipping ${proxiedName} - already registered`);
+            this.logger.debug(`[registerTools]   Skipping ${proxiedName} - already registered`);
             continue;
           }
 
-          this.logger.log(`[registerTools]   Registering tool: ${proxiedName}`);
+          this.logger.debug(`[registerTools]   Registering tool: ${proxiedName}`);
           server.registerTool(
             proxiedName,
             {
@@ -478,7 +470,7 @@ export class McpGatewayService {
       return existing;
     }
 
-    this.logger.log(`[getOrCreateExternalClient] Creating new persistent client for ${endpoint}`);
+    this.logger.debug(`[getOrCreateExternalClient] Creating new persistent client for ${endpoint}`);
     const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
       requestInit: {
         headers: {
@@ -494,7 +486,7 @@ export class McpGatewayService {
 
     await client.connect(transport);
     this.externalClients.set(endpoint, client);
-    this.logger.log(`[getOrCreateExternalClient] Client connected and cached for ${endpoint}`);
+    this.logger.debug(`[getOrCreateExternalClient] Client connected and cached for ${endpoint}`);
     return client;
   }
 
@@ -504,17 +496,17 @@ export class McpGatewayService {
    */
   private async discoverToolsFromEndpoint(endpoint: string): Promise<any[]> {
     try {
-      this.logger.log(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
+      this.logger.debug(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
 
       const client = await this.getOrCreateExternalClient(endpoint);
       const res = await client.listTools();
 
       const tools = res.tools ?? [];
-      this.logger.log(
-        `[discoverToolsFromEndpoint] SUCCESS: Discovered ${tools.length} tool(s) from ${endpoint}`,
+      this.logger.debug(
+        `[discoverToolsFromEndpoint] Discovered ${tools.length} tool(s) from ${endpoint}`,
       );
       if (tools.length > 0) {
-        this.logger.log(
+        this.logger.debug(
           `[discoverToolsFromEndpoint] Tool names: ${tools.map((t: any) => t.name).join(', ')}`,
         );
       }
