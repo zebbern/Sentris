@@ -219,6 +219,15 @@ export function WebhookEditorPage() {
   );
 
   const handleSave = async () => {
+    if (!form.workflowId) {
+      toast({
+        title: 'Validation error',
+        description: 'Please select a workflow before saving.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const payload = {
         ...form,
@@ -366,6 +375,7 @@ export function WebhookEditorPage() {
             onClick={handleSave}
             isSaving={isSaving}
             isDirty={isDirty || isNew}
+            disabled={!form.workflowId}
             label={isNew ? 'Create' : undefined}
           />
           {!isNew && (

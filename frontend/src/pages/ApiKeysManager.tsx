@@ -23,6 +23,9 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Copy, Trash2, ShieldOff, AlertTriangle, Key } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -91,12 +94,8 @@ export function ApiKeysManager() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // Revoke/Delete Confirmation
-  const [confirmAction, setConfirmAction] = useState<{
-    type: 'revoke' | 'delete';
-    target: ApiKeyResponseDto;
-  } | null>(null);
+  const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
 
   const handleCreateOpenChange = (open: boolean) => {
     setIsCreateOpen(open);
@@ -150,19 +149,42 @@ export function ApiKeysManager() {
     }
   };
 
-  const confirmRevokeOrDelete = async () => {
-    if (!confirmAction) return;
+  const handleRevoke = async (key: ApiKeyResponseDto) => {
+    const ok = await confirm({
+      title: 'Revoke API Key',
+      description: `Are you sure you want to revoke the key "${key.name}"? Applications using this key will immediately stop working.`,
+      confirmLabel: 'Revoke',
+      destructive: false,
+    });
+    if (!ok) return;
     try {
-      if (confirmAction.type === 'revoke') {
-        await revokeApiKeyMutation.mutateAsync(confirmAction.target.id);
-        setSuccessMessage(`API Key "${confirmAction.target.name}" revoked.`);
-      } else {
-        await deleteApiKeyMutation.mutateAsync(confirmAction.target.id);
-        setSuccessMessage(`API Key "${confirmAction.target.name}" deleted.`);
-      }
-      setConfirmAction(null);
+      await revokeApiKeyMutation.mutateAsync(key.id);
+      setSuccessMessage(`API Key "${key.name}" revoked.`);
     } catch (err) {
-      console.error(humanizeApiError(err));
+      toast({
+        title: 'Revoke failed',
+        description: humanizeApiError(err),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async (key: ApiKeyResponseDto) => {
+    const ok = await confirm({
+      title: 'Delete API Key',
+      description: `Are you sure you want to delete the key "${key.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    try {
+      await deleteApiKeyMutation.mutateAsync(key.id);
+      setSuccessMessage(`API Key "${key.name}" deleted.`);
+    } catch (err) {
+      toast({
+        title: 'Delete failed',
+        description: humanizeApiError(err),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -314,7 +336,7 @@ export function ApiKeysManager() {
                               size="icon"
                               title="Revoke Key"
                               aria-label="Revoke key"
-                              onClick={() => setConfirmAction({ type: 'revoke', target: key })}
+                              onClick={() => handleRevoke(key)}
                               disabled={isReadOnly}
                               className="h-8 w-8"
                             >
@@ -326,7 +348,7 @@ export function ApiKeysManager() {
                             size="icon"
                             title="Delete Key"
                             aria-label="Delete key"
-                            onClick={() => setConfirmAction({ type: 'delete', target: key })}
+                            onClick={() => handleDelete(key)}
                             disabled={isReadOnly}
                             className="h-8 w-8"
                           >
@@ -537,35 +559,7 @@ export function ApiKeysManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {confirmAction?.type === 'revoke' ? 'Revoke API Key' : 'Delete API Key'}
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to {confirmAction?.type} the key &quot;
-              <span className="font-medium text-foreground">{confirmAction?.target.name}</span>
-              &quot;?
-              {confirmAction?.type === 'revoke'
-                ? ' Applications using this key will immediately stop working.'
-                : ' This action cannot be undone.'}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmAction(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant={confirmAction?.type === 'delete' ? 'destructive' : 'default'}
-              onClick={confirmRevokeOrDelete}
-            >
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
