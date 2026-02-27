@@ -1,5 +1,5 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 const ReactQueryDevtools = lazy(() =>
   import('@tanstack/react-query-devtools').then((mod) => ({
@@ -106,6 +106,41 @@ function AuthIntegration({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Manages focus on SPA route changes for screen reader accessibility (WCAG 2.4.3).
+ * On pathname change, moves focus to <main> so screen readers announce the new content.
+ * Skips the initial mount and avoids stealing focus from interactive elements.
+ */
+function RouteChangeAnnouncer() {
+  const location = useLocation();
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Don't steal focus if user is actively interacting with a form element
+    const activeEl = document.activeElement;
+    const isInteracting =
+      activeEl instanceof HTMLInputElement ||
+      activeEl instanceof HTMLTextAreaElement ||
+      activeEl instanceof HTMLSelectElement ||
+      (activeEl instanceof HTMLElement && activeEl.isContentEditable);
+
+    if (isInteracting) return;
+
+    // Focus the main content area so screen readers announce the route change
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.focus({ preventScroll: true });
+    }
+  }, [location.pathname]);
+
+  return null;
+}
+
 function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   useCommandPaletteKeyboard();
   const isOpen = useCommandPaletteStore((state) => state.isOpen);
@@ -140,6 +175,7 @@ function App() {
                 {/* Analytics wiring */}
                 <AnalyticsRouterListener />
                 <PostHogClerkBridge />
+                <RouteChangeAnnouncer />
                 <AppLayout>
                   <ProtectedRoute>
                     <Suspense fallback={<PageSkeleton />}>

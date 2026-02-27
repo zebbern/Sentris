@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RefreshCw, Plus, Trash2, ExternalLink, Link2, Copy, RotateCw } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -34,6 +35,7 @@ import {
 } from '@/hooks/queries/useWebhookQueries';
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { env } from '@/config/env';
 import type { WebhookConfiguration } from '@shipsec/shared';
 
@@ -155,7 +157,7 @@ export function WebhooksPage() {
 
   const handleRefresh = async () => {
     try {
-      await queryClient.invalidateQueries({ queryKey: ['webhooks'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
       toast({
         title: 'Webhooks refreshed',
         description: 'Latest webhook configurations have been loaded.',
@@ -239,7 +241,7 @@ export function WebhooksPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex-1 bg-background">
+      <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           {/* Filters Row */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
@@ -247,6 +249,7 @@ export function WebhooksPage() {
               <div className="space-y-2">
                 <label className="text-xs uppercase text-muted-foreground">Search</label>
                 <Input
+                  type="search"
                   placeholder="Filter by name, workflow, or URL"
                   value={filters.search}
                   onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
@@ -481,14 +484,12 @@ export function WebhooksPage() {
                   {!isLoading && !hasData && (
                     <TableRow>
                       <TableCell colSpan={6}>
-                        <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
-                          <Link2 className="h-10 w-10 text-muted-foreground" />
-                          <p className="font-medium">No webhooks found</p>
-                          <p className="text-sm text-muted-foreground max-w-lg">
-                            Create your first webhook with the &quot;New webhook&quot; button or
-                            tweak the filters above.&nbsp;
-                          </p>
-                        </div>
+                        <EmptyState
+                          icon={Link2}
+                          title="No webhooks found"
+                          description='Create your first webhook with the "New webhook" button or tweak the filters above.'
+                          className="py-10"
+                        />
                       </TableCell>
                     </TableRow>
                   )}

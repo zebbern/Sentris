@@ -25,6 +25,7 @@ import {
   useDisconnectIntegration,
 } from '@/hooks/queries/useIntegrationQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { api } from '@/services/api';
 import { env } from '@/config/env';
@@ -207,7 +208,7 @@ export function IntegrationsManager() {
   ) => {
     setConfigProvider(null);
 
-    queryClient.invalidateQueries({ queryKey: ['integrationProviders'] }).catch((err) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.integrations.providers() }).catch((err) => {
       console.error('Failed to refresh providers', err);
     });
 
@@ -227,7 +228,7 @@ export function IntegrationsManager() {
   };
 
   const handleConnectionComplete = (connection: IntegrationConnection) => {
-    queryClient.invalidateQueries({ queryKey: ['integrationConnections'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.integrations.connections() });
     toast({
       title: `${connection.providerName} connected`,
       description: 'Credentials stored successfully.',

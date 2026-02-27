@@ -172,7 +172,7 @@ export function ApiKeysManager() {
   };
 
   return (
-    <div className="flex-1 bg-background">
+    <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8">
           <Button
@@ -403,6 +403,8 @@ export function ApiKeysManager() {
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   maxLength={100}
                   required
+                  aria-required="true"
+                  aria-describedby={createError ? 'create-api-key-error' : undefined}
                 />
               </div>
 
@@ -512,7 +514,11 @@ export function ApiKeysManager() {
                 </div>
               </div>
 
-              {createError && <p className="text-sm text-destructive">{createError}</p>}
+              {createError && (
+                <p id="create-api-key-error" className="text-sm text-destructive" role="alert">
+                  {createError}
+                </p>
+              )}
 
               <DialogFooter>
                 <Button

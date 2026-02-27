@@ -33,6 +33,7 @@ import {
   useDeleteSecret,
 } from '@/hooks/queries/useSecretQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
@@ -351,7 +352,7 @@ export function SecretsManager() {
   };
 
   return (
-    <div className="flex-1 bg-background">
+    <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         {isReadOnly && (
           <div className="mb-4 md:mb-6 rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
@@ -383,6 +384,8 @@ export function SecretsManager() {
                   disabled={disableCreate}
                   maxLength={100}
                   required
+                  aria-required="true"
+                  aria-describedby={formError ? 'create-secret-error' : undefined}
                 />
               </div>
 
@@ -427,13 +430,19 @@ export function SecretsManager() {
                   disabled={disableCreate}
                   rows={4}
                   required
+                  aria-required="true"
+                  aria-describedby={formError ? 'create-secret-error' : undefined}
                 />
                 <p className="text-xs text-muted-foreground">
                   The plaintext is never shown again after creation.
                 </p>
               </div>
 
-              {formError && <p className="text-sm text-destructive">{formError}</p>}
+              {formError && (
+                <p id="create-secret-error" className="text-sm text-destructive" role="alert">
+                  {formError}
+                </p>
+              )}
 
               {formSuccess && (
                 <p className="text-sm text-green-600 dark:text-green-400">{formSuccess}</p>
@@ -460,7 +469,7 @@ export function SecretsManager() {
                 onClick={() => {
                   setListSuccess(null);
                   queryClient
-                    .invalidateQueries({ queryKey: ['secrets'] })
+                    .invalidateQueries({ queryKey: queryKeys.secrets.all() })
                     .catch((err) => console.error('Failed to refresh secrets', err));
                 }}
                 disabled={loading}
@@ -644,6 +653,8 @@ export function SecretsManager() {
                 disabled={disableEditing}
                 maxLength={100}
                 required
+                aria-required="true"
+                aria-describedby={editError ? 'edit-secret-error' : undefined}
               />
             </div>
 
@@ -691,7 +702,11 @@ export function SecretsManager() {
               </p>
             </div>
 
-            {editError && <p className="text-sm text-destructive">{editError}</p>}
+            {editError && (
+              <p id="edit-secret-error" className="text-sm text-destructive" role="alert">
+                {editError}
+              </p>
+            )}
 
             <DialogFooter>
               <Button

@@ -163,6 +163,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                         type="button"
                         onClick={() => removeToast(id)}
                         className="pointer-events-auto flex-shrink-0 p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
+                        aria-label="Dismiss notification"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -281,6 +282,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                       type="button"
                       onClick={() => removeToast(frontToast.id)}
                       className="flex-shrink-0 p-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-muted transition-colors"
+                      aria-label="Dismiss notification"
                     >
                       <X className="h-4 w-4" />
                     </button>

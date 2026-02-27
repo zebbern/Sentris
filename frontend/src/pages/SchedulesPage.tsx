@@ -45,6 +45,7 @@ import {
 } from '@/hooks/queries/useScheduleQueries';
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   ScheduleEditorDrawer,
   type WorkflowOption,
@@ -175,7 +176,7 @@ export function SchedulesPage() {
   };
 
   const handleScheduleSaved = (savedSchedule: WorkflowSchedule, mode: 'create' | 'edit') => {
-    queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     toast({
       title: mode === 'create' ? 'Schedule created' : 'Schedule updated',
       description:
@@ -233,7 +234,7 @@ export function SchedulesPage() {
 
   const handleRefresh = async () => {
     try {
-      await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
       toast({
         title: 'Schedules refreshed',
         description: 'Latest schedule statuses have been loaded.',
@@ -288,7 +289,7 @@ export function SchedulesPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex-1 bg-background">
+      <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div className="flex-1 space-y-2">
@@ -297,6 +298,7 @@ export function SchedulesPage() {
                 Search schedules or workflows
               </label>
               <Input
+                type="search"
                 placeholder="Filter by schedule or workflow"
                 value={filters.search}
                 onChange={(event) =>

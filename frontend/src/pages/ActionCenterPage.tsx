@@ -162,11 +162,12 @@ export function ActionCenterPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex-1 bg-background">
+      <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           {/* Header */}
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl md:text-2xl font-semibold">Action Center</h1>
               {pendingCount > 0 && (
                 <Badge variant="default" className="text-base px-3 py-1">
                   {pendingCount} pending
@@ -183,6 +184,7 @@ export function ActionCenterPage() {
                 Search requests
               </label>
               <Input
+                type="search"
                 placeholder="Filter by title, node, or run ID"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
