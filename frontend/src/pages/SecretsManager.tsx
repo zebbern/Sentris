@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -208,7 +209,7 @@ export function SecretsManager() {
       setFormSuccess('Secret created successfully. You can now reference it from workflows.');
       setFormState(INITIAL_FORM);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create secret';
+      const message = humanizeApiError(err);
       setFormError(message);
     } finally {
       setIsSubmitting(false);
@@ -295,7 +296,7 @@ export function SecretsManager() {
       setListSuccess(`Secret "${latest.name}" ${actionSummary}.`);
       handleEditDialogChange(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update secret';
+      const message = humanizeApiError(err);
       setEditError(message);
     } finally {
       setIsEditing(false);
@@ -342,7 +343,7 @@ export function SecretsManager() {
       setListSuccess(`Secret "${secretName}" deleted.`);
       handleDeleteDialogChange(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete secret';
+      const message = humanizeApiError(err);
       setDeleteError(message);
     } finally {
       setIsDeleting(false);

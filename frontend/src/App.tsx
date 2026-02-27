@@ -199,7 +199,7 @@ function App() {
               </CommandPaletteProvider>
             </BrowserRouter>
           </ToastProvider>
-          {import.meta.env.DEV && import.meta.env.VITE_DISABLE_DEVTOOLS !== 'true' && (
+          {import.meta.env.DEV && import.meta.env.VITE_DEVTOOLS === 'true' && (
             <Suspense fallback={null}>
               <ReactQueryDevtools />
             </Suspense>

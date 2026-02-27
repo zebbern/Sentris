@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,7 +143,7 @@ export function ApiKeysManager() {
       setSuccessMessage('API Key created successfully.');
       // Don't close dialog yet because we need to show the key
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create API key';
+      const message = humanizeApiError(err);
       setCreateError(message);
     } finally {
       setIsSubmitting(false);
@@ -161,7 +162,7 @@ export function ApiKeysManager() {
       }
       setConfirmAction(null);
     } catch (err) {
-      console.error(err);
+      console.error(humanizeApiError(err));
     }
   };
 

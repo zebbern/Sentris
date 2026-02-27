@@ -328,12 +328,14 @@ export function WebhooksPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[140px]">Name</TableHead>
-                    <TableHead className="min-w-[120px] hidden md:table-cell">Workflow</TableHead>
-                    <TableHead className="min-w-[200px]">Webhook URL</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Created</TableHead>
-                    <TableHead className="min-w-[80px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[200px]">Actions</TableHead>
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="min-w-[100px] hidden md:table-cell">Workflow</TableHead>
+                    <TableHead className="min-w-[180px]">Webhook URL</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell whitespace-nowrap">
+                      Created
+                    </TableHead>
+                    <TableHead className="min-w-[80px] whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -402,10 +404,12 @@ export function WebhooksPage() {
                                 </Tooltip>
                               </div>
                             </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell">
+                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
                               {formatDateTime(webhook.createdAt)}
                             </TableCell>
-                            <TableCell>{renderStatusBadge(webhook.status)}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {renderStatusBadge(webhook.status)}
+                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1 md:gap-2">
                                 <Tooltip>

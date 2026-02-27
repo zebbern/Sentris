@@ -147,7 +147,15 @@ export function AppTopBar({
           variant="ghost"
           size="icon"
           onClick={onSidebarToggle}
-          aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+          aria-label={
+            isMobile
+              ? sidebarOpen
+                ? 'Close menu'
+                : 'Open menu'
+              : sidebarOpen
+                ? 'Collapse sidebar'
+                : 'Expand sidebar'
+          }
           className="h-9 w-9 flex-shrink-0"
         >
           {sidebarOpen ? (

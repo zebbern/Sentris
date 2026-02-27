@@ -231,13 +231,17 @@ export function ActionCenterPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[200px]">Title</TableHead>
-                    <TableHead className="min-w-[120px] hidden md:table-cell">Node</TableHead>
-                    <TableHead className="min-w-[150px] hidden lg:table-cell">Run ID</TableHead>
-                    <TableHead className="min-w-[130px] hidden sm:table-cell">Created</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Timeout</TableHead>
-                    <TableHead className="min-w-[100px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[180px]">Actions</TableHead>
+                    <TableHead className="min-w-[160px]">Title</TableHead>
+                    <TableHead className="min-w-[100px] hidden md:table-cell">Node</TableHead>
+                    <TableHead className="min-w-[110px] hidden lg:table-cell">Run ID</TableHead>
+                    <TableHead className="min-w-[110px] hidden sm:table-cell whitespace-nowrap">
+                      Created
+                    </TableHead>
+                    <TableHead className="min-w-[90px] hidden lg:table-cell whitespace-nowrap">
+                      Timeout
+                    </TableHead>
+                    <TableHead className="min-w-[80px] whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right min-w-[140px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -259,10 +263,10 @@ export function ActionCenterPage() {
                         return (
                           <TableRow key={approval.id}>
                             <TableCell className="font-medium">
-                              <div className="flex flex-col">
-                                <span className="truncate max-w-[200px]">{approval.title}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="truncate">{approval.title}</span>
                                 {approval.description && (
-                                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                  <span className="text-xs text-muted-foreground truncate">
                                     {approval.description}
                                   </span>
                                 )}
@@ -287,10 +291,10 @@ export function ActionCenterPage() {
                                 <TooltipContent>View run details</TooltipContent>
                               </Tooltip>
                             </TableCell>
-                            <TableCell className="text-sm hidden sm:table-cell">
+                            <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
                               {formatDateTime(approval.createdAt)}
                             </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell">
+                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
                               {approval.timeoutAt ? (
                                 <span
                                   className={approval.status === 'pending' ? 'text-warning' : ''}

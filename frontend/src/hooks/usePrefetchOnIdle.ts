@@ -16,6 +16,9 @@ export function usePrefetchOnIdle() {
     if (!isAuthenticated) return;
 
     const prefetch = () => {
+      // Skip prefetching when the browser is offline
+      if (!navigator.onLine) return;
+
       // Components – used on almost every workflow page
       queryClient.prefetchQuery({
         queryKey: queryKeys.components.all(),
@@ -25,10 +28,12 @@ export function usePrefetchOnIdle() {
       });
 
       // Workflows summary – used by schedules, webhooks, artifacts pages
+      // Aligned to Infinity to match components/templates (static-ish reference data)
       queryClient.prefetchQuery({
         queryKey: queryKeys.workflows.summary(),
         queryFn: () => api.workflows.listSummary(),
-        staleTime: 60_000,
+        staleTime: Infinity,
+        gcTime: Infinity,
       });
 
       // Templates – static reference data for template library
@@ -40,13 +45,22 @@ export function usePrefetchOnIdle() {
       });
     };
 
+    // Re-prefetch when connectivity returns
+    window.addEventListener('online', prefetch);
+
     if (typeof window.requestIdleCallback === 'function') {
       const id = window.requestIdleCallback(prefetch, { timeout: 5_000 });
-      return () => window.cancelIdleCallback(id);
+      return () => {
+        window.cancelIdleCallback(id);
+        window.removeEventListener('online', prefetch);
+      };
     }
 
     // Fallback for browsers without requestIdleCallback
     const timer = setTimeout(prefetch, 2_000);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('online', prefetch);
+    };
   }, [isAuthenticated]);
 }

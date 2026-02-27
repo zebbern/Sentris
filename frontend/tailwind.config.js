@@ -30,8 +30,12 @@ export default {
   		}
   	},
   	colors: (() => {
-		// Exclude deprecated color names to silence Tailwind v3 warnings
-		const { lightBlue, warmGray, trueGray, coolGray, blueGray, ...colors } = tailwindColors
+		// Filter deprecated color names without property access to avoid Tailwind v3 warnings.
+		// Destructuring triggers the deprecation getter; Object.entries does not.
+		const DEPRECATED = new Set(['lightBlue', 'warmGray', 'trueGray', 'coolGray', 'blueGray'])
+		const colors = Object.fromEntries(
+			Object.entries(tailwindColors).filter(([key]) => !DEPRECATED.has(key)),
+		)
 		return {
 			...colors,
 			// Custom semantic colors (override defaults)

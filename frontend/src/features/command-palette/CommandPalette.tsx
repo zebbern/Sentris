@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import * as LucideIcons from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
@@ -474,6 +474,10 @@ export function CommandPalette() {
           close();
         }}
       >
+        <DialogTitle className="sr-only">Command Palette</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search commands, workflows, and navigation
+        </DialogDescription>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
           <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />

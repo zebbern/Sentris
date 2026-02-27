@@ -1085,8 +1085,9 @@ function WorkflowBuilderContent() {
 }
 
 export function WorkflowBuilder() {
+  const { id } = useParams<{ id: string }>();
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={id ?? 'new'}>
       <WorkflowBuilderContent />
     </ReactFlowProvider>
   );

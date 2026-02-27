@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes, Navigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import { Shield, Settings } from 'lucide-react';
 
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
@@ -19,6 +19,8 @@ export function SettingsPage() {
       adminOnly: true,
     },
   ];
+
+  const visibleTabs = tabs.filter((t) => (t.adminOnly ? isAdmin : true));
 
   return (
     <div className="flex-1 bg-background">
@@ -48,11 +50,10 @@ export function SettingsPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2 border-b">
-            {tabs
-              .filter((t) => (t.adminOnly ? isAdmin : true))
-              .map((tab) => (
+        {visibleTabs.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-2 border-b">
+              {visibleTabs.map((tab) => (
                 <NavLink
                   key={tab.to}
                   to={tab.to}
@@ -68,13 +69,22 @@ export function SettingsPage() {
                   {tab.label}
                 </NavLink>
               ))}
-          </div>
+            </div>
 
-          <Routes>
-            <Route path="/" element={<Navigate to="audit" replace />} />
-            <Route path="audit" element={<AuditLogSettings />} />
-          </Routes>
-        </div>
+            <Routes>
+              <Route path="/" element={<Navigate to="audit" replace />} />
+              <Route path="audit" element={<AuditLogSettings />} />
+            </Routes>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Settings className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h2 className="text-lg font-medium text-foreground mb-2">Coming Soon</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Additional settings will appear here as features are enabled.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

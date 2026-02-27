@@ -435,13 +435,15 @@ export function SchedulesPage() {
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-sm hidden sm:table-cell">
+                            <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
                               {formatDateTime(schedule.nextRunAt)}
                             </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell">
+                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
                               {formatDateTime(schedule.lastRunAt)}
                             </TableCell>
-                            <TableCell>{renderStatusBadge(schedule.status)}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {renderStatusBadge(schedule.status)}
+                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1 md:gap-2">
                                 <Button

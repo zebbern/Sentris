@@ -51,6 +51,8 @@ import {
 } from '@/utils/portUtils';
 import { API_V1_URL, api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useApiKeys, useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { WorkflowSchedule } from '@shipsec/shared';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
@@ -64,6 +66,21 @@ interface CollapsibleSectionProps {
   count?: number;
   defaultOpen?: boolean;
   children: React.ReactNode;
+}
+
+/** Retry button used inside the ConfigPanel "component not found" card. */
+function ConfigPanelRetryButton() {
+  const queryClient = useQueryClient();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="w-fit h-6 text-xs border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/60"
+      onClick={() => void queryClient.invalidateQueries({ queryKey: queryKeys.components.all() })}
+    >
+      Retry
+    </Button>
+  );
 }
 
 function CollapsibleSection({
@@ -401,8 +418,17 @@ export function ConfigPanel({
           </Button>
         </div>
         <div className="flex-1 p-4">
-          <div className="text-sm text-red-700 dark:text-red-300 font-medium bg-red-50 dark:bg-red-900/40 p-3 rounded-lg border border-red-200 dark:border-red-800">
-            Component not found: {componentRef ?? 'unknown'}
+          <div className="flex items-start gap-2 text-sm bg-red-50 dark:bg-red-900/40 p-3 rounded-lg border border-red-200 dark:border-red-800">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+            <div className="flex flex-col gap-1.5">
+              <span className="text-red-700 dark:text-red-300 font-medium">
+                This component&#39;s metadata could not be loaded
+              </span>
+              <span className="text-xs text-red-600/70 dark:text-red-400/70">
+                {componentRef ?? 'unknown'}
+              </span>
+              <ConfigPanelRetryButton />
+            </div>
           </div>
         </div>
       </div>

@@ -49,6 +49,7 @@ interface AppLayoutProps {
 
 import { SidebarContext, type SidebarContextValue } from './sidebar-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsMac } from '@/hooks/useIsMac';
 
 const settingsItems = [
   {
@@ -85,6 +86,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     prefetchIdleRoutes();
   }, []);
   const isMobile = useIsMobile();
+  const isMac = useIsMac();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [, setIsHovered] = useState(false);
   const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(!isMobile);
@@ -333,8 +335,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         ]
       : []),
   ];
-
-
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -663,7 +663,13 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
                 {sidebarOpen && (
                   <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                    <Command className="h-2.5 w-2.5" />K
+                    {isMac ? (
+                      <>
+                        <Command className="h-2.5 w-2.5" />K
+                      </>
+                    ) : (
+                      'Ctrl+K'
+                    )}
                   </kbd>
                 )}
               </button>
