@@ -156,6 +156,15 @@ export function AgentTracePanel({ runId }: AgentTracePanelProps) {
 
   const hasEntries = agentEntries.length > 0;
 
+  const TERMINAL_STATUSES = new Set([
+    'COMPLETED',
+    'FAILED',
+    'CANCELLED',
+    'TERMINATED',
+    'TIMED_OUT',
+  ]);
+  const isTerminalRun = Boolean(effectiveRunStatus && TERMINAL_STATUSES.has(effectiveRunStatus));
+
   if (!runId) {
     return (
       <div className="h-full flex items-center justify-center text-sm text-muted-foreground px-6 text-center">
@@ -165,6 +174,17 @@ export function AgentTracePanel({ runId }: AgentTracePanelProps) {
   }
 
   if (loading && !hasEntries) {
+    // For active runs, show a contextual message instead of a bare loading indicator
+    if (isActiveRun) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+          <p>Waiting for agent outputs…</p>
+          <p className="text-xs">
+            Agent reasoning will appear here once an AI agent node begins execution.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="h-full flex items-center justify-center text-sm text-muted-foreground px-6 text-center">
         Loading agent outputs…
@@ -173,6 +193,19 @@ export function AgentTracePanel({ runId }: AgentTracePanelProps) {
   }
 
   if (error && !hasEntries) {
+    // For terminated/cancelled runs, show a friendly message instead of a hard error
+    if (isTerminalRun) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+          <p>No AI agent outputs available for this run.</p>
+          <p className="text-xs">
+            {effectiveRunStatus === 'COMPLETED'
+              ? 'This workflow completed without producing agent reasoning data.'
+              : `This run was ${effectiveRunStatus?.toLowerCase() ?? 'ended'} before agent outputs were recorded.`}
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="h-full flex flex-col items-center justify-center gap-2 px-6 text-center">
         <p className="text-sm font-medium text-destructive">Failed to load agent trace.</p>

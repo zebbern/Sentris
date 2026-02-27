@@ -133,6 +133,7 @@ export class TemporalService implements OnModuleDestroy {
       memo: options.memo,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK searchAttributes type mismatch
       searchAttributes: options.searchAttributes as any,
+      workflowExecutionTimeout: '2 hours',
     });
 
     this.logger.log(

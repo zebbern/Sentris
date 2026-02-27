@@ -1319,8 +1319,37 @@ export class WorkflowsService {
     this.logger.log(
       `Fetching result for workflow run ${runId} (temporalRunId=${temporalRunId ?? 'latest'})`,
     );
-    await this.requireRunAccess(runId, auth);
-    return this.temporalService.getWorkflowResult({ workflowId: runId, runId: temporalRunId });
+    const { run } = await this.requireRunAccess(runId, auth);
+
+    // Check cached terminal status to avoid calling Temporal for terminated/cancelled runs
+    const cachedStatus = run.status as string | undefined;
+    const nonResultStatuses = new Set(['TERMINATED', 'CANCELLED', 'TIMED_OUT']);
+    if (cachedStatus && nonResultStatuses.has(cachedStatus)) {
+      return { status: cachedStatus, result: null };
+    }
+
+    try {
+      return await this.temporalService.getWorkflowResult({
+        workflowId: runId,
+        runId: temporalRunId,
+      });
+    } catch (error: unknown) {
+      // Temporal throws WorkflowFailedError for terminated/cancelled/failed workflows
+      const errorName = error instanceof Error ? error.constructor.name : '';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (
+        errorName === 'WorkflowFailedError' ||
+        errorMessage.includes('terminated') ||
+        errorMessage.includes('cancelled') ||
+        errorMessage.includes('timed out')
+      ) {
+        this.logger.warn(`Workflow run ${runId} ended without a result: ${errorMessage}`);
+        return { status: 'TERMINATED', result: null };
+      }
+
+      throw error;
+    }
   }
 
   async getRunConfig(runId: string, auth?: AuthContext | null): Promise<WorkflowRunConfigPayload> {

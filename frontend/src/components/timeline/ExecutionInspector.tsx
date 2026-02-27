@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { RunSelector } from '@/components/timeline/RunSelector';
 import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
@@ -116,6 +117,19 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
   const isResizingTimeline = useRef(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const rawLogs = getDisplayLogs();
+  const navigate = useNavigate();
+
+  // Timeout for run loading: if a routeRunId is set but selectedRun never appears,
+  // show an error after 12 seconds instead of spinning indefinitely.
+  const [runLoadTimedOut, setRunLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!routeRunId || selectedRunId) {
+      setRunLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setRunLoadTimedOut(true), 12_000);
+    return () => clearTimeout(timer);
+  }, [routeRunId, selectedRunId]);
 
   // Vertical resize handlers for timeline section
   const handleTimelineResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -311,7 +325,22 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         )}
         {!selectedRun && (
           <div className="px-3 py-4 border-b text-xs text-muted-foreground text-center">
-            {routeRunId ? (
+            {routeRunId && runLoadTimedOut ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <p className="text-sm font-medium text-destructive">Run not found</p>
+                <p className="text-xs text-muted-foreground">
+                  This execution may have been deleted or is no longer available.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-1"
+                  onClick={() => navigate(`/workflows/${workflowId}`, { replace: true })}
+                >
+                  Back to workflow
+                </Button>
+              </div>
+            ) : routeRunId ? (
               <span className="flex items-center justify-center gap-1.5">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Loading run…
@@ -334,7 +363,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-              {routeRunId ? (
+              {routeRunId && !runLoadTimedOut ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 'Select a run to view timeline'

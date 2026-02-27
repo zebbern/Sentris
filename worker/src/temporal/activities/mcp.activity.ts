@@ -1,11 +1,11 @@
 import {
   componentRegistry,
-  ConfigurationError,
   getCredentialInputIds,
   isAgentCallable,
   getToolMetadata,
   ServiceError,
 } from '@shipsec/component-sdk';
+import { ApplicationFailure } from '@temporalio/activity';
 import {
   CleanupRunResourcesActivityInput,
   RegisterComponentToolActivityInput,
@@ -28,11 +28,9 @@ function normalizeBaseUrl(url: string): string {
 async function callInternalApi(path: string, body: any) {
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
   if (!internalToken) {
-    throw new ConfigurationError(
+    throw ApplicationFailure.nonRetryable(
       'INTERNAL_SERVICE_TOKEN env var must be set to call internal MCP registry',
-      {
-        configKey: 'INTERNAL_SERVICE_TOKEN',
-      },
+      'ConfigurationError',
     );
   }
 

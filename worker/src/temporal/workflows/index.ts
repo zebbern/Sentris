@@ -36,11 +36,9 @@ import type {
 const {
   runComponentActivity: _runComponentActivity,
   setRunMetadataActivity,
-  finalizeRunActivity,
   createHumanInputRequestActivity,
   expireHumanInputRequestActivity,
   registerLocalMcpActivity,
-  cleanupRunResourcesActivity,
   prepareAndRegisterToolActivity,
   areAllToolsReadyActivity,
 } = proxyActivities<{
@@ -50,7 +48,6 @@ const {
     workflowId: string;
     organizationId?: string | null;
   }): Promise<void>;
-  finalizeRunActivity(input: { runId: string }): Promise<void>;
   createHumanInputRequestActivity(input: {
     runId: string;
     workflowId: string;
@@ -70,7 +67,6 @@ const {
   expireHumanInputRequestActivity(requestId: string): Promise<void>;
   registerComponentToolActivity(input: RegisterComponentToolActivityInput): Promise<void>;
   registerLocalMcpActivity(input: RegisterLocalMcpActivityInput): Promise<void>;
-  cleanupRunResourcesActivity(input: CleanupRunResourcesActivityInput): Promise<void>;
   prepareAndRegisterToolActivity(input: PrepareAndRegisterToolActivityInput): Promise<void>;
   areAllToolsReadyActivity(input: {
     runId: string;
@@ -78,6 +74,18 @@ const {
   }): Promise<{ ready: boolean }>;
 }>({
   startToCloseTimeout: '10 minutes',
+});
+
+const { cleanupRunResourcesActivity, finalizeRunActivity } = proxyActivities<{
+  cleanupRunResourcesActivity(input: CleanupRunResourcesActivityInput): Promise<void>;
+  finalizeRunActivity(input: { runId: string }): Promise<void>;
+}>({
+  startToCloseTimeout: '2 minutes',
+  retry: {
+    maximumAttempts: 3,
+    initialInterval: '5s',
+    backoffCoefficient: 2,
+  },
 });
 
 const { prepareRunPayloadActivity } = proxyActivities<{
