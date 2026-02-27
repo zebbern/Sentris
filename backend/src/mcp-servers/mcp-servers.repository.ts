@@ -1,4 +1,5 @@
 import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq, sql, type SQL, or, isNull } from 'drizzle-orm';
 
@@ -159,11 +160,7 @@ export class McpServersRepository {
 
       return server;
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505'
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
       }
       throw error;
@@ -201,12 +198,7 @@ export class McpServersRepository {
 
       return updated;
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505' &&
-        data.name
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION && data.name) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
       }
       throw error;

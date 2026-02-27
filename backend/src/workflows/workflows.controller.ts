@@ -522,7 +522,8 @@ export class WorkflowsController {
 
     // Extract runtime inputs from the entry point's config
     const config = entryNode?.data?.config as Record<string, unknown> | undefined;
-    const rawInputs = (config?.runtimeInputs as RuntimeInput[]) || [];
+    const params = config?.params as Record<string, unknown> | undefined;
+    const rawInputs = (params?.runtimeInputs as RuntimeInput[]) || [];
 
     // Normalize and validate the inputs
     const inputs: RuntimeInput[] = rawInputs.map((input) => ({

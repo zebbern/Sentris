@@ -443,7 +443,10 @@ export const api = {
 
     create: async (input: CreateSecretDto): Promise<SecretSummaryResponse> => {
       const response = await apiClient.createSecret(input);
-      if (response.error) throw new Error('Failed to create secret');
+      if (response.error) {
+        const msg = (response as any).error?.message;
+        throw new Error(typeof msg === 'string' ? msg : 'Failed to create secret');
+      }
       if (!response.data) throw new Error('Secret creation failed');
       return response.data;
     },

@@ -5,6 +5,7 @@ import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import { secrets, secretVersions, type NewSecret, type NewSecretVersion } from '../database/schema';
 import { DEFAULT_ORGANIZATION_ID } from '../auth/constants';
+import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 
 export interface SecretSummary {
   id: string;
@@ -246,11 +247,7 @@ export class SecretsRepository {
         });
       });
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505'
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`Secret name '${secretData.name}' already exists`);
       }
       throw error;
@@ -361,12 +358,7 @@ export class SecretsRepository {
         })
         .where(and(...conditions));
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505' &&
-        updates.name
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION && updates.name) {
         throw new ConflictException(`Secret name '${updates.name}' already exists`);
       }
       throw error;

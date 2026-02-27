@@ -1,0 +1,488 @@
+# Development Environment Setup
+
+Step-by-step guide for starting the ShipSec Studio development environment. Written for both human developers and AI agents.
+
+## Prerequisites
+
+| Tool               | Version                  | Required     | Install                                                     |
+| ------------------ | ------------------------ | ------------ | ----------------------------------------------------------- |
+| **Docker Desktop** | Latest (with Compose v2) | Yes          | [docker.com](https://www.docker.com/)                       |
+| **Bun**            | 1.1.20+                  | Yes          | [bun.sh](https://bun.sh/)                                   |
+| **PM2**            | 6.x                      | Yes          | `bun add -g pm2` or use `npx pm2`                           |
+| **just**           | Latest                   | Optional     | [github.com/casey/just](https://github.com/casey/just)      |
+| **Git Bash / WSL** | —                        | Windows only | Required for bash scripts in `just` and `bun run dev:infra` |
+
+> **Windows note:** The `just` command and several `bun` scripts use bash. On Windows, run them inside Git Bash, WSL, or any POSIX-compatible shell. Native PowerShell does not work for these commands.
+
+## Architecture Overview
+
+The development environment has two layers: Docker infrastructure and application processes.
+
+```
+Docker Compose (infrastructure — project name: shipsec)
+├── shipsec-postgres          127.0.0.1:5433 → 5432   Postgres 16 database
+├── shipsec-temporal          127.0.0.1:7233           Temporal workflow engine
+├── shipsec-temporal-ui       127.0.0.1:8081 → 8080   Temporal dashboard
+├── shipsec-minio             127.0.0.1:9000, 9001     MinIO object storage
+├── shipsec-redis             127.0.0.1:6379           Redis cache & rate limiting
+├── shipsec-loki              127.0.0.1:3100           Loki log aggregation
+├── shipsec-redpanda          127.0.0.1:9092, 9644     Redpanda (Kafka) event streaming
+├── shipsec-redpanda-console  127.0.0.1:8082 → 8080   Redpanda Console UI
+├── shipsec-opensearch        127.0.0.1:9200, 9600     OpenSearch analytics
+├── shipsec-opensearch-dashboards  127.0.0.1:5601      OpenSearch Dashboards
+├── shipsec-opensearch-init   (one-shot)               Index pattern setup
+└── shipsec-nginx             0.0.0.0:80               Reverse proxy (auth gate)
+
+Application (PM2-managed processes on the host)
+├── shipsec-frontend-0        localhost:5173            React + Vite dev server
+├── shipsec-backend-0         localhost:3211            NestJS API
+└── shipsec-worker-0          (no HTTP port)            Temporal worker
+```
+
+> All Docker ports except nginx (port 80) bind to `127.0.0.1` only — they are not accessible from external networks.
+
+## Quick Start
+
+### Method 1: Using `just` (recommended — Linux / macOS / WSL)
+
+```bash
+cd workproject
+just init     # Install deps, create .env files from examples
+just dev      # Start Docker infra + PM2 app processes
+```
+
+Verify:
+
+```bash
+just dev status   # PM2 + Docker status
+just dev logs     # Tail application logs
+```
+
+Stop:
+
+```bash
+just dev stop     # Stop PM2 apps + Docker infra
+```
+
+### Method 2: Using bun scripts (cross-platform, requires bash)
+
+```bash
+cd workproject
+bun install
+
+# Copy env files manually (if not already done)
+cp backend/.env.example backend/.env
+cp worker/.env.example worker/.env
+cp frontend/.env.example frontend/.env
+
+# Start everything (Docker + PM2), then tail frontend logs
+bun run dev:stack
+```
+
+Stop:
+
+```bash
+bun run dev:stack:stop
+```
+
+### Method 3: Manual steps (most control — best for AI agents on Windows)
+
+Run each step in sequence. This approach avoids bash dependencies by running commands directly.
+
+```bash
+cd workproject
+
+# 1. Install dependencies
+bun install
+
+# 2. Create env files (skip if they already exist)
+cp backend/.env.example backend/.env
+cp worker/.env.example worker/.env
+cp frontend/.env.example frontend/.env
+
+# 3. Start Docker infrastructure
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+
+# 4. Wait for Postgres to be healthy (required before starting backend)
+docker exec shipsec-postgres pg_isready -U shipsec
+# Retry every 2 seconds until it returns "accepting connections"
+
+# 5. Start application via PM2
+pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+
+# 6. Check PM2 status
+pm2 status
+
+# 7. Verify health (see Health Checks section below)
+```
+
+**Stopping manually:**
+
+```bash
+pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+```
+
+## Port Reference
+
+| Service                   | Host Port | Protocol | Notes                                |
+| ------------------------- | --------- | -------- | ------------------------------------ |
+| **Frontend**              | 5173      | HTTP     | Vite dev server (hot reload)         |
+| **Backend API**           | 3211      | HTTP     | NestJS `/api` endpoints              |
+| **Nginx**                 | 80        | HTTP     | Reverse proxy, auth gate, serves app |
+| **Postgres**              | 5433      | TCP      | Maps to container port 5432          |
+| **Temporal**              | 7233      | gRPC     | Workflow engine                      |
+| **Temporal UI**           | 8081      | HTTP     | Maps to container port 8080          |
+| **MinIO API**             | 9000      | HTTP     | S3-compatible object storage         |
+| **MinIO Console**         | 9001      | HTTP     | MinIO admin UI                       |
+| **Redis**                 | 6379      | TCP      | Cache and rate limiting              |
+| **Loki**                  | 3100      | HTTP     | Log aggregation API                  |
+| **Redpanda (Kafka)**      | 9092      | TCP      | Event streaming broker               |
+| **Redpanda Admin**        | 9644      | HTTP     | Redpanda admin API                   |
+| **Redpanda Console**      | 8082      | HTTP     | Kafka topic browser UI               |
+| **OpenSearch**            | 9200      | HTTP     | Search and analytics engine          |
+| **OpenSearch Perf**       | 9600      | HTTP     | Performance analyzer                 |
+| **OpenSearch Dashboards** | 5601      | HTTP     | Analytics visualization UI           |
+
+> **Multi-instance:** When running instance N, frontend port = `5173 + N*100`, backend port = `3211 + N*100`. Docker infra ports remain fixed.
+
+## Health Checks
+
+### Docker Containers
+
+```bash
+# List all ShipSec containers with status
+docker ps -a --filter name=shipsec --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+**Expected:** All containers show `Up` and `(healthy)` status, except `shipsec-opensearch-init` which exits after completion.
+
+### Individual Service Checks
+
+```bash
+# Postgres
+docker exec shipsec-postgres pg_isready -U shipsec
+
+# Redis
+docker exec shipsec-redis redis-cli ping
+# Expected: PONG
+
+# OpenSearch
+curl -sf http://localhost:9200/_cluster/health
+# Expected: JSON with "status":"green" or "status":"yellow"
+
+# Loki
+curl -sf http://localhost:3100/ready
+# Expected: "ready"
+
+# Redpanda
+curl -sf http://localhost:9644/v1/status/ready
+
+# MinIO
+curl -sf http://localhost:9000/minio/health/live
+```
+
+### Application Processes
+
+```bash
+# PM2 process status
+pm2 status
+# Expected: shipsec-frontend-0, shipsec-backend-0, shipsec-worker-0 all "online"
+
+# Frontend responds
+curl -sf http://localhost:5173 > /dev/null && echo "Frontend OK" || echo "Frontend DOWN"
+
+# Backend API responds
+curl -sf http://localhost:3211/api > /dev/null && echo "Backend OK" || echo "Backend DOWN"
+
+# Nginx (serves app with auth)
+curl -sf http://localhost > /dev/null && echo "Nginx OK" || echo "Nginx DOWN"
+```
+
+**Windows PowerShell equivalents:**
+
+```powershell
+# Frontend
+Invoke-WebRequest -Uri http://localhost:5173 -UseBasicParsing -ErrorAction SilentlyContinue | Select-Object StatusCode
+
+# Backend
+Invoke-WebRequest -Uri http://localhost:3211/api -UseBasicParsing -ErrorAction SilentlyContinue | Select-Object StatusCode
+
+# Nginx
+Invoke-WebRequest -Uri http://localhost -UseBasicParsing -MaximumRedirection 0 -ErrorAction SilentlyContinue | Select-Object StatusCode
+```
+
+## Auth Modes
+
+| Mode                     | When Active                                              | Access                                                                                       |
+| ------------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Local auth (default)** | `CLERK_SECRET_KEY` is empty or not set in `backend/.env` | `http://localhost:5173` — no auth gate. `http://localhost` (nginx) — shows admin login form. |
+| **Clerk auth (secure)**  | `CLERK_SECRET_KEY` is set in `backend/.env`              | Requires a Clerk account. Enables multi-tenant isolation + OpenSearch Security.              |
+
+For local development, the default local auth mode is sufficient. No Clerk configuration is needed.
+
+## Environment Variables
+
+Three `.env` files control the application. Each has a `.env.example` template.
+
+### `backend/.env`
+
+Key variables:
+
+| Variable                  | Default                                               | Purpose                            |
+| ------------------------- | ----------------------------------------------------- | ---------------------------------- |
+| `DATABASE_URL`            | `postgresql://shipsec:shipsec@localhost:5433/shipsec` | Postgres connection                |
+| `PORT`                    | `3211`                                                | Backend HTTP port                  |
+| `TEMPORAL_ADDRESS`        | `localhost:7233`                                      | Temporal gRPC endpoint             |
+| `AUTH_PROVIDER`           | `local`                                               | Auth mode (`local` or `clerk`)     |
+| `SECRET_STORE_MASTER_KEY` | `CHANGE_ME_32_CHAR_SECRET_KEY!!!!`                    | 32-char encryption key             |
+| `OPENSEARCH_URL`          | (empty)                                               | OpenSearch endpoint (optional)     |
+| `REDIS_URL`               | (empty)                                               | Redis for rate limiting (optional) |
+
+### `worker/.env`
+
+Key variables:
+
+| Variable                  | Default                                               | Purpose                       |
+| ------------------------- | ----------------------------------------------------- | ----------------------------- |
+| `DATABASE_URL`            | `postgresql://shipsec:shipsec@localhost:5433/shipsec` | Postgres connection           |
+| `TEMPORAL_ADDRESS`        | `localhost:7233`                                      | Temporal gRPC endpoint        |
+| `MINIO_ENDPOINT`          | `localhost`                                           | MinIO host                    |
+| `SECRET_STORE_MASTER_KEY` | `CHANGE_ME_32_CHAR_SECRET_KEY!!!!`                    | Must match backend            |
+| `OPENSEARCH_URL`          | `http://localhost:9200`                               | OpenSearch for analytics sink |
+
+### `frontend/.env`
+
+Key variables:
+
+| Variable                         | Default                      | Purpose                 |
+| -------------------------------- | ---------------------------- | ----------------------- |
+| `VITE_API_URL`                   | `http://localhost`           | Backend URL (via nginx) |
+| `VITE_APP_NAME`                  | `Security Workflow Builder`  | App display name        |
+| `VITE_OPENSEARCH_DASHBOARDS_URL` | `http://localhost/analytics` | Dashboards link         |
+
+## Common Issues
+
+### Nginx shows unhealthy
+
+**Cause:** Nginx health check depends on the backend API (`/health` endpoint). If the backend is not running yet, nginx reports unhealthy.
+
+**Fix:** Start the backend process. Nginx will recover automatically on the next health check cycle (30s).
+
+### Postgres init script fails (CRLF on Windows)
+
+**Cause:** `docker/init-db/01-create-instance-databases.sh` has Windows line endings (CRLF) which bash inside the container cannot execute.
+
+**Fix:**
+
+```bash
+# Option A: Configure git to not convert line endings
+git config core.autocrlf false
+git checkout -- docker/init-db/
+
+# Option B: Convert the file manually
+sed -i 's/\r$//' docker/init-db/01-create-instance-databases.sh
+```
+
+### PM2 not found
+
+**Fix:** Install globally or use npx:
+
+```bash
+# Global install
+bun add -g pm2
+# Or use npx
+npx pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+```
+
+### Port conflicts
+
+Check which process is using a port:
+
+```bash
+# Linux / macOS
+lsof -i :PORT
+
+# Windows PowerShell
+Get-NetTCPConnection -LocalPort PORT -ErrorAction SilentlyContinue
+```
+
+Common conflicts: `5173` (Vite), `3211` (NestJS), `80` (nginx/IIS/Apache), `5432`/`5433` (Postgres), `9200` (Elasticsearch/OpenSearch).
+
+### Docker containers won't start
+
+```bash
+# Check Docker is running
+docker info
+
+# Check for leftover containers from a previous session
+docker ps -a --filter name=shipsec
+
+# Force remove and restart
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down -v
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+```
+
+### Worker fails with SWC binding error
+
+**Cause:** The Temporal worker uses Node + tsx (not Bun) and requires platform-specific SWC binaries.
+
+**Fix:** Re-run `bun install` to ensure native binaries are installed. The `pm2.config.cjs` automatically resolves the SWC binary path.
+
+## For AI Agents
+
+This section provides exact commands for AI agents to start, verify, and manage the development environment.
+
+### Terminal Naming Conventions
+
+| Terminal     | Purpose                                        |
+| ------------ | ---------------------------------------------- |
+| `install`    | Dependency installation (`bun install`)        |
+| `dev-server` | Long-running Docker and PM2 processes          |
+| `general`    | Health checks, status queries, ad-hoc commands |
+
+### Check if Environment is Already Running
+
+Run these checks **before** attempting to start anything:
+
+```bash
+# Check Docker containers
+docker ps --filter name=shipsec --format "{{.Names}}: {{.Status}}" 2>/dev/null
+
+# Check PM2 processes
+pm2 jlist 2>/dev/null | grep -o '"name":"shipsec-[^"]*","status":"[^"]*"' || echo "PM2 not running"
+```
+
+If containers are up and PM2 shows `online`, the environment is already running. Skip to health checks.
+
+### Start Sequence (Step-by-Step)
+
+Execute these in order. Verify each step before proceeding.
+
+**Step 1: Install dependencies**
+
+```bash
+cd workproject
+bun install
+```
+
+Verify: Command exits with code 0.
+
+**Step 2: Ensure `.env` files exist**
+
+```bash
+# Check existence, create from examples if missing
+test -f backend/.env || cp backend/.env.example backend/.env
+test -f worker/.env || cp worker/.env.example worker/.env
+test -f frontend/.env || cp frontend/.env.example frontend/.env
+```
+
+Verify: All three files exist.
+
+**Step 3: Start Docker infrastructure**
+
+```bash
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+```
+
+Verify: Wait for Postgres to accept connections:
+
+```bash
+# Retry loop (max 30 attempts, 2-second intervals)
+docker exec shipsec-postgres pg_isready -U shipsec
+```
+
+Expected output: `localhost:5432 - accepting connections`
+
+**Step 4: Start application processes**
+
+```bash
+pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+```
+
+Verify:
+
+```bash
+pm2 status
+```
+
+Expected: All three processes show `online`.
+
+**Step 5: Verify health**
+
+```bash
+# Wait up to 30 seconds for backend to respond
+curl -sf http://localhost:3211/api
+
+# Wait up to 30 seconds for frontend to respond
+curl -sf http://localhost:5173
+```
+
+On Windows PowerShell (if not using bash):
+
+```powershell
+Invoke-WebRequest -Uri http://localhost:3211/api -UseBasicParsing -ErrorAction SilentlyContinue
+Invoke-WebRequest -Uri http://localhost:5173 -UseBasicParsing -ErrorAction SilentlyContinue
+```
+
+### Starting Components Independently
+
+If only one component needs restarting:
+
+```bash
+# Frontend only
+pm2 restart shipsec-frontend-0
+
+# Backend only
+pm2 restart shipsec-backend-0
+
+# Worker only
+pm2 restart shipsec-worker-0
+
+# Docker infra only (if containers are down)
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+```
+
+### Viewing Logs
+
+```bash
+# All PM2 logs
+pm2 logs
+
+# Specific process
+pm2 logs shipsec-backend-0 --lines 50
+
+# Docker container logs
+docker logs shipsec-postgres --tail 50
+docker logs shipsec-nginx --tail 50
+```
+
+### Failure Recovery
+
+| Symptom                             | Action                                                                                                                      |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| PM2 process shows `errored`         | Run `pm2 logs <name> --lines 100` to diagnose, then `pm2 restart <name>`                                                    |
+| Docker container shows `Restarting` | Run `docker logs <container>` to diagnose. May need `docker compose ... down -v` and restart                                |
+| Backend can't connect to Postgres   | Check `docker exec shipsec-postgres pg_isready -U shipsec`. If failing, restart Postgres: `docker restart shipsec-postgres` |
+| Frontend shows blank page           | Check `pm2 logs shipsec-frontend-0`. Common cause: missing `frontend/.env`                                                  |
+| Nginx returns 502                   | Backend is not responding. Check backend health first                                                                       |
+| Port already in use                 | Kill the conflicting process, then restart the PM2 app                                                                      |
+
+### Full Stop Sequence
+
+```bash
+# Stop PM2 apps
+pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0
+
+# Stop Docker containers
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+```
+
+### Full Clean (Reset Everything)
+
+```bash
+pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0 2>/dev/null || true
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down -v
+```
+
+This removes all Docker volumes (database data, MinIO files, OpenSearch indexes).

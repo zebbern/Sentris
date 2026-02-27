@@ -11,13 +11,41 @@ Security workflow orchestration platform. Visual builder + Temporal for reliabil
 
 ## Development
 
+Full setup guide: `docs/development/dev-environment.md`
+
 ```bash
-just init              # First time setup
-just dev               # Start the active instance (default: 0)
-just dev stop          # Stop the active instance (does NOT stop shared infra)
-just dev stop all      # Stop all instances + shared infra
-just dev logs          # View logs for the active instance
-just help              # All commands
+# First time setup
+just init                          # Install deps + create .env files
+# OR (without just):
+bun install && cp backend/.env.example backend/.env && cp worker/.env.example worker/.env && cp frontend/.env.example frontend/.env
+
+# Start dev environment (Docker infra + PM2 apps)
+just dev                           # Recommended (Linux/macOS/WSL)
+# OR:
+bun run dev:stack                  # Cross-platform (requires bash)
+# OR (manual):
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+
+# Status & logs
+just dev status                    # PM2 + Docker status
+just dev logs                      # Tail app logs
+pm2 status                         # PM2 only
+docker ps --filter name=shipsec    # Docker only
+
+# Stop
+just dev stop                      # Stop PM2 + Docker
+# OR:
+bun run dev:stack:stop
+# OR (manual):
+pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+
+# Health checks
+curl -sf http://localhost:3211/api  # Backend API
+curl -sf http://localhost:5173      # Frontend
+curl -sf http://localhost           # Nginx (auth gate)
+
+just help                          # All commands
 ```
 
 **Active instance**:

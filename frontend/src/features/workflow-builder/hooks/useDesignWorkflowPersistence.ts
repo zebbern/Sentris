@@ -230,6 +230,9 @@ export function useDesignWorkflowPersistence({
           setHasMetadataChanges(false);
           markClean();
 
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+
           if (showToast) {
             toast({
               variant: 'success',
@@ -289,6 +292,9 @@ export function useDesignWorkflowPersistence({
 
           navigate(`${workflowRoutePrefix}/${savedWorkflow.id}`, { replace: true });
 
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+
           track(Events.WorkflowCreated, {
             workflow_id: savedWorkflow.id,
             node_count: designNodes.length,
@@ -336,6 +342,9 @@ export function useDesignWorkflowPersistence({
             nodes: cloneNodes(designNodesRef.current),
             edges: cloneEdges(designEdgesRef.current),
           };
+
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.workflows.list() });
 
           track(Events.WorkflowSaved, {
             workflow_id: updatedWorkflow.id,

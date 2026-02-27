@@ -4,7 +4,7 @@ import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
 import { Button } from '@/components/ui/button';
 import { MessageModal } from '@/components/ui/MessageModal';
-import { StopCircle, RefreshCw, Link2, Globe } from 'lucide-react';
+import { StopCircle, RefreshCw, Link2, Globe, Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useExecutionStore } from '@/store/executionStore';
@@ -12,6 +12,7 @@ import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useToast } from '@/components/ui/use-toast';
+import { useParams } from 'react-router-dom';
 import { useWorkflowRuns } from '@/hooks/queries/useRunQueries';
 import { cn } from '@/lib/utils';
 import type { ExecutionLog } from '@/schemas/execution';
@@ -95,6 +96,7 @@ const MAX_TIMELINE_HEIGHT = 320;
 const DEFAULT_TIMELINE_HEIGHT = 320;
 
 export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {}) {
+  const { runId: routeRunId } = useParams<{ runId?: string }>();
   const { selectedRunId, playbackMode, isPlaying } = useExecutionTimelineStore();
   const { id: workflowId, currentVersion: currentWorkflowVersion } = useWorkflowStore(
     (state) => state.metadata,
@@ -309,7 +311,14 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         )}
         {!selectedRun && (
           <div className="px-3 py-4 border-b text-xs text-muted-foreground text-center">
-            Select a run to explore
+            {routeRunId ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading run…
+              </span>
+            ) : (
+              'Select a run to explore'
+            )}
           </div>
         )}
 
@@ -325,7 +334,11 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-              Select a run to view timeline
+              {routeRunId ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Select a run to view timeline'
+              )}
             </div>
           )}
           {/* Vertical Resize Handle - More visible */}

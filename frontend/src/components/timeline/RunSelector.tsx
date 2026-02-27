@@ -345,6 +345,11 @@ export function RunSelector({
                     {formatStartTime(selectedRun.startTime)}
                   </span>
                 </div>
+              ) : routeRunId ? (
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Loading run…
+                </span>
               ) : (
                 <span className="text-muted-foreground">Select a run...</span>
               )}

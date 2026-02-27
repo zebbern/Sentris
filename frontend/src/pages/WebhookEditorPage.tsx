@@ -193,11 +193,9 @@ export function WebhookEditorPage() {
   const workflowRuntimeInputs = useMemo(() => runtimeInputsData?.inputs || [], [runtimeInputsData]);
 
   // Sync runtime inputs → expectedInputs in form
-  const lastSyncedWorkflowId = useRef('');
   useEffect(() => {
-    if (!form.workflowId || form.workflowId === lastSyncedWorkflowId.current) return;
+    if (!form.workflowId) return;
     if (workflowRuntimeInputs.length === 0) return;
-    lastSyncedWorkflowId.current = form.workflowId;
     const mappedInputs: WebhookInputDefinition[] = workflowRuntimeInputs.map((input: any) => ({
       id: input.id,
       label: input.label || input.id,

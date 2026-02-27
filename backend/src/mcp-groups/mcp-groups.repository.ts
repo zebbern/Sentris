@@ -3,6 +3,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
+import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 import {
   mcpGroups,
   mcpGroupServers,
@@ -102,11 +103,7 @@ export class McpGroupsRepository {
 
       return group;
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505'
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP group slug '${data.slug}' already exists`);
       }
       throw error;
@@ -130,11 +127,7 @@ export class McpGroupsRepository {
 
       return updated;
     } catch (error: unknown) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Record<string, unknown>).code === '23505'
-      ) {
+      if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP group with this configuration already exists`);
       }
       throw error;
@@ -260,14 +253,11 @@ export class McpGroupsRepository {
 
       return relation;
     } catch (error: unknown) {
-      const code =
-        error instanceof Error && 'code' in error
-          ? (error as Record<string, unknown>).code
-          : undefined;
-      if (code === '23505') {
+      const code = getPostgresErrorCode(error);
+      if (code === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`Server ${serverId} is already in group ${groupId}`);
       }
-      if (code === '23503') {
+      if (code === PG_ERROR.FOREIGN_KEY_VIOLATION) {
         throw new NotFoundException(`Group ${groupId} or server ${serverId} not found`);
       }
       throw error;

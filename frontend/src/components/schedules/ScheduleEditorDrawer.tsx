@@ -158,7 +158,7 @@ export function ScheduleEditorDrawer({
     const entryNode = workflowDetail.graph.nodes.find(
       (node: any) => node.type === ENTRY_COMPONENT_ID,
     );
-    return normalizeRuntimeInputs((entryNode?.data as any)?.config?.runtimeInputs);
+    return normalizeRuntimeInputs((entryNode?.data as any)?.config?.params?.runtimeInputs);
   }, [workflowDetail]);
 
   const [runtimeValues, setRuntimeValues] = useState<Record<string, unknown>>({});
