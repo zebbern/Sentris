@@ -32,7 +32,7 @@ export function usePauseSchedule() {
   return useMutation({
     mutationFn: (id: string) => api.schedules.pause(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      qc.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     },
   });
 }
@@ -42,7 +42,7 @@ export function useResumeSchedule() {
   return useMutation({
     mutationFn: (id: string) => api.schedules.resume(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      qc.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     },
   });
 }
@@ -58,7 +58,7 @@ export function useDeleteSchedule() {
   return useMutation({
     mutationFn: (id: string) => api.schedules.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      qc.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     },
   });
 }
@@ -69,7 +69,7 @@ export function useCreateSchedule() {
     mutationFn: (payload: Parameters<typeof api.schedules.create>[0]) =>
       api.schedules.create(payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      qc.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     },
   });
 }
@@ -85,7 +85,7 @@ export function useUpdateSchedule() {
       payload: Parameters<typeof api.schedules.update>[1];
     }) => api.schedules.update(id, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      qc.invalidateQueries({ queryKey: queryKeys.schedules.root() });
     },
   });
 }

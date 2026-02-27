@@ -2,7 +2,7 @@ import { TERMINAL_STATUSES } from '@shipsec/shared';
 import type { ExecutionStatus } from '@/schemas/execution';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 
-export const normalizeRunSummary = (run: any): ExecutionRun => {
+export const normalizeRunSummary = (run: Record<string, unknown>): ExecutionRun => {
   const status = (
     typeof run.status === 'string' ? run.status.toUpperCase() : 'FAILED'
   ) as ExecutionStatus;
@@ -26,7 +26,7 @@ export const normalizeRunSummary = (run: any): ExecutionRun => {
     triggerType: (run.triggerType ?? 'manual') as ExecutionRun['triggerType'],
     triggerSource: typeof run.triggerSource === 'string' ? run.triggerSource : null,
     triggerLabel: typeof run.triggerLabel === 'string' ? run.triggerLabel : null,
-    inputPreview: run.inputPreview ?? {
+    inputPreview: (run.inputPreview as ExecutionRun['inputPreview']) ?? {
       runtimeInputs: {},
       nodeOverrides: {},
     },

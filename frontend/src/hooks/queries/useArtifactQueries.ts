@@ -50,7 +50,7 @@ export function useDeleteArtifact() {
   return useMutation({
     mutationFn: (artifactId: string) => api.artifacts.delete(artifactId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['artifactLibrary'] });
+      qc.invalidateQueries({ queryKey: queryKeys.artifacts.root() });
     },
   });
 }

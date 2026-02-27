@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format, subHours, subDays, startOfDay, endOfDay, isAfter } from 'date-fns';
-import { CalendarIcon, RefreshCw, X, ListFilter, Clock } from 'lucide-react';
+import { CalendarIcon, ClipboardList, RefreshCw, X, ListFilter, Clock } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuditLogs } from '@/hooks/queries/useAuditLogQueries';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { hasAdminRole } from '@/utils/auth';
@@ -358,6 +362,7 @@ function DateTimeRangePicker({ from, to, onSelect }: DateTimeRangePickerProps) {
 }
 
 export function AuditLogSettings() {
+  useDocumentTitle('Audit Log');
   const roles = useAuthStore((state) => state.roles);
   const isAdmin = hasAdminRole(roles);
 
@@ -432,16 +437,23 @@ export function AuditLogSettings() {
           <p className="text-sm text-muted-foreground">Review activity across your organization.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => void refetch()}
-            disabled={loading}
-            title="Refresh logs"
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => void refetch()}
+                  disabled={loading}
+                  aria-label="Refresh logs"
+                >
+                  <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh logs</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -497,13 +509,25 @@ export function AuditLogSettings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.length === 0 && !isFetching && (
+              {isLoading && !items.length
+                ? Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`skeleton-${index}`}>
+                      {Array.from({ length: 5 }).map((_, cell) => (
+                        <TableCell key={`cell-${cell}`}>
+                          <Skeleton className="h-5 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                : null}
+              {items.length === 0 && !isFetching && !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
-                    <div className="flex flex-col items-center justify-center gap-1 text-muted-foreground">
-                      <p className="text-base font-medium text-foreground">No events found</p>
-                      <p className="text-sm">Try adjusting your filters to see more results.</p>
-                    </div>
+                  <TableCell colSpan={5} className="hover:bg-transparent">
+                    <EmptyState
+                      icon={ClipboardList}
+                      title="No events found"
+                      description="Try adjusting your filters to see more results."
+                    />
                   </TableCell>
                 </TableRow>
               )}

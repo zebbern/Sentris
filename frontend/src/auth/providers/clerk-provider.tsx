@@ -98,7 +98,6 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
     if (isLoaded && isSignedIn) {
       refreshInterval = setInterval(() => {
         if (!cancelled) {
-          console.log('[Clerk Auth] Refreshing token (proactive refresh)...');
           void syncToken();
         }
       }, 30 * 1000); // 30 seconds - very frequent refresh to prevent expiration issues

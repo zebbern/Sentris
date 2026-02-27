@@ -170,7 +170,7 @@ export function useWorkflowExecutionLifecycle({
         try {
           const runDetails = await api.executions.getRun(routeRunId);
           if (cancelled) return;
-          const normalized = normalizeRunSummary(runDetails);
+          const normalized = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(normalized);
           targetRun = normalized;
         } catch (error) {
@@ -334,7 +334,7 @@ export function useWorkflowExecutionLifecycle({
         try {
           const runDetails = await api.executions.getRun(targetRunId);
           if (latestTargetRunIdRef.current !== targetRunId) return;
-          runToUse = normalizeRunSummary(runDetails);
+          runToUse = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(runToUse);
         } catch (error) {
           if (latestTargetRunIdRef.current !== targetRunId) return;
@@ -359,7 +359,7 @@ export function useWorkflowExecutionLifecycle({
         try {
           const runDetails = await api.executions.getRun(targetRunId);
           if (latestTargetRunIdRef.current !== targetRunId) return;
-          runToUse = normalizeRunSummary(runDetails);
+          runToUse = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(runToUse);
         } catch (error) {
           if (latestTargetRunIdRef.current !== targetRunId) return;

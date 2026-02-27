@@ -17,6 +17,7 @@ export const queryKeys = {
     detail: (runId: string) => ['runs', getOrgScope(), 'detail', runId] as const,
   },
   schedules: {
+    root: () => ['schedules', getOrgScope()] as const,
     all: (filters?: Record<string, unknown>) => ['schedules', getOrgScope(), filters] as const,
   },
   mcpServers: {
@@ -45,6 +46,7 @@ export const queryKeys = {
     detail: (id: string) => ['webhooks', getOrgScope(), id] as const,
   },
   artifacts: {
+    root: () => ['artifactLibrary', getOrgScope()] as const,
     library: (filters?: Record<string, unknown>) =>
       ['artifactLibrary', getOrgScope(), filters] as const,
     byRun: (runId: string) => ['runArtifacts', getOrgScope(), runId] as const,

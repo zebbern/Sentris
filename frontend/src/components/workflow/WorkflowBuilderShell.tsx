@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { PanelLeftClose, PanelLeftOpen, X, Undo2, Redo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { HumanInputDialog } from './HumanInputDialog';
@@ -263,25 +264,31 @@ export function WorkflowBuilderShell({
 
         {showLibraryToggleButton && (
           <div className="absolute z-[35] top-[10px] left-[10px] flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onToggleLibrary}
-              className={cn(
-                'h-8 px-2 md:px-3 py-1.5',
-                'flex items-center gap-1.5 md:gap-2 rounded-md border bg-background',
-                'text-xs font-medium transition-all duration-200 hover:bg-muted',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm',
-              )}
-              aria-expanded={false}
-              aria-label="Show component library"
-              title="Show components"
-            >
-              <PanelLeftOpen className="h-4 w-4 flex-shrink-0" />
-              <span className="font-medium whitespace-nowrap hidden sm:inline">
-                Show components
-              </span>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onToggleLibrary}
+                    className={cn(
+                      'h-8 px-2 md:px-3 py-1.5',
+                      'flex items-center gap-1.5 md:gap-2 rounded-md border bg-background',
+                      'text-xs font-medium transition-all duration-200 hover:bg-muted',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-sm',
+                    )}
+                    aria-expanded={false}
+                    aria-label="Show component library"
+                  >
+                    <PanelLeftOpen className="h-4 w-4 flex-shrink-0" />
+                    <span className="font-medium whitespace-nowrap hidden sm:inline">
+                      Show components
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Show components</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {isMobile && mode === 'design' && (
               <div className="flex items-center gap-1 bg-background border rounded-md px-1 h-8 shadow-sm">
@@ -365,26 +372,31 @@ export function WorkflowBuilderShell({
             }}
           >
             {isLibraryVisible && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onToggleLibrary}
-                className={cn(
-                  'absolute z-50 top-3 md:top-4 right-3 md:right-4',
-                  'h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md',
-                  'text-xs font-medium transition-all duration-200 hover:bg-muted',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                )}
-                aria-expanded={true}
-                aria-label="Hide component library"
-                title="Hide components"
-              >
-                {isMobile ? (
-                  <X className="h-5 w-5" />
-                ) : (
-                  <PanelLeftClose className="h-4 w-4 flex-shrink-0" />
-                )}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      onClick={onToggleLibrary}
+                      className={cn(
+                        'absolute z-50 top-3 md:top-4 right-3 md:right-4',
+                        'h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md',
+                        'text-xs font-medium transition-all duration-200 hover:bg-muted',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                      )}
+                      aria-expanded={true}
+                      aria-label="Hide component library"
+                    >
+                      {isMobile ? (
+                        <X className="h-5 w-5" />
+                      ) : (
+                        <PanelLeftClose className="h-4 w-4 flex-shrink-0" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Hide components</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
             <div
               className={cn(

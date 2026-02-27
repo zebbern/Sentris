@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { List, Grid3x3, Hand } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
@@ -10,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ComponentMetadata } from '@/schemas/component';
 import { cn } from '@/lib/utils';
 import { env } from '@/config/env';
@@ -18,183 +19,8 @@ import { COMPONENT_CATEGORY_ORDER, isComponentCategory } from '@shipsec/shared';
 import { getCategorySeparatorColor, getCategoryTextColorClass } from '@/utils/categoryColors';
 import { useThemeStore } from '@/store/themeStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
-import { useWorkflowStore } from '@/store/workflowStore';
-import { usePlacementStore } from './sidebar-state';
-
-// Use backend-provided category configuration
-// The frontend will no longer categorize components - it will use backend data
-
-type ViewMode = 'list' | 'tiles';
-
-interface ComponentItemProps {
-  component: ComponentMetadata;
-  disabled?: boolean;
-  viewMode: ViewMode;
-}
-
-function ComponentItem({ component, disabled, viewMode }: ComponentItemProps) {
-  const description = component.description || 'No description available yet.';
-  const [isSelected, setIsSelected] = useState(false);
-
-  // Get placement store and workflow ID for scoped placement
-  const setPlacement = usePlacementStore((state) => state.setPlacement);
-  const placementComponentId = usePlacementStore((state) => state.componentId);
-  const currentWorkflowId = useWorkflowStore((state) => state.metadata.id);
-
-  const onDragStart = (event: React.DragEvent) => {
-    if (disabled) {
-      event.preventDefault();
-      return;
-    }
-    // Store component ID for canvas to create node
-    event.dataTransfer.setData('application/reactflow', component.id);
-    event.dataTransfer.effectAllowed = 'move';
-  };
-
-  // Handle tap on mobile - select component and close sidebar
-  const handleTap = () => {
-    if (disabled || component.deprecated) return;
-
-    // Set the component for placement, scoped to current workflow
-    setPlacement(component.id, component.name, currentWorkflowId);
-    setIsSelected(true);
-
-    // Close sidebar after a short delay to show selection feedback
-    setTimeout(() => {
-      // Close the library panel directly via store
-      useWorkflowUiStore.getState().setLibraryOpen(false);
-      setIsSelected(false);
-    }, 150);
-  };
-
-  // Clear selection if this component is no longer the active one
-  useEffect(() => {
-    if (placementComponentId !== component.id) {
-      setIsSelected(false);
-    }
-  }, [placementComponentId, component.id]);
-
-  if (viewMode === 'list') {
-    return (
-      <div
-        className={cn(
-          'group relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all',
-          'hover:bg-muted/50 border border-border/30 hover:border-border/60',
-          'md:cursor-move', // Desktop: show move cursor
-          disabled ? 'cursor-not-allowed opacity-50' : '',
-          component.deprecated && 'opacity-50',
-          isSelected && 'bg-primary/20 border-primary scale-95',
-        )}
-        draggable={!component.deprecated && !disabled}
-        onDragStart={onDragStart}
-        onClick={handleTap}
-      >
-        {/* Icon */}
-        <div className="flex-shrink-0">
-          {component.logo ? (
-            <img
-              src={component.logo}
-              alt={component.name}
-              className="h-5 w-5 object-contain"
-              onError={(e) => {
-                // Fallback to icon if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : null}
-          <DynamicIcon
-            name={component.icon || 'Box'}
-            className={cn(
-              'h-5 w-5 text-muted-foreground flex-shrink-0',
-              component.logo && 'hidden',
-            )}
-          />
-        </div>
-
-        {/* Title and description */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <span className="block text-sm font-medium leading-tight truncate">{component.name}</span>
-          {description && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5 leading-snug">
-              {description}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Tile view
-  return (
-    <div
-      className={cn(
-        'group relative flex flex-col p-3 border border-border/50 rounded-lg cursor-pointer transition-all',
-        'bg-background/50 hover:bg-background hover:border-border',
-        'text-foreground aspect-[4/3]',
-        'md:cursor-move', // Desktop: show move cursor
-        disabled ? 'cursor-not-allowed opacity-50' : 'hover:shadow-sm hover:scale-[1.02]',
-        component.deprecated && 'opacity-50',
-        isSelected && 'bg-primary/20 border-primary scale-95',
-      )}
-      draggable={!component.deprecated && !disabled}
-      onDragStart={onDragStart}
-      onClick={handleTap}
-    >
-      {/* Default: Centered icon and name */}
-      <div className="flex flex-col items-center justify-center gap-2 flex-1 group-hover:hidden transition-all">
-        {component.logo ? (
-          <img
-            src={component.logo}
-            alt={component.name}
-            className="h-8 w-8 flex-shrink-0 object-contain"
-            onError={(e) => {
-              // Fallback to icon if image fails to load
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-            }}
-          />
-        ) : null}
-        <DynamicIcon
-          name={component.icon || 'Box'}
-          className={cn('h-8 w-8 flex-shrink-0 text-muted-foreground', component.logo && 'hidden')}
-        />
-        <span className="text-[13px] font-semibold leading-tight text-center line-clamp-2">
-          {component.name}
-        </span>
-      </div>
-
-      {/* Hover: Icon left, name right, description below */}
-      <div className="hidden group-hover:flex flex-col gap-2 flex-1">
-        <div className="flex items-start gap-2.5">
-          {component.logo ? (
-            <img
-              src={component.logo}
-              alt={component.name}
-              className="h-6 w-6 flex-shrink-0 object-contain"
-              onError={(e) => {
-                // Fallback to icon if image fails to load
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : null}
-          <DynamicIcon
-            name={component.icon || 'Box'}
-            className={cn(
-              'h-6 w-6 flex-shrink-0 text-muted-foreground',
-              component.logo && 'hidden',
-            )}
-          />
-          <span className="text-[13px] font-semibold leading-[1.3] line-clamp-2 flex-1 -mt-0.5">
-            {component.name}
-          </span>
-        </div>
-        <p className="text-[10px] text-muted-foreground line-clamp-3 leading-snug">{description}</p>
-      </div>
-    </div>
-  );
-}
+import { useCustomScrollbar } from '@/hooks/useCustomScrollbar';
+import { ComponentItem, type ViewMode } from './ComponentItem';
 
 interface SidebarProps {
   canManageWorkflows?: boolean;
@@ -220,14 +46,6 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
   const getCategoryTextColor = (category: string): string => {
     return getCategoryTextColorClass(category);
   };
-
-  // Custom scrollbar state
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [scrollbarVisible, setScrollbarVisible] = useState(false);
-  const [scrollbarPosition, setScrollbarPosition] = useState(0);
-  const [scrollbarHeight, setScrollbarHeight] = useState(0);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isScrollingRef = useRef(false);
 
   const showDemoComponents = useWorkflowUiStore((state) => state.showDemoComponents);
   const allComponents = componentIndex ? Object.values(componentIndex.byId) : [];
@@ -367,71 +185,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
     // Only depend on searchQuery - not filteredComponentsByCategory to avoid loops
   }, [searchQuery]);
 
-  // Custom scrollbar logic - setup event listeners (only once)
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const updateScrollbar = (showImmediately = false) => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const maxScroll = scrollHeight - clientHeight;
-
-      if (maxScroll <= 0) {
-        setScrollbarVisible(false);
-        return;
-      }
-
-      // Calculate scrollbar thumb position and height
-      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 30);
-      const thumbPosition = (scrollTop / maxScroll) * (clientHeight - thumbHeight);
-
-      setScrollbarHeight(thumbHeight);
-      setScrollbarPosition(thumbPosition);
-
-      // Only show scrollbar when actively scrolling or explicitly requested
-      if (showImmediately || isScrollingRef.current) {
-        setScrollbarVisible(true);
-      }
-
-      // Clear existing timeout
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      // Hide scrollbar after scrolling stops
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingRef.current = false;
-        setScrollbarVisible(false);
-      }, 800);
-    };
-
-    const handleScroll = () => {
-      isScrollingRef.current = true;
-      updateScrollbar(true);
-    };
-
-    const handleResize = () => {
-      updateScrollbar(false);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
-
-    // Initial check - don't show scrollbar on mount
-    updateScrollbar(false);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-    // Only setup event listeners once - don't depend on content changes
-  }, []);
-
-  // Update scrollbar when content changes (without re-setting up listeners)
-  // Calculate a stable value for component count to use as dependency
+  // Stable component count for scrollbar recalculation
   const componentCount = useMemo(() => {
     return Object.values(filteredComponentsByCategory).reduce(
       (total, components) => total + components.length,
@@ -439,57 +193,45 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
     );
   }, [filteredComponentsByCategory]);
 
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // Use requestAnimationFrame to ensure DOM has updated after content changes
-    requestAnimationFrame(() => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const maxScroll = scrollHeight - clientHeight;
-
-      if (maxScroll <= 0) {
-        setScrollbarVisible(false);
-        setScrollbarHeight(0);
-        setScrollbarPosition(0);
-        return;
-      }
-
-      // Calculate scrollbar thumb position and height
-      const thumbHeight = Math.max((clientHeight / scrollHeight) * clientHeight, 30);
-      const thumbPosition = (scrollTop / maxScroll) * (clientHeight - thumbHeight);
-
-      setScrollbarHeight(thumbHeight);
-      setScrollbarPosition(thumbPosition);
-      // Don't show scrollbar automatically when content changes - only on scroll
-    });
-  }, [componentCount, loading]); // Use stable componentCount instead of filteredComponentsByCategory object
+  // Custom scrollbar
+  const { scrollContainerRef, scrollbarVisible, scrollbarPosition, scrollbarHeight } =
+    useCustomScrollbar(componentCount, loading);
 
   return (
     <div className="h-full w-full max-w-[320px] border-r bg-background flex flex-col">
       <div className="p-4 border-b space-y-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold leading-none">Components</h2>
-          <div className="flex items-center gap-0.5 border border-border/50 rounded-md p-0.5 h-7">
-            <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn('h-6 px-2', viewMode === 'list' && 'bg-muted')}
-              onClick={() => setViewMode('list')}
-              title="List view"
-            >
-              <List className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant={viewMode === 'tiles' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn('h-6 px-2', viewMode === 'tiles' && 'bg-muted')}
-              onClick={() => setViewMode('tiles')}
-              title="Tile view"
-            >
-              <Grid3x3 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex items-center gap-0.5 border border-border/50 rounded-md p-0.5 h-7">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className={cn('h-6 px-2', viewMode === 'list' && 'bg-muted')}
+                    onClick={() => setViewMode('list')}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>List view</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === 'tiles' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className={cn('h-6 px-2', viewMode === 'tiles' && 'bg-muted')}
+                    onClick={() => setViewMode('tiles')}
+                  >
+                    <Grid3x3 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Tile view</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
         <div className="relative">
