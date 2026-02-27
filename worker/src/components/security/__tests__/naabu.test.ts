@@ -1,0 +1,131 @@
+import { describe, it, expect, beforeAll, afterEach, vi, mock } from 'bun:test';
+import * as sdk from '@shipsec/component-sdk';
+import type { NaabuInput, NaabuOutput } from '../naabu';
+
+// Mock IsolatedContainerVolume BEFORE any component imports.
+// ../../index eagerly imports naabu.ts which pulls in the real
+// IsolatedContainerVolume; using a dynamic import in beforeAll()
+// ensures the mock is registered first.
+mock.module('../../../utils/isolated-volume', () => ({
+  IsolatedContainerVolume: class {
+    async initialize() {
+      return 'mock-volume';
+    }
+    getVolumeConfig(containerPath = '/inputs', readOnly = true) {
+      return { source: 'mock-volume', target: containerPath, readOnly };
+    }
+    async cleanup() {}
+  },
+}));
+
+let componentRegistry: typeof import('@shipsec/component-sdk').componentRegistry;
+
+describe('naabu component', () => {
+  beforeAll(async () => {
+    ({ componentRegistry } = await import('../../index'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should be registered with correct metadata', () => {
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    expect(component).toBeDefined();
+    expect(component!.label).toBe('Naabu Port Scan');
+    expect(component!.category).toBe('security');
+  });
+
+  it('should provide sensible defaults', () => {
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    if (!component) throw new Error('Component not registered');
+
+    const paramValues = {};
+
+    const parsedParams = component.parameters!.parse(paramValues);
+
+    expect(parsedParams.retries).toBe(1);
+    expect(parsedParams.enablePing).toBe(false);
+  });
+
+  it('should parse JSONL output into findings', async () => {
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'naabu-test',
+    });
+
+    const executePayload = {
+      inputs: {
+        targets: ['scanme.sh'],
+      },
+      params: {
+        ports: '80,443',
+        enablePing: true,
+      },
+    };
+
+    const rawOutput = [
+      JSON.stringify({ host: 'scanme.sh', ip: '45.33.32.156', port: 80, proto: 'tcp' }),
+      JSON.stringify({ host: 'scanme.sh', ip: '45.33.32.156', port: 443, proto: 'tcp' }),
+    ].join('\n');
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(rawOutput);
+
+    const result = await component.execute(executePayload, context);
+
+    expect(result.findings).toEqual([
+      { host: 'scanme.sh', ip: '45.33.32.156', port: 80, protocol: 'tcp' },
+      { host: 'scanme.sh', ip: '45.33.32.156', port: 443, protocol: 'tcp' },
+    ]);
+    expect(result.openPortCount).toBe(2);
+    expect(result.rawOutput).toBe(rawOutput);
+    expect(result.options.ports).toBe('80,443');
+    expect(result.options.enablePing).toBe(true);
+  });
+
+  it('should handle plain host:port output', async () => {
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'naabu-test',
+    });
+
+    const executePayload = {
+      inputs: {
+        targets: ['scanme.sh'],
+      },
+      params: {},
+    };
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue('scanme.sh:22\n');
+
+    const result = await component.execute(
+      {
+        inputs: component.inputs.parse(executePayload.inputs),
+        params: component.parameters!.parse(executePayload.params),
+      },
+      context,
+    );
+
+    expect(result.findings).toEqual([{ host: 'scanme.sh', ip: null, port: 22, protocol: 'tcp' }]);
+    expect(result.openPortCount).toBe(1);
+  });
+
+  it('should configure docker runner for naabu image', () => {
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    if (!component) throw new Error('Component not registered');
+
+    expect(component.runner.kind).toBe('docker');
+    if (component.runner.kind === 'docker') {
+      expect(component.runner.image).toBe('ghcr.io/shipsecai/naabu:latest');
+      // Distroless image — no entrypoint override, uses image default
+      expect(component.runner.entrypoint).toBeUndefined();
+      expect(component.runner.command).toEqual([]);
+    }
+  });
+});

@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build artifacts
+dist/
+build/
+.next/
+out/
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Tests
+**/__tests__/
+**/*.test.ts
+**/*.test.js
+coverage/
+
+# PM2
+pm2.config.cjs
+ecosystem.config.js
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Logs
+logs/
+*.log
+
+# Development tools
+.eslintrc*
+.prettierrc*
+jest.config.*
+
+# Database
+*.sqlite
+*.sqlite3
+
+# Misc
+.nyc_output
+.coverage
+.turbo
+.vercel

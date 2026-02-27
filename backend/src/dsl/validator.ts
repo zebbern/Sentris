@@ -1,0 +1,574 @@
+import { ZodError, ZodIssue } from 'zod';
+
+import {
+  componentRegistry,
+  type ComponentPortMetadata,
+  type ConnectionType,
+} from '@shipsec/component-sdk';
+import {
+  extractPorts,
+  canConnect,
+  describeConnectionType,
+  createPlaceholderForConnectionType,
+} from '@shipsec/component-sdk/zod-ports';
+
+import type { WorkflowGraphDto } from '../workflows/dto/workflow-graph.dto';
+import type { WorkflowAction, WorkflowDefinition } from './types';
+
+interface ActionPortSnapshot {
+  inputs: ComponentPortMetadata[];
+  outputs: ComponentPortMetadata[];
+}
+
+export interface ValidationError {
+  node: string;
+  field: string;
+  message: string;
+  severity: 'error' | 'warning';
+  suggestion?: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+}
+
+/**
+ * Comprehensive DSL validation for workflow graphs
+ */
+export function validateWorkflowGraph(
+  graph: WorkflowGraphDto,
+  compiledDefinition: WorkflowDefinition,
+): ValidationResult {
+  const errors: ValidationError[] = [];
+  const warnings: ValidationError[] = [];
+  const actionPorts = new Map<string, ActionPortSnapshot>();
+
+  // 1. Validate all components exist
+  for (const node of graph.nodes) {
+    const component = componentRegistry.get(node.type);
+    if (!component) {
+      errors.push({
+        node: node.id,
+        field: 'type',
+        message: `Unknown component type: ${node.type}`,
+        severity: 'error',
+        suggestion:
+          'Available components: ' +
+          componentRegistry
+            .list()
+            .map((entry) => entry.id)
+            .join(', '),
+      });
+    }
+  }
+
+  // 2. Validate component parameters against schemas
+  for (const action of compiledDefinition.actions) {
+    const component = componentRegistry.get(action.componentId);
+    if (!component) continue; // Already reported above
+
+    const portSnapshot = resolveActionPortSnapshot(action, component);
+    actionPorts.set(action.ref, portSnapshot);
+
+    const paramsForValidation = { ...(action.params ?? {}) } as Record<string, unknown>;
+    const inputOverrides = { ...(action.inputOverrides ?? {}) } as Record<string, unknown>;
+    const placeholderFields = new Set<string>();
+
+    for (const inputPort of portSnapshot.inputs) {
+      const hasStaticValue =
+        Object.prototype.hasOwnProperty.call(inputOverrides, inputPort.id) &&
+        inputOverrides[inputPort.id] !== undefined;
+      const hasMapping = Object.prototype.hasOwnProperty.call(
+        action.inputMappings ?? {},
+        inputPort.id,
+      );
+
+      if (!hasStaticValue && hasMapping) {
+        const connectionType = getPortConnectionType(inputPort);
+        inputOverrides[inputPort.id] = createPlaceholderForConnectionType(connectionType);
+        placeholderFields.add(inputPort.id);
+      }
+    }
+
+    const paramValidation = component.parameters
+      ? component.parameters.safeParse(paramsForValidation)
+      : {
+          success: Object.keys(paramsForValidation).length === 0,
+          error: new Error('Component does not accept parameters'),
+        };
+
+    if (!paramValidation.success) {
+      errors.push({
+        node: action.ref,
+        field: 'params',
+        message: `Component parameter validation failed: ${paramValidation.error?.message ?? 'Invalid parameters'}`,
+        severity: 'error',
+        suggestion: 'Check component parameter schema for required fields and correct types',
+      });
+    }
+
+    const validation = component.inputs.safeParse(inputOverrides);
+    if (!validation.success) {
+      const relevantIssues = validation.error.issues.filter(
+        (issue) => !isPlaceholderIssue(issue, placeholderFields),
+      );
+
+      if (relevantIssues.length > 0) {
+        const filteredError =
+          relevantIssues.length === validation.error.issues.length
+            ? validation.error
+            : new ZodError(relevantIssues as ZodIssue[]);
+
+        errors.push({
+          node: action.ref,
+          field: 'inputOverrides',
+          message: `Component input validation failed: ${filteredError.message}`,
+          severity: 'error',
+          suggestion: 'Check component input schema for required ports and correct types',
+        });
+      }
+    }
+
+    // 3. Validate secret parameter references
+    validateSecretParameters(action, component, errors, warnings);
+  }
+
+  // 4. Validate input mappings
+  validateInputMappings(graph, compiledDefinition, actionPorts, errors, warnings);
+
+  // 5. Validate entry point runtime inputs configuration
+  validateEntryPointConfiguration(graph, compiledDefinition, errors, warnings);
+
+  // 6. Validate edge type compatibility
+  validateEdgeCompatibility(compiledDefinition, actionPorts, errors);
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+function isPlaceholderIssue(issue: ZodIssue, placeholderFields: Set<string>): boolean {
+  const field = issue.path[0];
+  if (typeof field !== 'string') {
+    return false;
+  }
+
+  if (!placeholderFields.has(field)) {
+    return false;
+  }
+
+  switch (issue.code) {
+    case 'invalid_type':
+      return true;
+    case 'invalid_format':
+      return true;
+    case 'too_small':
+      return true;
+    case 'too_big':
+      return true;
+    case 'invalid_value':
+      // Enum/literal validation fails on placeholder objects with missing fields
+      // The actual value from upstream will have the correct enum value at runtime
+      return true;
+    case 'custom':
+      // Custom validations (from .refine()) fail on placeholders but will pass at runtime
+      // when the actual value comes from the connected edge
+      return true;
+    case 'invalid_union':
+      if ('unionErrors' in issue) {
+        const unionIssue = issue as ZodIssue & { unionErrors: ZodError[] };
+        return unionIssue.unionErrors.every((variant: ZodError) =>
+          variant.issues.every((inner) => inner.code === 'invalid_type'),
+        );
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Validate secret parameter references
+ */
+function validateSecretParameters(
+  action: WorkflowAction,
+  component: any,
+  errors: ValidationError[],
+  warnings: ValidationError[],
+) {
+  const secretParams =
+    componentRegistry
+      .getMetadata(action.componentId)
+      ?.parameters?.filter((p) => p.type === 'secret') ?? [];
+
+  for (const secretParam of secretParams) {
+    const paramValue = action.params?.[secretParam.id];
+
+    const isRequired = secretParam.required !== false;
+
+    if (!paramValue) {
+      if (!isRequired) {
+        continue;
+      }
+      errors.push({
+        node: action.ref,
+        field: secretParam.id,
+        message: `Required secret parameter '${secretParam.label}' is missing`,
+        severity: 'error',
+        suggestion: 'Configure this parameter in the node configuration panel',
+      });
+    } else if (typeof paramValue === 'string' && !isValidSecretId(paramValue)) {
+      // Check if it looks like a direct API key/value instead of a secret reference
+      if (
+        paramValue.length > 20 &&
+        (paramValue.startsWith('AIza') ||
+          paramValue.startsWith('sk-') ||
+          /[A-Za-z0-9_-]{20,}/.test(paramValue))
+      ) {
+        errors.push({
+          node: action.ref,
+          field: secretParam.id,
+          message: `Invalid secret reference: '${paramValue.substring(0, 10)}...' appears to be a direct API key value`,
+          severity: 'error',
+          suggestion:
+            'Store your API key in the secrets manager and reference it by name instead of using the raw value',
+        });
+      } else {
+        warnings.push({
+          node: action.ref,
+          field: secretParam.id,
+          message: `Secret reference '${paramValue}' may not exist or may be malformed`,
+          severity: 'warning',
+          suggestion: 'Verify the secret exists in the secrets manager',
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Validate input mappings between nodes
+ */
+function validateInputMappings(
+  graph: WorkflowGraphDto,
+  compiledDefinition: WorkflowDefinition,
+  actionPorts: Map<string, ActionPortSnapshot>,
+  errors: ValidationError[],
+  _warnings: ValidationError[],
+) {
+  const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  for (const action of compiledDefinition.actions) {
+    const componentInputs = actionPorts.get(action.ref)?.inputs ?? [];
+
+    // Check if all required inputs have mappings or static values
+    for (const input of componentInputs) {
+      const hasStaticValue = Object.hasOwn(action.inputOverrides ?? {}, input.id);
+      const hasMapping = Object.hasOwn(action.inputMappings ?? {}, input.id);
+
+      if (input.required && !hasStaticValue && !hasMapping) {
+        errors.push({
+          node: action.ref,
+          field: 'inputMappings',
+          message: `Required input '${input.label}' (${input.id}) has no mapping or static value`,
+          severity: 'error',
+          suggestion:
+            'Either provide a static value in node configuration or connect an edge to this input',
+        });
+      }
+    }
+
+    // Validate edge mappings point to valid nodes
+    for (const [_targetHandle, mapping] of Object.entries(action.inputMappings ?? {})) {
+      const sourceNode = nodes.get(mapping.sourceRef);
+      if (!sourceNode) {
+        errors.push({
+          node: action.ref,
+          field: 'inputMappings',
+          message: `Edge references unknown source node: ${mapping.sourceRef}`,
+          severity: 'error',
+          suggestion: 'Check that the source node exists and the edge is properly connected',
+        });
+      }
+    }
+
+    // Check raw edges for multiple inputs to the same port
+    const edgesToThisNode = graph.edges.filter((e) => e.target === action.ref);
+    const portsSeen = new Map<string, number>();
+    for (const edge of edgesToThisNode) {
+      const targetHandle = edge.targetHandle ?? edge.sourceHandle;
+      if (!targetHandle) continue;
+
+      portsSeen.set(targetHandle, (portsSeen.get(targetHandle) ?? 0) + 1);
+    }
+
+    for (const [portId, count] of portsSeen.entries()) {
+      if (count > 1 && portId !== 'tools') {
+        const inputMetadata = actionPorts.get(action.ref)?.inputs.find((i) => i.id === portId);
+        const portLabel = inputMetadata?.label || portId;
+
+        errors.push({
+          node: action.ref,
+          field: 'inputMappings',
+          message: `Multiple edges detected for input port '${portLabel}'. Only one edge allowed per input.`,
+          severity: 'error',
+          suggestion: `Combine the sources into a single object using a transformer node or create a separate variable for each source.`,
+        });
+      }
+    }
+  }
+}
+
+function validateEdgeCompatibility(
+  compiledDefinition: WorkflowDefinition,
+  actionPorts: Map<string, ActionPortSnapshot>,
+  errors: ValidationError[],
+) {
+  const actions = new Map(compiledDefinition.actions.map((action) => [action.ref, action]));
+
+  for (const edge of compiledDefinition.edges) {
+    const sourceAction = actions.get(edge.sourceRef);
+    const targetAction = actions.get(edge.targetRef);
+
+    if (!sourceAction || !targetAction) {
+      errors.push({
+        node: edge.targetRef,
+        field: 'inputMappings',
+        message: `Edge references unknown action(s): ${edge.sourceRef} -> ${edge.targetRef}`,
+        severity: 'error',
+        suggestion: 'Ensure each edge points to a valid node',
+      });
+      continue;
+    }
+
+    const sourcePorts = actionPorts.get(sourceAction.ref);
+    const targetPorts = actionPorts.get(targetAction.ref);
+
+    if (!sourcePorts || !targetPorts) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Missing port metadata for ${edge.sourceRef} -> ${edge.targetRef}`,
+        severity: 'error',
+        suggestion: 'Verify component metadata exports both inputs and outputs',
+      });
+      continue;
+    }
+
+    const sourceHandle = edge.sourceHandle;
+    const targetHandle = edge.targetHandle;
+
+    // Check for malformed data edges: if one handle is present but not the other
+    const hasSourceHandle = !!sourceHandle;
+    const hasTargetHandle = !!targetHandle;
+
+    if (hasSourceHandle && !hasTargetHandle) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Edge has sourceHandle "${sourceHandle}" but missing targetHandle. Data edges must specify both source and target handles.`,
+        severity: 'error',
+        suggestion:
+          'Add targetHandle to specify which input port on the target node should receive the data',
+      });
+      continue;
+    }
+
+    if (!hasSourceHandle && hasTargetHandle) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Edge has targetHandle "${targetHandle}" but missing sourceHandle. Data edges must specify both source and target handles.`,
+        severity: 'error',
+        suggestion:
+          'Add sourceHandle to specify which output port on the source node provides the data',
+      });
+      continue;
+    }
+
+    if (!hasSourceHandle && !hasTargetHandle) {
+      // Control edge used for ordering only; skip type validation
+      continue;
+    }
+
+    const sourcePort = sourcePorts.outputs.find((port) => port.id === sourceHandle);
+    const targetPort = targetPorts.inputs.find((port) => port.id === targetHandle);
+
+    if (!sourcePort) {
+      const sourceNodeMetadata = compiledDefinition.nodes[sourceAction.ref];
+      if (sourceHandle === 'tools' && sourceNodeMetadata?.mode === 'tool') {
+        // Allow explicit tool connection bypass
+      } else {
+        errors.push({
+          node: targetAction.ref,
+          field: 'inputMappings',
+          message: `Source port '${sourceHandle}' not found on ${edge.sourceRef}`,
+          severity: 'error',
+          suggestion: 'Confirm the source component exposes this output port',
+        });
+        continue;
+      }
+    }
+
+    if (!targetPort) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Target port '${targetHandle}' not found on ${edge.targetRef}`,
+        severity: 'error',
+        suggestion: 'Connect to a valid input port on the target component',
+      });
+      continue;
+    }
+
+    const sourceType = sourcePort ? getPortConnectionType(sourcePort) : { kind: 'any' as const };
+    const targetType = getPortConnectionType(targetPort);
+
+    if (!sourceType || !targetType) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Missing port type metadata for ${edge.sourceRef}.${sourceHandle} -> ${edge.targetRef}.${targetHandle}`,
+        severity: 'error',
+        suggestion: 'Ensure both ports declare a connection type or have derivable schemas',
+      });
+      continue;
+    }
+
+    if (!canConnect(sourceType, targetType)) {
+      errors.push({
+        node: targetAction.ref,
+        field: 'inputMappings',
+        message: `Type mismatch: ${describeConnectionType(sourceType)} cannot connect to ${describeConnectionType(targetType)}`,
+        severity: 'error',
+        suggestion: 'Use matching port types or add a transformer component',
+      });
+    }
+  }
+}
+
+/**
+ * Validate entry point runtime inputs configuration
+ */
+function validateEntryPointConfiguration(
+  _graph: WorkflowGraphDto,
+  compiledDefinition: WorkflowDefinition,
+  errors: ValidationError[],
+  warnings: ValidationError[],
+) {
+  const entryPointActions = compiledDefinition.actions.filter(
+    (action) => action.componentId === 'core.workflow.entrypoint',
+  );
+
+  if (entryPointActions.length === 0) {
+    errors.push({
+      node: 'entry-point',
+      field: 'componentId',
+      message: 'Entry Point is required to start the workflow',
+      severity: 'error',
+      suggestion: 'Add an Entry Point component to define how the workflow is invoked',
+    });
+  } else if (entryPointActions.length > 1) {
+    errors.push({
+      node: 'entry-point',
+      field: 'componentId',
+      message: 'Only one Entry Point is allowed per workflow',
+      severity: 'error',
+      suggestion: 'Remove additional Entry Point components',
+    });
+  }
+
+  for (const action of entryPointActions) {
+    const runtimeInputs = action.params?.runtimeInputs;
+
+    if (!Array.isArray(runtimeInputs)) {
+      errors.push({
+        node: action.ref,
+        field: 'runtimeInputs',
+        message: 'Entry Point requires runtimeInputs configuration',
+        severity: 'error',
+        suggestion: 'Configure runtime inputs to collect data when the workflow is triggered',
+      });
+    } else if (runtimeInputs.length === 0) {
+      warnings.push({
+        node: action.ref,
+        field: 'runtimeInputs',
+        message: 'Entry Point has no runtime inputs configured',
+        severity: 'warning',
+        suggestion: 'Add runtime inputs if you need to collect data when the workflow is triggered',
+      });
+    } else {
+      // Validate runtime input definitions
+      for (const runtimeInput of runtimeInputs) {
+        if (!runtimeInput.id || !runtimeInput.label || !runtimeInput.type) {
+          errors.push({
+            node: action.ref,
+            field: 'runtimeInputs',
+            message: 'Runtime input definition missing required fields (id, label, type)',
+            severity: 'error',
+            suggestion: 'Ensure each runtime input has id, label, and type fields',
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Check if a string looks like a valid secret ID (not a raw secret value)
+ */
+function isValidSecretId(secretId: string): boolean {
+  // Secret IDs should be reasonable-length identifiers, not raw secret values
+
+  // 1. Explicitly allow UUIDs (common format for internal IDs)
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(secretId)) {
+    return true;
+  }
+
+  // 2. Reject common patterns that suggest raw API keys or secrets
+  const suspiciousPatterns = [
+    /^AIza[A-Za-z0-9_-]{35}$/, // Google API keys
+    /^sk-[A-Za-z0-9]{48}$/, // Stripe keys
+    /^ghp_[A-Za-z0-9]{36}$/, // GitHub PATs
+    /^xoxb-[0-9]+-[0-9]+-[A-Za-z0-9]{24}$/, // Slack bot tokens
+    /^[A-Za-z0-9]{32,}$/, // Generic long alphanumeric strings (no dashes/underscores)
+  ];
+
+  // If it matches suspicious patterns, it's probably a raw secret
+  if (suspiciousPatterns.some((pattern) => pattern.test(secretId))) {
+    return false;
+  }
+
+  // Valid secret names should be reasonable length.
+  // We allow names with dashes/underscores even if long, as they are likely identifiers.
+  return secretId.length >= 1 && secretId.length <= 100;
+}
+
+function resolveActionPortSnapshot(action: WorkflowAction, component: any): ActionPortSnapshot {
+  let inputs: ComponentPortMetadata[] = [];
+  let outputs: ComponentPortMetadata[] = [];
+
+  if (typeof component.resolvePorts === 'function') {
+    const resolved = component.resolvePorts(action.params ?? {});
+    if (resolved?.inputs) {
+      inputs = extractPorts(resolved.inputs);
+    }
+    if (resolved?.outputs) {
+      outputs = extractPorts(resolved.outputs);
+    }
+  } else {
+    inputs = extractPorts(component.inputs);
+    outputs = extractPorts(component.outputs);
+  }
+
+  return { inputs, outputs };
+}
+
+function getPortConnectionType(port: ComponentPortMetadata): ConnectionType | undefined {
+  return port.connectionType;
+}

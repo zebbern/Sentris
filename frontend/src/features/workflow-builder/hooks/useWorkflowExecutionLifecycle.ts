@@ -1,0 +1,475 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { FrontendNodeData } from '@/schemas/node';
+import { api } from '@/services/api';
+import { deserializeNodes, deserializeEdges } from '@/utils/workflowSerializer';
+import { cloneNodes, cloneEdges, type GraphSnapshot } from './useWorkflowGraphControllers';
+import {
+  useWorkflowRuns,
+  upsertRunInCache,
+  getRunByIdFromCache,
+  invalidateRunsForWorkflow,
+} from '@/hooks/queries/useRunQueries';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
+import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
+import { useExecutionStore } from '@/store/executionStore';
+import { normalizeRunSummary, isRunLive } from '@/features/workflow-builder/utils/executionRuns';
+
+type ToastFn = (params: {
+  title: string;
+  description?: string;
+  variant?: 'default' | 'destructive' | 'warning' | 'success';
+  duration?: number;
+}) => void;
+
+type SetNodesFn = (setter: SetStateAction<ReactFlowNode<FrontendNodeData>[]>) => void;
+type SetEdgesFn = (setter: SetStateAction<ReactFlowEdge[]>) => void;
+
+interface UseWorkflowExecutionLifecycleOptions {
+  workflowId: string | null | undefined;
+  metadata: {
+    id: string | null;
+    currentVersionId: string | null;
+  };
+  routeRunId?: string;
+  selectedRunId: string | null;
+  mode: 'design' | 'execution';
+  builderRoutePrefix: string;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
+  toast: ToastFn;
+  setMode: (mode: 'design' | 'execution') => void;
+  designNodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
+  designEdgesRef: React.MutableRefObject<ReactFlowEdge[]>;
+  designSavedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
+  executionNodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
+  executionEdgesRef: React.MutableRefObject<ReactFlowEdge[]>;
+  preservedExecutionStateRef: React.MutableRefObject<GraphSnapshot | null>;
+  executionLoadedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
+  setExecutionNodes: SetNodesFn;
+  setExecutionEdges: SetEdgesFn;
+  setExecutionDirty: (dirty: boolean) => void;
+}
+
+interface UseWorkflowExecutionLifecycleResult {
+  mostRecentRunId: string | null;
+  fetchRuns: (params: { workflowId: string; force?: boolean }) => Promise<unknown>;
+  resetHistoricalTracking: () => void;
+}
+
+// Stable empty array to prevent useSyncExternalStore infinite loop warnings
+const EMPTY_RUNS: never[] = [];
+
+export function useWorkflowExecutionLifecycle({
+  workflowId,
+  metadata,
+  routeRunId,
+  selectedRunId,
+  mode,
+  builderRoutePrefix,
+  navigate,
+  toast,
+  setMode,
+  designNodesRef,
+  designEdgesRef,
+  designSavedSnapshotRef,
+  executionNodesRef,
+  executionEdgesRef,
+  preservedExecutionStateRef,
+  executionLoadedSnapshotRef,
+  setExecutionNodes,
+  setExecutionEdges,
+  setExecutionDirty,
+}: UseWorkflowExecutionLifecycleOptions): UseWorkflowExecutionLifecycleResult {
+  // TanStack Query: only enable fetching when in execution mode or navigating to a specific run.
+  // Use workflowId (from route param) rather than metadata.id (from store) to avoid a render
+  // cycle delay that leaves the query disabled on first mount.
+  const shouldFetchRuns =
+    Boolean(workflowId) && workflowId !== 'new' && (mode === 'execution' || Boolean(routeRunId));
+  const { data: runsPage, refetch: refetchRuns } = useWorkflowRuns(
+    shouldFetchRuns ? workflowId : undefined,
+  );
+  const workflowRuns = runsPage?.runs ?? EMPTY_RUNS;
+
+  // Provide a fetchRuns function that matches the old store API for external consumers
+  const fetchRuns = useCallback(async (params: { workflowId: string; force?: boolean }) => {
+    if (params.force) {
+      invalidateRunsForWorkflow(params.workflowId);
+    }
+    // Refetch the workflow-scoped query for the passed workflowId, not whatever
+    // query this hook instance is currently bound to (which may be global/disabled
+    // when in design mode).
+    return queryClient.refetchQueries({
+      queryKey: queryKeys.runs.byWorkflow(params.workflowId),
+    });
+  }, []);
+
+  const [historicalVersionId, setHistoricalVersionId] = useState<string | null>(null);
+  const prevRunIdRef = useRef<string | null>(null);
+  const prevVersionIdRef = useRef<string | null>(null);
+  const latestTargetRunIdRef = useRef<string | null>(null);
+  // Track the last routeRunId we processed to prevent re-processing the same run
+  const lastProcessedRouteRunIdRef = useRef<string | null>(null);
+  const selectRun = useExecutionTimelineStore((state) => state.selectRun);
+
+  const mostRecentRunId = useMemo(
+    () => (workflowRuns.length > 0 ? workflowRuns[0].id : null),
+    [workflowRuns],
+  );
+
+  const resetHistoricalTracking = useCallback(() => {
+    setHistoricalVersionId(null);
+    prevRunIdRef.current = null;
+    prevVersionIdRef.current = null;
+    lastProcessedRouteRunIdRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!metadata.id) {
+      useExecutionTimelineStore.getState().reset();
+      return;
+    }
+    // Run fetching is now handled by useWorkflowRuns via the `shouldFetchRuns` enabled flag.
+    // This effect only handles the timeline reset when metadata.id is cleared.
+  }, [metadata.id]);
+
+  useEffect(() => {
+    if (!metadata.id || !routeRunId) {
+      return;
+    }
+
+    // Check if we already processed this routeRunId to prevent loops
+    if (lastProcessedRouteRunIdRef.current === routeRunId) {
+      return;
+    }
+
+    // Check directly from store (not the prop which may be stale due to render timing)
+    const currentSelectedRunId = useExecutionTimelineStore.getState().selectedRunId;
+    if (currentSelectedRunId === routeRunId) {
+      lastProcessedRouteRunIdRef.current = routeRunId;
+      return;
+    }
+
+    let cancelled = false;
+
+    const ensureRouteRun = async () => {
+      let targetRun = getRunByIdFromCache(routeRunId);
+
+      if (!targetRun) {
+        try {
+          invalidateRunsForWorkflow(metadata.id!);
+          await refetchRuns();
+          targetRun = getRunByIdFromCache(routeRunId);
+        } catch (error) {
+          console.error('Failed to refresh runs for route:', error);
+        }
+      }
+
+      if (!targetRun) {
+        try {
+          const runDetails = await api.executions.getRun(routeRunId);
+          if (cancelled) return;
+          const normalized = normalizeRunSummary(runDetails);
+          upsertRunInCache(normalized);
+          targetRun = normalized;
+        } catch (error) {
+          if (cancelled) return;
+          console.error('Failed to load workflow run from route:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Run not found',
+            description: 'This execution may have been deleted or is no longer available.',
+          });
+          navigate(`${builderRoutePrefix}/${metadata.id}`, { replace: true });
+          return;
+        }
+      }
+
+      if (cancelled || !targetRun) {
+        return;
+      }
+
+      if (targetRun.workflowId && targetRun.workflowId !== metadata.id) {
+        navigate(`${builderRoutePrefix}/${targetRun.workflowId}/runs/${routeRunId}`, {
+          replace: true,
+        });
+        return;
+      }
+
+      // Mark as processed BEFORE calling selectRun to prevent loops
+      // and StrictMode double-fires
+      lastProcessedRouteRunIdRef.current = routeRunId;
+
+      // Re-check cancelled after async work above (StrictMode cleanup may have fired)
+      if (cancelled) return;
+
+      try {
+        await selectRun(routeRunId, isRunLive(targetRun) ? 'live' : 'replay');
+        if (cancelled) return;
+        setMode('execution');
+        if (isRunLive(targetRun)) {
+          useExecutionStore.getState().monitorRun(routeRunId, targetRun.workflowId);
+        }
+      } catch (error) {
+        console.error('Failed to select run from route:', error);
+      }
+    };
+
+    void ensureRouteRun();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    builderRoutePrefix,
+    metadata.id,
+    navigate,
+    refetchRuns,
+    routeRunId,
+    toast,
+    setMode,
+    selectRun,
+  ]);
+
+  useEffect(() => {
+    if (mode !== 'execution' || !metadata.id) {
+      return;
+    }
+
+    const targetRunId = selectedRunId ?? routeRunId ?? mostRecentRunId;
+
+    if (!targetRunId) {
+      preservedExecutionStateRef.current = null;
+      setExecutionDirty(false);
+
+      if (designSavedSnapshotRef.current) {
+        const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
+        const savedEdges = cloneEdges(designSavedSnapshotRef.current.edges);
+        const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+        setExecutionNodes([...savedNodes, ...terminalNodes]);
+        setExecutionEdges(savedEdges);
+        executionLoadedSnapshotRef.current = {
+          nodes: cloneNodes(savedNodes),
+          edges: cloneEdges(savedEdges),
+        };
+      } else {
+        const designNodesCopy = cloneNodes(designNodesRef.current);
+        const designEdgesCopy = cloneEdges(designEdgesRef.current);
+        const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+        setExecutionNodes([...designNodesCopy, ...terminalNodes]);
+        setExecutionEdges(designEdgesCopy);
+        executionLoadedSnapshotRef.current = {
+          nodes: cloneNodes(designNodesCopy),
+          edges: cloneEdges(designEdgesCopy),
+        };
+      }
+
+      if (historicalVersionId) {
+        setHistoricalVersionId(null);
+      }
+      prevRunIdRef.current = null;
+      prevVersionIdRef.current = null;
+      return;
+    }
+
+    let run = getRunByIdFromCache(targetRunId);
+    if (!run) {
+      run = workflowRuns.find((candidate) => candidate.id === targetRunId);
+    }
+
+    // If execution graph is empty when navigating directly to a run, hydrate from the latest
+    // design snapshot so the canvas isn't blank while we load the historical version.
+    if (executionNodesRef.current.length === 0 && executionEdgesRef.current.length === 0) {
+      if (designSavedSnapshotRef.current && designSavedSnapshotRef.current.nodes.length > 0) {
+        const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
+        const savedEdges = cloneEdges(designSavedSnapshotRef.current.edges);
+        const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+        setExecutionNodes([...savedNodes, ...terminalNodes]);
+        setExecutionEdges(savedEdges);
+        executionLoadedSnapshotRef.current = {
+          nodes: cloneNodes(savedNodes),
+          edges: cloneEdges(savedEdges),
+        };
+      } else if (designNodesRef.current.length > 0) {
+        const designNodesCopy = cloneNodes(designNodesRef.current);
+        const designEdgesCopy = cloneEdges(designEdgesRef.current);
+        const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+        setExecutionNodes([...designNodesCopy, ...terminalNodes]);
+        setExecutionEdges(designEdgesCopy);
+        executionLoadedSnapshotRef.current = {
+          nodes: cloneNodes(designNodesCopy),
+          edges: cloneEdges(designEdgesCopy),
+        };
+      } else {
+        // Both execution and design graphs are empty - workflow hasn't loaded yet.
+        // Return early and let the workflow load effect populate the design state first.
+        // This effect will re-run when the design state is populated.
+        return;
+      }
+    }
+
+    const versionId = run?.workflowVersionId ?? null;
+    const currentRunId = run?.id ?? null;
+
+    const runIdChanged = currentRunId !== prevRunIdRef.current;
+    const versionIdChanged = versionId !== prevVersionIdRef.current;
+
+    if (!runIdChanged && !versionIdChanged && prevRunIdRef.current !== null) {
+      return;
+    }
+
+    prevRunIdRef.current = currentRunId;
+    prevVersionIdRef.current = versionId;
+
+    if (runIdChanged) {
+      preservedExecutionStateRef.current = null;
+      setExecutionDirty(false);
+    }
+
+    const loadVersionForRun = async () => {
+      latestTargetRunIdRef.current = targetRunId;
+      let runToUse = run;
+      if (!runToUse && targetRunId) {
+        try {
+          const runDetails = await api.executions.getRun(targetRunId);
+          if (latestTargetRunIdRef.current !== targetRunId) return;
+          runToUse = normalizeRunSummary(runDetails);
+          upsertRunInCache(runToUse);
+        } catch (error) {
+          if (latestTargetRunIdRef.current !== targetRunId) return;
+          console.error('[VersionLoad] Failed to fetch run details:', error);
+          if (designSavedSnapshotRef.current) {
+            const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
+            const savedEdges = cloneEdges(designSavedSnapshotRef.current.edges);
+            const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+            setExecutionNodes([...savedNodes, ...terminalNodes]);
+            setExecutionEdges(savedEdges);
+            executionLoadedSnapshotRef.current = {
+              nodes: cloneNodes(savedNodes),
+              edges: cloneEdges(savedEdges),
+            };
+          }
+          return;
+        }
+      }
+
+      // If the cached run is missing version info, fetch the full details before deciding how to load
+      if (runToUse && !runToUse.workflowVersionId && targetRunId) {
+        try {
+          const runDetails = await api.executions.getRun(targetRunId);
+          if (latestTargetRunIdRef.current !== targetRunId) return;
+          runToUse = normalizeRunSummary(runDetails);
+          upsertRunInCache(runToUse);
+        } catch (error) {
+          if (latestTargetRunIdRef.current !== targetRunId) return;
+          console.error('[VersionLoad] Failed to fetch run details for version resolution:', error);
+        }
+      }
+
+      if (!runToUse || latestTargetRunIdRef.current !== targetRunId) return;
+
+      const actualVersionId = runToUse.workflowVersionId;
+
+      if (!actualVersionId || actualVersionId === metadata.currentVersionId) {
+        preservedExecutionStateRef.current = null;
+        setExecutionDirty(false);
+
+        if (designSavedSnapshotRef.current) {
+          const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
+          const savedEdges = cloneEdges(designSavedSnapshotRef.current.edges);
+          const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+          setExecutionNodes([...savedNodes, ...terminalNodes]);
+          setExecutionEdges(savedEdges);
+          executionLoadedSnapshotRef.current = {
+            nodes: cloneNodes(savedNodes),
+            edges: cloneEdges(savedEdges),
+          };
+        } else {
+          const designNodesCopy = cloneNodes(designNodesRef.current);
+          const designEdgesCopy = cloneEdges(designEdgesRef.current);
+          const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+          setExecutionNodes([...designNodesCopy, ...terminalNodes]);
+          setExecutionEdges(designEdgesCopy);
+          executionLoadedSnapshotRef.current = {
+            nodes: cloneNodes(designNodesCopy),
+            edges: cloneEdges(designEdgesCopy),
+          };
+        }
+
+        if (historicalVersionId) {
+          setHistoricalVersionId(null);
+        }
+        return;
+      }
+
+      if (actualVersionId === historicalVersionId) {
+        return;
+      }
+
+      preservedExecutionStateRef.current = null;
+      setExecutionDirty(false);
+
+      try {
+        const workflowIdForRun = runToUse.workflowId ?? metadata.id;
+        if (!workflowIdForRun) {
+          return;
+        }
+
+        const version = await api.workflows.getVersion(workflowIdForRun, actualVersionId);
+        if (latestTargetRunIdRef.current !== targetRunId) return;
+
+        const versionNodes = deserializeNodes(version);
+        const versionEdges = deserializeEdges(version);
+        const terminalNodes = executionNodesRef.current.filter((n) => n.type === 'terminal');
+        setExecutionNodes([...versionNodes, ...terminalNodes]);
+        setExecutionEdges(versionEdges);
+        executionLoadedSnapshotRef.current = {
+          nodes: cloneNodes(versionNodes),
+          edges: cloneEdges(versionEdges),
+        };
+        setHistoricalVersionId(actualVersionId);
+      } catch (error) {
+        if (latestTargetRunIdRef.current !== targetRunId) return;
+        console.error('[VersionLoad] Failed to load workflow version:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Failed to load workflow version',
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    void loadVersionForRun();
+
+    return () => {
+      // Keep latestTargetRunIdRef for guarding async responses; it will be overwritten on next run evaluation.
+    };
+  }, [
+    mode,
+    metadata.id,
+    metadata.currentVersionId,
+    workflowRuns,
+    selectedRunId,
+    mostRecentRunId,
+    historicalVersionId,
+    routeRunId,
+    designSavedSnapshotRef,
+    designNodesRef,
+    designEdgesRef,
+    executionNodesRef,
+    executionEdgesRef,
+    setExecutionNodes,
+    setExecutionEdges,
+    executionLoadedSnapshotRef,
+    preservedExecutionStateRef,
+    setExecutionDirty,
+    toast,
+  ]);
+
+  return {
+    mostRecentRunId,
+    fetchRuns,
+    resetHistoricalTracking,
+  };
+}

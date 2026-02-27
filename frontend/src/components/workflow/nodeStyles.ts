@@ -1,0 +1,62 @@
+import type { NodeStatus } from '@/schemas/node';
+
+/**
+ * Node state styling configuration
+ */
+export interface NodeStateStyle {
+  border: string;
+  bg: string;
+  icon: string | null;
+  iconClass?: string;
+}
+
+/**
+ * Get styling for a node based on its execution state
+ */
+export function getNodeStyle(state: NodeStatus): NodeStateStyle {
+  const styles: Record<NodeStatus, NodeStateStyle> = {
+    idle: {
+      border: 'border-border',
+      bg: 'bg-background',
+      icon: null,
+    },
+    running: {
+      border: 'border-blue-500',
+      bg: 'bg-blue-50 dark:bg-blue-950/30',
+      icon: 'Activity',
+      iconClass: 'text-blue-600 dark:text-blue-400',
+    },
+    success: {
+      border: 'border-border',
+      bg: 'bg-background',
+      icon: 'CheckCircle',
+      iconClass: 'text-green-600 dark:text-green-400',
+    },
+    error: {
+      border: 'border-red-500',
+      bg: 'bg-red-50 dark:bg-red-950/30',
+      icon: 'XCircle',
+      iconClass: 'text-red-600 dark:text-red-400',
+    },
+    waiting: {
+      border: 'border-gray-400 dark:border-gray-600',
+      bg: 'bg-gray-50 dark:bg-gray-900/30',
+      icon: 'Clock',
+      iconClass: 'text-gray-500 dark:text-gray-400',
+    },
+    awaiting_input: {
+      border: 'border-blue-500 border-dashed',
+      bg: 'bg-blue-50 dark:bg-blue-950/30',
+      icon: 'ShieldAlert',
+      iconClass: 'text-blue-600 dark:text-blue-400',
+    },
+    skipped: {
+      border: 'border-slate-300 dark:border-slate-700 border-dashed',
+      bg: 'bg-slate-50 dark:bg-slate-900/40 opacity-70',
+      icon: 'Ban',
+      iconClass: 'text-slate-500 dark:text-slate-400',
+    },
+  };
+
+  return styles[state];
+}
