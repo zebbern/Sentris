@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { ApiTags, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -33,7 +43,7 @@ export class WebhooksAdminController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a webhook configuration by ID' })
   @ApiOkResponse({ type: WebhookConfigurationResponseDto })
-  async get(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
+  async get(@CurrentAuth() auth: AuthContext, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.webhooksService.get(auth, id);
   }
 
@@ -52,7 +62,7 @@ export class WebhooksAdminController {
   @ApiOkResponse({ type: WebhookConfigurationResponseDto })
   async update(
     @CurrentAuth() auth: AuthContext,
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(UpdateWebhookRequestDto.schema)) dto: UpdateWebhookRequestDto,
   ) {
     return this.webhooksService.update(auth, id, dto);
@@ -60,7 +70,7 @@ export class WebhooksAdminController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a webhook configuration' })
-  async delete(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
+  async delete(@CurrentAuth() auth: AuthContext, @Param('id', new ParseUUIDPipe()) id: string) {
     await this.webhooksService.delete(auth, id);
     return { success: true };
   }
@@ -68,14 +78,17 @@ export class WebhooksAdminController {
   @Post(':id/regenerate-path')
   @ApiOperation({ summary: 'Regenerate webhook path (creates new URL)' })
   @ApiOkResponse({ type: RegeneratePathResponseDto })
-  async regeneratePath(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
+  async regeneratePath(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     return this.webhooksService.regeneratePath(auth, id);
   }
 
   @Get(':id/url')
   @ApiOperation({ summary: 'Get the webhook URL for a configuration' })
   @ApiOkResponse({ type: GetWebhookUrlResponseDto })
-  async getUrl(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
+  async getUrl(@CurrentAuth() auth: AuthContext, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.webhooksService.getUrl(auth, id);
   }
 
@@ -93,14 +106,20 @@ export class WebhooksAdminController {
   @Get(':id/deliveries')
   @ApiOperation({ summary: 'List delivery history for a webhook' })
   @ApiOkResponse({ type: [WebhookDeliveryResponseDto] })
-  async listDeliveries(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
+  async listDeliveries(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     return this.webhooksService.listDeliveries(auth, id);
   }
 
   @Get(':id/deliveries/:deliveryId')
   @ApiOperation({ summary: 'Get details of a specific delivery' })
   @ApiOkResponse({ type: WebhookDeliveryResponseDto })
-  async getDelivery(@CurrentAuth() auth: AuthContext, @Param('deliveryId') deliveryId: string) {
+  async getDelivery(
+    @CurrentAuth() auth: AuthContext,
+    @Param('deliveryId', new ParseUUIDPipe()) deliveryId: string,
+  ) {
     return this.webhooksService.getDelivery(auth, deliveryId);
   }
 }
