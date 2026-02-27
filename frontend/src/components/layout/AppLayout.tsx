@@ -128,10 +128,13 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [location.pathname, isMobile]);
 
   // Auto-expand the Manage section when navigating to a settings sub-page
+  // (includes both settingsItems routes like /secrets, /api-keys, /mcp-library
+  // and the Settings page at /settings/*)
   useEffect(() => {
-    const isSettingsPage = settingsItems.some(
-      (item) => location.pathname === item.href || location.pathname.startsWith(item.href + '/'),
-    );
+    const isSettingsPage =
+      settingsItems.some(
+        (item) => location.pathname === item.href || location.pathname.startsWith(item.href + '/'),
+      ) || location.pathname.startsWith('/settings');
     if (isSettingsPage && !settingsOpen) {
       setSettingsOpen(true);
     }
@@ -439,7 +442,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   setSidebarOpen(false);
                   setWasExplicitlyOpened(false);
                 }}
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                className="p-2.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 min-h-11 min-w-11 flex items-center justify-center"
                 aria-label="Close sidebar"
               >
                 <X className="h-5 w-5" />
@@ -694,7 +697,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   {sidebarOpen && (
                     <button
                       onClick={startTransition}
-                      className="p-2 rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground text-muted-foreground flex-shrink-0"
+                      className="p-2.5 rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground text-muted-foreground flex-shrink-0 min-h-11 min-w-11 flex items-center justify-center"
                       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                     >
                       {theme === 'dark' ? (
@@ -711,7 +714,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <div className={cn('flex', sidebarOpen ? 'justify-end' : 'justify-center')}>
                   <button
                     onClick={startTransition}
-                    className="p-2 rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground text-muted-foreground"
+                    className="p-2.5 rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground text-muted-foreground min-h-11 min-w-11 flex items-center justify-center"
                     aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                   >
                     {theme === 'dark' ? (

@@ -125,6 +125,14 @@ export function AppTopBar({
       };
     }
 
+    if (location.pathname.startsWith('/settings')) {
+      return {
+        title: 'Settings',
+        shortTitle: 'Settings',
+        subtitle: 'Organization and workspace configuration',
+      };
+    }
+
     return {
       title: 'Security Workflow Builder',
       shortTitle: 'Workflows',
@@ -156,7 +164,7 @@ export function AppTopBar({
                 ? 'Collapse sidebar'
                 : 'Expand sidebar'
           }
-          className="h-9 w-9 flex-shrink-0"
+          className="h-9 w-9 min-h-11 min-w-11 flex-shrink-0"
         >
           {sidebarOpen ? (
             <PanelLeftClose className="h-5 w-5" />

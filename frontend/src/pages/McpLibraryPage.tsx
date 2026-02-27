@@ -1957,7 +1957,7 @@ export function McpLibraryPage() {
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4">
                     {serverCount === 0 ? (
-                      <div className="border rounded-lg">
+                      <div className="border rounded-lg overflow-x-auto">
                         <Table>
                           {renderServerTableHeader()}
                           <TableBody>
@@ -1972,7 +1972,7 @@ export function McpLibraryPage() {
                         </Table>
                       </div>
                     ) : (
-                      <div className="border rounded-lg">
+                      <div className="border rounded-lg overflow-x-auto">
                         <Table>
                           {renderServerTableHeader()}
                           <TableBody>

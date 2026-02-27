@@ -26,6 +26,9 @@ import {
   CornerDownLeft,
   Box,
   Puzzle,
+  Webhook,
+  Zap,
+  ServerCog,
 } from 'lucide-react';
 import { env } from '@/config/env';
 import { WorkflowMetadataSchema } from '@/schemas/workflow';
@@ -263,6 +266,36 @@ export function CommandPalette() {
         icon: Archive,
         keywords: ['artifacts', 'files', 'storage', 'library'],
         href: '/artifacts',
+      },
+      {
+        id: 'nav-webhooks',
+        type: 'navigation',
+        label: 'Webhooks',
+        description: 'Manage and debug incoming webhooks',
+        category: 'navigation',
+        icon: Webhook,
+        keywords: ['webhooks', 'hooks', 'triggers', 'incoming'],
+        href: '/webhooks',
+      },
+      {
+        id: 'nav-action-center',
+        type: 'navigation',
+        label: 'Action Center',
+        description: 'Review and respond to pending items',
+        category: 'navigation',
+        icon: Zap,
+        keywords: ['action', 'center', 'pending', 'approval', 'review'],
+        href: '/action-center',
+      },
+      {
+        id: 'nav-mcp-servers',
+        type: 'navigation',
+        label: 'MCP Servers',
+        description: 'Discover and manage MCP server configurations',
+        category: 'navigation',
+        icon: ServerCog,
+        keywords: ['mcp', 'servers', 'tools', 'configurations'],
+        href: '/mcp-library',
       },
     ];
 

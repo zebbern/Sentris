@@ -106,7 +106,7 @@ export function ArtifactLibrary() {
                 type="submit"
                 variant="secondary"
                 disabled={libraryLoading}
-                className="flex-shrink-0"
+                className="flex-shrink-0 border border-input"
               >
                 Search
               </Button>

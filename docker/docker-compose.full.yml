@@ -272,6 +272,7 @@ services:
       - OPENSEARCH_DASHBOARDS_URL=http://opensearch-dashboards:5601/analytics
       - OPENSEARCH_ADMIN_USERNAME=${OPENSEARCH_ADMIN_USERNAME:-admin}
       - OPENSEARCH_ADMIN_PASSWORD=${OPENSEARCH_ADMIN_PASSWORD:-}
+      - SECRET_STORE_MASTER_KEY=${SECRET_STORE_MASTER_KEY:-abcdefghijklmnopqrstuvwxyz012345}
     # Internal only - accessed via nginx at /api/
     expose:
       - '3211'
