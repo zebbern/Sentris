@@ -22,7 +22,7 @@ export function useWebhook(id: string | undefined) {
 
 export function useWebhookDeliveries(webhookId: string | undefined) {
   return useQuery({
-    queryKey: ['webhookDeliveries', webhookId] as const,
+    queryKey: queryKeys.webhooks.deliveries(webhookId || ''),
     queryFn: () => api.webhooks.listDeliveries(webhookId!),
     enabled: !!webhookId,
     staleTime: 60_000,

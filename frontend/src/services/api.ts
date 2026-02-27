@@ -1111,10 +1111,13 @@ export const api = {
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {
-    const headers = await getAuthHeaders();
+    const headers: Record<string, string> = { ...(await getAuthHeaders()) };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
     const response = await fetch(`${API_V1_URL}${path}`, {
       method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {
@@ -1125,10 +1128,13 @@ export const api = {
   },
 
   async put<T>(path: string, body?: unknown): Promise<T> {
-    const headers = await getAuthHeaders();
+    const headers: Record<string, string> = { ...(await getAuthHeaders()) };
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
     const response = await fetch(`${API_V1_URL}${path}`, {
       method: 'PUT',
-      headers: { ...headers, 'Content-Type': 'application/json' },
+      headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (!response.ok) {

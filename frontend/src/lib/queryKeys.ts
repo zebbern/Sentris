@@ -44,6 +44,7 @@ export const queryKeys = {
   webhooks: {
     all: (filters?: Record<string, unknown>) => ['webhooks', getOrgScope(), filters] as const,
     detail: (id: string) => ['webhooks', getOrgScope(), id] as const,
+    deliveries: (webhookId: string) => ['webhookDeliveries', getOrgScope(), webhookId] as const,
   },
   artifacts: {
     root: () => ['artifactLibrary', getOrgScope()] as const,
