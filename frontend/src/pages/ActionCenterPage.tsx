@@ -231,17 +231,17 @@ export function ActionCenterPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[160px]">Title</TableHead>
-                    <TableHead className="min-w-[100px] hidden md:table-cell">Node</TableHead>
-                    <TableHead className="min-w-[110px] hidden lg:table-cell">Run ID</TableHead>
-                    <TableHead className="min-w-[110px] hidden sm:table-cell whitespace-nowrap">
+                    <TableHead className="min-w-[120px]">Title</TableHead>
+                    <TableHead className="min-w-[80px] hidden md:table-cell">Node</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Run ID</TableHead>
+                    <TableHead className="min-w-[100px] hidden sm:table-cell whitespace-nowrap">
                       Created
                     </TableHead>
-                    <TableHead className="min-w-[90px] hidden lg:table-cell whitespace-nowrap">
+                    <TableHead className="min-w-[80px] hidden lg:table-cell whitespace-nowrap">
                       Timeout
                     </TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right min-w-[140px]">Actions</TableHead>
+                    <TableHead className="min-w-[70px] whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right min-w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

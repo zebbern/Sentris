@@ -33,6 +33,7 @@ import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { env } from '@/config/env';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/components/ui/use-toast';
 
 interface TopBarProps {
   workflowId?: string;
@@ -90,6 +91,7 @@ export function TopBar({
   // For other providers (local, custom), org context is always ready
   const isOrgReady = authProvider !== 'clerk' || organizationId !== DEFAULT_ORG_ID;
   const canEdit = Boolean(canManageWorkflows);
+  const { toast } = useToast();
 
   const handleChangeWorkflowName = () => {
     const trimmed = (tempWorkflowName ?? '').trim();
@@ -97,6 +99,10 @@ export function TopBar({
       setWorkflowName(DEFAULT_WORKFLOW_NAME);
       setTempWorkflowName(DEFAULT_WORKFLOW_NAME);
       setIsEditingTitle(false);
+      toast({
+        title: 'Workflow name cannot be empty',
+        description: `Using "${DEFAULT_WORKFLOW_NAME}" as the default name.`,
+      });
       return;
     }
     if (trimmed !== metadata.name) {
@@ -320,6 +326,7 @@ export function TopBar({
                   onKeyDown={handleKeyDown}
                   className="font-semibold bg-transparent border-none shadow-none h-7 px-0 py-0 text-xs sm:text-sm md:text-base focus-visible:ring-0 focus-visible:ring-offset-0 w-full min-w-[80px]"
                   placeholder="Workflow name"
+                  maxLength={100}
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
@@ -491,7 +498,12 @@ export function TopBar({
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More options">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="More options"
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

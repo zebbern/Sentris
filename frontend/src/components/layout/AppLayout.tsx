@@ -583,8 +583,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               {/* Collapsible Manage Items */}
               <div
                 className={cn(
-                  'overflow-hidden transition-all duration-300',
-                  settingsOpen ? 'max-h-96 mt-1 space-y-1' : 'max-h-0',
+                  'overflow-hidden transition-[max-height] duration-300',
+                  settingsOpen && sidebarOpen ? 'max-h-96 mt-1 space-y-1' : 'max-h-0',
                 )}
               >
                 {settingsItems.map((item) => {

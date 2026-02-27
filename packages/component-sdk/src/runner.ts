@@ -44,6 +44,24 @@ export async function resolveDockerPath(context?: ExecutionContext): Promise<str
 
 
 
+/**
+ * Detect Docker image pull progress messages that are sent to stderr
+ * but are informational, not actual errors.
+ */
+const DOCKER_PROGRESS_PATTERNS = [
+  /^(Pulling|Waiting|Downloading|Extracting|Verifying|Pull complete|Download complete|Already exists)/i,
+  /^[0-9a-f]{12}:\s*(Pulling|Waiting|Downloading|Extracting|Verifying|Pull complete|Download complete|Already exists)/i,
+  /^Digest:\s*sha256:/i,
+  /^Status:\s*(Downloaded|Image is up to date)/i,
+  /^[0-9a-f]{12}:\s*(Pulling fs layer|Download complete|Pull complete)/i,
+];
+
+function isDockerProgressMessage(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.length === 0) return false;
+  return DOCKER_PROGRESS_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 function formatArgs(args: string[]): string {
   return args
     .map((part, index) => {
@@ -317,11 +335,13 @@ async function runDockerWithStandardIO<I, O>(
       stderrEmitter(data);
       const chunk = data.toString();
       stderr += chunk;
+      const isProgress = isDockerProgressMessage(chunk);
+      const level = isProgress ? 'info' as const : 'error' as const;
       const logEntry = {
         runId: context.runId,
         nodeRef: context.componentRef,
         stream: 'stderr' as const,
-        level: 'error' as const,
+        level,
         message: chunk,
         timestamp: new Date().toISOString(),
       };
@@ -331,12 +351,14 @@ async function runDockerWithStandardIO<I, O>(
       if (chunk.trim().length > 0 && chunk.trim().length < 500) {
         context.emitProgress({
           message: chunk.trim(),
-          level: 'error',
+          level,
           data: { stream: 'stderr', origin: 'docker' },
         });
       }
 
-      console.error(`[${context.componentRef}] [Docker] stderr: ${chunk.trim()}`);
+      if (!isProgress) {
+        console.error(`[${context.componentRef}] [Docker] stderr: ${chunk.trim()}`);
+      }
     });
 
     proc.on('error', (error) => {

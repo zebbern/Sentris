@@ -381,6 +381,7 @@ export function SecretsManager() {
                   value={formState.name}
                   onChange={handleChange('name')}
                   disabled={disableCreate}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -396,6 +397,7 @@ export function SecretsManager() {
                   value={formState.description}
                   onChange={handleChange('description')}
                   disabled={disableCreate}
+                  maxLength={500}
                 />
               </div>
 
@@ -640,6 +642,7 @@ export function SecretsManager() {
                 value={editFormState.name}
                 onChange={handleEditChange('name')}
                 disabled={disableEditing}
+                maxLength={100}
                 required
               />
             </div>
@@ -654,6 +657,7 @@ export function SecretsManager() {
                 value={editFormState.description}
                 onChange={handleEditChange('description')}
                 disabled={disableEditing}
+                maxLength={500}
               />
             </div>
 

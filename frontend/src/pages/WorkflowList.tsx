@@ -214,7 +214,7 @@ export function WorkflowList() {
                     <TableHead>Name</TableHead>
                     <TableHead>Nodes</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>
+                    <TableHead className="hidden md:table-cell">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -229,7 +229,7 @@ export function WorkflowList() {
                         </Tooltip>
                       </TooltipProvider>
                     </TableHead>
-                    <TableHead>
+                    <TableHead className="hidden lg:table-cell">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -262,10 +262,10 @@ export function WorkflowList() {
                       <TableCell>
                         <Skeleton className="h-5 w-[80px] bg-muted" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Skeleton className="h-4 w-[160px] bg-muted" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <Skeleton className="h-4 w-[160px] bg-muted" />
                       </TableCell>
                       {canManageWorkflows && (
@@ -316,7 +316,7 @@ export function WorkflowList() {
                       <TableHead className="min-w-[150px]">Name</TableHead>
                       <TableHead className="min-w-[80px]">Nodes</TableHead>
                       <TableHead className="min-w-[100px]">Status</TableHead>
-                      <TableHead className="min-w-[140px] hidden sm:table-cell">
+                      <TableHead className="min-w-[140px] hidden md:table-cell">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -331,7 +331,7 @@ export function WorkflowList() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      <TableHead className="min-w-[140px] hidden md:table-cell">
+                      <TableHead className="min-w-[140px] hidden lg:table-cell">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -503,10 +503,10 @@ function WorkflowRowItem({
         </Badge>
       </TableCell>
       <TableCell>{statusBadge}</TableCell>
-      <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">
+      <TableCell className="text-muted-foreground text-sm hidden md:table-cell">
         {workflow.lastRun ? formatDate(workflow.lastRun) : 'N/A'}
       </TableCell>
-      <TableCell className="text-muted-foreground text-sm hidden md:table-cell">
+      <TableCell className="text-muted-foreground text-sm hidden lg:table-cell">
         {formatDate(workflow.updatedAt)}
       </TableCell>
       {canManageWorkflows && (

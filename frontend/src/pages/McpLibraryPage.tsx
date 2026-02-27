@@ -2323,6 +2323,7 @@ export function McpLibraryPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="My MCP Server"
+                  maxLength={100}
                 />
               </div>
 
@@ -2334,6 +2335,7 @@ export function McpLibraryPage() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional description..."
                   rows={2}
+                  maxLength={500}
                 />
               </div>
 

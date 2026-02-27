@@ -1046,8 +1046,15 @@ export const api = {
 
     get: async (id: string): Promise<WebhookConfiguration> => {
       const response = await apiClient.getWebhookConfiguration(id);
-      if (response.error || !response.data)
+      if (response.error || !response.data) {
+        const errorBody = (response as any).error as Record<string, unknown> | undefined;
+        const statusCode = errorBody?.statusCode ?? errorBody?.status;
+        const message = errorBody?.message;
+        if (statusCode === 404 || (typeof message === 'string' && message.includes('not found'))) {
+          throw new Error('Webhook not found');
+        }
         throw new Error('Failed to fetch webhook configuration');
+      }
       return response.data as WebhookConfiguration;
     },
 

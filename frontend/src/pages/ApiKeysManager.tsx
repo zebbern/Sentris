@@ -401,6 +401,7 @@ export function ApiKeysManager() {
                   placeholder="e.g. CI/CD Runner"
                   value={formState.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -412,6 +413,7 @@ export function ApiKeysManager() {
                   placeholder="What is this key used for?"
                   value={formState.description || ''}
                   onChange={(e) => handleInputChange('description', e.target.value)}
+                  maxLength={500}
                 />
               </div>
 

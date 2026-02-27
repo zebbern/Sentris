@@ -42,6 +42,8 @@ import { cn } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { SaveButton } from '@/components/ui/save-button';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import type { WebhookConfiguration, WebhookInputDefinition } from '@shipsec/shared';
 
 // Configure Monaco
@@ -74,6 +76,7 @@ export function WebhookEditorPage() {
   const isNew = !id || id === 'new';
   useDocumentTitle(isNew ? 'New Webhook' : 'Edit Webhook');
   const { confirm, dialogProps } = useConfirmDialog();
+  const queryClient = useQueryClient();
 
   // Get returnTo state for back button (if navigated from workflow webhooks sidebar)
   const navigationState = location.state as {
@@ -160,9 +163,13 @@ export function WebhookEditorPage() {
   // Handle webhook load error — navigate away
   useEffect(() => {
     if (webhookError && !isNew) {
+      const errorMessage = String(webhookError);
+      const isNotFound = errorMessage.includes('not found') || errorMessage.includes('404');
       toast({
-        title: 'Error loading data',
-        description: String(webhookError),
+        title: isNotFound ? 'Webhook not found' : 'Error loading webhook',
+        description: isNotFound
+          ? 'This webhook may have been deleted or the URL is invalid.'
+          : errorMessage,
         variant: 'destructive',
       });
       navigate('/webhooks');
@@ -277,7 +284,10 @@ export function WebhookEditorPage() {
     });
     if (!ok) return;
     try {
+      // Remove the webhook detail query before deletion to prevent stale 404 fetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.webhooks.detail(id!) });
       await deleteWebhook.mutateAsync(id!);
+      queryClient.removeQueries({ queryKey: queryKeys.webhooks.detail(id!) });
       navigate('/webhooks');
     } catch (error) {
       toast({

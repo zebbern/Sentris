@@ -52,12 +52,25 @@ export function RunWorkflowDialog({
   // Reset inputs when dialog opens
   useEffect(() => {
     if (open) {
-      setInputs(initialValues ?? {});
+      // Unwrap single-element arrays for non-array input types (fixes rerun pre-fill)
+      const unwrapped = { ...(initialValues ?? {}) };
+      for (const input of runtimeInputs) {
+        const value = unwrapped[input.id];
+        if (
+          input.type !== 'array' &&
+          input.type !== 'json' &&
+          Array.isArray(value) &&
+          value.length === 1
+        ) {
+          unwrapped[input.id] = value[0];
+        }
+      }
+      setInputs(unwrapped);
       setUploading({});
       setErrors({});
       setFormSeed((seed) => seed + 1);
     }
-  }, [initialValues, open]);
+  }, [initialValues, open, runtimeInputs]);
 
   const handleFileUpload = async (inputId: string, file: File) => {
     setUploading((prev) => ({ ...prev, [inputId]: true }));

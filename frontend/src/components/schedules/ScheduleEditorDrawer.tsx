@@ -115,6 +115,43 @@ const toOverrideDrafts = (
   }, {});
 };
 
+/**
+ * Validate a 5-field cron expression (minute hour day-of-month month day-of-week).
+ * Returns null if valid, or an error message string if invalid.
+ */
+function validateCronExpression(expression: string): string | null {
+  const trimmed = expression.trim();
+  if (!trimmed) return null; // empty is handled by required check
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length !== 5) {
+    return `Expected 5 fields (minute hour day month weekday), got ${parts.length}.`;
+  }
+
+  const fieldRanges: [string, number, number][] = [
+    ['minute', 0, 59],
+    ['hour', 0, 23],
+    ['day of month', 1, 31],
+    ['month', 1, 12],
+    ['day of week', 0, 7],
+  ];
+
+  // Matches: *, */N, N, N-N, N-N/N, names like MON-FRI, JAN-DEC, and comma-separated lists
+  const fieldPattern = /^(\*|[0-9a-zA-Z]+(-[0-9a-zA-Z]+)?)(\/(0|[1-9][0-9]*))?$/;
+
+  for (let i = 0; i < 5; i++) {
+    const [fieldName] = fieldRanges[i];
+    const items = parts[i].split(',');
+    for (const item of items) {
+      if (!fieldPattern.test(item)) {
+        return `Invalid ${fieldName} field: "${item}".`;
+      }
+    }
+  }
+
+  return null;
+}
+
 const ENTRY_SECTION_COPY =
   'Configure how this workflow should run on a cadence. Provide runtime inputs for the Entry Point and optional node overrides before saving the schedule.';
 
@@ -168,6 +205,7 @@ export function ScheduleEditorDrawer({
   const [nodeOverrideErrors, setNodeOverrideErrors] = useState<Record<string, string>>({});
   const [pendingOverrideNode, setPendingOverrideNode] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [cronError, setCronError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formSeed, setFormSeed] = useState(0);
 
@@ -193,6 +231,7 @@ export function ScheduleEditorDrawer({
     setNodeOverrideErrors({});
     setPendingOverrideNode('');
     setFormError(null);
+    setCronError(null);
     setFormSeed((seed) => seed + 1);
   };
 
@@ -222,6 +261,9 @@ export function ScheduleEditorDrawer({
     value: ScheduleFormState[K],
   ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === 'cronExpression') {
+      setCronError(validateCronExpression(String(value)));
+    }
   };
 
   const handleRuntimeInputChange = (input: RuntimeInputDefinition, value: unknown) => {
@@ -398,6 +440,12 @@ export function ScheduleEditorDrawer({
     }
     if (!form.cronExpression.trim()) {
       setFormError('Provide a cron expression.');
+      return;
+    }
+    const cronValidationError = validateCronExpression(form.cronExpression);
+    if (cronValidationError) {
+      setCronError(cronValidationError);
+      setFormError('Fix the cron expression before saving.');
       return;
     }
     if (!form.timezone.trim()) {
@@ -746,6 +794,7 @@ export function ScheduleEditorDrawer({
                   value={form.name}
                   onChange={(event) => handleFieldChange('name', event.target.value)}
                   placeholder="Daily quick scan"
+                  maxLength={100}
                 />
                 <p className="text-xs text-muted-foreground">
                   Appears in run metadata and chips inside the workflow.
@@ -758,6 +807,7 @@ export function ScheduleEditorDrawer({
                 value={form.description}
                 onChange={(event) => handleFieldChange('description', event.target.value)}
                 rows={3}
+                maxLength={500}
                 placeholder="Optional context for other operators."
               />
             </div>
@@ -771,11 +821,15 @@ export function ScheduleEditorDrawer({
                   value={form.cronExpression}
                   onChange={(event) => handleFieldChange('cronExpression', event.target.value)}
                   placeholder="0 9 * * MON-FRI"
-                  className="font-mono text-sm"
+                  className={cn('font-mono text-sm', cronError && 'border-destructive')}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Use standard cron syntax. Temporal handles catch-up windows.
-                </p>
+                {cronError ? (
+                  <p className="text-xs text-destructive">{cronError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Use standard cron syntax. Temporal handles catch-up windows.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Timezone</Label>
