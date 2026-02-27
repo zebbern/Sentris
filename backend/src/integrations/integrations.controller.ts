@@ -13,6 +13,7 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -34,11 +35,15 @@ import {
   UpsertProviderConfigSchema,
 } from './integrations.dto';
 import { IntegrationsService } from './integrations.service';
+import type { IntegrationsEnvConfig } from '../config';
 
 @ApiTags('integrations')
 @Controller('integrations')
 export class IntegrationsController {
-  constructor(private readonly integrations: IntegrationsService) {}
+  constructor(
+    private readonly integrations: IntegrationsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get('providers')
   @ApiOperation({ summary: 'List all integration providers' })
@@ -205,7 +210,8 @@ export class IntegrationsController {
   }
 
   private assertInternalAccess(token?: string): void {
-    const expected = process.env.INTERNAL_SERVICE_TOKEN;
+    const intCfg = this.configService.get<IntegrationsEnvConfig>('integrations')!;
+    const expected = intCfg.internalServiceToken;
     if (!expected) {
       return;
     }

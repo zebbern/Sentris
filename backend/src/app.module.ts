@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'node:path';
 import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
@@ -11,6 +11,17 @@ import { AppService } from './app.service';
 import { authConfig } from './config/auth.config';
 import { opensearchConfig } from './config/opensearch.config';
 import { validateBackendEnv } from './config/env.validate';
+import {
+  appConfig,
+  ingestConfig,
+  integrationsEnvConfig,
+  kafkaConfig,
+  lokiConfig,
+  minioEnvConfig,
+  redisConfig,
+  secretsConfig,
+  temporalTaskConfig,
+} from './config';
 import { OpenSearchModule } from './config/opensearch.module';
 import { AgentsModule } from './agents/agents.module';
 import { AuthModule } from './auth/auth.module';
@@ -82,12 +93,25 @@ function getEnvFilePaths(): string[] {
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: getEnvFilePaths(),
-      load: [authConfig, opensearchConfig],
+      load: [
+        appConfig,
+        authConfig,
+        ingestConfig,
+        integrationsEnvConfig,
+        kafkaConfig,
+        lokiConfig,
+        minioEnvConfig,
+        opensearchConfig,
+        redisConfig,
+        secretsConfig,
+        temporalTaskConfig,
+      ],
       validate: validateBackendEnv,
     }),
     ThrottlerModule.forRootAsync({
-      useFactory: () => {
-        const redisUrl = process.env.REDIS_URL;
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('redis.url');
 
         return {
           throttlers: [

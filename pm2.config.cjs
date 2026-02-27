@@ -162,6 +162,25 @@ if (!swcBinaryPath) {
   console.warn('Unable to automatically resolve SWC native binary; Temporal workers will use default resolution.');
 }
 
+// Resolve the tsx binary path cross-platform. Bun installs `.exe` on Windows
+// instead of the extensionless scripts that npm/yarn create.
+function resolveTsxBinary() {
+  const basePath = path.join(__dirname, 'node_modules', '.bin', 'tsx');
+  const candidates = process.platform === 'win32'
+    ? [basePath + '.exe', basePath + '.cmd', basePath]
+    : [basePath];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  // Fall back to the base path and let PM2 report the error.
+  return basePath;
+}
+
+const tsxBinary = resolveTsxBinary();
+
 // Load .env file and extract VITE_* variables for frontend
 function loadFrontendEnv(envFilePath) {
   const env = { NODE_ENV: 'development' };
@@ -345,7 +364,7 @@ module.exports = {
       name: `shipsec-worker-${instanceNum}`,
       cwd: __dirname + '/worker',
       // Run the worker with Node + tsx to avoid Bun's SWC binding issues
-      script: __dirname + '/node_modules/.bin/tsx',
+      script: tsxBinary,
       args: 'src/temporal/workers/dev.worker.ts',
       env_file: resolveEnvFile('worker', instanceNum),
       env: Object.assign(
@@ -377,7 +396,7 @@ module.exports = {
       name: 'shipsec-test-worker',
       cwd: __dirname + '/worker',
       // Use Node + tsx here as well
-      script: __dirname + '/node_modules/.bin/tsx',
+      script: tsxBinary,
       args: 'src/temporal/workers/dev.worker.ts',
       env_file: __dirname + '/worker/.env',
       env: Object.assign(

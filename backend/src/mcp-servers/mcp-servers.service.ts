@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, Logger, Inject, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 import { McpServersEncryptionService } from './mcp-servers.encryption';
@@ -17,6 +18,7 @@ import type {
 } from './dto/mcp-servers.dto';
 import type { McpServerRecord, McpServerToolRecord } from '../database/schema';
 import { SecretResolver } from '../secrets/secret-resolver';
+import type { TemporalTaskConfig } from '../config';
 
 // Redis injection token - defined as const to avoid circular dependency
 const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
@@ -32,6 +34,7 @@ export class McpServersService {
     @Optional() @Inject(MCP_SERVERS_REDIS) private readonly redis: Redis | null,
     @Optional() private readonly temporalService: TemporalService | null,
     private readonly auditLogService: AuditLogService,
+    private readonly configService: ConfigService,
   ) {}
 
   private resolveOrganizationId(auth: AuthContext | null): string {
@@ -519,9 +522,10 @@ export class McpServersService {
       this.logger.log(`Testing stdio server ${server.id} via Temporal workflow`);
 
       // Start discovery workflow
+      const temporalCfg = this.configService.get<TemporalTaskConfig>('temporalTask')!;
       const workflowResult = await this.temporalService.startWorkflow({
         workflowType: 'mcpDiscoveryWorkflow',
-        taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-dev',
+        taskQueue: temporalCfg.taskQueue,
         args: [
           {
             transport: 'stdio',

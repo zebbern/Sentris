@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Client } from 'minio';
+import type { MinioEnvConfig } from '../config';
 
 @Injectable()
 export class MinioConfig {
@@ -7,14 +9,15 @@ export class MinioConfig {
   private client: Client;
   private readonly bucketName = 'shipsec-files';
 
-  constructor() {
-    const endpointEnv = process.env.MINIO_ENDPOINT ?? 'localhost';
-    const portEnv = process.env.MINIO_PORT;
-    const useSSLEnv = process.env.MINIO_USE_SSL;
+  constructor(private readonly configService: ConfigService) {
+    const minioCfg = this.configService.get<MinioEnvConfig>('minio')!;
+    const endpointEnv = minioCfg.endpoint;
+    const portEnv = minioCfg.port;
+    const useSSLEnv = minioCfg.useSsl;
 
     const { endPoint, port, useSSL } = this.normalizeEndpoint(endpointEnv, portEnv, useSSLEnv);
-    const accessKey = process.env.MINIO_ROOT_USER ?? 'minioadmin';
-    const secretKey = process.env.MINIO_ROOT_PASSWORD ?? 'minioadmin';
+    const accessKey = minioCfg.rootUser;
+    const secretKey = minioCfg.rootPassword;
 
     this.client = new Client({
       endPoint,

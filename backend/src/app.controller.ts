@@ -8,6 +8,7 @@ import { CurrentAuth } from './auth/auth-context.decorator';
 import type { AuthContext } from './auth/types';
 import { Public } from './auth/public.decorator';
 import type { AuthConfig } from './config/auth.config';
+import type { AppConfig } from './config';
 import {
   SESSION_COOKIE_NAME,
   SESSION_COOKIE_MAX_AGE,
@@ -131,11 +132,14 @@ export class AppController {
     }
 
     // Create session token and set cookie
-    const sessionToken = createSessionToken(username);
+    const sessionToken = createSessionToken(username, {
+      sessionSecret: this.configService.get<AuthConfig>('auth')?.sessionSecret,
+      nodeEnv: this.configService.get<AppConfig>('app')?.nodeEnv,
+    });
 
     res.cookie(SESSION_COOKIE_NAME, sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: this.configService.get<AppConfig>('app')!.nodeEnv === 'production',
       sameSite: 'lax',
       maxAge: SESSION_COOKIE_MAX_AGE,
       path: '/',

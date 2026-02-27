@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SecretEncryption, SecretEncryptionMaterial, parseMasterKey } from '@shipsec/shared';
+import type { IntegrationsEnvConfig, SecretsConfig } from '../config';
 
 const DEFAULT_DEV_KEY = 'fedcba9876543210fedcba9876543210';
 
@@ -13,13 +15,12 @@ export class TokenEncryptionService {
   private readonly logger = new Logger(TokenEncryptionService.name);
   private readonly encryptor: SecretEncryption;
 
-  constructor() {
-    const rawKey =
-      process.env.INTEGRATION_STORE_MASTER_KEY ??
-      process.env.SECRET_STORE_MASTER_KEY ??
-      DEFAULT_DEV_KEY;
+  constructor(private readonly configService: ConfigService) {
+    const integrations = this.configService.get<IntegrationsEnvConfig>('integrations')!;
+    const secrets = this.configService.get<SecretsConfig>('secrets')!;
+    const rawKey = integrations.masterKey ?? secrets.masterKey ?? DEFAULT_DEV_KEY;
 
-    if (!process.env.INTEGRATION_STORE_MASTER_KEY && !process.env.SECRET_STORE_MASTER_KEY) {
+    if (!integrations.masterKey && !secrets.masterKey) {
       this.logger.warn(
         'INTEGRATION_STORE_MASTER_KEY is not configured. Falling back to insecure development key.',
       );

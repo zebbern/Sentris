@@ -434,6 +434,7 @@ describe('WorkflowsController', () => {
       terminalStreamService as any,
       terminalArchiveService as any,
       nodeIOService as any,
+      { get: () => undefined } as any,
     );
   });
 

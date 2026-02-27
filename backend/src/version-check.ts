@@ -9,9 +9,9 @@ const rootPackage = (() => {
   }
 })();
 
-const DEFAULT_BASE_URL = process.env.SHIPSEC_VERSION_CHECK_URL ?? 'https://version.shipsec.ai';
+const FALLBACK_BASE_URL = 'https://version.shipsec.ai';
 const DEFAULT_VERSION = typeof rootPackage?.version === 'string' ? rootPackage.version : '0.1.1';
-const DEFAULT_TIMEOUT_MS = Number(process.env.SHIPSEC_VERSION_CHECK_TIMEOUT_MS ?? '5000');
+const FALLBACK_TIMEOUT_MS = 5000;
 
 export interface VersionCheckResponse {
   latest_version: string;
@@ -41,23 +41,31 @@ export function isVersionCheckDisabled(env: NodeJS.ProcessEnv = process.env) {
   return ['1', 'true', 'yes'].includes(value.toLowerCase());
 }
 
+export interface VersionCheckOptions {
+  baseUrl?: string;
+  timeoutMs?: number;
+  metadata?: Partial<VersionCheckMetadata>;
+}
+
 export async function performVersionCheck(
-  overrides: Partial<VersionCheckMetadata> = {},
+  options: VersionCheckOptions = {},
 ): Promise<VersionCheckResult> {
+  const baseUrl = options.baseUrl ?? FALLBACK_BASE_URL;
+  const timeoutMs = options.timeoutMs ?? FALLBACK_TIMEOUT_MS;
   const metadata: VersionCheckMetadata = {
-    version: overrides.version ?? DEFAULT_VERSION,
-    platform: overrides.platform ?? process.platform,
-    arch: overrides.arch ?? process.arch,
+    version: options.metadata?.version ?? DEFAULT_VERSION,
+    platform: options.metadata?.platform ?? process.platform,
+    arch: options.metadata?.arch ?? process.arch,
   };
 
-  const url = new URL('/api/version/check', ensureTrailingSlash(DEFAULT_BASE_URL));
+  const url = new URL('/api/version/check', ensureTrailingSlash(baseUrl));
   url.searchParams.set('app', 'studio');
   url.searchParams.set('version', metadata.version);
   if (metadata.platform) url.searchParams.set('platform', metadata.platform);
   if (metadata.arch) url.searchParams.set('arch', metadata.arch);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url.toString(), { signal: controller.signal });

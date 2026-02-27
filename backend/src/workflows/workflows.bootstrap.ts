@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { WorkflowsService } from './workflows.service';
+import type { AppConfig, TemporalTaskConfig } from '../config';
 
 const DEMO_WORKFLOW_NAME = 'Temporal Demo Workflow';
 
@@ -8,7 +10,10 @@ const DEMO_WORKFLOW_NAME = 'Temporal Demo Workflow';
 export class WorkflowsBootstrapService implements OnModuleInit {
   private readonly logger = new Logger(WorkflowsBootstrapService.name);
 
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(
+    private readonly workflowsService: WorkflowsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     if (!this.shouldBootstrap()) {
@@ -33,12 +38,13 @@ export class WorkflowsBootstrapService implements OnModuleInit {
   }
 
   private shouldBootstrap(): boolean {
-    if (process.env.NODE_ENV === 'test') {
+    const appCfg = this.configService.get<AppConfig>('app')!;
+    if (appCfg.nodeEnv === 'test') {
       return false;
     }
 
-    const flag = process.env.TEMPORAL_BOOTSTRAP_DEMO;
-    return flag?.toLowerCase() === 'true';
+    const temporalCfg = this.configService.get<TemporalTaskConfig>('temporalTask')!;
+    return temporalCfg.bootstrapDemo;
   }
 
   private async ensureDemoWorkflow(): Promise<string> {

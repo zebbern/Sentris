@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Kafka, Consumer } from 'kafkajs';
 import { getTopicResolver } from '../common/kafka-topic-resolver';
 
@@ -6,6 +7,7 @@ import { LogStreamRepository } from '../trace/log-stream.repository';
 import type { KafkaLogEntry } from './log-entry.types';
 import { LokiLogClient } from './loki.client';
 import { redactSensitiveData } from './redact-sensitive';
+import type { KafkaConfig, LokiConfig } from '../config';
 
 @Injectable()
 export class LogIngestService implements OnModuleInit, OnModuleDestroy {
@@ -17,8 +19,13 @@ export class LogIngestService implements OnModuleInit, OnModuleDestroy {
   private readonly kafkaClientId: string;
   private readonly lokiClient: LokiLogClient;
 
-  constructor(private readonly repository: LogStreamRepository) {
-    const brokerEnv = process.env.LOG_KAFKA_BROKERS ?? '';
+  constructor(
+    private readonly repository: LogStreamRepository,
+    private readonly configService: ConfigService,
+  ) {
+    const kafka = this.configService.get<KafkaConfig>('kafka')!;
+    const loki = this.configService.get<LokiConfig>('loki')!;
+    const brokerEnv = kafka.brokers;
     this.kafkaBrokers = brokerEnv
       .split(',')
       .map((broker) => broker.trim())
@@ -28,21 +35,24 @@ export class LogIngestService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Use instance-aware topic name
-    const topicResolver = getTopicResolver();
+    const topicResolver = getTopicResolver({
+      instanceId: kafka.instanceId,
+      topics: { logs: kafka.logTopic },
+    });
     this.kafkaTopic = topicResolver.getLogsTopic();
 
-    this.kafkaGroupId = process.env.LOG_KAFKA_GROUP_ID ?? 'shipsec-log-ingestor';
-    this.kafkaClientId = process.env.LOG_KAFKA_CLIENT_ID ?? 'shipsec-backend';
+    this.kafkaGroupId = kafka.logGroupId ?? 'shipsec-log-ingestor';
+    this.kafkaClientId = kafka.logClientId ?? 'shipsec-backend';
 
-    const lokiUrl = process.env.LOKI_URL;
+    const lokiUrl = loki.url;
     if (!lokiUrl) {
       throw new Error('LOKI_URL must be configured for Kafka log ingestion');
     }
     this.lokiClient = new LokiLogClient({
       baseUrl: lokiUrl,
-      tenantId: process.env.LOKI_TENANT_ID,
-      username: process.env.LOKI_USERNAME,
-      password: process.env.LOKI_PASSWORD,
+      tenantId: loki.tenantId,
+      username: loki.username,
+      password: loki.password,
     });
   }
 

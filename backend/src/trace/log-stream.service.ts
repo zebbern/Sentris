@@ -4,6 +4,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { LogStreamRepository } from './log-stream.repository';
 import type { WorkflowLogStreamRecord } from '../database/schema';
@@ -36,11 +37,14 @@ export class LogStreamService {
   private readonly password?: string;
   private readonly defaultTailWindowMs = 60_000;
 
-  constructor(private readonly repository: LogStreamRepository) {
-    this.baseUrl = process.env.LOKI_URL;
-    this.tenantId = process.env.LOKI_TENANT_ID;
-    this.username = process.env.LOKI_USERNAME;
-    this.password = process.env.LOKI_PASSWORD;
+  constructor(
+    private readonly repository: LogStreamRepository,
+    private readonly configService: ConfigService,
+  ) {
+    this.baseUrl = this.configService.get<string>('loki.url');
+    this.tenantId = this.configService.get<string>('loki.tenantId');
+    this.username = this.configService.get<string>('loki.username');
+    this.password = this.configService.get<string>('loki.password');
   }
 
   async fetch(runId: string, auth: AuthContext | null, options: FetchLogsOptions = {}) {

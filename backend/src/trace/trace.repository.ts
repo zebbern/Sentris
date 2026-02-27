@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { eq, and, gt, desc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
@@ -31,10 +32,11 @@ export class TraceRepository implements OnModuleDestroy {
   constructor(
     @Inject(DRIZZLE_TOKEN)
     private readonly db: NodePgDatabase,
+    private readonly configService: ConfigService,
   ) {
     // Create a separate pool for LISTEN/NOTIFY to avoid conflicts
     this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: this.configService.get<string>('DATABASE_URL'),
     });
   }
 

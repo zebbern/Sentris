@@ -4,10 +4,10 @@ import { NodeIOService } from './node-io.service';
 import { NodeIOIngestService } from './node-io-ingest.service';
 import { DatabaseModule } from '../database/database.module';
 import { StorageModule } from '../storage/storage.module';
+import { ingestConfig, type IngestConfig } from '../config';
 
-const ingestServicesEnabled =
-  (process.env.ENABLE_INGEST_SERVICES ?? 'true') === 'true' &&
-  process.env.SKIP_INGEST_SERVICES !== 'true';
+const cfg = ingestConfig() as IngestConfig;
+const ingestServicesEnabled = cfg.enableIngestServices && !cfg.skipIngestServices;
 
 const ingestServices = ingestServicesEnabled ? [NodeIOIngestService] : [];
 

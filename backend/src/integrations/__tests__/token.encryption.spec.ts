@@ -2,6 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { Logger } from '@nestjs/common';
 
 import { TokenEncryptionService } from '../token.encryption';
+import type { ConfigService } from '@nestjs/config';
+
+function createMockConfigService(): ConfigService {
+  return {
+    get: (key: string) => {
+      if (key === 'integrations') {
+        return { masterKey: process.env.INTEGRATION_STORE_MASTER_KEY };
+      }
+      if (key === 'secrets') {
+        return { masterKey: process.env.SECRET_STORE_MASTER_KEY };
+      }
+      return undefined;
+    },
+  } as unknown as ConfigService;
+}
+
 const CUSTOM_KEY = 'abcdef1234567890abcdef1234567890'; // 32 hex chars
 
 describe('TokenEncryptionService', () => {
@@ -31,7 +47,7 @@ describe('TokenEncryptionService', () => {
 
   describe('encrypt/decrypt round-trip', () => {
     it('encrypts and decrypts back to the original plaintext using the dev key', async () => {
-      const service = new TokenEncryptionService();
+      const service = new TokenEncryptionService(createMockConfigService());
       const plaintext = 'oauth-token-abc123';
 
       const material = await service.encrypt(plaintext);
@@ -50,7 +66,7 @@ describe('TokenEncryptionService', () => {
     it('encrypts and decrypts with a custom INTEGRATION_STORE_MASTER_KEY', async () => {
       process.env.INTEGRATION_STORE_MASTER_KEY = CUSTOM_KEY;
 
-      const service = new TokenEncryptionService();
+      const service = new TokenEncryptionService(createMockConfigService());
       const plaintext = 'refresh-token-xyz789';
 
       const material = await service.encrypt(plaintext);
@@ -61,7 +77,7 @@ describe('TokenEncryptionService', () => {
       // Ciphertext from a custom key should differ from the dev key
       // (different key → different ciphertext, even for the same plaintext — but
       //  randomized IV guarantees different output regardless; we just verify both paths work)
-      const devService = new TokenEncryptionService();
+      const devService = new TokenEncryptionService(createMockConfigService());
       delete process.env.INTEGRATION_STORE_MASTER_KEY;
       const devMaterial = await devService.encrypt(plaintext);
 
@@ -73,7 +89,7 @@ describe('TokenEncryptionService', () => {
     it('logs a warning when falling back to the insecure dev key', () => {
       const loggerWarnSpy = spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
-      const _service = new TokenEncryptionService();
+      const _service = new TokenEncryptionService(createMockConfigService());
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('insecure development key'),
@@ -87,7 +103,7 @@ describe('TokenEncryptionService', () => {
 
       const loggerWarnSpy = spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
-      const _service = new TokenEncryptionService();
+      const _service = new TokenEncryptionService(createMockConfigService());
 
       expect(loggerWarnSpy).not.toHaveBeenCalled();
       loggerWarnSpy.mockRestore();
@@ -96,7 +112,7 @@ describe('TokenEncryptionService', () => {
 
   describe('keyId', () => {
     it('returns a non-empty string identifier', () => {
-      const service = new TokenEncryptionService();
+      const service = new TokenEncryptionService(createMockConfigService());
       const id = service.keyId;
 
       expect(typeof id).toBe('string');

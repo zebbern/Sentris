@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { AuthService } from '../../auth/auth.service';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -64,7 +64,12 @@ describe('MCP Internal API (Integration)', () => {
 
     const { McpModule } = await import('../mcp.module');
     const mockRedis = new MockRedis();
-    const encryption = new SecretsEncryptionService();
+    const encryption = new SecretsEncryptionService({
+      get: (key: string) => {
+        if (key === 'secrets') return { masterKey: process.env.SECRET_STORE_MASTER_KEY };
+        return undefined;
+      },
+    } as any);
     const toolRegistryService = new ToolRegistryService(mockRedis as unknown as any, encryption);
     const mockGatewayService = {
       refreshServersForRun: async () => {},
@@ -156,7 +161,8 @@ describe('MCP Internal API (Integration)', () => {
     const authService = moduleFixture.get(AuthService);
     const apiKeysService = moduleFixture.get(ApiKeysService);
     const reflector = moduleFixture.get(Reflector);
-    app.useGlobalGuards(new AuthGuard(authService, apiKeysService, reflector));
+    const configService = moduleFixture.get(ConfigService);
+    app.useGlobalGuards(new AuthGuard(authService, apiKeysService, reflector, configService));
     await app.init();
 
     redis = moduleFixture.get(TOOL_REGISTRY_REDIS);

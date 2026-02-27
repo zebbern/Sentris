@@ -4,6 +4,19 @@ import { LogStreamService } from '../log-stream.service';
 import type { WorkflowLogStreamRecord } from '../../database/schema';
 import type { LogStreamRepository } from '../log-stream.repository';
 import type { AuthContext } from '../../auth/types';
+import type { ConfigService } from '@nestjs/config';
+
+function createMockConfigService(): ConfigService {
+  return {
+    get: (key: string) => {
+      if (key === 'loki.url') return process.env.LOKI_URL;
+      if (key === 'loki.tenantId') return process.env.LOKI_TENANT_ID;
+      if (key === 'loki.username') return process.env.LOKI_USERNAME;
+      if (key === 'loki.password') return process.env.LOKI_PASSWORD;
+      return undefined;
+    },
+  } as unknown as ConfigService;
+}
 
 describe('LogStreamService', () => {
   const originalEnv = { ...process.env };
@@ -46,7 +59,7 @@ describe('LogStreamService', () => {
     const repository = {
       listByRunId: async () => [record],
     } as unknown as LogStreamRepository;
-    const service = new LogStreamService(repository);
+    const service = new LogStreamService(repository, createMockConfigService());
 
     await expect(service.fetch('run-123', null)).rejects.toThrow(
       'Loki integration is not configured',
@@ -80,7 +93,7 @@ describe('LogStreamService', () => {
     const repository = {
       listByRunId: async () => [record],
     } as unknown as LogStreamRepository;
-    const service = new LogStreamService(repository);
+    const service = new LogStreamService(repository, createMockConfigService());
     const result = await service.fetch('run-123', authContext, {
       nodeRef: 'node-1',
       stream: 'stdout',
@@ -139,7 +152,7 @@ describe('LogStreamService', () => {
       ],
     } as unknown as LogStreamRepository;
 
-    const service = new LogStreamService(repository);
+    const service = new LogStreamService(repository, createMockConfigService());
     await service.fetch('run-456', authContext, {});
 
     expect(calls).toHaveLength(1);
@@ -169,7 +182,7 @@ describe('LogStreamService', () => {
     const repository = {
       listByRunId: async () => [record],
     } as unknown as LogStreamRepository;
-    const service = new LogStreamService(repository);
+    const service = new LogStreamService(repository, createMockConfigService());
     const result = await service.fetch('run-123', authContext, {
       nodeRef: 'node-1',
       stream: 'stdout',

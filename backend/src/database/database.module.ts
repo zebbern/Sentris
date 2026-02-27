@@ -1,9 +1,10 @@
 import { Global, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { MigrationGuard } from './migration.guard';
 import * as schema from './schema';
+import type { IngestConfig } from '../config';
 
 export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
 
@@ -13,8 +14,9 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
   providers: [
     {
       provide: Pool,
-      useFactory: () => {
-        if (process.env.SKIP_INGEST_SERVICES === 'true') {
+      useFactory: (configService: ConfigService) => {
+        const ingest = configService.get<IngestConfig>('ingest')!;
+        if (ingest.skipIngestServices) {
           return {
             connect: async () => ({
               query: async () => ({ rows: [] }),
@@ -23,17 +25,19 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
             on: () => {},
           } as unknown as Pool;
         }
-        const connectionString = process.env.DATABASE_URL;
+        const connectionString = configService.get<string>('DATABASE_URL');
         if (!connectionString) {
           throw new Error('DATABASE_URL is not set');
         }
         return new Pool({ connectionString });
       },
+      inject: [ConfigService],
     },
     {
       provide: DRIZZLE_TOKEN,
-      useFactory: (pool: Pool) => {
-        if (process.env.SKIP_INGEST_SERVICES === 'true') {
+      useFactory: (pool: Pool, configService: ConfigService) => {
+        const ingest = configService.get<IngestConfig>('ingest')!;
+        if (ingest.skipIngestServices) {
           // Recursive mock that handles method chaining and awaits
           const createRecursiveMock = (): any => {
             return new Proxy(() => {}, {
@@ -54,7 +58,7 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
         // Pass schema to enable relational query API (db.query.tableName)
         return drizzle(pool, { schema });
       },
-      inject: [Pool],
+      inject: [Pool, ConfigService],
     },
     MigrationGuard,
   ],

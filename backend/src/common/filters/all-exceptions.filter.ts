@@ -6,7 +6,9 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
+import type { AppConfig } from '../../config';
 
 /**
  * Global exception filter — catches any unhandled exception that escapes
@@ -22,15 +24,19 @@ import type { Request, Response } from 'express';
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+  private readonly isProduction: boolean;
+
+  constructor(private readonly configService: ConfigService) {
+    const appCfg = this.configService.get<AppConfig>('app');
+    this.isProduction = appCfg?.nodeEnv === 'production';
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
 
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    const { status, body } = this.buildResponse(exception, request, isProduction);
+    const { status, body } = this.buildResponse(exception, request, this.isProduction);
 
     this.logException(exception, status, request);
 

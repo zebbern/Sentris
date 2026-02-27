@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 import { DatabaseModule } from '../database/database.module';
@@ -7,6 +8,7 @@ import { McpGroupsRepository } from './mcp-groups.repository';
 import { McpGroupsService } from './mcp-groups.service';
 import { McpGroupsSeedingService } from './mcp-groups-seeding.service';
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+import type { RedisConfig } from '../config';
 
 // Redis injection token - must match the one in mcp-servers.service.ts
 const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
@@ -21,11 +23,12 @@ const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
     McpServersRepository,
     {
       provide: MCP_SERVERS_REDIS,
-      useFactory: () => {
-        const url =
-          process.env.REDIS_URL ?? process.env.TERMINAL_REDIS_URL ?? 'redis://localhost:6379';
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.url ?? redis.terminalUrl ?? 'redis://localhost:6379';
         return new Redis(url);
       },
+      inject: [ConfigService],
     },
   ],
   exports: [McpGroupsService, McpGroupsRepository],

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SecretEncryptionMaterial } from '@shipsec/shared';
 import { randomBytes, createHash } from 'crypto';
 
@@ -84,8 +85,10 @@ export class IntegrationsService implements OnModuleInit {
   constructor(
     private readonly repository: IntegrationsRepository,
     private readonly encryption: TokenEncryptionService,
+    private readonly configService: ConfigService,
   ) {
-    this.providers = loadIntegrationProviders();
+    const intConfig = this.configService.get('integrations')!;
+    this.providers = loadIntegrationProviders(intConfig);
   }
 
   async onModuleInit(): Promise<void> {

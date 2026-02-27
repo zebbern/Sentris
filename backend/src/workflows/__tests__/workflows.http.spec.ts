@@ -97,6 +97,7 @@ describe('WorkflowsController contract coverage', () => {
       terminalStreamService as any,
       terminalArchiveService as any,
       nodeIOService as any,
+      { get: () => undefined } as any,
     );
     vi.clearAllMocks();
   });

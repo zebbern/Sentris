@@ -5,7 +5,11 @@ import type { LocalAuthConfig } from '../../config/auth.config';
 import { DEFAULT_ROLES, type AuthContext } from '../types';
 import type { AuthProviderStrategy } from './auth-provider.interface';
 import { DEFAULT_ORGANIZATION_ID } from '../constants';
-import { verifySessionToken, SESSION_COOKIE_NAME } from '../session.utils';
+import {
+  verifySessionToken,
+  SESSION_COOKIE_NAME,
+  type SessionSecretConfig,
+} from '../session.utils';
 
 function extractBasicAuth(
   headerValue: string | undefined,
@@ -31,7 +35,10 @@ export class LocalAuthProvider implements AuthProviderStrategy {
   readonly name = 'local';
   private readonly logger = new Logger(LocalAuthProvider.name);
 
-  constructor(private readonly config: LocalAuthConfig) {}
+  constructor(
+    private readonly config: LocalAuthConfig,
+    private readonly sessionConfig: SessionSecretConfig = {},
+  ) {}
 
   async authenticate(request: Request): Promise<AuthContext> {
     // Always use local-dev org ID for local auth
@@ -45,7 +52,7 @@ export class LocalAuthProvider implements AuthProviderStrategy {
     // Try session cookie first (for browser navigation requests like /analytics/)
     const sessionCookie = request.cookies?.[SESSION_COOKIE_NAME];
     if (sessionCookie) {
-      const session = verifySessionToken(sessionCookie);
+      const session = verifySessionToken(sessionCookie, this.sessionConfig);
       if (session && session.username === this.config.adminUsername) {
         this.logger.debug(`Session cookie auth successful for user: ${session.username}`);
         return {

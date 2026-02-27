@@ -1,5 +1,6 @@
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, Logger, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
@@ -9,6 +10,7 @@ import { IS_PUBLIC_KEY } from './public.decorator';
 import type { AuthContext } from './types';
 import { DEFAULT_ROLES } from './types';
 import { DEFAULT_ORGANIZATION_ID } from './constants';
+import type { IntegrationsEnvConfig } from '../config';
 
 export interface RequestWithAuthContext extends Request {
   auth?: AuthContext;
@@ -23,6 +25,7 @@ export class AuthGuard implements CanActivate {
     @Inject(forwardRef(() => ApiKeysService))
     private readonly apiKeysService: ApiKeysService,
     private readonly reflector: Reflector,
+    private readonly configService: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -83,7 +86,8 @@ export class AuthGuard implements CanActivate {
 
   private tryInternalAuth(request: Request): AuthContext | null {
     const provided = request.header('x-internal-token');
-    const expected = process.env.INTERNAL_SERVICE_TOKEN;
+    const intCfg = this.configService.get<IntegrationsEnvConfig>('integrations')!;
+    const expected = intCfg.internalServiceToken;
 
     if (!provided || !expected) {
       return null;

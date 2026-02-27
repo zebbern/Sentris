@@ -7,6 +7,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   type WebhookConfiguration,
   type WebhookDelivery,
@@ -22,12 +23,12 @@ import { WebhookRepository } from './repository/webhook.repository';
 import { WebhookDeliveryRepository } from './repository/webhook-delivery.repository';
 import type { WebhookConfigurationRecord, WebhookDeliveryRecord } from '../database/schema';
 
-const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || 'https://api.shipsec.ai';
 const WEBHOOK_PATH_PREFIX = 'wh_';
 
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
+  private readonly webhookBaseUrl: string;
 
   constructor(
     private readonly repository: WebhookRepository,
@@ -35,7 +36,13 @@ export class WebhooksService {
     private readonly workflowsService: WorkflowsService,
     private readonly temporalService: TemporalService,
     private readonly auditLogService: AuditLogService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.webhookBaseUrl = this.configService.get<string>(
+      'app.webhookBaseUrl',
+      'https://api.shipsec.ai',
+    );
+  }
 
   // Management methods (auth required)
 
@@ -541,7 +548,7 @@ export class WebhooksService {
   }
 
   private buildWebhookUrl(path: string): string {
-    return `${WEBHOOK_BASE_URL}/webhooks/inbound/${path}`;
+    return `${this.webhookBaseUrl}/webhooks/inbound/${path}`;
   }
 
   private mapConfigurationRecord(record: WebhookConfigurationRecord): WebhookConfiguration {

@@ -24,9 +24,11 @@ describe('AuthGuard', () => {
   };
   let mockExecutionContext: ExecutionContext;
   let mockRequest: RequestWithAuthContext;
+  let mockInternalServiceToken: string | undefined;
 
   beforeEach(() => {
     // Reset mocks
+    mockInternalServiceToken = undefined;
     mockAuthService = {
       authenticate: vi.fn(),
       providerName: 'clerk',
@@ -38,11 +40,19 @@ describe('AuthGuard', () => {
       getAllAndOverride: vi.fn(),
     };
 
+    const mockConfigService = {
+      get: (key: string) => {
+        if (key === 'integrations') return { internalServiceToken: mockInternalServiceToken };
+        return undefined;
+      },
+    };
+
     // Create guard with mocked dependencies
     guard = new AuthGuard(
       mockAuthService as unknown as AuthService,
       mockApiKeysService as unknown as ApiKeysService,
       mockReflector as unknown as Reflector,
+      mockConfigService as any,
     );
 
     // Setup mock request
@@ -79,7 +89,7 @@ describe('AuthGuard', () => {
 
     it('should prioritize internal auth over API key auth', async () => {
       const internalToken = 'internal-secret-token';
-      process.env.INTERNAL_SERVICE_TOKEN = internalToken;
+      mockInternalServiceToken = internalToken;
 
       (mockRequest.header as ReturnType<typeof vi.fn>).mockImplementation((name: string) => {
         if (name === 'x-internal-token') return internalToken;
@@ -98,8 +108,6 @@ describe('AuthGuard', () => {
       });
       expect(mockApiKeysService.validateKey).not.toHaveBeenCalled();
       expect(mockAuthService.authenticate).not.toHaveBeenCalled();
-
-      delete process.env.INTERNAL_SERVICE_TOKEN;
     });
 
     it('should prioritize API key auth over user auth', async () => {
@@ -172,11 +180,11 @@ describe('AuthGuard', () => {
 
   describe('tryInternalAuth', () => {
     beforeEach(() => {
-      process.env.INTERNAL_SERVICE_TOKEN = 'test-internal-token';
+      mockInternalServiceToken = 'test-internal-token';
     });
 
     afterEach(() => {
-      delete process.env.INTERNAL_SERVICE_TOKEN;
+      mockInternalServiceToken = undefined;
     });
 
     it('should authenticate with valid internal token', async () => {
@@ -454,7 +462,7 @@ describe('AuthGuard', () => {
 
   describe('edge cases', () => {
     it('should handle request with all auth methods present (internal wins)', async () => {
-      process.env.INTERNAL_SERVICE_TOKEN = 'internal-token';
+      mockInternalServiceToken = 'internal-token';
 
       const apiKey = 'sk_live_test123_secretkey12345678901234567890';
       const mockApiKeyRecord: ApiKey = {
@@ -495,8 +503,6 @@ describe('AuthGuard', () => {
       expect(mockRequest.auth?.provider).toBe('internal');
       expect(mockApiKeysService.validateKey).not.toHaveBeenCalled();
       expect(mockAuthService.authenticate).not.toHaveBeenCalled();
-
-      delete process.env.INTERNAL_SERVICE_TOKEN;
     });
 
     it('should handle request with API key and user auth (API key wins)', async () => {

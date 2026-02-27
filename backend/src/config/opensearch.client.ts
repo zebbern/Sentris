@@ -31,7 +31,7 @@ export class OpenSearchClient implements OnModuleInit {
         node: url,
         auth: username && password ? { username, password } : undefined,
         ssl: {
-          rejectUnauthorized: process.env.NODE_ENV === 'production',
+          rejectUnauthorized: this.configService.get<string>('app.nodeEnv') === 'production',
         },
       });
 

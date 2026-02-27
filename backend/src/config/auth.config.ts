@@ -16,6 +16,7 @@ export interface AuthConfig {
   provider: AuthProvider;
   local: LocalAuthConfig;
   clerk: ClerkAuthConfig;
+  sessionSecret: string | undefined;
 }
 
 function normalizeProvider(raw: string | undefined): AuthProvider {
@@ -40,5 +41,6 @@ export const authConfig = registerAs<AuthConfig>('auth', () => {
       publishableKey: process.env.CLERK_PUBLISHABLE_KEY ?? null,
       secretKey: process.env.CLERK_SECRET_KEY ?? null,
     },
+    sessionSecret: process.env.SESSION_SECRET,
   };
 });

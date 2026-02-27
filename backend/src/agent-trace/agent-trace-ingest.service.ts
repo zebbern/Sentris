@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Consumer, Kafka } from 'kafkajs';
 import { getTopicResolver } from '../common/kafka-topic-resolver';
 
 import { AgentTraceRepository, type AgentTraceEventInput } from './agent-trace.repository';
+import type { KafkaConfig } from '../config';
 
 @Injectable()
 export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
@@ -13,8 +15,12 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
   private readonly kafkaClientId: string;
   private consumer: Consumer | undefined;
 
-  constructor(private readonly repository: AgentTraceRepository) {
-    const brokerEnv = process.env.LOG_KAFKA_BROKERS ?? '';
+  constructor(
+    private readonly repository: AgentTraceRepository,
+    private readonly configService: ConfigService,
+  ) {
+    const kafka = this.configService.get<KafkaConfig>('kafka')!;
+    const brokerEnv = kafka.brokers;
     this.kafkaBrokers = brokerEnv
       .split(',')
       .map((broker) => broker.trim())
@@ -24,9 +30,12 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Use instance-aware topic name
-    const topicResolver = getTopicResolver();
+    const topicResolver = getTopicResolver({
+      instanceId: kafka.instanceId,
+      topics: { agentTrace: kafka.agentTraceTopic },
+    });
     this.kafkaTopic = topicResolver.getAgentTraceTopic();
-    const instanceId = process.env.SHIPSEC_INSTANCE;
+    const instanceId = kafka.instanceId;
     const defaultGroupId = instanceId
       ? `shipsec-agent-trace-ingestor-${instanceId}`
       : 'shipsec-agent-trace-ingestor';
@@ -34,8 +43,8 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
       ? `shipsec-backend-agent-trace-${instanceId}`
       : 'shipsec-backend-agent-trace';
 
-    this.kafkaGroupId = process.env.AGENT_TRACE_KAFKA_GROUP_ID ?? defaultGroupId;
-    this.kafkaClientId = process.env.AGENT_TRACE_KAFKA_CLIENT_ID ?? defaultClientId;
+    this.kafkaGroupId = kafka.agentTraceGroupId ?? defaultGroupId;
+    this.kafkaClientId = kafka.agentTraceClientId ?? defaultClientId;
   }
 
   async onModuleInit(): Promise<void> {

@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
+import type { AppConfig } from '../config';
 
 const REQUIRED_TABLES = [
   'workflows',
@@ -15,10 +17,14 @@ const REQUIRED_TABLES = [
 export class MigrationGuard implements OnModuleInit {
   private readonly logger = new Logger(MigrationGuard.name);
 
-  constructor(@Inject(Pool) private readonly pool: Pool) {}
+  constructor(
+    @Inject(Pool) private readonly pool: Pool,
+    private readonly configService: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
-    if (process.env.SHIPSEC_SKIP_MIGRATION_CHECK === 'true') {
+    const appCfg = this.configService.get<AppConfig>('app')!;
+    if (appCfg.skipMigrationCheck) {
       this.logger.warn('Skipping migration check because SHIPSEC_SKIP_MIGRATION_CHECK=true.');
       return;
     }

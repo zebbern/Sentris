@@ -2,6 +2,35 @@ import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { LogIngestService } from '../log-ingest.service';
 import type { LogStreamRepository } from '../../trace/log-stream.repository';
+import type { ConfigService } from '@nestjs/config';
+
+function createMockConfigService(): ConfigService {
+  return {
+    get: (key: string) => {
+      if (key === 'kafka') {
+        return {
+          brokers: process.env.LOG_KAFKA_BROKERS ?? '',
+          instanceId: undefined,
+          logGroupId: undefined,
+          logClientId: undefined,
+          logTopic: 'telemetry.logs',
+          eventTopic: 'telemetry.events',
+          agentTraceTopic: 'telemetry.agent-trace',
+          nodeIoTopic: 'telemetry.node-io',
+        };
+      }
+      if (key === 'loki') {
+        return {
+          url: process.env.LOKI_URL,
+          tenantId: undefined,
+          username: undefined,
+          password: undefined,
+        };
+      }
+      return undefined;
+    },
+  } as unknown as ConfigService;
+}
 
 describe('LogIngestService', () => {
   const originalEnv = { ...process.env };
@@ -20,7 +49,7 @@ describe('LogIngestService', () => {
       upsertMetadata: mock(async () => undefined),
     } as unknown as LogStreamRepository;
 
-    const service = new LogIngestService(repository);
+    const service = new LogIngestService(repository, createMockConfigService());
     const push = mock(async () => undefined);
     (service as any).lokiClient = { push };
 

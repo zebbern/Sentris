@@ -1,20 +1,26 @@
 import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
 
 import { isVersionCheckDisabled, performVersionCheck } from './version-check';
+import type { AppConfig } from './config/app.config';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  await enforceVersionCheck();
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn'],
   });
+
+  const configService = app.get(ConfigService);
+  const appCfg = configService.get<AppConfig>('app')!;
+
+  await enforceVersionCheck(configService);
 
   // Enable cookie parsing for session auth
   app.use(cookieParser());
@@ -63,8 +69,8 @@ async function bootstrap() {
       'X-Forwarded-Proto',
     ],
   });
-  const port = Number(process.env.PORT ?? 3211);
-  const host = process.env.HOST ?? '0.0.0.0';
+  const port = appCfg.port;
+  const host = appCfg.host;
 
   const config = new DocumentBuilder()
     .setTitle('ShipSec Studio API')
@@ -82,16 +88,20 @@ async function bootstrap() {
 
 const versionLogger = new Logger('VersionCheck');
 
-async function enforceVersionCheck() {
+async function enforceVersionCheck(configService: ConfigService) {
   if (isVersionCheckDisabled(process.env)) {
     versionLogger.warn('Skipping version validation (disabled via env).');
     return;
   }
 
+  const appCfg = configService.get<AppConfig>('app')!;
+
   try {
-    const result = await performVersionCheck();
-    const currentVersion =
-      process.env.SHIPSEC_VERSION_CHECK_VERSION ?? result.response.min_supported_version;
+    const result = await performVersionCheck({
+      baseUrl: appCfg.versionCheckUrl,
+      timeoutMs: appCfg.versionCheckTimeoutMs,
+    });
+    const currentVersion = appCfg.versionCheckVersion ?? result.response.min_supported_version;
     const latest = result.response.latest_version;
 
     if (result.outcome === 'unsupported') {

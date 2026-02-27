@@ -1,9 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Consumer, Kafka } from 'kafkajs';
 import { getTopicResolver } from '../common/kafka-topic-resolver';
 
 import { TraceRepository, type PersistedTraceEvent } from '../trace/trace.repository';
 import type { TraceEventType } from '../trace/types';
+import type { KafkaConfig } from '../config';
 
 interface KafkaTraceEventPayload {
   runId: string;
@@ -29,8 +31,12 @@ export class EventIngestService implements OnModuleInit, OnModuleDestroy {
   private readonly kafkaClientId: string;
   private consumer: Consumer | undefined;
 
-  constructor(private readonly traceRepository: TraceRepository) {
-    const brokerEnv = process.env.LOG_KAFKA_BROKERS ?? '';
+  constructor(
+    private readonly traceRepository: TraceRepository,
+    private readonly configService: ConfigService,
+  ) {
+    const kafka = this.configService.get<KafkaConfig>('kafka')!;
+    const brokerEnv = kafka.brokers;
     this.kafkaBrokers = brokerEnv
       .split(',')
       .map((broker) => broker.trim())
@@ -40,11 +46,14 @@ export class EventIngestService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Use instance-aware topic name
-    const topicResolver = getTopicResolver();
+    const topicResolver = getTopicResolver({
+      instanceId: kafka.instanceId,
+      topics: { events: kafka.eventTopic },
+    });
     this.kafkaTopic = topicResolver.getEventsTopic();
 
-    this.kafkaGroupId = process.env.EVENT_KAFKA_GROUP_ID ?? 'shipsec-event-ingestor';
-    this.kafkaClientId = process.env.EVENT_KAFKA_CLIENT_ID ?? 'shipsec-backend-events';
+    this.kafkaGroupId = kafka.eventGroupId ?? 'shipsec-event-ingestor';
+    this.kafkaClientId = kafka.eventClientId ?? 'shipsec-backend-events';
   }
 
   async onModuleInit(): Promise<void> {

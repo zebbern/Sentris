@@ -17,6 +17,7 @@ import {
   StreamableFile,
   Headers,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiCreatedResponse,
   ApiOkResponse,
@@ -73,6 +74,7 @@ import { RunArtifactIdParamDto, RunArtifactIdParamSchema } from '../storage/dto/
 import type { WorkflowTerminalRecord } from '../database/schema';
 import { NodeIOService } from '../node-io/node-io.service';
 import { TERMINAL_STATUSES } from '@shipsec/shared';
+import type { AppConfig } from '../config';
 
 const TERMINAL_COMPLETION_STATUSES = new Set(TERMINAL_STATUSES);
 
@@ -256,6 +258,7 @@ export class WorkflowsController {
     private readonly terminalStreamService: TerminalStreamService,
     private readonly terminalArchiveService: TerminalArchiveService,
     private readonly nodeIOService: NodeIOService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post()
@@ -698,7 +701,8 @@ export class WorkflowsController {
       };
 
       // Include stack trace and cause only in development to avoid leaking internal details
-      const isDevelopment = process.env.NODE_ENV !== 'production';
+      const appCfg = this.configService.get<AppConfig>('app')!;
+      const isDevelopment = appCfg.nodeEnv !== 'production';
       if (isDevelopment) {
         if (error instanceof Error && error.stack) {
           errorDetails.stack = error.stack;

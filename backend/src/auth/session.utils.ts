@@ -4,10 +4,15 @@ import * as crypto from 'crypto';
 export const SESSION_COOKIE_NAME = 'shipsec_session';
 export const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function getSessionSecret(): string {
-  const secret = process.env.SESSION_SECRET;
+export interface SessionSecretConfig {
+  sessionSecret?: string;
+  nodeEnv?: string;
+}
+
+function getSessionSecret(config: SessionSecretConfig): string {
+  const secret = config.sessionSecret;
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
+    if (config.nodeEnv === 'production') {
       throw new Error('SESSION_SECRET is required in production for session authentication');
     }
     return 'local-dev-session-secret';
@@ -23,8 +28,8 @@ export interface SessionPayload {
 /**
  * Create a signed session token for local auth.
  */
-export function createSessionToken(username: string): string {
-  const secret = getSessionSecret();
+export function createSessionToken(username: string, config: SessionSecretConfig): string {
+  const secret = getSessionSecret(config);
   const payload = JSON.stringify({ username, ts: Date.now() });
   const hmac = crypto.createHmac('sha256', secret);
   hmac.update(payload);
@@ -35,9 +40,12 @@ export function createSessionToken(username: string): string {
 /**
  * Verify and decode a session token.
  */
-export function verifySessionToken(token: string): SessionPayload | null {
+export function verifySessionToken(
+  token: string,
+  config: SessionSecretConfig,
+): SessionPayload | null {
   try {
-    const secret = getSessionSecret();
+    const secret = getSessionSecret(config);
     const decoded = Buffer.from(token, 'base64').toString('utf-8');
     const lastDot = decoded.lastIndexOf('.');
     if (lastDot === -1) return null;

@@ -323,6 +323,9 @@ describe('WebhooksService', () => {
       workflowsService,
       temporalService,
       auditLogService as any,
+      {
+        get: (key: string, defaultValue?: string) => defaultValue ?? 'https://api.shipsec.ai',
+      } as any,
     );
     ensureWorkflowAdminAccessCalls.length = 0;
     getCompiledWorkflowContextCalls.length = 0;

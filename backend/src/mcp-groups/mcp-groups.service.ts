@@ -6,6 +6,7 @@ import {
   Inject,
   Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 import {
@@ -31,6 +32,7 @@ import type {
 } from './dto/mcp-groups.dto';
 import type { McpGroupRecord } from '../database/schema';
 import type { TemplateSyncResult } from './mcp-groups-seeding.service';
+import type { IngestConfig } from '../config';
 
 /** Template server shape including optional runtime ID (not in Zod schema but may exist at runtime) */
 interface McpTemplateServer {
@@ -54,10 +56,12 @@ export class McpGroupsService implements OnModuleInit {
     private readonly mcpServersRepository: McpServersRepository,
     @Optional() @Inject(MCP_SERVERS_REDIS) private readonly redis: Redis | null,
     private readonly auditLogService: AuditLogService,
+    private readonly configService: ConfigService,
   ) {}
 
   async onModuleInit() {
-    if (process.env.MCP_SYNC_TEMPLATES_ON_STARTUP !== 'true') {
+    const ingest = this.configService.get<IngestConfig>('ingest')!;
+    if (!ingest.mcpSyncTemplatesOnStartup) {
       return;
     }
 

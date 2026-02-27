@@ -1,4 +1,5 @@
 import { Global, Logger, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from './tool-registry.service';
 import { McpGatewayService } from './mcp-gateway.service';
@@ -15,6 +16,7 @@ import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
 import { DatabaseModule } from '../database/database.module';
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
 import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
+import type { RedisConfig } from '../config';
 
 @Global()
 @Module({
@@ -30,18 +32,18 @@ import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
   providers: [
     {
       provide: MCP_DISCOVERY_REDIS,
-      useFactory: () => {
-        // Keep consistent with the worker-side caching (worker uses REDIS_URL || TERMINAL_REDIS_URL || localhost).
-        const redisUrl =
-          process.env.REDIS_URL || process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379';
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const redisUrl = redis.url || redis.terminalUrl || 'redis://localhost:6379';
         return new Redis(redisUrl);
       },
+      inject: [ConfigService],
     },
     {
       provide: TOOL_REGISTRY_REDIS,
-      useFactory: () => {
-        // Use the same Redis URL as terminal or a dedicated one
-        const url = process.env.TOOL_REGISTRY_REDIS_URL ?? process.env.TERMINAL_REDIS_URL;
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.toolRegistryUrl ?? redis.terminalUrl;
         if (!url) {
           new Logger('McpModule').warn('Redis URL not set; tool registry disabled');
         }
@@ -50,6 +52,7 @@ import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
         }
         return new Redis(url);
       },
+      inject: [ConfigService],
     },
     ToolRegistryService,
     McpAuthService,

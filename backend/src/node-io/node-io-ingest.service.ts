@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Consumer, Kafka } from 'kafkajs';
 import { getTopicResolver } from '../common/kafka-topic-resolver';
 
 import { NodeIORepository } from './node-io.repository';
+import type { KafkaConfig } from '../config';
 
 interface SerializedNodeIOEvent {
   type: 'NODE_IO_START' | 'NODE_IO_COMPLETION';
@@ -33,8 +35,12 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
   private readonly kafkaClientId: string;
   private consumer: Consumer | undefined;
 
-  constructor(private readonly nodeIORepository: NodeIORepository) {
-    const brokerEnv = process.env.LOG_KAFKA_BROKERS ?? '';
+  constructor(
+    private readonly nodeIORepository: NodeIORepository,
+    private readonly configService: ConfigService,
+  ) {
+    const kafka = this.configService.get<KafkaConfig>('kafka')!;
+    const brokerEnv = kafka.brokers;
     this.kafkaBrokers = brokerEnv
       .split(',')
       .map((broker) => broker.trim())
@@ -44,9 +50,12 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Use instance-aware topic name
-    const topicResolver = getTopicResolver();
+    const topicResolver = getTopicResolver({
+      instanceId: kafka.instanceId,
+      topics: { nodeIo: kafka.nodeIoTopic },
+    });
     this.kafkaTopic = topicResolver.getNodeIOTopic();
-    const instanceId = process.env.SHIPSEC_INSTANCE;
+    const instanceId = kafka.instanceId;
     const defaultGroupId = instanceId
       ? `shipsec-node-io-ingestor-${instanceId}`
       : 'shipsec-node-io-ingestor';
@@ -54,8 +63,8 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
       ? `shipsec-backend-node-io-${instanceId}`
       : 'shipsec-backend-node-io';
 
-    this.kafkaGroupId = process.env.NODE_IO_KAFKA_GROUP_ID ?? defaultGroupId;
-    this.kafkaClientId = process.env.NODE_IO_KAFKA_CLIENT_ID ?? defaultClientId;
+    this.kafkaGroupId = kafka.nodeIoGroupId ?? defaultGroupId;
+    this.kafkaClientId = kafka.nodeIoClientId ?? defaultClientId;
   }
 
   async onModuleInit(): Promise<void> {

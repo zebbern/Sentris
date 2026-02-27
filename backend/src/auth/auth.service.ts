@@ -30,11 +30,19 @@ export class AuthService {
     const config = this.configService.get<AuthConfig>('auth');
     if (!config) {
       this.logger.warn('Auth config missing, defaulting to local provider');
-      return new LocalAuthProvider({
-        adminUsername: process.env.ADMIN_USERNAME ?? 'admin',
-        adminPassword: process.env.ADMIN_PASSWORD ?? 'admin',
-      });
+      return new LocalAuthProvider(
+        {
+          adminUsername: 'admin',
+          adminPassword: 'admin',
+        },
+        {},
+      );
     }
+
+    const sessionConfig = {
+      sessionSecret: config.sessionSecret,
+      nodeEnv: this.configService.get<string>('app.nodeEnv'),
+    };
 
     const provider: AuthProviderName = config.provider;
     if (provider === 'clerk') {
@@ -55,6 +63,6 @@ export class AuthService {
       return new ClerkAuthProvider(config.clerk);
     }
 
-    return new LocalAuthProvider(config.local);
+    return new LocalAuthProvider(config.local, sessionConfig);
   }
 }

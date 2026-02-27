@@ -2,6 +2,33 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { NodeIOIngestService } from '../node-io-ingest.service';
 import type { NodeIORepository } from '../node-io.repository';
+import type { ConfigService } from '@nestjs/config';
+import type { KafkaConfig } from '../../config';
+
+function createMockConfigService(): ConfigService {
+  const kafkaConfig: KafkaConfig = {
+    brokers: process.env.LOG_KAFKA_BROKERS ?? '',
+    instanceId: process.env.SHIPSEC_INSTANCE,
+    nodeIoGroupId: process.env.NODE_IO_KAFKA_GROUP_ID,
+    nodeIoClientId: process.env.NODE_IO_KAFKA_CLIENT_ID,
+    eventGroupId: undefined,
+    eventClientId: undefined,
+    agentTraceGroupId: undefined,
+    agentTraceClientId: undefined,
+    logGroupId: undefined,
+    logClientId: undefined,
+    logTopic: 'telemetry.logs',
+    eventTopic: 'telemetry.events',
+    agentTraceTopic: 'telemetry.agent-trace',
+    nodeIoTopic: 'telemetry.node-io',
+  };
+  return {
+    get: (key: string) => {
+      if (key === 'kafka') return kafkaConfig;
+      return undefined;
+    },
+  } as unknown as ConfigService;
+}
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -27,7 +54,7 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository) as unknown as {
+    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };
@@ -42,7 +69,7 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository) as unknown as {
+    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };
@@ -59,7 +86,7 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository) as unknown as {
+    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };

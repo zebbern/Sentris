@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import type { IntegrationsEnvConfig } from '../config';
 
 export type TokenRequestEncoding = 'json' | 'form';
 export type TokenAuthMethod = 'client_secret_post' | 'client_secret_basic';
@@ -32,12 +33,16 @@ export interface IntegrationProviderSummary {
   isConfigured: boolean;
 }
 
-export function loadIntegrationProviders(): Record<string, IntegrationProviderConfig> {
-  const githubScopes = process.env.GITHUB_OAUTH_SCOPES?.split(',')
+export function loadIntegrationProviders(
+  config: IntegrationsEnvConfig,
+): Record<string, IntegrationProviderConfig> {
+  const githubScopes = config.github.scopes
+    ?.split(',')
     .map((scope) => scope.trim())
     .filter(Boolean) ?? ['repo', 'read:user'];
 
-  const zoomScopes = process.env.ZOOM_OAUTH_SCOPES?.split(',')
+  const zoomScopes = config.zoom.scopes
+    ?.split(',')
     .map((scope) => scope.trim())
     .filter(Boolean) ?? ['user:read:admin'];
 
@@ -59,8 +64,8 @@ export function loadIntegrationProviders(): Record<string, IntegrationProviderCo
       extraAuthorizeParams: {
         allow_signup: 'false',
       },
-      clientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? null,
-      clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? null,
+      clientId: config.github.clientId,
+      clientSecret: config.github.clientSecret,
     },
     zoom: {
       id: 'zoom',
@@ -79,8 +84,8 @@ export function loadIntegrationProviders(): Record<string, IntegrationProviderCo
         access_type: 'offline',
         prompt: 'consent',
       },
-      clientId: process.env.ZOOM_OAUTH_CLIENT_ID ?? null,
-      clientSecret: process.env.ZOOM_OAUTH_CLIENT_SECRET ?? null,
+      clientId: config.zoom.clientId,
+      clientSecret: config.zoom.clientSecret,
     },
   };
 }

@@ -1,82 +1,11 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SecretSelect } from '@/components/inputs/SecretSelect';
-import { KeyRound } from 'lucide-react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { McpDiscoveryPreview } from '@/components/mcp/McpDiscoveryPreview';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
-  Search,
-  Plus,
-  ArrowDownToLine,
-  ChevronDown,
-  Trash2,
-  Edit3,
-  RefreshCw,
-  Plug,
-  Wrench,
-  AlertCircle,
-  CheckCircle2,
-  HelpCircle,
-  FileJson,
-  Layers,
-  Cloud,
-  Package,
-  GitBranch,
-  Globe,
-  Loader,
-  Loader2,
-  CheckCircle,
-} from 'lucide-react';
+import { Search, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useMcpServers,
   useMcpAllTools,
-  useCreateMcpServer,
-  useUpdateMcpServer,
   useDeleteMcpServer,
   useToggleMcpServer,
   useTestMcpConnection,
@@ -88,272 +17,50 @@ import { useMcpGroupsWithServers, useMcpGroupTemplates } from '@/hooks/queries/u
 import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  mcpGroupsApi,
-  type McpGroupTemplateResponse,
-  type McpGroupServerResponse,
-} from '@/services/mcpGroupsApi';
-import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
-import type { McpHealthStatus, CreateMcpServer } from '@shipsec/shared';
+import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
+import type { McpHealthStatus } from '@shipsec/shared';
 import { cn } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { MarkdownView } from '@/components/ui/markdown';
-import { env } from '@/config/env';
-
-const TRANSPORT_TYPES = [
-  { value: 'http', label: 'HTTP' },
-  { value: 'stdio', label: 'stdio (Local)' },
-] as const;
-
-type TransportType = (typeof TRANSPORT_TYPES)[number]['value'];
-
-// Group icon mapping for visual distinction
-function getGroupIcon(groupSlug: string, groupName: string) {
-  const slug = groupSlug.toLowerCase();
-  const name = groupName.toLowerCase();
-
-  if (slug === 'aws' || name.includes('aws') || name.includes('amazon')) return Cloud;
-  if (slug.includes('github') || name.includes('github') || name.includes('git')) return GitBranch;
-  if (slug.includes('gcp') || name.includes('gcp') || name.includes('google')) return Globe;
-  return Package;
-}
-
-function getGroupLogoUrl(groupSlug: string) {
-  const domainMap: Record<string, string> = {
-    aws: 'aws.amazon.com',
-  };
-
-  const domain = domainMap[groupSlug.toLowerCase()];
-  if (!domain || !env.VITE_LOGO_DEV_PUBLIC_KEY) return null;
-
-  return `https://img.logo.dev/${domain}?token=${env.VITE_LOGO_DEV_PUBLIC_KEY}`;
-}
-
-function GroupLogo({ slug, name, className }: { slug: string; name: string; className?: string }) {
-  const logoUrl = getGroupLogoUrl(slug);
-  const FallbackIcon = getGroupIcon(slug, name);
-
-  const [showFallback, setShowFallback] = useState(!logoUrl);
-
-  if (showFallback) {
-    return <FallbackIcon className={className} aria-hidden="true" />;
-  }
-
-  return (
-    <img
-      src={logoUrl ?? undefined}
-      alt={`${name} logo`}
-      className={cn('h-5 w-5 object-contain', className)}
-      onError={(event) => {
-        event.currentTarget.style.display = 'none';
-        setShowFallback(true);
-      }}
-    />
-  );
-}
-
-function getGroupTheme(groupSlug: string) {
-  if (groupSlug === 'aws') {
-    return {
-      container: 'bg-aws-accent/5 dark:bg-aws-accent/10 border-aws-accent/20',
-      headerBorder: 'border-aws-accent/20',
-      iconWrapper: 'bg-aws-accent/5 dark:bg-aws-accent/10 border-aws-accent/20',
-      iconText: 'text-aws-accent-foreground',
-      pillBorder: 'border-aws-accent/20',
-      accentText: 'text-aws-accent-foreground',
-    };
-  }
-
-  return {
-    container: 'bg-background border-border',
-    headerBorder: 'border-border',
-    iconWrapper: 'bg-muted border-border',
-    iconText: 'text-muted-foreground',
-    pillBorder: 'border-border',
-    accentText: 'text-muted-foreground',
-  };
-}
-
-function HealthIndicator({
-  status,
-  checking,
-}: {
-  status: McpHealthStatus | null;
-  checking?: boolean;
-}) {
-  const statusConfig = {
-    healthy: { icon: CheckCircle2, color: 'text-success', label: 'Healthy' },
-    unhealthy: { icon: AlertCircle, color: 'text-destructive', label: 'Unhealthy' },
-    unknown: { icon: HelpCircle, color: 'text-muted-foreground', label: 'Not checked' },
-  };
-
-  if (checking) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger>
-            <div className="flex items-center gap-1.5">
-              <RefreshCw className="h-4 w-4 text-info animate-spin" />
-              <span className="text-xs text-muted-foreground">Checking...</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Checking server status...</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  const config = statusConfig[status ?? 'unknown'];
-  const Icon = config.icon;
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger>
-          <div className="flex items-center gap-1.5">
-            <Icon className={cn('h-4 w-4', config.color)} />
-            <span className="text-xs text-muted-foreground">{config.label}</span>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Server status: {config.label}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-function TransportBadge({ type }: { type?: TransportType | null }) {
-  const variants: Record<TransportType, 'default' | 'secondary' | 'outline'> = {
-    http: 'default',
-    stdio: 'outline',
-  };
-
-  const safeType: TransportType = type ?? 'http';
-  const label = type ? type.toUpperCase() : 'UNKNOWN';
-
-  return (
-    <Badge variant={variants[safeType]} className="text-xs">
-      {label}
-    </Badge>
-  );
-}
-
-interface ServerFormData {
-  name: string;
-  description: string;
-  transportType: TransportType;
-  endpoint: string;
-  command: string;
-  args: string;
-  headers: string;
-  healthCheckUrl: string;
-  enabled: boolean;
-}
-
-interface HeaderEntry {
-  key: string;
-  value: string;
-  secretId?: string; // If set, value references a secret by ID
-}
-
-const INITIAL_FORM_DATA: ServerFormData = {
-  name: '',
-  description: '',
-  transportType: 'http',
-  endpoint: '',
-  command: '',
-  args: '',
-  headers: '',
-  healthCheckUrl: '',
-  enabled: true,
-};
+import {
+  GroupTemplatesSection,
+  ImportedGroupsSection,
+  CustomServersTable,
+  ServerEditorSheet,
+  DeleteServerDialog,
+  ToolsDialog,
+  useEditorActions,
+  useJsonImport,
+  useGroupActions,
+  parseClaudeCodeConfig,
+  type TransportType,
+} from './mcp-library';
 
 export function McpLibraryPage() {
   useDocumentTitle('MCP Library');
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
+  const queryClient = useQueryClient();
+
+  // ------ Data queries ------
+  const { data: servers = [], isLoading, error: serversError } = useMcpServers();
+  const { data: tools = [] } = useMcpAllTools();
+  const { data: groups = [] } = useMcpGroupsWithServers();
+  const { data: groupTemplates = [], isLoading: isLoadingTemplates } = useMcpGroupTemplates();
+  const error = serversError?.message ?? null;
+
+  // ------ Local state ------
   const [searchQuery, setSearchQuery] = useState('');
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editingServer, setEditingServer] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ServerFormData>(INITIAL_FORM_DATA);
-  const [isSaving, setIsSaving] = useState(false);
+  const [checkingServers, setCheckingServers] = useState<Set<string>>(new Set());
+  const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(new Set());
+  const [testingServer, setTestingServer] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [testingServer, setTestingServer] = useState<string | null>(null);
-  const [checkingServers, setCheckingServers] = useState<Set<string>>(new Set());
   const [toolsDialogOpen, setToolsDialogOpen] = useState(false);
   const [selectedServerForTools, setSelectedServerForTools] = useState<string | null>(null);
-  const [jsonValue, setJsonValue] = useState('');
-  const [jsonParseError, setJsonParseError] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isTestingDiscovery, setIsTestingDiscovery] = useState(false);
-  const [discoveryPreview, setDiscoveryPreview] = useState<
-    | {
-        name: string;
-        transportType: 'http' | 'stdio';
-        toolCount: number;
-        tools?: { name: string; description?: string }[];
-        error?: string;
-        status: 'pending' | 'discovering' | 'completed' | 'failed';
-        cacheToken?: string;
-      }[]
-    | null
-  >(null);
-  const [discoveryCacheTokens, setDiscoveryCacheTokens] = useState<
-    Map<
-      string,
-      {
-        cacheToken: string;
-        tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-      }
-    >
-  >(new Map());
-  const [activeTab, setActiveTab] = useState<'manual' | 'json'>('manual');
-  const [headerEntries, setHeaderEntries] = useState<HeaderEntry[]>([]);
-  const [secretPickerEntryIndex, setSecretPickerEntryIndex] = useState<number | null>(null);
-  const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(new Set());
-  const { data: groupTemplates = [], isLoading: isLoadingTemplates } = useMcpGroupTemplates();
-  const [importingTemplates, setImportingTemplates] = useState<Set<string>>(new Set());
-  const [templatesOpen, setTemplatesOpen] = useState(true);
-  const [templatesManuallyToggled, setTemplatesManuallyToggled] = useState(false);
-  // Group template discovery preview state - keyed by template slug
-  const [groupDiscoveryPreview, setGroupDiscoveryPreview] = useState<
-    Record<
-      string,
-      {
-        name: string;
-        transportType: 'http' | 'stdio';
-        toolCount: number;
-        tools?: { name: string; description?: string }[];
-        error?: string;
-        status: 'pending' | 'discovering' | 'completed' | 'failed';
-        cacheToken?: string;
-      }[]
-    >
-  >({});
-  const [discoveringGroups, setDiscoveringGroups] = useState<Set<string>>(new Set());
-  const [discoveryStatus, setDiscoveryStatus] = useState<{
-    workflowId?: string;
-    status?: 'running' | 'completed' | 'failed';
-    tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-    toolCount?: number;
-    error?: string;
-  } | null>(null);
 
-  const queryClient = useQueryClient();
-  const { data: servers = [], isLoading, error: serversError } = useMcpServers();
-  const { data: tools = [] } = useMcpAllTools();
-  const error = serversError?.message ?? null;
-  const { data: groups = [] } = useMcpGroupsWithServers();
-
-  // Mutation hooks
-  const createServerMutation = useCreateMcpServer();
-  const updateServerMutation = useUpdateMcpServer();
+  // ------ Mutations (kept in main because handlers are local) ------
   const deleteServerMutation = useDeleteMcpServer();
   const toggleServerMutation = useToggleMcpServer();
   const testConnectionMutation = useTestMcpConnection();
@@ -361,6 +68,33 @@ export function McpLibraryPage() {
   const toggleToolMutation = useToggleMcpTool();
   const discoverToolsMutation = useDiscoverMcpTools();
 
+  // ------ Extracted hooks ------
+  const editor = useEditorActions({ servers, setCheckingServers });
+  const jsonImport = useJsonImport({
+    editingServer: editor.editingServer,
+    formData: editor.formData,
+    setEditorOpen: editor.setEditorOpen,
+    setEditingServer: editor.setEditingServer,
+    setFormData: editor.setFormData,
+    setCheckingServers,
+    setDiscoveringServerIds,
+  });
+  const groupActions = useGroupActions({ groupCount: groups.length, confirm });
+
+  // ------ Cross-hook effect: sync JSON → Manual form ------
+  useEffect(() => {
+    if (!jsonImport.jsonValue.trim() || editor.editingServer) return;
+    const { servers: parsedServers, error: parseError } = parseClaudeCodeConfig(
+      jsonImport.jsonValue,
+    );
+    if (parseError || parsedServers.length !== 1) return;
+    const parsedConfig = parsedServers[0].config;
+    if (editor.activeTab === 'json' && parsedConfig.name !== editor.formData.name) {
+      editor.setFormData(parsedConfig);
+    }
+  }, [jsonImport.jsonValue, editor.activeTab, editor.editingServer, editor.formData.name]);
+
+  // ------ Memoized lookups ------
   const getGroupServers = useCallback(
     (groupId: string): McpGroupServerResponse[] => {
       return groups.find((g) => g.id === groupId)?.servers ?? [];
@@ -368,70 +102,14 @@ export function McpLibraryPage() {
     [groups],
   );
 
-  // Templates are now fetched via useMcpGroupTemplates() hook above.
-
-  // Default: show templates when no groups are installed; collapse when groups exist.
-  useEffect(() => {
-    if (templatesManuallyToggled) return;
-    setTemplatesOpen(groups.length === 0);
-  }, [groups.length, templatesManuallyToggled]);
-
-  // Sync JSON config to Manual form when valid single-server JSON is entered
-  useEffect(() => {
-    if (!jsonValue.trim() || editingServer) return;
-
-    const { servers: parsedServers, error } = parseClaudeCodeConfig(jsonValue);
-    if (error || parsedServers.length !== 1) return;
-
-    // Only sync if JSON tab is active and the form data differs
-    const parsedConfig = parsedServers[0].config;
-    if (activeTab === 'json' && parsedConfig.name !== formData.name) {
-      setFormData(parsedConfig);
-    }
-  }, [jsonValue, activeTab, editingServer]);
-
-  // Populate header entries when editing a server
-  useEffect(() => {
-    if (!editingServer) return;
-    const server = servers.find((s) => s.id === editingServer);
-    if (server?.headerKeys && server.headerKeys.length > 0) {
-      setHeaderEntries(server.headerKeys.map((key) => ({ key, value: '' })));
-    } else {
-      setHeaderEntries([]);
-    }
-  }, [editingServer, servers]);
-
-  // Header entry management functions
-  const addHeaderEntry = () => {
-    setHeaderEntries((prev) => [...prev, { key: '', value: '' }]);
-  };
-
-  const updateHeaderEntry = (index: number, field: 'key' | 'value' | 'secretId', value: string) => {
-    setHeaderEntries((prev) => {
-      const updated = [...prev];
-      if (field === 'secretId') {
-        updated[index] = { ...updated[index], secretId: value || undefined, value: '' };
-      } else {
-        updated[index] = { ...updated[index], [field]: value, secretId: undefined };
-      }
-      return updated;
-    });
-  };
-
-  const removeHeaderEntry = (index: number) => {
-    setHeaderEntries((prev) => prev.filter((_, i) => i !== index));
-  };
-
   const groupedServerIds = useMemo(() => {
     const ids = new Set<string>();
     for (const server of servers) {
-      if (server.groupId) {
-        ids.add(server.id);
-      }
+      if (server.groupId) ids.add(server.id);
     }
     for (const group of groups) {
-      for (const server of getGroupServers(group.id)) {
-        ids.add(server.serverId);
+      for (const gs of getGroupServers(group.id)) {
+        ids.add(gs.serverId);
       }
     }
     return ids;
@@ -439,45 +117,40 @@ export function McpLibraryPage() {
 
   const filteredCustomServers = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const customServers = servers.filter((server) => !groupedServerIds.has(server.id));
-
+    const customServers = servers.filter((s) => !groupedServerIds.has(s.id));
     if (!query) return customServers;
-
     return customServers.filter(
-      (server) =>
-        server.name.toLowerCase().includes(query) ||
-        server.description?.toLowerCase().includes(query) ||
-        server.endpoint?.toLowerCase().includes(query),
+      (s) =>
+        s.name.toLowerCase().includes(query) ||
+        s.description?.toLowerCase().includes(query) ||
+        s.endpoint?.toLowerCase().includes(query),
     );
   }, [servers, searchQuery, groupedServerIds]);
 
-  const importedGroupSlugs = useMemo(() => new Set(groups.map((group) => group.slug)), [groups]);
+  const importedGroupSlugs = useMemo(() => new Set(groups.map((g) => g.slug)), [groups]);
 
   const filteredTemplates = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return groupTemplates;
-
     return groupTemplates.filter(
-      (template) =>
-        template.name.toLowerCase().includes(query) ||
-        template.slug.toLowerCase().includes(query) ||
-        template.description?.toLowerCase().includes(query),
+      (t) =>
+        t.name.toLowerCase().includes(query) ||
+        t.slug.toLowerCase().includes(query) ||
+        t.description?.toLowerCase().includes(query),
     );
   }, [groupTemplates, searchQuery]);
 
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return groups;
-
     return groups.filter(
-      (group) =>
-        group.name.toLowerCase().includes(query) ||
-        group.slug.toLowerCase().includes(query) ||
-        group.description?.toLowerCase().includes(query),
+      (g) =>
+        g.name.toLowerCase().includes(query) ||
+        g.slug.toLowerCase().includes(query) ||
+        g.description?.toLowerCase().includes(query),
     );
   }, [groups, searchQuery]);
 
-  // Calculate tool counts per server (enabled/total)
   const toolCountsByServer = useMemo(() => {
     const counts: Record<string, { enabled: number; total: number }> = {};
     for (const server of servers) {
@@ -490,6 +163,25 @@ export function McpLibraryPage() {
     return counts;
   }, [servers, tools]);
 
+  const serverTools = useMemo(() => {
+    if (!selectedServerForTools) return [];
+    return tools.filter((t) => t.serverId === selectedServerForTools);
+  }, [tools, selectedServerForTools]);
+
+  const selectedServer = useMemo<{ name?: string; transportType?: TransportType } | null>(() => {
+    if (!selectedServerForTools) return null;
+    const direct = servers.find((s) => s.id === selectedServerForTools);
+    if (direct) return direct;
+    for (const group of groups) {
+      const match = getGroupServers(group.id).find((s) => s.serverId === selectedServerForTools);
+      if (match) {
+        return { name: match.serverName, transportType: match.transportType };
+      }
+    }
+    return null;
+  }, [servers, selectedServerForTools, groups, getGroupServers]);
+
+  // ------ Helper functions ------
   const getGroupServerHealthStatus = (server: {
     serverId: string;
     healthStatus: McpHealthStatus;
@@ -497,11 +189,7 @@ export function McpLibraryPage() {
 
   const getGroupServerToolCounts = (server: { serverId: string; toolCount: number }) => {
     const counts = toolCountsByServer[server.serverId];
-    // If we haven't loaded tools for this server (common for disabled servers),
-    // don't let a 0/0 cache override the server's known discovered toolCount.
-    if (counts && !(counts.total === 0 && server.toolCount > 0)) {
-      return counts;
-    }
+    if (counts && !(counts.total === 0 && server.toolCount > 0)) return counts;
     const fallbackTotal = server.toolCount;
     return fallbackTotal > 0 ? { enabled: fallbackTotal, total: fallbackTotal } : null;
   };
@@ -513,345 +201,9 @@ export function McpLibraryPage() {
     return group?.defaultDockerImage ?? undefined;
   };
 
-  const renderServerTableHeader = () => (
-    <TableHeader>
-      <TableRow>
-        <TableHead className="w-[200px]">Name</TableHead>
-        <TableHead className="w-[100px]">Type</TableHead>
-        <TableHead>Connection</TableHead>
-        <TableHead className="w-[120px]">Status</TableHead>
-        <TableHead className="w-[80px] text-center">Tools</TableHead>
-        <TableHead className="w-[100px] text-center">Enabled</TableHead>
-        <TableHead className="w-[180px] text-right">Actions</TableHead>
-      </TableRow>
-    </TableHeader>
-  );
-
-  const renderConnectionCell = (connection: {
-    endpoint?: string | null;
-    command?: string | null;
-    args?: string[] | null;
-  }) => {
-    if (connection.endpoint) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger className="text-left">
-              <div className="font-mono text-sm text-muted-foreground truncate max-w-[300px]">
-                {connection.endpoint}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[400px]">
-              <p className="font-mono text-xs break-all">{connection.endpoint}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    if (connection.command) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger className="text-left">
-              <div className="font-mono text-sm text-muted-foreground truncate max-w-[300px]">
-                {connection.command}
-                {connection.args &&
-                  connection.args.length > 0 &&
-                  (() => {
-                    const argsStr = connection.args.join(' ');
-                    const MAX_INLINE_ARGS = 40;
-                    if (argsStr.length <= MAX_INLINE_ARGS) {
-                      return ` ${argsStr}`;
-                    }
-                    return ` +${connection.args.length} arg${
-                      connection.args.length === 1 ? '' : 's'
-                    }`;
-                  })()}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-[400px]">
-              <p className="font-mono text-xs break-all">
-                {connection.command} {connection.args?.join(' ') || ''}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return <span className="text-muted-foreground">—</span>;
-  };
-
-  // Generate Claude Code style JSON from form data (for JSON tab display)
-  const formDataToJson = (data: ServerFormData, serverHeaderKeys?: string[] | null): string => {
-    const serverConfig: Record<string, unknown> = {};
-
-    if (data.transportType === 'stdio') {
-      serverConfig.command = data.command;
-      if (data.args.trim()) {
-        serverConfig.args = data.args
-          .split('\n')
-          .map((a) => a.trim())
-          .filter(Boolean);
-      }
-    } else {
-      serverConfig.url = data.endpoint;
-    }
-
-    // Show existing header keys with masked values, plus any new headers from form
-    const headersToShow: Record<string, string> = {};
-
-    // Add existing headers with masked values
-    if (serverHeaderKeys && serverHeaderKeys.length > 0) {
-      for (const key of serverHeaderKeys) {
-        headersToShow[key] = '****';
-      }
-    }
-
-    // Add/override with new header entries that have values
-    for (const entry of headerEntries) {
-      if (entry.key.trim()) {
-        if (entry.value.trim()) {
-          headersToShow[entry.key] = '****'; // Mask new values too in JSON view
-        } else if (entry.secretId) {
-          headersToShow[entry.key] = '****';
-        }
-      }
-    }
-
-    if (Object.keys(headersToShow).length > 0) {
-      serverConfig.headers = headersToShow;
-    }
-
-    return JSON.stringify(
-      {
-        mcpServers: {
-          [data.name || 'server']: serverConfig,
-        },
-      },
-      null,
-      2,
-    );
-  };
-
-  const handleCreateNew = () => {
-    setEditingServer(null);
-    setFormData(INITIAL_FORM_DATA);
-    setJsonValue('');
-    setJsonParseError(null);
-    setDiscoveryStatus(null);
-    setActiveTab('manual');
-    setEditorOpen(true);
-  };
-
-  const handleEditorClose = (open: boolean) => {
-    if (!open) {
-      setDiscoveryStatus(null);
-    }
-    setEditorOpen(open);
-  };
-
-  const handleEdit = (serverId: string) => {
-    const server = servers.find((s) => s.id === serverId);
-    if (!server) return;
-
-    setEditingServer(serverId);
-    setDiscoveryStatus(null);
-    const editFormData: ServerFormData = {
-      name: server.name,
-      description: server.description ?? '',
-      transportType: server.transportType,
-      endpoint: server.endpoint ?? '',
-      command: server.command ?? '',
-      args: server.args?.join('\n') ?? '',
-      headers: '', // Never show existing headers
-      healthCheckUrl: '',
-      enabled: server.enabled,
-    };
-    setFormData(editFormData);
-    setJsonValue(formDataToJson(editFormData, server.headerKeys));
-    setJsonParseError(null);
-    setActiveTab('manual');
-    setEditorOpen(true);
-  };
-
-  const handleTestAndDiscover = async () => {
-    // Build headers from headerEntries
-    const headersPayload = headerEntries
-      .filter((e) => e.key.trim() && (e.value.trim() || e.secretId))
-      .reduce(
-        (acc, entry) => {
-          const key = entry.key.trim();
-          const value = entry.secretId ? `{{secret:${entry.secretId}}}` : entry.value.trim();
-          acc[key] = value;
-          return acc;
-        },
-        {} as Record<string, string>,
-      );
-
-    const input = {
-      transport: formData.transportType,
-      name: formData.name.trim(),
-      endpoint: formData.transportType === 'http' ? formData.endpoint.trim() : undefined,
-      headers: Object.keys(headersPayload).length > 0 ? headersPayload : undefined,
-      command: formData.transportType === 'stdio' ? formData.command.trim() : undefined,
-      args:
-        formData.transportType === 'stdio' && formData.args.trim()
-          ? formData.args
-              .split('\n')
-              .map((a) => a.trim())
-              .filter(Boolean)
-          : undefined,
-    };
-
-    try {
-      const { workflowId } = await mcpDiscoveryApi.discover(input);
-      setDiscoveryStatus({ workflowId, status: 'running' });
-
-      const pollInterval = setInterval(async () => {
-        try {
-          const result = await mcpDiscoveryApi.getStatus(workflowId);
-
-          if (result.status === 'completed') {
-            clearInterval(pollInterval);
-            setDiscoveryStatus({
-              status: 'completed',
-              tools: result.tools,
-              toolCount: result.toolCount,
-            });
-          } else if (result.status === 'failed') {
-            clearInterval(pollInterval);
-            setDiscoveryStatus({
-              status: 'failed',
-              error: result.error,
-            });
-          }
-        } catch (error: unknown) {
-          clearInterval(pollInterval);
-          setDiscoveryStatus({
-            status: 'failed',
-            error: error instanceof Error ? error.message : 'Discovery failed',
-          });
-        }
-      }, 2000);
-
-      // Cleanup interval on unmount
-      return () => clearInterval(pollInterval);
-    } catch (error: unknown) {
-      setDiscoveryStatus({
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Failed to start discovery',
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      // Build headers from headerEntries - include entries with value OR secretId
-      const headersPayload = headerEntries
-        .filter((e) => e.key.trim() && (e.value.trim() || e.secretId))
-        .reduce(
-          (acc, entry) => {
-            const key = entry.key.trim();
-            // Use secret reference format if secretId is set, otherwise use the value
-            const value = entry.secretId ? `{{secret:${entry.secretId}}}` : entry.value.trim();
-            acc[key] = value;
-            return acc;
-          },
-          {} as Record<string, string>,
-        );
-
-      const payload: CreateMcpServer = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
-        transportType: formData.transportType,
-        endpoint: formData.transportType === 'http' ? formData.endpoint.trim() : undefined,
-        command: formData.transportType === 'stdio' ? formData.command.trim() : undefined,
-        args:
-          formData.transportType === 'stdio' && formData.args.trim()
-            ? formData.args
-                .split('\n')
-                .map((a) => a.trim())
-                .filter(Boolean)
-            : undefined,
-        headers: Object.keys(headersPayload).length > 0 ? headersPayload : undefined,
-        enabled: true, // Always enabled on create, can toggle from list
-      };
-
-      if (editingServer) {
-        // Mark as checking BEFORE the update to prevent "Unknown" flash
-        setCheckingServers((prev) => new Set([...prev, editingServer]));
-        await updateServerMutation.mutateAsync({ id: editingServer, input: payload });
-        // Run health check after update to refresh status and tools
-        testConnectionMutation
-          .mutateAsync(editingServer)
-          .then(async () => {
-            // Invalidate queries to refresh tool counts and health status
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-          })
-          .catch(() => {
-            // Silently ignore health check errors on update
-          })
-          .finally(() => {
-            setCheckingServers((prev) => {
-              const next = new Set(prev);
-              next.delete(editingServer);
-              return next;
-            });
-          });
-        toast({ title: 'Server updated', description: `${payload.name} has been updated.` });
-      } else {
-        const newServer = await createServerMutation.mutateAsync(payload);
-        // Immediately add to checking set - batched with store update to prevent "Unknown" flash
-        setCheckingServers((prev) => new Set([...prev, newServer.id]));
-        // Run health check to set status and discover tools
-        testConnectionMutation
-          .mutateAsync(newServer.id)
-          .then(async (result) => {
-            // Invalidate queries to refresh tool counts and health status
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-            await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-            if (result.toolCount !== undefined && result.toolCount > 0) {
-              toast({
-                title: 'Server ready',
-                description: `Discovered ${result.toolCount} tool(s) from ${payload.name}.`,
-              });
-            }
-          })
-          .catch(() => {
-            // Silently ignore health check errors
-          })
-          .finally(() => {
-            setCheckingServers((prev) => {
-              const next = new Set(prev);
-              next.delete(newServer.id);
-              return next;
-            });
-          });
-        toast({ title: 'Server created', description: `${payload.name} has been added.` });
-      }
-
-      setEditorOpen(false);
-      setEditingServer(null);
-      setFormData(INITIAL_FORM_DATA);
-      setDiscoveryStatus(null);
-    } catch (err: unknown) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to save server',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
+  // ------ Handlers ------
   const handleDelete = async () => {
     if (!serverToDelete) return;
-
     setIsDeleting(true);
     try {
       await deleteServerMutation.mutateAsync(serverToDelete);
@@ -913,13 +265,16 @@ export function McpLibraryPage() {
 
   const handleDiscoverServerTools = async (serverId: string, image?: string) => {
     if (discoveringServerIds.has(serverId)) return;
-
     setDiscoveringServerIds((prev) => new Set(prev).add(serverId));
     try {
-      const tools = await discoverToolsMutation.mutateAsync({ serverId, servers, image });
+      const discoveredTools = await discoverToolsMutation.mutateAsync({
+        serverId,
+        servers,
+        image,
+      });
       toast({
         title: 'Tool discovery complete',
-        description: `Discovered ${tools.length} tool(s) from this server.`,
+        description: `Discovered ${discoveredTools.length} tool(s) from this server.`,
       });
     } catch (err: unknown) {
       toast({
@@ -932,232 +287,6 @@ export function McpLibraryPage() {
         const next = new Set(prev);
         next.delete(serverId);
         return next;
-      });
-    }
-  };
-
-  const refreshTemplates = async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.templates() });
-  };
-
-  const handleGroupTestAndDiscover = async (template: McpGroupTemplateResponse) => {
-    if (discoveringGroups.has(template.slug)) return;
-
-    setDiscoveringGroups((prev) => new Set(prev).add(template.slug));
-
-    // Initialize preview with pending status
-    interface GroupDiscoveryRow {
-      name: string;
-      transportType: 'http' | 'stdio';
-      toolCount: number;
-      status: 'pending' | 'discovering' | 'completed' | 'failed';
-      tools?: { name: string; description?: string }[];
-      error?: string;
-      cacheToken?: string;
-    }
-
-    const initialResults: GroupDiscoveryRow[] = template.servers.map((server) => ({
-      name: server.name,
-      transportType: server.transportType,
-      toolCount: 0,
-      status: 'pending',
-      tools: undefined,
-      error: undefined,
-      cacheToken: undefined,
-    }));
-    setGroupDiscoveryPreview((prev) => ({
-      ...prev,
-      [template.slug]: initialResults,
-    }));
-
-    try {
-      const results: GroupDiscoveryRow[] = [...initialResults].map((entry) => ({
-        ...entry,
-        status: 'discovering',
-      }));
-      setGroupDiscoveryPreview((prev) => ({ ...prev, [template.slug]: [...results] }));
-
-      const { workflowId, cacheTokens } = await mcpDiscoveryApi.discoverGroup({
-        image: template.defaultDockerImage,
-        servers: template.servers.map((server) => ({
-          transport: server.transportType,
-          name: server.name,
-          endpoint: server.transportType === 'http' ? (server.endpoint ?? undefined) : undefined,
-          command: server.transportType === 'stdio' ? (server.command ?? undefined) : undefined,
-          args: server.transportType === 'stdio' ? (server.args ?? undefined) : undefined,
-        })),
-      });
-
-      const maxAttempts = 60;
-      const pollInterval = 1000;
-      let finished = false;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const status = await mcpDiscoveryApi.getGroupStatus(workflowId);
-
-        if (status.status === 'completed') {
-          const resultsByName = new Map(
-            (status.results ?? []).map((result) => [result.name, result]),
-          );
-
-          const updated: GroupDiscoveryRow[] = template.servers.map((server) => {
-            const result = resultsByName.get(server.name);
-            if (!result) {
-              return {
-                name: server.name,
-                transportType: server.transportType,
-                toolCount: 0,
-                status: 'failed',
-                error: 'Discovery result missing',
-              };
-            }
-
-            const tools = result.tools ?? [];
-            return {
-              name: server.name,
-              transportType: server.transportType,
-              toolCount: result.toolCount ?? tools.length,
-              tools: tools.map((t) => ({ name: t.name, description: t.description })),
-              status: result.status === 'completed' ? 'completed' : 'failed',
-              error: result.error,
-              cacheToken: result.cacheToken ?? cacheTokens[server.name],
-            };
-          });
-
-          setGroupDiscoveryPreview((prev) => ({ ...prev, [template.slug]: updated }));
-          const completedCount = updated.filter((r) => r.status === 'completed').length;
-          toast({
-            title: 'Discovery complete',
-            description: `${completedCount}/${template.servers.length} servers discovered`,
-          });
-          finished = true;
-          break;
-        }
-
-        if (status.status === 'failed') {
-          const updated: GroupDiscoveryRow[] = template.servers.map((server) => ({
-            name: server.name,
-            transportType: server.transportType,
-            toolCount: 0,
-            status: 'failed',
-            error: status.error ?? 'Discovery failed',
-          }));
-          setGroupDiscoveryPreview((prev) => ({ ...prev, [template.slug]: updated }));
-          finished = true;
-          break;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-      }
-
-      if (!finished) {
-        const updated: GroupDiscoveryRow[] = template.servers.map((server) => ({
-          name: server.name,
-          transportType: server.transportType,
-          toolCount: 0,
-          status: 'failed',
-          error: 'Discovery timed out',
-        }));
-        setGroupDiscoveryPreview((prev) => ({ ...prev, [template.slug]: updated }));
-      }
-    } catch (err: unknown) {
-      toast({
-        title: 'Discovery failed',
-        description: err instanceof Error ? err.message : 'Failed to discover servers',
-        variant: 'destructive',
-      });
-    } finally {
-      setDiscoveringGroups((prev) => {
-        const next = new Set(prev);
-        next.delete(template.slug);
-        return next;
-      });
-    }
-  };
-
-  const handleImportDiscoveredTemplate = async (template: McpGroupTemplateResponse) => {
-    const preview = groupDiscoveryPreview[template.slug];
-    if (!preview) {
-      toast({
-        title: 'No discovery data',
-        description: 'Please run "Test & Discover" first',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (importingTemplates.has(template.slug)) return;
-
-    setImportingTemplates((prev) => new Set(prev).add(template.slug));
-    try {
-      // Collect cache tokens from completed discoveries
-      const serverCacheTokens: Record<string, string> = {};
-      for (const result of preview) {
-        if (result.status === 'completed' && result.cacheToken) {
-          serverCacheTokens[result.name] = result.cacheToken;
-        }
-      }
-
-      const successCount = Object.keys(serverCacheTokens).length;
-      if (successCount === 0) {
-        toast({
-          title: 'No servers discovered',
-          description: 'At least one server must be successfully discovered',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Import template with cache tokens
-      const result = await mcpGroupsApi.importTemplate(template.slug, serverCacheTokens);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-
-      toast({
-        title: 'Group imported',
-        description: `Imported ${result.group.name} with ${successCount} server(s)`,
-      });
-
-      // Clear discovery preview after successful import
-      setGroupDiscoveryPreview((prev) => {
-        const { [template.slug]: _, ...rest } = prev;
-        return rest;
-      });
-    } catch (err: unknown) {
-      toast({
-        title: 'Import failed',
-        description: err instanceof Error ? err.message : 'Failed to import group',
-        variant: 'destructive',
-      });
-    } finally {
-      setImportingTemplates((prev) => {
-        const next = new Set(prev);
-        next.delete(template.slug);
-        return next;
-      });
-    }
-  };
-
-  const handleRemoveGroup = async (groupId: string, groupName: string) => {
-    const ok = await confirm({
-      title: 'Remove group',
-      description: `Remove ${groupName}? This will delete the group.`,
-      confirmLabel: 'Remove',
-    });
-    if (!ok) return;
-
-    try {
-      await mcpGroupsApi.deleteGroup(groupId);
-      toast({
-        title: 'Group removed',
-        description: `${groupName} was removed.`,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-    } catch (err: unknown) {
-      toast({
-        title: 'Remove failed',
-        description: err instanceof Error ? err.message : 'Failed to remove group',
-        variant: 'destructive',
       });
     }
   };
@@ -1178,426 +307,7 @@ export function McpLibraryPage() {
     }
   };
 
-  // Parse Claude Code style JSON config
-  const parseClaudeCodeConfig = (
-    jsonString: string,
-  ): {
-    servers: { name: string; config: ServerFormData }[];
-    error?: string;
-  } => {
-    try {
-      const parsed = JSON.parse(jsonString);
-
-      // Validate structure - support both { mcpServers: {...} } and direct server config
-      let mcpServers: Record<string, unknown>;
-
-      if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
-        mcpServers = parsed.mcpServers;
-      } else if (parsed.url || parsed.command) {
-        // Direct single server config without name
-        mcpServers = { 'Imported Server': parsed };
-      } else {
-        return {
-          servers: [],
-          error: 'Invalid config: expected mcpServers object or server config with url/command',
-        };
-      }
-
-      const servers: { name: string; config: ServerFormData }[] = [];
-
-      for (const [name, config] of Object.entries(mcpServers)) {
-        const serverConfig = config as {
-          url?: string;
-          headers?: Record<string, string>;
-          command?: string;
-          args?: string[];
-        };
-
-        // Determine transport type based on config
-        let transportType: TransportType = 'http';
-        if (serverConfig.command) {
-          transportType = 'stdio';
-        }
-
-        servers.push({
-          name,
-          config: {
-            name,
-            description: '',
-            transportType,
-            endpoint: serverConfig.url ?? '',
-            command: serverConfig.command ?? '',
-            args: serverConfig.args?.join('\n') ?? '',
-            headers: serverConfig.headers ? JSON.stringify(serverConfig.headers, null, 2) : '',
-            healthCheckUrl: '', // Will default to endpoint
-            enabled: true,
-          },
-        });
-      }
-
-      return { servers };
-    } catch (e: unknown) {
-      return {
-        servers: [],
-        error: e instanceof Error ? `JSON parse error: ${e.message}` : 'Invalid JSON',
-      };
-    }
-  };
-
-  // Handle "Test & Discover" for JSON config - validates and discovers tools before importing
-  const handleJsonTestAndDiscover = async () => {
-    const { servers, error } = parseClaudeCodeConfig(jsonValue);
-
-    if (error) {
-      setJsonParseError(error);
-      return;
-    }
-
-    if (servers.length === 0) {
-      setJsonParseError('No servers found in config');
-      return;
-    }
-
-    setIsTestingDiscovery(true);
-    setJsonParseError(null);
-
-    // Initialize preview with pending status
-    const initialResults: {
-      name: string;
-      transportType: 'http' | 'stdio';
-      toolCount: number;
-      status: 'pending' | 'discovering' | 'completed' | 'failed';
-      tools?: { name: string; description?: string }[];
-      error?: string;
-      cacheToken?: string;
-    }[] = servers.map(({ config }) => ({
-      name: config.name.trim(),
-      transportType: config.transportType as 'http' | 'stdio',
-      toolCount: 0,
-      status: 'pending' as const,
-      tools: undefined,
-      error: undefined,
-      cacheToken: undefined,
-    }));
-    setDiscoveryPreview(initialResults);
-
-    try {
-      // Discover tools sequentially with live updates
-      const results = [...initialResults];
-
-      for (let i = 0; i < servers.length; i++) {
-        const { config } = servers[i];
-
-        // Update status to discovering
-        results[i] = { ...results[i], status: 'discovering', error: undefined };
-        setDiscoveryPreview([...results]);
-
-        try {
-          const { workflowId, cacheToken } = await mcpDiscoveryApi.discover({
-            transport: config.transportType,
-            name: config.name.trim(),
-            endpoint:
-              config.transportType === 'http' ? config.endpoint.trim() || undefined : undefined,
-            command:
-              config.transportType === 'stdio' ? config.command.trim() || undefined : undefined,
-            args:
-              config.transportType === 'stdio' && config.args.trim()
-                ? config.args
-                    .split('\n')
-                    .map((a) => a.trim())
-                    .filter(Boolean)
-                : undefined,
-          });
-
-          // Poll for completion (60 second timeout)
-          const maxAttempts = 60;
-          const pollInterval = 1000;
-
-          for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const status = await mcpDiscoveryApi.getStatus(workflowId);
-
-            if (status.status === 'completed') {
-              results[i] = {
-                ...results[i],
-                toolCount: status.toolCount ?? 0,
-                tools: status.tools?.map((t) => ({ name: t.name, description: t.description })),
-                status: 'completed',
-                error: undefined,
-                cacheToken,
-              };
-              // Store cache token and full tool data for this server
-              if (cacheToken) {
-                const tools = status.tools ?? [];
-                if (tools.length > 0) {
-                  setDiscoveryCacheTokens((prev) =>
-                    new Map(prev).set(config.name.trim(), {
-                      cacheToken,
-                      tools: tools.map((t) => ({
-                        name: t.name,
-                        description: t.description,
-                        inputSchema: t.inputSchema,
-                      })),
-                    }),
-                  );
-                }
-              }
-              setDiscoveryPreview([...results]);
-              break;
-            }
-
-            if (status.status === 'failed') {
-              results[i] = {
-                ...results[i],
-                toolCount: 0,
-                error: status.error ?? 'Discovery failed',
-                status: 'failed',
-              };
-              setDiscoveryPreview([...results]);
-              break;
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, pollInterval));
-          }
-        } catch (err: unknown) {
-          results[i] = {
-            ...results[i],
-            toolCount: 0,
-            error: err instanceof Error ? err.message : 'Unknown error',
-            status: 'failed',
-          };
-          setDiscoveryPreview([...results]);
-        }
-      }
-    } finally {
-      setIsTestingDiscovery(false);
-    }
-  };
-
-  // Handle saving from JSON tab (parses JSON and saves)
-  const handleJsonSave = async () => {
-    const { servers, error } = parseClaudeCodeConfig(jsonValue);
-
-    if (error) {
-      setJsonParseError(error);
-      return;
-    }
-
-    if (servers.length === 0) {
-      setJsonParseError('No servers found in config');
-      return;
-    }
-
-    // When editing, update the server with the parsed config
-    if (editingServer) {
-      const firstServer = servers[0].config;
-      setIsSaving(true);
-      try {
-        const payload: CreateMcpServer = {
-          name: formData.name.trim(), // Keep original name
-          description: firstServer.description.trim() || undefined,
-          transportType: firstServer.transportType,
-          endpoint:
-            firstServer.transportType === 'http'
-              ? firstServer.endpoint.trim() || undefined
-              : undefined,
-          command:
-            firstServer.transportType === 'stdio'
-              ? firstServer.command.trim() || undefined
-              : undefined,
-          args:
-            firstServer.transportType === 'stdio' && firstServer.args.trim()
-              ? firstServer.args
-                  .split('\n')
-                  .map((a) => a.trim())
-                  .filter(Boolean)
-              : undefined,
-          headers: firstServer.headers.trim() ? JSON.parse(firstServer.headers) : undefined,
-          enabled: formData.enabled,
-        };
-        await updateServerMutation.mutateAsync({ id: editingServer, input: payload });
-        toast({ title: 'Server updated', description: `${payload.name} has been updated.` });
-        setEditorOpen(false);
-        setEditingServer(null);
-        setFormData(INITIAL_FORM_DATA);
-        setDiscoveryStatus(null);
-      } catch (err: unknown) {
-        toast({
-          title: 'Error',
-          description: err instanceof Error ? err.message : 'Failed to save server',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsSaving(false);
-      }
-      return;
-    }
-
-    // When adding new, batch create all servers
-    setIsImporting(true);
-    setJsonParseError(null);
-
-    try {
-      const results = await Promise.allSettled(
-        servers.map(({ config }) => {
-          const cached = discoveryCacheTokens.get(config.name.trim());
-          const payload: CreateMcpServer = {
-            name: config.name.trim(),
-            description: config.description.trim() || undefined,
-            transportType: config.transportType,
-            endpoint:
-              config.transportType === 'http' ? config.endpoint.trim() || undefined : undefined,
-            command:
-              config.transportType === 'stdio' ? config.command.trim() || undefined : undefined,
-            args:
-              config.transportType === 'stdio' && config.args.trim()
-                ? config.args
-                    .split('\n')
-                    .map((a) => a.trim())
-                    .filter(Boolean)
-                : undefined,
-            headers: config.headers.trim() ? JSON.parse(config.headers) : undefined,
-            enabled: true,
-            // Pass cacheToken to backend so it can automatically create tools from cached discovery
-            cacheToken: cached?.cacheToken,
-          };
-          return createServerMutation.mutateAsync(payload);
-        }),
-      );
-
-      // Extract successfully created servers and collect errors
-      type ServerResponse = Awaited<ReturnType<typeof createServerMutation.mutateAsync>>;
-      const createdServers = results
-        .filter((r): r is PromiseFulfilledResult<ServerResponse> => r.status === 'fulfilled')
-        .map((r) => r.value);
-
-      // Extract error details from failed promises
-      const failedResults = results.filter((r) => r.status === 'rejected');
-      const errors = failedResults.map((r, idx) => {
-        const error = r.status === 'rejected' ? r.reason : null;
-        const serverName = servers[idx]?.config?.name || `Server ${idx + 1}`;
-        return {
-          server: serverName,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
-      });
-
-      const succeeded = createdServers.length;
-      const failed = failedResults.length;
-
-      // Mark all created servers as checking to prevent "Unknown" flash
-      if (createdServers.length > 0) {
-        setCheckingServers(new Set(createdServers.map((s) => s.id)));
-
-        // For servers with cached discovery results, skip post-save discovery
-        const serversToDiscover: typeof createdServers = [];
-        for (const server of createdServers) {
-          const cached = discoveryCacheTokens.get(server.name);
-          if (cached) {
-            // Server has cached discovery results - skip discovery, tools will be added via backend
-          } else {
-            serversToDiscover.push(server);
-          }
-        }
-
-        // Only discover tools for servers without cached results
-        if (serversToDiscover.length > 0) {
-          setDiscoveringServerIds(new Set(serversToDiscover.map((s) => s.id)));
-
-          Promise.allSettled(
-            serversToDiscover.map((server) =>
-              discoverToolsMutation
-                .mutateAsync({ serverId: server.id, servers: createdServers })
-                .catch(() => {}),
-            ),
-          )
-            .then(async () => {
-              // Invalidate queries to refresh tool counts and health status
-              await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-              await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-            })
-            .finally(() => {
-              // Clear discovering state
-              setDiscoveringServerIds((prev) => {
-                const next = new Set(prev);
-                serversToDiscover.forEach((s) => next.delete(s.id));
-                return next;
-              });
-            });
-        }
-
-        // For cached servers, just fetch their tools and refresh
-        if (serversToDiscover.length < createdServers.length) {
-          Promise.resolve()
-            .then(async () => {
-              // Invalidate queries to refresh tool counts and health status
-              await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
-              await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-            })
-            .finally(() => {
-              // Clear checking state
-              setCheckingServers((prev) => {
-                const next = new Set(prev);
-                createdServers.forEach((s) => next.delete(s.id));
-                return next;
-              });
-            });
-        }
-      }
-
-      if (failed > 0) {
-        // Build detailed error message
-        const errorDetails = errors.map((e) => `${e.server}: ${e.error}`).join('\n');
-        const title =
-          succeeded > 0
-            ? `Partial import: ${succeeded} succeeded, ${failed} failed`
-            : `Import failed: ${failed} server${failed === 1 ? '' : 's'} could not be created`;
-        toast({
-          title,
-          description: errorDetails || 'Some servers could not be created',
-          variant: succeeded > 0 ? 'default' : 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Import successful',
-          description: `Created ${succeeded} MCP server(s)`,
-        });
-      }
-
-      setEditorOpen(false);
-      setJsonValue('');
-      setDiscoveryStatus(null);
-    } catch (err: unknown) {
-      toast({
-        title: 'Import failed',
-        description: err instanceof Error ? err.message : 'Failed to import servers',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const serverTools = useMemo(() => {
-    if (!selectedServerForTools) return [];
-    return tools.filter((t) => t.serverId === selectedServerForTools);
-  }, [tools, selectedServerForTools]);
-
-  const selectedServer = useMemo<{ name?: string; transportType?: TransportType } | null>(() => {
-    if (!selectedServerForTools) return null;
-    const direct = servers.find((s) => s.id === selectedServerForTools);
-    if (direct) return direct;
-    for (const group of groups) {
-      const match = getGroupServers(group.id).find((s) => s.serverId === selectedServerForTools);
-      if (match) {
-        return {
-          name: match.serverName,
-          transportType: match.transportType,
-        };
-      }
-    }
-    return null;
-  }, [servers, selectedServerForTools, groups, getGroupServers]);
-
+  // ------ Error state ------
   if (error) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -1615,6 +325,7 @@ export function McpLibraryPage() {
     );
   }
 
+  // ------ Main render ------
   return (
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
@@ -1625,7 +336,7 @@ export function McpLibraryPage() {
             Configure Model Context Protocol servers for AI agents
           </p>
         </div>
-        <Button onClick={handleCreateNew}>
+        <Button onClick={editor.handleCreateNew}>
           <Plus className="h-4 w-4 mr-2" />
           Add Server
         </Button>
@@ -1649,7 +360,7 @@ export function McpLibraryPage() {
           onClick={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
             queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-            void refreshTemplates();
+            void groupActions.refreshTemplates();
           }}
           disabled={isLoading}
         >
@@ -1658,1205 +369,109 @@ export function McpLibraryPage() {
       </div>
 
       {/* Group Templates */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Layers className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Group templates</h2>
-          <Badge variant="secondary" className="text-xs">
-            {filteredTemplates.length} {filteredTemplates.length === 1 ? 'group' : 'groups'}
-          </Badge>
-          <div className="ml-auto">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setTemplatesManuallyToggled(true);
-                setTemplatesOpen((v) => !v);
-              }}
-            >
-              {templatesOpen ? (
-                <>
-                  Hide
-                  <ChevronDown className="h-4 w-4 ml-2 rotate-180" />
-                </>
-              ) : (
-                <>
-                  Show
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+      <GroupTemplatesSection
+        templates={filteredTemplates}
+        isLoading={isLoadingTemplates}
+        searchQuery={searchQuery}
+        templatesOpen={groupActions.templatesOpen}
+        onToggleTemplates={groupActions.toggleTemplates}
+        importedGroupSlugs={importedGroupSlugs}
+        groupDiscoveryPreview={groupActions.groupDiscoveryPreview}
+        discoveringGroups={groupActions.discoveringGroups}
+        importingTemplates={groupActions.importingTemplates}
+        onTestAndDiscover={groupActions.handleGroupTestAndDiscover}
+        onImportDiscovered={groupActions.handleImportDiscoveredTemplate}
+        onClearDiscoveryPreview={groupActions.clearGroupDiscoveryPreview}
+      />
 
-        {templatesOpen && (
-          <>
-            {isLoadingTemplates ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {Array.from({ length: 2 }).map((_, i) => (
-                  <Card key={i} className="overflow-hidden">
-                    <CardHeader className="pb-4">
-                      <Skeleton className="h-5 w-40 mb-2" />
-                      <Skeleton className="h-4 w-64" />
-                    </CardHeader>
-                    <CardContent>
-                      <Skeleton className="h-12 w-full" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-8">
-                  <Cloud className="h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="text-muted-foreground text-sm">
-                    {searchQuery ? 'No groups match your search.' : 'No group templates available.'}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                {filteredTemplates.map((template) => {
-                  const theme = getGroupTheme(template.slug);
-                  const isImported = importedGroupSlugs.has(template.slug);
-
-                  return (
-                    <Card
-                      key={template.slug}
-                      className={cn('overflow-hidden border', theme.container)}
-                    >
-                      <CardHeader
-                        className={cn(
-                          'flex flex-row items-center gap-3 py-3 border-b',
-                          theme.headerBorder,
-                        )}
-                      >
-                        <div className={cn('p-2.5 rounded-lg border', theme.iconWrapper)}>
-                          <GroupLogo
-                            slug={template.slug}
-                            name={template.name}
-                            className={theme.iconText}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-base">{template.name}</h3>
-                            <Badge variant="secondary" className="text-xs">
-                              {template.servers.length} servers
-                            </Badge>
-                          </div>
-                          {template.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {template.description}
-                            </p>
-                          )}
-                        </div>
-                        {isImported && (
-                          <Badge variant="secondary" className="text-xs">
-                            Imported
-                          </Badge>
-                        )}
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {/* Discovery Preview */}
-                        {groupDiscoveryPreview[template.slug] && (
-                          <McpDiscoveryPreview
-                            results={groupDiscoveryPreview[template.slug]}
-                            onClear={() => {
-                              setGroupDiscoveryPreview((prev) => {
-                                const { [template.slug]: _, ...rest } = prev;
-                                return rest;
-                              });
-                            }}
-                          />
-                        )}
-
-                        {/* Discovery summary when available */}
-                        {groupDiscoveryPreview[template.slug] && (
-                          <div className="flex items-center justify-between text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
-                            <span className="text-success">
-                              {
-                                groupDiscoveryPreview[template.slug].filter(
-                                  (r) => r.status === 'completed',
-                                ).length
-                              }{' '}
-                              of {template.servers.length} servers ready
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Action buttons */}
-                        <div className="flex justify-end gap-2 pt-2">
-                          {groupDiscoveryPreview[template.slug] && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setGroupDiscoveryPreview((prev) => {
-                                  const { [template.slug]: _, ...rest } = prev;
-                                  return rest;
-                                });
-                              }}
-                            >
-                              Clear
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleGroupTestAndDiscover(template)}
-                            disabled={discoveringGroups.has(template.slug)}
-                          >
-                            {discoveringGroups.has(template.slug) ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                                Discovering...
-                              </>
-                            ) : (
-                              <>
-                                <Search className="h-3 w-3 mr-2" />
-                                Test & Discover
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            disabled={
-                              isImported ||
-                              importingTemplates.has(template.slug) ||
-                              !groupDiscoveryPreview[template.slug] ||
-                              groupDiscoveryPreview[template.slug].some(
-                                (r) => r.status !== 'completed',
-                              )
-                            }
-                            onClick={() => handleImportDiscoveredTemplate(template)}
-                          >
-                            {importingTemplates.has(template.slug) ? (
-                              <>
-                                <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
-                                Importing...
-                              </>
-                            ) : (
-                              <>
-                                <ArrowDownToLine className="h-3 w-3 mr-2" />
-                                Import
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Imported Groups Section */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Package className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">MCP groups</h2>
-          <Badge variant="secondary" className="text-xs">
-            {filteredGroups.length} {filteredGroups.length === 1 ? 'group' : 'groups'}
-          </Badge>
-          <div className="ml-auto flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label="MCP groups help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Import curated MCP groups to auto-register servers and discover tools.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-
-        {isLoading && groups.length === 0 ? (
-          <div className="space-y-3">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <Card key={i} className="overflow-hidden">
-                <CardHeader className="pb-4">
-                  <Skeleton className="h-5 w-40 mb-2" />
-                  <Skeleton className="h-4 w-64" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-14 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : filteredGroups.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <Cloud className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground text-sm">
-                {searchQuery ? 'No imported groups match your search.' : 'No groups imported yet.'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Accordion type="multiple" className="space-y-3">
-            {filteredGroups.map((group) => {
-              const theme = getGroupTheme(group.slug);
-              const groupServerList = getGroupServers(group.id);
-              const serverCount = groupServerList.length;
-
-              return (
-                <AccordionItem
-                  key={group.id}
-                  value={group.id}
-                  className={cn('rounded-lg border overflow-hidden', theme.container)}
-                >
-                  <AccordionTrigger
-                    className={cn('hover:no-underline px-4 py-3', theme.headerBorder)}
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className={cn('p-2 rounded-lg border', theme.iconWrapper)}>
-                        <GroupLogo slug={group.slug} name={group.name} className={theme.iconText} />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center gap-3">
-                          <h3 className="font-semibold">{group.name}</h3>
-                          <Badge variant="secondary" className="text-xs font-medium">
-                            {serverCount} {serverCount === 1 ? 'server' : 'servers'}
-                          </Badge>
-                        </div>
-                        {group.description && (
-                          <p className="text-sm text-muted-foreground mt-0.5">
-                            {group.description}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label={`Delete group ${group.name}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleRemoveGroup(group.id, group.name);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-4">
-                    {serverCount === 0 ? (
-                      <div className="border rounded-lg overflow-x-auto">
-                        <Table>
-                          {renderServerTableHeader()}
-                          <TableBody>
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8 text-sm">
-                                <span className="text-muted-foreground">
-                                  No servers in this group
-                                </span>
-                              </TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    ) : (
-                      <div className="border rounded-lg overflow-x-auto">
-                        <Table>
-                          {renderServerTableHeader()}
-                          <TableBody>
-                            {groupServerList.map((server) => {
-                              const toolCounts = getGroupServerToolCounts(server);
-                              const healthStatus = getGroupServerHealthStatus(server);
-
-                              return (
-                                <TableRow key={server.serverId}>
-                                  <TableCell>
-                                    <div>
-                                      <div className="font-medium">{server.serverName}</div>
-                                      {server.description && (
-                                        <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                                          {server.description}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <TransportBadge type={server.transportType} />
-                                  </TableCell>
-                                  <TableCell>
-                                    {renderConnectionCell({
-                                      endpoint: server.endpoint,
-                                      command: server.command,
-                                      args: server.args,
-                                    })}
-                                  </TableCell>
-                                  <TableCell>
-                                    <HealthIndicator
-                                      status={healthStatus}
-                                      checking={checkingServers.has(server.serverId)}
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {toolCounts && toolCounts.total > 0 ? (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              className="h-7 px-2 font-mono text-xs"
-                                              onClick={() => handleViewTools(server.serverId)}
-                                            >
-                                              {toolCounts.enabled}/{toolCounts.total}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>
-                                              {toolCounts.enabled} enabled out of {toolCounts.total}{' '}
-                                              tools
-                                            </p>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    ) : (
-                                      <span className="text-muted-foreground text-xs">—</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <Switch
-                                      checked={server.enabled}
-                                      onCheckedChange={() => handleToggle(server.serverId)}
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              aria-label="View tools"
-                                              onClick={() => handleViewTools(server.serverId)}
-                                            >
-                                              <Wrench className="h-4 w-4" />
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>View tools</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              aria-label="Rediscover tools"
-                                              onClick={() =>
-                                                handleDiscoverServerTools(
-                                                  server.serverId,
-                                                  group.defaultDockerImage ?? undefined,
-                                                )
-                                              }
-                                              disabled={discoveringServerIds.has(server.serverId)}
-                                            >
-                                              {discoveringServerIds.has(server.serverId) ? (
-                                                <Loader className="h-4 w-4 animate-spin" />
-                                              ) : (
-                                                <RefreshCw className="h-4 w-4" />
-                                              )}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>Rediscover tools</TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        )}
-      </div>
+      {/* Imported Groups */}
+      <ImportedGroupsSection
+        groups={filteredGroups}
+        isLoading={isLoading}
+        searchQuery={searchQuery}
+        checkingServers={checkingServers}
+        discoveringServerIds={discoveringServerIds}
+        getGroupServers={getGroupServers}
+        getGroupServerHealthStatus={getGroupServerHealthStatus}
+        getGroupServerToolCounts={getGroupServerToolCounts}
+        onToggle={handleToggle}
+        onViewTools={handleViewTools}
+        onDiscoverTools={(serverId) =>
+          handleDiscoverServerTools(serverId, getServerDiscoveryImage(serverId))
+        }
+        onRemoveGroup={groupActions.handleRemoveGroup}
+      />
 
       {/* Custom Servers */}
-      <div className="flex items-center gap-3 mb-4">
-        <Package className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Custom MCP Servers</h2>
-        <Badge variant="secondary" className="text-xs">
-          {filteredCustomServers.length} {filteredCustomServers.length === 1 ? 'server' : 'servers'}
-        </Badge>
-      </div>
-      <div className="border rounded-lg">
-        <Table>
-          {renderServerTableHeader()}
-          <TableBody>
-            {isLoading && servers.length === 0 ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Skeleton className="h-5 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-16" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-10 mx-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-5 w-10 mx-auto" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-8 w-24 ml-auto" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : filteredCustomServers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
-                  <Plug className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? 'No servers match your search' : 'No custom servers configured'}
-                  </p>
-                  {!searchQuery && (
-                    <Button variant="outline" className="mt-4" onClick={handleCreateNew}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add your first custom server
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredCustomServers.map((server) => (
-                <TableRow key={server.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{server.name}</div>
-                      {server.description && (
-                        <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                          {server.description}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <TransportBadge type={server.transportType} />
-                  </TableCell>
-                  <TableCell>
-                    {renderConnectionCell({
-                      endpoint: server.endpoint,
-                      command: server.command,
-                      args: server.args,
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <HealthIndicator
-                      status={server.lastHealthStatus ?? null}
-                      checking={checkingServers.has(server.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {toolCountsByServer[server.id]?.total > 0 ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {toolCountsByServer[server.id].enabled}/
-                              {toolCountsByServer[server.id].total}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>
-                              {toolCountsByServer[server.id].enabled} enabled out of{' '}
-                              {toolCountsByServer[server.id].total} tools
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Switch
-                      checked={server.enabled}
-                      onCheckedChange={() => handleToggle(server.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="View tools"
-                              onClick={() => handleViewTools(server.id)}
-                            >
-                              <Wrench className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>View tools</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+      <CustomServersTable
+        servers={filteredCustomServers}
+        isLoading={isLoading}
+        searchQuery={searchQuery}
+        checkingServers={checkingServers}
+        testingServer={testingServer}
+        toolCountsByServer={toolCountsByServer}
+        onCreateNew={editor.handleCreateNew}
+        onToggle={handleToggle}
+        onViewTools={handleViewTools}
+        onTestConnection={handleTestConnection}
+        onEdit={editor.handleEdit}
+        onDelete={(serverId) => {
+          setServerToDelete(serverId);
+          setDeleteDialogOpen(true);
+        }}
+      />
 
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Test connection"
-                              onClick={() => handleTestConnection(server.id)}
-                              disabled={testingServer === server.id}
-                            >
-                              <Plug
-                                className={cn(
-                                  'h-4 w-4',
-                                  testingServer === server.id && 'animate-pulse',
-                                )}
-                              />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Test connection</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+      {/* Editor Sheet */}
+      <ServerEditorSheet
+        open={editor.editorOpen}
+        onOpenChange={editor.handleEditorClose}
+        editingServer={editor.editingServer}
+        formData={editor.formData}
+        onFormDataChange={editor.setFormData}
+        activeTab={editor.activeTab}
+        onActiveTabChange={editor.setActiveTab}
+        isSaving={editor.isSaving}
+        isImporting={jsonImport.isImporting}
+        headerEntries={editor.headerEntries}
+        secretPickerEntryIndex={editor.secretPickerEntryIndex}
+        onSecretPickerEntryIndexChange={editor.setSecretPickerEntryIndex}
+        onAddHeader={editor.addHeaderEntry}
+        onUpdateHeader={editor.updateHeaderEntry}
+        onRemoveHeader={editor.removeHeaderEntry}
+        discoveryStatus={editor.discoveryStatus}
+        onTestAndDiscover={editor.handleTestAndDiscover}
+        onSave={editor.handleSave}
+        jsonValue={jsonImport.jsonValue}
+        onJsonValueChange={jsonImport.setJsonValue}
+        jsonParseError={jsonImport.jsonParseError}
+        onJsonParseErrorChange={jsonImport.setJsonParseError}
+        isTestingDiscovery={jsonImport.isTestingDiscovery}
+        discoveryPreview={jsonImport.discoveryPreview}
+        onClearDiscoveryPreview={() => jsonImport.setDiscoveryPreview(null)}
+        onJsonTestAndDiscover={jsonImport.handleJsonTestAndDiscover}
+        onJsonSave={jsonImport.handleJsonSave}
+      />
 
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Edit server"
-                              onClick={() => handleEdit(server.id)}
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Delete server"
-                              onClick={() => {
-                                setServerToDelete(server.id);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Delete</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Server Editor Sheet */}
-      <Sheet open={editorOpen} onOpenChange={handleEditorClose}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editingServer ? 'Edit MCP Server' : 'Add MCP Server'}</SheetTitle>
-            <SheetDescription>
-              Configure an MCP server that AI agents can use to access tools.
-            </SheetDescription>
-          </SheetHeader>
-
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => setActiveTab(v as 'manual' | 'json')}
-            className="mt-4"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="manual">Manual</TabsTrigger>
-              <TabsTrigger value="json">
-                <FileJson className="h-4 w-4 mr-2" />
-                JSON
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="manual" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="My MCP Server"
-                  maxLength={100}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional description..."
-                  rows={2}
-                  maxLength={500}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="transportType">Transport Type *</Label>
-                <Select
-                  value={formData.transportType}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, transportType: value as TransportType })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRANSPORT_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.transportType === 'http' && (
-                <div className="space-y-2">
-                  <Label htmlFor="endpoint">Endpoint URL *</Label>
-                  <Input
-                    id="endpoint"
-                    value={formData.endpoint}
-                    onChange={(e) => setFormData({ ...formData, endpoint: e.target.value })}
-                    placeholder="https://mcp.example.com/mcp"
-                  />
-                </div>
-              )}
-
-              {formData.transportType === 'stdio' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="command">Command *</Label>
-                    <Input
-                      id="command"
-                      value={formData.command}
-                      onChange={(e) => setFormData({ ...formData, command: e.target.value })}
-                      placeholder="npx"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="args">Arguments (one per line)</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setSecretPickerEntryIndex(-1)}
-                      >
-                        <KeyRound className="h-3 w-3 mr-1" />
-                        Insert Secret
-                      </Button>
-                    </div>
-                    <Textarea
-                      ref={(el) => {
-                        if (el && secretPickerEntryIndex === -1) {
-                          // Store textarea ref for cursor positioning
-                          (el as any)._argsTextarea = el;
-                        }
-                      }}
-                      id="args"
-                      value={formData.args}
-                      onChange={(e) => setFormData({ ...formData, args: e.target.value })}
-                      placeholder="-y&#10;@modelcontextprotocol/server-everything&#10;{{secret:SECRET_ID}}"
-                      rows={3}
-                    />
-                    {secretPickerEntryIndex === -1 && (
-                      <div className="mt-1">
-                        <SecretSelect
-                          value={undefined}
-                          onChange={(secretId) => {
-                            if (secretId) {
-                              const textarea = document.getElementById(
-                                'args',
-                              ) as HTMLTextAreaElement;
-                              if (textarea) {
-                                const cursorPos = textarea.selectionStart;
-                                const textBefore = formData.args.substring(0, cursorPos);
-                                const textAfter = formData.args.substring(cursorPos);
-                                const secretRef = `{{secret:${secretId}}}`;
-                                setFormData({
-                                  ...formData,
-                                  args: textBefore + secretRef + textAfter,
-                                });
-                                // Move cursor after the inserted secret reference
-                                setTimeout(() => {
-                                  textarea.selectionStart = textarea.selectionEnd =
-                                    cursorPos + secretRef.length;
-                                  textarea.focus();
-                                }, 0);
-                              }
-                            }
-                            setSecretPickerEntryIndex(null);
-                          }}
-                          placeholder="Select a secret to insert..."
-                          clearable={false}
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Use &quot;Insert Secret&quot; to add secret references. Each line becomes a
-                      separate argument.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              <div className="space-y-3">
-                <Label>Headers</Label>
-                {headerEntries.length > 0 ? (
-                  <div className="space-y-2">
-                    {headerEntries.map((entry, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <Input
-                          value={entry.key}
-                          onChange={(e) => updateHeaderEntry(index, 'key', e.target.value)}
-                          placeholder="Header name"
-                          className="flex-1 font-mono text-sm"
-                        />
-                        <div className="relative flex-1">
-                          <Input
-                            type={entry.secretId ? 'text' : 'password'}
-                            value={entry.secretId ? `🔐 Secret` : entry.value}
-                            onChange={(e) => updateHeaderEntry(index, 'value', e.target.value)}
-                            placeholder="Value"
-                            className={cn(
-                              'font-mono text-sm pr-20',
-                              entry.secretId && 'text-success',
-                            )}
-                          />
-                          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => setSecretPickerEntryIndex(index)}
-                              title="Pick a secret"
-                              aria-label="Pick a secret"
-                            >
-                              <KeyRound className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          {secretPickerEntryIndex === index && (
-                            <div className="absolute top-full right-0 mt-1 z-50 w-64 bg-popover border rounded-md shadow-lg p-2">
-                              <SecretSelect
-                                value={entry.secretId}
-                                onChange={(secretId) => {
-                                  updateHeaderEntry(index, 'secretId', secretId ?? '');
-                                  setSecretPickerEntryIndex(null);
-                                }}
-                                placeholder="Select a secret..."
-                                clearable={true}
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeHeaderEntry(index)}
-                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                          aria-label="Remove header entry"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground py-2">
-                    No headers configured. Add headers for authentication.
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addHeaderEntry}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Header
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Pick a secret to reference stored values, or enter values directly. Headers are
-                  securely encrypted when stored.
-                </p>
-              </div>
-
-              {/* Discovery Status Alerts */}
-              {discoveryStatus?.status === 'completed' && (
-                <div className="flex items-center justify-between p-3 rounded-md bg-success/10 border border-success/20">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-success" />
-                    <span className="text-sm text-success">
-                      Found {discoveryStatus.toolCount} tool
-                      {discoveryStatus.toolCount !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={isSaving || !formData.name.trim()}
-                  >
-                    {isSaving ? 'Saving...' : 'Save MCP Server'}
-                  </Button>
-                </div>
-              )}
-
-              {discoveryStatus?.status === 'failed' && (
-                <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  <span className="text-sm text-destructive">
-                    Discovery failed: {discoveryStatus.error || 'Unknown error'}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setEditorOpen(false)}
-                  disabled={discoveryStatus?.status === 'running'}
-                >
-                  Cancel
-                </Button>
-                {discoveryStatus?.status !== 'completed' && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleTestAndDiscover}
-                      disabled={
-                        discoveryStatus?.status === 'running' ||
-                        !formData.name.trim() ||
-                        (!formData.endpoint.trim() && !formData.command.trim())
-                      }
-                    >
-                      {discoveryStatus?.status === 'running' ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Discovering...
-                        </>
-                      ) : (
-                        'Test & Discover'
-                      )}
-                    </Button>
-                    <Button
-                      onClick={handleSave}
-                      disabled={
-                        isSaving ||
-                        !formData.name.trim() ||
-                        (!formData.endpoint.trim() && !formData.command.trim())
-                      }
-                    >
-                      {isSaving ? 'Saving...' : editingServer ? 'Update' : 'Create'}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="json" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>{editingServer ? 'Server Configuration (JSON)' : 'Paste JSON Config'}</Label>
-                <Textarea
-                  value={jsonValue}
-                  onChange={(e) => {
-                    setJsonValue(e.target.value);
-                    setJsonParseError(null);
-                  }}
-                  placeholder={`{
-  "mcpServers": {
-    "server-name": {
-      "url": "https://mcp.example.com/mcp",
-      "headers": {
-        "Authorization": "Bearer xxx"
-      }
-    }
-  }
-}`}
-                  rows={14}
-                  className="font-mono text-sm"
-                />
-                {jsonParseError && (
-                  <div className="flex items-start gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{jsonParseError}</span>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {editingServer
-                    ? 'Edit the JSON configuration and save.'
-                    : 'Paste Claude Code config format. Multiple servers will be created.'}
-                </p>
-              </div>
-
-              {/* Discovery Preview */}
-              {discoveryPreview && (
-                <McpDiscoveryPreview
-                  results={discoveryPreview}
-                  onClear={() => setDiscoveryPreview(null)}
-                />
-              )}
-
-              <div className="flex flex-col gap-3 pt-4">
-                {/* Discovery info message */}
-                {!editingServer && !discoveryPreview && jsonValue.trim() && (
-                  <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                    <HelpCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>
-                      Run &quot;Test &amp; Discover&quot; first to validate servers and discover
-                      available tools before importing.
-                    </span>
-                  </div>
-                )}
-
-                {/* Discovery summary when available */}
-                {!editingServer && discoveryPreview && (
-                  <div className="flex items-center justify-between text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
-                    <span className="text-success">
-                      {discoveryPreview.filter((r) => r.status === 'completed').length} of{' '}
-                      {discoveryPreview.length} servers ready
-                      {discoveryPreview.some((r) => r.status === 'completed') && (
-                        <span className="text-success ml-2">
-                          (
-                          {discoveryPreview
-                            .filter((r) => r.status === 'completed')
-                            .reduce((sum, r) => sum + (r.toolCount ?? 0), 0)}{' '}
-                          tools discovered)
-                        </span>
-                      )}
-                    </span>
-                    {discoveryPreview.some((r) => r.status === 'failed') && (
-                      <span className="text-destructive">
-                        {discoveryPreview.filter((r) => r.status === 'failed').length} failed
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setEditorOpen(false)}>
-                    Cancel
-                  </Button>
-                  {!editingServer && (
-                    <Button
-                      variant="outline"
-                      onClick={handleJsonTestAndDiscover}
-                      disabled={isTestingDiscovery || !jsonValue.trim()}
-                    >
-                      {isTestingDiscovery ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Testing...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="h-4 w-4 mr-2" />
-                          Test & Discover
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleJsonSave}
-                    disabled={
-                      (editingServer ? isSaving : isImporting) ||
-                      !jsonValue.trim() ||
-                      // Require discovery for new servers (unless editing)
-                      (!editingServer && !discoveryPreview) ||
-                      // Disable while any discovery is still running
-                      (!editingServer &&
-                        discoveryPreview?.some(
-                          (r) => r.status === 'discovering' || r.status === 'pending',
-                        ))
-                    }
-                  >
-                    {editingServer
-                      ? isSaving
-                        ? 'Saving...'
-                        : 'Update'
-                      : isImporting
-                        ? 'Importing...'
-                        : discoveryPreview && discoveryPreview.some((r) => r.status === 'completed')
-                          ? `Import ${discoveryPreview.filter((r) => r.status === 'completed').length} Server${discoveryPreview.filter((r) => r.status === 'completed').length === 1 ? '' : 's'}`
-                          : 'Import'}
-                  </Button>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </SheetContent>
-      </Sheet>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete MCP Server</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this server? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation */}
+      <DeleteServerDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        isDeleting={isDeleting}
+        onDelete={handleDelete}
+      />
 
       {/* Tools Dialog */}
-      <Dialog open={toolsDialogOpen} onOpenChange={setToolsDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Tools from {selectedServer?.name ?? 'Server'}</DialogTitle>
-            <DialogDescription>
-              {serverTools.length > 0 ? (
-                <span className="flex items-center gap-2 mt-1">
-                  Enabled: {serverTools.filter((t) => t.enabled).length} / {serverTools.length}
-                </span>
-              ) : (
-                'These are the tools discovered from this MCP server.'
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[65vh] overflow-y-auto">
-            {serverTools.length === 0 ? (
-              <div className="text-center py-8">
-                <Wrench className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-sm font-medium mb-1">No tools discovered yet</p>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Discover tools from this server to enable them in your workflows
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    selectedServerForTools &&
-                    handleDiscoverServerTools(
-                      selectedServerForTools,
-                      getServerDiscoveryImage(selectedServerForTools),
-                    )
-                  }
-                  disabled={
-                    !selectedServerForTools || discoveringServerIds.has(selectedServerForTools)
-                  }
-                >
-                  {selectedServerForTools && discoveringServerIds.has(selectedServerForTools) ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Discovering...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="h-4 w-4 mr-2" />
-                      Discover Tools
-                    </>
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {serverTools.map((tool) => (
-                  <div
-                    key={tool.id}
-                    className={cn(
-                      'border rounded-lg p-3 transition-opacity',
-                      !tool.enabled && 'opacity-60',
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{tool.toolName}</div>
-                        {tool.description && (
-                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            <MarkdownView
-                              content={tool.description}
-                              className="prose prose-sm max-w-none"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Enabled</span>
-                        <Switch
-                          checked={tool.enabled}
-                          onCheckedChange={() => handleToggleTool(tool.serverId, tool.id)}
-                        />
-                      </div>
-                    </div>
-                    {tool.inputSchema && (
-                      <details className="mt-2">
-                        <summary className="text-xs text-muted-foreground cursor-pointer">
-                          View schema
-                        </summary>
-                        <pre className="text-xs bg-muted p-2 rounded mt-2 overflow-x-auto">
-                          {JSON.stringify(tool.inputSchema, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ToolsDialog
+        open={toolsDialogOpen}
+        onOpenChange={setToolsDialogOpen}
+        serverName={selectedServer?.name ?? 'Unknown'}
+        tools={serverTools}
+        selectedServerForTools={selectedServerForTools}
+        discoveringServerIds={discoveringServerIds}
+        onToggleTool={handleToggleTool}
+        onDiscoverTools={handleDiscoverServerTools}
+      />
+
       <ConfirmDialog {...dialogProps} />
     </div>
   );

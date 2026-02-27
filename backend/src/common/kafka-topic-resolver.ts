@@ -2,29 +2,38 @@
  * Kafka Topic Resolver
  *
  * Provides instance-aware topic naming for multi-instance deployments.
- * When SHIPSEC_INSTANCE is set, topics are namespaced with the instance number.
+ * When instanceId is set, topics are namespaced with the instance number.
  *
- * Environment Variables:
- * - SHIPSEC_INSTANCE: Instance number (0-9) for multi-instance isolation
- * - LOG_KAFKA_TOPIC: Base topic for logs (default: telemetry.logs)
- * - EVENT_KAFKA_TOPIC: Base topic for events (default: telemetry.events)
- * - AGENT_TRACE_KAFKA_TOPIC: Base topic for agent traces (default: telemetry.agent-trace)
- * - NODE_IO_KAFKA_TOPIC: Base topic for node I/O (default: telemetry.node-io)
+ * Topic names and instance ID are provided via TopicResolverConfig,
+ * typically sourced from the KafkaConfig namespace (ConfigService).
  */
 
 export interface TopicResolverConfig {
   instanceId?: string;
   enableInstanceSuffix?: boolean;
+  topics?: {
+    logs?: string;
+    events?: string;
+    agentTrace?: string;
+    nodeIo?: string;
+  };
 }
 
 export class KafkaTopicResolver {
   private instanceId: string | undefined;
   private enableInstanceSuffix: boolean;
+  private topics: Required<NonNullable<TopicResolverConfig['topics']>>;
 
   constructor(config: TopicResolverConfig = {}) {
-    this.instanceId = config.instanceId ?? process.env.SHIPSEC_INSTANCE;
-    // Enable instance suffix only if SHIPSEC_INSTANCE is set
+    this.instanceId = config.instanceId;
+    // Enable instance suffix only if instanceId is set
     this.enableInstanceSuffix = config.enableInstanceSuffix ?? Boolean(this.instanceId);
+    this.topics = {
+      logs: config.topics?.logs ?? 'telemetry.logs',
+      events: config.topics?.events ?? 'telemetry.events',
+      agentTrace: config.topics?.agentTrace ?? 'telemetry.agent-trace',
+      nodeIo: config.topics?.nodeIo ?? 'telemetry.node-io',
+    };
   }
 
   /**
@@ -43,32 +52,28 @@ export class KafkaTopicResolver {
    * Get logs topic
    */
   getLogsTopic(): string {
-    const baseTopic = process.env.LOG_KAFKA_TOPIC ?? 'telemetry.logs';
-    return this.resolveTopic(baseTopic);
+    return this.resolveTopic(this.topics.logs);
   }
 
   /**
    * Get events topic
    */
   getEventsTopic(): string {
-    const baseTopic = process.env.EVENT_KAFKA_TOPIC ?? 'telemetry.events';
-    return this.resolveTopic(baseTopic);
+    return this.resolveTopic(this.topics.events);
   }
 
   /**
    * Get agent trace topic
    */
   getAgentTraceTopic(): string {
-    const baseTopic = process.env.AGENT_TRACE_KAFKA_TOPIC ?? 'telemetry.agent-trace';
-    return this.resolveTopic(baseTopic);
+    return this.resolveTopic(this.topics.agentTrace);
   }
 
   /**
    * Get node I/O topic
    */
   getNodeIOTopic(): string {
-    const baseTopic = process.env.NODE_IO_KAFKA_TOPIC ?? 'telemetry.node-io';
-    return this.resolveTopic(baseTopic);
+    return this.resolveTopic(this.topics.nodeIo);
   }
 
   /**

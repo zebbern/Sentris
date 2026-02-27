@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SecretEncryption, parseMasterKey, SecretEncryptionMaterial } from '@shipsec/shared';
+import type { SecretsConfig } from '../config';
 
 const FALLBACK_DEV_KEY = '0123456789abcdef0123456789abcdef';
 
@@ -12,9 +14,10 @@ export class McpServersEncryptionService {
   private readonly logger = new Logger(McpServersEncryptionService.name);
   private readonly encryptor: SecretEncryption;
 
-  constructor() {
-    const rawKey = process.env.SECRET_STORE_MASTER_KEY ?? FALLBACK_DEV_KEY;
-    if (!process.env.SECRET_STORE_MASTER_KEY) {
+  constructor(private readonly configService: ConfigService) {
+    const secrets = this.configService.get<SecretsConfig>('secrets')!;
+    const rawKey = secrets.masterKey ?? FALLBACK_DEV_KEY;
+    if (!secrets.masterKey) {
       this.logger.warn(
         'SECRET_STORE_MASTER_KEY is not set. Using insecure default key for development purposes only.',
       );
