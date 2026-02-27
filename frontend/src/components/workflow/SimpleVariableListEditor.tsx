@@ -132,7 +132,7 @@ function toInternal(value: any): InternalVariable[] {
       if (Array.isArray(parsed)) {
         list = parsed;
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('Failed to parse legacy variables', e);
     }
   }

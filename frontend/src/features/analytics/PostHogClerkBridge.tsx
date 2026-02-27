@@ -36,14 +36,14 @@ function ClerkBridgeInner() {
             name: primaryOrg.name,
           });
         }
-      } catch (_) {
+      } catch (_: unknown) {
         // ignore
       }
     } else {
       // Clear user on sign-out
       try {
         posthog.reset();
-      } catch (_) {
+      } catch (_: unknown) {
         // ignore
       }
     }

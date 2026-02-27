@@ -28,7 +28,7 @@ export const codeSnippets = {
     const result = await response.json();
     console.log('Success:', result);
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error invoking workflow:', error);
     throw error;
   }

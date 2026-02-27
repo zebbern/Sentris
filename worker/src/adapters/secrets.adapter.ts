@@ -74,9 +74,9 @@ export class SecretsAdapter implements ISecretsService {
       });
 
       return { value, version: options?.version ?? record.versionNumber };
-    } catch (error) {
+    } catch (error: unknown) {
       throw new ServiceError(`Failed to decrypt secret '${key}'`, {
-        cause: error as Error,
+        cause: error instanceof Error ? error : undefined,
         details: { secretKey: key, keyId: record.keyId },
       });
     }

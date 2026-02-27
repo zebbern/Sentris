@@ -368,7 +368,7 @@ export function PublishTemplateModal({
         // Show success state
         setSuccess(true);
         onSuccess?.();
-      } catch (err) {
+      } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to prepare template for publishing');
       } finally {
         setIsLoading(false);

@@ -98,7 +98,7 @@ export class IsolatedContainerVolume {
 
       this.isInitialized = true;
       return this.volumeName;
-    } catch (error) {
+    } catch (error: unknown) {
       // Clean up on failure
       if (this.volumeName) {
         await this.cleanup().catch(() => {
@@ -311,7 +311,7 @@ export class IsolatedContainerVolume {
       try {
         const content = await this.readFileFromVolume(filename);
         results[filename] = content;
-      } catch (error) {
+      } catch (error: unknown) {
         // File might not exist, which is okay
         console.warn(
           `Could not read file ${filename}: ${error instanceof Error ? error.message : String(error)}`,
@@ -440,7 +440,7 @@ export class IsolatedContainerVolume {
 
     try {
       await this.executeDockerCommand('volume', 'rm', [this.volumeName]);
-    } catch (error) {
+    } catch (error: unknown) {
       // Log but don't throw - cleanup should be best-effort
       console.error(
         `Failed to cleanup volume ${this.volumeName}: ${error instanceof Error ? error.message : String(error)}`,
@@ -530,14 +530,14 @@ export async function cleanupOrphanedVolumes(olderThanHours = 24): Promise<numbe
           await exec(`docker volume rm ${volumeName}`);
           console.log(`Removed orphaned volume: ${volumeName}`);
           removedCount++;
-        } catch (error) {
+        } catch (error: unknown) {
           console.error(`Failed to remove volume ${volumeName}: ${error}`);
         }
       }
     }
 
     return removedCount;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Failed to cleanup orphaned volumes: ${error}`);
     return 0;
   }

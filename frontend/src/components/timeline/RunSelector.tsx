@@ -220,7 +220,7 @@ export function RunSelector({
         } else {
           throw new Error('Clipboard API is unavailable');
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to copy run link:', error);
         toast({
           variant: 'destructive',

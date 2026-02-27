@@ -109,11 +109,11 @@ const definition = defineComponent({
     if (format === 'json') {
       try {
         secretOutput = JSON.parse(resolved.value);
-      } catch (error) {
+      } catch (error: unknown) {
         throw new ValidationError(
-          `Failed to parse secret value as JSON: ${(error as Error).message}`,
+          `Failed to parse secret value as JSON: ${error instanceof Error ? error.message : String(error)}`,
           {
-            cause: error as Error,
+            cause: error instanceof Error ? error : undefined,
             fieldErrors: { outputFormat: ['Invalid JSON in secret value'] },
           },
         );

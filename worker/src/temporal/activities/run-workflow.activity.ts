@@ -76,12 +76,14 @@ export async function runWorkflowActivity(
     );
     console.log(`📊 [ACTIVITY] Result keys: ${Object.keys(result || {}).join(', ')}`);
     return result;
-  } catch (error) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
     console.error(
       `❌ [ACTIVITY FAIL] runWorkflow FAILED for run: ${input.runId} after ${duration}ms`,
     );
-    console.error(`❌ [ACTIVITY] Error type: ${error?.constructor?.name}`);
+    console.error(
+      `❌ [ACTIVITY] Error type: ${error instanceof Error ? error.constructor.name : typeof error}`,
+    );
     console.error(
       `❌ [ACTIVITY] Error message: ${error instanceof Error ? error.message : String(error)}`,
     );

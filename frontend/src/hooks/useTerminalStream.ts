@@ -85,7 +85,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
         if (result.chunks.length > 0) {
           setMode(autoConnect ? 'live' : 'replay');
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('[useTerminalStream] hydrate failed', err);
         setError(err instanceof Error ? err.message : 'Failed to load terminal output');
       } finally {
@@ -111,7 +111,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
       cursorRef.current = result.cursor ?? cursorRef.current;
       setChunks((prev) => mergeTerminalChunks(prev, result.chunks));
       setMode('replay');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[useTerminalStream] fetchMore failed', err);
       setError(err instanceof Error ? err.message : 'Failed to load additional chunks');
     }
@@ -236,7 +236,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
               return merged;
             });
             setMode('live');
-          } catch (err) {
+          } catch (err: unknown) {
             console.error('[useTerminalStream] failed to parse terminal SSE', err);
           }
         };
@@ -259,7 +259,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
         source.addEventListener('ready', (event) => {
           console.debug('[useTerminalStream] SSE ready event', event);
         });
-      } catch (err) {
+      } catch (err: unknown) {
         if (isMounted) {
           console.error('[useTerminalStream] SSE connection failed', err);
           setError('Failed to connect to terminal stream');

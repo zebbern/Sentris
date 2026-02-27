@@ -758,7 +758,7 @@ export function TemplateLibraryPage() {
   const handleSync = async () => {
     try {
       await syncMutation.mutateAsync();
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Template sync failed',
         description: humanizeApiError(err),

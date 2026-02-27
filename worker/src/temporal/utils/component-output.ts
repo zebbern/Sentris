@@ -94,7 +94,7 @@ export function maskSecretParameters(component: RegisteredComponent, params: unk
         }
       }
     }
-  } catch (_e) {
+  } catch (_e: unknown) {
     // Fallback if metadata extraction fails
   }
 

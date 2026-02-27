@@ -184,7 +184,7 @@ export function TopBar({
     try {
       setIsImporting(true);
       await onImport(file);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to import workflow:', error);
     } finally {
       setIsImporting(false);
@@ -351,8 +351,8 @@ export function TopBar({
               </span>
             )}
           </div>
-          {/* Mode toggle - flex-centered, won't overlap with other elements */}
-          <div className="flex-1 flex justify-center min-w-0">
+          {/* Mode toggle - flex-centered, z-10 ensures it stays clickable above adjacent fixed-width sections */}
+          <div className="flex-1 flex justify-center min-w-0 relative z-10">
             <div className="flex-shrink-0">{modeToggle}</div>
           </div>
           {/* Actions on the right - fixed width to match left section for consistent centering */}

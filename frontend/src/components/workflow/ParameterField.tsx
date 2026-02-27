@@ -138,7 +138,7 @@ export function ParameterField({
 
         onUpdateParameter?.('childWorkflowName', workflow.name);
         onUpdateParameter?.('childRuntimeInputs', runtimeInputs);
-      } catch (error) {
+      } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         setWorkflowPortSyncError(message);
         onUpdateParameter?.('childRuntimeInputs', []);
@@ -196,7 +196,7 @@ export function ParameterField({
   const handleRefreshConnections = async () => {
     try {
       await queryClient.invalidateQueries({ queryKey: ['integrationConnections'] });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to refresh integration connections', error);
     }
   };
@@ -697,7 +697,7 @@ export function ParameterField({
           try {
             textValue = JSON.stringify(value, null, 2);
             needsNormalization = true;
-          } catch (error) {
+          } catch (error: unknown) {
             console.error('Failed to serialize JSON parameter value', error);
             return;
           }
@@ -731,7 +731,7 @@ export function ParameterField({
           JSON.parse(nextValue); // Validate JSON syntax
           setJsonError(null);
           onChange(nextValue); // Pass string, not parsed object
-        } catch (_error) {
+        } catch (_error: unknown) {
           setJsonError('Invalid JSON');
           // Keep showing error, don't update parent
         }

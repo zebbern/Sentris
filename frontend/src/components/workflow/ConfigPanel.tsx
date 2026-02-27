@@ -493,7 +493,7 @@ export function ConfigPanel({
             }
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         console.error('Failed to resolve dynamic ports', e);
       }
     }, 500); // 500ms debounce
@@ -517,7 +517,7 @@ export function ConfigPanel({
     }
     try {
       return JSON.stringify(component.toolSchema, null, 2);
-    } catch (_error) {
+    } catch (_error: unknown) {
       return String(component.toolSchema);
     }
   }, [component.toolSchema]);
@@ -528,7 +528,7 @@ export function ConfigPanel({
     if (typeof component.toolSchema === 'string') {
       try {
         return JSON.parse(component.toolSchema);
-      } catch (_error) {
+      } catch (_error: unknown) {
         return null;
       }
     }

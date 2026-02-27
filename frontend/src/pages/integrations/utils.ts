@@ -16,7 +16,7 @@ export function formatTimestamp(iso: string | null | undefined): string {
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(iso));
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to format timestamp', error);
     return iso;
   }

@@ -208,7 +208,7 @@ export function ArtifactLibrary() {
                     onDownload={async () => {
                       try {
                         await downloadArtifactMutation.mutateAsync({ artifact });
-                      } catch (err) {
+                      } catch (err: unknown) {
                         toast({
                           title: 'Download failed',
                           description: humanizeApiError(err),
@@ -225,7 +225,7 @@ export function ArtifactLibrary() {
                       if (!ok) return;
                       try {
                         await deleteArtifactMutation.mutateAsync(artifact.id);
-                      } catch (err) {
+                      } catch (err: unknown) {
                         toast({
                           title: 'Failed to delete artifact',
                           description: humanizeApiError(err),
@@ -244,7 +244,7 @@ export function ArtifactLibrary() {
                         setTimeout(() => {
                           setCopiedRemoteUri((current) => (current === uri ? null : current));
                         }, 2000);
-                      } catch (error) {
+                      } catch (error: unknown) {
                         console.error('Failed to copy remote URI', error);
                       }
                     }}

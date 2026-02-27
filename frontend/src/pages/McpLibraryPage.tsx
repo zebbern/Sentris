@@ -727,7 +727,7 @@ export function McpLibraryPage() {
               error: result.error,
             });
           }
-        } catch (error) {
+        } catch (error: unknown) {
           clearInterval(pollInterval);
           setDiscoveryStatus({
             status: 'failed',
@@ -738,7 +738,7 @@ export function McpLibraryPage() {
 
       // Cleanup interval on unmount
       return () => clearInterval(pollInterval);
-    } catch (error) {
+    } catch (error: unknown) {
       setDiscoveryStatus({
         status: 'failed',
         error: error instanceof Error ? error.message : 'Failed to start discovery',
@@ -838,7 +838,7 @@ export function McpLibraryPage() {
       setEditingServer(null);
       setFormData(INITIAL_FORM_DATA);
       setDiscoveryStatus(null);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to save server',
@@ -858,7 +858,7 @@ export function McpLibraryPage() {
       toast({ title: 'Server deleted', description: 'MCP server has been removed.' });
       setDeleteDialogOpen(false);
       setServerToDelete(null);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to delete server',
@@ -876,7 +876,7 @@ export function McpLibraryPage() {
         title: server.enabled ? 'Server enabled' : 'Server disabled',
         description: `${server.name} has been ${server.enabled ? 'enabled' : 'disabled'}.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to toggle server',
@@ -894,7 +894,7 @@ export function McpLibraryPage() {
         description: result.message,
         variant: result.success ? 'default' : 'destructive',
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Test failed',
         description: err instanceof Error ? err.message : 'Connection test failed',
@@ -921,7 +921,7 @@ export function McpLibraryPage() {
         title: 'Tool discovery complete',
         description: `Discovered ${tools.length} tool(s) from this server.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Discovery failed',
         description: err instanceof Error ? err.message : 'Failed to discover tools',
@@ -1060,7 +1060,7 @@ export function McpLibraryPage() {
         }));
         setGroupDiscoveryPreview((prev) => ({ ...prev, [template.slug]: updated }));
       }
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Discovery failed',
         description: err instanceof Error ? err.message : 'Failed to discover servers',
@@ -1123,7 +1123,7 @@ export function McpLibraryPage() {
         const { [template.slug]: _, ...rest } = prev;
         return rest;
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Import failed',
         description: err instanceof Error ? err.message : 'Failed to import group',
@@ -1153,7 +1153,7 @@ export function McpLibraryPage() {
         description: `${groupName} was removed.`,
       });
       await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Remove failed',
         description: err instanceof Error ? err.message : 'Failed to remove group',
@@ -1169,7 +1169,7 @@ export function McpLibraryPage() {
         title: tool.enabled ? 'Tool enabled' : 'Tool disabled',
         description: `${tool.toolName} has been ${tool.enabled ? 'enabled' : 'disabled'}.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
         description: err instanceof Error ? err.message : 'Failed to toggle tool',
@@ -1236,7 +1236,7 @@ export function McpLibraryPage() {
       }
 
       return { servers };
-    } catch (e) {
+    } catch (e: unknown) {
       return {
         servers: [],
         error: e instanceof Error ? `JSON parse error: ${e.message}` : 'Invalid JSON',
@@ -1358,7 +1358,7 @@ export function McpLibraryPage() {
 
             await new Promise((resolve) => setTimeout(resolve, pollInterval));
           }
-        } catch (err) {
+        } catch (err: unknown) {
           results[i] = {
             ...results[i],
             toolCount: 0,
@@ -1420,7 +1420,7 @@ export function McpLibraryPage() {
         setEditingServer(null);
         setFormData(INITIAL_FORM_DATA);
         setDiscoveryStatus(null);
-      } catch (err) {
+      } catch (err: unknown) {
         toast({
           title: 'Error',
           description: err instanceof Error ? err.message : 'Failed to save server',
@@ -1566,7 +1566,7 @@ export function McpLibraryPage() {
       setEditorOpen(false);
       setJsonValue('');
       setDiscoveryStatus(null);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Import failed',
         description: err instanceof Error ? err.message : 'Failed to import servers',

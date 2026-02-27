@@ -813,7 +813,7 @@ function useAgentTranscript(agentRunId: string | null): AgentTranscriptState {
             steps,
           });
         }
-      } catch (err) {
+      } catch (err: unknown) {
         if (!cancelled) {
           setState({
             loading: false,

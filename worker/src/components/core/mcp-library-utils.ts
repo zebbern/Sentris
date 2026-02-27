@@ -139,8 +139,8 @@ async function discoverToolsFromEndpoint(
       const tools = (res.tools ?? []).map((t) => McpToolSchema.parse(t));
       console.log(`[discoverTools] ✓ Discovered ${tools.length} tools on attempt ${attempt}`);
       return tools;
-    } catch (error) {
-      lastError = error as Error;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       await client?.close().catch(() => {});
 
       if (attempt < maxRetries) {

@@ -139,7 +139,7 @@ export async function cleanupRunResourcesActivity(
     console.log(
       `[MCP Cleanup] Found ${namePatternContainerIds.length} containers matching name pattern`,
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn(`[MCP Cleanup] Failed to list containers by name pattern:`, error);
   }
 
@@ -166,7 +166,7 @@ export async function cleanupRunResourcesActivity(
         try {
           await execAsync(`docker rm -f ${containerId}`);
           console.log(`[MCP Cleanup] Removed container: ${containerId}`);
-        } catch (error) {
+        } catch (error: unknown) {
           console.warn(`[MCP Cleanup] Failed to remove container ${containerId}:`, error);
         }
       }),
@@ -199,12 +199,12 @@ export async function cleanupRunResourcesActivity(
         }
         try {
           await execAsync(`docker volume rm ${volumeName}`);
-        } catch (error) {
+        } catch (error: unknown) {
           console.warn(`[MCP Cleanup] Failed to remove volume ${volumeName}:`, error);
         }
       }),
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn(`[MCP Cleanup] Failed to list volumes for run ${input.runId}:`, error);
   }
 }

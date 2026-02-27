@@ -360,7 +360,7 @@ export function useDesignWorkflowPersistence({
             });
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to save workflow:', error);
 
         const isNetworkError =

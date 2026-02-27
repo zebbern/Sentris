@@ -452,7 +452,7 @@ const definition = defineComponent({
         } else {
           rawOutput = '';
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // Subfinder can exit non-zero when some sources fail or rate-limit,
         // even though it still printed valid findings. Preserve partial results
         // instead of failing the entire workflow.

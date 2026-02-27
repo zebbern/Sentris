@@ -147,7 +147,7 @@ export function ApiKeysManager() {
       await createApiKeyMutation.mutateAsync(formState);
       setSuccessMessage('API Key created successfully.');
       // Don't close dialog yet because we need to show the key
-    } catch (err) {
+    } catch (err: unknown) {
       const message = humanizeApiError(err);
       setCreateError(message);
     } finally {
@@ -166,7 +166,7 @@ export function ApiKeysManager() {
     try {
       await revokeApiKeyMutation.mutateAsync(key.id);
       setSuccessMessage(`API Key "${key.name}" revoked.`);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Revoke failed',
         description: humanizeApiError(err),
@@ -185,7 +185,7 @@ export function ApiKeysManager() {
     try {
       await deleteApiKeyMutation.mutateAsync(key.id);
       setSuccessMessage(`API Key "${key.name}" deleted.`);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Delete failed',
         description: humanizeApiError(err),

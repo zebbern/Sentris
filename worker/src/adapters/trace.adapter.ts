@@ -48,7 +48,7 @@ export class TraceAdapter implements ITraceService {
     }
 
     const sequence = this.nextSequence(event.runId);
-    void this.persist(event, sequence).catch((error) => {
+    void this.persist(event, sequence).catch((error: unknown) => {
       this.logger.error('[TRACE] Failed to persist trace event', error);
     });
   }

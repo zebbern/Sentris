@@ -19,7 +19,7 @@ export function AnalyticsRouterListener() {
         $pathname: location.pathname,
         $search: location.search,
       });
-    } catch (_) {
+    } catch (_: unknown) {
       // no-op
     }
   }, [location.pathname, location.search]);

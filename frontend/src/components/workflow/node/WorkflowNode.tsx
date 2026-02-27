@@ -181,7 +181,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
       setIsTerminalLoading(true);
       try {
         await prefetchTerminal(id, 'pty', selectedRunId ?? undefined);
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to prefetch terminal output', error);
       } finally {
         if (!cancelled) setIsTerminalLoading(false);
@@ -365,7 +365,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
           description: input.description || `Runtime input: ${input.label}`,
         }));
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to parse runtimeInputs:', error);
     }
   }

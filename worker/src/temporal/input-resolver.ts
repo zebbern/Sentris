@@ -70,7 +70,7 @@ function coercePrimitiveValue(type: string | undefined, value: unknown): Coercio
       if (typeof value === 'object') {
         try {
           return { ok: true, value: JSON.stringify(value) };
-        } catch (error) {
+        } catch (error: unknown) {
           return {
             ok: false,
             error:

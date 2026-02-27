@@ -124,7 +124,7 @@ export function ProviderConfigDialog({
         ...(trimmedSecret.length > 0 ? { clientSecret: trimmedSecret } : {}),
       });
       onCompleted('saved', provider);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save provider credentials.';
       setError(message);
     } finally {
@@ -142,7 +142,7 @@ export function ProviderConfigDialog({
     try {
       await api.integrations.deleteProviderConfig(provider.id);
       onCompleted('deleted', provider);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to remove stored credentials.';
       setError(message);
       setSaving(false);
@@ -161,7 +161,7 @@ export function ProviderConfigDialog({
       await navigator.clipboard.writeText(callbackUrl);
       setCopiedRedirect(true);
       setTimeout(() => setCopiedRedirect(false), 2000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to copy redirect URL', err);
       setError('Unable to copy redirect URL. Please copy it manually.');
     }

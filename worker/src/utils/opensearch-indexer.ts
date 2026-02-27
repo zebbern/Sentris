@@ -23,7 +23,7 @@ async function retryWithBackoff<T>(operation: () => Promise<T>, operationName: s
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await operation();
-    } catch (error) {
+    } catch (error: unknown) {
       const isLastAttempt = attempt === maxAttempts - 1;
 
       if (isLastAttempt) {
@@ -95,7 +95,7 @@ export class OpenSearchIndexer {
         console.log(
           `[OpenSearchIndexer] Client initialized (security enabled: ${this.securityEnabled})`,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[OpenSearchIndexer] Failed to initialize client:', error);
       }
     } else {
@@ -160,7 +160,7 @@ export class OpenSearchIndexer {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       // Log error but don't block indexing
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[OpenSearchIndexer] Error provisioning tenant ${orgId}: ${message}`);
@@ -259,7 +259,7 @@ export class OpenSearchIndexer {
       }
 
       return indexName;
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[OpenSearchIndexer] Failed to index document after retries:`, error);
 
@@ -384,7 +384,7 @@ export class OpenSearchIndexer {
       }
 
       return { indexName, documentCount: documents.length };
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[OpenSearchIndexer] Failed to bulk index after retries:`, error);
 
@@ -487,7 +487,7 @@ export class OpenSearchIndexer {
           `[OpenSearchIndexer] Failed to update index pattern: ${updateResponse.status}`,
         );
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // Non-critical failure - log but don't throw
       console.warn('[OpenSearchIndexer] Failed to refresh index pattern:', error);
     }

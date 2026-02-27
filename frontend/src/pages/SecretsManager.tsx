@@ -221,7 +221,7 @@ export function SecretsManager() {
       });
       setFormSuccess('Secret created successfully. You can now reference it from workflows.');
       setFormState(INITIAL_FORM);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = humanizeApiError(err);
       setFormError(message);
     } finally {
@@ -308,7 +308,7 @@ export function SecretsManager() {
 
       setListSuccess(`Secret "${latest.name}" ${actionSummary}.`);
       handleEditDialogChange(false);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = humanizeApiError(err);
       setEditError(message);
     } finally {
@@ -355,7 +355,7 @@ export function SecretsManager() {
       track(Events.SecretDeleted, { name_length: secretNameLength });
       setListSuccess(`Secret "${secretName}" deleted.`);
       handleDeleteDialogChange(false);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = humanizeApiError(err);
       setDeleteError(message);
     } finally {
@@ -480,7 +480,7 @@ export function SecretsManager() {
                   setListSuccess(null);
                   queryClient
                     .invalidateQueries({ queryKey: queryKeys.secrets.all() })
-                    .catch((err) => console.error('Failed to refresh secrets', err));
+                    .catch((err: unknown) => console.error('Failed to refresh secrets', err));
                 }}
                 disabled={loading}
                 className="self-start sm:self-auto flex-shrink-0"

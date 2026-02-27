@@ -105,7 +105,7 @@ export function useTimelineTerminalStream(
         const sorted = [...result.chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
         setAllChunks(sorted);
         fetchedRunIdRef.current = terminalOptions.runId;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('[useTimelineTerminalStream] Failed to fetch chunks', error);
       } finally {
         setIsFetchingTimeline(false);

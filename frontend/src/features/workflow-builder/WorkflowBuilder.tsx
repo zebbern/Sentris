@@ -695,10 +695,10 @@ function WorkflowBuilderContent() {
               }
             }
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to check for active runs:', error);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to load workflow:', error);
 
         // Check if it's a network error (backend not available)
@@ -781,7 +781,7 @@ function WorkflowBuilderContent() {
           type: input.type === 'string' ? 'text' : input.type,
         }));
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to parse runtime inputs:', error);
     }
 

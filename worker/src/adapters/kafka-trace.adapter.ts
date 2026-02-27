@@ -56,7 +56,7 @@ export class KafkaTraceAdapter implements ITraceService {
       allowAutoTopicCreation: true,
     });
 
-    this.connectPromise = this.producer.connect().catch((error) => {
+    this.connectPromise = this.producer.connect().catch((error: unknown) => {
       this.logger.error('[KafkaTraceAdapter] Failed to connect to brokers', error);
       throw error;
     });
@@ -101,7 +101,7 @@ export class KafkaTraceAdapter implements ITraceService {
           ],
         }),
       )
-      .catch((error) => {
+      .catch((error: unknown) => {
         this.logger.error('[KafkaTraceAdapter] Failed to send trace event', error);
       });
   }

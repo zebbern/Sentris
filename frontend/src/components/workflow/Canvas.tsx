@@ -432,7 +432,7 @@ export function Canvas({
                 includeHiddenNodes: false,
                 nodes: currentWorkflowNodes, // Only fit workflow nodes, exclude terminals
               });
-            } catch (error) {
+            } catch (error: unknown) {
               console.warn('Failed to fit view:', error);
             }
           });
@@ -1156,7 +1156,7 @@ export function Canvas({
                 if (nodes.length > 0) {
                   try {
                     instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.85 });
-                  } catch (error) {
+                  } catch (error: unknown) {
                     console.warn('Failed to fit view on init:', error);
                   }
                 }

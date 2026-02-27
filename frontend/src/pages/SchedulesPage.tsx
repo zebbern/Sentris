@@ -202,7 +202,7 @@ export function SchedulesPage() {
           description: `"${schedule.name}" is active again.`,
         });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Schedule update failed',
         description: err instanceof Error ? err.message : 'Try again in a moment.',
@@ -221,7 +221,7 @@ export function SchedulesPage() {
         title: 'Run requested',
         description: `Scheduled cadence "${schedule.name}" is executing now.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Failed to trigger schedule',
         description: err instanceof Error ? err.message : 'Try again in a moment.',
@@ -239,7 +239,7 @@ export function SchedulesPage() {
         title: 'Schedules refreshed',
         description: 'Latest schedule statuses have been loaded.',
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Refresh failed',
         description: err instanceof Error ? err.message : 'Try again in a moment.',
@@ -266,7 +266,7 @@ export function SchedulesPage() {
         title: 'Schedule deleted',
         description: `"${schedule.name}" has been deleted.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Failed to delete schedule',
         description: err instanceof Error ? err.message : 'Try again in a moment.',

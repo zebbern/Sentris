@@ -186,7 +186,7 @@ export async function mcpDiscoveryWorkflow(input: DiscoveryInput): Promise<Disco
           tools: discovery.tools,
           workflowId,
         });
-      } catch (cacheError) {
+      } catch (cacheError: unknown) {
         // Log cache error but don't fail the workflow
         console.error('[mcpDiscoveryWorkflow] Failed to cache discovery results:', cacheError);
       }
@@ -203,7 +203,7 @@ export async function mcpDiscoveryWorkflow(input: DiscoveryInput): Promise<Disco
       workflowId,
       ...discoveryResult,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     // Handle activity failures
     const errorMessage = error instanceof Error ? error.message : String(error);
     const isNonRetryable = error instanceof ApplicationFailure && error.nonRetryable;
@@ -282,7 +282,7 @@ export async function mcpGroupDiscoveryWorkflow(
             tools: result.tools ?? [],
             workflowId,
           });
-        } catch (cacheError) {
+        } catch (cacheError: unknown) {
           console.error(
             '[mcpGroupDiscoveryWorkflow] Failed to cache discovery results:',
             cacheError,
@@ -300,7 +300,7 @@ export async function mcpGroupDiscoveryWorkflow(
       workflowId,
       ...discoveryResult,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const isNonRetryable = error instanceof ApplicationFailure && error.nonRetryable;
 

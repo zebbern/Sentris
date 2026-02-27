@@ -143,7 +143,7 @@ const definition = defineComponent({
           organizationId ?? null,
           connectedToolIds,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         context.logger.error(`[OpenCode] Failed to generate gateway token: ${error}`);
       }
     }

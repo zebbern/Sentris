@@ -352,7 +352,7 @@ const definition = defineComponent({
         documentCount: result.documentCount,
         indexName: result.indexName,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error during indexing';
       context.logger.error(`[Analytics Sink] Indexing failed: ${errorMessage}`);
 

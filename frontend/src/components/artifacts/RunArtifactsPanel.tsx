@@ -48,7 +48,7 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
       setTimeout(() => {
         setCopiedId((current) => (current === artifactId ? null : current));
       }, 2000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to copy artifact ID', error);
     }
   }, []);
@@ -125,7 +125,7 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
                     setTimeout(() => {
                       setCopiedRemoteUri((current) => (current === uri ? null : current));
                     }, 2000);
-                  } catch (error) {
+                  } catch (error: unknown) {
                     console.error('Failed to copy remote URI', error);
                   }
                 }}

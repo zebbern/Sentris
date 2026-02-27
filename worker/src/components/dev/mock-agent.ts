@@ -258,7 +258,7 @@ const definition = defineComponent({
                     : outputText,
               });
             }
-          } catch (error) {
+          } catch (error: unknown) {
             const durationMs = Date.now() - startTime;
             const errorMsg = error instanceof Error ? error.message : String(error);
             console.log(

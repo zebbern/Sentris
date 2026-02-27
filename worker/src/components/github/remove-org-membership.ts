@@ -187,10 +187,10 @@ const definition = defineComponent({
             headers,
           },
         );
-      } catch (error) {
+      } catch (error: unknown) {
         throw new NetworkError(
-          `GitHub API request failed while removing ${login} from team ${teamSlug}: ${(error as Error).message}`,
-          { cause: error as Error },
+          `GitHub API request failed while removing ${login} from team ${teamSlug}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error instanceof Error ? error : undefined },
         );
       }
 
@@ -222,10 +222,10 @@ const definition = defineComponent({
           headers,
         },
       );
-    } catch (error) {
+    } catch (error: unknown) {
       throw new NetworkError(
-        `GitHub API request failed while removing ${login} from organization ${organization}: ${(error as Error).message}`,
-        { cause: error as Error },
+        `GitHub API request failed while removing ${login} from organization ${organization}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error instanceof Error ? error : undefined },
       );
     }
 
@@ -418,8 +418,8 @@ async function resolveLogin(
 async function safeReadText(response: Response): Promise<string> {
   try {
     return await response.text();
-  } catch (error) {
-    return `<<unable to read body: ${(error as Error).message}>>`;
+  } catch (error: unknown) {
+    return `<<unable to read body: ${error instanceof Error ? error.message : String(error)}>>`;
   }
 }
 

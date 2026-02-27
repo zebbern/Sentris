@@ -185,7 +185,7 @@ async function main() {
       clientId: process.env.LOG_KAFKA_CLIENT_ID ?? 'shipsec-worker',
     });
     console.log(`✅ Kafka logging enabled (${kafkaBrokers.join(', ')})${instanceMsg}`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Failed to initialize Kafka logging', error);
     throw error;
   }
@@ -198,7 +198,7 @@ async function main() {
       const maxEntries = Number(process.env.TERMINAL_REDIS_MAXLEN ?? '5000');
       terminalStream = new RedisTerminalStreamAdapter(redis, { maxEntries });
       console.log(`✅ Terminal Redis streaming enabled (${terminalRedisUrl})`);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('⚠️ Failed to initialize terminal Redis streaming', error);
     }
   } else {
@@ -357,7 +357,7 @@ async function main() {
               return rule;
             });
           }
-        } catch (_err) {
+        } catch (_err: unknown) {
           console.warn(
             'Failed to apply webpackConfigHook override; falling back to default SWC loader',
             _err,
@@ -400,12 +400,13 @@ async function main() {
   await worker.run();
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
+  const err = error instanceof Error ? error : new Error(String(error));
   console.error('💥 Temporal worker failed to start:', {
-    error: error.message,
-    stack: error.stack,
-    code: error.code,
-    details: error.details,
+    error: err.message,
+    stack: err.stack,
+    code: 'code' in err ? (err as { code: unknown }).code : undefined,
+    details: 'details' in err ? (err as { details: unknown }).details : undefined,
   });
   process.exit(1);
 });
@@ -415,7 +416,7 @@ async function ensureTemporalNamespace(connection: NativeConnection, namespace: 
     await connection.workflowService.describeNamespace({ namespace });
     console.log(`✅ Temporal namespace "${namespace}" is ready`);
     return;
-  } catch (error) {
+  } catch (error: unknown) {
     if (!(isGrpcServiceError(error) && error.code === grpcStatus.NOT_FOUND)) {
       throw error;
     }
@@ -433,7 +434,7 @@ async function ensureTemporalNamespace(connection: NativeConnection, namespace: 
       },
     });
     console.log(`✅ Temporal namespace "${namespace}" created`);
-  } catch (error) {
+  } catch (error: unknown) {
     if (isGrpcServiceError(error) && error.code === grpcStatus.ALREADY_EXISTS) {
       console.log(`✅ Temporal namespace "${namespace}" already exists`);
       return;

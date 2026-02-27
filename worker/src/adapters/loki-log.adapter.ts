@@ -99,7 +99,7 @@ export class LokiLogAdapter implements WorkflowLogSink {
 
     try {
       await this.client.push(labels, lines);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[LOKI] Failed to push log entry', error);
       return;
     }
@@ -252,7 +252,7 @@ export class LokiLogAdapter implements WorkflowLogSink {
           CREATE UNIQUE INDEX IF NOT EXISTS workflow_log_streams_run_node_stream_uidx
           ON workflow_log_streams (run_id, node_ref, stream);
         `);
-      })().catch((error) => {
+      })().catch((error: unknown) => {
         this.ensureIndexPromise = undefined;
         throw error;
       });

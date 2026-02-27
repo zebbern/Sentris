@@ -71,7 +71,7 @@ export class KafkaNodeIOAdapter implements INodeIOService {
       allowAutoTopicCreation: true,
     });
 
-    this.connectPromise = this.producer.connect().catch((error) => {
+    this.connectPromise = this.producer.connect().catch((error: unknown) => {
       this.logger.error('[KafkaNodeIOAdapter] Failed to connect to brokers', error);
       throw error;
     });
@@ -198,7 +198,7 @@ export class KafkaNodeIOAdapter implements INodeIOService {
       }
 
       await this.sendRaw(payload.runId, message);
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error('[KafkaNodeIOAdapter] Failed to process or send node I/O event', error);
     }
   }

@@ -994,7 +994,7 @@ const definition = defineComponent({
           } else {
             parseErrors.push(validation.error.message);
           }
-        } catch (error) {
+        } catch (error: unknown) {
           const reason = error instanceof Error ? error.message : String(error);
           parseErrors.push(`Failed to parse dnsx output line: ${reason}`);
         }

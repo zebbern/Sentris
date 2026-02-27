@@ -153,7 +153,7 @@ export function WorkflowList() {
       await deleteWorkflow.mutateAsync(workflowToDelete.id);
       setWorkflows((prev) => prev.filter((workflow) => workflow.id !== workflowToDelete.id));
       handleDeleteDialogChange(false);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to delete workflow:', err);
       toast({
         title: 'Delete failed',

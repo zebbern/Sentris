@@ -93,7 +93,7 @@ export function HumanInputResolutionView({
     if (typeof request.inputSchema === 'object') return request.inputSchema;
     try {
       return JSON.parse(request.inputSchema);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to parse inputSchema:', e);
       return null;
     }
@@ -139,7 +139,7 @@ export function HumanInputResolutionView({
       });
 
       onResolved?.(updatedRequest as unknown as HumanInputRequest);
-    } catch (err) {
+    } catch (err: unknown) {
       toast({
         title: 'Action failed',
         description: err instanceof Error ? err.message : 'Try again in a moment.',

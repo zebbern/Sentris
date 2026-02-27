@@ -81,7 +81,7 @@ export function track<T extends EventName>(event: T, payload: unknown = {}): voi
     if (import.meta.env.DEV) {
       console.debug('[analytics]', event, data);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn('[analytics] capture failed', event, err);
   }
 }

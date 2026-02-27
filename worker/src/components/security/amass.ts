@@ -659,7 +659,7 @@ const definition = (defineComponent as any)({
         } else {
           rawOutput = '';
         }
-      } catch (error) {
+      } catch (error: unknown) {
         // Amass can exit non-zero when some data sources fail or rate-limit,
         // even though it still printed valid findings. Preserve partial results
         // instead of failing the entire workflow.

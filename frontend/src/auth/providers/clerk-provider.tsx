@@ -81,7 +81,7 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
             setToken(null);
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Failed to retrieve Clerk token', err);
         if (!cancelled) {
           setError('Failed to retrieve authentication token');
@@ -153,7 +153,7 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
       signOut: async () => {
         try {
           await signOut();
-        } catch (signOutError) {
+        } catch (signOutError: unknown) {
           console.error('Failed to sign out from Clerk', signOutError);
         }
       },

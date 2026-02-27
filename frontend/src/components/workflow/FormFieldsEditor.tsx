@@ -208,7 +208,7 @@ function toInternal(value: any): InternalFormField[] {
           placeholder: prop.description || '',
         }));
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('Failed to parse legacy form fields', e);
     }
   }

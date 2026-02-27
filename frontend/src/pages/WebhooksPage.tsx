@@ -146,7 +146,7 @@ export function WebhooksPage() {
         title: 'Webhook URL copied',
         description: 'The webhook URL has been copied to your clipboard.',
       });
-    } catch (_err) {
+    } catch (_err: unknown) {
       toast({
         title: 'Failed to copy',
         description: 'Could not copy the webhook URL to clipboard.',
@@ -162,7 +162,7 @@ export function WebhooksPage() {
         title: 'Webhooks refreshed',
         description: 'Latest webhook configurations have been loaded.',
       });
-    } catch (_err) {
+    } catch (_err: unknown) {
       toast({
         title: 'Refresh failed',
         description: _err instanceof Error ? _err.message : 'Try again in a moment.',
@@ -194,7 +194,7 @@ export function WebhooksPage() {
         title: 'Webhook deleted',
         description: `Successfully deleted webhook ${webhook.name}`,
       });
-    } catch (_err) {
+    } catch (_err: unknown) {
       toast({
         title: 'Failed to delete webhook',
         description: _err instanceof Error ? _err.message : 'Unknown error occurred',
@@ -223,7 +223,7 @@ export function WebhooksPage() {
         title: 'URL regenerated',
         description: 'New webhook URL has been generated',
       });
-    } catch (_err) {
+    } catch (_err: unknown) {
       toast({
         title: 'Failed to regenerate URL',
         description: _err instanceof Error ? _err.message : 'Unknown error occurred',

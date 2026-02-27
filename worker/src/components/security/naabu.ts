@@ -374,7 +374,7 @@ const definition = defineComponent({
           context,
         );
         rawOutput = typeof result === 'string' ? result : '';
-      } catch (error) {
+      } catch (error: unknown) {
         // Naabu can exit non-zero when some probes fail,
         // but may still have produced valid output. Preserve partial results.
         if (error instanceof ContainerError) {

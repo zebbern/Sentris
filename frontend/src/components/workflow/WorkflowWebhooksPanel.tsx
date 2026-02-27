@@ -52,7 +52,7 @@ export function WorkflowWebhooksSidebar({
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to copy:', err);
     }
   };

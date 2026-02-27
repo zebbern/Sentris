@@ -74,7 +74,7 @@ export function UseTemplateModal({
         secretMappings: requiredSecrets.length > 0 ? secretMappings : undefined,
       });
       onSuccess(result.workflow?.id ?? result.workflowId);
-    } catch (err) {
+    } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to create workflow from template');
     }
   };

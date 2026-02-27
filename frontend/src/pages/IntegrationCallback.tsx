@@ -80,7 +80,7 @@ export function IntegrationCallback() {
             : '/';
           navigate(target, { replace: true });
         }, 1200);
-      } catch (error) {
+      } catch (error: unknown) {
         if (cancelled) {
           return;
         }

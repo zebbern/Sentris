@@ -325,7 +325,7 @@ export function ScheduleEditorDrawer({
     try {
       const fileData = await api.files.upload(file);
       setRuntimeValues((prev) => ({ ...prev, [inputId]: fileData.id }));
-    } catch (error) {
+    } catch (error: unknown) {
       setRuntimeErrors((prev) => ({
         ...prev,
         [inputId]: error instanceof Error ? error.message : 'File upload failed',
@@ -482,7 +482,7 @@ export function ScheduleEditorDrawer({
           : await api.schedules.update(schedule!.id, payload);
       onSaved?.(saved, mode);
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       setFormError(error instanceof Error ? error.message : 'Failed to save schedule');
     } finally {
       setSubmitting(false);

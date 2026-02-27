@@ -105,7 +105,7 @@ export function useWorkflowSchedules({
           toast({ title: 'Schedule triggered', description: schedule.name });
         }
         void refreshSchedules();
-      } catch (err) {
+      } catch (err: unknown) {
         toast({
           title: 'Schedule action failed',
           description: err instanceof Error ? err.message : 'Please try again.',
@@ -134,7 +134,7 @@ export function useWorkflowSchedules({
           description: `"${schedule.name}" has been deleted.`,
         });
         void refreshSchedules();
-      } catch (err) {
+      } catch (err: unknown) {
         toast({
           title: 'Failed to delete schedule',
           description: err instanceof Error ? err.message : 'Please try again.',

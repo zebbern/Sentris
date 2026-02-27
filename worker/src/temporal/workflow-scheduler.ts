@@ -164,7 +164,7 @@ export async function runWorkflowWithScheduler(
             status: 'fulfilled' as const,
             completedAt: Date.now(),
           }))
-          .catch((reason) => ({
+          .catch((reason: unknown) => ({
             ref,
             context,
             status: 'rejected' as const,

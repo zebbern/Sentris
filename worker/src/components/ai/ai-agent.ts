@@ -575,7 +575,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         });
         discoveredTools = discoveryResult.tools;
         closeDiscovery = discoveryResult.close;
-      } catch (error) {
+      } catch (error: unknown) {
         context.logger.error(`Failed to discover tools from gateway: ${error}`);
       }
     }
@@ -710,7 +710,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         generationResult = await agent.generate({
           messages: messagesForModel,
         });
-      } catch (genError) {
+      } catch (genError: unknown) {
         const errorSummary = formatErrorForLog(genError, LOG_TRUNCATE_LIMIT);
         context.logger.error(
           `[AIAgent] agent.generate() FAILED (truncated): ${safeStringify(

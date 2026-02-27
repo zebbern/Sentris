@@ -185,14 +185,14 @@ export async function runComponentActivity(
               metadata: entry.metadata,
               organizationId: input.organizationId ?? null,
             })
-            .catch((error) => {
+            .catch((error: unknown) => {
               console.error('[Logs] Failed to append log entry', error);
             });
         }
       : undefined,
     terminalCollector: globalTerminal
       ? (chunk) => {
-          void globalTerminal?.append(chunk).catch((error) => {
+          void globalTerminal?.append(chunk).catch((error: unknown) => {
             console.error('[Terminal] Failed to append chunk', error);
           });
         }
@@ -265,7 +265,7 @@ export async function runComponentActivity(
           } else {
             obj[key] = fullData;
           }
-        } catch (err) {
+        } catch (err: unknown) {
           console.error(
             `[Activity] Failed to resolve spilled ${contextLabel.toLowerCase()} '${key}':`,
             err,
@@ -302,7 +302,7 @@ export async function runComponentActivity(
         if (resolved?.inputs) {
           inputsSchema = resolved.inputs;
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn(`[Activity] Failed to resolve ports for secret check: ${err}`);
       }
     }
@@ -334,7 +334,7 @@ export async function runComponentActivity(
         } else {
           console.warn(`[Activity] Secret '${value}' not found in store for input '${key}'`);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn(`[Activity] Error resolving secret '${value}' for input '${key}': ${err}`);
       }
     }
@@ -378,7 +378,7 @@ export async function runComponentActivity(
         } else {
           console.warn(`[Activity] Secret '${value}' not found in store for param '${key}'`);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn(`[Activity] Error resolving secret '${value}' for param '${key}': ${err}`);
       }
     }
@@ -503,7 +503,7 @@ export async function runComponentActivity(
               originalSize: size,
             };
           }
-        } catch (err) {
+        } catch (err: unknown) {
           console.warn('[Activity] Failed to check/spill output size', err);
           // Continue with original output - if it fails in Temporal, it fails.
         }
@@ -530,7 +530,7 @@ export async function runComponentActivity(
     }
 
     return { output, activeOutputPorts };
-  } catch (error) {
+  } catch (error: unknown) {
     const rawErrorMsg = getErrorMessage(error);
     const errorMsg = truncateText(rawErrorMsg, ERROR_LOG_LIMIT);
     console.error(`[Activity] Failed ${action.ref}: ${errorMsg}`);

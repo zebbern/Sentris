@@ -173,7 +173,7 @@ export function useWorkflowImportExport({
             }
           });
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to validate secrets during import:', error);
         // Continue with import even if validation fails
       }
@@ -287,7 +287,7 @@ export function useWorkflowImportExport({
         title: 'Workflow exported',
         description: `${safeName}.json saved to your device.`,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to export workflow:', error);
       toast({
         variant: 'destructive',

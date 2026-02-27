@@ -34,7 +34,7 @@ export class KafkaAgentTracePublisher implements AgentTracePublisher {
       allowAutoTopicCreation: true,
     });
 
-    this.connectPromise = this.producer.connect().catch((error) => {
+    this.connectPromise = this.producer.connect().catch((error: unknown) => {
       this.logger.error('[KafkaAgentTracePublisher] Failed to connect to brokers', error);
       throw error;
     });
@@ -51,7 +51,7 @@ export class KafkaAgentTracePublisher implements AgentTracePublisher {
           },
         ],
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         this.logger.error('[KafkaAgentTracePublisher] Failed to send agent trace event', error);
       });
   }

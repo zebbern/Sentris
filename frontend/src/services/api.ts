@@ -71,12 +71,31 @@ export type IntegrationProvider = IntegrationProviderResponse;
 export type IntegrationConnection = IntegrationConnectionResponse;
 export type IntegrationProviderConfiguration = ProviderConfigurationResponse;
 export type OAuthStartResponse = OAuthStartResponseDto;
+export interface UploadedFileResponse {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  storageKey: string;
+  uploadedAt: string;
+}
+
 export interface ArtifactListFilters {
   workflowId?: string;
   componentId?: string;
   destination?: ArtifactDestination;
   search?: string;
   limit?: number;
+}
+
+/**
+ * Generic openapi-fetch response shape for use when generated types lack `.error`.
+ * Allows type-safe access to data/error without `as any`.
+ */
+interface ApiResponse<D = unknown> {
+  data?: D;
+  error?: { message?: string } | string;
+  response?: Response;
 }
 
 /**
@@ -124,7 +143,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
       } else {
         // If we can't get a fresh token, fall back to store token
       }
-    } catch (_error) {
+    } catch (_error: unknown) {
       // Fall back to store token if fresh token fetch fails
     }
   }
@@ -343,11 +362,17 @@ export const api = {
     },
 
     create: async (workflow: CreateWorkflowRequestDto): Promise<WorkflowResponseDto> => {
-      const response = (await apiClient.createWorkflow(workflow)) as any;
+      const response = (await apiClient.createWorkflow(
+        workflow,
+      )) as ApiResponse<WorkflowResponseDto>;
       if (response.error) {
+        const err = response.error;
         const errorMessage =
-          response.error?.message ||
-          (typeof response.error === 'string' ? response.error : 'Failed to create workflow');
+          typeof err === 'object' && err.message
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : 'Failed to create workflow';
         throw new Error(errorMessage);
       }
       if (!response.data) throw new Error('Workflow creation failed');
@@ -358,11 +383,18 @@ export const api = {
       id: string,
       workflow: UpdateWorkflowRequestDto,
     ): Promise<WorkflowResponseDto> => {
-      const response = (await apiClient.updateWorkflow(id, workflow)) as any;
+      const response = (await apiClient.updateWorkflow(
+        id,
+        workflow,
+      )) as ApiResponse<WorkflowResponseDto>;
       if (response.error) {
+        const err = response.error;
         const errorMessage =
-          response.error?.message ||
-          (typeof response.error === 'string' ? response.error : 'Failed to update workflow');
+          typeof err === 'object' && err.message
+            ? err.message
+            : typeof err === 'string'
+              ? err
+              : 'Failed to update workflow';
         throw new Error(errorMessage);
       }
       if (!response.data) throw new Error('Workflow update failed');
@@ -442,9 +474,10 @@ export const api = {
     },
 
     create: async (input: CreateSecretDto): Promise<SecretSummaryResponse> => {
-      const response = await apiClient.createSecret(input);
+      const response = (await apiClient.createSecret(input)) as ApiResponse<SecretSummaryResponse>;
       if (response.error) {
-        const msg = (response as any).error?.message;
+        const err = response.error;
+        const msg = typeof err === 'object' ? err.message : err;
         throw new Error(typeof msg === 'string' ? msg : 'Failed to create secret');
       }
       if (!response.data) throw new Error('Secret creation failed');
@@ -696,14 +729,20 @@ export const api = {
             version: options.version,
           }
         : undefined;
-      const response = await apiClient.runWorkflow(workflowId, payload);
-      if ((response as any).error) {
-        const error = (response as any).error;
+      const response = (await apiClient.runWorkflow(workflowId, payload)) as ApiResponse<{
+        runId?: string;
+      }>;
+      if (response.error) {
+        const error = response.error;
         const errorMessage =
-          error?.message || (typeof error === 'string' ? error : 'Failed to start execution');
+          typeof error === 'object' && error.message
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : 'Failed to start execution';
         throw new Error(errorMessage);
       }
-      return { executionId: (response.data as any)?.runId || '' };
+      return { executionId: response.data?.runId || '' };
     },
 
     getStatus: async (executionId: string) => {
@@ -771,7 +810,9 @@ export const api = {
     },
 
     getArtifacts: async (executionId: string): Promise<RunArtifactsResponse> => {
-      const response = (await apiClient.getWorkflowRunArtifacts(executionId)) as any;
+      const response = (await apiClient.getWorkflowRunArtifacts(
+        executionId,
+      )) as ApiResponse<RunArtifactsResponse>;
       if (response.error || !response.data) {
         throw new Error('Failed to fetch run artifacts');
       }
@@ -816,7 +857,7 @@ export const api = {
             token = freshToken;
             storeState.setToken(freshToken);
           }
-        } catch (_error) {
+        } catch (_error: unknown) {
           // Ignore token fetch errors for SSE, will fallback to existing
         }
       }
@@ -945,18 +986,17 @@ export const api = {
       return response.data;
     },
 
-    upload: async (file: File) => {
-      const response = (await apiClient.uploadFile(file)) as any;
+    upload: async (file: File): Promise<UploadedFileResponse> => {
+      const response = (await apiClient.uploadFile(file)) as ApiResponse<UploadedFileResponse>;
       if (response.error) {
         const errorMessage =
-          response.error instanceof Error
-            ? response.error.message
-            : typeof response.error === 'string'
-              ? response.error
-              : 'Failed to upload file';
+          typeof response.error === 'string'
+            ? response.error
+            : response.error?.message || 'Failed to upload file';
         throw new Error(errorMessage);
       }
-      return response.data;
+      if (!response.data) throw new Error('File upload failed');
+      return response.data as UploadedFileResponse;
     },
 
     download: async (id: string) => {
@@ -971,7 +1011,9 @@ export const api = {
 
   artifacts: {
     list: async (filters?: ArtifactListFilters) => {
-      const response = (await apiClient.listArtifacts(filters)) as any;
+      const response = (await apiClient.listArtifacts(filters)) as ApiResponse<{
+        artifacts: unknown[];
+      }>;
       if (response.error) {
         throw new Error('Failed to fetch artifacts');
       }
@@ -1045,9 +1087,11 @@ export const api = {
     },
 
     get: async (id: string): Promise<WebhookConfiguration> => {
-      const response = await apiClient.getWebhookConfiguration(id);
+      const response = (await apiClient.getWebhookConfiguration(
+        id,
+      )) as ApiResponse<WebhookConfiguration>;
       if (response.error || !response.data) {
-        const errorBody = (response as any).error as Record<string, unknown> | undefined;
+        const errorBody = response.error as Record<string, unknown> | undefined;
         const statusCode = errorBody?.statusCode ?? errorBody?.status;
         const message = errorBody?.message;
         if (statusCode === 404 || (typeof message === 'string' && message.includes('not found'))) {
@@ -1059,7 +1103,9 @@ export const api = {
     },
 
     create: async (payload: Partial<WebhookConfiguration>): Promise<WebhookConfiguration> => {
-      const response = await apiClient.createWebhookConfiguration(payload as any);
+      const response = await apiClient.createWebhookConfiguration(
+        payload as components['schemas']['CreateWebhookRequestDto'],
+      );
       if (response.error) throw new Error('Failed to create webhook configuration');
       return response.data as WebhookConfiguration;
     },
@@ -1068,7 +1114,10 @@ export const api = {
       id: string,
       payload: Partial<WebhookConfiguration>,
     ): Promise<WebhookConfiguration> => {
-      const response = await apiClient.updateWebhookConfiguration(id, payload as any);
+      const response = await apiClient.updateWebhookConfiguration(
+        id,
+        payload as components['schemas']['UpdateWebhookRequestDto'],
+      );
       if (response.error) throw new Error('Failed to update webhook configuration');
       return response.data as WebhookConfiguration;
     },

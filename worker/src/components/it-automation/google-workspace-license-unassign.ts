@@ -304,7 +304,7 @@ const definition = defineComponent({
           typeof service_account_secret === 'string'
             ? service_account_secret
             : JSON.stringify(service_account_secret);
-      } catch (error) {
+      } catch (error: unknown) {
         throw new ConfigurationError(
           `Failed to parse service account secret: ${error instanceof Error ? error.message : 'Unknown error'}`,
           {

@@ -130,7 +130,7 @@ export function IntegrationsManager() {
         scopes: buildRequestedScopes(provider),
       });
       window.location.href = response.authorizationUrl;
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to start OAuth session';
       toast({
         title: 'Could not start OAuth flow',
@@ -156,7 +156,7 @@ export function IntegrationsManager() {
         title: 'Token refreshed',
         description: `${connection.providerName} token has been refreshed.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to refresh token';
       toast({
         title: 'Refresh failed',
@@ -177,7 +177,7 @@ export function IntegrationsManager() {
         title: 'Connection removed',
         description: `${connection.providerName} credentials have been deleted.`,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to disconnect';
       toast({
         title: 'Disconnect failed',
@@ -208,9 +208,11 @@ export function IntegrationsManager() {
   ) => {
     setConfigProvider(null);
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.integrations.providers() }).catch((err) => {
-      console.error('Failed to refresh providers', err);
-    });
+    queryClient
+      .invalidateQueries({ queryKey: queryKeys.integrations.providers() })
+      .catch((err: unknown) => {
+        console.error('Failed to refresh providers', err);
+      });
 
     const title =
       action === 'saved'

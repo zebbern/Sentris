@@ -93,4 +93,5 @@ export interface FrontendNodeData extends NodeData {
   status?: NodeStatus;
   executionTime?: number;
   error?: string;
+  ui?: Record<string, unknown>;
 }

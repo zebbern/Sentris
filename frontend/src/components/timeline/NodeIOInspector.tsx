@@ -90,7 +90,7 @@ export function NodeIOInspector() {
               outputs: detail.outputs || null,
               errorMessage: detail.errorMessage || null,
             } as NodeIO);
-          } catch (_err) {
+          } catch (_err: unknown) {
             setSelectedNodeIO(null);
           }
         };

@@ -291,7 +291,7 @@ function parseRawOutput(rawOutput: string): Output {
       if (secret.Verified === true) {
         verifiedCount++;
       }
-    } catch (_error) {
+    } catch (_error: unknown) {
       // Skip non-JSON lines (like status messages)
       continue;
     }
@@ -451,7 +451,7 @@ const definition = defineComponent({
           effectiveInput,
           context,
         );
-      } catch (error) {
+      } catch (error: unknown) {
         // Check if this is a TruffleHog exit code 183 (secrets found with --fail)
         const errorMessage = error instanceof Error ? error.message : String(error);
 

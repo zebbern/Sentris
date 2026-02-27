@@ -20,7 +20,7 @@ export function HumanInputDialog() {
       api.humanInputs
         .get(humanInputRequestId)
         .then((data) => setRequest(data as unknown as HumanInputRequest))
-        .catch((err) => setError(err.message))
+        .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
         .finally(() => setLoading(false));
     } else {
       setRequest(null);

@@ -27,7 +27,7 @@ export async function getFreshClerkToken(): Promise<string | null> {
     const jwtTemplate = (import.meta.env.VITE_CLERK_JWT_TEMPLATE || '').trim() || undefined;
     const token = await clerkGetToken(jwtTemplate ? { template: jwtTemplate } : undefined);
     return token;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[Clerk Token] Failed to get fresh token:', error);
     return null;
   }

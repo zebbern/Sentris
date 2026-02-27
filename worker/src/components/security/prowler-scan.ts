@@ -554,11 +554,14 @@ const definition = defineComponent({
     if (parsedParams.customFlags && parsedParams.customFlags.trim().length > 0) {
       try {
         cmd.push(...splitArgs(parsedParams.customFlags));
-      } catch (err) {
-        throw new ValidationError(`Failed to parse custom CLI flags: ${(err as Error).message}`, {
-          cause: err as Error,
-          fieldErrors: { customFlags: ['Invalid CLI flag syntax'] },
-        });
+      } catch (err: unknown) {
+        throw new ValidationError(
+          `Failed to parse custom CLI flags: ${err instanceof Error ? err.message : String(err)}`,
+          {
+            cause: err instanceof Error ? err : undefined,
+            fieldErrors: { customFlags: ['Invalid CLI flag syntax'] },
+          },
+        );
       }
     }
 
@@ -669,8 +672,8 @@ const definition = defineComponent({
             stderrCombined = result.stderr;
           }
         }
-      } catch (err) {
-        const msg = (err as Error)?.message ?? '';
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '';
         const isFindingsExit = /exit code\s*3/.test(msg);
         if (isFindingsExit) {
           // Prowler uses exit code 3 to indicate checks failed (findings present).
@@ -855,7 +858,7 @@ function parseSegment(segment: string, segmentIndex: number, errors: string[]): 
       }
       return [parsed];
     }
-  } catch (_error) {
+  } catch (_error: unknown) {
     // Fallback to NDJSON parsing
     const ndjsonResults: unknown[] = [];
     trimmed
@@ -865,9 +868,9 @@ function parseSegment(segment: string, segmentIndex: number, errors: string[]): 
       .forEach((line, lineIndex) => {
         try {
           ndjsonResults.push(JSON.parse(line));
-        } catch (innerError) {
+        } catch (innerError: unknown) {
           errors.push(
-            `Segment ${segmentIndex + 1} line ${lineIndex + 1}: Unable to parse JSON (${(innerError as Error).message})`,
+            `Segment ${segmentIndex + 1} line ${lineIndex + 1}: Unable to parse JSON (${innerError instanceof Error ? innerError.message : String(innerError)})`,
           );
         }
       });

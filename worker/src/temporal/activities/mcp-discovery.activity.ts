@@ -158,7 +158,7 @@ export async function discoverMcpGroupToolsActivity(
         await testMcpConnection(server.endpoint, server.headers);
         const tools = await listMcpTools(server.endpoint, server.headers);
         results.push({ name: server.name, tools });
-      } catch (error) {
+      } catch (error: unknown) {
         results.push({
           name: server.name,
           tools: [],
@@ -176,7 +176,7 @@ export async function discoverMcpGroupToolsActivity(
         await waitForContainerReady(`${baseEndpoint}/health`);
         const tools = await listMcpTools(endpoint, server.headers);
         results.push({ name: server.name, tools });
-      } catch (error) {
+      } catch (error: unknown) {
         results.push({
           name: server.name,
           tools: [],
@@ -476,7 +476,7 @@ async function cleanupContainer(containerId: string | undefined): Promise<void> 
 
   try {
     await execAsync(`docker rm -f ${containerId}`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`[MCP Discovery] Failed to cleanup container ${containerId}:`, error);
   }
 }

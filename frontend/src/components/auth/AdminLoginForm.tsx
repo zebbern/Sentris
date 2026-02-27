@@ -67,7 +67,7 @@ export function AdminLoginForm() {
       } else {
         navigate('/');
       }
-    } catch (err) {
+    } catch (err: unknown) {
       // Clear credentials on error
       useAuthStore.getState().clear();
       if (err instanceof TypeError && err.message.includes('fetch')) {

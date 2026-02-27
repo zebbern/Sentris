@@ -1,6 +1,7 @@
 import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
 import { MarkerType } from 'reactflow';
 import type { NodeData, NodeConfig } from '@/schemas/node';
+import type { InputPort } from '@/schemas/component';
 import type { components } from '@shipsec/backend-client';
 
 // Backend types
@@ -51,7 +52,7 @@ export function serializeNodes(reactFlowNodes: ReactFlowNode<FrontendNodeData>[]
     }
 
     // Include UI metadata
-    const ui = (node.data as any).ui;
+    const ui = node.data.ui;
 
     // Build the new config structure
     const config: Record<string, unknown> = {
@@ -69,7 +70,7 @@ export function serializeNodes(reactFlowNodes: ReactFlowNode<FrontendNodeData>[]
       position: node.position,
       data: {
         label: node.data.label || '',
-        config: config as any, // Cast to satisfy BackendNode config type
+        config: config as BackendNode['data']['config'],
       },
     };
   });
@@ -177,10 +178,10 @@ export function deserializeNodes(workflow: {
     // Extract config from backend node data
     const backendConfig = node.data.config || {};
     const { __ui, params, inputOverrides, ...restOfConfig } = backendConfig as {
-      __ui?: any;
+      __ui?: Record<string, unknown>;
       params?: Record<string, unknown>;
       inputOverrides?: Record<string, unknown>;
-      [key: string]: any;
+      [key: string]: unknown;
     };
 
     // Ensure config has the required structure
@@ -191,7 +192,10 @@ export function deserializeNodes(workflow: {
     } as NodeConfig;
 
     // Extract dynamic ports from backend node data (if present)
-    const backendNodeData = node.data as any;
+    const backendNodeData = node.data as {
+      dynamicInputs?: InputPort[];
+      dynamicOutputs?: InputPort[];
+    };
     const dynamicInputs = backendNodeData.dynamicInputs;
     const dynamicOutputs = backendNodeData.dynamicOutputs;
 

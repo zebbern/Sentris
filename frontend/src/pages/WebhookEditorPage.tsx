@@ -182,7 +182,7 @@ export function WebhookEditorPage() {
     if (!initialForm) return false;
     try {
       return JSON.stringify(form) !== JSON.stringify(initialForm);
-    } catch (_e) {
+    } catch (_e: unknown) {
       return true;
     }
   }, [form, initialForm]);
@@ -244,7 +244,7 @@ export function WebhookEditorPage() {
         setInitialForm(payload);
         toast({ title: 'Webhook saved' });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: 'Save failed',
         description: String(error),
@@ -298,7 +298,7 @@ export function WebhookEditorPage() {
       await deleteWebhook.mutateAsync(id!);
       queryClient.removeQueries({ queryKey: queryKeys.webhooks.detail(id!) });
       navigate('/webhooks');
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: 'Delete failed',
         description: String(error),

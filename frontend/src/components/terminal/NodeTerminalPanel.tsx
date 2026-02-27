@@ -94,7 +94,7 @@ export function NodeTerminalPanel({
       .join('');
     try {
       await navigator.clipboard.writeText(decoded);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[NodeTerminalPanel] Failed to copy to clipboard', error);
     }
   }, [chunks]);
@@ -158,7 +158,7 @@ export function NodeTerminalPanel({
 
       try {
         term.open(container);
-      } catch (error) {
+      } catch (error: unknown) {
         console.warn('[NodeTerminalPanel] Failed to open terminal:', error);
         // If opening fails, dispose and return early
         term.dispose();
@@ -179,7 +179,7 @@ export function NodeTerminalPanel({
               fitAddonRef.current.fit();
               terminalReadyRef.current = true;
               setIsTerminalReady(true);
-            } catch (error) {
+            } catch (error: unknown) {
               console.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
               // Mark as ready anyway to allow rendering
               terminalReadyRef.current = true;
@@ -194,7 +194,7 @@ export function NodeTerminalPanel({
       if (fitAddonRef.current) {
         try {
           fitAddonRef.current.fit();
-        } catch (_error) {
+        } catch (_error: unknown) {
           // Ignore resize errors during terminal recreation
         }
       }
@@ -336,7 +336,7 @@ export function NodeTerminalPanel({
         if (fitAddonRef.current) {
           try {
             fitAddonRef.current.fit();
-          } catch (_error) {
+          } catch (_error: unknown) {
             // Ignore fit errors during terminal recreation
           }
         }

@@ -73,7 +73,7 @@ export async function executeWorkflow(
             message: entry.message,
             timestamp,
           })
-          .catch((error) => {
+          .catch((error: unknown) => {
             console.error('[Logs] Failed to append log entry', error);
           });
       }
@@ -221,7 +221,7 @@ export async function executeWorkflow(
             } else {
               resolvedParams[key] = fullData;
             }
-          } catch (err) {
+          } catch (err: unknown) {
             console.error(`[WorkflowRunner] Failed to resolve spilled parameter '${key}':`, err);
             throw new WorkflowSchedulerError(
               `Failed to resolve spilled input parameter '${key}': ${err instanceof Error ? err.message : String(err)}`,
@@ -345,7 +345,7 @@ export async function executeWorkflow(
                 originalSize: size,
               } as any;
             }
-          } catch (err) {
+          } catch (err: unknown) {
             console.warn('[WorkflowRunner] Failed to check/spill output size', err);
           }
         }
@@ -376,7 +376,7 @@ export async function executeWorkflow(
             failure,
           },
         });
-      } catch (error) {
+      } catch (error: unknown) {
         const errorMsg = error instanceof Error ? error.message : String(error);
 
         // Extract error properties without using 'any'
@@ -493,7 +493,7 @@ export async function executeWorkflow(
 
     console.log(`✅ [WORKFLOW RUNNER] Workflow completed successfully for ${runId}`);
     return { outputs: outputsObject, success: true };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`❌ [WORKFLOW RUNNER] Workflow threw exception for ${runId}:`, error);
     return {
       outputs: {},

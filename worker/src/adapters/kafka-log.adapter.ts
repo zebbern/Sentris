@@ -36,7 +36,7 @@ export class KafkaLogAdapter implements WorkflowLogSink {
       allowAutoTopicCreation: true,
     });
 
-    this.connectPromise = this.producer.connect().catch((error) => {
+    this.connectPromise = this.producer.connect().catch((error: unknown) => {
       console.error('[KafkaLogAdapter] Failed to connect to brokers', error);
       throw error;
     });
@@ -86,7 +86,7 @@ export class KafkaLogAdapter implements WorkflowLogSink {
           ],
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[KafkaLogAdapter] Failed to send log entry', error);
     }
   }

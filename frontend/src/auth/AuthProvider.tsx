@@ -101,7 +101,7 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
             method: 'POST',
             credentials: 'include',
           });
-        } catch (error) {
+        } catch (error: unknown) {
           console.warn('Failed to clear session cookie:', error);
         }
         // Clear admin credentials from store

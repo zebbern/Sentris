@@ -44,7 +44,7 @@ export class DebugLogger {
     try {
       const logLine = JSON.stringify(entry);
       fs.appendFileSync(DEBUG_LOG_FILE, logLine + '\n');
-    } catch (_err) {
+    } catch (_err: unknown) {
       // Silently fail if we can't write
     }
 
@@ -82,7 +82,7 @@ export function logHeartbeat(taskQueue: string) {
 
   try {
     fs.appendFileSync(HEARTBEAT_LOG_FILE, JSON.stringify(entry) + '\n');
-  } catch (_err) {
+  } catch (_err: unknown) {
     // Silently fail
   }
 }

@@ -33,7 +33,7 @@ const formatTime = (timestamp: string) => {
 const formatStructured = (value: Record<string, unknown>) => {
   try {
     return JSON.stringify(value, null, 2);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to stringify structured log data', error);
     return String(value);
   }
@@ -212,7 +212,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
       } else {
         throw new Error('Clipboard API is unavailable');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to copy run link:', error);
       toast({
         variant: 'destructive',

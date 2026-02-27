@@ -161,7 +161,7 @@ export function useWorkflowExecutionLifecycle({
           invalidateRunsForWorkflow(metadata.id!);
           await refetchRuns();
           targetRun = getRunByIdFromCache(routeRunId);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to refresh runs for route:', error);
         }
       }
@@ -173,7 +173,7 @@ export function useWorkflowExecutionLifecycle({
           const normalized = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(normalized);
           targetRun = normalized;
-        } catch (error) {
+        } catch (error: unknown) {
           if (cancelled) return;
           console.error('Failed to load workflow run from route:', error);
           toast({
@@ -211,7 +211,7 @@ export function useWorkflowExecutionLifecycle({
         if (isRunLive(targetRun)) {
           useExecutionStore.getState().monitorRun(routeRunId, targetRun.workflowId);
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to select run from route:', error);
       }
     };
@@ -336,7 +336,7 @@ export function useWorkflowExecutionLifecycle({
           if (latestTargetRunIdRef.current !== targetRunId) return;
           runToUse = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(runToUse);
-        } catch (error) {
+        } catch (error: unknown) {
           if (latestTargetRunIdRef.current !== targetRunId) return;
           console.error('[VersionLoad] Failed to fetch run details:', error);
           if (designSavedSnapshotRef.current) {
@@ -361,7 +361,7 @@ export function useWorkflowExecutionLifecycle({
           if (latestTargetRunIdRef.current !== targetRunId) return;
           runToUse = normalizeRunSummary(runDetails as Record<string, unknown>);
           upsertRunInCache(runToUse);
-        } catch (error) {
+        } catch (error: unknown) {
           if (latestTargetRunIdRef.current !== targetRunId) return;
           console.error('[VersionLoad] Failed to fetch run details for version resolution:', error);
         }
@@ -429,7 +429,7 @@ export function useWorkflowExecutionLifecycle({
           edges: cloneEdges(versionEdges),
         };
         setHistoricalVersionId(actualVersionId);
-      } catch (error) {
+      } catch (error: unknown) {
         if (latestTargetRunIdRef.current !== targetRunId) return;
         console.error('[VersionLoad] Failed to load workflow version:', error);
         toast({

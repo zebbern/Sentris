@@ -641,7 +641,7 @@ function validateNucleiTemplate(yamlContent: string): void {
         );
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ValidationError) {
       throw error; // Re-throw ValidationErrors as-is
     }
@@ -695,7 +695,7 @@ async function extractAndValidateZip(
       try {
         validateNucleiTemplate(fileData.toString('utf-8'));
         files[entry.entryName] = fileData;
-      } catch (error) {
+      } catch (error: unknown) {
         context.logger.warn(
           `[Nuclei] Skipping invalid template ${entry.entryName}: ${error instanceof Error ? error.message : 'validation failed'}`,
         );
@@ -713,7 +713,7 @@ async function extractAndValidateZip(
     );
 
     return files;
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof ValidationError) {
       throw error; // Re-throw ValidationErrors as-is
     }

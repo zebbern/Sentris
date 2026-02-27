@@ -18,7 +18,7 @@ export interface Secret {
 export async function fetchSecrets(): Promise<SecretSummary[]> {
   try {
     return await api.secrets.list();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to fetch secrets:', error);
     return [];
   }
@@ -32,7 +32,7 @@ export async function fetchSecret(id: string): Promise<SecretSummary | null> {
     // Find the secret in the list since there's no direct get endpoint
     const secrets = await api.secrets.list();
     return secrets.find((secret) => secret.id === id) || null;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Failed to fetch secret ${id}:`, error);
     return null;
   }

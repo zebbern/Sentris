@@ -204,7 +204,7 @@ export class FetchEventSource implements EventSource {
           }
         }
       }
-    } catch (_error) {
+    } catch (_error: unknown) {
       if (this.controller?.signal.aborted) {
         // Connection was intentionally closed
         return;
@@ -226,7 +226,7 @@ export class FetchEventSource implements EventSource {
       for (const listener of listeners) {
         try {
           listener(event as MessageEvent);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error(`Error in SSE event listener for ${type}:`, error);
         }
       }

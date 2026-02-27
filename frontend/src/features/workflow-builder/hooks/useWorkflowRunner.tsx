@@ -146,7 +146,7 @@ export function useWorkflowRunner({
             description: 'Execution initiated, but no run ID was returned.',
           });
         }
-      } catch (error) {
+      } catch (error: unknown) {
         handleExecutionError(error, toast, nodes, setNodes);
       } finally {
         setPendingVersionId(null);
@@ -292,7 +292,7 @@ export function useWorkflowRunner({
           inputs: config.inputs ?? {},
           versionId: config.workflowVersionId ?? null,
         });
-      } catch (error) {
+      } catch (error: unknown) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         toast({
           variant: 'destructive',

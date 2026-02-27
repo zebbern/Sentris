@@ -226,7 +226,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       get().monitorRun(executionId, workflowId);
 
       return executionId;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to start execution:', error);
       set({ status: 'failed' });
       throw error;
@@ -254,7 +254,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         } else {
           set({ status: 'cancelled' });
         }
-      } catch (statusError) {
+      } catch (statusError: unknown) {
         console.warn('Failed to fetch final status after stop:', statusError);
         set({ status: 'cancelled' });
       }
@@ -265,7 +265,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       if (workflowId) {
         invalidateRunsForWorkflow(workflowId);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to stop execution:', error);
       // Still stop polling on cancel failure to avoid zombie polling
       get().stopPolling();
@@ -303,7 +303,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     // Connect stream - errors are handled inside connectStream
     get()
       .connectStream(runId)
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error('[ExecutionStore] Failed to connect stream in monitorRun:', error);
       });
   },
@@ -365,7 +365,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           invalidateRunsForWorkflow(currentWorkflowId);
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to poll execution status:', error);
     }
   },
@@ -428,7 +428,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               cursor: nextCursor ?? null,
             };
           });
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to parse trace payload from stream', error);
         }
       });
@@ -451,7 +451,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           if (TERMINAL_STATUSES.includes(statusPayload.status)) {
             get().stopPolling();
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to parse status update from stream', error);
         }
       });
@@ -464,7 +464,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           }
           const { useExecutionTimelineStore } = await import('./executionTimelineStore');
           useExecutionTimelineStore.getState().appendDataFlows(payload.packets);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to parse dataflow payload from stream', error);
         }
       });
@@ -548,7 +548,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               terminalCursor: payload.cursor ?? state.terminalCursor,
             };
           });
-        } catch (error) {
+        } catch (error: unknown) {
           console.error(
             'Failed to parse terminal payload from stream',
             error,
@@ -595,7 +595,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               logCursor: payload.cursor ?? state.logCursor,
             };
           });
-        } catch (error) {
+        } catch (error: unknown) {
           console.error(
             'Failed to parse logs payload from stream',
             error,
@@ -631,7 +631,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             }, 5000); // Every 5 seconds as backup only
             set({ pollingInterval: backupPoll });
           }
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to parse ready event from stream', error);
         }
       });
@@ -647,7 +647,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       };
 
       set({ eventSource: source, streamingMode: 'connecting' });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to open execution stream', error);
     }
   },
@@ -707,7 +707,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           terminalCursor: result.cursor ?? state.terminalCursor,
         };
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch terminal chunks', error);
     }
   },
@@ -754,7 +754,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         scrubberLogs: result.logs as ExecutionLog[],
         logMode: 'scrubbing',
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch logs for time range', error);
     }
   },
@@ -770,7 +770,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         historicalLogs: result.logs as ExecutionLog[],
         logMode: 'historical',
       }));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch historical logs', error);
     }
   },
@@ -827,7 +827,7 @@ export const initializeExecutionStore = () => {
         },
       );
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error('Failed to initialize execution store timeline subscription', error);
     });
 };

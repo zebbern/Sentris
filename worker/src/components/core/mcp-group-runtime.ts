@@ -258,7 +258,7 @@ export async function executeMcpGroupNode(
     );
     console.log(`[executeMcpGroupNode] ============================================`);
     return { endpoints };
-  } catch (error) {
+  } catch (error: unknown) {
     // Cleanup volume on error
     if (volume) {
       await volume.cleanup().catch(() => {});
@@ -325,8 +325,8 @@ async function discoverToolsWithRetry(
         `[discoverToolsWithRetry] ✓ Discovered ${tools.length} tools on attempt ${attempt}`,
       );
       return tools;
-    } catch (error) {
-      lastError = error as Error;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       await client?.close().catch(() => {});
       console.warn(`[discoverToolsWithRetry] Attempt ${attempt} failed: ${lastError.message}`);
 

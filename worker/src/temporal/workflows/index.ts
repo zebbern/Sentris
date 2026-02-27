@@ -256,7 +256,7 @@ export async function shipsecWorkflowRun(
       if (pending) {
         pending.resolve(result);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const result: ToolCallResult = {
         callId: request.callId,
@@ -497,7 +497,7 @@ export async function shipsecWorkflowRun(
               parentRunId: input.runId,
               parentNodeRef: action.ref,
             });
-          } catch (error) {
+          } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             await recordTraceEventActivity({
               type: 'NODE_FAILED',
@@ -547,7 +547,7 @@ export async function shipsecWorkflowRun(
               child.result().then((result) => ({ kind: 'result' as const, result })),
               sleep(timeoutMs).then(() => ({ kind: 'timeout' as const })),
             ]);
-          } catch (childError) {
+          } catch (childError: unknown) {
             // child.result() rejects when the child workflow throws (shipsecWorkflowRun
             // always throws on failure rather than returning { success: false }).
             // Record NODE_FAILED so the UI shows the node as failed instead of stuck running.
@@ -708,7 +708,7 @@ export async function shipsecWorkflowRun(
               });
 
               const mcpOutput = await runMcp(activityInput);
-              const output = mcpOutput.output as any;
+              const output = mcpOutput.output as { endpoint?: string; containerId?: string };
               const endpoint = output.endpoint;
               const containerId = output.containerId;
 
@@ -761,7 +761,7 @@ export async function shipsecWorkflowRun(
             });
 
             return { activePorts: ['default', 'tools'] };
-          } catch (error) {
+          } catch (error: unknown) {
             // Cleanup any MCP containers that were started before failure
             if (startedContainerId) {
               console.warn(
@@ -769,7 +769,7 @@ export async function shipsecWorkflowRun(
               );
               try {
                 await cleanupRunResourcesActivity({ runId: input.runId });
-              } catch (cleanupError) {
+              } catch (cleanupError: unknown) {
                 console.error(`[Workflow] Failed to cleanup MCP container: ${cleanupError}`);
               }
             }
@@ -875,10 +875,21 @@ export async function shipsecWorkflowRun(
         // Check if this is a pending human input request (approval gate, form, choice, etc.)
         if (isApprovalPending(output.output)) {
           console.log(
-            `[Workflow] Pending human input detected at ${action.ref} (type=${(output.output as any).inputType ?? 'approval'})`,
+            `[Workflow] Pending human input detected at ${action.ref} (type=${(output.output as Record<string, unknown>).inputType ?? 'approval'})`,
           );
 
-          const pendingData = output.output as any;
+          const pendingData = output.output as {
+            pending: true;
+            inputType?: 'approval' | 'form' | 'selection' | 'review' | 'acknowledge';
+            title: string;
+            description?: string;
+            contextData?: Record<string, unknown>;
+            inputSchema?: Record<string, unknown>;
+            options?: unknown[];
+            multiple?: boolean;
+            schema?: Record<string, unknown>;
+            timeoutAt?: string;
+          };
 
           // Create the human input request in the database
           const approvalResult = await createHumanInputRequestActivity({
@@ -972,7 +983,7 @@ export async function shipsecWorkflowRun(
             activePorts.push(resolution.approved ? 'approved' : 'rejected');
           } else if (inputType === 'selection') {
             // Activate ports for selected options
-            const selection = (resolution.responseData as any)?.selection;
+            const selection = (resolution.responseData as Record<string, unknown>)?.selection;
             if (selection !== undefined && selection !== null) {
               activePorts.push('selection');
               if (Array.isArray(selection)) {
@@ -1050,7 +1061,7 @@ export async function shipsecWorkflowRun(
       outputs,
       success: true,
     };
-  } catch (error) {
+  } catch (error: unknown) {
     workflowCompletedSuccessfully = false;
     const outputs = Object.fromEntries(results);
     const normalizedError =
@@ -1067,10 +1078,10 @@ export async function shipsecWorkflowRun(
     console.log(
       `[Workflow] Cleaning up MCP containers for run ${input.runId} (success=${workflowCompletedSuccessfully})`,
     );
-    await cleanupRunResourcesActivity({ runId: input.runId }).catch((err) => {
+    await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
       console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);
     });
-    await finalizeRunActivity({ runId: input.runId }).catch((err) => {
+    await finalizeRunActivity({ runId: input.runId }).catch((err: unknown) => {
       console.error(`[Workflow] Failed to finalize run ${input.runId}`, err);
     });
   }

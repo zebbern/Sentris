@@ -635,7 +635,7 @@ export const useExecutionTimelineStore = create<TimelineStore>()(
           clockOffset: null,
           nodeStates: calculateNodeStates(events, dataFlows, initialCurrentTime, timelineStartTime),
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Failed to load timeline:', error);
       }
     },
@@ -932,15 +932,16 @@ export const initializeTimelineStore = () => {
         const timelineStore = useExecutionTimelineStore.getState();
 
         // Check if workflow has completed or failed
-        const isTerminalStatus = runStatus && TERMINAL_STATUSES.includes(runStatus.status as any);
+        const isTerminalStatus =
+          runStatus && (TERMINAL_STATUSES as readonly string[]).includes(runStatus.status);
         const isTerminalLifecycle = status === 'completed' || status === 'failed';
 
         // Check if status changed from non-terminal to terminal (workflow just completed)
         const statusJustChanged =
           prevRunStatus &&
           runStatus &&
-          !TERMINAL_STATUSES.includes(prevRunStatus.status as any) &&
-          TERMINAL_STATUSES.includes(runStatus.status as any);
+          !(TERMINAL_STATUSES as readonly string[]).includes(prevRunStatus.status) &&
+          (TERMINAL_STATUSES as readonly string[]).includes(runStatus.status);
 
         // Update prevRunStatus for next comparison
         prevRunStatus = runStatus;
@@ -1072,7 +1073,7 @@ export const initializeTimelineStore = () => {
         }
       });
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error('Failed to initialize timeline store subscription', error);
     });
 };

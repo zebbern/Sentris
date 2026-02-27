@@ -82,7 +82,7 @@ export function RunWorkflowDialog({
 
       const fileData = await api.files.upload(file);
       setInputs((prev) => ({ ...prev, [inputId]: fileData.id }));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('File upload failed:', error);
       setErrors((prev) => ({
         ...prev,
@@ -135,7 +135,7 @@ export function RunWorkflowDialog({
     } else if (normalizedType === 'json') {
       try {
         parsedValue = value ? JSON.parse(value as string) : undefined;
-      } catch (_error) {
+      } catch (_error: unknown) {
         setErrors((prev) => ({
           ...prev,
           [inputId]: 'Invalid JSON format',

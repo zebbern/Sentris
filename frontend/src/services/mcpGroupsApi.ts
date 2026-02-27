@@ -26,6 +26,7 @@ export interface McpGroupServerResponse {
   args?: string[] | null;
   enabled: boolean;
   healthStatus: 'healthy' | 'unhealthy' | 'unknown';
+  lastHealthStatus?: 'healthy' | 'unhealthy' | 'unknown';
   toolCount: number;
   recommended?: boolean;
   defaultSelected?: boolean;
@@ -104,11 +105,7 @@ export const mcpGroupsApi = {
       command: server.command ?? null,
       args: server.args ?? null,
       toolCount: server.toolCount ?? 0,
-      healthStatus:
-        (server as any).healthStatus ??
-        (server as any).lastHealthStatus ??
-        server.healthStatus ??
-        'unknown',
+      healthStatus: server.healthStatus ?? server.lastHealthStatus ?? 'unknown',
     }));
   },
 

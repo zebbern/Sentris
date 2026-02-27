@@ -189,8 +189,8 @@ function normaliseEmailUsername(value: string): string | null {
 async function readResponseBody(response: Response): Promise<string> {
   try {
     return (await response.text()).slice(0, 2000);
-  } catch (error) {
-    return `Failed to read response body: ${(error as Error).message}`;
+  } catch (error: unknown) {
+    return `Failed to read response body: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 
@@ -316,11 +316,11 @@ const definition = defineComponent({
         },
       );
       context.logger.info(`[AtlassianOffboarding] Output of ${searchResponse}`);
-    } catch (error) {
-      const message = (error as Error).message ?? 'Unknown error';
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       context.logger.error(`[AtlassianOffboarding] Search request failed: ${message}`);
       throw new NetworkError(`Failed to call Atlassian search API: ${message}`, {
-        cause: error as Error,
+        cause: error instanceof Error ? error : undefined,
       });
     }
 
@@ -343,13 +343,13 @@ const definition = defineComponent({
       context.logger.info(
         `[AtlassianOffboarding] Search API responded with json ${searchPayloadJson}`,
       );
-    } catch (error) {
-      const message = (error as Error).message ?? 'Unknown error';
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       context.logger.error(
         `[AtlassianOffboarding] Failed to parse search response JSON: ${message}`,
       );
       throw new ValidationError(`Unable to parse Atlassian search response JSON: ${message}`, {
-        cause: error as Error,
+        cause: error instanceof Error ? error : undefined,
         details: { operation: 'parseSearchResponse' },
       });
     }
@@ -442,8 +442,8 @@ const definition = defineComponent({
             },
           },
         );
-      } catch (error) {
-        const message = (error as Error).message ?? 'Unknown error';
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
         context.logger.error(
           `[AtlassianOffboarding] Failed to delete account ${accountId} (${emailUsername}): ${message}`,
         );

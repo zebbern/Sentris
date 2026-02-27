@@ -334,8 +334,8 @@ const definition = defineComponent({
             stdoutCombined = '[object]';
           }
         }
-      } catch (err) {
-        const msg = (err as Error)?.message ?? 'Unknown error';
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         context.logger.error(`[SupabaseScanner] Scanner failed: ${msg}`);
 
         // Check if this is a fatal Docker error (image pull failure, container start failure)
@@ -367,16 +367,16 @@ const definition = defineComponent({
             issues = Array.isArray(safe.data.issues) ? (safe.data.issues as unknown[]) : undefined;
           }
           stdoutCombined = text.trim();
-        } catch (_e) {
+        } catch (_e: unknown) {
           report = { raw: text };
           stdoutCombined = text.trim();
         }
-      } catch (_e) {
+      } catch (_e: unknown) {
         context.logger.error('[SupabaseScanner] Output JSON file not found or unreadable.');
         errors.push('Scanner output file not found.');
       }
-    } catch (err) {
-      const msg = (err as Error)?.message ?? 'Unknown error';
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       context.logger.error(`[SupabaseScanner] Scanner failed: ${msg}`);
 
       // Check if this is a fatal Docker error that should fail the workflow
