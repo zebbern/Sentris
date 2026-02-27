@@ -15,7 +15,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ToolRegistryService, RegisteredTool } from './tool-registry.service';
+
+/** Minimal shape shared by MCP-discovered tools and pre-discovered DB tools */
+interface DiscoveredTool {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
 import { TemporalService } from '../temporal/temporal.service';
 import { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
 import { TraceRepository } from '../trace/trace.repository';
@@ -134,7 +142,7 @@ export class McpGatewayService {
     toolName: string,
     status: 'STARTED' | 'COMPLETED' | 'FAILED',
     nodeRef: string,
-    details: { duration?: number; error?: any; output?: any } = {},
+    details: { duration?: number; error?: unknown; output?: unknown } = {},
   ) {
     try {
       const lastSeq = await this.traceRepository.getLastSequence(runId);
@@ -218,7 +226,7 @@ export class McpGatewayService {
           inputSchema: inputShape,
           _meta: { inputSchema: tool.inputSchema },
         },
-        async (args: any) => {
+        async (args: Record<string, unknown>) => {
           const startTime = Date.now();
           await this.logToolCall(runId, tool.toolName, 'STARTED', tool.nodeId);
 
@@ -335,7 +343,7 @@ export class McpGatewayService {
     this.logger.debug(`[registerTools] Processing ${filteredSources.length} external sources...`);
     for (const source of filteredSources) {
       try {
-        let tools: any[] = [];
+        let tools: DiscoveredTool[] = [];
 
         // First, check Redis for pre-discovered tools (from registerMcpServer API)
         this.logger.debug(
@@ -367,7 +375,7 @@ export class McpGatewayService {
           );
           if (tools.length > 0) {
             this.logger.debug(
-              `[registerTools]   FALLBACK tool names: ${tools.map((t: any) => t.name).join(', ')}`,
+              `[registerTools]   FALLBACK tool names: ${tools.map((t) => t.name).join(', ')}`,
             );
           }
         } else {
@@ -410,7 +418,7 @@ export class McpGatewayService {
               description: t.description,
               _meta: { inputSchema: t.inputSchema },
             },
-            async (args: any) => {
+            async (args: Record<string, unknown>) => {
               const startTime = Date.now();
               const nodeRef = `mcp:${proxiedName}`;
               await this.logToolCall(runId, proxiedName, 'STARTED', nodeRef);
@@ -443,7 +451,7 @@ export class McpGatewayService {
   /**
    * Get pre-discovered tools from the database for a registered MCP server
    */
-  private async getPreDiscoveredTools(serverId: string): Promise<any[]> {
+  private async getPreDiscoveredTools(serverId: string): Promise<DiscoveredTool[]> {
     try {
       const toolRecords = await this.mcpServersRepository.listTools(serverId);
       return toolRecords
@@ -494,7 +502,7 @@ export class McpGatewayService {
    * Discover tools on-the-fly from an MCP endpoint (for local-mcp type)
    * Uses the persistent client pool so the same connection is reused for later tool calls.
    */
-  private async discoverToolsFromEndpoint(endpoint: string): Promise<any[]> {
+  private async discoverToolsFromEndpoint(endpoint: string): Promise<DiscoveredTool[]> {
     try {
       this.logger.debug(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
 
@@ -507,7 +515,7 @@ export class McpGatewayService {
       );
       if (tools.length > 0) {
         this.logger.debug(
-          `[discoverToolsFromEndpoint] Tool names: ${tools.map((t: any) => t.name).join(', ')}`,
+          `[discoverToolsFromEndpoint] Tool names: ${tools.map((t) => t.name).join(', ')}`,
         );
       }
       return tools;
@@ -526,8 +534,8 @@ export class McpGatewayService {
   private async proxyCallToExternal(
     source: RegisteredTool,
     toolName: string,
-    args: any,
-  ): Promise<any> {
+    args: Record<string, unknown>,
+  ): Promise<CallToolResult> {
     if (!source.endpoint) {
       throw new McpError(
         ErrorCode.InternalError,
@@ -548,7 +556,7 @@ export class McpGatewayService {
             name: toolName,
             arguments: args,
           }),
-          new Promise((_, reject) =>
+          new Promise<never>((_, reject) =>
             setTimeout(
               () => reject(new Error(`Tool call timed out after ${TIMEOUT_MS}ms`)),
               TIMEOUT_MS,
@@ -556,7 +564,7 @@ export class McpGatewayService {
           ),
         ]);
 
-        return result;
+        return result as CallToolResult;
       } catch (error) {
         lastError = error;
         this.logger.warn(`External tool call attempt ${attempt} failed: ${error}`);

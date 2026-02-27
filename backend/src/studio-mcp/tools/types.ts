@@ -1,5 +1,33 @@
 import { Logger } from '@nestjs/common';
+import type { TraceEventPayload, WorkflowSchedule } from '@shipsec/shared';
 import type { AuthContext, ApiKeyPermissions } from '../../auth/types';
+import type {
+  HumanInputResponseDto,
+  ListHumanInputsQueryDto,
+  ResolveHumanInputDto,
+} from '../../human-inputs/dto/human-inputs.dto';
+import type { NodeIODetail, NodeIOSummary } from '../../node-io/node-io.service';
+import type {
+  CreateScheduleRequestDto,
+  UpdateScheduleRequestDto,
+} from '../../schedules/dto/schedule.dto';
+import type { ScheduleRepositoryFilters } from '../../schedules/repository/schedule.repository';
+import type { SecretSummary } from '../../secrets/secrets.repository';
+import type {
+  CreateSecretInput,
+  RotateSecretInput,
+  UpdateSecretInput,
+} from '../../secrets/secrets.service';
+import type {
+  ArtifactListResponseDto,
+  ArtifactMetadataDto,
+  RunArtifactsResponseDto,
+} from '../../storage/dto/artifact.dto';
+import type {
+  TerminalFetchOptions,
+  TerminalFetchResult,
+  TerminalStreamDescriptor,
+} from '../../terminal/terminal-stream.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
 
 export type PermissionPath =
@@ -34,43 +62,97 @@ export interface ToolResult {
 
 export interface StudioMcpDeps {
   workflowsService: WorkflowsService;
-  traceService?: { list(runId: string, auth?: any): Promise<{ events: any[]; cursor?: string }> };
-  nodeIOService?: {
-    listSummaries(runId: string, organizationId?: string): Promise<any[]>;
-    getNodeIO(runId: string, nodeRef: string, full?: boolean): Promise<any>;
+  traceService?: {
+    list(
+      runId: string,
+      auth?: AuthContext | null,
+    ): Promise<{ events: TraceEventPayload[]; cursor?: string }>;
   };
-  logStreamService?: { fetch(runId: string, auth: any, options?: any): Promise<any> };
+  nodeIOService?: {
+    listSummaries(runId: string, organizationId?: string): Promise<NodeIOSummary[]>;
+    getNodeIO(runId: string, nodeRef: string, full?: boolean): Promise<NodeIODetail | null>;
+  };
+  logStreamService?: {
+    fetch(
+      runId: string,
+      auth: AuthContext | null,
+      options?: {
+        nodeRef?: string;
+        stream?: string;
+        level?: string;
+        limit?: number;
+        cursor?: string;
+        startTime?: string;
+        endTime?: string;
+      },
+    ): Promise<unknown>;
+  };
   terminalStreamService?: {
-    listStreams(runId: string): Promise<any[]>;
-    fetchChunks(runId: string, options?: any): Promise<any>;
+    listStreams(runId: string): Promise<TerminalStreamDescriptor[]>;
+    fetchChunks(runId: string, options?: TerminalFetchOptions): Promise<TerminalFetchResult>;
   };
   artifactsService?: {
-    listArtifacts(auth: any, filters?: any): Promise<any>;
-    listRunArtifacts(auth: any, runId: string): Promise<any>;
-    downloadArtifact(auth: any, artifactId: string): Promise<{ buffer: Buffer; artifact: any }>;
-    deleteArtifact(auth: any, artifactId: string): Promise<void>;
+    listArtifacts(
+      auth: AuthContext | null,
+      filters?: {
+        workflowId?: string;
+        componentId?: string;
+        destination?: string;
+        search?: string;
+        limit?: number;
+      },
+    ): Promise<ArtifactListResponseDto>;
+    listRunArtifacts(auth: AuthContext | null, runId: string): Promise<RunArtifactsResponseDto>;
+    downloadArtifact(
+      auth: AuthContext | null,
+      artifactId: string,
+    ): Promise<{ buffer: Buffer; artifact: ArtifactMetadataDto }>;
+    deleteArtifact(auth: AuthContext | null, artifactId: string): Promise<void>;
   };
   schedulesService?: {
-    list(auth: any, filters?: any): Promise<any[]>;
-    get(auth: any, id: string): Promise<any>;
-    create(auth: any, dto: any): Promise<any>;
-    update(auth: any, id: string, dto: any): Promise<any>;
-    delete(auth: any, id: string): Promise<void>;
-    pause(auth: any, id: string): Promise<any>;
-    resume(auth: any, id: string): Promise<any>;
-    trigger(auth: any, id: string): Promise<any>;
+    list(
+      auth: AuthContext | null,
+      filters?: ScheduleRepositoryFilters,
+    ): Promise<WorkflowSchedule[]>;
+    get(auth: AuthContext | null, id: string): Promise<WorkflowSchedule>;
+    create(auth: AuthContext | null, dto: CreateScheduleRequestDto): Promise<WorkflowSchedule>;
+    update(
+      auth: AuthContext | null,
+      id: string,
+      dto: UpdateScheduleRequestDto,
+    ): Promise<WorkflowSchedule>;
+    delete(auth: AuthContext | null, id: string): Promise<void>;
+    pause(auth: AuthContext | null, id: string): Promise<WorkflowSchedule>;
+    resume(auth: AuthContext | null, id: string): Promise<WorkflowSchedule>;
+    trigger(auth: AuthContext | null, id: string): Promise<void>;
   };
   secretsService?: {
-    listSecrets(auth: any): Promise<any[]>;
-    createSecret(auth: any, input: any): Promise<any>;
-    rotateSecret(auth: any, secretId: string, input: any): Promise<any>;
-    updateSecret(auth: any, secretId: string, input: any): Promise<any>;
-    deleteSecret(auth: any, secretId: string): Promise<void>;
+    listSecrets(auth: AuthContext | null): Promise<SecretSummary[]>;
+    createSecret(auth: AuthContext | null, input: CreateSecretInput): Promise<SecretSummary>;
+    rotateSecret(
+      auth: AuthContext | null,
+      secretId: string,
+      input: RotateSecretInput,
+    ): Promise<SecretSummary>;
+    updateSecret(
+      auth: AuthContext | null,
+      secretId: string,
+      input: UpdateSecretInput,
+    ): Promise<SecretSummary>;
+    deleteSecret(auth: AuthContext | null, secretId: string): Promise<void>;
   };
   humanInputsService?: {
-    list(query?: any, organizationId?: string): Promise<any[]>;
-    getById(id: string, organizationId?: string): Promise<any>;
-    resolve(id: string, dto: any, organizationId?: string, auth?: any): Promise<any>;
+    list(
+      query?: ListHumanInputsQueryDto,
+      organizationId?: string,
+    ): Promise<HumanInputResponseDto[]>;
+    getById(id: string, organizationId?: string): Promise<HumanInputResponseDto>;
+    resolve(
+      id: string,
+      dto: ResolveHumanInputDto,
+      organizationId?: string,
+      auth?: AuthContext | null,
+    ): Promise<HumanInputResponseDto>;
   };
 }
 

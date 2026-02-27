@@ -14,18 +14,24 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
   CompleteOAuthDto,
+  CompleteOAuthSchema,
   DisconnectConnectionDto,
+  DisconnectConnectionSchema,
   ConnectionTokenResponseDto,
   IntegrationConnectionResponse,
   IntegrationProviderResponse,
   ProviderConfigurationResponse,
   OAuthStartResponseDto,
   RefreshConnectionDto,
+  RefreshConnectionSchema,
   StartOAuthDto,
+  StartOAuthSchema,
   UpsertProviderConfigDto,
+  UpsertProviderConfigSchema,
 } from './integrations.dto';
 import { IntegrationsService } from './integrations.service';
 
@@ -61,7 +67,7 @@ export class IntegrationsController {
   @ApiOkResponse({ type: ProviderConfigurationResponse })
   async upsertProviderConfiguration(
     @Param('provider') provider: string,
-    @Body() body: UpsertProviderConfigDto,
+    @Body(new ZodValidationPipe(UpsertProviderConfigSchema)) body: UpsertProviderConfigDto,
   ): Promise<ProviderConfigurationResponse> {
     await this.integrations.upsertProviderConfiguration(provider, {
       clientId: body.clientId,
@@ -106,7 +112,7 @@ export class IntegrationsController {
   @ApiOkResponse({ type: OAuthStartResponseDto })
   async startOAuth(
     @Param('provider') provider: string,
-    @Body() body: StartOAuthDto,
+    @Body(new ZodValidationPipe(StartOAuthSchema)) body: StartOAuthDto,
   ): Promise<OAuthStartResponseDto> {
     const response = await this.integrations.startOAuthSession(provider, {
       userId: body.userId,
@@ -126,7 +132,7 @@ export class IntegrationsController {
   @ApiOkResponse({ type: IntegrationConnectionResponse })
   async completeOAuth(
     @Param('provider') provider: string,
-    @Body() body: CompleteOAuthDto,
+    @Body(new ZodValidationPipe(CompleteOAuthSchema)) body: CompleteOAuthDto,
   ): Promise<IntegrationConnectionResponse> {
     const connection = await this.integrations.completeOAuthSession(provider, {
       userId: body.userId,
@@ -148,7 +154,7 @@ export class IntegrationsController {
   @ApiOkResponse({ type: IntegrationConnectionResponse })
   async refreshConnection(
     @Param('id') id: string,
-    @Body() body: RefreshConnectionDto,
+    @Body(new ZodValidationPipe(RefreshConnectionSchema)) body: RefreshConnectionDto,
   ): Promise<IntegrationConnectionResponse> {
     const refreshed = await this.integrations.refreshConnection(id, body.userId);
     return {
@@ -163,7 +169,7 @@ export class IntegrationsController {
   @ApiOkResponse({ description: 'Connection removed' })
   async disconnectConnection(
     @Param('id') id: string,
-    @Body() body: DisconnectConnectionDto,
+    @Body(new ZodValidationPipe(DisconnectConnectionSchema)) body: DisconnectConnectionDto,
   ): Promise<void> {
     await this.integrations.disconnect(id, body.userId);
   }

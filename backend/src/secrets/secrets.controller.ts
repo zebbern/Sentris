@@ -13,6 +13,7 @@ import {
   Query,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ZodValidationPipe } from 'nestjs-zod';
 import {
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -24,8 +25,11 @@ import {
 import { SecretsService } from './secrets.service';
 import {
   CreateSecretDto,
+  CreateSecretSchema,
   UpdateSecretDto,
+  UpdateSecretSchema,
   RotateSecretDto,
+  RotateSecretSchema,
   SecretSummaryResponse,
   SecretValueResponse,
 } from './secrets.dto';
@@ -86,7 +90,7 @@ export class SecretsController {
   @ApiCreatedResponse({ type: SecretSummaryResponse })
   async createSecret(
     @CurrentAuth() auth: AuthContext | null,
-    @Body() body: CreateSecretDto,
+    @Body(new ZodValidationPipe(CreateSecretSchema)) body: CreateSecretDto,
   ): Promise<SecretSummaryResponse> {
     return this.secretsService.createSecret(auth, body);
   }
@@ -96,7 +100,7 @@ export class SecretsController {
   async rotateSecret(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: RotateSecretDto,
+    @Body(new ZodValidationPipe(RotateSecretSchema)) body: RotateSecretDto,
   ): Promise<SecretSummaryResponse> {
     return this.secretsService.rotateSecret(auth, id, body);
   }
@@ -106,7 +110,7 @@ export class SecretsController {
   async updateSecret(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: UpdateSecretDto,
+    @Body(new ZodValidationPipe(UpdateSecretSchema)) body: UpdateSecretDto,
   ): Promise<SecretSummaryResponse> {
     return this.secretsService.updateSecret(auth, id, body);
   }

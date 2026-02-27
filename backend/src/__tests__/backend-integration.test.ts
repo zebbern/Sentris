@@ -138,6 +138,7 @@ interface Component {
   const testBucket = process.env.MINIO_BUCKET_NAME || 'shipsec-files';
 
   beforeAll(async () => {
+    // eslint-disable-next-line no-console
     console.log('🚀 Starting backend integration test setup...');
 
     // Create NestJS test application
@@ -169,12 +170,14 @@ interface Component {
       await minioClient.makeBucket(testBucket, 'us-east-1');
     }
 
+    // eslint-disable-next-line no-console
     console.log('✅ Backend integration test setup complete\n');
   });
 
   afterAll(async () => {
     await app.close();
     await pool.end();
+    // eslint-disable-next-line no-console
     console.log('✅ Backend integration test teardown complete');
   });
 

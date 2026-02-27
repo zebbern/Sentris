@@ -663,7 +663,13 @@ export class WorkflowsController {
 
       // Extract detailed error information
       const message = error instanceof Error ? error.message : 'Failed to run workflow';
-      const errorDetails: any = {
+      const errorDetails: {
+        message: string;
+        error: string;
+        statusCode: number;
+        stack?: string;
+        cause?: unknown;
+      } = {
         message,
         error: 'Bad Request',
         statusCode: 400,
@@ -676,8 +682,8 @@ export class WorkflowsController {
           errorDetails.stack = error.stack;
         }
 
-        if (error instanceof Error && (error as any).cause) {
-          errorDetails.cause = (error as any).cause;
+        if (error instanceof Error && (error as Error & { cause?: unknown }).cause) {
+          errorDetails.cause = (error as Error & { cause?: unknown }).cause;
         }
       }
 

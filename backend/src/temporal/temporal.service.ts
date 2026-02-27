@@ -201,7 +201,7 @@ export class TemporalService implements OnModuleDestroy {
   async signalWorkflow(input: {
     workflowId: string;
     signalName: string;
-    args: any;
+    args: unknown;
   }): Promise<void> {
     const handle = await this.getWorkflowHandle({ workflowId: input.workflowId });
     this.logger.log(

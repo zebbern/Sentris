@@ -245,8 +245,12 @@ export class SecretsRepository {
           versionCreatedBy: insertedVersion.createdBy,
         });
       });
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505'
+      ) {
         throw new ConflictException(`Secret name '${secretData.name}' already exists`);
       }
       throw error;
@@ -356,8 +360,13 @@ export class SecretsRepository {
           updatedAt: sql`now()`,
         })
         .where(and(...conditions));
-    } catch (error: any) {
-      if (error?.code === '23505' && updates.name) {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505' &&
+        updates.name
+      ) {
         throw new ConflictException(`Secret name '${updates.name}' already exists`);
       }
       throw error;

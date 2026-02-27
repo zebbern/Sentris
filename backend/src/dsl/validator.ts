@@ -2,6 +2,7 @@ import { ZodError, ZodIssue } from 'zod';
 
 import {
   componentRegistry,
+  type ComponentDefinition,
   type ComponentPortMetadata,
   type ConnectionType,
 } from '@shipsec/component-sdk';
@@ -196,7 +197,7 @@ function isPlaceholderIssue(issue: ZodIssue, placeholderFields: Set<string>): bo
  */
 function validateSecretParameters(
   action: WorkflowAction,
-  component: any,
+  component: ComponentDefinition,
   errors: ValidationError[],
   warnings: ValidationError[],
 ) {
@@ -549,7 +550,10 @@ function isValidSecretId(secretId: string): boolean {
   return secretId.length >= 1 && secretId.length <= 100;
 }
 
-function resolveActionPortSnapshot(action: WorkflowAction, component: any): ActionPortSnapshot {
+function resolveActionPortSnapshot(
+  action: WorkflowAction,
+  component: ComponentDefinition,
+): ActionPortSnapshot {
   let inputs: ComponentPortMetadata[] = [];
   let outputs: ComponentPortMetadata[] = [];
 

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsInt, Min, Max, IsOptional } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import type { SubscriptionTier } from '../../database/schema/organization-settings';
 
 export type { SubscriptionTier };
@@ -49,27 +50,9 @@ export class AnalyticsSettingsResponseDto {
   updatedAt!: Date;
 }
 
-export class UpdateAnalyticsSettingsDto {
-  @ApiProperty({
-    description: 'Data retention period in days (must be within tier limits)',
-    example: 30,
-    minimum: 1,
-    maximum: 365,
-    required: false,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(365)
-  analyticsRetentionDays?: number;
+export const UpdateAnalyticsSettingsSchema = z.object({
+  analyticsRetentionDays: z.number().int().min(1).max(365).optional(),
+  subscriptionTier: z.enum(['free', 'pro', 'enterprise']).optional(),
+});
 
-  // Optional: allow updating subscription tier (if needed in the future)
-  @ApiProperty({
-    description: 'Subscription tier (optional - usually set by billing system)',
-    enum: ['free', 'pro', 'enterprise'],
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(['free', 'pro', 'enterprise'])
-  subscriptionTier?: SubscriptionTier;
-}
+export class UpdateAnalyticsSettingsDto extends createZodDto(UpdateAnalyticsSettingsSchema) {}

@@ -78,8 +78,12 @@ export class McpGroupsRepository {
       const [group] = await this.db.insert(mcpGroups).values(data).returning();
 
       return group;
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505'
+      ) {
         throw new ConflictException(`MCP group slug '${data.slug}' already exists`);
       }
       throw error;
@@ -102,8 +106,12 @@ export class McpGroupsRepository {
       }
 
       return updated;
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505'
+      ) {
         throw new ConflictException(`MCP group with this configuration already exists`);
       }
       throw error;
@@ -244,11 +252,15 @@ export class McpGroupsRepository {
         .returning();
 
       return relation;
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (error: unknown) {
+      const code =
+        error instanceof Error && 'code' in error
+          ? (error as Record<string, unknown>).code
+          : undefined;
+      if (code === '23505') {
         throw new ConflictException(`Server ${serverId} is already in group ${groupId}`);
       }
-      if (error?.code === '23503') {
+      if (code === '23503') {
         throw new NotFoundException(`Group ${groupId} or server ${serverId} not found`);
       }
       throw error;

@@ -48,7 +48,7 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-extraneous-class': 'off', // NestJS modules
 
-      'no-console': 'off',
+      'no-console': 'warn',
       'no-undef': 'off',
       'no-case-declarations': 'error',
       'no-empty': 'error',

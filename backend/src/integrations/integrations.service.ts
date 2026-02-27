@@ -512,10 +512,9 @@ export class IntegrationsService implements OnModuleInit {
           body: new URLSearchParams(bodyParams).toString(),
         });
       }
-    } catch (error: any) {
-      this.logger.error(
-        `Token request to ${provider.id} failed: ${error.message ?? String(error)}`,
-      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Token request to ${provider.id} failed: ${message}`);
       throw new BadRequestException(`Failed to contact ${provider.name} token endpoint`);
     }
 

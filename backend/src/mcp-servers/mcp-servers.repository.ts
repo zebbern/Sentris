@@ -158,8 +158,12 @@ export class McpServersRepository {
         .returning();
 
       return server;
-    } catch (error: any) {
-      if (error?.code === '23505') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505'
+      ) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
       }
       throw error;
@@ -196,8 +200,13 @@ export class McpServersRepository {
       }
 
       return updated;
-    } catch (error: any) {
-      if (error?.code === '23505' && data.name) {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as Record<string, unknown>).code === '23505' &&
+        data.name
+      ) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
       }
       throw error;

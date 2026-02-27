@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AuthContext } from '../../auth/types';
 import {
@@ -283,17 +284,23 @@ export function registerWorkflowTools(
         const gate = checkPermission(auth, 'runs.read');
         if (!gate.allowed) throw new Error(gate.error.content[0].text);
         const result = await extra.taskStore.getTaskResult(extra.taskId);
-        return result as any;
+        return result as CallToolResult;
       },
     },
   );
+}
+
+/** Minimal subset of the MCP RequestTaskStore used by the monitor loop. */
+interface WorkflowTaskStore {
+  storeTaskResult(taskId: string, status: 'completed' | 'failed', result: unknown): Promise<void>;
+  updateTaskStatus(taskId: string, status: string, statusMessage?: string): Promise<void>;
 }
 
 export async function monitorWorkflowRun(
   runId: string,
   temporalRunId: string | undefined,
   taskId: string,
-  taskStore: any,
+  taskStore: WorkflowTaskStore,
   workflowsService: StudioMcpDeps['workflowsService'],
   auth: AuthContext,
 ): Promise<void> {
@@ -328,7 +335,7 @@ export async function monitorWorkflowRun(
         // For terminal states, storeTaskResult sets the status itself.
         // Do NOT call updateTaskStatus first — it would move the task into a terminal
         // state and then storeTaskResult would refuse to update it again.
-        let resultData: any;
+        let resultData: unknown;
         if (taskState === 'completed') {
           try {
             resultData = await workflowsService.getRunResult(runId, temporalRunId, auth);

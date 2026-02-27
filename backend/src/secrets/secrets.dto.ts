@@ -1,54 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class CreateSecretDto {
-  @ApiProperty({ description: 'Human-readable unique secret name' })
-  @IsString()
-  @MinLength(1)
-  name!: string;
+export const CreateSecretSchema = z.object({
+  name: z.string().min(1),
+  value: z.string().min(1),
+  description: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
 
-  @ApiProperty({ description: 'Secret plaintext value' })
-  @IsString()
-  @MinLength(1)
-  value!: string;
+export class CreateSecretDto extends createZodDto(CreateSecretSchema) {}
 
-  @ApiPropertyOptional({ description: 'Optional description for operators' })
-  @IsOptional()
-  @IsString()
-  description?: string;
+export const RotateSecretSchema = z.object({
+  value: z.string().min(1),
+});
 
-  @ApiPropertyOptional({ description: 'Optional tags to help organize secrets', type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
-}
+export class RotateSecretDto extends createZodDto(RotateSecretSchema) {}
 
-export class RotateSecretDto {
-  @ApiProperty({ description: 'New plaintext secret value' })
-  @IsString()
-  @MinLength(1)
-  value!: string;
-}
+export const UpdateSecretSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  tags: z.array(z.string()).nullable().optional(),
+});
 
-export class UpdateSecretDto {
-  @ApiPropertyOptional({ description: 'Updated secret name (must remain unique)' })
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  name?: string;
-
-  @ApiPropertyOptional({ description: 'Updated description for the secret' })
-  @IsOptional()
-  @IsString()
-  description?: string | null;
-
-  @ApiPropertyOptional({ description: 'Updated tags for the secret', type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[] | null;
-}
+export class UpdateSecretDto extends createZodDto(UpdateSecretSchema) {}
 
 export class SecretVersionResponse {
   @ApiProperty()

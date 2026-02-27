@@ -13,6 +13,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiOkResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 import { SecurityAnalyticsService } from './security-analytics.service';
 import { OrganizationSettingsService } from './organization-settings.service';
@@ -21,6 +22,7 @@ import { AnalyticsQueryRequestDto, AnalyticsQueryResponseDto } from './dto/analy
 import {
   AnalyticsSettingsResponseDto,
   UpdateAnalyticsSettingsDto,
+  UpdateAnalyticsSettingsSchema,
   TIER_LIMITS,
 } from './dto/analytics-settings.dto';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -177,7 +179,8 @@ export class AnalyticsController {
   })
   async updateAnalyticsSettings(
     @CurrentAuth() auth: AuthContext | null,
-    @Body() updateDto: UpdateAnalyticsSettingsDto,
+    @Body(new ZodValidationPipe(UpdateAnalyticsSettingsSchema))
+    updateDto: UpdateAnalyticsSettingsDto,
   ): Promise<AnalyticsSettingsResponseDto> {
     // Require authentication
     if (!auth || !auth.isAuthenticated) {

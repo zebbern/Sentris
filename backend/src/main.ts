@@ -80,9 +80,11 @@ async function bootstrap() {
   Logger.log(`🚀 ShipSec backend listening on http://${host}:${port}`, 'Bootstrap');
 }
 
+const versionLogger = new Logger('VersionCheck');
+
 async function enforceVersionCheck() {
   if (isVersionCheckDisabled(process.env)) {
-    console.warn('[version-check] Skipping version validation (disabled via env).');
+    versionLogger.warn('Skipping version validation (disabled via env).');
     return;
   }
 
@@ -93,34 +95,33 @@ async function enforceVersionCheck() {
     const latest = result.response.latest_version;
 
     if (result.outcome === 'unsupported') {
-      console.error(
-        `[version-check] Version ${currentVersion} is no longer supported. Latest available: ${latest}.`,
+      versionLogger.error(
+        `Version ${currentVersion} is no longer supported. Latest available: ${latest}.`,
       );
       if (result.response.upgrade_url) {
-        console.error(`[version-check] Upgrade URL: ${result.response.upgrade_url}`);
+        versionLogger.error(`Upgrade URL: ${result.response.upgrade_url}`);
       }
       process.exit(1);
     }
 
     if (result.outcome === 'upgrade') {
-      console.warn(
-        `[version-check] Version ${latest} is available. You are running ${currentVersion}.`,
-      );
+      versionLogger.warn(`Version ${latest} is available. You are running ${currentVersion}.`);
       if (result.response.upgrade_url) {
-        console.warn(`[version-check] Upgrade URL: ${result.response.upgrade_url}`);
+        versionLogger.warn(`Upgrade URL: ${result.response.upgrade_url}`);
       }
     } else if (result.outcome === 'ok') {
-      console.log(`[version-check] Version ${currentVersion} is supported.`);
+      versionLogger.log(`Version ${currentVersion} is supported.`);
     }
   } catch (error) {
-    console.warn(
-      '[version-check] Failed to contact version service. Continuing without enforcement.',
-      error,
+    versionLogger.warn(
+      'Failed to contact version service. Continuing without enforcement.',
+      error instanceof Error ? error.stack : String(error),
     );
   }
 }
 
 bootstrap().catch((error) => {
+  // eslint-disable-next-line no-console
   console.error('Failed to bootstrap ShipSec backend', error);
   process.exit(1);
 });

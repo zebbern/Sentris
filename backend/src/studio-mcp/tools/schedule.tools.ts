@@ -100,6 +100,8 @@ export function registerScheduleTools(
           name: args.name,
           cronExpression: args.cronExpression,
           timezone: args.timezone ?? 'UTC',
+          overlapPolicy: 'skip' as const,
+          catchupWindowSeconds: 0,
           description: args.description,
           inputPayload: {
             runtimeInputs: args.inputs ?? {},
@@ -141,14 +143,15 @@ export function registerScheduleTools(
       const gate = checkPermission(auth, 'schedules.update');
       if (!gate.allowed) return gate.error;
       try {
-        const dto: Record<string, unknown> = {};
-        if (args.name !== undefined) dto.name = args.name;
-        if (args.cronExpression !== undefined) dto.cronExpression = args.cronExpression;
-        if (args.inputs !== undefined) {
-          dto.inputPayload = { runtimeInputs: args.inputs, nodeOverrides: {} };
-        }
-        if (args.timezone !== undefined) dto.timezone = args.timezone;
-        if (args.description !== undefined) dto.description = args.description;
+        const dto = {
+          ...(args.name !== undefined && { name: args.name }),
+          ...(args.cronExpression !== undefined && { cronExpression: args.cronExpression }),
+          ...(args.inputs !== undefined && {
+            inputPayload: { runtimeInputs: args.inputs, nodeOverrides: {} },
+          }),
+          ...(args.timezone !== undefined && { timezone: args.timezone }),
+          ...(args.description !== undefined && { description: args.description }),
+        };
         const schedule = await schedulesService.update(auth, args.scheduleId, dto);
         return jsonResult(schedule);
       } catch (error) {

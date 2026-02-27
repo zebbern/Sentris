@@ -22,6 +22,15 @@ import { FileIdParamDto, FileIdParamSchema } from './dto/file-param.dto';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 
+/** Minimal multer file shape from NestJS file upload interceptors */
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
@@ -56,7 +65,7 @@ export class FilesController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@CurrentAuth() auth: AuthContext | null, @NestUploadedFile() file: any) {
+  async uploadFile(@CurrentAuth() auth: AuthContext | null, @NestUploadedFile() file: MulterFile) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }

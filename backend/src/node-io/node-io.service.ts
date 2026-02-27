@@ -24,8 +24,8 @@ export interface NodeIODetail {
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
-  inputs: any;
-  outputs: any;
+  inputs: unknown;
+  outputs: unknown;
   inputsSize: number;
   outputsSize: number;
   inputsSpilled: boolean;
@@ -88,8 +88,8 @@ export class NodeIOService {
   }
 
   async toDetail(record: NodeIORecord, full = false): Promise<NodeIODetail> {
-    let inputs: any = record.inputs ?? null;
-    let outputs: any = record.outputs ?? null;
+    let inputs: unknown = record.inputs ?? null;
+    let outputs: unknown = record.outputs ?? null;
 
     // Helper to detect if a payload is a spill marker (handles both new and legacy formats)
     const isSpillMarker = (

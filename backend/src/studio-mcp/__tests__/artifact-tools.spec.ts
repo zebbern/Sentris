@@ -131,14 +131,14 @@ describe('Artifact Tools', () => {
       expect(parsed[0].id).toBe('a1');
     });
 
-    it('normalizes contentType → mimeType when mimeType is absent', async () => {
+    it('correctly maps mimeType through to result', async () => {
       artifactsService.listArtifacts.mockResolvedValue({
         artifacts: [
           {
             id: 'b1',
             name: 'data.bin',
             size: 512,
-            contentType: 'application/octet-stream',
+            mimeType: 'application/octet-stream',
             runId: 'run-2',
             createdAt: '2026-01-02',
           },

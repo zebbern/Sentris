@@ -93,7 +93,7 @@ export class SecurityAnalyticsService {
       const indexName = this.buildIndexName(orgId, options.indexSuffix);
 
       // Build bulk operations array
-      const bulkOps: any[] = [];
+      const bulkOps: Record<string, unknown>[] = [];
       for (const document of documents) {
         const assetKey = this.detectAssetKey(document, options.assetKeyField);
 
@@ -117,7 +117,9 @@ export class SecurityAnalyticsService {
       });
 
       if (response.body.errors) {
-        const errorCount = response.body.items.filter((item: any) => item.index?.error).length;
+        const errorCount = response.body.items.filter(
+          (item: { index?: { error?: unknown } }) => item.index?.error,
+        ).length;
         this.logger.warn(
           `Bulk indexing completed with ${errorCount} errors out of ${documents.length} documents`,
         );
@@ -194,11 +196,13 @@ export class SecurityAnalyticsService {
           ? (response.body.hits.total.value ?? 0)
           : (response.body.hits.total ?? 0);
 
-      const hits = response.body.hits.hits.map((hit: any) => ({
-        _id: hit._id,
-        _source: hit._source,
-        ...(hit._score !== undefined && { _score: hit._score }),
-      }));
+      const hits = response.body.hits.hits.map(
+        (hit: { _id: string; _source?: Record<string, unknown>; _score?: string | number }) => ({
+          _id: hit._id as string,
+          _source: (hit._source ?? {}) as Record<string, any>,
+          ...(hit._score !== undefined && { _score: Number(hit._score) }),
+        }),
+      );
 
       return {
         total,

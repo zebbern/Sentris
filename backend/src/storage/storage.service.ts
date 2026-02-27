@@ -47,8 +47,12 @@ export class StorageService {
     try {
       const stream = await client.getPartialObject(bucket, storageKey, 0, length);
       return await this.streamToBuffer(stream);
-    } catch (error: any) {
-      if (error.code === 'NoSuchKey') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'NoSuchKey'
+      ) {
         throw new NotFoundException(`File not found: ${storageKey}`);
       }
       throw error;
@@ -62,8 +66,12 @@ export class StorageService {
     try {
       const stream = await client.getObject(bucket, storageKey);
       return await this.streamToBuffer(stream);
-    } catch (error: any) {
-      if (error.code === 'NoSuchKey') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'NoSuchKey'
+      ) {
         throw new NotFoundException(`File not found: ${storageKey}`);
       }
       throw error;
@@ -85,8 +93,12 @@ export class StorageService {
         mimeType: stat.metaData['content-type'] || 'application/octet-stream',
         originalFileName: stat.metaData['x-amz-meta-original-filename'],
       };
-    } catch (error: any) {
-      if (error.code === 'NoSuchKey') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'NoSuchKey'
+      ) {
         throw new NotFoundException(`File not found: ${storageKey}`);
       }
       throw error;
@@ -99,8 +111,12 @@ export class StorageService {
 
     try {
       await client.removeObject(bucket, storageKey);
-    } catch (error: any) {
-      if (error.code === 'NoSuchKey') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'NoSuchKey'
+      ) {
         throw new NotFoundException(`File not found: ${storageKey}`);
       }
       throw error;

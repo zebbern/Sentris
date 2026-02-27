@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AuthContext } from '../../auth/types';
+import type { ArtifactMetadataDto } from '../../storage/dto/artifact.dto';
 import { type StudioMcpDeps, checkPermission, jsonResult, errorResult } from './types';
 
 const TEXT_MIME_PREFIXES = ['text/', 'application/json', 'application/xml', 'application/yaml'];
@@ -50,14 +51,12 @@ export function registerArtifactTools(
         });
 
         // Normalise to a consistent shape regardless of what the service returns
-        const artifacts = Array.isArray(result)
-          ? result
-          : (result?.artifacts ?? result?.items ?? []);
-        const summary = artifacts.map((a: any) => ({
+        const artifacts = Array.isArray(result) ? result : (result?.artifacts ?? []);
+        const summary = artifacts.map((a: ArtifactMetadataDto) => ({
           id: a.id,
           name: a.name,
           size: a.size,
-          mimeType: a.mimeType ?? a.contentType,
+          mimeType: a.mimeType,
           runId: a.runId,
           createdAt: a.createdAt,
         }));
@@ -88,11 +87,11 @@ export function registerArtifactTools(
       try {
         const result = await deps.artifactsService.listRunArtifacts(auth, args.runId);
         const artifacts = Array.isArray(result) ? result : (result?.artifacts ?? []);
-        const summary = artifacts.map((a: any) => ({
+        const summary = artifacts.map((a: ArtifactMetadataDto) => ({
           id: a.id,
           name: a.name,
           size: a.size,
-          mimeType: a.mimeType ?? a.contentType,
+          mimeType: a.mimeType,
           runId: a.runId,
           createdAt: a.createdAt,
         }));
@@ -134,7 +133,7 @@ export function registerArtifactTools(
         const totalSize = buffer.length;
         const offset = args.offset ?? 0;
         const limit = args.limit ?? 10000;
-        const mimeType = artifact?.mimeType ?? artifact?.contentType;
+        const mimeType = artifact?.mimeType;
 
         // Determine if the artifact is text-readable
         const textByMime = isTextMime(mimeType);

@@ -67,14 +67,15 @@ export class OpenSearchTenantService {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         return await fetch(url, options);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (attempt === MAX_RETRIES) {
           throw error;
         }
 
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        const errMsg = error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          `${label}: fetch failed (attempt ${attempt}/${MAX_RETRIES}): ${error?.message}. Retrying in ${delay}ms`,
+          `${label}: fetch failed (attempt ${attempt}/${MAX_RETRIES}): ${errMsg}. Retrying in ${delay}ms`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -133,10 +134,9 @@ export class OpenSearchTenantService {
 
       this.logger.log(`Tenant provisioned successfully: ${normalizedOrgId}`);
       return true;
-    } catch (error: any) {
-      this.logger.error(
-        `Failed to provision tenant ${normalizedOrgId}: ${error?.message || error}`,
-      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to provision tenant ${normalizedOrgId}: ${message}`);
       return false;
     }
   }

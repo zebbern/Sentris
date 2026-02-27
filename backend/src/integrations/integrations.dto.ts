@@ -1,64 +1,40 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class StartOAuthDto {
-  @ApiProperty({ description: 'Application user identifier to associate the connection with' })
-  @IsString()
-  @MinLength(1)
-  userId!: string;
+export const StartOAuthSchema = z.object({
+  userId: z.string().min(1),
+  redirectUri: z.string().url(),
+  scopes: z.array(z.string()).optional(),
+});
 
-  @ApiProperty({ description: 'Frontend callback URL that receives the OAuth code' })
-  @IsString()
-  @IsUrl()
-  redirectUri!: string;
+export class StartOAuthDto extends createZodDto(StartOAuthSchema) {}
 
-  @ApiPropertyOptional({ description: 'Optional override of scopes to request', type: [String] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  scopes?: string[];
-}
+export const CompleteOAuthSchema = StartOAuthSchema.extend({
+  state: z.string().min(1),
+  code: z.string().min(1),
+});
 
-export class CompleteOAuthDto extends StartOAuthDto {
-  @ApiProperty({ description: 'Opaque OAuth state returned from the authorize redirect' })
-  @IsString()
-  @MinLength(1)
-  state!: string;
+export class CompleteOAuthDto extends createZodDto(CompleteOAuthSchema) {}
 
-  @ApiProperty({ description: 'Authorization code issued by the provider' })
-  @IsString()
-  @MinLength(1)
-  code!: string;
-}
+export const RefreshConnectionSchema = z.object({
+  userId: z.string().min(1),
+});
 
-export class RefreshConnectionDto {
-  @ApiProperty({ description: 'Application user identifier that owns the connection' })
-  @IsString()
-  @MinLength(1)
-  userId!: string;
-}
+export class RefreshConnectionDto extends createZodDto(RefreshConnectionSchema) {}
 
-export class DisconnectConnectionDto {
-  @ApiProperty({ description: 'Application user identifier that owns the connection' })
-  @IsString()
-  @MinLength(1)
-  userId!: string;
-}
+export const DisconnectConnectionSchema = z.object({
+  userId: z.string().min(1),
+});
 
-export class UpsertProviderConfigDto {
-  @ApiProperty({ description: 'OAuth client identifier used for this provider' })
-  @IsString()
-  @MinLength(1)
-  clientId!: string;
+export class DisconnectConnectionDto extends createZodDto(DisconnectConnectionSchema) {}
 
-  @ApiPropertyOptional({
-    description: 'OAuth client secret. Required when configuring the provider for the first time.',
-  })
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  clientSecret?: string;
-}
+export const UpsertProviderConfigSchema = z.object({
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1).optional(),
+});
+
+export class UpsertProviderConfigDto extends createZodDto(UpsertProviderConfigSchema) {}
 
 export class ProviderConfigurationResponse {
   @ApiProperty()

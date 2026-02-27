@@ -402,9 +402,10 @@ export class ComponentsController {
         inputs: resolved.inputs ? extractPorts(resolved.inputs) : baseInputs,
         outputs: resolved.outputs ? extractPorts(resolved.outputs) : baseOutputs,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Fallback to static on error
-      this.logger.error(`Error resolving ports for ${id}:`, error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error resolving ports for ${id}:`, stack);
       return {
         inputs: baseInputs,
         outputs: baseOutputs,

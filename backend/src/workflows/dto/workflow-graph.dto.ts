@@ -199,7 +199,7 @@ export interface ServiceWorkflowResponse {
   name: string;
   description?: string | null;
   graph: z.infer<typeof WorkflowGraphSchema>; // The original stored graph (contains nodes, edges, viewport)
-  compiledDefinition: any | null;
+  compiledDefinition: Record<string, unknown> | null;
   lastRun: Date | null;
   runCount: number;
   createdAt: Date;
