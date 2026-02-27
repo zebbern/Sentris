@@ -130,6 +130,18 @@ export function SecretsManager() {
 
   const [listSuccess, setListSuccess] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!formSuccess) return;
+    const timer = setTimeout(() => setFormSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [formSuccess]);
+
+  useEffect(() => {
+    if (!listSuccess) return;
+    const timer = setTimeout(() => setListSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [listSuccess]);
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSecret, setEditingSecret] = useState<SecretSummary | null>(null);
   const [editFormState, setEditFormState] = useState<EditFormState>(INITIAL_EDIT_FORM);
@@ -444,9 +456,7 @@ export function SecretsManager() {
                 </p>
               )}
 
-              {formSuccess && (
-                <p className="text-sm text-green-600 dark:text-green-400">{formSuccess}</p>
-              )}
+              {formSuccess && <p className="text-sm text-success">{formSuccess}</p>}
 
               <Button type="submit" disabled={!isFormValid || disableCreate}>
                 {isSubmitting ? 'Saving…' : 'Create secret'}
@@ -481,9 +491,7 @@ export function SecretsManager() {
 
             {error && <div className="mb-4 text-xs md:text-sm text-destructive">{error}</div>}
             {listSuccess && (
-              <div className="mb-4 text-xs md:text-sm text-green-600 dark:text-green-400">
-                {listSuccess}
-              </div>
+              <div className="mb-4 text-xs md:text-sm text-success">{listSuccess}</div>
             )}
 
             {loading && secrets.length === 0 ? (

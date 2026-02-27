@@ -51,7 +51,7 @@ export function useRefreshConnection() {
     mutationFn: ({ id, userId }: { id: string; userId: string }) =>
       api.integrations.refreshConnection(id, userId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['integrationConnections'] });
+      qc.invalidateQueries({ queryKey: queryKeys.integrations.connections() });
     },
   });
 }
@@ -62,7 +62,7 @@ export function useDisconnectIntegration() {
     mutationFn: ({ id, userId }: { id: string; userId: string }) =>
       api.integrations.disconnect(id, userId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['integrationConnections'] });
+      qc.invalidateQueries({ queryKey: queryKeys.integrations.connections() });
     },
   });
 }

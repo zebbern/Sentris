@@ -48,6 +48,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
 
 const WORKFLOW_ORDER_KEY = 'workflow-list-order';
 
@@ -82,6 +83,7 @@ function applyOrder<T extends { id: string }>(items: T[], savedOrder: string[]):
 export function WorkflowList() {
   useDocumentTitle('Workflows');
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { data: rawWorkflows = EMPTY_WORKFLOWS, isLoading, error, refetch } = useWorkflowsSummary();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const trackedRef = useRef(false);
@@ -153,6 +155,11 @@ export function WorkflowList() {
       handleDeleteDialogChange(false);
     } catch (err) {
       console.error('Failed to delete workflow:', err);
+      toast({
+        title: 'Delete failed',
+        description: 'Failed to delete workflow. Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 

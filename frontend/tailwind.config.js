@@ -60,6 +60,19 @@ export default {
 				DEFAULT: 'hsl(var(--destructive))',
 				foreground: 'hsl(var(--destructive-foreground))'
 			},
+			success: {
+				DEFAULT: 'hsl(var(--color-success))'
+			},
+			warning: {
+				DEFAULT: 'hsl(var(--color-warning))'
+			},
+			info: {
+				DEFAULT: 'hsl(var(--color-info))'
+			},
+			'aws-accent': {
+				DEFAULT: 'hsl(var(--aws-accent))',
+				foreground: 'hsl(var(--aws-accent-foreground))'
+			},
 			muted: {
 				DEFAULT: 'hsl(var(--muted))',
 				foreground: 'hsl(var(--muted-foreground))'

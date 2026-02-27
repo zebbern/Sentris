@@ -83,7 +83,39 @@ Access the studio at `http://localhost`.
 
 ---
 
-## 🛠️ Capabilities
+## � Development Quickstart
+
+Get the dev environment running in 3 steps:
+
+**Prerequisites:** [Docker Desktop](https://www.docker.com/), [Bun](https://bun.sh/), [Node.js](https://nodejs.org/) (v20+)
+
+```bash
+git clone https://github.com/ShipSecAI/studio.git
+cd studio
+bun run setup   # Install deps + create .env files
+bun run dev     # Start Docker infra + all apps
+```
+
+Once running:
+
+| Service     | URL                     |
+| ----------- | ----------------------- |
+| Frontend    | <http://localhost:5173> |
+| Backend API | <http://localhost:3211> |
+| Temporal UI | <http://localhost:8081> |
+
+```bash
+bun run dev:stop   # Stop everything (PM2 + Docker)
+bun run dev:fe     # Frontend-only dev (no Docker needed)
+pm2 logs           # View application logs
+pm2 status         # Check process status
+```
+
+> **Advanced:** `just dev` remains available for multi-instance development, Clerk auth auto-detection, and TLS certificate generation. See the [Multi-Instance Guide](docs/MULTI-INSTANCE-DEV.md) for details.
+
+---
+
+## �🛠️ Capabilities
 
 ### Integrated Tooling
 

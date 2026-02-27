@@ -37,6 +37,9 @@
     --color-success: 142.1 76.2% 36.3%;
     --color-warning: 37.7 92.1% 50.2%;
     --color-error: 0 84.2% 60.2%;
+    --color-info: 221.2 83.2% 53.3%;
+    --aws-accent: 24.6 95% 53.1%;
+    --aws-accent-foreground: 20.9 90.2% 36.7%;
     --tertiary: 220 9% 46%;
     /* Edge colors for React Flow */
     --edge-default: 214.3 31.8% 80%;
@@ -82,6 +85,9 @@
     --color-warning: 48 96% 53%;
     /* Accent Error: #EF4444 */
     --color-error: 0 84% 60%;
+    --color-info: 217 92% 60%;
+    --aws-accent: 24.6 95% 53.1%;
+    --aws-accent-foreground: 30.7 97.2% 72.4%;
     /* Text Tertiary: #7A7C80 */
     --tertiary: 220 3% 49%;
     /* Edge colors for React Flow - Dark */

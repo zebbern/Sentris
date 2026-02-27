@@ -1098,6 +1098,57 @@ export const api = {
       return (response.data || []) as WebhookDelivery[];
     },
   },
+
+  // Generic HTTP methods for services not covered by the typed client
+  async get<T>(path: string): Promise<T> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}${path}`, { headers });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: `GET ${path} failed` }));
+      throw new Error(error.message || `GET ${path} failed`);
+    }
+    return response.json();
+  },
+
+  async post<T>(path: string, body?: unknown): Promise<T> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}${path}`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: `POST ${path} failed` }));
+      throw new Error(error.message || `POST ${path} failed`);
+    }
+    return response.json();
+  },
+
+  async put<T>(path: string, body?: unknown): Promise<T> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}${path}`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: `PUT ${path} failed` }));
+      throw new Error(error.message || `PUT ${path} failed`);
+    }
+    return response.json();
+  },
+
+  async del(path: string): Promise<void> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}${path}`, {
+      method: 'DELETE',
+      headers,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: `DELETE ${path} failed` }));
+      throw new Error(error.message || `DELETE ${path} failed`);
+    }
+  },
 };
 
 export async function getApiAuthHeaders(): Promise<Record<string, string>> {

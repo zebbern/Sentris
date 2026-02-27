@@ -37,9 +37,9 @@ export function useSyncTemplates() {
   return useMutation({
     mutationFn: () => api.templates.sync(),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['templates'] });
-      qc.invalidateQueries({ queryKey: ['templateCategories'] });
-      qc.invalidateQueries({ queryKey: ['templateTags'] });
+      qc.invalidateQueries({ queryKey: queryKeys.templates.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.templates.categories() });
+      qc.invalidateQueries({ queryKey: queryKeys.templates.tags() });
     },
   });
 }
@@ -57,7 +57,7 @@ export function useUseTemplate() {
       secretMappings?: Record<string, string>;
     }) => api.templates.use(templateId, { workflowName, secretMappings }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: queryKeys.workflows.list() });
     },
   });
 }

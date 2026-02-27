@@ -156,12 +156,12 @@ function GroupLogo({ slug, name, className }: { slug: string; name: string; clas
 function getGroupTheme(groupSlug: string) {
   if (groupSlug === 'aws') {
     return {
-      container: 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800',
-      headerBorder: 'border-orange-200 dark:border-orange-800',
-      iconWrapper: 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800',
-      iconText: 'text-orange-700 dark:text-orange-300',
-      pillBorder: 'border-orange-200 dark:border-orange-800',
-      accentText: 'text-orange-700 dark:text-orange-300',
+      container: 'bg-aws-accent/5 dark:bg-aws-accent/10 border-aws-accent/20',
+      headerBorder: 'border-aws-accent/20',
+      iconWrapper: 'bg-aws-accent/5 dark:bg-aws-accent/10 border-aws-accent/20',
+      iconText: 'text-aws-accent-foreground',
+      pillBorder: 'border-aws-accent/20',
+      accentText: 'text-aws-accent-foreground',
     };
   }
 
@@ -183,8 +183,8 @@ function HealthIndicator({
   checking?: boolean;
 }) {
   const statusConfig = {
-    healthy: { icon: CheckCircle2, color: 'text-green-500', label: 'Healthy' },
-    unhealthy: { icon: AlertCircle, color: 'text-red-500', label: 'Unhealthy' },
+    healthy: { icon: CheckCircle2, color: 'text-success', label: 'Healthy' },
+    unhealthy: { icon: AlertCircle, color: 'text-destructive', label: 'Unhealthy' },
     unknown: { icon: HelpCircle, color: 'text-muted-foreground', label: 'Not checked' },
   };
 
@@ -194,7 +194,7 @@ function HealthIndicator({
         <Tooltip>
           <TooltipTrigger>
             <div className="flex items-center gap-1.5">
-              <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />
+              <RefreshCw className="h-4 w-4 text-info animate-spin" />
               <span className="text-xs text-muted-foreground">Checking...</span>
             </div>
           </TooltipTrigger>
@@ -1774,8 +1774,8 @@ export function McpLibraryPage() {
 
                         {/* Discovery summary when available */}
                         {groupDiscoveryPreview[template.slug] && (
-                          <div className="flex items-center justify-between text-sm bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md px-3 py-2">
-                            <span className="text-green-700 dark:text-green-300">
+                          <div className="flex items-center justify-between text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
+                            <span className="text-success">
                               {
                                 groupDiscoveryPreview[template.slug].filter(
                                   (r) => r.status === 'completed',
@@ -2471,7 +2471,7 @@ export function McpLibraryPage() {
                             placeholder="Value"
                             className={cn(
                               'font-mono text-sm pr-20',
-                              entry.secretId && 'text-green-600 dark:text-green-400',
+                              entry.secretId && 'text-success',
                             )}
                           />
                           <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
@@ -2537,10 +2537,10 @@ export function McpLibraryPage() {
 
               {/* Discovery Status Alerts */}
               {discoveryStatus?.status === 'completed' && (
-                <div className="flex items-center justify-between p-3 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between p-3 rounded-md bg-success/10 border border-success/20">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm text-green-700 dark:text-green-300">
+                    <CheckCircle className="h-4 w-4 text-success" />
+                    <span className="text-sm text-success">
                       Found {discoveryStatus.toolCount} tool
                       {discoveryStatus.toolCount !== 1 ? 's' : ''}
                     </span>
@@ -2664,12 +2664,12 @@ export function McpLibraryPage() {
 
                 {/* Discovery summary when available */}
                 {!editingServer && discoveryPreview && (
-                  <div className="flex items-center justify-between text-sm bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md px-3 py-2">
-                    <span className="text-green-700 dark:text-green-300">
+                  <div className="flex items-center justify-between text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
+                    <span className="text-success">
                       {discoveryPreview.filter((r) => r.status === 'completed').length} of{' '}
                       {discoveryPreview.length} servers ready
                       {discoveryPreview.some((r) => r.status === 'completed') && (
-                        <span className="text-green-600 dark:text-green-400 ml-2">
+                        <span className="text-success ml-2">
                           (
                           {discoveryPreview
                             .filter((r) => r.status === 'completed')

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
@@ -96,6 +96,12 @@ export function ApiKeysManager() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 5000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   const handleCreateOpenChange = (open: boolean) => {
     setIsCreateOpen(open);
@@ -213,7 +219,7 @@ export function ApiKeysManager() {
         )}
 
         {successMessage && (
-          <div className="mb-4 md:mb-6 rounded-md bg-green-500/10 p-3 md:p-4 text-xs md:text-sm text-green-600 dark:text-green-400">
+          <div className="mb-4 md:mb-6 rounded-md bg-success/10 p-3 md:p-4 text-xs md:text-sm text-success">
             {successMessage}
           </div>
         )}
@@ -309,7 +315,7 @@ export function ApiKeysManager() {
                         {key.isActive ? (
                           <Badge
                             variant="outline"
-                            className="bg-green-500/10 text-green-600 border-green-500/20 text-xs"
+                            className="bg-success/10 text-success border-success/20 text-xs"
                           >
                             Active
                           </Badge>
@@ -377,16 +383,14 @@ export function ApiKeysManager() {
 
           {lastCreatedKey ? (
             <div className="space-y-4">
-              <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 mb-4">
+              <div className="rounded-md bg-warning/10 dark:bg-warning/10 p-4 mb-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <AlertTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
+                    <AlertTriangle className="h-5 w-5 text-warning" aria-hidden="true" />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      Save your secret key
-                    </h3>
-                    <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
+                    <h3 className="text-sm font-medium text-warning">Save your secret key</h3>
+                    <div className="mt-2 text-sm text-warning">
                       <p>
                         This is the only time we will show you the secret key. Make sure to copy it
                         now.

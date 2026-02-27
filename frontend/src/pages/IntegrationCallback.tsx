@@ -130,7 +130,7 @@ function StatusIcon({ status }: { status: CallbackStatus }) {
   }
 
   if (status === 'success') {
-    return <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />;
+    return <CheckCircle className="h-12 w-12 mx-auto mb-4 text-success" />;
   }
 
   return <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />;

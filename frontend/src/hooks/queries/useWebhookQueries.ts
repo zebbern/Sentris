@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { WebhookConfiguration } from '@shipsec/shared';
 import { api } from '@/services/api';
-import { API_V1_URL, getApiAuthHeaders } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function useWebhooks() {
@@ -35,7 +34,7 @@ export function useDeleteWebhook() {
   return useMutation({
     mutationFn: (id: string) => api.webhooks.delete(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['webhooks'] });
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
     },
   });
 }
@@ -45,7 +44,7 @@ export function useCreateWebhook() {
   return useMutation({
     mutationFn: (payload: Partial<WebhookConfiguration>) => api.webhooks.create(payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['webhooks'] });
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
     },
   });
 }
@@ -56,7 +55,7 @@ export function useUpdateWebhook() {
     mutationFn: ({ id, payload }: { id: string; payload: Partial<WebhookConfiguration> }) =>
       api.webhooks.update(id, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['webhooks'] });
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
     },
   });
 }
@@ -65,16 +64,12 @@ export function useRegenerateWebhookPath() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const headers = await getApiAuthHeaders();
-      const response = await fetch(`${API_V1_URL}/webhooks/configurations/${id}/regenerate-path`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) throw new Error('Failed to regenerate webhook path');
-      return response.json() as Promise<{ id: string; webhookPath: string; url: string }>;
+      return api.post<{ id: string; webhookPath: string; url: string }>(
+        `/webhooks/configurations/${id}/regenerate-path`,
+      );
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['webhooks'] });
+      qc.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
     },
   });
 }
