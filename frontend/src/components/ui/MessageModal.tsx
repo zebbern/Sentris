@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AnsiUp } from 'ansi_up';
+import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
 interface MessageModalProps {
@@ -55,7 +56,7 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
   const ansiHtml = useMemo(() => {
     if (!(colorize && hasAnsi)) return '';
     const au = new AnsiUp();
-    return au.ansi_to_html(message);
+    return DOMPurify.sanitize(au.ansi_to_html(message));
   }, [colorize, hasAnsi, message]);
   const copyToClipboard = () => {
     navigator.clipboard.writeText(message);
