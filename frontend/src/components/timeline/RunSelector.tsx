@@ -497,7 +497,7 @@ export function RunSelector({
                       'text-xs',
                       playbackMode === 'live'
                         ? 'bg-blue-100 text-blue-700 border border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-700',
+                        : 'bg-muted text-muted-foreground border border-border',
                     )}
                   >
                     {playbackMode === 'live' ? (

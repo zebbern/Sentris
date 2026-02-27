@@ -444,6 +444,7 @@ export function NodeTerminalPanel({
             size="icon"
             className="h-6 w-6 text-muted-foreground"
             onClick={onClose}
+            aria-label="Close terminal panel"
           >
             <X className="h-4 w-4" />
           </Button>

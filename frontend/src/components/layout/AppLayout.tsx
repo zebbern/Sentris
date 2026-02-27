@@ -370,6 +370,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarContext.Provider value={sidebarContextValue}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:z-[200] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:shadow-lg focus:outline-none"
+      >
+        Skip to main content
+      </a>
       <ThemeTransition />
       <div className="flex h-screen bg-background overflow-hidden">
         {/* Mobile backdrop overlay */}
@@ -669,7 +675,10 @@ export function AppLayout({ children }: AppLayoutProps) {
               {/* Auth components - UserButton includes organization switching */}
               {showUserButton && (
                 <div
-                  className={`flex items-center gap-2 ${sidebarOpen ? 'justify-between' : 'justify-center'}`}
+                  className={cn(
+                    'flex items-center gap-2',
+                    sidebarOpen ? 'justify-between' : 'justify-center',
+                  )}
                 >
                   <UserButton
                     className={sidebarOpen ? 'flex-1' : 'w-auto'}
@@ -693,7 +702,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               )}
               {/* Dark mode toggle when no user button */}
               {!showUserButton && (
-                <div className={`flex ${sidebarOpen ? 'justify-end' : 'justify-center'}`}>
+                <div className={cn('flex', sidebarOpen ? 'justify-end' : 'justify-center')}>
                   <button
                     onClick={startTransition}
                     className="p-2 rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground text-muted-foreground"
@@ -731,6 +740,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Main content area */}
         <main
+          id="main-content"
           className={cn(
             'flex-1 flex flex-col overflow-hidden min-w-0',
             // On mobile, main content takes full width since sidebar is overlay

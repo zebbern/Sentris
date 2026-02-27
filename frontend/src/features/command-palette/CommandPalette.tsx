@@ -491,7 +491,7 @@ export function CommandPalette() {
                 ? 'Search commands, components, workflows...'
                 : 'Search commands, workflows, settings...'
             }
-            className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/60"
+            className="flex-1 bg-transparent border-none outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-base placeholder:text-muted-foreground/60"
             autoComplete="off"
             spellCheck={false}
           />

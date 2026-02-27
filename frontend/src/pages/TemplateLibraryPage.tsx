@@ -361,8 +361,8 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
     <div
       className={cn(
         'group flex flex-col rounded-2xl cursor-pointer',
-        'bg-white dark:bg-zinc-900',
-        'border border-gray-100 dark:border-white/5',
+        'bg-card dark:bg-zinc-900',
+        'border border-border',
         'shadow-sm',
         'transition-all duration-300 ease-out',
         'hover:shadow-lg hover:-translate-y-1',
@@ -393,7 +393,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
               <div className="h-5 w-5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
                 {template.author.charAt(0).toUpperCase()}
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[80px]">
+              <span className="text-xs text-muted-foreground truncate max-w-[80px]">
                 {template.author}
               </span>
             </div>
@@ -403,7 +403,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
         {/* Title + Description */}
         <div>
           <h3
-            className="text-xl font-semibold text-gray-900 dark:text-white leading-tight line-clamp-1"
+            className="text-xl font-semibold text-foreground leading-tight line-clamp-1"
             title={template.name}
           >
             {toTitleCase(template.name)}
@@ -411,7 +411,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
 
           {template.description && (
             <p
-              className="text-sm text-gray-500 dark:text-gray-400 mt-2 line-clamp-2"
+              className="text-sm text-muted-foreground mt-2 line-clamp-2"
               title={template.description}
             >
               {template.description}
@@ -438,8 +438,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
                     key={tag}
                     className={cn(
                       'inline-flex items-center px-3 py-1 rounded-full text-xs',
-                      'bg-gray-100 text-gray-700 border border-gray-200',
-                      'dark:bg-white/5 dark:text-gray-300 dark:border-white/10',
+                      'bg-muted text-muted-foreground border border-border',
                     )}
                   >
                     {tag}
@@ -452,8 +451,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
                         <span
                           className={cn(
                             'inline-flex items-center px-3 py-1 rounded-full text-xs cursor-default',
-                            'bg-gray-100 text-gray-700 border border-gray-200',
-                            'dark:bg-white/5 dark:text-gray-300 dark:border-white/10',
+                            'bg-muted text-muted-foreground border border-border',
                           )}
                         >
                           +{filteredTags.length - 3}
@@ -468,14 +466,14 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
           })()}
 
           {/* Marketplace metadata */}
-          <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
             {template.popularity > 0 && (
               <>
                 <span className="flex items-center gap-1">
                   <Star className="h-3 w-3 text-amber-500" />
                   {template.popularity}
                 </span>
-                <span className="text-gray-300 dark:text-gray-600">&middot;</span>
+                <span className="text-border">&middot;</span>
               </>
             )}
             {template.requiredSecrets && template.requiredSecrets.length > 0 && (
@@ -485,7 +483,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
                   {template.requiredSecrets.length} secret
                   {template.requiredSecrets.length !== 1 ? 's' : ''}
                 </span>
-                <span className="text-gray-300 dark:text-gray-600">&middot;</span>
+                <span className="text-border">&middot;</span>
               </>
             )}
             {template.updatedAt && <span>Updated {timeAgo(template.updatedAt)}</span>}
@@ -517,8 +515,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
                     variant="outline"
                     className={cn(
                       'h-11 w-11 rounded-xl p-0 flex-shrink-0',
-                      'bg-gray-50 border-gray-200 hover:bg-gray-100',
-                      'dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10',
+                      'bg-muted border-border hover:bg-muted/80',
                     )}
                     asChild
                   >
@@ -548,7 +545,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
 
 function CardSkeleton() {
   return (
-    <div className="flex flex-col rounded-2xl border border-gray-100 dark:border-white/5 bg-white dark:bg-zinc-900 shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-border bg-card dark:bg-zinc-900 shadow-sm">
       <div className="p-5 md:p-6 space-y-6">
         <Skeleton className="h-44 w-full rounded-xl" />
         <div className="flex items-center justify-between">

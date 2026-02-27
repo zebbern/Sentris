@@ -98,7 +98,7 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
       default:
         return (
           <span
-            className="w-2.5 h-2.5 rounded-full bg-gray-400"
+            className="w-2.5 h-2.5 rounded-full bg-muted-foreground"
             title="Unknown - Health status not checked"
           />
         );
@@ -284,7 +284,9 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
                     <div className="flex items-center gap-1">
                       {status === 'healthy' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
                       {status === 'unhealthy' && <AlertCircle className="h-3 w-3 text-red-500" />}
-                      {status === 'unknown' && <HelpCircle className="h-3 w-3 text-gray-400" />}
+                      {status === 'unknown' && (
+                        <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                      )}
                       <span className="capitalize">{status}</span>
                     </div>
 

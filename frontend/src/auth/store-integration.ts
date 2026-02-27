@@ -10,17 +10,29 @@ import { queryClient } from '@/lib/queryClient';
 export function useAuthStoreIntegration() {
   const { user, token, isAuthenticated, isLoading, error } = useAuth();
   const authProvider = useAuthProvider();
-  const { setAuthContext, clear: clearStore } = useAuthStore();
+  // Use selectors to avoid subscribing to the entire store — `useAuthStore()` with no
+  // selector triggers a re-render on every `set()` call because Zustand creates a new
+  // state object each time.
+  const setAuthContext = useAuthStore((s) => s.setAuthContext);
+  const clearStore = useAuthStore((s) => s.clear);
   const organizationId = useAuthStore((s) => s.organizationId);
   const prevOrgRef = useRef(organizationId);
+  // Track whether the auth provider has been established at least once.
+  // On the very first render the GlobalAuthContext has no provider, so useAuth()
+  // returns the fallback with isAuthenticated=false / isLoading=true. We must NOT
+  // clear the query cache in that transient state.
+  const providerReady = useRef(false);
+  if (authProvider.name !== 'none') {
+    providerReady.current = true;
+  }
 
-  // Clear query cache on logout
+  // Clear query cache on logout (only after the real provider has been seen)
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (providerReady.current && !isAuthenticated && !isLoading) {
       queryClient.cancelQueries();
       queryClient.clear();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isLoading]);
 
   // Clear query cache on org change
   useEffect(() => {

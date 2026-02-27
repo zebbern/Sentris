@@ -48,8 +48,14 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { cn } from '@/lib/utils';
 
 const WORKFLOW_ORDER_KEY = 'workflow-list-order';
+
+// Stable reference to avoid creating a new [] on every render when query data is undefined.
+// Without this, the destructuring default `data: rawWorkflows = []` would create a new
+// array reference each render, triggering the useEffect → setState → re-render loop.
+const EMPTY_WORKFLOWS: WorkflowSummary[] = [];
 
 function getSavedOrder(): string[] {
   try {
@@ -76,7 +82,7 @@ function applyOrder<T extends { id: string }>(items: T[], savedOrder: string[]):
 
 export function WorkflowList() {
   const navigate = useNavigate();
-  const { data: rawWorkflows = [], isLoading, error, refetch } = useWorkflowsSummary();
+  const { data: rawWorkflows = EMPTY_WORKFLOWS, isLoading, error, refetch } = useWorkflowsSummary();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const trackedRef = useRef(false);
 
@@ -97,7 +103,7 @@ export function WorkflowList() {
         trackedRef.current = true;
       }
     } else if (!isLoading) {
-      setWorkflows([]);
+      setWorkflows((prev) => (prev.length === 0 ? prev : []));
     }
   }, [rawWorkflows, isLoading]);
 
@@ -469,7 +475,7 @@ function WorkflowRowItem({
       ref={setNodeRef}
       style={style}
       onClick={onRowClick}
-      className={`cursor-pointer transition-colors duration-150 hover:bg-accent/50 dark:hover:bg-accent/30 ${isDragging ? 'bg-accent/50 shadow-lg' : ''}`}
+      className={cn('cursor-pointer transition-colors duration-150 hover:bg-accent/50 dark:hover:bg-accent/30', isDragging && 'bg-accent/50 shadow-lg')}
     >
       <TableCell className="w-10 px-2">
         <div

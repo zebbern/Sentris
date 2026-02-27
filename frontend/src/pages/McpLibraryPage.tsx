@@ -182,7 +182,7 @@ function HealthIndicator({
   const statusConfig = {
     healthy: { icon: CheckCircle2, color: 'text-green-500', label: 'Healthy' },
     unhealthy: { icon: AlertCircle, color: 'text-red-500', label: 'Unhealthy' },
-    unknown: { icon: HelpCircle, color: 'text-gray-400', label: 'Not checked' },
+    unknown: { icon: HelpCircle, color: 'text-muted-foreground', label: 'Not checked' },
   };
 
   if (checking) {
@@ -1639,6 +1639,7 @@ export function McpLibraryPage() {
         <Button
           variant="outline"
           size="icon"
+          aria-label="Refresh MCP servers"
           onClick={() => {
             queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
             queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
@@ -1860,7 +1861,12 @@ export function McpLibraryPage() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    aria-label="MCP groups help"
+                  >
                     <HelpCircle className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
@@ -1933,6 +1939,7 @@ export function McpLibraryPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        aria-label={`Delete group ${group.name}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           void handleRemoveGroup(group.id, group.name);
@@ -2035,6 +2042,7 @@ export function McpLibraryPage() {
                                             <Button
                                               variant="ghost"
                                               size="icon"
+                                              aria-label="View tools"
                                               onClick={() => handleViewTools(server.serverId)}
                                             >
                                               <Wrench className="h-4 w-4" />
@@ -2049,6 +2057,7 @@ export function McpLibraryPage() {
                                             <Button
                                               variant="ghost"
                                               size="icon"
+                                              aria-label="Rediscover tools"
                                               onClick={() =>
                                                 handleDiscoverServerTools(
                                                   server.serverId,
@@ -2202,6 +2211,7 @@ export function McpLibraryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="View tools"
                               onClick={() => handleViewTools(server.id)}
                             >
                               <Wrench className="h-4 w-4" />
@@ -2217,6 +2227,7 @@ export function McpLibraryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="Test connection"
                               onClick={() => handleTestConnection(server.id)}
                               disabled={testingServer === server.id}
                             >
@@ -2238,6 +2249,7 @@ export function McpLibraryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="Edit server"
                               onClick={() => handleEdit(server.id)}
                             >
                               <Edit3 className="h-4 w-4" />
@@ -2253,6 +2265,7 @@ export function McpLibraryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="Delete server"
                               onClick={() => {
                                 setServerToDelete(server.id);
                                 setDeleteDialogOpen(true);
@@ -2461,6 +2474,7 @@ export function McpLibraryPage() {
                               className="h-7 w-7"
                               onClick={() => setSecretPickerEntryIndex(index)}
                               title="Pick a secret"
+                              aria-label="Pick a secret"
                             >
                               <KeyRound className="h-3.5 w-3.5" />
                             </Button>
@@ -2485,6 +2499,7 @@ export function McpLibraryPage() {
                           size="icon"
                           onClick={() => removeHeaderEntry(index)}
                           className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                          aria-label="Remove header entry"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

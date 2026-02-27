@@ -93,7 +93,7 @@ export function McpLibraryToolSelector({
       case 'unhealthy':
         return <span className="w-2 h-2 rounded-full bg-red-500" title="Unhealthy" />;
       default:
-        return <span className="w-2 h-2 rounded-full bg-gray-400" title="Unknown" />;
+        return <span className="w-2 h-2 rounded-full bg-muted-foreground" title="Unknown" />;
     }
   };
 

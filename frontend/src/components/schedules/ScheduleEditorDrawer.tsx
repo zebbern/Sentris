@@ -633,6 +633,7 @@ export function ScheduleEditorDrawer({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
+                  aria-label="Remove override"
                   onClick={() => removeOverrideNode(nodeId)}
                 >
                   <Trash2 className="h-4 w-4 text-red-500" />

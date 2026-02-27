@@ -163,7 +163,13 @@ export function WorkflowSchedulesSidebar({
             {schedules.length}
           </Badge>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-muted"
+          onClick={onClose}
+          aria-label="Close schedules panel"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>

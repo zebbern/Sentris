@@ -23,6 +23,7 @@ import { useWorkflowsList } from '@/hooks/queries/useWorkflowQueries';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { useQueryClient } from '@tanstack/react-query';
 import { env } from '@/config/env';
+import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
 import {
@@ -1203,13 +1204,16 @@ export function ParameterFieldWrapper({
 
   return (
     <div
-      className={`space-y-2 ${isNestedParameter ? 'ml-2 px-3 py-2.5 mt-1 bg-muted/80 rounded-lg' : ''}`}
+      className={cn(
+        'space-y-2',
+        isNestedParameter && 'ml-2 px-3 py-2.5 mt-1 bg-muted/80 rounded-lg',
+      )}
     >
       {/* Label and required indicator - skip for boolean (label is inside) */}
       {!isBooleanParameter && (
         <div className="flex items-center justify-between mb-1">
           <label
-            className={`${isNestedParameter ? 'text-xs' : 'text-sm'} font-medium`}
+            className={cn(isNestedParameter ? 'text-xs' : 'text-sm', 'font-medium')}
             htmlFor={parameter.id}
           >
             {parameter.label}

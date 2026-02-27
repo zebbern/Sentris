@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 import {
   useSchedules,
   usePauseSchedule,
@@ -304,7 +305,7 @@ export function SchedulesPage() {
                 onClick={handleRefresh}
                 disabled={isLoading}
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
               </Button>
               <Button variant="default" className="gap-2" onClick={openCreateDrawer}>

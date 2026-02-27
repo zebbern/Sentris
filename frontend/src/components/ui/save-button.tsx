@@ -33,7 +33,7 @@ export function SaveButton({
   const saveButtonClasses = cn(
     'gap-2 min-w-0 transition-all duration-200',
     saveState === 'clean' && 'border-emerald-200 dark:border-emerald-700',
-    saveState === 'dirty' && 'border-gray-300 dark:border-gray-600',
+    saveState === 'dirty' && 'border-border',
     saveState === 'saving' && 'border-blue-300 dark:border-blue-700',
     className,
   );

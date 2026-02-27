@@ -278,6 +278,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
                     className="h-5 w-5"
                     onClick={handleCopyLink}
                     title="Copy run link"
+                    aria-label="Copy run link"
                   >
                     <Link2 className="h-3 w-3" />
                   </Button>

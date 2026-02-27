@@ -114,7 +114,13 @@ export function WorkflowWebhooksSidebar({
             {workflowId ? webhooks.length + 1 : 1}
           </Badge>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-muted"
+          onClick={onClose}
+          aria-label="Close webhooks panel"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -167,6 +173,7 @@ export function WorkflowWebhooksSidebar({
               className="h-7 w-7 shrink-0"
               onClick={() => handleCopy(defaultWebhookUrl, 'default')}
               title="Copy URL"
+              aria-label="Copy default webhook URL"
             >
               {copiedId === 'default' ? (
                 <Check className="h-3.5 w-3.5 text-green-500" />
@@ -266,6 +273,7 @@ export function WorkflowWebhooksSidebar({
                         handleCopy(webhookUrl, webhook.id);
                       }}
                       title="Copy URL"
+                      aria-label="Copy webhook URL"
                     >
                       {copiedId === webhook.id ? (
                         <Check className="h-3.5 w-3.5 text-green-500" />

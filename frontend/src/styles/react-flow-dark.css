@@ -1,0 +1,205 @@
+/* ==========================================================================
+ * React Flow overrides — pointer events, config panel, dark theme controls,
+ * minimap, background, edges, handles, selection, attribution
+ * ========================================================================== */
+
+/* Fix for React Flow pointer events - ensure interactive elements in config panel are clickable */
+.react-flow__panel {
+  pointer-events: all !important;
+}
+
+/* Ensure all input elements and buttons have proper pointer events */
+input,
+textarea,
+select,
+button,
+label {
+  pointer-events: auto !important;
+}
+
+button,
+label,
+input[type="checkbox"],
+select {
+  cursor: pointer;
+}
+
+input[type="text"],
+input[type="number"],
+textarea {
+  cursor: text;
+}
+
+/* Ensure config panel has higher z-index and pointer events */
+.config-panel {
+  z-index: 100;
+  pointer-events: auto !important;
+}
+
+/* Config panel scrollbar styling */
+.config-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.config-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.config-panel::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+
+.config-panel::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Smooth scrolling for config panel content */
+.config-panel>div {
+  scroll-behavior: smooth;
+}
+
+/* React Flow Controls - Dark Theme */
+.dark .react-flow__controls {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.375rem !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2) !important;
+}
+
+.dark .react-flow__controls-button {
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  fill: hsl(var(--foreground)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .react-flow__controls-button:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+.dark .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.dark .react-flow__controls-button svg {
+  fill: hsl(var(--foreground)) !important;
+}
+
+.dark .react-flow__controls-button svg path {
+  fill: hsl(var(--foreground)) !important;
+}
+
+/* React Flow MiniMap - Dark Theme */
+.dark .react-flow__minimap {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.375rem !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2) !important;
+}
+
+.dark .react-flow__minimap svg {
+  background-color: hsl(var(--card)) !important;
+}
+
+.dark .react-flow__minimap-mask {
+  fill: hsl(var(--background)) !important;
+  opacity: 0.6 !important;
+}
+
+.dark .react-flow__minimap-node {
+  fill: hsl(var(--muted-foreground)) !important;
+}
+
+/* React Flow Background - Dark Theme */
+.dark .react-flow__background {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .react-flow__background pattern circle,
+.dark .react-flow__background pattern line {
+  stroke: hsl(var(--border)) !important;
+}
+
+/* Override the default grid dot color in dark mode */
+.dark .react-flow .react-flow__background svg circle {
+  fill: hsl(var(--border)) !important;
+}
+
+/* React Flow Attribution - Hidden (MIT license allows removal) */
+.react-flow__attribution {
+  display: none !important;
+}
+
+.dark .react-flow__attribution {
+  display: none !important;
+}
+
+.dark .react-flow__attribution a {
+  display: none !important;
+}
+
+.dark .react-flow__panel {
+  background-color: transparent !important;
+}
+
+/* React Flow Edges - Use edge-specific colors for better visibility */
+.react-flow__edge-path {
+  stroke: hsl(var(--edge-default));
+  stroke-width: 2;
+}
+
+.dark .react-flow__edge-path {
+  stroke: hsl(var(--edge-default));
+  stroke-width: 2;
+}
+
+.dark .react-flow__edge.selected .react-flow__edge-path,
+.dark .react-flow__edge:focus .react-flow__edge-path,
+.dark .react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: hsl(var(--primary));
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path,
+.react-flow__edge:focus-visible .react-flow__edge-path {
+  stroke: hsl(var(--primary));
+  stroke-width: 2.5;
+}
+
+/* Edge markers (arrows) - match edge color */
+.react-flow__edge markerEnd path,
+.react-flow__edge marker path {
+  fill: hsl(var(--edge-default));
+}
+
+/* React Flow Handles - Dark Theme */
+.dark .react-flow__handle {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--border));
+}
+
+/* React Flow Selection Box - Dark Theme */
+.dark .react-flow__selection {
+  background-color: hsl(var(--primary) / 0.1);
+  border: 1px dashed hsl(var(--primary));
+}
+
+/* React Flow Pane - Dark Theme */
+.dark .react-flow__pane {
+  background-color: hsl(var(--background));
+}
+
+/* React Flow Node Selection - Remove border, keep only gradient shadow from WorkflowNode */
+.react-flow__node.selected {
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.dark .react-flow__node.selected {
+  box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+}

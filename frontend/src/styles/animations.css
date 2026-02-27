@@ -1,0 +1,36 @@
+/* ==========================================================================
+ * Animations — @keyframes definitions and animation utility classes
+ * ========================================================================== */
+
+/* Security Dashboard - new finding highlight */
+@keyframes highlight-fade {
+  0% {
+    background-color: hsl(var(--primary) / 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-highlight-fade {
+  animation: highlight-fade 2s ease-out;
+}
+
+/* Navigation progress bar animation */
+@keyframes nprogress-indeterminate {
+  0%   { transform: translateX(-100%); opacity: 1; }
+  60%  { transform: translateX(60%);   opacity: 1; }
+  100% { transform: translateX(100%);  opacity: 0; }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

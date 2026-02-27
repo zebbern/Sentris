@@ -67,7 +67,7 @@ export function McpGroupServersDisplay({
             ? 'text-green-500'
             : status === 'unhealthy'
               ? 'text-red-500'
-              : 'text-gray-400';
+              : 'text-muted-foreground';
 
         return (
           <Badge

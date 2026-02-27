@@ -59,7 +59,7 @@ export const UserButton: React.FC<UserButtonProps> = ({
   if (authProvider.name === 'clerk') {
     const ClerkUserButton = authProvider.UserButtonComponent;
     return (
-      <div className={`flex items-center ${className}`}>
+      <div className={cn('flex items-center', className)}>
         <ClerkUserButton
           afterSignOutUrl={afterSignOutUrl}
           appearance={{
@@ -199,7 +199,7 @@ export const UserButtonText: React.FC<{ className?: string }> = ({ className = '
   const { user, isAuthenticated, isLoading } = authProvider.context;
 
   if (isLoading) {
-    return <div className={`animate-pulse w-16 h-4 bg-muted rounded ${className}`}></div>;
+    return <div className={cn('animate-pulse w-16 h-4 bg-muted rounded', className)}></div>;
   }
 
   if (!isAuthenticated || !user) {

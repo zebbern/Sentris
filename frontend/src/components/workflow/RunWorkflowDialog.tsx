@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Play, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
+import { cn } from '@/lib/utils';
 
 type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string' | 'secret';
 type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;
@@ -207,7 +208,7 @@ export function RunWorkflowDialog({
               id={input.id}
               placeholder='{"key": "value"}'
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
-              className={`${hasError ? 'border-red-500' : ''} max-h-[120px] overflow-y-auto`}
+              className={cn('max-h-[120px] overflow-y-auto', hasError && 'border-red-500')}
               rows={2}
               defaultValue={
                 typeof inputs[input.id] === 'string'
@@ -235,7 +236,10 @@ export function RunWorkflowDialog({
               id={input.id}
               placeholder='value1, value2 or ["value1", "value2"]'
               onChange={(e) => handleInputChange(input.id, e.target.value, input.type)}
-              className={`${hasError ? 'border-red-500 font-mono' : 'font-mono'} max-h-[120px] overflow-y-auto`}
+              className={cn(
+                'font-mono max-h-[120px] overflow-y-auto',
+                hasError && 'border-red-500',
+              )}
               rows={2}
               defaultValue={
                 typeof inputs[input.id] === 'string'
@@ -319,7 +323,10 @@ export function RunWorkflowDialog({
               id={input.id}
               placeholder="Enter text"
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
-              className={`${hasError ? 'border-red-500 font-mono' : 'font-mono'} max-h-[120px] overflow-y-auto`}
+              className={cn(
+                'font-mono max-h-[120px] overflow-y-auto',
+                hasError && 'border-red-500',
+              )}
               rows={2}
               defaultValue={
                 inputs[input.id] !== undefined && inputs[input.id] !== null

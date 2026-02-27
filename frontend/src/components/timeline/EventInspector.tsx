@@ -78,7 +78,7 @@ const EVENT_LAYOUT_PRESETS: Record<
     message: 'text-xs text-muted-foreground/90',
   },
   'stacked-contrast': {
-    li: 'px-3 py-3 transition-colors bg-white/80 dark:bg-neutral-900/60 backdrop-blur',
+    li: 'px-3 py-3 transition-colors bg-white/80 dark:bg-neutral-900/80 backdrop-blur',
     button: 'rounded-md',
     iconWrap: 'h-8 w-8 border-2',
     title: 'text-sm font-semibold tracking-wide',

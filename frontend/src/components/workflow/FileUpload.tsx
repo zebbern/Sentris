@@ -77,7 +77,7 @@ export function FileUpload({ onFileUploaded }: FileUploadProps) {
                   </p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={handleClear}>
+              <Button variant="ghost" size="icon" onClick={handleClear} aria-label="Clear file">
                 <X className="h-4 w-4" />
               </Button>
             </div>

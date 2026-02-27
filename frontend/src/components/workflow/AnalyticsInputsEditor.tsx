@@ -108,6 +108,7 @@ export function AnalyticsInputsEditor({ value, onChange }: AnalyticsInputsEditor
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
+                  aria-label={`Remove input ${index + 1}`}
                   onClick={() => removeInput(index)}
                 >
                   <Trash2 className="h-3 w-3 text-red-500" />

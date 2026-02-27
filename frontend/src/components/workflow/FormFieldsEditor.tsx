@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -71,7 +72,10 @@ function SortableRow({ item, onUpdate, onRemove }: SortableRowProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex flex-col gap-2 p-3 border rounded-md bg-background ${isDragging ? 'shadow-lg ring-2 ring-primary' : ''}`}
+      className={cn(
+        'flex flex-col gap-2 p-3 border rounded-md bg-background',
+        isDragging && 'shadow-lg ring-2 ring-primary',
+      )}
     >
       <div className="flex items-center gap-2">
         <div
@@ -118,7 +122,7 @@ function SortableRow({ item, onUpdate, onRemove }: SortableRowProps) {
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
+              <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Field settings">
                 <Settings2 className="h-3 w-3" />
               </Button>
             </PopoverTrigger>

@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw, Plus, Trash2, ExternalLink, Link2, Copy, RotateCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   useWebhooks,
   useDeleteWebhook,
@@ -291,7 +292,7 @@ export function WebhooksPage() {
                   onClick={handleRefresh}
                   disabled={isLoading}
                 >
-                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                   <span className="hidden sm:inline">Refresh</span>
                 </Button>
                 <Button
@@ -381,6 +382,7 @@ export function WebhooksPage() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-6 w-6 shrink-0"
+                                      aria-label="Copy webhook URL"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleCopyUrl(webhook);
@@ -430,7 +432,10 @@ export function WebhooksPage() {
                                       className="h-8 w-8"
                                     >
                                       <RotateCw
-                                        className={`h-4 w-4 ${isActionBusy(webhook.id) ? 'animate-spin' : ''}`}
+                                        className={cn(
+                                          'h-4 w-4',
+                                          isActionBusy(webhook.id) && 'animate-spin',
+                                        )}
                                       />
                                     </Button>
                                   </TooltipTrigger>

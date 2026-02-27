@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, XCircle, RefreshCw, Search, Clock, Zap, ExternalLink } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -207,7 +208,7 @@ export function ActionCenterPage() {
                 onClick={handleRefresh}
                 disabled={isLoading}
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
               </Button>
             </div>

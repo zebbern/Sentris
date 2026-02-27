@@ -109,7 +109,7 @@ export function LeanSelect({
             'flex-1 px-3 py-2 text-sm border rounded-md bg-background/50 backdrop-blur-sm',
             'flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer outline-none',
             'hover:bg-muted/40 hover:border-muted-foreground/30',
-            'focus:ring-2 focus:ring-primary/20 focus:border-primary/50',
+            'focus:ring-2 focus:ring-primary/50 focus:border-primary/50',
             disabled && 'opacity-50 cursor-not-allowed grayscale pointer-events-none',
             className,
           )}

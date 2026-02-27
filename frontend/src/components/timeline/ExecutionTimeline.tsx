@@ -315,6 +315,7 @@ export function ExecutionTimeline() {
                 size="icon"
                 onClick={stepBackward}
                 disabled={currentTime <= 0}
+                aria-label="Step backward"
               >
                 <SkipBack className="h-4 w-4" />
               </Button>
@@ -323,6 +324,7 @@ export function ExecutionTimeline() {
                 size="icon"
                 onClick={handlePlayPause}
                 disabled={playbackMode === 'live'}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
@@ -331,6 +333,7 @@ export function ExecutionTimeline() {
                 size="icon"
                 onClick={stepForward}
                 disabled={currentTime >= totalDuration}
+                aria-label="Step forward"
               >
                 <SkipForward className="h-4 w-4" />
               </Button>

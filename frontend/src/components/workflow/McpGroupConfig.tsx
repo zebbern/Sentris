@@ -104,7 +104,7 @@ export function McpGroupConfig({
       default:
         return (
           <span
-            className="w-2.5 h-2.5 rounded-full bg-gray-400"
+            className="w-2.5 h-2.5 rounded-full bg-muted-foreground"
             title="Unknown - Health status not checked"
           />
         );

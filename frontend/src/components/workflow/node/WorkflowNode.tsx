@@ -568,7 +568,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
                     onChange={(e) => setEditingLabelValue(e.target.value)}
                     onBlur={handleSaveLabel}
                     onKeyDown={handleLabelKeyDown}
-                    className="text-sm font-semibold bg-transparent border-b border-primary outline-none w-full py-0"
+                    className="text-sm font-semibold bg-transparent border-b border-primary outline-none focus-visible:ring-2 focus-visible:ring-ring w-full py-0"
                     autoFocus
                   />
                 ) : (

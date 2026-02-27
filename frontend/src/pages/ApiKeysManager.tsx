@@ -310,6 +310,7 @@ export function ApiKeysManager() {
                               variant="ghost"
                               size="icon"
                               title="Revoke Key"
+                              aria-label="Revoke key"
                               onClick={() => setConfirmAction({ type: 'revoke', target: key })}
                               disabled={isReadOnly}
                               className="h-8 w-8"
@@ -321,6 +322,7 @@ export function ApiKeysManager() {
                             variant="ghost"
                             size="icon"
                             title="Delete Key"
+                            aria-label="Delete key"
                             onClick={() => setConfirmAction({ type: 'delete', target: key })}
                             disabled={isReadOnly}
                             className="h-8 w-8"
@@ -376,6 +378,7 @@ export function ApiKeysManager() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Copy secret key"
                     onClick={() => copyToClipboard(lastCreatedKey)}
                   >
                     <Copy className="h-4 w-4" />

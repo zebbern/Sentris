@@ -384,6 +384,7 @@ export function ConfigPanel({
               size="icon"
               className="h-8 w-8 md:h-7 md:w-7 hover:bg-muted"
               onClick={onClose}
+              aria-label="Close panel"
             >
               <X className="h-5 w-5 md:h-4 md:w-4" />
             </Button>
@@ -406,6 +407,7 @@ export function ConfigPanel({
             size="icon"
             className="h-8 w-8 md:h-7 md:w-7 hover:bg-muted"
             onClick={onClose}
+            aria-label="Close panel"
           >
             <X className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
@@ -623,6 +625,7 @@ export function ConfigPanel({
           size="icon"
           className="h-8 w-8 md:h-7 md:w-7 hover:bg-muted"
           onClick={onClose}
+          aria-label="Close panel"
         >
           <X className="h-5 w-5 md:h-4 md:w-4" />
         </Button>
@@ -672,6 +675,7 @@ export function ConfigPanel({
                   size="icon"
                   className="h-5 w-5 flex-shrink-0"
                   onClick={handleSaveNodeName}
+                  aria-label="Save node name"
                 >
                   <Check className="h-3 w-3" />
                 </Button>
@@ -689,6 +693,7 @@ export function ConfigPanel({
                       setIsEditingNodeName(true);
                     }}
                     title="Rename node"
+                    aria-label="Rename node"
                   >
                     <Pencil className="h-3 w-3" />
                   </Button>
@@ -1217,6 +1222,7 @@ export function ConfigPanel({
                         size="icon"
                         className="h-5 w-5 text-muted-foreground hover:text-foreground"
                         title="Manage API Keys"
+                        aria-label="Manage API keys"
                         onClick={() => navigate('/api-keys')}
                       >
                         <Key className="h-3 w-3" />

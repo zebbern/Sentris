@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { AnsiUp } from 'ansi_up';
+import { cn } from '@/lib/utils';
 
 interface MessageModalProps {
   open: boolean;
@@ -71,12 +72,18 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
         <div className="flex-1 overflow-y-auto">
           {colorize && hasAnsi ? (
             <div
-              className={`text-xs font-mono bg-muted/30 rounded p-3 border min-h-[200px] ${wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre overflow-x-auto'}`}
+              className={cn(
+                'text-xs font-mono bg-muted/30 rounded p-3 border min-h-[200px]',
+                wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre overflow-x-auto',
+              )}
               dangerouslySetInnerHTML={{ __html: ansiHtml }}
             />
           ) : (
             <pre
-              className={`text-xs font-mono bg-muted/30 rounded p-3 border min-h-[200px] ${wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre overflow-x-auto'}`}
+              className={cn(
+                'text-xs font-mono bg-muted/30 rounded p-3 border min-h-[200px]',
+                wrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre overflow-x-auto',
+              )}
             >
               {message}
             </pre>
