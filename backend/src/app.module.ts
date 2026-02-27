@@ -8,18 +8,20 @@ import Redis from 'ioredis';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { authConfig } from './config/auth.config';
-import { opensearchConfig } from './config/opensearch.config';
 import { validateBackendEnv } from './config/env.validate';
 import {
   appConfig,
+  authConfig,
+  databaseConfig,
   ingestConfig,
   integrationsEnvConfig,
   kafkaConfig,
   lokiConfig,
   minioEnvConfig,
+  opensearchConfig,
   redisConfig,
   secretsConfig,
+  templatesConfig,
   temporalTaskConfig,
 } from './config';
 import { OpenSearchModule } from './config/opensearch.module';
@@ -96,6 +98,7 @@ function getEnvFilePaths(): string[] {
       load: [
         appConfig,
         authConfig,
+        databaseConfig,
         ingestConfig,
         integrationsEnvConfig,
         kafkaConfig,
@@ -104,6 +107,7 @@ function getEnvFilePaths(): string[] {
         opensearchConfig,
         redisConfig,
         secretsConfig,
+        templatesConfig,
         temporalTaskConfig,
       ],
       validate: validateBackendEnv,

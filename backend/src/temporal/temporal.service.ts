@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Injectable, Logger, OnModuleDestroy, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { TemporalTaskConfig } from '../config';
 import { status as grpcStatus, type ServiceError } from '@grpc/grpc-js';
 import Long from 'long';
 import {
@@ -96,12 +97,10 @@ export class TemporalService implements OnModuleDestroy {
   private connection?: Connection;
 
   constructor(@Inject(ConfigService) private readonly configService: ConfigService) {
-    this.address = this.configService.get<string>('TEMPORAL_ADDRESS', 'localhost:7233');
-    this.namespace = this.configService.get<string>('TEMPORAL_NAMESPACE', 'shipsec-dev');
-    this.defaultTaskQueue = this.configService.get<string>(
-      'TEMPORAL_TASK_QUEUE',
-      'shipsec-default',
-    );
+    const temporal = this.configService.get<TemporalTaskConfig>('temporalTask')!;
+    this.address = temporal.address;
+    this.namespace = temporal.namespace;
+    this.defaultTaskQueue = temporal.taskQueue;
   }
 
   async onModuleDestroy(): Promise<void> {

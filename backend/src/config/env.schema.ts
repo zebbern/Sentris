@@ -86,6 +86,16 @@ export const backendEnvSchema = z
     GITHUB_TEMPLATE_BRANCH: z.string().optional().default('main'),
     GITHUB_TEMPLATE_TOKEN: z.string().optional(),
 
+    // --- Version Check ---
+    SHIPSEC_VERSION_CHECK_URL: z.string().optional().default('https://version.shipsec.ai'),
+    SHIPSEC_VERSION_CHECK_TIMEOUT_MS: z.coerce.number().optional().default(5000),
+    SHIPSEC_VERSION_CHECK_VERSION: z.string().optional(),
+    SHIPSEC_SKIP_MIGRATION_CHECK: stringToBoolean(false),
+    SHIPSEC_VERSION_CHECK_DISABLED: stringToBoolean(false),
+
+    // --- Runtime ---
+    NODE_ENV: z.string().optional().default('development'),
+
     // --- Temporal ---
     TEMPORAL_BOOTSTRAP_DEMO: stringToBoolean(false),
   })

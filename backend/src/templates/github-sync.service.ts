@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TemplatesRepository } from './templates.repository';
+import type { TemplatesConfig } from '../config';
 import { TemplateManifest } from '../database/schema/templates';
 
 interface GitHubFile {
@@ -127,7 +128,7 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
    * With a token: 5,000 requests/hour. Without: 60 requests/hour.
    */
   private getToken(): string | undefined {
-    return this.configService.get<string>('GITHUB_TEMPLATE_TOKEN');
+    return this.configService.get<TemplatesConfig>('templates')!.github.token;
   }
 
   /**
@@ -148,12 +149,10 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
    * Get the GitHub repository configuration from environment variables.
    */
   private getRepoConfig(): { owner: string; repo: string; branch: string } {
-    const repo = this.configService.get<string>(
-      'GITHUB_TEMPLATE_REPO',
-      'shipsecai/workflow-templates',
-    );
-    const branch = this.configService.get<string>('GITHUB_TEMPLATE_BRANCH', 'main');
-    const [owner, repoName] = repo.split('/');
+    const templatesCfg = this.configService.get<TemplatesConfig>('templates')!;
+    const repoFull = templatesCfg.github.repo;
+    const branch = templatesCfg.github.branch;
+    const [owner, repoName] = repoFull.split('/');
 
     if (!owner || !repoName) {
       throw new Error('Invalid GITHUB_TEMPLATE_REPO format. Expected: owner/repo');

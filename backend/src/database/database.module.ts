@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { MigrationGuard } from './migration.guard';
 import * as schema from './schema';
-import type { IngestConfig } from '../config';
+import type { DatabaseConfig, IngestConfig } from '../config';
 
 export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
 
@@ -25,7 +25,7 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
             on: () => {},
           } as unknown as Pool;
         }
-        const connectionString = configService.get<string>('DATABASE_URL');
+        const connectionString = configService.get<DatabaseConfig>('database')!.connectionString;
         if (!connectionString) {
           throw new Error('DATABASE_URL is not set');
         }

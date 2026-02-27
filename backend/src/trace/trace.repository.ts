@@ -36,7 +36,7 @@ export class TraceRepository implements OnModuleDestroy {
   ) {
     // Create a separate pool for LISTEN/NOTIFY to avoid conflicts
     this.pool = new Pool({
-      connectionString: this.configService.get<string>('DATABASE_URL'),
+      connectionString: this.configService.get<string>('database.connectionString'),
     });
   }
 
