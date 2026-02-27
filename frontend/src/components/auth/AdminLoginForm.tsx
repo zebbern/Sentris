@@ -49,9 +49,8 @@ export function AdminLoginForm() {
         if (loginResponse.status === 401) {
           throw new Error('Invalid username or password');
         }
-        throw new Error(
-          `Authentication failed: ${loginResponse.status} ${loginResponse.statusText}`,
-        );
+        console.error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
+        throw new Error('Unable to log in. Please try again or contact your administrator.');
       }
 
       // Store credentials for API requests (Basic auth header)
@@ -71,7 +70,12 @@ export function AdminLoginForm() {
     } catch (err) {
       // Clear credentials on error
       useAuthStore.getState().clear();
-      setError(err instanceof Error ? err.message : 'Login failed');
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        console.error('Network error during login:', err);
+        setError('Unable to connect to the server. Please check your connection.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Login failed');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +100,7 @@ export function AdminLoginForm() {
               placeholder="admin"
               required
               autoFocus
+              autoComplete="username"
               disabled={isLoading}
             />
           </div>
@@ -109,6 +114,7 @@ export function AdminLoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
               required
+              autoComplete="current-password"
               disabled={isLoading}
             />
           </div>

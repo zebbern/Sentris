@@ -28,6 +28,7 @@ import {
   Settings,
   ChevronDown,
   Package,
+  X,
 } from 'lucide-react';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -48,6 +49,33 @@ interface AppLayoutProps {
 
 import { SidebarContext, type SidebarContextValue } from './sidebar-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
+
+const settingsItems = [
+  {
+    name: 'Secrets',
+    href: '/secrets',
+    icon: KeyRound,
+  },
+  {
+    name: 'API Keys',
+    href: '/api-keys',
+    icon: Shield,
+  },
+  {
+    name: 'MCP Servers',
+    href: '/mcp-library',
+    icon: ServerCog,
+  },
+  ...(env.VITE_OPENSEARCH_DASHBOARDS_URL
+    ? [
+        {
+          name: 'Analytics Settings',
+          href: '/analytics-settings',
+          icon: Settings,
+        },
+      ]
+    : []),
+];
 
 export function AppLayout({ children }: AppLayoutProps) {
   usePrefetchOnIdle();
@@ -97,12 +125,15 @@ export function AppLayout({ children }: AppLayoutProps) {
     }
   }, [location.pathname, isMobile]);
 
-  // Close sidebar on mobile when navigating
+  // Auto-expand the Manage section when navigating to a settings sub-page
   useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
+    const isSettingsPage = settingsItems.some(
+      (item) => location.pathname === item.href || location.pathname.startsWith(item.href + '/'),
+    );
+    if (isSettingsPage) {
+      setSettingsOpen(true);
     }
-  }, [location.pathname, isMobile]);
+  }, [location.pathname, settingsItems]);
 
   // Set up sidebar close callback for mobile component placement
   useEffect(() => {
@@ -303,32 +334,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       : []),
   ];
 
-  const settingsItems = [
-    {
-      name: 'Secrets',
-      href: '/secrets',
-      icon: KeyRound,
-    },
-    {
-      name: 'API Keys',
-      href: '/api-keys',
-      icon: Shield,
-    },
-    {
-      name: 'MCP Servers',
-      href: '/mcp-library',
-      icon: ServerCog,
-    },
-    ...(env.VITE_OPENSEARCH_DASHBOARDS_URL
-      ? [
-          {
-            name: 'Analytics Settings',
-            href: '/analytics-settings',
-            icon: Settings,
-          },
-        ]
-      : []),
-  ];
+
 
   const isActive = (path: string) => {
     if (path === '/') {
@@ -393,7 +399,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <SidebarHeader className="flex items-center justify-between p-4 border-b">
             <Link
               to="/"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 min-w-0 flex-1"
               onClick={() => isMobile && setSidebarOpen(false)}
             >
               <div className="flex-shrink-0">
@@ -421,6 +427,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                 ShipSec Studio
               </span>
             </Link>
+            {isMobile && sidebarOpen && (
+              <button
+                onClick={() => {
+                  setSidebarOpen(false);
+                  setWasExplicitlyOpened(false);
+                }}
+                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                aria-label="Close sidebar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </SidebarHeader>
 
           <SidebarContent className="py-0">

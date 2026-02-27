@@ -172,8 +172,11 @@ export function AppTopBar({
             )}
           </div>
         ) : (
-          /* Desktop: Full page title */
-          <h1 className="text-xl font-semibold truncate">{pageInfo.title}</h1>
+          /* Desktop: Full page title — responsive sizing for tablet */
+          <h1 className="text-base lg:text-xl font-semibold truncate">
+            <span className="lg:hidden">{pageInfo.shortTitle || pageInfo.title}</span>
+            <span className="hidden lg:inline">{pageInfo.title}</span>
+          </h1>
         )}
       </div>
 
