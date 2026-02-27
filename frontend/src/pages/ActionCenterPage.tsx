@@ -20,6 +20,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle, XCircle, RefreshCw, Search, Clock, Zap, ExternalLink } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -162,22 +163,13 @@ export function ActionCenterPage() {
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           {/* Header */}
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Zap className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Action Center</h1>
-                <p className="text-sm text-muted-foreground">
-                  Review and respond to workflow requests
-                </p>
-              </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {pendingCount > 0 && (
+                <Badge variant="default" className="text-base px-3 py-1">
+                  {pendingCount} pending
+                </Badge>
+              )}
             </div>
-            {pendingCount > 0 && (
-              <Badge variant="default" className="text-base px-3 py-1">
-                {pendingCount} pending
-              </Badge>
-            )}
           </div>
 
           {/* Filters */}
@@ -369,15 +361,16 @@ export function ActionCenterPage() {
                   {!isLoading && !hasData && (
                     <TableRow>
                       <TableCell colSpan={7}>
-                        <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
-                          <Zap className="h-12 w-12 text-muted-foreground/30" />
-                          <p className="font-medium">No pending actions</p>
-                          <p className="text-sm text-muted-foreground max-w-lg">
-                            {statusFilter === 'pending'
+                        <EmptyState
+                          icon={Zap}
+                          title="No pending actions"
+                          description={
+                            statusFilter === 'pending'
                               ? 'All requests have been handled. Check back later or view all statuses.'
-                              : 'No requests match your filters. Try adjusting the search or status filter.'}
-                          </p>
-                        </div>
+                              : 'No requests match your filters. Try adjusting the search or status filter.'
+                          }
+                          className="py-10"
+                        />
                       </TableCell>
                     </TableRow>
                   )}

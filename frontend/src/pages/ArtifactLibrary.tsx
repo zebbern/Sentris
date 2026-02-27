@@ -1,6 +1,25 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, RefreshCw, Search, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Download,
+  FileBox,
+  RefreshCw,
+  Search,
+  Copy,
+  ExternalLink,
+  Trash2,
+} from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   useArtifactLibrary,
   useDownloadArtifact,
@@ -65,12 +84,6 @@ export function ArtifactLibrary() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <div className="mb-4 md:mb-8">
-          <p className="text-sm md:text-base text-muted-foreground">
-            Browse artifacts saved across workflow runs and reuse them in new automations.
-          </p>
-        </div>
-
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <form onSubmit={handleSearch} className="flex items-center gap-2">
@@ -108,42 +121,76 @@ export function ArtifactLibrary() {
 
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
           {libraryLoading ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Loading artifacts…
-            </div>
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow className="text-xs uppercase text-muted-foreground">
+                  <TableHead className="min-w-[150px]">Name</TableHead>
+                  <TableHead className="min-w-[150px] hidden sm:table-cell">Workflow</TableHead>
+                  <TableHead className="min-w-[100px] hidden sm:table-cell">Run</TableHead>
+                  <TableHead className="min-w-[60px]">Size</TableHead>
+                  <TableHead className="min-w-[100px] hidden lg:table-cell">Created</TableHead>
+                  <TableHead className="min-w-[120px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={`skeleton-${idx}`}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[130px]" />
+                      <Skeleton className="h-3 w-[80px] mt-1" />
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Skeleton className="h-4 w-[120px]" />
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Skeleton className="h-4 w-[70px]" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-[50px]" />
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <Skeleton className="h-4 w-[100px]" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Skeleton className="h-8 w-[60px]" />
+                        <Skeleton className="h-8 w-[80px]" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           ) : libraryError ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-destructive">
-              <span>{libraryError}</span>
-              <Button type="button" variant="outline" size="sm" onClick={handleRefresh}>
-                Try again
-              </Button>
-            </div>
+            <EmptyState
+              icon={AlertTriangle}
+              title="Failed to load artifacts"
+              description={libraryError}
+              action={
+                <Button type="button" variant="outline" size="sm" onClick={handleRefresh}>
+                  Try again
+                </Button>
+              }
+            />
           ) : library.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-              <span>No artifacts found.</span>
-              <p className="text-center text-xs text-muted-foreground">
-                Run workflows with artifact saving enabled to populate this library.
-              </p>
-            </div>
+            <EmptyState
+              icon={FileBox}
+              title="No artifacts found"
+              description="Run workflows with artifact saving enabled to populate this library."
+            />
           ) : (
-            <table className="w-full border-separate border-spacing-0 text-sm min-w-[600px]">
-              <thead className="sticky top-0 bg-background shadow-sm">
-                <tr className="text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-3 md:px-6 py-3 font-medium min-w-[150px]">Name</th>
-                  <th className="px-3 md:px-4 py-3 font-medium min-w-[150px] hidden sm:table-cell">
-                    Workflow
-                  </th>
-                  <th className="px-3 md:px-4 py-3 font-medium min-w-[100px] hidden sm:table-cell">
-                    Run
-                  </th>
-                  <th className="px-3 md:px-4 py-3 font-medium min-w-[60px]">Size</th>
-                  <th className="px-3 md:px-4 py-3 font-medium min-w-[100px] hidden lg:table-cell">
-                    Created
-                  </th>
-                  <th className="px-3 md:px-4 py-3 font-medium min-w-[120px] text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow className="text-xs uppercase text-muted-foreground">
+                  <TableHead className="min-w-[150px]">Name</TableHead>
+                  <TableHead className="min-w-[150px] hidden sm:table-cell">Workflow</TableHead>
+                  <TableHead className="min-w-[100px] hidden sm:table-cell">Run</TableHead>
+                  <TableHead className="min-w-[60px]">Size</TableHead>
+                  <TableHead className="min-w-[100px] hidden lg:table-cell">Created</TableHead>
+                  <TableHead className="min-w-[120px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {library.map((artifact) => (
                   <ArtifactLibraryRow
                     key={artifact.id}
@@ -170,8 +217,8 @@ export function ArtifactLibrary() {
                     isDownloading={downloadArtifactMutation.isPending}
                   />
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           )}
         </div>
       </div>
@@ -201,8 +248,8 @@ function ArtifactLibraryRow({
   const remoteUploads = getRemoteUploads(artifact);
 
   return (
-    <tr className="border-b last:border-none">
-      <td className="px-3 md:px-6 py-3 md:py-4 align-top">
+    <TableRow>
+      <TableCell className="align-top">
         <div className="font-medium truncate max-w-[150px] md:max-w-none">{artifact.name}</div>
         <div className="text-[10px] md:text-xs text-muted-foreground font-mono truncate max-w-[150px] md:max-w-none">
           {artifact.id}
@@ -247,24 +294,22 @@ function ArtifactLibraryRow({
             ))}
           </div>
         )}
-      </td>
-      <td className="px-3 md:px-4 py-3 md:py-4 align-top text-xs md:text-sm text-muted-foreground hidden sm:table-cell">
+      </TableCell>
+      <TableCell className="align-top text-xs md:text-sm text-muted-foreground hidden sm:table-cell">
         <span className="truncate max-w-[150px] block" title={workflowName}>
           {workflowName}
         </span>
-      </td>
-      <td className="px-3 md:px-4 py-3 md:py-4 align-top text-xs md:text-sm text-primary hidden sm:table-cell">
+      </TableCell>
+      <TableCell className="align-top text-xs md:text-sm text-primary hidden sm:table-cell">
         <Link to={`/runs/${artifact.runId}`} className="hover:underline font-mono">
           {artifact.runId.substring(0, 8)}…
         </Link>
-      </td>
-      <td className="px-3 md:px-4 py-3 md:py-4 align-top text-xs md:text-sm">
-        {formatBytes(artifact.size)}
-      </td>
-      <td className="px-3 md:px-4 py-3 md:py-4 align-top text-xs md:text-sm text-muted-foreground hidden lg:table-cell">
+      </TableCell>
+      <TableCell className="align-top text-xs md:text-sm">{formatBytes(artifact.size)}</TableCell>
+      <TableCell className="align-top text-xs md:text-sm text-muted-foreground hidden lg:table-cell">
         {formatTimestamp(artifact.createdAt)}
-      </td>
-      <td className="px-3 md:px-4 py-3 md:py-4 align-top text-left">
+      </TableCell>
+      <TableCell className="align-top">
         <div className="flex flex-wrap justify-start gap-1 md:gap-2">
           <Button
             type="button"
@@ -293,7 +338,7 @@ function ArtifactLibraryRow({
             <span className="hidden md:inline">{isDownloading ? 'Downloading…' : 'Download'}</span>
           </Button>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }

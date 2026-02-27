@@ -22,6 +22,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Workflow, AlertCircle, Trash2, Info, GripVertical } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { api, type WorkflowSummary } from '@/services/api';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
@@ -290,15 +291,17 @@ export function WorkflowList() {
             </Button>
           </div>
         ) : workflows.length === 0 ? (
-          <div className="text-center py-8 md:py-12 border rounded-lg bg-card">
-            <Workflow className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-3 md:mb-4 text-muted-foreground" />
-            <h3 className="text-base md:text-lg font-semibold mb-2">No workflows yet</h3>
-            <p className="text-sm md:text-base text-muted-foreground mb-4 px-4">
-              Create your first workflow to get started
-            </p>
-            <Button onClick={handleCreateWorkflow} disabled={isReadOnly} size="default">
-              Create Workflow
-            </Button>
+          <div className="border rounded-lg bg-card">
+            <EmptyState
+              icon={Workflow}
+              title="No workflows yet"
+              description="Create your first workflow to get started"
+              action={
+                <Button onClick={handleCreateWorkflow} disabled={isReadOnly} size="default">
+                  Create Workflow
+                </Button>
+              }
+            />
           </div>
         ) : (
           <div className="border rounded-lg bg-card overflow-hidden">

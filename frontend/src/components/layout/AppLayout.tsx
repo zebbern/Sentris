@@ -130,10 +130,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     const isSettingsPage = settingsItems.some(
       (item) => location.pathname === item.href || location.pathname.startsWith(item.href + '/'),
     );
-    if (isSettingsPage) {
+    if (isSettingsPage && !settingsOpen) {
       setSettingsOpen(true);
     }
-  }, [location.pathname, settingsItems]);
+  }, [location.pathname, settingsOpen]);
 
   // Set up sidebar close callback for mobile component placement
   useEffect(() => {

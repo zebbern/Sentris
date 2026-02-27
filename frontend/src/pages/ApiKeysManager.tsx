@@ -20,7 +20,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Copy, Trash2, ShieldOff, AlertTriangle } from 'lucide-react';
+import { Copy, Trash2, ShieldOff, AlertTriangle, Key } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   useApiKeys,
   useCreateApiKey,
@@ -170,12 +172,6 @@ export function ApiKeysManager() {
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8">
-          <div>
-            <h1 className="text-xl md:text-2xl font-semibold tracking-tight">API Keys</h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Manage API keys for programmatic access to ShipSec.
-            </p>
-          </div>
           <Button
             onClick={() => setIsCreateOpen(true)}
             disabled={isReadOnly}
@@ -213,15 +209,44 @@ export function ApiKeysManager() {
               </TableHeader>
               <TableBody>
                 {loading && apiKeys.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center">
-                      Loading...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <TableRow key={`skeleton-${idx}`}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-[120px]" />
+                        <Skeleton className="h-3 w-[80px] mt-1" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-[60px]" />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="flex gap-1">
+                          <Skeleton className="h-5 w-[70px]" />
+                          <Skeleton className="h-5 w-[50px]" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-[60px]" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-[80px]" />
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <Skeleton className="h-4 w-[80px]" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Skeleton className="h-8 w-8 ml-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : apiKeys.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                      No API keys found.
+                    <TableCell colSpan={7}>
+                      <EmptyState
+                        icon={Key}
+                        title="No API keys"
+                        description="Create your first API key to enable programmatic access."
+                        className="py-10"
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (

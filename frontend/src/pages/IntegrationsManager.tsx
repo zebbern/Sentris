@@ -13,8 +13,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  AlertCircle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   Check,
   Copy,
   KeyRound,
@@ -24,6 +32,7 @@ import {
   RefreshCcw,
   Trash2,
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 import type { components } from '@shipsec/backend-client';
 import {
@@ -269,13 +278,6 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-8 px-4">
-        <div className="mb-8">
-          <p className="text-muted-foreground">
-            Manage OAuth tokens for external providers. Connections are encrypted and can be
-            refreshed or revoked at any time.
-          </p>
-        </div>
-
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -288,36 +290,27 @@ export function IntegrationsManager() {
           </div>
 
           {connections.length === 0 ? (
-            <div className="border rounded-lg p-6 text-center bg-muted/30">
-              <AlertCircle className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-              <h3 className="text-lg font-medium">No active connections yet</h3>
-              <p className="text-sm text-muted-foreground">
-                Connect a provider below to start using OAuth-protected APIs in your workflows.
-              </p>
+            <div className="border rounded-lg bg-muted/30">
+              <EmptyState
+                icon={Plug}
+                title="No active connections yet"
+                description="Connect a provider below to start using OAuth-protected APIs in your workflows."
+                className="py-10"
+              />
             </div>
           ) : (
             <div className="overflow-x-auto border rounded-lg">
-              <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/40">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Provider
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Scopes
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                      Expires
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Scopes</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {connections.map((connection) => {
                     const isRefreshing = refreshingConnectionId === connection.id;
                     const isDeleting = deletingConnectionId === connection.id;
@@ -325,20 +318,20 @@ export function IntegrationsManager() {
                     const canRefresh = connection.supportsRefresh && connection.hasRefreshToken;
 
                     return (
-                      <tr key={connection.id} className="bg-background">
-                        <td className="px-4 py-3">
+                      <TableRow key={connection.id}>
+                        <TableCell>
                           <div className="font-medium">{connection.providerName}</div>
                           <div className="text-xs text-muted-foreground">{connection.userId}</div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge
                             variant={connection.status === 'active' ? 'secondary' : 'destructive'}
                             className="uppercase tracking-wide"
                           >
                             {connection.status}
                           </Badge>
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell>
                           <div className="flex flex-wrap gap-2">
                             {connection.scopes.map((scope) => (
                               <Badge key={scope} variant="outline" className="text-[11px]">
@@ -349,11 +342,11 @@ export function IntegrationsManager() {
                               <span className="text-xs text-muted-foreground">(none)</span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-muted-foreground">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                           {formatTimestamp(connection.expiresAt ?? null)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="ghost"
@@ -389,12 +382,12 @@ export function IntegrationsManager() {
                               Reconnect
                             </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </section>
@@ -566,7 +559,27 @@ export function IntegrationsManager() {
           </div>
 
           {(loadingProviders || loadingConnections) && (
-            <p className="text-sm text-muted-foreground mt-4">Loading provider catalog…</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div
+                  key={`skeleton-${idx}`}
+                  className="border rounded-lg p-5 bg-card flex flex-col gap-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-[140px]" />
+                      <Skeleton className="h-3 w-[200px]" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-5 w-[60px]" />
+                    <Skeleton className="h-5 w-[50px]" />
+                  </div>
+                  <Skeleton className="h-9 w-[100px]" />
+                </div>
+              ))}
+            </div>
           )}
         </section>
       </div>

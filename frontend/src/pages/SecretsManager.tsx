@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { KeyRound } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -346,12 +357,6 @@ export function SecretsManager() {
           </div>
         )}
 
-        <div className="mb-4 md:mb-8">
-          <p className="text-sm md:text-base text-muted-foreground">
-            Store API keys, credentials, and tokens for use in workflows and security components.
-          </p>
-        </div>
-
         <div className="grid gap-4 md:gap-6 lg:grid-cols-[2fr,3fr]">
           <div className="border rounded-lg bg-card p-4 md:p-6 space-y-4">
             <div>
@@ -468,33 +473,74 @@ export function SecretsManager() {
             )}
 
             {loading && secrets.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Loading secrets…</div>
-            ) : secrets.length === 0 ? (
-              <div className="text-sm text-muted-foreground">
-                No secrets yet. Use the form to create your first secret.
+              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-muted-foreground">
+                      <TableHead className="min-w-[120px]">Name</TableHead>
+                      <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
+                      <TableHead className="min-w-[120px] hidden md:table-cell">
+                        Active Version
+                      </TableHead>
+                      <TableHead className="min-w-[100px] hidden lg:table-cell">Updated</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <TableRow key={`skeleton-${idx}`}>
+                        <TableCell>
+                          <Skeleton className="h-4 w-[120px]" />
+                          <Skeleton className="h-3 w-[80px] mt-1" />
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <div className="flex gap-1">
+                            <Skeleton className="h-5 w-[50px]" />
+                            <Skeleton className="h-5 w-[40px]" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Skeleton className="h-4 w-[60px]" />
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Skeleton className="h-4 w-[100px]" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <Skeleton className="h-8 w-[50px]" />
+                            <Skeleton className="h-8 w-[60px]" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
+            ) : secrets.length === 0 ? (
+              <EmptyState
+                icon={KeyRound}
+                title="No secrets yet"
+                description="Store and manage sensitive values like API keys, credentials, and tokens for use in workflows."
+                className="py-12"
+              />
             ) : (
               <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="py-2 pr-4 font-medium min-w-[120px]">Name</th>
-                      <th className="py-2 pr-4 font-medium min-w-[100px] hidden sm:table-cell">
-                        Tags
-                      </th>
-                      <th className="py-2 pr-4 font-medium min-w-[120px] hidden md:table-cell">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="text-muted-foreground">
+                      <TableHead className="min-w-[120px]">Name</TableHead>
+                      <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
+                      <TableHead className="min-w-[120px] hidden md:table-cell">
                         Active Version
-                      </th>
-                      <th className="py-2 pr-4 font-medium min-w-[100px] hidden lg:table-cell">
-                        Updated
-                      </th>
-                      <th className="py-2 font-medium text-right min-w-[100px]">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                      <TableHead className="min-w-[100px] hidden lg:table-cell">Updated</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {secrets.map((secret) => (
-                      <tr key={secret.id} className="border-t last:border-b">
-                        <td className="py-3 pr-4 align-top">
+                      <TableRow key={secret.id}>
+                        <TableCell className="align-top">
                           <div className="font-medium truncate max-w-[150px] md:max-w-none">
                             {secret.name}
                           </div>
@@ -506,8 +552,8 @@ export function SecretsManager() {
                               {secret.description}
                             </div>
                           )}
-                        </td>
-                        <td className="py-3 pr-4 align-top hidden sm:table-cell">
+                        </TableCell>
+                        <TableCell className="align-top hidden sm:table-cell">
                           <div className="flex flex-wrap gap-1">
                             {secret.tags?.length ? (
                               secret.tags.map((tag) => (
@@ -519,8 +565,8 @@ export function SecretsManager() {
                               <span className="text-xs text-muted-foreground">—</span>
                             )}
                           </div>
-                        </td>
-                        <td className="py-3 pr-4 align-top hidden md:table-cell">
+                        </TableCell>
+                        <TableCell className="align-top hidden md:table-cell">
                           {secret.activeVersion ? (
                             <div>
                               <div className="font-mono text-xs">
@@ -533,13 +579,13 @@ export function SecretsManager() {
                           ) : (
                             <span className="text-xs text-muted-foreground">No active version</span>
                           )}
-                        </td>
-                        <td className="py-3 pr-4 align-top hidden lg:table-cell">
+                        </TableCell>
+                        <TableCell className="align-top hidden lg:table-cell">
                           <div className="text-xs text-muted-foreground">
                             {formatDate(secret.updatedAt)}
                           </div>
-                        </td>
-                        <td className="py-3 align-top">
+                        </TableCell>
+                        <TableCell className="align-top">
                           <div className="flex justify-end gap-1 md:gap-2">
                             <Button
                               variant="outline"
@@ -562,11 +608,11 @@ export function SecretsManager() {
                               Delete
                             </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>

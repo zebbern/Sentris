@@ -101,6 +101,22 @@ export function AppTopBar({
       };
     }
 
+    if (location.pathname === '/action-center') {
+      return {
+        title: 'Action Center',
+        shortTitle: 'Actions',
+        subtitle: 'Review and respond to pending items',
+      };
+    }
+
+    if (location.pathname === '/mcp-library') {
+      return {
+        title: 'MCP Servers',
+        shortTitle: 'MCP',
+        subtitle: 'Discover and manage MCP server configurations',
+      };
+    }
+
     if (location.pathname === '/analytics-settings') {
       return {
         title: 'Analytics Settings',
@@ -173,10 +189,17 @@ export function AppTopBar({
           </div>
         ) : (
           /* Desktop: Full page title — responsive sizing for tablet */
-          <h1 className="text-base lg:text-xl font-semibold truncate">
-            <span className="lg:hidden">{pageInfo.shortTitle || pageInfo.title}</span>
-            <span className="hidden lg:inline">{pageInfo.title}</span>
-          </h1>
+          <div className="min-w-0">
+            <h1 className="text-base lg:text-xl font-semibold truncate">
+              <span className="lg:hidden">{pageInfo.shortTitle || pageInfo.title}</span>
+              <span className="hidden lg:inline">{pageInfo.title}</span>
+            </h1>
+            {pageInfo.subtitle && (
+              <p className="text-sm text-muted-foreground truncate hidden lg:block">
+                {pageInfo.subtitle}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

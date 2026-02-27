@@ -83,51 +83,74 @@ export function AdminLoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8 shadow-lg">
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold">Admin Login</h1>
-          <p className="text-sm text-muted-foreground">Enter your admin credentials to continue</p>
+      <div className="w-full max-w-md">
+        {/* Branding */}
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <img
+            src="/favicon.ico"
+            alt="ShipSec Studio"
+            className="h-12 w-12"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight">ShipSec Studio</h1>
+            <p className="text-sm text-muted-foreground">Security Workflow Platform</p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
-              required
-              autoFocus
-              autoComplete="username"
-              disabled={isLoading}
-            />
+        {/* Login card */}
+        <div className="space-y-6 rounded-lg border bg-card p-8 shadow-xl">
+          <div className="space-y-1 text-center">
+            <h2 className="text-lg font-semibold">Admin Login</h2>
+            <p className="text-sm text-muted-foreground">
+              Enter your admin credentials to continue
+            </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              required
-              autoComplete="current-password"
-              disabled={isLoading}
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
+                required
+                autoFocus
+                autoComplete="username"
+                disabled={isLoading}
+              />
+            </div>
 
-          {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                autoComplete="current-password"
+                disabled={isLoading}
+              />
+            </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            <LogIn className="mr-2 h-4 w-4" />
-            {isLoading ? 'Logging in...' : 'Login'}
-          </Button>
-        </form>
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              <LogIn className="mr-2 h-4 w-4" />
+              {isLoading ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

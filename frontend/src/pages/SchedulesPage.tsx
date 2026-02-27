@@ -20,7 +20,17 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PauseCircle, PlayCircle, RefreshCw, Search, Edit3, Plus, Trash2 } from 'lucide-react';
+import {
+  PauseCircle,
+  PlayCircle,
+  RefreshCw,
+  Search,
+  Edit3,
+  Plus,
+  Trash2,
+  CalendarClock,
+} from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useSchedules,
@@ -494,13 +504,12 @@ export function SchedulesPage() {
                   {!isLoading && !hasData && (
                     <TableRow>
                       <TableCell colSpan={7}>
-                        <div className="flex flex-col items-center justify-center py-10 text-center space-y-2">
-                          <p className="font-medium">No schedules found</p>
-                          <p className="text-sm text-muted-foreground max-w-lg">
-                            Create your first cadence with the “New schedule” button or tweak the
-                            filters above.
-                          </p>
-                        </div>
+                        <EmptyState
+                          icon={CalendarClock}
+                          title="No schedules found"
+                          description='Create your first cadence with the "New schedule" button or adjust the filters above.'
+                          className="py-10"
+                        />
                       </TableCell>
                     </TableRow>
                   )}
