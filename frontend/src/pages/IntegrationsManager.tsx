@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +78,7 @@ function getProviderConnection(
 }
 
 export function IntegrationsManager() {
+  useDocumentTitle('Integrations');
   const navigate = useNavigate();
   const location = useLocation();
   const userId = getCurrentUserId();

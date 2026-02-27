@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, ArrowLeft } from 'lucide-react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function NotFound() {
+  useDocumentTitle('Not Found');
   const navigate = useNavigate();
 
   return (

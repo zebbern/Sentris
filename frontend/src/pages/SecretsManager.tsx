@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -107,6 +108,7 @@ function formatDate(iso: string) {
 }
 
 export function SecretsManager() {
+  useDocumentTitle('Secrets');
   const roles = useAuthStore((state) => state.roles);
   const canManageSecrets = hasAdminRole(roles);
   const isReadOnly = !canManageSecrets;

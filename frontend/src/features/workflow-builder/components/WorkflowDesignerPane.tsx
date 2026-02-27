@@ -13,7 +13,9 @@ import { WorkflowSchedulesProvider } from '@/features/workflow-builder/contexts/
 import { useWorkflowSchedules } from '@/features/workflow-builder/hooks/useWorkflowSchedules';
 import { ScheduleEditorDrawer } from '@/components/schedules/ScheduleEditorDrawer';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { API_V1_URL } from '@/services/api';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -50,6 +52,7 @@ export function WorkflowDesignerPane({
 }: WorkflowDesignerPaneProps) {
   const [hasSelectedNode, setHasSelectedNode] = useState(false);
   const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
   const {
     schedules,
     isLoading,
@@ -67,6 +70,7 @@ export function WorkflowDesignerPane({
   } = useWorkflowSchedules({
     workflowId,
     toast,
+    confirmFn: confirm,
   });
 
   const { setSchedulesPanelOpen } = useWorkflowUiStore();
@@ -271,6 +275,7 @@ export function WorkflowDesignerPane({
             onSaved={handleScheduleSaved}
           />
         ) : null}
+        <ConfirmDialog {...dialogProps} />
       </div>
     </WorkflowSchedulesProvider>
   );

@@ -15,6 +15,12 @@ interface ToastParams {
 interface UseWorkflowSchedulesOptions {
   workflowId?: string | null;
   toast: (params: ToastParams) => void;
+  /** Optional async confirm function. If omitted, deletes proceed without confirmation. */
+  confirmFn?: (opts: {
+    title: string;
+    description: string;
+    confirmLabel?: string;
+  }) => Promise<boolean>;
 }
 
 interface UseWorkflowSchedulesResult {
@@ -40,6 +46,7 @@ interface UseWorkflowSchedulesResult {
 export function useWorkflowSchedules({
   workflowId,
   toast,
+  confirmFn,
 }: UseWorkflowSchedulesOptions): UseWorkflowSchedulesResult {
   const queryClient = useQueryClient();
   const {
@@ -112,12 +119,13 @@ export function useWorkflowSchedules({
 
   const handleScheduleDelete = useCallback(
     async (schedule: WorkflowSchedule) => {
-      if (
-        !confirm(
-          `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
-        )
-      ) {
-        return;
+      if (confirmFn) {
+        const ok = await confirmFn({
+          title: 'Delete schedule',
+          description: `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
+          confirmLabel: 'Delete',
+        });
+        if (!ok) return;
       }
       try {
         await api.schedules.delete(schedule.id);
@@ -135,7 +143,7 @@ export function useWorkflowSchedules({
         throw err;
       }
     },
-    [refreshSchedules, toast],
+    [confirmFn, refreshSchedules, toast],
   );
 
   return {

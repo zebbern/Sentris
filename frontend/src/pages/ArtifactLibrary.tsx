@@ -29,9 +29,12 @@ import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { ArtifactMetadata } from '@shipsec/shared';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -51,8 +54,10 @@ const formatTimestamp = (value: string) => {
 };
 
 export function ArtifactLibrary() {
+  useDocumentTitle('Artifacts');
   const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
+  const { confirm, dialogProps } = useConfirmDialog();
 
   const searchFilter = searchQuery.trim() || undefined;
   const {
@@ -197,7 +202,14 @@ export function ArtifactLibrary() {
                     artifact={artifact}
                     workflowName={workflows[artifact.workflowId] || 'Unknown Workflow'}
                     onDownload={() => downloadArtifactMutation.mutate({ artifact })}
-                    onDelete={() => deleteArtifactMutation.mutate(artifact.id)}
+                    onDelete={async () => {
+                      const ok = await confirm({
+                        title: 'Delete artifact',
+                        description: 'Are you sure you want to delete this artifact?',
+                        confirmLabel: 'Delete',
+                      });
+                      if (ok) deleteArtifactMutation.mutate(artifact.id);
+                    }}
                     isDeleting={
                       deleteArtifactMutation.isPending &&
                       deleteArtifactMutation.variables === artifact.id
@@ -221,6 +233,7 @@ export function ArtifactLibrary() {
             </Table>
           )}
         </div>
+        <ConfirmDialog {...dialogProps} />
       </div>
     </div>
   );
@@ -317,9 +330,7 @@ function ArtifactLibraryRow({
             size="sm"
             className="gap-1 md:gap-2 h-8 px-2 md:px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={() => {
-              if (confirm('Are you sure you want to delete this artifact?')) {
-                onDelete();
-              }
+              onDelete();
             }}
             disabled={isDeleting}
           >

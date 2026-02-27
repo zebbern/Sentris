@@ -23,14 +23,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Skeleton } from '@/components/ui/skeleton';
 import { Workflow, AlertCircle, Trash2, Info, GripVertical } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { api, type WorkflowSummary } from '@/services/api';
+import { type WorkflowSummary } from '@/services/api';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
-import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
-import { queryClient } from '@/lib/queryClient';
-import { queryKeys } from '@/lib/queryKeys';
+import { useWorkflowsSummary, useDeleteWorkflow } from '@/hooks/queries/useWorkflowQueries';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   DndContext,
   closestCenter,
@@ -81,6 +80,7 @@ function applyOrder<T extends { id: string }>(items: T[], savedOrder: string[]):
 }
 
 export function WorkflowList() {
+  useDocumentTitle('Workflows');
   const navigate = useNavigate();
   const { data: rawWorkflows = EMPTY_WORKFLOWS, isLoading, error, refetch } = useWorkflowsSummary();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
@@ -91,8 +91,7 @@ export function WorkflowList() {
   const isReadOnly = !canManageWorkflows;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowSummary | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const deleteWorkflow = useDeleteWorkflow();
 
   // Sync ordered workflows from query data
   useEffect(() => {
@@ -133,7 +132,7 @@ export function WorkflowList() {
       return;
     }
     setWorkflowToDelete(workflow);
-    setDeleteError(null);
+    deleteWorkflow.reset();
     setIsDeleteDialogOpen(true);
   };
 
@@ -141,26 +140,19 @@ export function WorkflowList() {
     setIsDeleteDialogOpen(open);
     if (!open) {
       setWorkflowToDelete(null);
-      setDeleteError(null);
+      deleteWorkflow.reset();
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!workflowToDelete || !canManageWorkflows) return;
 
-    setIsDeleting(true);
-    setDeleteError(null);
-
     try {
-      await api.workflows.delete(workflowToDelete.id);
+      await deleteWorkflow.mutateAsync(workflowToDelete.id);
       setWorkflows((prev) => prev.filter((workflow) => workflow.id !== workflowToDelete.id));
-      queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
       handleDeleteDialogChange(false);
     } catch (err) {
       console.error('Failed to delete workflow:', err);
-      setDeleteError(err instanceof Error ? err.message : 'Failed to delete workflow');
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -369,7 +361,7 @@ export function WorkflowList() {
                           key={workflow.id}
                           workflow={workflow}
                           canManageWorkflows={canManageWorkflows}
-                          isDeleting={isDeleting}
+                          isDeleting={deleteWorkflow.isPending}
                           isLoading={isLoading}
                           formatDate={formatDate}
                           onRowClick={() => navigate(`/workflows/${workflow.id}`)}
@@ -402,19 +394,29 @@ export function WorkflowList() {
               <div className="text-xs text-muted-foreground">
                 ID: <span className="font-mono">{workflowToDelete?.id}</span>
               </div>
-              {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+              {deleteWorkflow.error && (
+                <p className="text-sm text-destructive">
+                  {deleteWorkflow.error instanceof Error
+                    ? deleteWorkflow.error.message
+                    : 'Failed to delete workflow'}
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleDeleteDialogChange(false)}
-                disabled={isDeleting}
+                disabled={deleteWorkflow.isPending}
               >
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>
-                {isDeleting ? 'Deleting…' : 'Delete workflow'}
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                disabled={deleteWorkflow.isPending}
+              >
+                {deleteWorkflow.isPending ? 'Deleting…' : 'Delete workflow'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -475,7 +477,10 @@ function WorkflowRowItem({
       ref={setNodeRef}
       style={style}
       onClick={onRowClick}
-      className={cn('cursor-pointer transition-colors duration-150 hover:bg-accent/50 dark:hover:bg-accent/30', isDragging && 'bg-accent/50 shadow-lg')}
+      className={cn(
+        'cursor-pointer transition-colors duration-150 hover:bg-accent/50 dark:hover:bg-accent/30',
+        isDragging && 'bg-accent/50 shadow-lg',
+      )}
     >
       <TableCell className="w-10 px-2">
         <div

@@ -87,6 +87,7 @@ import {
 import { useMcpGroupsWithServers, useMcpGroupTemplates } from '@/hooks/queries/useMcpGroupQueries';
 import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   mcpGroupsApi,
   type McpGroupTemplateResponse,
@@ -95,6 +96,8 @@ import {
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import type { McpHealthStatus, CreateMcpServer } from '@shipsec/shared';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { MarkdownView } from '@/components/ui/markdown';
 import { env } from '@/config/env';
 
@@ -270,7 +273,9 @@ const INITIAL_FORM_DATA: ServerFormData = {
 };
 
 export function McpLibraryPage() {
+  useDocumentTitle('MCP Library');
   const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
   const [searchQuery, setSearchQuery] = useState('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<string | null>(null);
@@ -1134,8 +1139,12 @@ export function McpLibraryPage() {
   };
 
   const handleRemoveGroup = async (groupId: string, groupName: string) => {
-    const confirmed = window.confirm(`Remove ${groupName}? This will delete the group.`);
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: 'Remove group',
+      description: `Remove ${groupName}? This will delete the group.`,
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
 
     try {
       await mcpGroupsApi.deleteGroup(groupId);
@@ -2849,6 +2858,7 @@ export function McpLibraryPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

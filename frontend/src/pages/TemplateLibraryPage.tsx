@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -722,6 +723,7 @@ function TemplateDetailModal({
 // ---------------------------------------------------------------------------
 
 export function TemplateLibraryPage() {
+  useDocumentTitle('Templates');
   const navigate = useNavigate();
   const roles = useAuthStore((state) => state.roles);
   const canManageWorkflows = hasAdminRole(roles);

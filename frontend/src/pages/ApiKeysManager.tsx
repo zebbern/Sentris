@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -70,6 +71,7 @@ function truncateKey(keyHint: string) {
 }
 
 export function ApiKeysManager() {
+  useDocumentTitle('API Keys');
   const roles = useAuthStore((state) => state.roles);
   const canManageKeys = hasAdminRole(roles);
   const isReadOnly = !canManageKeys;

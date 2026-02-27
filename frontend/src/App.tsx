@@ -17,6 +17,7 @@ import { PostHogClerkBridge } from '@/features/analytics/PostHogClerkBridge';
 import { useCommandPaletteKeyboard } from '@/features/command-palette/useCommandPaletteKeyboard';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 // Lazy-loaded page components
 const WorkflowList = lazy(() =>
@@ -142,42 +143,56 @@ function App() {
                 <AppLayout>
                   <ProtectedRoute>
                     <Suspense fallback={<PageSkeleton />}>
-                      <Routes>
-                        <Route path="/" element={<WorkflowList />} />
-                        <Route path="/templates" element={<TemplateLibraryPage />} />
-                        <Route
-                          path="/workflows/:id"
-                          element={<WorkflowBuilder />}
-                        />
-                        <Route
-                          path="/workflows/:id/runs"
-                          element={<WorkflowBuilder />}
-                        />
-                        <Route
-                          path="/workflows/:id/runs/:runId"
-                          element={<WorkflowBuilder />}
-                        />
-                        <Route path="/secrets" element={<SecretsManager />} />
-                        <Route path="/api-keys" element={<ApiKeysManager />} />
-                        <Route path="/integrations" element={<IntegrationsManager />} />
-                        <Route path="/webhooks" element={<WebhooksPage />} />
-                        <Route path="/webhooks/new" element={<WebhookEditorPage />} />
-                        <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
-                        <Route path="/webhooks/:id/deliveries" element={<WebhookEditorPage />} />
-                        <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
-                        <Route path="/schedules" element={<SchedulesPage />} />
-                        <Route path="/action-center" element={<ActionCenterPage />} />
-                        <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
-                        <Route path="/settings/*" element={<SettingsPage />} />
-                        <Route path="/artifacts" element={<ArtifactLibrary />} />
-                        <Route path="/mcp-library" element={<McpLibraryPage />} />
-                        <Route path="/runs/:runId" element={<RunRedirect />} />
-                        <Route
-                          path="/integrations/callback/:provider"
-                          element={<IntegrationCallback />}
-                        />
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
+                      <ErrorBoundary>
+                        <Routes>
+                          <Route path="/" element={<WorkflowList />} />
+                          <Route path="/templates" element={<TemplateLibraryPage />} />
+                          <Route
+                            path="/workflows/:id"
+                            element={
+                              <ErrorBoundary>
+                                <WorkflowBuilder />
+                              </ErrorBoundary>
+                            }
+                          />
+                          <Route
+                            path="/workflows/:id/runs"
+                            element={
+                              <ErrorBoundary>
+                                <WorkflowBuilder />
+                              </ErrorBoundary>
+                            }
+                          />
+                          <Route
+                            path="/workflows/:id/runs/:runId"
+                            element={
+                              <ErrorBoundary>
+                                <WorkflowBuilder />
+                              </ErrorBoundary>
+                            }
+                          />
+                          <Route path="/secrets" element={<SecretsManager />} />
+                          <Route path="/api-keys" element={<ApiKeysManager />} />
+                          <Route path="/integrations" element={<IntegrationsManager />} />
+                          <Route path="/webhooks" element={<WebhooksPage />} />
+                          <Route path="/webhooks/new" element={<WebhookEditorPage />} />
+                          <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
+                          <Route path="/webhooks/:id/deliveries" element={<WebhookEditorPage />} />
+                          <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
+                          <Route path="/schedules" element={<SchedulesPage />} />
+                          <Route path="/action-center" element={<ActionCenterPage />} />
+                          <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
+                          <Route path="/settings/*" element={<SettingsPage />} />
+                          <Route path="/artifacts" element={<ArtifactLibrary />} />
+                          <Route path="/mcp-library" element={<McpLibraryPage />} />
+                          <Route path="/runs/:runId" element={<RunRedirect />} />
+                          <Route
+                            path="/integrations/callback/:provider"
+                            element={<IntegrationCallback />}
+                          />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </ErrorBoundary>
                     </Suspense>
                   </ProtectedRoute>
                 </AppLayout>

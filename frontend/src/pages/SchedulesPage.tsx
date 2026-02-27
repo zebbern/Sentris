@@ -32,7 +32,10 @@ import {
 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   useSchedules,
   usePauseSchedule,
@@ -79,7 +82,9 @@ const getWorkflowName = (workflowId: string, workflows: WorkflowOption[]): strin
 };
 
 export function SchedulesPage() {
+  useDocumentTitle('Schedules');
   const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [actionState, setActionState] = useState<Record<string, 'run' | 'toggle'>>({});
@@ -247,11 +252,12 @@ export function SchedulesPage() {
   };
 
   const handleDelete = async (schedule: WorkflowSchedule) => {
-    if (
-      !confirm(`Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`)
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete schedule',
+      description: `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     markAction(schedule.id, 'run');
     try {
       await deleteScheduleMutation.mutateAsync(schedule.id);
@@ -531,6 +537,7 @@ export function SchedulesPage() {
         onClose={() => setEditorOpen(false)}
         onSaved={handleScheduleSaved}
       />
+      <ConfirmDialog {...dialogProps} />
     </TooltipProvider>
   );
 }

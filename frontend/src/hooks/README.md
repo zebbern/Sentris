@@ -6,20 +6,20 @@ Custom React hooks for reusable state logic and side effects.
 
 **All server-state data fetching uses TanStack Query hooks.** See `frontend/docs/state.md` for the full pattern.
 
-| File                       | Hooks                                                                                                                                    |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `useComponentQueries.ts`   | `useComponents` — Component catalogue with slug/id index                                                                                 |
-| `useWorkflowQueries.ts`    | `useWorkflowsList`, `useWorkflowsSummary`, `useWorkflow`, `useWorkflowRuntimeInputs` — Workflow metadata, detail + inputs                |
-| `useScheduleQueries.ts`    | `useSchedules`, `useCreateSchedule`, `useUpdateSchedule`, `usePauseSchedule`, `useResumeSchedule`, `useRunSchedule`, `useDeleteSchedule` |
-| `useWebhookQueries.ts`     | `useWebhooks`, `useWebhook`, `useWebhookDeliveries`, `useCreateWebhook`, `useUpdateWebhook`, `useDeleteWebhook`                          |
-| `useSecretQueries.ts`      | `useSecrets` — Secret summaries                                                                                                          |
-| `useApiKeyQueries.ts`      | `useApiKeys` — API key management                                                                                                        |
-| `useMcpGroupQueries.ts`    | `useMcpGroups`, `useMcpGroupServers`, `useMcpGroupTemplates`, `useSyncMcpGroupTemplates`                                                 |
-| `useHumanInputQueries.ts`  | `useHumanInputs`, `useInvalidateHumanInputs` — Action center                                                                             |
-| `useExecutionQueries.ts`   | `useExecutionNodeIO`, `useExecutionResult`, `useExecutionRun` — Execution data                                                           |
-| `useRunQueries.ts`         | `useRuns`, `useRunDetail`                                                                                                                |
-| `useArtifactQueries.ts`    | `useArtifactLibrary`, `useRunArtifacts`                                                                                                  |
-| `useIntegrationQueries.ts` | `useIntegrationProviders`, `useIntegrationConnections`, `useProviderConfig`                                                              |
+| File                       | Hooks                                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useComponentQueries.ts`   | `useComponents` — Component catalogue with slug/id index                                                                                                        |
+| `useWorkflowQueries.ts`    | `useWorkflowsList`, `useWorkflowsSummary`, `useWorkflow`, `useWorkflowRuntimeInputs`, `useDeleteWorkflow` — Workflow metadata, detail, inputs + delete mutation |
+| `useScheduleQueries.ts`    | `useSchedules`, `useCreateSchedule`, `useUpdateSchedule`, `usePauseSchedule`, `useResumeSchedule`, `useRunSchedule`, `useDeleteSchedule`                        |
+| `useWebhookQueries.ts`     | `useWebhooks`, `useWebhook`, `useWebhookDeliveries`, `useCreateWebhook`, `useUpdateWebhook`, `useDeleteWebhook`                                                 |
+| `useSecretQueries.ts`      | `useSecrets` — Secret summaries                                                                                                                                 |
+| `useApiKeyQueries.ts`      | `useApiKeys` — API key management                                                                                                                               |
+| `useMcpGroupQueries.ts`    | `useMcpGroups`, `useMcpGroupServers`, `useMcpGroupTemplates`, `useSyncMcpGroupTemplates`                                                                        |
+| `useHumanInputQueries.ts`  | `useHumanInputs`, `useInvalidateHumanInputs` — Action center                                                                                                    |
+| `useExecutionQueries.ts`   | `useExecutionNodeIO`, `useExecutionResult`, `useExecutionRun` — Execution data                                                                                  |
+| `useRunQueries.ts`         | `useRuns`, `useRunDetail`                                                                                                                                       |
+| `useArtifactQueries.ts`    | `useArtifactLibrary`, `useRunArtifacts`                                                                                                                         |
+| `useIntegrationQueries.ts` | `useIntegrationProviders`, `useIntegrationConnections`, `useProviderConfig`                                                                                     |
 
 ### Adding a New Query Hook
 

@@ -12,8 +12,14 @@ import {
   AlertTriangle,
   Code,
 } from 'lucide-react';
-import { api } from '@/services/api';
-import { useWebhook, useWebhookDeliveries } from '@/hooks/queries/useWebhookQueries';
+import {
+  useWebhook,
+  useWebhookDeliveries,
+  useCreateWebhook,
+  useUpdateWebhook,
+  useDeleteWebhook,
+  useTestWebhookScript,
+} from '@/hooks/queries/useWebhookQueries';
 import { useWorkflowsSummary, useWorkflowRuntimeInputs } from '@/hooks/queries/useWorkflowQueries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,8 +36,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import Editor, { loader } from '@monaco-editor/react';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { SaveButton } from '@/components/ui/save-button';
 import type { WebhookConfiguration, WebhookInputDefinition } from '@shipsec/shared';
 
@@ -63,6 +72,8 @@ export function WebhookEditorPage() {
   const location = useLocation();
   const { toast } = useToast();
   const isNew = !id || id === 'new';
+  useDocumentTitle(isNew ? 'New Webhook' : 'Edit Webhook');
+  const { confirm, dialogProps } = useConfirmDialog();
 
   // Get returnTo state for back button (if navigated from workflow webhooks sidebar)
   const navigationState = location.state as {
@@ -88,7 +99,13 @@ export function WebhookEditorPage() {
     }
   };
 
-  const [isSaving, setIsSaving] = useState(false);
+  // --- Mutation hooks ---
+  const createWebhook = useCreateWebhook();
+  const updateWebhook = useUpdateWebhook();
+  const deleteWebhook = useDeleteWebhook();
+  const testScriptMutation = useTestWebhookScript();
+
+  const isSaving = createWebhook.isPending || updateWebhook.isPending;
 
   // --- Query hooks for server data ---
   const {
@@ -166,8 +183,10 @@ export function WebhookEditorPage() {
   // Test State
   const [testPayload, setTestPayload] = useState('{\n  "message": "Hello World"\n}');
   const [testHeaders, setTestHeaders] = useState('{\n  "content-type": "application/json"\n}');
-  const [testResult, setTestResult] = useState<any>(null);
-  const [isTesting, setIsTesting] = useState(false);
+  const isTesting = testScriptMutation.isPending;
+  const testResult: Record<string, any> | null =
+    testScriptMutation.data ??
+    (testScriptMutation.error ? { error: String(testScriptMutation.error) } : null);
 
   // --- Runtime inputs query (reactive to form.workflowId) ---
   const { data: runtimeInputsData } = useWorkflowRuntimeInputs(form.workflowId || undefined);
@@ -195,20 +214,19 @@ export function WebhookEditorPage() {
   );
 
   const handleSave = async () => {
-    setIsSaving(true);
     try {
       const payload = {
         ...form,
-        expectedInputs: form.expectedInputs, // simplified for now
+        expectedInputs: form.expectedInputs,
       };
 
       if (isNew) {
-        const created = (await api.webhooks.create(payload)) as any;
+        const created = (await createWebhook.mutateAsync(payload)) as any;
         toast({ title: 'Webhook created' });
         setInitialForm(payload);
         navigate(`/webhooks/${created.id}`, { replace: true });
       } else {
-        await api.webhooks.update(id!, payload);
+        await updateWebhook.mutateAsync({ id: id!, payload });
         setInitialForm(payload);
         toast({ title: 'Webhook saved' });
       }
@@ -218,8 +236,6 @@ export function WebhookEditorPage() {
         description: String(error),
         variant: 'destructive',
       });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -240,29 +256,30 @@ export function WebhookEditorPage() {
   }, [handleSave, isDirty, isNew, isSaving]);
 
   const handleTest = async () => {
-    setIsTesting(true);
-    setTestResult(null);
+    testScriptMutation.reset();
     try {
       const payloadObj = JSON.parse(testPayload);
       const headersObj = JSON.parse(testHeaders);
 
-      const result = await api.webhooks.testScript({
-        script: form.parsingScript,
-        payload: payloadObj,
-        headers: headersObj,
+      await testScriptMutation.mutateAsync({
+        parsingScript: form.parsingScript,
+        testPayload: payloadObj,
+        testHeaders: headersObj,
       });
-      setTestResult(result);
-    } catch (error) {
-      setTestResult({ error: String(error) });
-    } finally {
-      setIsTesting(false);
+    } catch {
+      // Error is captured in testScriptMutation.error and displayed via testResult
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this webhook?')) return;
+    const ok = await confirm({
+      title: 'Delete webhook',
+      description: 'Are you sure you want to delete this webhook?',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
     try {
-      await api.webhooks.delete(id!);
+      await deleteWebhook.mutateAsync(id!);
       navigate('/webhooks');
     } catch (error) {
       toast({
@@ -661,6 +678,7 @@ export function WebhookEditorPage() {
           </TabsContent>
         </Tabs>
       </div>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }

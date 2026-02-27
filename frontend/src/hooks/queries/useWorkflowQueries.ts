@@ -1,4 +1,4 @@
-import { useQuery, skipToken } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -33,5 +33,16 @@ export function useWorkflowRuntimeInputs(workflowId: string | undefined) {
     queryFn: workflowId ? () => api.workflows.getRuntimeInputs(workflowId) : skipToken,
     staleTime: 30_000,
     ...(workflowId ? {} : { gcTime: 0 }),
+  });
+}
+
+export function useDeleteWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.workflows.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+      qc.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+    },
   });
 }

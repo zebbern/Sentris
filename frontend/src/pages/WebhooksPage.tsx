@@ -22,8 +22,11 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RefreshCw, Plus, Trash2, ExternalLink, Link2, Copy, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
   useWebhooks,
   useDeleteWebhook,
@@ -71,7 +74,9 @@ const getWorkflowName = (workflowId: string, workflows: WorkflowOption[]): strin
 const WEBHOOK_BASE_URL = env.VITE_API_URL || 'https://api.shipsec.ai';
 
 export function WebhooksPage() {
+  useDocumentTitle('Webhooks');
   const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,9 +178,12 @@ export function WebhooksPage() {
   const isActionBusy = (id: string) => Boolean(actionState[id]);
 
   const handleDelete = async (webhook: WebhookConfiguration) => {
-    if (!confirm(`Are you sure you want to delete the webhook "${webhook.name}"?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete webhook',
+      description: `Are you sure you want to delete the webhook "${webhook.name}"?`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
 
     setActionState((prev) => ({ ...prev, [webhook.id]: 'delete' }));
     try {
@@ -199,13 +207,12 @@ export function WebhooksPage() {
   };
 
   const handleRegeneratePath = async (webhook: WebhookConfiguration) => {
-    if (
-      !confirm(
-        `Are you sure you want to regenerate the URL for "${webhook.name}"? The old URL will stop working.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Regenerate URL',
+      description: `Are you sure you want to regenerate the URL for "${webhook.name}"? The old URL will stop working.`,
+      confirmLabel: 'Regenerate',
+    });
+    if (!ok) return;
 
     setActionState((prev) => ({ ...prev, [webhook.id]: 'regenerate' }));
     try {
@@ -487,6 +494,7 @@ export function WebhooksPage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog {...dialogProps} />
     </TooltipProvider>
   );
 }

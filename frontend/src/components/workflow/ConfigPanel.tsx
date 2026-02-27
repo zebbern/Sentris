@@ -30,6 +30,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { ParameterFieldWrapper } from './ParameterField';
 import { WebhookDetails } from './WebhookDetails';
@@ -283,6 +285,7 @@ export function ConfigPanel({
   onViewSchedules,
 }: ConfigPanelProps) {
   const isMobile = useIsMobile();
+  const { confirm: confirmDialog, dialogProps: confirmDialogProps } = useConfirmDialog();
   const { data: componentIndex, isLoading: loading } = useComponents();
   const getComponent = (ref: string) => {
     if (!componentIndex || !ref) return null;
@@ -647,7 +650,10 @@ export function ConfigPanel({
                 }}
               />
             ) : null}
-            <DynamicIcon name={component.icon || 'Box'} className={cn('h-6 w-6 text-primary', component.logo && 'hidden')} />
+            <DynamicIcon
+              name={component.icon || 'Box'}
+              className={cn('h-6 w-6 text-primary', component.logo && 'hidden')}
+            />
           </div>
           <div className="flex-1 min-w-0">
             {/* Node Name - editable for non-entry-point nodes */}
@@ -1380,14 +1386,13 @@ export function ConfigPanel({
                                   size="sm"
                                   variant="ghost"
                                   className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    if (
-                                      confirm(
-                                        `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
-                                      )
-                                    ) {
-                                      onScheduleDelete(schedule);
-                                    }
+                                  onClick={async () => {
+                                    const ok = await confirmDialog({
+                                      title: 'Delete schedule',
+                                      description: `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
+                                      confirmLabel: 'Delete',
+                                    });
+                                    if (ok) onScheduleDelete(schedule);
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -1465,6 +1470,7 @@ export function ConfigPanel({
           <span className="font-mono">{component.slug}</span>
         </div>
       </div>
+      <ConfirmDialog {...confirmDialogProps} />
     </div>
   );
 }

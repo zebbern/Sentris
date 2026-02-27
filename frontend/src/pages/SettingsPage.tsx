@@ -5,8 +5,10 @@ import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { AuditLogSettings } from '@/pages/settings/AuditLogSettings';
 import { cn } from '@/lib/utils';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function SettingsPage() {
+  useDocumentTitle('Settings');
   const roles = useAuthStore((state) => state.roles);
   const isAdmin = hasAdminRole(roles);
 

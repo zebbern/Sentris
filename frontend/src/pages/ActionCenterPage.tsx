@@ -86,8 +86,10 @@ import {
   HumanInputResolutionView,
   type HumanInputRequest,
 } from '@/components/workflow/HumanInputResolutionView';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function ActionCenterPage() {
+  useDocumentTitle('Action Center');
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'expired'>(

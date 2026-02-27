@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, Database, Calendar, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 // Retention period options in days
 const RETENTION_PERIODS = [
@@ -34,6 +35,7 @@ const TIER_LIMITS = {
 type SubscriptionTier = keyof typeof TIER_LIMITS;
 
 export function AnalyticsSettingsPage() {
+  useDocumentTitle('Analytics Settings');
   const roles = useAuthStore((state) => state.roles);
   const canManageSettings = hasAdminRole(roles);
   const isReadOnly = !canManageSettings;
