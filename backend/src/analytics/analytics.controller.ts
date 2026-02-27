@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiOkResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags, ApiHeader, ApiOperation } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -55,6 +55,7 @@ export class AnalyticsController {
 
   @Post('query')
   @Throttle({ default: { limit: 100, ttl: 60000 } }) // 100 requests per minute per user
+  @ApiOperation({ summary: 'Query analytics data' })
   @ApiOkResponse({
     description: 'Query analytics data for the authenticated organization',
     type: AnalyticsQueryResponseDto,
@@ -135,6 +136,7 @@ export class AnalyticsController {
   }
 
   @Get('settings')
+  @ApiOperation({ summary: 'Get analytics settings' })
   @ApiOkResponse({
     description: 'Get analytics settings for the authenticated organization',
     type: AnalyticsSettingsResponseDto,
@@ -173,6 +175,7 @@ export class AnalyticsController {
   }
 
   @Put('settings')
+  @ApiOperation({ summary: 'Update analytics settings' })
   @ApiOkResponse({
     description: 'Update analytics settings for the authenticated organization',
     type: AnalyticsSettingsResponseDto,
@@ -261,6 +264,7 @@ export class AnalyticsController {
   @Public()
   @SkipThrottle()
   @Post('ensure-tenant')
+  @ApiOperation({ summary: 'Ensure tenant resources exist for an organization' })
   @ApiOkResponse({
     description: 'Ensure tenant resources exist for organization',
     schema: {

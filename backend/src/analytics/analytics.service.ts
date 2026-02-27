@@ -171,6 +171,7 @@ export class AnalyticsService implements OnModuleInit {
   }
 
   // Generic event tracking
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PostHog SDK accepts untyped properties
   track(event: string, properties: Record<string, any>, distinctId?: string) {
     if (!this.analyticsEnabled || !this.posthog) return;
 

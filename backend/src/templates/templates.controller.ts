@@ -10,6 +10,13 @@ import {
   HttpStatus,
   HttpException,
 } from '@nestjs/common';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { TemplateService } from './templates.service';
 import { GitHubSyncService } from './github-sync.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -21,6 +28,7 @@ import { Public } from '../auth/public.decorator';
  * Templates Controller
  * Handles template library API endpoints
  */
+@ApiTags('templates')
 @Controller('templates')
 export class TemplatesController {
   constructor(
@@ -33,6 +41,8 @@ export class TemplatesController {
    */
   @Public()
   @Get()
+  @ApiOperation({ summary: 'List all templates' })
+  @ApiOkResponse({ description: 'Returns filtered list of templates' })
   async listTemplates(
     @Query('category') category?: string,
     @Query('search') search?: string,
@@ -56,6 +66,8 @@ export class TemplatesController {
    */
   @Public()
   @Get('categories')
+  @ApiOperation({ summary: 'List template categories' })
+  @ApiOkResponse({ description: 'Returns available template categories' })
   async getCategories() {
     return await this.templateService.getCategories();
   }
@@ -65,6 +77,8 @@ export class TemplatesController {
    */
   @Public()
   @Get('tags')
+  @ApiOperation({ summary: 'List template tags' })
+  @ApiOkResponse({ description: 'Returns available template tags' })
   async getTags() {
     return await this.templateService.getTags();
   }
@@ -73,6 +87,8 @@ export class TemplatesController {
    * GET /templates/my - Get user's submitted templates
    */
   @Get('my')
+  @ApiOperation({ summary: 'Get my submitted templates' })
+  @ApiOkResponse({ description: 'Returns templates submitted by the current user' })
   async getMyTemplates(@CurrentAuth() auth: { userId?: string; organizationId?: string }) {
     return await this.templateService.getMyTemplates(auth.userId || auth.organizationId);
   }
@@ -83,6 +99,8 @@ export class TemplatesController {
    */
   @Public()
   @Get('repo-info')
+  @ApiOperation({ summary: 'Get template repository info' })
+  @ApiOkResponse({ description: 'Returns GitHub repository information' })
   async getRepoInfo() {
     return await this.githubSyncService.getRepositoryInfo();
   }
@@ -92,6 +110,8 @@ export class TemplatesController {
    * IMPORTANT: Must come before :id route to avoid route conflict
    */
   @Get('submissions')
+  @ApiOperation({ summary: 'Get template submissions' })
+  @ApiOkResponse({ description: 'Returns template submissions for the current user' })
   async getSubmissions(@CurrentAuth() auth: { userId?: string; organizationId?: string }) {
     return await this.templateService.getSubmissions(auth.userId || auth.organizationId || '');
   }
@@ -102,6 +122,8 @@ export class TemplatesController {
    */
   @Public()
   @Get(':id')
+  @ApiOperation({ summary: 'Get template by ID' })
+  @ApiOkResponse({ description: 'Returns template details' })
   async getTemplate(@Param('id') id: string) {
     const template = await this.templateService.getTemplateById(id);
     if (!template) {
@@ -120,6 +142,8 @@ export class TemplatesController {
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Validate a workflow for template submission' })
+  @ApiResponse({ status: 202, description: 'Template validation result' })
   async publishTemplate(
     @CurrentAuth() auth: { userId?: string; organizationId?: string },
     @Body()
@@ -145,6 +169,8 @@ export class TemplatesController {
   @Post(':id/use')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Use a template to create a new workflow' })
+  @ApiCreatedResponse({ description: 'Created workflow from template' })
   async useTemplate(
     @Param('id') id: string,
     @CurrentAuth() auth: { userId?: string; organizationId?: string },
@@ -169,6 +195,8 @@ export class TemplatesController {
   @Post('sync')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Sync templates from GitHub' })
+  @ApiOkResponse({ description: 'Sync result' })
   async syncTemplates(@CurrentAuth() _auth: { organizationId?: string }) {
     return await this.githubSyncService.syncTemplates();
   }

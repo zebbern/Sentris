@@ -1,5 +1,5 @@
 import { Controller, Get, Logger, NotFoundException, Param, Post, Body } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 // Ensure all worker components are registered before accessing the registry
 import '@shipsec/studio-worker/components';
@@ -58,6 +58,7 @@ export class ComponentsController {
   private readonly logger = new Logger(ComponentsController.name);
 
   @Get()
+  @ApiOperation({ summary: 'List all registered components' })
   @ApiOkResponse({
     description: 'List all registered components',
     schema: {
@@ -247,6 +248,7 @@ export class ComponentsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a component by ID' })
   @ApiOkResponse({
     description: 'Get a specific component by ID',
     schema: {
@@ -373,6 +375,7 @@ export class ComponentsController {
     return serializeComponent(entry);
   }
   @Post(':id/resolve-ports')
+  @ApiOperation({ summary: 'Resolve dynamic ports for a component' })
   @ApiOkResponse({
     description: 'Resolve dynamic ports based on parameters',
   })

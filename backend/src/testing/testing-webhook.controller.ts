@@ -12,6 +12,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { randomUUID } from 'node:crypto';
 import type { Request } from 'express';
 import type { Response } from 'express';
@@ -22,6 +23,7 @@ import { TestingWebhookService } from './testing-webhook.service';
 import { AcceptWebhookQueryDto, AcceptWebhookQuerySchema } from './dto/testing-webhook.dto';
 import { z } from 'zod';
 
+@ApiExcludeController()
 @Controller('testing/webhooks')
 export class TestingWebhookController {
   constructor(

@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 import type { ExecutionTriggerMetadata } from '@shipsec/shared';
 
@@ -7,6 +8,7 @@ import type { AuthContext } from '../auth/types';
 import { PrepareRunRequestDto, PrepareRunRequestSchema } from './dto/workflow-graph.dto';
 import { WorkflowsService } from './workflows.service';
 
+@ApiExcludeController()
 @Controller('internal/runs')
 export class InternalRunsController {
   constructor(private readonly workflowsService: WorkflowsService) {}

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -14,11 +15,14 @@ import {
 } from './dto/schedule.dto';
 import { SchedulesService } from './schedules.service';
 
+@ApiTags('schedules')
 @Controller('schedules')
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List schedules' })
+  @ApiOkResponse({ type: [ScheduleResponseDto] })
   async list(
     @CurrentAuth() auth: AuthContext | null,
     @Query(new ZodValidationPipe(ListSchedulesQuerySchema))
@@ -31,6 +35,8 @@ export class SchedulesController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a schedule by ID' })
+  @ApiOkResponse({ type: ScheduleResponseDto })
   async getOne(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id') id: string,
@@ -40,6 +46,8 @@ export class SchedulesController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a schedule' })
+  @ApiCreatedResponse({ type: ScheduleResponseDto })
   async create(
     @CurrentAuth() auth: AuthContext | null,
     @Body(new ZodValidationPipe(CreateScheduleRequestSchema))
@@ -50,6 +58,8 @@ export class SchedulesController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a schedule' })
+  @ApiOkResponse({ type: ScheduleResponseDto })
   async update(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id') id: string,
@@ -61,12 +71,16 @@ export class SchedulesController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a schedule' })
+  @ApiOkResponse({ description: 'Schedule deleted' })
   async delete(@CurrentAuth() auth: AuthContext | null, @Param('id') id: string) {
     await this.schedulesService.delete(auth, id);
     return { success: true };
   }
 
   @Post(':id/pause')
+  @ApiOperation({ summary: 'Pause a schedule' })
+  @ApiOkResponse({ type: ScheduleResponseDto })
   async pause(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id') id: string,
@@ -76,6 +90,8 @@ export class SchedulesController {
   }
 
   @Post(':id/resume')
+  @ApiOperation({ summary: 'Resume a schedule' })
+  @ApiOkResponse({ type: ScheduleResponseDto })
   async resume(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id') id: string,
@@ -85,6 +101,8 @@ export class SchedulesController {
   }
 
   @Post(':id/trigger')
+  @ApiOperation({ summary: 'Trigger a schedule immediately' })
+  @ApiOkResponse()
   async trigger(@CurrentAuth() auth: AuthContext | null, @Param('id') id: string) {
     await this.schedulesService.trigger(auth, id);
     return { success: true };

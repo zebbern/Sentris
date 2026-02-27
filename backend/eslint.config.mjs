@@ -40,7 +40,7 @@ export default tseslint.config(
           ignoreRestSiblings: true,
         },
       ],
-      '@typescript-eslint/no-explicit-any': 'off', // Relaxed
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'error',
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/no-namespace': 'error',
@@ -53,6 +53,12 @@ export default tseslint.config(
       'no-case-declarations': 'error',
       'no-empty': 'error',
       'no-useless-catch': 'error',
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts', '**/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   configPrettier,

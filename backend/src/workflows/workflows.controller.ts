@@ -17,7 +17,13 @@ import {
   StreamableFile,
   Headers,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -253,7 +259,8 @@ export class WorkflowsController {
   ) {}
 
   @Post()
-  @ApiOkResponse({ type: WorkflowResponseDto })
+  @ApiOperation({ summary: 'Create a new workflow' })
+  @ApiCreatedResponse({ type: WorkflowResponseDto })
   async create(
     @CurrentAuth() auth: AuthContext | null,
     @Body() body: CreateWorkflowRequestDto,
@@ -265,6 +272,7 @@ export class WorkflowsController {
   @Put(':id')
   @UseGuards(WorkflowRoleGuard)
   @RequireWorkflowRole('ADMIN')
+  @ApiOperation({ summary: 'Update a workflow' })
   @ApiOkResponse({ type: WorkflowResponseDto })
   async update(
     @CurrentAuth() auth: AuthContext | null,
@@ -278,6 +286,7 @@ export class WorkflowsController {
   @Patch(':id/metadata')
   @UseGuards(WorkflowRoleGuard)
   @RequireWorkflowRole('ADMIN')
+  @ApiOperation({ summary: 'Update workflow metadata' })
   @ApiOkResponse({ type: WorkflowResponseDto })
   async updateMetadata(
     @CurrentAuth() auth: AuthContext | null,
@@ -289,6 +298,7 @@ export class WorkflowsController {
   }
 
   @Get('summary')
+  @ApiOperation({ summary: 'List workflow summaries' })
   @ApiOkResponse({
     description: 'Lightweight workflow list without graph data',
     schema: {
@@ -315,6 +325,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs')
+  @ApiOperation({ summary: 'List workflow runs' })
   @ApiOkResponse({
     description: 'List all workflow runs with metadata',
     schema: {
@@ -391,6 +402,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId')
+  @ApiOperation({ summary: 'Get a workflow run' })
   @ApiOkResponse({
     description: 'Metadata for a single workflow run',
     schema: {
@@ -451,6 +463,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/children')
+  @ApiOperation({ summary: 'List child workflow runs' })
   @ApiOkResponse({
     description: 'List direct child workflow runs spawned by a parent run',
     schema: {
@@ -479,6 +492,7 @@ export class WorkflowsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a workflow by ID' })
   @ApiOkResponse({ type: WorkflowResponseDto })
   async findOne(
     @CurrentAuth() auth: AuthContext | null,
@@ -489,6 +503,7 @@ export class WorkflowsController {
   }
 
   @Get(':id/runtime-inputs')
+  @ApiOperation({ summary: 'Get workflow runtime inputs' })
   @ApiOkResponse({
     type: WorkflowRuntimeInputsResponseDto,
     description: 'Get the runtime inputs defined in the workflow Entry Point',
@@ -501,6 +516,7 @@ export class WorkflowsController {
 
     // Find the entry point node by checking the component type
     const entryNode = workflow.graph.nodes.find((node) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Component type union mismatch
       ENTRY_POINT_COMPONENT_IDS.includes(node.type as any),
     );
 
@@ -525,6 +541,7 @@ export class WorkflowsController {
   }
 
   @Get(':workflowId/versions/:versionId')
+  @ApiOperation({ summary: 'Get a specific workflow version' })
   @ApiOkResponse({ type: WorkflowVersionResponseDto })
   async findVersion(
     @CurrentAuth() auth: AuthContext | null,
@@ -537,6 +554,8 @@ export class WorkflowsController {
   @Delete(':id')
   @UseGuards(WorkflowRoleGuard)
   @RequireWorkflowRole('ADMIN')
+  @ApiOperation({ summary: 'Delete a workflow' })
+  @ApiOkResponse({ description: 'Workflow deleted successfully' })
   async remove(@CurrentAuth() auth: AuthContext | null, @Param('id') id: string) {
     await this.workflowsService.delete(id, auth);
     return { status: 'deleted', id };
@@ -545,6 +564,7 @@ export class WorkflowsController {
   @Post(':id/commit')
   @UseGuards(WorkflowRoleGuard)
   @RequireWorkflowRole('ADMIN')
+  @ApiOperation({ summary: 'Commit a workflow version' })
   @ApiOkResponse({
     description: 'Compiled workflow definition',
     schema: {
@@ -598,6 +618,7 @@ export class WorkflowsController {
   }
 
   @Post(':id/run')
+  @ApiOperation({ summary: 'Run a workflow' })
   @ApiCreatedResponse({
     description: 'Workflow execution result',
     schema: {
@@ -692,6 +713,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/status')
+  @ApiOperation({ summary: 'Get workflow run status' })
   @ApiOkResponse({
     description: 'Current Temporal execution status',
   })
@@ -710,6 +732,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/result')
+  @ApiOperation({ summary: 'Get workflow run result' })
   @ApiOkResponse({
     description: 'Resolved workflow result payload',
   })
@@ -723,6 +746,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/config')
+  @ApiOperation({ summary: 'Get workflow run configuration' })
   @ApiOkResponse({
     description: 'Inputs and version metadata captured for a workflow run',
     schema: runConfigSchema,
@@ -732,6 +756,7 @@ export class WorkflowsController {
   }
 
   @Post('/runs/:runId/cancel')
+  @ApiOperation({ summary: 'Cancel a workflow run' })
   @ApiOkResponse({
     description: 'Cancels a running workflow execution',
   })
@@ -745,6 +770,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/trace')
+  @ApiOperation({ summary: 'Get workflow run trace events' })
   @ApiOkResponse({
     description: 'Trace events for a workflow run',
     schema: traceEnvelopeSchema,
@@ -755,6 +781,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/events')
+  @ApiOperation({ summary: 'Get workflow run event timeline' })
   @ApiOkResponse({
     description: 'Full event timeline for a workflow run',
     schema: traceEnvelopeSchema,
@@ -765,6 +792,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/dataflows')
+  @ApiOperation({ summary: 'Get workflow run data flows' })
   @ApiOkResponse({
     description: 'Derived data flow packets for a workflow run',
     schema: dataFlowEnvelopeSchema,
@@ -776,6 +804,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/artifacts')
+  @ApiOperation({ summary: 'List workflow run artifacts' })
   @ApiOkResponse({
     description: 'Artifacts generated for a workflow run',
     type: RunArtifactsResponseDto,
@@ -785,6 +814,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/artifacts/:artifactId/download')
+  @ApiOperation({ summary: 'Download a workflow run artifact' })
   @ApiOkResponse({
     description: 'Download artifact for a specific run',
   })
@@ -808,6 +838,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/node-io')
+  @ApiOperation({ summary: 'List node inputs and outputs for a workflow run' })
   @ApiOkResponse({
     description: 'Node inputs/outputs for a workflow run',
     schema: {
@@ -845,6 +876,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/node-io/:nodeRef')
+  @ApiOperation({ summary: 'Get specific node input/output for a workflow run' })
   @ApiQuery({
     name: 'full',
     required: false,
@@ -890,6 +922,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/stream')
+  @ApiOperation({ summary: 'Stream workflow run updates via SSE' })
   @ApiOkResponse({ description: 'Server-sent events stream for workflow run updates' })
   async stream(
     @Param('runId') runId: string,
@@ -903,7 +936,9 @@ export class WorkflowsController {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flushHeaders
     if (typeof (res as any).flushHeaders === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flushHeaders
       (res as any).flushHeaders();
     }
 
@@ -932,7 +967,9 @@ export class WorkflowsController {
         res.write(`event: ${event}\n`);
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
         // Flush headers if available (helps with immediate delivery)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flush
         if (typeof (res as any).flush === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flush
           (res as any).flush();
         }
       } catch (error) {
@@ -1056,6 +1093,7 @@ export class WorkflowsController {
     let useRealtime = false;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Accessing private repository for realtime subscription
       const traceRepo = (this.traceService as any).repository;
       if (traceRepo && typeof traceRepo.subscribeToRun === 'function') {
         unsubscribe = await traceRepo.subscribeToRun(runId, async (payload: string) => {
@@ -1147,6 +1185,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/logs')
+  @ApiOperation({ summary: 'Get workflow run logs' })
   @ApiOkResponse({
     description: 'Logs for a workflow run',
     schema: {
@@ -1191,6 +1230,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/terminal')
+  @ApiOperation({ summary: 'Get workflow run terminal output' })
   @ApiOkResponse({
     description: 'Terminal chunks for a workflow run',
   })
@@ -1226,6 +1266,7 @@ export class WorkflowsController {
   }
 
   @Post('/runs/:runId/terminal/archive')
+  @ApiOperation({ summary: 'Archive terminal output for a workflow run' })
   @ApiCreatedResponse({ type: TerminalRecordingDto })
   async archiveTerminal(
     @Param('runId') runId: string,
@@ -1238,6 +1279,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/terminal/archive')
+  @ApiOperation({ summary: 'List terminal archive recordings for a workflow run' })
   @ApiOkResponse({ type: TerminalRecordListDto })
   async listTerminalArchives(
     @Param('runId') runId: string,
@@ -1251,6 +1293,7 @@ export class WorkflowsController {
   }
 
   @Get('/runs/:runId/terminal/archive/:recordId/download')
+  @ApiOperation({ summary: 'Download a terminal archive recording' })
   @ApiOkResponse({ description: 'Download terminal recording' })
   async downloadTerminalArchive(
     @Param('runId') runId: string,
@@ -1273,6 +1316,7 @@ export class WorkflowsController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List all workflows' })
   @ApiOkResponse({ type: [WorkflowResponseDto] })
   async findAll(@CurrentAuth() auth: AuthContext | null): Promise<WorkflowResponseDto[]> {
     const serviceResponses = await this.workflowsService.list(auth);

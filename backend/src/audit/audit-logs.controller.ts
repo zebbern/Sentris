@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -17,6 +17,7 @@ export class AuditLogsController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List audit log events' })
   @ApiOkResponse({
     description: 'List audit log events for the authenticated organization',
     type: ListAuditLogsResponseDto,

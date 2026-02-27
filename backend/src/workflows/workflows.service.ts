@@ -576,6 +576,7 @@ export class WorkflowsService {
       action: 'workflow.delete',
       resourceType: 'workflow',
       resourceId: id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Audit log record may lack name property
       resourceName: (existing as any)?.name ?? null,
     });
   }
@@ -958,7 +959,9 @@ export class WorkflowsService {
         error &&
         typeof error === 'object' &&
         'message' in error &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK error type narrowing
         typeof (error as any).message === 'string' &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK error type narrowing
         (error as any).message.includes('Workflow execution already started')
       ) {
         const existing = await this.runRepository.findByRunId(prepared.runId, {
@@ -1797,6 +1800,7 @@ export class WorkflowsService {
       return undefined;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal failure object is untyped
     const failureObj = failure as any;
     if (!failureObj) {
       return {

@@ -175,6 +175,7 @@ export class McpGroupsRepository {
       string,
       (McpServerRecord & { recommended: boolean; defaultSelected: boolean; toolCount: number })[]
     >();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL returns untyped rows
     for (const row of result.rows as any[]) {
       const groupId = row.group_id;
       if (!grouped.has(groupId)) {

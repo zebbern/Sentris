@@ -24,6 +24,7 @@ export class SecurityAnalyticsService {
    */
   async indexDocument(
     orgId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch SDK requires untyped payloads
     document: Record<string, any>,
     options: IndexDocumentOptions,
   ): Promise<void> {
@@ -70,6 +71,7 @@ export class SecurityAnalyticsService {
    */
   async bulkIndex(
     orgId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch SDK requires untyped payloads
     documents: Record<string, any>[],
     options: BulkIndexOptions,
   ): Promise<void> {
@@ -154,14 +156,18 @@ export class SecurityAnalyticsService {
   async query(
     orgId: string,
     options: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch DSL query is untyped
       query?: Record<string, any>;
       size?: number;
       from?: number;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation is untyped
       aggs?: Record<string, any>;
     },
   ): Promise<{
     total: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
     hits: { _id: string; _source: Record<string, any>; _score?: number }[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation result is untyped
     aggregations?: Record<string, any>;
   }> {
     if (!this.openSearchClient.isClientEnabled()) {
@@ -199,6 +205,7 @@ export class SecurityAnalyticsService {
       const hits = response.body.hits.hits.map(
         (hit: { _id: string; _source?: Record<string, unknown>; _score?: string | number }) => ({
           _id: hit._id as string,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
           _source: (hit._source ?? {}) as Record<string, any>,
           ...(hit._score !== undefined && { _score: Number(hit._score) }),
         }),
@@ -219,6 +226,7 @@ export class SecurityAnalyticsService {
    * Auto-detect asset key from common fields
    * Priority: host > domain > subdomain > url > ip > asset > target
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch document is untyped
   private detectAssetKey(document: Record<string, any>, explicitField?: string): string | null {
     // If explicit field is provided, use it
     if (explicitField && document[explicitField]) {

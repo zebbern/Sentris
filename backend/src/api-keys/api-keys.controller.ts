@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
@@ -37,6 +37,7 @@ export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List API keys' })
   @ApiOkResponse({ type: ApiKeyResponseDto, isArray: true })
   async list(
     @CurrentAuth() auth: AuthContext,
@@ -48,6 +49,7 @@ export class ApiKeysController {
 
   @Post()
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Create a new API key' })
   @ApiCreatedResponse({ type: CreateApiKeyResponseDto })
   async create(
     @CurrentAuth() auth: AuthContext,
@@ -62,6 +64,7 @@ export class ApiKeysController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get an API key by ID' })
   @ApiOkResponse({ type: ApiKeyResponseDto })
   async get(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     const apiKey = await this.apiKeysService.get(auth, id);
@@ -70,6 +73,7 @@ export class ApiKeysController {
 
   @Patch(':id')
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Update an API key' })
   @ApiOkResponse({ type: ApiKeyResponseDto })
   async update(
     @CurrentAuth() auth: AuthContext,
@@ -82,6 +86,7 @@ export class ApiKeysController {
 
   @Post(':id/revoke')
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Revoke an API key' })
   @ApiOkResponse({ type: ApiKeyResponseDto })
   async revoke(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     const apiKey = await this.apiKeysService.update(auth, id, { isActive: false });
@@ -90,6 +95,7 @@ export class ApiKeysController {
 
   @Delete(':id')
   @Roles('ADMIN')
+  @ApiOperation({ summary: 'Delete an API key' })
   @ApiOkResponse({ type: DeleteApiKeyResponseDto })
   async delete(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     await this.apiKeysService.delete(auth, id);

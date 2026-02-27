@@ -8,7 +8,7 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -28,6 +28,7 @@ export class WebhooksController {
   ) {}
 
   @Get('workflows')
+  @ApiOperation({ summary: 'List workflows accessible via webhook' })
   async listWorkflows(@CurrentAuth() auth: AuthContext) {
     await this.checkPermission(auth, 'workflows', 'list');
 
@@ -37,12 +38,14 @@ export class WebhooksController {
   }
 
   @Get('workflows/:id')
+  @ApiOperation({ summary: 'Get a workflow by ID via webhook' })
   async getWorkflow(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     await this.checkPermission(auth, 'workflows', 'read');
     return this.workflowsService.findById(id, auth);
   }
 
   @Post('workflows/:id/run')
+  @ApiOperation({ summary: 'Run a workflow via webhook' })
   async runWorkflow(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,
@@ -78,6 +81,7 @@ export class WebhooksController {
   }
 
   @Get('runs/:runId/status')
+  @ApiOperation({ summary: 'Get workflow run status' })
   async getRunStatus(@CurrentAuth() auth: AuthContext, @Param('runId') runId: string) {
     await this.checkPermission(auth, 'runs', 'read');
     // Using simple getRunStatus which delegates to Temporal
@@ -85,6 +89,7 @@ export class WebhooksController {
   }
 
   @Get('runs/:runId/result')
+  @ApiOperation({ summary: 'Get workflow run result' })
   async getRunResult(@CurrentAuth() auth: AuthContext, @Param('runId') runId: string) {
     await this.checkPermission(auth, 'runs', 'read');
     const result = await this.workflowsService.getRunResult(runId, undefined, auth);
@@ -92,6 +97,7 @@ export class WebhooksController {
   }
 
   @Post('runs/:runId/cancel')
+  @ApiOperation({ summary: 'Cancel a workflow run' })
   async cancelRun(@CurrentAuth() auth: AuthContext, @Param('runId') runId: string) {
     await this.checkPermission(auth, 'runs', 'cancel');
     await this.workflowsService.cancelRun(runId, undefined, auth);

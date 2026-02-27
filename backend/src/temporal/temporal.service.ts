@@ -128,8 +128,10 @@ export class TemporalService implements OnModuleDestroy {
     const handle = await client.start(workflowFn, {
       workflowId,
       taskQueue,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK args type mismatch
       args: (options.args ?? []) as any,
       memo: options.memo,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK searchAttributes type mismatch
       searchAttributes: options.searchAttributes as any,
     });
 
@@ -175,6 +177,7 @@ export class TemporalService implements OnModuleDestroy {
       closeTime: description.closeTime?.toISOString(),
       historyLength: description.historyLength,
       taskQueue: description.taskQueue,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK status type lacks failure property
       failure: (description.status as any)?.failure,
     };
   }

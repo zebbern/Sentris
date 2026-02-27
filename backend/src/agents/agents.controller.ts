@@ -10,7 +10,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { createUIMessageStream, pipeUIMessageStreamToResponse, type UIMessageChunk } from 'ai';
@@ -35,6 +35,7 @@ export class AgentsController {
   ) {}
 
   @Get('/:agentRunId/parts')
+  @ApiOperation({ summary: 'Get stored agent trace parts' })
   @ApiOkResponse({ description: 'Returns stored agent trace parts' })
   async parts(
     @Param('agentRunId') agentRunId: string,
@@ -71,6 +72,7 @@ export class AgentsController {
   }
 
   @Post('/:agentRunId/chat')
+  @ApiOperation({ summary: 'Stream agent chat via SSE' })
   @ApiOkResponse({ description: 'AI SDK-compatible SSE for agent run' })
   async chat(
     @Param('agentRunId') agentRunId: string,

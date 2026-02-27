@@ -18,6 +18,7 @@ import {
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -42,12 +43,14 @@ export class SecretsController {
   constructor(private readonly secretsService: SecretsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List all secrets' })
   @ApiOkResponse({ type: [SecretSummaryResponse] })
   async listSecrets(@CurrentAuth() auth: AuthContext | null): Promise<SecretSummaryResponse[]> {
     return this.secretsService.listSecrets(auth);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a secret by ID' })
   @ApiOkResponse({ type: SecretSummaryResponse })
   async getSecret(
     @CurrentAuth() auth: AuthContext | null,
@@ -57,6 +60,7 @@ export class SecretsController {
   }
 
   @Get(':id/value')
+  @ApiOperation({ summary: 'Get a secret value' })
   @ApiOkResponse({ type: SecretValueResponse })
   @ApiQuery({
     name: 'version',
@@ -87,6 +91,7 @@ export class SecretsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new secret' })
   @ApiCreatedResponse({ type: SecretSummaryResponse })
   async createSecret(
     @CurrentAuth() auth: AuthContext | null,
@@ -96,6 +101,7 @@ export class SecretsController {
   }
 
   @Put(':id/rotate')
+  @ApiOperation({ summary: 'Rotate a secret value' })
   @ApiOkResponse({ type: SecretSummaryResponse })
   async rotateSecret(
     @CurrentAuth() auth: AuthContext | null,
@@ -106,6 +112,7 @@ export class SecretsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update secret metadata' })
   @ApiOkResponse({ type: SecretSummaryResponse })
   async updateSecret(
     @CurrentAuth() auth: AuthContext | null,
@@ -116,8 +123,9 @@ export class SecretsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a secret' })
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiNoContentResponse()
+  @ApiNoContentResponse({ description: 'Secret deleted' })
   async deleteSecret(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,

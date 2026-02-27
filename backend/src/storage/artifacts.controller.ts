@@ -9,7 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 import type { Response } from 'express';
 
@@ -31,6 +31,7 @@ export class ArtifactsController {
   constructor(private readonly artifactsService: ArtifactsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'List workspace artifacts' })
   @ApiOkResponse({
     description: 'List workspace artifacts',
     type: ArtifactListResponseDto,
@@ -43,6 +44,7 @@ export class ArtifactsController {
   }
 
   @Get(':id/download')
+  @ApiOperation({ summary: 'Download an artifact' })
   @ApiOkResponse({
     description: 'Download artifact binary',
     content: {
@@ -72,6 +74,7 @@ export class ArtifactsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete an artifact' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({
     description: 'Artifact deleted successfully',

@@ -6,6 +6,7 @@ export class AnalyticsQueryRequestDto {
     example: { match_all: {} },
     required: false,
   })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch DSL query is untyped
   query?: Record<string, any>;
 
   @ApiProperty({
@@ -37,6 +38,7 @@ export class AnalyticsQueryRequestDto {
     },
     required: false,
   })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation is untyped
   aggs?: Record<string, any>;
 }
 
@@ -54,6 +56,7 @@ export class AnalyticsQueryResponseDto {
   })
   hits!: {
     _id: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
     _source: Record<string, any>;
     _score?: number;
   }[];
@@ -62,5 +65,6 @@ export class AnalyticsQueryResponseDto {
     description: 'Aggregation results',
     required: false,
   })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation result is untyped
   aggregations?: Record<string, any>;
 }

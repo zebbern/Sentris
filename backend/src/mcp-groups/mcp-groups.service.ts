@@ -79,10 +79,14 @@ export class McpGroupsService implements OnModuleInit {
       : never,
   ): McpGroupServerResponse {
     const transportType =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
       (record as any).transportType ?? (record as any).transport_type ?? record.transportType;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
     const toolCount = (record as any).toolCount ?? (record as any).tool_count ?? 0;
     const healthStatus =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
       (record as any).lastHealthStatus ??
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
       (record as any).last_health_status ??
       record.lastHealthStatus ??
       'unknown';
@@ -95,6 +99,7 @@ export class McpGroupsService implements OnModuleInit {
       transportType: transportType as 'http' | 'stdio' | 'sse' | 'websocket',
       endpoint: record.endpoint,
       command: record.command,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle raw SQL result type
       args: (record as any).args ?? null,
       enabled: record.enabled,
       healthStatus: healthStatus as 'healthy' | 'unhealthy' | 'unknown',
@@ -174,6 +179,7 @@ export class McpGroupsService implements OnModuleInit {
               );
               await this.mcpServersRepository.upsertTools(
                 server.id,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK tool cache is untyped
                 cached.tools.map((tool: any) => ({
                   toolName: tool.name,
                   description: tool.description ?? null,
@@ -428,6 +434,7 @@ export class McpGroupsService implements OnModuleInit {
     }
 
     // Search for server by ID (primary) or name (fallback)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Template server type is untyped
     const server = template.servers.find((s: any) => s.id === serverId || s.name === serverId);
     if (!server) {
       throw new BadRequestException(`Server '${serverId}' not found in group '${groupSlug}'`);

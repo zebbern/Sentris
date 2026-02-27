@@ -1,10 +1,12 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ApiExcludeController } from '@nestjs/swagger';
 import { ToolRegistryService } from './tool-registry.service';
 import { McpGatewayService } from './mcp-gateway.service';
 import { McpGroupsService } from '../mcp-groups/mcp-groups.service';
 import { McpAuthService } from './mcp-auth.service';
 import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
 
+@ApiExcludeController()
 @Controller('internal/mcp')
 export class InternalMcpController {
   constructor(

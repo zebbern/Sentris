@@ -12,7 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiConsumes, ApiBody, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiConsumes, ApiBody, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 import type { Response } from 'express-serve-static-core';
 
@@ -37,6 +37,7 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
+  @ApiOperation({ summary: 'Upload a file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -74,6 +75,7 @@ export class FilesController {
   }
 
   @Get()
+  @ApiOperation({ summary: 'List uploaded files' })
   @ApiOkResponse({
     description: 'List all uploaded files',
     schema: {
@@ -98,6 +100,7 @@ export class FilesController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get file metadata' })
   @ApiOkResponse({
     description: 'Get file metadata',
   })
@@ -109,6 +112,7 @@ export class FilesController {
   }
 
   @Get(':id/download')
+  @ApiOperation({ summary: 'Download a file' })
   @ApiOkResponse({
     description: 'Download file',
     content: {
@@ -137,6 +141,7 @@ export class FilesController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a file' })
   @ApiOkResponse({
     description: 'Delete file',
   })

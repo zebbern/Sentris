@@ -110,6 +110,7 @@ export class McpGroupResponseDto extends createZodDto(McpGroupResponseSchema) {
       credentialMapping: group.credentialMapping,
       defaultDockerImage: group.defaultDockerImage,
       enabled: group.enabled,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle schema lacks templateHash column type
       templateHash: (group as any).templateHash ?? null,
       createdAt: group.createdAt.toISOString(),
       updatedAt: group.updatedAt.toISOString(),

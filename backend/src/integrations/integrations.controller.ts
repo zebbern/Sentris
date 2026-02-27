@@ -13,7 +13,7 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -41,6 +41,7 @@ export class IntegrationsController {
   constructor(private readonly integrations: IntegrationsService) {}
 
   @Get('providers')
+  @ApiOperation({ summary: 'List all integration providers' })
   @ApiOkResponse({ type: [IntegrationProviderResponse] })
   listProviders(): IntegrationProviderResponse[] {
     return this.integrations.listProviders().map((provider) => ({
@@ -49,6 +50,7 @@ export class IntegrationsController {
   }
 
   @Get('providers/:provider/config')
+  @ApiOperation({ summary: 'Get provider OAuth configuration' })
   @ApiOkResponse({ type: ProviderConfigurationResponse })
   async getProviderConfiguration(
     @Param('provider') provider: string,
@@ -64,6 +66,7 @@ export class IntegrationsController {
   }
 
   @Put('providers/:provider/config')
+  @ApiOperation({ summary: 'Create or update provider OAuth configuration' })
   @ApiOkResponse({ type: ProviderConfigurationResponse })
   async upsertProviderConfiguration(
     @Param('provider') provider: string,
@@ -85,12 +88,15 @@ export class IntegrationsController {
   }
 
   @Delete('providers/:provider/config')
+  @ApiOperation({ summary: 'Delete provider OAuth configuration' })
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Provider configuration deleted' })
   async deleteProviderConfiguration(@Param('provider') provider: string): Promise<void> {
     await this.integrations.deleteProviderConfiguration(provider);
   }
 
   @Get('connections')
+  @ApiOperation({ summary: 'List integration connections' })
   @ApiOkResponse({ type: [IntegrationConnectionResponse] })
   async listConnections(
     @Query('userId') userId?: string,
@@ -109,6 +115,7 @@ export class IntegrationsController {
   }
 
   @Post(':provider/start')
+  @ApiOperation({ summary: 'Start OAuth authorization flow' })
   @ApiOkResponse({ type: OAuthStartResponseDto })
   async startOAuth(
     @Param('provider') provider: string,
@@ -129,6 +136,7 @@ export class IntegrationsController {
   }
 
   @Post(':provider/exchange')
+  @ApiOperation({ summary: 'Complete OAuth token exchange' })
   @ApiOkResponse({ type: IntegrationConnectionResponse })
   async completeOAuth(
     @Param('provider') provider: string,
@@ -151,6 +159,7 @@ export class IntegrationsController {
   }
 
   @Post('connections/:id/refresh')
+  @ApiOperation({ summary: 'Refresh an integration connection' })
   @ApiOkResponse({ type: IntegrationConnectionResponse })
   async refreshConnection(
     @Param('id') id: string,
@@ -166,6 +175,7 @@ export class IntegrationsController {
   }
 
   @Delete('connections/:id')
+  @ApiOperation({ summary: 'Disconnect an integration connection' })
   @ApiOkResponse({ description: 'Connection removed' })
   async disconnectConnection(
     @Param('id') id: string,
@@ -175,6 +185,7 @@ export class IntegrationsController {
   }
 
   @Post('connections/:id/token')
+  @ApiOperation({ summary: 'Issue a connection access token' })
   @ApiOkResponse({ type: ConnectionTokenResponseDto })
   async issueConnectionToken(
     @Param('id') id: string,
