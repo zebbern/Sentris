@@ -16,12 +16,7 @@ type UpdateWorkflowRequestDto = components['schemas']['UpdateWorkflowRequestDto'
  * Backend: { id, type: componentId, position, data: { label, config: { params, inputOverrides } } }
  */
 import type { FrontendNodeData } from '@/schemas/node';
-
-const ENTRY_POINT_COMPONENT_IDS = ['core.workflow.entrypoint', 'entry-point'] as const;
-
-function isEntryPointComponent(componentId: string): boolean {
-  return ENTRY_POINT_COMPONENT_IDS.includes(componentId as any);
-}
+import { isEntryPointComponentRef } from '@/utils/entryPointUtils';
 
 export function serializeNodes(reactFlowNodes: ReactFlowNode<FrontendNodeData>[]): BackendNode[] {
   return reactFlowNodes.map((node) => {
@@ -33,7 +28,7 @@ export function serializeNodes(reactFlowNodes: ReactFlowNode<FrontendNodeData>[]
     const inputOverrides = { ...(existingConfig.inputOverrides || {}) };
 
     // For Entry Point components, extract runtimeInputs and populate inputOverrides
-    if (isEntryPointComponent(componentId)) {
+    if (isEntryPointComponentRef(componentId)) {
       const runtimeInputs = params.runtimeInputs as
         | {
             id: string;

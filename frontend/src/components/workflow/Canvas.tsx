@@ -44,19 +44,7 @@ import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder
 import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
-
-const ENTRY_COMPONENT_ID = 'core.workflow.entrypoint';
-const ENTRY_COMPONENT_SLUG = 'entry-point';
-
-const isEntryPointComponentRef = (ref?: string | null) =>
-  ref === ENTRY_COMPONENT_ID || ref === ENTRY_COMPONENT_SLUG;
-
-const isEntryPointNode = (node?: Node<NodeData> | null) => {
-  if (!node) return false;
-  const nodeData = node?.data as NodeData | undefined;
-  const componentRef = (nodeData?.componentId ?? nodeData?.componentSlug) as string | undefined;
-  return isEntryPointComponentRef(componentRef);
-};
+import { isEntryPointComponentRef, isEntryPointNode } from '@/utils/entryPointUtils';
 
 interface CanvasProps {
   className?: string;

@@ -323,7 +323,6 @@ export function ParameterField({
           onChange={(event) => {
             autoSelectedConnectionRef.current = true;
             const nextValue = event.target.value;
-            console.log('Selected GitHub connection ID:', nextValue);
             if (nextValue === '') {
               onChange(undefined);
               if (isRemoveGithubComponent) {

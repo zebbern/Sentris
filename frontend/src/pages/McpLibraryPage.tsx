@@ -1494,9 +1494,6 @@ export function McpLibraryPage() {
           const cached = discoveryCacheTokens.get(server.name);
           if (cached) {
             // Server has cached discovery results - skip discovery, tools will be added via backend
-            console.log(
-              `[MCP Import] Using cached discovery results for ${server.name}: ${cached.tools.length} tools`,
-            );
           } else {
             serversToDiscover.push(server);
           }

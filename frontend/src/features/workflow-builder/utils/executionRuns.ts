@@ -2,9 +2,6 @@ import { TERMINAL_STATUSES } from '@shipsec/shared';
 import type { ExecutionStatus } from '@/schemas/execution';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 
-/** @deprecated Use TERMINAL_STATUSES from @shipsec/shared instead */
-export const TERMINAL_RUN_STATUSES = TERMINAL_STATUSES;
-
 export const normalizeRunSummary = (run: any): ExecutionRun => {
   const status = (
     typeof run.status === 'string' ? run.status.toUpperCase() : 'FAILED'
@@ -23,7 +20,7 @@ export const normalizeRunSummary = (run: any): ExecutionRun => {
     nodeCount: typeof run.nodeCount === 'number' ? run.nodeCount : 0,
     eventCount: typeof run.eventCount === 'number' ? run.eventCount : 0,
     createdAt: startTime,
-    isLive: !TERMINAL_RUN_STATUSES.includes(status),
+    isLive: !TERMINAL_STATUSES.includes(status),
     workflowVersionId: typeof run.workflowVersionId === 'string' ? run.workflowVersionId : null,
     workflowVersion: typeof run.workflowVersion === 'number' ? run.workflowVersion : null,
     triggerType: (run.triggerType ?? 'manual') as ExecutionRun['triggerType'],
@@ -43,5 +40,5 @@ export const isRunLive = (run?: ExecutionRun | null) => {
   if (run.isLive) {
     return true;
   }
-  return !TERMINAL_RUN_STATUSES.includes(run.status);
+  return !TERMINAL_STATUSES.includes(run.status);
 };

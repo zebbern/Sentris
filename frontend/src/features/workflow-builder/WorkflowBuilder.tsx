@@ -18,9 +18,12 @@ import {
   useWorkflowGraphControllers,
   cloneNodes,
   cloneEdges,
+} from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
+import {
   ENTRY_COMPONENT_ID,
   ENTRY_COMPONENT_SLUG,
-} from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
+  isEntryPointNode,
+} from '@/utils/entryPointUtils';
 import { WorkflowDesignerPane } from '@/features/workflow-builder/components/WorkflowDesignerPane';
 import { WorkflowExecutionPane } from '@/features/workflow-builder/components/WorkflowExecutionPane';
 import { useWorkflowImportExport } from '@/features/workflow-builder/hooks/useWorkflowImportExport';
@@ -62,11 +65,6 @@ const ENTRY_DEFAULT_RUNTIME_INPUTS = [
   },
 ] as const;
 
-const isEntryPointNode = (node?: ReactFlowNode<FrontendNodeData>) => {
-  if (!node) return false;
-  const componentRef = node.data?.componentId ?? node.data?.componentSlug;
-  return componentRef === ENTRY_COMPONENT_ID || componentRef === ENTRY_COMPONENT_SLUG;
-};
 const computeGraphSignature = (
   nodesSnapshot: ReactFlowNode<FrontendNodeData>[] | null,
   edgesSnapshot: ReactFlowEdge[] | null,
@@ -681,11 +679,6 @@ function WorkflowBuilderContent() {
             if (latestRun && latestRun.id && latestRun.status) {
               const isActive = ['QUEUED', 'RUNNING'].includes(latestRun.status);
               if (isActive) {
-                console.log(
-                  '[WorkflowBuilder] Found active run, resuming monitoring:',
-                  latestRun.id,
-                );
-
                 // Resume monitoring in execution store (always - this is background work)
                 useExecutionStore.getState().monitorRun(latestRun.id, workflow.id);
 

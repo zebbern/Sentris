@@ -952,17 +952,6 @@ export const initializeTimelineStore = () => {
             // Reload timeline to ensure all final events are loaded, then position at end
             if (!runId) return;
 
-            console.log(
-              '[TimelineStore] Workflow completed/failed detected, switching from live to replay mode',
-              {
-                isTerminalStatus,
-                isTerminalLifecycle,
-                statusJustChanged,
-                runStatus: runStatus?.status,
-                status,
-              },
-            );
-
             // Update run in TanStack Query cache to mark it as completed (removes from live runs)
             if (runStatus) {
               void import('@/hooks/queries/useRunQueries').then(
@@ -1020,13 +1009,6 @@ export const initializeTimelineStore = () => {
                     finalState.timelineStartTime,
                   ),
                 });
-                console.log(
-                  '[TimelineStore] Successfully switched to replay mode at end position',
-                  {
-                    totalDuration: finalState.totalDuration,
-                    eventsCount: finalState.events.length,
-                  },
-                );
               });
             return;
           }

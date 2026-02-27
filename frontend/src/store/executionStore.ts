@@ -613,7 +613,6 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           };
 
           set({ streamingMode: payload.mode });
-          console.log(`Streaming connected in ${payload.mode} mode for run ${payload.runId}`);
 
           // If we're in polling mode, we already have the interval set up
           // If we're in realtime mode, we can reduce polling frequency as backup

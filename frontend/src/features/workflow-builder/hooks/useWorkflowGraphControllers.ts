@@ -8,9 +8,13 @@ import {
   type Edge as ReactFlowEdge,
 } from 'reactflow';
 import type { FrontendNodeData } from '@/schemas/node';
+import {
+  ENTRY_COMPONENT_ID,
+  ENTRY_COMPONENT_SLUG,
+  isEntryPointNode,
+} from '@/utils/entryPointUtils';
 
-export const ENTRY_COMPONENT_ID = 'core.workflow.entrypoint';
-export const ENTRY_COMPONENT_SLUG = 'entry-point';
+export { ENTRY_COMPONENT_ID, ENTRY_COMPONENT_SLUG };
 
 export interface GraphSnapshot {
   nodes: ReactFlowNode<FrontendNodeData>[];
@@ -40,12 +44,6 @@ type ToastFn = (params: {
   description?: string;
   variant?: 'default' | 'destructive' | 'warning' | 'success';
 }) => void;
-
-const isEntryPointNode = (node?: ReactFlowNode<FrontendNodeData>) => {
-  if (!node) return false;
-  const componentRef = node.data?.componentId ?? node.data?.componentSlug;
-  return componentRef === ENTRY_COMPONENT_ID || componentRef === ENTRY_COMPONENT_SLUG;
-};
 
 export const cloneNodes = (
   nodes: ReactFlowNode<FrontendNodeData>[],

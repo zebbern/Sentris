@@ -24,8 +24,8 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { api } from '@/services/api';
 import { useWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { cn } from '@/lib/utils';
-
-const ENTRY_COMPONENT_ID = 'core.workflow.entrypoint';
+import { ENTRY_COMPONENT_ID } from '@/utils/entryPointUtils';
+import { normalizeRuntimeInputs } from '@/utils/runtimeInputUtils';
 
 type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string';
 type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;
@@ -98,21 +98,6 @@ const getLocalTimezone = (): string => {
   } catch {
     return 'UTC';
   }
-};
-
-const normalizeRuntimeInputs = (value: unknown): RuntimeInputDefinition[] => {
-  if (Array.isArray(value)) {
-    return value as RuntimeInputDefinition[];
-  }
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as RuntimeInputDefinition[]) : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
 };
 
 const normalizeRuntimeInputType = (type: RuntimeInputType): NormalizedRuntimeInputType =>

@@ -291,7 +291,6 @@ function arePropsEqual(prevProps: MarkdownViewProps, nextProps: MarkdownViewProp
 
   // Check if this content change was from a checkbox toggle we already handled
   if (expectedContent !== undefined && nextProps.content === expectedContent) {
-    console.log('[MarkdownView] Skipping re-render - checkbox update already applied to DOM');
     pendingCheckboxUpdates.delete(key);
     return true; // Skip re-render, we already updated the DOM
   }
@@ -305,9 +304,6 @@ function arePropsEqual(prevProps: MarkdownViewProps, nextProps: MarkdownViewProp
     prevProps.content === nextProps.content &&
     prevProps.className === nextProps.className &&
     prevProps.dataTestId === nextProps.dataTestId;
-  if (!equal) {
-    console.log('[MarkdownView] Props changed, will re-render');
-  }
   return equal;
 }
 
@@ -319,7 +315,6 @@ export const MarkdownView = memo(function MarkdownView({
   dataTestId,
   onEdit,
 }: MarkdownViewProps) {
-  console.log('[MarkdownView] Rendering with content length:', content.length);
   // Store onEdit in a ref so we can use a stable callback without re-renders
   const onEditRef = useRef(onEdit);
   onEditRef.current = onEdit;

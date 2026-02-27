@@ -56,8 +56,8 @@ import type { WorkflowSchedule } from '@shipsec/shared';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
 import { formatScheduleTimestamp, scheduleStatusVariant } from './schedules-utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
-
-const ENTRY_COMPONENT_ID = 'core.workflow.entrypoint';
+import { ENTRY_COMPONENT_ID } from '@/utils/entryPointUtils';
+import { normalizeRuntimeInputs } from '@/utils/runtimeInputUtils';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -134,21 +134,6 @@ const buildSampleValueForRuntimeInput = (type?: string, id?: string) => {
     default:
       return id ? `${id}-value` : 'value';
   }
-};
-
-const normalizeRuntimeInputs = (value: unknown) => {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
 };
 
 interface ManualListChipsInputProps {
