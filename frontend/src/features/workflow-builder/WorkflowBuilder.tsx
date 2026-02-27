@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useLocation, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   ReactFlowProvider,
@@ -54,7 +54,6 @@ import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 const ENTRY_DEFAULT_RUNTIME_INPUTS = [
   {
@@ -934,11 +933,8 @@ function WorkflowBuilderContent() {
   ]);
 
   // --- Unsaved changes guard ---
-  // Block in-app navigation (React Router) when there are unsaved design changes
-  const shouldBlockNavigation = isDirty && mode === 'design' && !isNewWorkflow;
-  const blocker = useBlocker(shouldBlockNavigation);
-
   // Block browser-level navigation (refresh, close tab, browser back)
+  const shouldBlockNavigation = isDirty && mode === 'design' && !isNewWorkflow;
   useEffect(() => {
     if (!shouldBlockNavigation) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1096,17 +1092,6 @@ function WorkflowBuilderContent() {
           onOpenChange={setIsPublishModalOpen}
         />
       )}
-      {/* Unsaved changes confirmation dialog (triggered by React Router blocker) */}
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        title="Unsaved changes"
-        description="You have unsaved changes that will be lost if you leave. Do you want to discard them?"
-        confirmLabel="Discard changes"
-        cancelLabel="Keep editing"
-        destructive={true}
-        onConfirm={() => blocker.proceed?.()}
-        onCancel={() => blocker.reset?.()}
-      />
     </>
   );
 }
