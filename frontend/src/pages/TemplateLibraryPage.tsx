@@ -47,6 +47,8 @@ import {
   type Template,
 } from '@/hooks/queries/useTemplateQueries';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/components/ui/use-toast';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { UseTemplateModal } from '@/features/templates/UseTemplateModal';
@@ -747,13 +749,22 @@ export function TemplateLibraryPage() {
   const { data: categories = [] } = useTemplateCategories();
   const { data: tags = [] } = useTemplateTags();
   const syncMutation = useSyncTemplates();
+  const { toast } = useToast();
 
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isUseModalOpen, setIsUseModalOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
-  const handleSync = () => {
-    syncMutation.mutate();
+  const handleSync = async () => {
+    try {
+      await syncMutation.mutateAsync();
+    } catch (err) {
+      toast({
+        title: 'Template sync failed',
+        description: humanizeApiError(err),
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSearchChange = (value: string) => {

@@ -36,6 +36,8 @@ import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useToast } from '@/components/ui/use-toast';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -59,6 +61,7 @@ export function ArtifactLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
   const { confirm, dialogProps } = useConfirmDialog();
+  const { toast } = useToast();
 
   const searchFilter = searchQuery.trim() || undefined;
   const {
@@ -202,14 +205,33 @@ export function ArtifactLibrary() {
                     key={artifact.id}
                     artifact={artifact}
                     workflowName={workflows[artifact.workflowId] || 'Unknown Workflow'}
-                    onDownload={() => downloadArtifactMutation.mutate({ artifact })}
+                    onDownload={async () => {
+                      try {
+                        await downloadArtifactMutation.mutateAsync({ artifact });
+                      } catch (err) {
+                        toast({
+                          title: 'Download failed',
+                          description: humanizeApiError(err),
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
                     onDelete={async () => {
                       const ok = await confirm({
                         title: 'Delete artifact',
                         description: 'Are you sure you want to delete this artifact?',
                         confirmLabel: 'Delete',
                       });
-                      if (ok) deleteArtifactMutation.mutate(artifact.id);
+                      if (!ok) return;
+                      try {
+                        await deleteArtifactMutation.mutateAsync(artifact.id);
+                      } catch (err) {
+                        toast({
+                          title: 'Failed to delete artifact',
+                          description: humanizeApiError(err),
+                          variant: 'destructive',
+                        });
+                      }
                     }}
                     isDeleting={
                       deleteArtifactMutation.isPending &&
