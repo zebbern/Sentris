@@ -1,21 +1,16 @@
 import '../../components';
 import { Context } from '@temporalio/activity';
-import { ApplicationFailure } from '@temporalio/common';
 import * as crypto from 'node:crypto';
 import {
   componentRegistry,
   createExecutionContext,
   NotFoundError,
-  ValidationError,
   TEMPORAL_SPILL_THRESHOLD_BYTES,
-  isSpilledDataMarker,
-  extractPorts,
   type IFileStorageService,
   type ISecretsService,
   type ITraceService,
   type INodeIOService,
   type AgentTracePublisher,
-  type ComponentPortMetadata,
 } from '@shipsec/component-sdk';
 
 import {
@@ -23,6 +18,10 @@ import {
   maskSecretOutputs,
   createLightweightSummary,
 } from '../utils/component-output';
+import { unspill } from './spill-resolver';
+import { resolveSecretInputOverrides, resolveSecretParams } from './secret-resolver';
+import { validateRequiredInputs } from './input-validator';
+import { handleComponentError } from './error-handler';
 import { RedisTerminalStreamAdapter } from '../../adapters';
 import type {
   RunComponentActivityInput,
@@ -44,41 +43,6 @@ interface ComponentActivityServices {
 }
 
 let componentServices: ComponentActivityServices | null = null;
-
-const ERROR_LOG_LIMIT = 600;
-
-function truncateText(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  const remaining = value.length - maxLength;
-  return `${value.slice(0, maxLength)}...(+${remaining} chars)`;
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && typeof error.message === 'string') {
-    return error.message;
-  }
-  return String(error);
-}
-
-function truncateDetails(
-  details: Record<string, unknown> | undefined,
-  maxLength: number,
-): Record<string, unknown> | undefined {
-  if (!details) {
-    return undefined;
-  }
-  try {
-    const raw = JSON.stringify(details);
-    if (raw.length <= maxLength) {
-      return details;
-    }
-    return { truncated: true, preview: truncateText(raw, maxLength) };
-  } catch {
-    return { truncated: true, preview: truncateText(String(details), maxLength) };
-  }
-}
 
 export function initializeComponentActivityServices(options: {
   storage: IFileStorageService;
@@ -242,238 +206,31 @@ export async function runComponentActivity(
   const resolvedParams = { ...params };
   const resolvedInputs = { ...inputs };
 
-  async function unspill(obj: Record<string, any>, contextLabel: string) {
-    for (const [key, value] of Object.entries(obj)) {
-      if (isSpilledDataMarker(value)) {
-        if (!svc.storage) {
-          console.warn(
-            `[Activity] ${contextLabel} '${key}' is spilled but no storage service is available`,
-          );
-          continue;
-        }
-
-        try {
-          let fullData: any;
-          if (spilledObjectsCache.has(value.storageRef)) {
-            fullData = spilledObjectsCache.get(value.storageRef);
-          } else {
-            const content = await svc.storage!.downloadFile(value.storageRef);
-            fullData = JSON.parse(content.buffer.toString('utf8'));
-            spilledObjectsCache.set(value.storageRef, fullData);
-          }
-
-          const handle = (value as any).__spilled_handle__;
-          if (handle && handle !== '__self__') {
-            if (
-              fullData &&
-              typeof fullData === 'object' &&
-              Object.prototype.hasOwnProperty.call(fullData, handle)
-            ) {
-              obj[key] = fullData[handle];
-            } else {
-              console.warn(
-                `[Activity] Spilled handle '${handle}' not found in downloaded data for ${contextLabel.toLowerCase()} '${key}'`,
-              );
-              obj[key] = undefined;
-              warningsToReport.push({
-                target: key,
-                sourceRef: 'spilled-storage',
-                sourceHandle: String(handle),
-              });
-            }
-          } else {
-            obj[key] = fullData;
-          }
-        } catch (err: unknown) {
-          console.error(
-            `[Activity] Failed to resolve spilled ${contextLabel.toLowerCase()} '${key}':`,
-            err,
-          );
-          throw ApplicationFailure.retryable(
-            `Failed to resolve spilled ${contextLabel.toLowerCase()} '${key}': ${err instanceof Error ? err.message : String(err)}`,
-            'SpillResolutionError',
-          );
-        }
-      }
-    }
-  }
-
-  await unspill(resolvedParams, 'Parameter');
-  await unspill(resolvedInputs, 'Input');
-
-  // Resolve secret references in inputOverrides
-  // When a user selects a secret from the store in the config panel,
-  // the secret ID is stored. We need to resolve it to the actual value.
-  const resolveSecretInputOverrides = async (
-    inputs: Record<string, unknown>,
-    inputOverrides: Record<string, unknown>,
-  ) => {
-    if (!svc.secrets) {
-      return;
-    }
-
-    // Get input port metadata to identify which inputs are secret-type
-    // For components with dynamic ports, we must resolve them first
-    let inputsSchema = component.inputs;
-    if (typeof component.resolvePorts === 'function') {
-      try {
-        const resolved = component.resolvePorts(resolvedParams);
-        if (resolved?.inputs) {
-          inputsSchema = resolved.inputs;
-        }
-      } catch (_err: unknown) {
-        console.warn('[Activity] Failed to resolve ports for secret check');
-      }
-    }
-
-    const inputPorts = inputsSchema ? extractPorts(inputsSchema) : [];
-
-    for (const [key, value] of Object.entries(inputOverrides)) {
-      if (typeof value !== 'string' || !value) {
-        continue;
-      }
-
-      const portMeta = inputPorts.find((p: ComponentPortMetadata) => p.id === key);
-      const isSecretPort =
-        portMeta?.editor === 'secret' ||
-        (portMeta?.connectionType?.kind === 'primitive' &&
-          portMeta?.connectionType?.name === 'secret');
-
-      if (!isSecretPort) {
-        continue;
-      }
-
-      // This is a secret reference, resolve it
-      try {
-        console.log(`[Activity] Resolving secret reference for input '${key}'...`);
-        const resolved = await svc.secrets.get(value);
-        if (resolved?.value) {
-          inputs[key] = resolved.value;
-          console.log(`[Activity] Successfully resolved secret reference for input '${key}'`);
-        } else {
-          console.warn(`[Activity] Secret reference not found in store for input '${key}'`);
-        }
-      } catch (err: unknown) {
-        console.warn(
-          `[Activity] Error resolving secret reference for input '${key}': ${err instanceof Error ? err.message : 'unknown error'}`,
-        );
-      }
-    }
-  };
+  await unspill(resolvedParams, 'Parameter', svc.storage, spilledObjectsCache, warningsToReport);
+  await unspill(resolvedInputs, 'Input', svc.storage, spilledObjectsCache, warningsToReport);
 
   // Resolve secret references for input overrides
-  await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {});
-
-  // Also resolve secret references in params (for params with editor: 'secret')
-  const resolveSecretParams = async (
-    params: Record<string, unknown>,
-    rawParams: Record<string, unknown>,
-  ) => {
-    if (!svc.secrets || !component.parameters) {
-      return;
-    }
-
-    const paramPorts = extractPorts(component.parameters);
-
-    for (const [key, value] of Object.entries(rawParams)) {
-      if (typeof value !== 'string' || !value) {
-        continue;
-      }
-
-      const portMeta = paramPorts.find((p: ComponentPortMetadata) => p.id === key);
-      const isSecretParam =
-        portMeta?.editor === 'secret' ||
-        (portMeta?.connectionType?.kind === 'primitive' &&
-          portMeta?.connectionType?.name === 'secret');
-
-      if (!isSecretParam) {
-        continue;
-      }
-
-      try {
-        console.log(`[Activity] Resolving secret reference for param '${key}'...`);
-        const resolved = await svc.secrets.get(value);
-        if (resolved?.value) {
-          params[key] = resolved.value;
-          console.log(`[Activity] Successfully resolved secret reference for param '${key}'`);
-        } else {
-          console.warn(`[Activity] Secret reference not found in store for param '${key}'`);
-        }
-      } catch (err: unknown) {
-        console.warn(
-          `[Activity] Error resolving secret reference for param '${key}': ${err instanceof Error ? err.message : 'unknown error'}`,
-        );
-      }
-    }
-  };
-
-  await resolveSecretParams(resolvedParams, input.rawParams ?? {});
-
-  // Get input port metadata to check which inputs are truly required
-  let inputsSchemaForValidation = component.inputs;
-  if (typeof component.resolvePorts === 'function') {
-    try {
-      const resolved = component.resolvePorts(resolvedParams);
-      if (resolved?.inputs) {
-        inputsSchemaForValidation = resolved.inputs;
-      }
-    } catch {
-      // If port resolution fails, use the base schema
-    }
-  }
-  const inputPorts = inputsSchemaForValidation ? extractPorts(inputsSchemaForValidation) : [];
-
-  // Filter warnings to only those for truly required inputs
-  // An input is NOT required if:
-  // - Its schema allows undefined/null (required: false)
-  // - It accepts any type (connectionType.kind === 'any') which includes undefined
-  const requiredMissingInputs = warningsToReport.filter((warning) => {
-    const portMeta = inputPorts.find((p: ComponentPortMetadata) => p.id === warning.target);
-    // If we can't find the port metadata, assume it's required to be safe
-    if (!portMeta) return true;
-    // If marked as not required, it's optional
-    if (portMeta.required === false) return false;
-    // If connectionType is 'any', it accepts undefined
-    if (portMeta.connectionType?.kind === 'any') return false;
-    return true;
+  await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
+    secrets: svc.secrets,
+    component,
+    resolvedParams,
   });
 
-  // Log warnings for all undefined inputs (even optional ones)
-  for (const warning of warningsToReport) {
-    const isRequired = requiredMissingInputs.some((r) => r.target === warning.target);
-    context.trace?.record({
-      type: 'NODE_PROGRESS',
-      timestamp: new Date().toISOString(),
-      message: `Input '${warning.target}' mapped from ${warning.sourceRef}.${warning.sourceHandle} was undefined`,
-      level: isRequired ? 'error' : 'warn',
-      data: warning,
-    });
-  }
+  // Also resolve secret references in params (for params with editor: 'secret')
+  await resolveSecretParams(resolvedParams, input.rawParams ?? {}, {
+    secrets: svc.secrets,
+    component,
+  });
 
-  // Only throw if there are truly missing required inputs
-  if (requiredMissingInputs.length > 0) {
-    const missing = requiredMissingInputs.map((warning) => `'${warning.target}'`).join(', ');
-    throw new ValidationError(`Missing required inputs for ${action.ref}: ${missing}`, {
-      fieldErrors: Object.fromEntries(
-        requiredMissingInputs.map((w) => [
-          w.target,
-          [`mapped from ${w.sourceRef}.${w.sourceHandle} was undefined`],
-        ]),
-      ),
-      details: { actionRef: action.ref, componentId: action.componentId },
-    });
-  }
+  // Validate required inputs and log warnings
+  validateRequiredInputs(warningsToReport, component, resolvedParams, context.trace, action.ref);
 
-  // For components with dynamic ports (resolvePorts), resolve the actual input/output schemas
+  // For components with dynamic ports (resolvePorts), resolve the actual input schemas
   let inputsSchema = component.inputs;
-  let _outputsSchema = component.outputs;
   if (typeof component.resolvePorts === 'function') {
     const resolved = component.resolvePorts(params);
     if (resolved?.inputs) {
       inputsSchema = resolved.inputs;
-    }
-    if (resolved?.outputs) {
-      _outputsSchema = resolved.outputs;
     }
   }
 
@@ -541,8 +298,6 @@ export async function runComponentActivity(
         status: 'completed',
       });
 
-      // Clean up Node I/O recording - output has been recorded
-
       context.trace?.record({
         type: 'NODE_COMPLETED',
         timestamp: new Date().toISOString(),
@@ -554,104 +309,19 @@ export async function runComponentActivity(
 
     return { output, activeOutputPorts };
   } catch (error: unknown) {
-    const rawErrorMsg = getErrorMessage(error);
-    const errorMsg = truncateText(rawErrorMsg, ERROR_LOG_LIMIT);
-    console.error(`[Activity] Failed ${action.ref}: ${errorMsg}`);
-
-    // Extract error properties without using 'any'
-    let errorType: string | undefined;
-    let errorDetails: Record<string, unknown> | undefined;
-    let fieldErrors: Record<string, string[]> | undefined;
-    let isRetryable = false;
-
-    if (error instanceof Error) {
-      errorType = error.name;
-
-      // Check if it's a ComponentError (has type and retryable properties)
-      if ('type' in error && typeof (error as { type: unknown }).type === 'string') {
-        errorType = (error as { type: string }).type;
-      }
-
-      // Check if it's retryable
-      if (
-        'retryable' in error &&
-        typeof (error as { retryable: unknown }).retryable === 'boolean'
-      ) {
-        isRetryable = (error as { retryable: boolean }).retryable;
-      }
-
-      // Extract details if present
-      if (
-        'details' in error &&
-        typeof (error as { details: unknown }).details === 'object' &&
-        (error as { details: unknown }).details !== null
-      ) {
-        errorDetails = truncateDetails(
-          (error as { details: Record<string, unknown> }).details,
-          ERROR_LOG_LIMIT,
-        );
-      }
-
-      // Extract fieldErrors if it's a ValidationError
-      if (error instanceof ValidationError && error.fieldErrors) {
-        fieldErrors = error.fieldErrors;
-      }
-    }
-
-    const traceError: {
-      message: string;
-      type?: string;
-      stack?: string;
-      details?: Record<string, unknown>;
-      fieldErrors?: Record<string, string[]>;
-    } = {
-      message: errorMsg,
-      type: errorType || 'UnknownError',
-      stack:
-        error instanceof Error && error.stack
-          ? truncateText(error.stack, ERROR_LOG_LIMIT)
-          : undefined,
-      details: errorDetails,
-      fieldErrors,
-    };
-
-    context.trace?.record({
-      type: 'NODE_FAILED',
-      timestamp: new Date().toISOString(),
-      message: errorMsg,
-      error: traceError,
-      level: 'error',
-    });
-
-    // Record node I/O failure
-    await svc.nodeIO?.recordCompletion({
-      runId: input.runId,
-      nodeRef: action.ref,
+    await handleComponentError(error, {
+      actionRef: action.ref,
       componentId: action.componentId,
-      outputs: {},
-      status: 'failed',
-      errorMessage: errorMsg,
-    });
-
-    const finalErrorType = errorType || 'ComponentError';
-
-    const details = {
-      componentId: action.componentId,
-      nodeRef: action.ref,
-      attempt: activityInfo.attempt,
       activityId: activityInfo.activityId,
+      attempt: activityInfo.attempt,
+      runId: input.runId,
       streamId,
       joinStrategy,
       triggeredBy,
       failure,
-      stack: error instanceof Error ? error.stack : undefined,
-    };
-
-    if (isRetryable) {
-      throw ApplicationFailure.retryable(errorMsg, finalErrorType, [details]);
-    }
-
-    throw ApplicationFailure.nonRetryable(errorMsg, finalErrorType, [details]);
+      trace: context.trace,
+      nodeIO: svc.nodeIO,
+    });
   } finally {
     // Do not finalize run here; lifecycle is managed by workflow orchestration.
   }
