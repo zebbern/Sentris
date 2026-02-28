@@ -6,6 +6,7 @@ import { AuditLogSettings } from '@/pages/settings/AuditLogSettings';
 import { GeneralSettings } from '@/pages/settings/GeneralSettings';
 import { AppearanceSettings } from '@/pages/settings/AppearanceSettings';
 import { NotificationSettings } from '@/pages/settings/NotificationSettings';
+import { KeyboardShortcutsSettings } from '@/pages/settings/KeyboardShortcutsSettings';
 import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -28,6 +29,11 @@ export function SettingsPage() {
     {
       label: 'Notifications',
       to: '/settings/notifications',
+      adminOnly: false,
+    },
+    {
+      label: 'Shortcuts',
+      to: '/settings/shortcuts',
       adminOnly: false,
     },
     {
@@ -67,6 +73,7 @@ export function SettingsPage() {
             <Route path="general" element={<GeneralSettings />} />
             <Route path="appearance" element={<AppearanceSettings />} />
             <Route path="notifications" element={<NotificationSettings />} />
+            <Route path="shortcuts" element={<KeyboardShortcutsSettings />} />
             {isAdmin && <Route path="audit" element={<AuditLogSettings />} />}
           </Routes>
         </div>

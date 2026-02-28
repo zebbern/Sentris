@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
@@ -116,6 +116,12 @@ export function ApiKeysManager() {
   const [formState, setFormState] = useState<CreateApiKeyInput>(INITIAL_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  const isFormValid = useMemo(() => {
+    const trimmedName = formState.name.trim();
+    return trimmedName.length >= 1 && trimmedName.length <= 64;
+  }, [formState.name]);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { toast } = useToast();
@@ -132,6 +138,7 @@ export function ApiKeysManager() {
     if (!open) {
       setFormState(INITIAL_FORM);
       setCreateError(null);
+      setNameError(null);
       clearLastCreatedKey(); // Clear sensitive key if dialog closed
     }
   };
@@ -164,11 +171,26 @@ export function ApiKeysManager() {
     e.preventDefault();
     if (!canManageKeys) return;
 
+    const trimmedName = formState.name.trim();
+    if (!trimmedName) {
+      setNameError('API key name is required.');
+      return;
+    }
+    if (trimmedName.length > 64) {
+      setNameError('API key name must be 64 characters or fewer.');
+      return;
+    }
+
     setCreateError(null);
+    setNameError(null);
     setIsSubmitting(true);
 
     try {
-      await createApiKeyMutation.mutateAsync(formState);
+      await createApiKeyMutation.mutateAsync({
+        ...formState,
+        name: trimmedName,
+        description: formState.description?.trim() || undefined,
+      });
       setSuccessMessage('API Key created successfully.');
       // Don't close dialog yet because we need to show the key
     } catch (err: unknown) {
@@ -481,12 +503,31 @@ export function ApiKeysManager() {
                   id="name"
                   placeholder="e.g. CI/CD Runner"
                   value={formState.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  maxLength={100}
+                  onChange={(e) => {
+                    handleInputChange('name', e.target.value);
+                    if (nameError) setNameError(null);
+                  }}
+                  maxLength={64}
                   required
                   aria-required="true"
-                  aria-describedby={createError ? 'create-api-key-error' : undefined}
+                  aria-invalid={!!nameError}
+                  aria-describedby={
+                    nameError
+                      ? 'create-apikey-name-error'
+                      : createError
+                        ? 'create-api-key-error'
+                        : undefined
+                  }
                 />
+                {nameError && (
+                  <p
+                    id="create-apikey-name-error"
+                    className="text-sm text-destructive"
+                    role="alert"
+                  >
+                    {nameError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -609,7 +650,7 @@ export function ApiKeysManager() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting || !formState.name}>
+                <Button type="submit" disabled={!isFormValid || isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Key'}
                 </Button>
               </DialogFooter>

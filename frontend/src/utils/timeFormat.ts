@@ -85,3 +85,23 @@ export function formatRelativeTime(value?: string | null): string {
   }
   return `${minutes}m left`;
 }
+
+/**
+ * Format a past date as a concise relative time string.
+ * Returns "today" for the current day, then "1d ago", "Xd ago",
+ * "Xw ago", "Xmo ago", or "Xy ago" for older dates.
+ * @param date ISO timestamp string or Date object
+ * @returns Formatted relative time string
+ */
+export function formatTimeAgo(date: string | Date): string {
+  const now = new Date();
+  const past = new Date(date);
+  const diffMs = now.getTime() - past.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return '1d ago';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+  return `${Math.floor(diffDays / 365)}y ago`;
+}

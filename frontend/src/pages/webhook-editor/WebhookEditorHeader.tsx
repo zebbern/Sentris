@@ -39,8 +39,9 @@ export function WebhookEditorHeader({
       )}
     >
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button variant="ghost" size="icon" onClick={onBack} className="gap-1.5">
           <ArrowLeft className="h-5 w-5" />
+          <span className="text-sm font-medium hidden sm:inline">Webhooks</span>
         </Button>
         <div className="flex flex-col">
           <div className="flex items-center gap-2">

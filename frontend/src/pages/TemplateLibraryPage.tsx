@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { formatTimeAgo } from '@/utils/timeFormat';
 import {
   Eye,
   Filter,
@@ -37,6 +38,7 @@ import {
   Workflow,
   KeyRound,
   ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -183,19 +185,6 @@ function getCategoryStyle(category?: string | null): CategoryStyle {
 
 function toTitleCase(str: string): string {
   return str.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function timeAgo(date: string | Date): string {
-  const now = new Date();
-  const past = new Date(date);
-  const diffMs = now.getTime() - past.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return '1d ago';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  return `${Math.floor(diffDays / 365)}y ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +497,7 @@ function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps)
                 <span className="text-border">&middot;</span>
               </>
             )}
-            {template.updatedAt && <span>Updated {timeAgo(template.updatedAt)}</span>}
+            {template.updatedAt && <span>Updated {formatTimeAgo(template.updatedAt)}</span>}
           </div>
         </div>
 
@@ -889,6 +878,18 @@ export function TemplateLibraryPage() {
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
               <span className="hidden sm:inline">Sync</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                window.open('https://github.com/shipsec/templates', '_blank', 'noopener,noreferrer')
+              }
+              className="gap-2 h-9"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Contribute</span>
             </Button>
           </div>
 
