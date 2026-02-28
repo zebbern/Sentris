@@ -22,7 +22,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Copy, Trash2, ShieldOff, AlertTriangle, Key } from 'lucide-react';
+import { Copy, Trash2, ShieldOff, AlertTriangle, Key, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -90,7 +91,7 @@ export function ApiKeysManager() {
   const queryClient = useQueryClient();
 
   const organizationId = useAuthStore((state) => state.organizationId);
-  const { data: apiKeys = [], isLoading: loading, error: apiKeysError } = useApiKeys();
+  const { data: apiKeys = [], isLoading: loading, error: apiKeysError, refetch } = useApiKeys();
   const error = apiKeysError?.message ?? null;
 
   const getApiKeyId = useCallback((k: ApiKeyResponseDto) => k.id, []);
@@ -183,7 +184,7 @@ export function ApiKeysManager() {
       title: 'Revoke API Key',
       description: `Are you sure you want to revoke the key "${key.name}"? Applications using this key will immediately stop working.`,
       confirmLabel: 'Revoke',
-      destructive: false,
+      destructive: true,
     });
     if (!ok) return;
     try {
@@ -226,13 +227,24 @@ export function ApiKeysManager() {
     <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8">
-          <Button
-            onClick={() => setIsCreateOpen(true)}
-            disabled={isReadOnly}
-            className="self-start sm:self-auto"
-          >
-            Create new key
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setIsCreateOpen(true)}
+              disabled={isReadOnly}
+              className="self-start sm:self-auto"
+            >
+              Create new key
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => refetch()}
+              disabled={loading}
+              className="gap-2"
+            >
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          </div>
         </div>
 
         {error && (

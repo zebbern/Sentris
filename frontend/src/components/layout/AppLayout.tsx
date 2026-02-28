@@ -386,6 +386,9 @@ export function AppLayout({ children }: AppLayoutProps) {
             sidebarOpen ? 'w-72' : isMobile ? 'w-0 -translate-x-full' : 'w-16',
             // Ensure sidebar is above backdrop on mobile
             isMobile && sidebarOpen && 'translate-x-0',
+            // Prevent closed mobile sidebar from blocking clicks
+            !sidebarOpen && isMobile && 'pointer-events-none',
+            sidebarOpen && isMobile && 'pointer-events-auto',
           )}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
