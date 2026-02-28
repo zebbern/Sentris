@@ -4,6 +4,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { Copy, Download, Loader2, PlugZap, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useTimelineTerminalStream } from '@/hooks/useTimelineTerminalStream';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -23,6 +24,11 @@ interface NodeTerminalPanelProps {
    * Used for bringing the panel to the front in z-index stacking.
    */
   onFocus?: () => void;
+  /**
+   * When true, the panel fills its container (no fixed w/h, no border/shadow).
+   * Intended for embedding inside the dock panel.
+   */
+  embedded?: boolean;
 }
 
 const decodePayload = (payload: string): Uint8Array => {
@@ -47,6 +53,7 @@ export function NodeTerminalPanel({
   onClose,
   timelineSync = false,
   onFocus,
+  embedded = false,
 }: NodeTerminalPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -405,7 +412,12 @@ export function NodeTerminalPanel({
       ref={panelRef}
       // nodrag, nowheel, nopan: Prevent ReactFlow from intercepting mouse events in terminal
       // This fixes sticky selection issues caused by ReactFlow capturing mouse events
-      className="nodrag nowheel nopan select-text w-[520px] rounded-lg border-2 border-border bg-card overflow-hidden shadow-lg"
+      className={cn(
+        'nodrag nowheel nopan select-text overflow-hidden',
+        embedded
+          ? 'w-full h-full flex flex-col bg-card'
+          : 'w-[520px] rounded-lg border-2 border-border bg-card shadow-lg',
+      )}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
         <div>
@@ -454,8 +466,11 @@ export function NodeTerminalPanel({
           </span>
         </div>
       )}
-      <div className="relative" style={{ backgroundColor: '#1e1e1e' }}>
-        <div ref={containerRef} className="h-[360px] w-full" />
+      <div
+        className={cn('relative', embedded ? 'flex-1 min-h-0' : '')}
+        style={{ backgroundColor: '#1e1e1e' }}
+      >
+        <div ref={containerRef} className={cn(embedded ? 'h-full w-full' : 'h-[360px] w-full')} />
         {!hasData && !session?.chunks?.length && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-sm text-foreground space-y-2 text-center p-4">

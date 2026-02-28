@@ -25,6 +25,7 @@ import {
 import 'reactflow/dist/style.css';
 
 import { WorkflowNode } from './WorkflowNode';
+/** @deprecated Terminal rendering moved to TerminalDockPanel. Kept for backward compatibility. */
 import { TerminalNode } from './TerminalNode';
 import { ConfigPanel } from './ConfigPanel';
 import { ValidationDock } from './ValidationDock';
@@ -160,6 +161,7 @@ export function Canvas({
   const nodeTypes = useMemo(
     () => ({
       workflow: WorkflowNode,
+      /** @deprecated Terminal nodes replaced by TerminalDockPanel. Kept to avoid ReactFlow warnings. */
       terminal: TerminalNode,
     }),
     [],

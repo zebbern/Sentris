@@ -5,20 +5,20 @@ import type { InputPort, OutputPort } from '@/schemas/component';
 export type { NodeStatus, FrontendNodeData, NodeVisualState, InputPort, OutputPort };
 
 /**
- * Props for the TerminalButton component
+ * Props for the TerminalButton component.
+ * Uses the workflow UI store dock actions internally — no ReactFlow node creation.
  */
 export interface TerminalButtonProps {
+  /** The workflow node ID this terminal belongs to. */
   id: string;
-  isTerminalOpen: boolean;
-  setIsTerminalOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  isTerminalLoading: boolean;
-  terminalSession: { chunks?: unknown[] } | undefined;
+  /** Display label for the terminal tab (node label). */
+  label: string;
+  /** The currently selected run ID. */
   selectedRunId: string;
-  mode: string;
-  playbackMode: string;
-  isLiveFollowing: boolean;
-  focusedTerminalNodeId: string | null;
-  bringTerminalToFront: (nodeId: string) => void;
+  /** Whether the terminal data is still loading. */
+  isTerminalLoading: boolean;
+  /** Terminal session data (used to show the green dot indicator). */
+  terminalSession: { chunks?: unknown[] } | undefined;
 }
 
 /**

@@ -164,11 +164,16 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
   const { data: secrets = [] } = useSecrets();
   const { getNodes, getEdges, setNodes, deleteElements } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
-  const { nodeStates, selectedRunId, selectNode, isPlaying, playbackMode, isLiveFollowing } =
-    useExecutionTimelineStore();
+  const {
+    nodeStates,
+    selectedRunId,
+    selectNode,
+    isPlaying,
+    playbackMode,
+    isLiveFollowing: _isLiveFollowing,
+  } = useExecutionTimelineStore();
   const { markDirty } = useWorkflowStore();
-  const { mode, focusedTerminalNodeId, bringTerminalToFront, openHumanInputDialog } =
-    useWorkflowUiStore();
+  const { mode, openHumanInputDialog } = useWorkflowUiStore();
   const prefetchTerminal = useExecutionStore((state) => state.prefetchTerminal);
   const terminalSession = useExecutionStore((state) => state.getTerminalSession(id, 'pty'));
   const theme = useThemeStore((state) => state.theme);
@@ -181,8 +186,9 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
     selectEntryPoint,
   } = useEntryPointActions();
 
-  // Local state
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  // Terminal dock state (derived from store)
+  const dockedTerminals = useWorkflowUiStore((s) => s.dockedTerminals);
+  const isTerminalDocked = dockedTerminals.some((t) => t.nodeId === id);
   const [isTerminalLoading, setIsTerminalLoading] = useState(false);
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -202,9 +208,9 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
     };
   });
 
-  // Terminal loading effect
+  // Terminal loading effect — prefetch when terminal is docked
   useEffect(() => {
-    if (!isTerminalOpen) return;
+    if (!isTerminalDocked) return;
 
     let cancelled = false;
     const loadTerminal = async () => {
@@ -222,7 +228,7 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
     return () => {
       cancelled = true;
     };
-  }, [id, isTerminalOpen, prefetchTerminal, selectedRunId]);
+  }, [id, isTerminalDocked, prefetchTerminal, selectedRunId]);
 
   const nodeData = data;
   const componentRef: string | undefined = nodeData.componentId ?? nodeData.componentSlug;
@@ -716,16 +722,10 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
                 {supportsLiveLogs && mode === 'execution' && selectedRunId && (
                   <TerminalButton
                     id={id}
-                    isTerminalOpen={isTerminalOpen}
-                    setIsTerminalOpen={setIsTerminalOpen}
+                    label={displayLabel}
+                    selectedRunId={selectedRunId}
                     isTerminalLoading={isTerminalLoading}
                     terminalSession={terminalSession}
-                    selectedRunId={selectedRunId}
-                    mode={mode}
-                    playbackMode={playbackMode}
-                    isLiveFollowing={isLiveFollowing}
-                    focusedTerminalNodeId={focusedTerminalNodeId}
-                    bringTerminalToFront={bringTerminalToFront}
                   />
                 )}
                 {mode === 'design' && !isEntryPoint && (

@@ -31,6 +31,8 @@ interface WorkflowBuilderShellProps {
   canRedo?: boolean;
   /** Floating overlay content for execution mode (e.g., parent run breadcrumbs) */
   executionOverlay?: ReactNode;
+  /** Bottom dock panel content (e.g., TerminalDockPanel) */
+  terminalDockContent?: ReactNode;
 }
 
 const LIBRARY_PANEL_WIDTH = 320;
@@ -60,6 +62,7 @@ export function WorkflowBuilderShell({
   canUndo,
   canRedo,
   executionOverlay,
+  terminalDockContent,
 }: WorkflowBuilderShellProps) {
   const isMobile = useIsMobile();
   const layoutRef = useRef<HTMLDivElement | null>(null);
@@ -412,128 +415,134 @@ export function WorkflowBuilderShell({
           </div>
         </aside>
 
-        <main
-          className="flex-1 relative flex min-w-0"
-          style={{
-            transition: isInspectorResizing ? 'none' : 'all 200ms ease-in-out',
-          }}
-        >
-          <div className="flex-1 h-full relative min-w-0">{canvasContent}</div>
+        {/* Wrapper: flex column for main + terminal dock */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <main
+            className="flex-1 relative flex min-w-0 min-h-0"
+            style={{
+              transition: isInspectorResizing ? 'none' : 'all 200ms ease-in-out',
+            }}
+          >
+            <div className="flex-1 h-full relative min-w-0">{canvasContent}</div>
 
-          {/* Schedule Sidebar - Hide on mobile, show as drawer instead */}
-          {showScheduleSidebarContainer && !isMobile && (
-            <aside
-              className={cn(
-                'overflow-hidden border-l bg-background transition-all duration-150 ease-out',
-                isScheduleSidebarVisible
-                  ? 'opacity-100 w-[432px]'
-                  : 'opacity-0 w-0 pointer-events-none',
-              )}
-              style={{
-                transition: 'width 150ms ease-out, opacity 150ms ease-out',
-              }}
-            >
-              {isScheduleSidebarVisible && scheduleSidebarContent}
-            </aside>
-          )}
-
-          {/* Mobile: Draggable bottom sheet for all panels */}
-          {isMobile ? (
-            <aside
-              className={cn(
-                'fixed inset-x-0 bottom-0 z-[60] bg-background border-t rounded-t-2xl shadow-2xl overflow-hidden',
-                'transition-opacity duration-200',
-                anyMobilePanelVisible
-                  ? 'opacity-100'
-                  : 'opacity-0 pointer-events-none translate-y-full',
-              )}
-              style={{
-                height: anyMobilePanelVisible ? `${mobileSheetHeight}%` : 0,
-                maxHeight: 'calc(100vh - 56px)', // Don't go above topbar
-                transition: isDraggingSheetRef.current
-                  ? 'none'
-                  : 'height 200ms ease-out, opacity 200ms ease-out, transform 200ms ease-out',
-              }}
-            >
-              {/* Drag handle with animated hint */}
-              <div
-                className="flex justify-center py-3 cursor-grab active:cursor-grabbing touch-none select-none"
-                onTouchStart={handleSheetTouchStart}
-                onTouchMove={handleSheetTouchMove}
-                onTouchEnd={handleSheetTouchEnd}
-                onMouseDown={handleSheetMouseDown}
-              >
-                <div
-                  className={cn(
-                    'flex items-center justify-center rounded-full transition-all duration-500 ease-out overflow-hidden',
-                    showMobileHint
-                      ? 'bg-muted/80 border px-3 py-1.5 gap-1.5'
-                      : 'bg-muted-foreground/40 w-12 h-1.5',
-                  )}
-                >
-                  {showMobileHint ? (
-                    <>
-                      <svg
-                        className="w-3 h-3 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                      </svg>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {isConfigPanelVisible
-                          ? 'Slide down to see canvas'
-                          : isScheduleSidebarVisible
-                            ? 'Slide down to see canvas'
-                            : 'Slide down to inspect nodes'}
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex h-[calc(100%-36px)] min-h-0 overflow-hidden w-full relative">
-                {isConfigPanelVisible
-                  ? configPanelContent
-                  : isScheduleSidebarVisible
-                    ? scheduleSidebarContent
-                    : inspectorContent}
-                <div id="mobile-bottom-sheet-portal" className="absolute inset-0 empty:hidden" />
-              </div>
-            </aside>
-          ) : (
-            // Desktop: Side panel (unchanged)
-            <aside
-              className={cn(
-                'border-l bg-background overflow-hidden relative h-full',
-                isInspectorVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
-              )}
-              style={{
-                width: isInspectorVisible ? inspectorWidth : 0,
-                transition: isInspectorResizing
-                  ? 'opacity 200ms ease-in-out'
-                  : 'width 200ms ease-in-out, opacity 200ms ease-in-out',
-              }}
-            >
-              <div
-                className="absolute inset-0"
+            {/* Schedule Sidebar - Hide on mobile, show as drawer instead */}
+            {showScheduleSidebarContainer && !isMobile && (
+              <aside
+                className={cn(
+                  'overflow-hidden border-l bg-background transition-all duration-150 ease-out',
+                  isScheduleSidebarVisible
+                    ? 'opacity-100 w-[432px]'
+                    : 'opacity-0 w-0 pointer-events-none',
+                )}
                 style={{
-                  width: inspectorWidth,
+                  transition: 'width 150ms ease-out, opacity 150ms ease-out',
                 }}
               >
-                {/* Resize handle */}
+                {isScheduleSidebarVisible && scheduleSidebarContent}
+              </aside>
+            )}
+
+            {/* Mobile: Draggable bottom sheet for all panels */}
+            {isMobile ? (
+              <aside
+                className={cn(
+                  'fixed inset-x-0 bottom-0 z-[60] bg-background border-t rounded-t-2xl shadow-2xl overflow-hidden',
+                  'transition-opacity duration-200',
+                  anyMobilePanelVisible
+                    ? 'opacity-100'
+                    : 'opacity-0 pointer-events-none translate-y-full',
+                )}
+                style={{
+                  height: anyMobilePanelVisible ? `${mobileSheetHeight}%` : 0,
+                  maxHeight: 'calc(100vh - 56px)', // Don't go above topbar
+                  transition: isDraggingSheetRef.current
+                    ? 'none'
+                    : 'height 200ms ease-out, opacity 200ms ease-out, transform 200ms ease-out',
+                }}
+              >
+                {/* Drag handle with animated hint */}
                 <div
-                  className="absolute top-0 left-0 h-full w-2 cursor-col-resize border-l border-transparent hover:border-primary/40 z-10"
-                  onMouseDown={handleInspectorResizeStart}
-                />
-                <div className="flex h-full min-h-0 overflow-hidden pl-2">{inspectorContent}</div>
-              </div>
-            </aside>
-          )}
-        </main>
+                  className="flex justify-center py-3 cursor-grab active:cursor-grabbing touch-none select-none"
+                  onTouchStart={handleSheetTouchStart}
+                  onTouchMove={handleSheetTouchMove}
+                  onTouchEnd={handleSheetTouchEnd}
+                  onMouseDown={handleSheetMouseDown}
+                >
+                  <div
+                    className={cn(
+                      'flex items-center justify-center rounded-full transition-all duration-500 ease-out overflow-hidden',
+                      showMobileHint
+                        ? 'bg-muted/80 border px-3 py-1.5 gap-1.5'
+                        : 'bg-muted-foreground/40 w-12 h-1.5',
+                    )}
+                  >
+                    {showMobileHint ? (
+                      <>
+                        <svg
+                          className="w-3 h-3 text-muted-foreground"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {isConfigPanelVisible
+                            ? 'Slide down to see canvas'
+                            : isScheduleSidebarVisible
+                              ? 'Slide down to see canvas'
+                              : 'Slide down to inspect nodes'}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex h-[calc(100%-36px)] min-h-0 overflow-hidden w-full relative">
+                  {isConfigPanelVisible
+                    ? configPanelContent
+                    : isScheduleSidebarVisible
+                      ? scheduleSidebarContent
+                      : inspectorContent}
+                  <div id="mobile-bottom-sheet-portal" className="absolute inset-0 empty:hidden" />
+                </div>
+              </aside>
+            ) : (
+              // Desktop: Side panel (unchanged)
+              <aside
+                className={cn(
+                  'border-l bg-background overflow-hidden relative h-full',
+                  isInspectorVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
+                )}
+                style={{
+                  width: isInspectorVisible ? inspectorWidth : 0,
+                  transition: isInspectorResizing
+                    ? 'opacity 200ms ease-in-out'
+                    : 'width 200ms ease-in-out, opacity 200ms ease-in-out',
+                }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    width: inspectorWidth,
+                  }}
+                >
+                  {/* Resize handle */}
+                  <div
+                    className="absolute top-0 left-0 h-full w-2 cursor-col-resize border-l border-transparent hover:border-primary/40 z-10"
+                    onMouseDown={handleInspectorResizeStart}
+                  />
+                  <div className="flex h-full min-h-0 overflow-hidden pl-2">{inspectorContent}</div>
+                </div>
+              </aside>
+            )}
+          </main>
+
+          {/* Desktop terminal dock panel — hidden on mobile */}
+          {!isMobile && terminalDockContent}
+        </div>
       </div>
       {scheduleDrawer}
       {runDialog}

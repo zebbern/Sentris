@@ -3,18 +3,34 @@ import { persist } from 'zustand/middleware';
 
 export type WorkflowMode = 'design' | 'execution';
 
+/** A terminal tab docked in the bottom panel. */
+export interface DockedTerminal {
+  nodeId: string;
+  label: string;
+  runId?: string;
+  status: 'idle' | 'running' | 'completed' | 'failed';
+}
+
 interface WorkflowUiState {
   mode: WorkflowMode;
   inspectorTab: 'events' | 'logs' | 'artifacts' | 'agent' | 'io' | 'network';
   libraryOpen: boolean;
   inspectorWidth: number;
-  /** Currently focused terminal panel's node ID (for z-index stacking) */
+  /** @deprecated Use `activeDockedTerminalId` + `dockedTerminals` instead. */
   focusedTerminalNodeId: string | null;
   showDemoComponents: boolean;
   configPanelOpen: boolean;
   schedulesPanelOpen: boolean;
   humanInputRequestId: string | null;
   humanInputDialogOpen: boolean;
+  /** Terminal tabs docked in the bottom panel. */
+  dockedTerminals: DockedTerminal[];
+  /** Currently active (visible) terminal tab's node ID. */
+  activeDockedTerminalId: string | null;
+  /** Height of the terminal dock panel in px (persisted). */
+  terminalPanelHeight: number;
+  /** Whether the dock panel is collapsed to tab bar only. */
+  terminalPanelCollapsed: boolean;
 }
 
 interface WorkflowUiActions {
@@ -23,13 +39,25 @@ interface WorkflowUiActions {
   setLibraryOpen: (open: boolean) => void;
   toggleLibrary: () => void;
   setInspectorWidth: (width: number) => void;
-  /** Bring a terminal panel to the front by setting it as focused */
+  /** @deprecated Use `setActiveDockedTerminal` instead. */
   bringTerminalToFront: (nodeId: string) => void;
   toggleDemoComponents: () => void;
   setConfigPanelOpen: (open: boolean) => void;
   setSchedulesPanelOpen: (open: boolean) => void;
   openHumanInputDialog: (requestId: string) => void;
   closeHumanInputDialog: () => void;
+  /** Add a terminal to the dock panel. If already present, activates it. */
+  dockTerminal: (nodeId: string, label: string, runId?: string) => void;
+  /** Remove a terminal tab from the dock panel. */
+  undockTerminal: (nodeId: string) => void;
+  /** Set the active (visible) terminal tab. */
+  setActiveDockedTerminal: (nodeId: string) => void;
+  /** Set dock panel height (clamped 150 … 70% viewport). */
+  setTerminalPanelHeight: (height: number) => void;
+  /** Toggle collapsed/expanded state of the dock panel. */
+  toggleTerminalPanelCollapsed: () => void;
+  /** Remove all terminal tabs and hide the dock panel. */
+  clearDockedTerminals: () => void;
 }
 
 export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
@@ -40,6 +68,10 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       libraryOpen: true,
       inspectorWidth: 432,
       focusedTerminalNodeId: null,
+      dockedTerminals: [],
+      activeDockedTerminalId: null,
+      terminalPanelHeight: 300,
+      terminalPanelCollapsed: false,
       setMode: (mode) =>
         set((state) => ({
           mode,
@@ -67,6 +99,56 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       openHumanInputDialog: (requestId) =>
         set({ humanInputDialogOpen: true, humanInputRequestId: requestId }),
       closeHumanInputDialog: () => set({ humanInputDialogOpen: false, humanInputRequestId: null }),
+
+      // --- Terminal dock actions ---
+      dockTerminal: (nodeId, label, runId) =>
+        set((state) => {
+          const exists = state.dockedTerminals.some((t) => t.nodeId === nodeId);
+          if (exists) {
+            return {
+              activeDockedTerminalId: nodeId,
+              terminalPanelCollapsed: false,
+            };
+          }
+          return {
+            dockedTerminals: [
+              ...state.dockedTerminals,
+              { nodeId, label, runId, status: 'idle' as const },
+            ],
+            activeDockedTerminalId: nodeId,
+            terminalPanelCollapsed: false,
+          };
+        }),
+
+      undockTerminal: (nodeId) =>
+        set((state) => {
+          const remaining = state.dockedTerminals.filter((t) => t.nodeId !== nodeId);
+          const wasActive = state.activeDockedTerminalId === nodeId;
+          return {
+            dockedTerminals: remaining,
+            activeDockedTerminalId: wasActive
+              ? remaining.length > 0
+                ? remaining[remaining.length - 1].nodeId
+                : null
+              : state.activeDockedTerminalId,
+          };
+        }),
+
+      setActiveDockedTerminal: (nodeId) =>
+        set({ activeDockedTerminalId: nodeId, terminalPanelCollapsed: false }),
+
+      setTerminalPanelHeight: (height) =>
+        set(() => {
+          const maxHeight = typeof window !== 'undefined' ? window.innerHeight * 0.7 : 600;
+          return {
+            terminalPanelHeight: Math.max(150, Math.min(maxHeight, Math.round(height))),
+          };
+        }),
+
+      toggleTerminalPanelCollapsed: () =>
+        set((state) => ({ terminalPanelCollapsed: !state.terminalPanelCollapsed })),
+
+      clearDockedTerminals: () => set({ dockedTerminals: [], activeDockedTerminalId: null }),
     }),
     {
       name: 'workflow-ui-preferences',
@@ -74,6 +156,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         // Note: 'mode' is intentionally NOT persisted - workflows should always open in design mode
         libraryOpen: state.libraryOpen,
         inspectorWidth: state.inspectorWidth,
+        terminalPanelHeight: state.terminalPanelHeight,
       }),
       // Merge function to ensure mode is never restored from localStorage
       merge: (persistedState, currentState) => ({

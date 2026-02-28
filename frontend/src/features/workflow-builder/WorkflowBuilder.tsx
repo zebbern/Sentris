@@ -11,6 +11,7 @@ import { ExecutionInspector } from '@/components/timeline/ExecutionInspector';
 import { RunBreadcrumbs } from '@/components/timeline/RunBreadcrumbs';
 import { RunWorkflowDialog } from '@/components/workflow/RunWorkflowDialog';
 import { WorkflowBuilderShell } from '@/components/workflow/WorkflowBuilderShell';
+import { TerminalDockPanel } from '@/components/terminal/TerminalDockPanel';
 import { PublishTemplateModal } from '@/features/templates/PublishTemplateModal';
 import { useWorkflowGraphControllers } from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
 import { WorkflowDesignerPane } from '@/features/workflow-builder/components/WorkflowDesignerPane';
@@ -447,6 +448,7 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
             />
           ) : null
         }
+        terminalDockContent={<TerminalDockPanel />}
       />
       {!isNewWorkflow && workflowId && (
         <PublishTemplateModal
