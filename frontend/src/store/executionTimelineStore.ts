@@ -50,7 +50,7 @@ export interface DataPacket {
   visualTime: number; // When this packet should appear in timeline
 }
 
-interface RawDataPacket {
+export interface RawDataPacket {
   id: string;
   sourceNode: string;
   targetNode: string;

@@ -87,7 +87,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isMobile = useIsMobile();
   const isMac = useIsMac();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
-  const [, setIsHovered] = useState(false);
   const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(!isMobile);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
@@ -142,7 +141,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Handle hover to expand sidebar when collapsed (desktop only)
   const handleMouseEnter = () => {
     if (isMobile) return;
-    setIsHovered(true);
     if (!sidebarOpen) {
       setSidebarOpen(true);
     }
@@ -150,7 +148,6 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const handleMouseLeave = () => {
     if (isMobile) return;
-    setIsHovered(false);
     // Only collapse if it was expanded due to hover (not explicitly opened)
     if (!wasExplicitlyOpened && sidebarOpen) {
       setSidebarOpen(false);
@@ -163,7 +160,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       // Only collapse if it was expanded due to hover (not explicitly opened)
       if (!isMobile && !wasExplicitlyOpened && sidebarOpen) {
         setSidebarOpen(false);
-        setIsHovered(false);
       }
     };
 
@@ -171,7 +167,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       // When tab becomes hidden (e.g., user switched tabs), collapse hover-opened sidebar
       if (document.hidden && !isMobile && !wasExplicitlyOpened && sidebarOpen) {
         setSidebarOpen(false);
-        setIsHovered(false);
       }
     };
 

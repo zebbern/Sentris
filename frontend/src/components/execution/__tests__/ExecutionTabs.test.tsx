@@ -181,4 +181,65 @@ describe('ExecutionTabs', () => {
 
     expect(screen.getByRole('tablist')).toBeTruthy();
   });
+
+  it('calls removeTrackedRun when Enter is pressed on close button', () => {
+    mockTrackedRuns = [
+      makeRun({ runId: 'run-1', workflowName: 'Flow A' }),
+      makeRun({ runId: 'run-2', workflowName: 'Flow B' }),
+    ];
+    mockActiveRunId = 'run-1';
+
+    render(<ExecutionTabs />);
+
+    const closeButton = screen.getByLabelText('Close Flow B');
+    fireEvent.keyDown(closeButton, { key: 'Enter' });
+
+    expect(mockRemoveTrackedRun).toHaveBeenCalledWith('run-2');
+  });
+
+  it('calls removeTrackedRun when Space is pressed on close button', () => {
+    mockTrackedRuns = [
+      makeRun({ runId: 'run-1', workflowName: 'Flow A' }),
+      makeRun({ runId: 'run-2', workflowName: 'Flow B' }),
+    ];
+    mockActiveRunId = 'run-1';
+
+    render(<ExecutionTabs />);
+
+    const closeButton = screen.getByLabelText('Close Flow B');
+    fireEvent.keyDown(closeButton, { key: ' ' });
+
+    expect(mockRemoveTrackedRun).toHaveBeenCalledWith('run-2');
+  });
+
+  it('calls disconnectStream when Enter is pressed on the active tab close button', () => {
+    mockTrackedRuns = [
+      makeRun({ runId: 'run-1', workflowName: 'Active Flow' }),
+      makeRun({ runId: 'run-2', workflowName: 'Other Flow' }),
+    ];
+    mockActiveRunId = 'run-1';
+
+    render(<ExecutionTabs />);
+
+    const closeButton = screen.getByLabelText('Close Active Flow');
+    fireEvent.keyDown(closeButton, { key: 'Enter' });
+
+    expect(mockDisconnectStream).toHaveBeenCalledTimes(1);
+    expect(mockRemoveTrackedRun).toHaveBeenCalledWith('run-1');
+  });
+
+  it('does not call removeTrackedRun for non-activation keys on close button', () => {
+    mockTrackedRuns = [
+      makeRun({ runId: 'run-1', workflowName: 'Flow A' }),
+      makeRun({ runId: 'run-2', workflowName: 'Flow B' }),
+    ];
+    mockActiveRunId = 'run-1';
+
+    render(<ExecutionTabs />);
+
+    const closeButton = screen.getByLabelText('Close Flow B');
+    fireEvent.keyDown(closeButton, { key: 'Tab' });
+
+    expect(mockRemoveTrackedRun).not.toHaveBeenCalled();
+  });
 });

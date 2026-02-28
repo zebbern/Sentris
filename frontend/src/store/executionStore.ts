@@ -3,6 +3,7 @@ import { TERMINAL_STATUSES } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
 import { logger } from '@/lib/logger';
+import type { RawDataPacket } from './executionTimelineStore';
 import {
   executionStatusOptions,
   executionTraceOptions,
@@ -486,7 +487,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
 
       source.addEventListener('dataflow', async (event) => {
         try {
-          const payload = JSON.parse((event as MessageEvent).data) as { packets?: any[] };
+          const payload = JSON.parse((event as MessageEvent).data) as { packets?: RawDataPacket[] };
           if (!payload.packets || payload.packets.length === 0) {
             return;
           }

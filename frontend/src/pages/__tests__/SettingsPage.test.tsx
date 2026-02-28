@@ -73,6 +73,22 @@ describe('SettingsPage', () => {
     expect(screen.queryByText('Audit')).toBeNull();
   });
 
+  it('never shows "Coming Soon" placeholder for admin users', () => {
+    mockRoles = ['ADMIN'];
+    renderSettings();
+
+    expect(screen.queryByText('Coming Soon')).toBeNull();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+
+  it('never shows "Coming Soon" placeholder for non-admin users', () => {
+    mockRoles = ['VIEWER'];
+    renderSettings();
+
+    expect(screen.queryByText('Coming Soon')).toBeNull();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+  });
+
   it('renders GeneralSettings content on /settings/general', () => {
     renderSettings('/settings/general');
     expect(screen.getByTestId('general-settings')).toBeTruthy();

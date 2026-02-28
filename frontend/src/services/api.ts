@@ -1166,34 +1166,11 @@ export const api = {
 
   analyticsSettings: {
     get: async (): Promise<AnalyticsSettingsResponse> => {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${API_V1_URL}/analytics/settings`, { headers });
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ message: 'Failed to fetch analytics settings' }));
-        throw new Error(error.message || 'Failed to fetch analytics settings');
-      }
-      return response.json();
+      return api.get<AnalyticsSettingsResponse>('/analytics/settings');
     },
 
     update: async (data: UpdateAnalyticsSettingsInput): Promise<AnalyticsSettingsResponse> => {
-      const headers: Record<string, string> = {
-        ...(await getAuthHeaders()),
-        'Content-Type': 'application/json',
-      };
-      const response = await fetch(`${API_V1_URL}/analytics/settings`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response
-          .json()
-          .catch(() => ({ message: 'Failed to update analytics settings' }));
-        throw new Error(error.message || 'Failed to update analytics settings');
-      }
-      return response.json();
+      return api.put<AnalyticsSettingsResponse>('/analytics/settings', data);
     },
   },
 

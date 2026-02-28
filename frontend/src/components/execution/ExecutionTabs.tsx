@@ -35,7 +35,7 @@ export function ExecutionTabs() {
   const disconnectStream = useExecutionStore((s) => s.disconnectStream);
 
   const handleClose = useCallback(
-    (e: React.MouseEvent, runId: string) => {
+    (e: React.SyntheticEvent, runId: string) => {
       e.stopPropagation();
       // If closing the active tab, just disconnect; the user will need
       // to pick another tab or start a new run.
@@ -92,7 +92,7 @@ export function ExecutionTabs() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        handleClose(e as unknown as React.MouseEvent, run.runId);
+                        handleClose(e, run.runId);
                       }
                     }}
                   >
