@@ -351,6 +351,11 @@ export function useDesignWorkflowPersistence({
 
           queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
           queryClient.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+          if (workflowId) {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.workflows.versions(workflowId),
+            });
+          }
 
           track(Events.WorkflowSaved, {
             workflow_id: updatedWorkflow.id,

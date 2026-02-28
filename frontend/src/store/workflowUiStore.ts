@@ -21,6 +21,7 @@ interface WorkflowUiState {
   showDemoComponents: boolean;
   configPanelOpen: boolean;
   schedulesPanelOpen: boolean;
+  versionHistoryPanelOpen: boolean;
   humanInputRequestId: string | null;
   humanInputDialogOpen: boolean;
   /** Terminal tabs docked in the bottom panel. */
@@ -44,6 +45,7 @@ interface WorkflowUiActions {
   toggleDemoComponents: () => void;
   setConfigPanelOpen: (open: boolean) => void;
   setSchedulesPanelOpen: (open: boolean) => void;
+  setVersionHistoryPanelOpen: (open: boolean) => void;
   openHumanInputDialog: (requestId: string) => void;
   closeHumanInputDialog: () => void;
   /** Add a terminal to the dock panel. If already present, activates it. */
@@ -92,10 +94,12 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         set((state) => ({ showDemoComponents: !state.showDemoComponents })),
       configPanelOpen: false,
       schedulesPanelOpen: false,
+      versionHistoryPanelOpen: false,
       humanInputRequestId: null,
       humanInputDialogOpen: false,
       setConfigPanelOpen: (open) => set({ configPanelOpen: open }),
       setSchedulesPanelOpen: (open) => set({ schedulesPanelOpen: open }),
+      setVersionHistoryPanelOpen: (open) => set({ versionHistoryPanelOpen: open }),
       openHumanInputDialog: (requestId) =>
         set({ humanInputDialogOpen: true, humanInputRequestId: requestId }),
       closeHumanInputDialog: () => set({ humanInputDialogOpen: false, humanInputRequestId: null }),

@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Package,
   ChevronDown,
+  History,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ interface TopBarProps {
   canRedo?: boolean;
   isInWorkflowBuilder?: boolean;
   hasAnalyticsSink?: boolean;
+  onToggleVersionHistory?: () => void;
 }
 
 const DEFAULT_WORKFLOW_NAME = 'Untitled Workflow';
@@ -74,6 +76,7 @@ export function TopBar({
   canUndo,
   canRedo,
   hasAnalyticsSink = false,
+  onToggleVersionHistory,
 }: TopBarProps) {
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
@@ -534,6 +537,15 @@ export function TopBar({
                           <Download className="mr-2 h-4 w-4" />
                           <span>Export</span>
                         </DropdownMenuItem>
+                      )}
+                      {onToggleVersionHistory && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={onToggleVersionHistory}>
+                            <History className="mr-2 h-4 w-4" />
+                            <span>Version History</span>
+                          </DropdownMenuItem>
+                        </>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>

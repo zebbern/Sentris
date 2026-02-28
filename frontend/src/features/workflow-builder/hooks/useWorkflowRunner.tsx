@@ -7,6 +7,8 @@ import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { api } from '@/services/api';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 type ToastFn = (params: {
   title: string;
@@ -73,6 +75,7 @@ export function useWorkflowRunner({
   setIsLoading,
   workflowRoutePrefix = '/workflows',
 }: UseWorkflowRunnerOptions): UseWorkflowRunnerResult {
+  const queryClient = useQueryClient();
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [runtimeInputs, setRuntimeInputs] = useState<any[]>([]);
   const [prefilledRuntimeValues, setPrefilledRuntimeValues] = useState<Record<string, unknown>>({});
@@ -112,6 +115,10 @@ export function useWorkflowRunner({
         if (shouldCommitBeforeRun) {
           await api.workflows.commit(workflowId);
           markClean();
+          // Invalidate versions cache so the version list picks up the new commit
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.workflows.versions(workflowId),
+          });
         }
 
         const runId = await useExecutionStore.getState().startExecution(workflowId, {
@@ -167,6 +174,7 @@ export function useWorkflowRunner({
       toast,
       setNodes,
       workflowRoutePrefix,
+      queryClient,
     ],
   );
 

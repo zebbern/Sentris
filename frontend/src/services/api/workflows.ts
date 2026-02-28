@@ -5,6 +5,7 @@ type WorkflowResponseDto = components['schemas']['WorkflowResponseDto'];
 type CreateWorkflowRequestDto = components['schemas']['CreateWorkflowRequestDto'];
 type UpdateWorkflowRequestDto = components['schemas']['UpdateWorkflowRequestDto'];
 type WorkflowVersionResponse = components['schemas']['WorkflowVersionResponseDto'];
+type WorkflowVersionSummary = components['schemas']['WorkflowVersionSummaryDto'];
 
 export interface WorkflowSummary {
   id: string;
@@ -40,6 +41,12 @@ export const workflowsApi = {
     if (response.error) throw new Error('Failed to fetch workflow');
     if (!response.data) throw new Error('Workflow not found');
     return response.data;
+  },
+
+  listVersions: async (workflowId: string): Promise<WorkflowVersionSummary[]> => {
+    const response = await apiClient.listWorkflowVersions(workflowId);
+    if (response.error) throw new Error('Failed to fetch workflow versions');
+    return response.data || [];
   },
 
   getVersion: async (workflowId: string, versionId: string): Promise<WorkflowVersionResponse> => {

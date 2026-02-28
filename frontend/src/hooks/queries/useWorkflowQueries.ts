@@ -36,6 +36,15 @@ export function useWorkflowRuntimeInputs(workflowId: string | undefined) {
   });
 }
 
+export function useWorkflowVersions(workflowId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.workflows.versions(workflowId ?? ''),
+    queryFn: workflowId ? () => api.workflows.listVersions(workflowId) : skipToken,
+    staleTime: 30_000,
+    ...(workflowId ? {} : { gcTime: 0 }),
+  });
+}
+
 export function useDeleteWorkflow() {
   const qc = useQueryClient();
   return useMutation({

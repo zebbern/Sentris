@@ -13,6 +13,7 @@ import { RunWorkflowDialog } from '@/components/workflow/RunWorkflowDialog';
 import { WorkflowBuilderShell } from '@/components/workflow/WorkflowBuilderShell';
 import { TerminalDockPanel } from '@/components/terminal/TerminalDockPanel';
 import { PublishTemplateModal } from '@/features/templates/PublishTemplateModal';
+import { VersionHistoryPanel } from '@/features/workflow-builder/components/VersionHistoryPanel';
 import { useWorkflowGraphControllers } from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
 import { WorkflowDesignerPane } from '@/features/workflow-builder/components/WorkflowDesignerPane';
 import { WorkflowExecutionPane } from '@/features/workflow-builder/components/WorkflowExecutionPane';
@@ -99,6 +100,8 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     toggleDemoComponents,
     configPanelOpen,
     schedulesPanelOpen,
+    versionHistoryPanelOpen,
+    setVersionHistoryPanelOpen,
     setLibraryOpen,
   } = useWorkflowUiStore();
 
@@ -361,7 +364,21 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       canUndo={canUndo}
       canRedo={canRedo}
       hasAnalyticsSink={hasAnalyticsSink}
+      onToggleVersionHistory={() => setVersionHistoryPanelOpen(!versionHistoryPanelOpen)}
     />
+  );
+
+  const handleLoadVersion = useCallback(
+    (graph: {
+      nodes: unknown[];
+      edges: unknown[];
+      viewport?: { x: number; y: number; zoom: number };
+    }) => {
+      setDesignNodes(graph.nodes as ReactFlowNode<FrontendNodeData>[]);
+      setDesignEdges(graph.edges as ReactFlowEdge[]);
+      markDirty();
+    },
+    [setDesignNodes, setDesignEdges, markDirty],
   );
 
   const designerCanvas = (
@@ -457,6 +474,9 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
           open={isPublishModalOpen}
           onOpenChange={setIsPublishModalOpen}
         />
+      )}
+      {!isNewWorkflow && workflowId && (
+        <VersionHistoryPanel workflowId={workflowId} onLoadVersion={handleLoadVersion} />
       )}
     </>
   );

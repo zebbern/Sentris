@@ -90,6 +90,12 @@ export class ShipSecApiClient {
     });
   }
 
+  async listWorkflowVersions(workflowId: string) {
+    return this.client.GET('/api/v1/workflows/{workflowId}/versions', {
+      params: { path: { workflowId } },
+    });
+  }
+
   async getWorkflowVersion(workflowId: string, versionId: string) {
     return this.client.GET('/api/v1/workflows/{workflowId}/versions/{versionId}', {
       params: { path: { workflowId, versionId } },
