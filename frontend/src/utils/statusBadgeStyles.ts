@@ -9,6 +9,7 @@ export type StatusColor = 'blue' | 'green' | 'red' | 'amber' | 'gray' | 'purple'
  * Map execution statuses to colors
  */
 export const STATUS_COLOR_MAP: Record<string, StatusColor> = {
+  // Workflow execution statuses
   RUNNING: 'blue',
   QUEUED: 'blue',
   COMPLETED: 'green',
@@ -18,7 +19,26 @@ export const STATUS_COLOR_MAP: Record<string, StatusColor> = {
   TIMED_OUT: 'amber',
   AWAITING_INPUT: 'purple',
   STALE: 'amber', // Orphaned record - data inconsistency warning
+  // Action Center statuses
+  PENDING: 'blue',
+  APPROVED: 'green',
+  REJECTED: 'red',
+  EXPIRED: 'amber',
+  // API Key statuses
+  ACTIVE: 'green',
+  REVOKED: 'gray',
 };
+
+/**
+ * Format a status string to title case for display.
+ * e.g. "FAILED" → "Failed", "TIMED_OUT" → "Timed Out", "NOT TRIGGERED" → "Not Triggered"
+ */
+export function formatStatusText(status: string): string {
+  return status
+    .replace(/[_\s]+/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 /**
  * Get the color for a given status string

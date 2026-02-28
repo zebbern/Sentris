@@ -24,6 +24,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -33,14 +34,6 @@ const STATUS_OPTIONS = [
   { value: 'resolved', label: 'Resolved' },
   { value: 'expired', label: 'Expired' },
 ];
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  pending: 'default',
-  approved: 'secondary',
-  rejected: 'destructive',
-  expired: 'outline',
-  cancelled: 'outline',
-};
 
 const STATUS_ICONS: Record<string, typeof CheckCircle> = {
   pending: Clock,
@@ -148,11 +141,10 @@ export function ActionCenterPage() {
       status = approval.responseData.status as string;
     }
 
-    const variant = STATUS_VARIANTS[status] || 'outline';
     const label = status.charAt(0).toUpperCase() + status.slice(1);
     const Icon = STATUS_ICONS[status] || Clock;
     return (
-      <Badge variant={variant} className="gap-1">
+      <Badge variant="outline" className={getStatusBadgeClassFromStatus(status, 'gap-1')}>
         <Icon className="h-3 w-3" />
         {label}
       </Badge>

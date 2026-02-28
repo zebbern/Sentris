@@ -824,7 +824,7 @@ export function TemplateLibraryPage() {
         {/* Filters */}
         <div className="mb-6 space-y-3">
           {/* Search + Category + Sync */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -836,7 +836,7 @@ export function TemplateLibraryPage() {
             </div>
 
             <Select value={selectedCategory || 'all'} onValueChange={handleCategoryChange}>
-              <SelectTrigger className="w-[180px] h-9">
+              <SelectTrigger className="w-full sm:w-[180px] h-9">
                 <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Category" />
               </SelectTrigger>

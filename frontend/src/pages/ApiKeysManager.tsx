@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Copy, Trash2, ShieldOff, AlertTriangle, Key } from 'lucide-react';
+import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
@@ -356,21 +357,15 @@ export function ApiKeysManager() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {key.isActive ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-success/10 text-success border-success/20 text-xs"
-                                  >
-                                    Active
-                                  </Badge>
-                                ) : (
-                                  <Badge
-                                    variant="outline"
-                                    className="bg-muted text-muted-foreground text-xs"
-                                  >
-                                    Revoked
-                                  </Badge>
-                                )}
+                                <Badge
+                                  variant="outline"
+                                  className={getStatusBadgeClassFromStatus(
+                                    key.isActive ? 'active' : 'revoked',
+                                    'text-xs',
+                                  )}
+                                >
+                                  {key.isActive ? 'Active' : 'Revoked'}
+                                </Badge>
                               </TableCell>
                               <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
                                 {formatDate(key.createdAt)}

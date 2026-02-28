@@ -74,11 +74,6 @@ export function ArtifactLibrary() {
     if (w.id) workflows[w.id] = w.name;
   });
 
-  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.root() });
-  };
-
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.root() });
   };
@@ -88,26 +83,16 @@ export function ArtifactLibrary() {
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <form onSubmit={handleSearch} className="flex items-center gap-2">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search artifacts..."
-                  className="pl-8 w-full sm:w-auto"
-                  autoComplete="off"
-                />
-              </div>
-              <Button
-                type="submit"
-                variant="secondary"
-                disabled={libraryLoading}
-                className="flex-shrink-0 border border-input"
-              >
-                Search
-              </Button>
-            </form>
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search artifacts..."
+                className="pl-8 w-full sm:w-auto"
+                autoComplete="off"
+              />
+            </div>
           </div>
           <Button
             type="button"

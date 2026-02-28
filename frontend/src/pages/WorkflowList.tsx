@@ -24,7 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Workflow, AlertCircle, Trash2, Info, GripVertical } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { type WorkflowSummary } from '@/services/api';
-import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
+import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
@@ -192,13 +192,6 @@ export function WorkflowList() {
             workflows.
           </div>
         )}
-
-        <div className="mb-4 md:mb-8">
-          <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-2">Your Workflows</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Create and manage security automation workflows with powerful visual tools
-          </p>
-        </div>
 
         {/* <div className="mb-6 flex flex-wrap gap-3">
           <Button
@@ -473,14 +466,14 @@ function WorkflowRowItem({
         'text-xs whitespace-nowrap',
       )}
     >
-      {workflow.latestRunStatus}
+      {formatStatusText(workflow.latestRunStatus)}
     </Badge>
   ) : (
     <Badge
       variant="outline"
       className={getStatusBadgeClassFromStatus('NONE', 'text-xs whitespace-nowrap')}
     >
-      NOT TRIGGERED
+      {formatStatusText('NOT TRIGGERED')}
     </Badge>
   );
 

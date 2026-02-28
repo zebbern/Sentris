@@ -31,7 +31,7 @@ export function AppTopBar({
 
     if (location.pathname === '/') {
       return {
-        title: 'Security Workflow Builder',
+        title: 'Workflow Builder',
         shortTitle: 'Workflows',
         subtitle: 'Create and manage security automation workflows',
       };
@@ -63,7 +63,7 @@ export function AppTopBar({
 
     if (location.pathname === '/secrets') {
       return {
-        title: 'Secret Manager',
+        title: 'Secrets',
         shortTitle: 'Secrets',
         subtitle: 'Store and manage sensitive credentials',
       };
@@ -135,7 +135,7 @@ export function AppTopBar({
 
     return {
       title: 'ShipSec Studio',
-      shortTitle: 'ShipSec',
+      shortTitle: 'Not Found',
       subtitle: '',
     };
   };
