@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Search, Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useMcpServers,
@@ -332,39 +332,33 @@ export function McpLibraryPage() {
   // ------ Main render ------
   return (
     <div className="container mx-auto py-8 px-4">
-      {/* Header actions */}
-      <div className="flex items-center justify-end mb-6">
-        <Button onClick={editor.handleCreateNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Server
-        </Button>
-      </div>
-
-      {/* Search */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search servers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Refresh MCP servers"
-          onClick={() => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
-            queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
-            void groupActions.refreshTemplates();
-          }}
-          disabled={isLoading}
-        >
-          <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-        </Button>
-      </div>
+      <PageToolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search servers..."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Refresh MCP servers"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
+                queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
+                void groupActions.refreshTemplates();
+              }}
+              disabled={isLoading}
+            >
+              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+            </Button>
+            <Button onClick={editor.handleCreateNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Server
+            </Button>
+          </>
+        }
+        className="mb-6"
+      />
 
       {error && (
         <ErrorBanner

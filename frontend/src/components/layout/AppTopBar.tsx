@@ -1,7 +1,6 @@
 import { useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { env } from '@/config/env';
 import { cn } from '@/lib/utils';
 
 interface AppTopBarProps {
@@ -85,11 +84,11 @@ export function AppTopBar({
       };
     }
 
-    if (env.VITE_ENABLE_CONNECTIONS && location.pathname === '/integrations') {
+    if (location.pathname === '/integrations') {
       return {
-        title: 'Connections',
-        shortTitle: 'Connections',
-        subtitle: 'Manage OAuth tokens for external providers',
+        title: 'Integrations',
+        shortTitle: 'Integrations',
+        subtitle: 'Connect and manage OAuth providers',
       };
     }
 

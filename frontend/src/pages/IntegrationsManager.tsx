@@ -18,6 +18,7 @@ import {
 import { ExternalLink, KeyRound, Plug, RefreshCcw, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 
 import {
   useIntegrationProviders,
@@ -242,6 +243,8 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-8 px-4">
+        <PageToolbar title="Integrations" className="mb-4 md:mb-6" />
+
         {error && (
           <ErrorBanner
             message={error}
