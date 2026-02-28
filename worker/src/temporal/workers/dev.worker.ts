@@ -192,11 +192,12 @@ async function main() {
 
   const terminalRedisUrl = process.env.TERMINAL_REDIS_URL;
   let terminalStream: RedisTerminalStreamAdapter | undefined;
+  let terminalRedis: Redis | undefined;
   if (terminalRedisUrl) {
     try {
-      const redis = new Redis(terminalRedisUrl);
+      terminalRedis = new Redis(terminalRedisUrl);
       const maxEntries = Number(process.env.TERMINAL_REDIS_MAXLEN ?? '5000');
-      terminalStream = new RedisTerminalStreamAdapter(redis, { maxEntries });
+      terminalStream = new RedisTerminalStreamAdapter(terminalRedis, { maxEntries });
       console.log(`✅ Terminal Redis streaming enabled (${terminalRedisUrl})`);
     } catch (error: unknown) {
       console.error('⚠️ Failed to initialize terminal Redis streaming', error);
@@ -392,12 +393,38 @@ async function main() {
   console.log(`⏳ Worker is now running and waiting for tasks...`);
 
   // Set up periodic heartbeat logging (file-based only)
-  setInterval(() => {
+  const heartbeatInterval = setInterval(() => {
     logHeartbeat(taskQueue);
   }, 15000);
 
+  // Register graceful shutdown handlers
+  // PM2 sends SIGINT on restart; container orchestrators send SIGTERM.
+  const handleShutdown = (signal: string) => {
+    console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+    // Worker.shutdown() signals the worker to stop polling for new tasks
+    // and waits for in-flight activities to complete before worker.run() resolves.
+    worker.shutdown();
+  };
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+
   console.log(`🚀 Starting worker.run() - this will block and listen for tasks...`);
-  await worker.run();
+  try {
+    await worker.run();
+  } finally {
+    console.log('🧹 Cleaning up resources...');
+    clearInterval(heartbeatInterval);
+    await pool.end().catch((e: unknown) => console.error('Failed to close DB pool', e));
+    await connection
+      .close()
+      .catch((e: unknown) => console.error('Failed to close Temporal connection', e));
+    if (terminalRedis) {
+      await terminalRedis
+        .quit()
+        .catch((e: unknown) => console.error('Failed to close terminal Redis', e));
+    }
+    console.log('✅ Worker shutdown complete');
+  }
 }
 
 main().catch((error: unknown) => {
