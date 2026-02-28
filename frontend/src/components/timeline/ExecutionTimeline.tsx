@@ -471,7 +471,7 @@ export function ExecutionTimeline() {
                   className="absolute -top-1 left-1/2 block h-2 w-2"
                   style={{
                     transform: 'translateX(-50%) rotate(45deg)',
-                    backgroundColor: isLiveMode ? '#ef4444' : '#3b82f6',
+                    backgroundColor: isLiveMode ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
                   }}
                 />
               </button>
@@ -518,7 +518,7 @@ export function ExecutionTimeline() {
                 left: `${normalizedProgress * 100}%`,
                 top: 0,
                 transform: 'translate(-50%, 0)',
-                color: isLiveMode ? '#ef4444' : '#3b82f6',
+                color: isLiveMode ? 'hsl(var(--destructive))' : 'hsl(var(--primary))',
               }}
             >
               <div

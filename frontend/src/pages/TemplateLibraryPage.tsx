@@ -242,7 +242,7 @@ function PreviewSection({ graph }: { graph?: Record<string, unknown>; category?:
         hasGraph && zoom > 1 && 'cursor-zoom-out',
       )}
       style={{
-        background: 'linear-gradient(180deg, #F8FAFF 0%, #F1F5FF 100%)',
+        background: 'linear-gradient(180deg, hsl(var(--muted) / 0.5) 0%, hsl(var(--muted)) 100%)',
       }}
       onWheel={hasGraph ? handleWheel : undefined}
       onMouseMove={hasGraph ? updateOrigin : undefined}
@@ -252,7 +252,7 @@ function PreviewSection({ graph }: { graph?: Record<string, unknown>; category?:
       <div
         className="absolute inset-0 hidden dark:block"
         style={{
-          background: 'linear-gradient(180deg, #111827 0%, #0B1220 100%)',
+          background: 'linear-gradient(180deg, hsl(var(--muted)) 0%, hsl(var(--background)) 100%)',
         }}
       />
       {/* Subtle radial glow in dark mode */}

@@ -396,7 +396,7 @@ function handleExecutionError(
             ...node.style,
             ...(node.id === failedComponentId
               ? {
-                  outline: '3px solid #ef4444',
+                  outline: '3px solid hsl(var(--destructive))',
                   outlineOffset: '2px',
                   animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 }
