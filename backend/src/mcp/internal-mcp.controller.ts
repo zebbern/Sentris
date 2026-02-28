@@ -4,7 +4,14 @@ import { ToolRegistryService } from './tool-registry.service';
 import { McpGatewayService } from './mcp-gateway.service';
 import { McpGroupsService } from '../mcp-groups/mcp-groups.service';
 import { McpAuthService } from './mcp-auth.service';
-import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
+import {
+  CleanupRunInput,
+  GenerateTokenInput,
+  RegisterComponentToolInput,
+  RegisterGroupServerInput,
+  RegisterMcpServerInput,
+  ToolsReadyInput,
+} from './dto/mcp.dto';
 
 @ApiExcludeController()
 @Controller('internal/mcp')
@@ -17,15 +24,7 @@ export class InternalMcpController {
   ) {}
 
   @Post('generate-token')
-  async generateToken(
-    @Body()
-    body: {
-      runId: string;
-      organizationId?: string | null;
-      agentId?: string;
-      allowedNodeIds?: string[];
-    },
-  ) {
+  async generateToken(@Body() body: GenerateTokenInput) {
     const token = await this.mcpAuthService.generateSessionToken(
       body.runId,
       body.organizationId ?? null,
@@ -54,21 +53,19 @@ export class InternalMcpController {
   }
 
   @Post('cleanup')
-  async cleanupRun(@Body() body: { runId: string }) {
+  async cleanupRun(@Body() body: CleanupRunInput) {
     const containerIds = await this.toolRegistry.cleanupRun(body.runId);
     return { containerIds };
   }
 
   @Post('tools-ready')
-  async areToolsReady(@Body() body: { runId: string; requiredNodeIds: string[] }) {
+  async areToolsReady(@Body() body: ToolsReadyInput) {
     const ready = await this.toolRegistry.areAllToolsReady(body.runId, body.requiredNodeIds);
     return { ready };
   }
 
   @Post('register-group-server')
-  async registerGroupServer(
-    @Body() body: { runId: string; nodeId: string; groupSlug: string; serverId: string },
-  ) {
+  async registerGroupServer(@Body() body: RegisterGroupServerInput) {
     const serverConfig = await this.mcpGroupsService.getServerConfig(body.groupSlug, body.serverId);
     return serverConfig;
   }

@@ -58,3 +58,38 @@ export class RegisterComponentToolInput {
   parameters?: Record<string, unknown>;
   providerKind?: 'component' | 'mcp-server' | 'mcp-group';
 }
+
+/**
+ * Input for generating an MCP session token
+ */
+export class GenerateTokenInput {
+  runId!: string;
+  organizationId?: string | null;
+  agentId?: string;
+  allowedNodeIds?: string[];
+}
+
+/**
+ * Input for cleaning up a run's MCP resources
+ */
+export class CleanupRunInput {
+  runId!: string;
+}
+
+/**
+ * Input for checking if all required tools are ready
+ */
+export class ToolsReadyInput {
+  runId!: string;
+  requiredNodeIds!: string[];
+}
+
+/**
+ * Input for registering a group server
+ */
+export class RegisterGroupServerInput {
+  runId!: string;
+  nodeId!: string;
+  groupSlug!: string;
+  serverId!: string;
+}
