@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, RefreshCw } from 'lucide-react';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
@@ -43,6 +43,7 @@ import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
+import { cn } from '@/lib/utils';
 
 interface FormState {
   name: string;
@@ -495,7 +496,6 @@ export function SecretsManager() {
               </div>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => {
                   setListSuccess(null);
                   queryClient
@@ -503,9 +503,10 @@ export function SecretsManager() {
                     .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
                 }}
                 disabled={loading}
-                className="self-start sm:self-auto flex-shrink-0"
+                className="gap-2"
               >
-                {loading ? 'Refreshing…' : 'Refresh'}
+                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                <span className="hidden sm:inline">Refresh</span>
               </Button>
             </div>
 

@@ -47,7 +47,7 @@ interface AppLayoutProps {
 }
 
 import { SidebarContext, type SidebarContextValue } from './sidebar-context';
-import { useIsMobile } from '@/hooks/useIsMobile';
+import { useIsMobile, useIsTablet } from '@/hooks/useIsMobile';
 import { useIsMac } from '@/hooks/useIsMac';
 
 const settingsItems = [
@@ -85,9 +85,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     prefetchIdleRoutes();
   }, []);
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
   const isMac = useIsMac();
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
-  const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(!isMobile);
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile && !isTablet);
+  const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(!isMobile && !isTablet);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -110,9 +111,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       : 'dev';
 
   // Auto-collapse sidebar when opening workflow builder, expand for other routes
-  // On mobile, always start collapsed
+  // On mobile, always start collapsed; on tablet, keep collapsed (icon-only)
   useEffect(() => {
-    if (isMobile) {
+    if (isMobile || isTablet) {
       setSidebarOpen(false);
       setWasExplicitlyOpened(false);
     } else {
@@ -123,7 +124,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       setSidebarOpen(!isWorkflowRoute);
       setWasExplicitlyOpened(!isWorkflowRoute);
     }
-  }, [location.pathname, isMobile]);
+  }, [location.pathname, isMobile, isTablet]);
 
   // Auto-expand the Manage section when navigating to a settings sub-page
   // (includes both settingsItems routes like /secrets, /api-keys, /mcp-library
