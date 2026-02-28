@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -33,6 +34,8 @@ import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import {
   useWebhooks,
   useDeleteWebhook,
@@ -135,6 +138,46 @@ export function WebhooksPage() {
     storageKey: `shipsec:sort:webhooks:${organizationId}`,
     disabled: hasActiveFilters,
   });
+
+  const {
+    selectedIds,
+    toggleId,
+    toggleAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+    selectedCount,
+  } = useBulkSelection(orderedWebhooks);
+
+  const handleBulkDelete = async () => {
+    const count = selectedCount;
+    const ok = await confirm({
+      title: `Delete ${count} webhook${count !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to delete ${count} webhook${count !== 1 ? 's' : ''}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) => deleteWebhookMutation.mutateAsync(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      toast({ title: `Deleted ${succeeded} webhook${succeeded !== 1 ? 's' : ''}` });
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Deleted ${succeeded} of ${count} webhooks (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleWorkflowFilterChange = (value: string) => {
     const workflowId = value === 'all' ? null : value;
@@ -335,6 +378,16 @@ export function WebhooksPage() {
 
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
+              <BulkActionBar
+                selectedCount={selectedCount}
+                actions={[
+                  {
+                    label: 'Delete selected',
+                    onClick: handleBulkDelete,
+                    variant: 'destructive',
+                  },
+                ]}
+              />
               <DndContext
                 sensors={sensors}
                 collisionDetection={collisionDetection}
@@ -343,6 +396,13 @@ export function WebhooksPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                          onCheckedChange={toggleAll}
+                          aria-label="Select all webhooks"
+                        />
+                      </TableHead>
                       <TableHead className="w-10" />
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden md:table-cell">Workflow</TableHead>
@@ -358,6 +418,9 @@ export function WebhooksPage() {
                     {isLoading && !hasData
                       ? Array.from({ length: 4 }).map((_, index) => (
                           <TableRow key={`skeleton-${index}`}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-4" />
+                            </TableCell>
                             <TableCell>
                               <Skeleton className="h-4 w-4" />
                             </TableCell>
@@ -384,9 +447,17 @@ export function WebhooksPage() {
                               disabled={isDragDisabled}
                               className="cursor-pointer hover:bg-muted/50 transition-colors"
                               onClick={() => navigate(`/webhooks/${webhook.id}`)}
+                              data-state={selectedIds.has(webhook.id) ? 'selected' : undefined}
                             >
                               {({ handleProps }) => (
                                 <>
+                                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedIds.has(webhook.id)}
+                                      onCheckedChange={() => toggleId(webhook.id)}
+                                      aria-label={`Select ${webhook.name}`}
+                                    />
+                                  </TableCell>
                                   <DragHandle {...handleProps} disabled={isDragDisabled} />
                                   <TableCell className="font-medium">
                                     <div className="flex flex-col">
@@ -511,7 +582,7 @@ export function WebhooksPage() {
                     ) : null}
                     {!isLoading && !hasData && (
                       <TableRow>
-                        <TableCell colSpan={7}>
+                        <TableCell colSpan={8}>
                           <EmptyState
                             icon={Link2}
                             title="No webhooks found"

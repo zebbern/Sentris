@@ -72,7 +72,7 @@ const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
 
-// Lazy-load CommandPalette — it pulls in the entire lucide-react barrel (~350KB)
+// Lazy-load CommandPalette — heavy component with many commands
 const CommandPalette = lazy(() =>
   import('@/features/command-palette/CommandPalette').then((m) => ({
     default: m.CommandPalette,

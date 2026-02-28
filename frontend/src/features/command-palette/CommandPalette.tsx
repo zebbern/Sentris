@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import * as LucideIcons from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
@@ -43,6 +43,7 @@ interface BaseCommand {
   description?: string;
   category: CommandCategory;
   icon?: React.ComponentType<{ className?: string }>;
+  iconName?: string; // Dynamic lucide icon name (resolved via DynamicIcon)
   iconUrl?: string; // For component logos
   keywords?: string[];
 }
@@ -333,21 +334,14 @@ export function CommandPalette() {
   // Build component commands
   const componentCommands = useMemo<Command[]>(() => {
     return allComponents.map((component) => {
-      // Get icon component if available
-      const iconName = component.icon && component.icon in LucideIcons ? component.icon : null;
-      const IconComponent = iconName
-        ? (LucideIcons[iconName as keyof typeof LucideIcons] as React.ComponentType<{
-            className?: string;
-          }>)
-        : Box;
-
       return {
         id: `component-${component.id}`,
         type: 'component' as const,
         label: component.name,
         description: component.description || `Add ${component.name} to canvas`,
         category: 'components' as const,
-        icon: IconComponent,
+        icon: Box,
+        iconName: component.icon || undefined,
         iconUrl: component.logo || undefined,
         componentId: component.id,
         componentName: component.name,
@@ -606,6 +600,15 @@ export function CommandPalette() {
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
+                          />
+                        ) : command.iconName ? (
+                          <DynamicIcon
+                            name={command.iconName}
+                            fallback="box"
+                            className={cn(
+                              'w-4 h-4',
+                              isSelected ? 'text-primary' : 'text-muted-foreground',
+                            )}
                           />
                         ) : Icon ? (
                           <Icon

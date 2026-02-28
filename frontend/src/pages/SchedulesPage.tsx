@@ -2,6 +2,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -37,6 +38,8 @@ import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import {
   useSchedules,
   usePauseSchedule,
@@ -150,6 +153,119 @@ export function SchedulesPage() {
     storageKey: `shipsec:sort:schedules:${organizationId}`,
     disabled: hasActiveFilters,
   });
+
+  const {
+    selectedIds,
+    toggleId,
+    toggleAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+    selectedCount,
+  } = useBulkSelection(orderedSchedules);
+
+  const handleBulkPause = async () => {
+    const ids = Array.from(selectedIds).filter((id) => {
+      const schedule = orderedSchedules.find((s) => s.id === id);
+      return schedule?.status === 'active';
+    });
+    if (ids.length === 0) return;
+
+    const results = await Promise.allSettled(
+      ids.map((id) => pauseScheduleMutation.mutateAsync(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      toast({ title: `Paused ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Paused ${succeeded} of ${ids.length} schedules (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkResume = async () => {
+    const ids = Array.from(selectedIds).filter((id) => {
+      const schedule = orderedSchedules.find((s) => s.id === id);
+      return schedule?.status === 'paused';
+    });
+    if (ids.length === 0) return;
+
+    const results = await Promise.allSettled(
+      ids.map((id) => resumeScheduleMutation.mutateAsync(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      toast({ title: `Resumed ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Resumed ${succeeded} of ${ids.length} schedules (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const count = selectedCount;
+    const ok = await confirm({
+      title: `Delete ${count} schedule${count !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to delete ${count} schedule${count !== 1 ? 's' : ''}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) => deleteScheduleMutation.mutateAsync(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      toast({ title: `Deleted ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Deleted ${succeeded} of ${count} schedules (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const bulkActions = useMemo(() => {
+    const actions: { label: string; onClick: () => void; variant?: 'default' | 'destructive' }[] =
+      [];
+    const hasActiveSelected = Array.from(selectedIds).some((id) => {
+      const schedule = orderedSchedules.find((s) => s.id === id);
+      return schedule?.status === 'active';
+    });
+    const hasPausedSelected = Array.from(selectedIds).some((id) => {
+      const schedule = orderedSchedules.find((s) => s.id === id);
+      return schedule?.status === 'paused';
+    });
+    if (hasActiveSelected) {
+      actions.push({ label: 'Pause selected', onClick: handleBulkPause });
+    }
+    if (hasPausedSelected) {
+      actions.push({ label: 'Resume selected', onClick: handleBulkResume });
+    }
+    actions.push({ label: 'Delete selected', onClick: handleBulkDelete, variant: 'destructive' });
+    return actions;
+  }, [selectedIds, orderedSchedules]);
 
   const markAction = (id: string, action: 'run' | 'toggle') => {
     setActionState((state) => ({ ...state, [id]: action }));
@@ -380,6 +496,7 @@ export function SchedulesPage() {
 
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
+              <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
               <DndContext
                 sensors={sensors}
                 collisionDetection={collisionDetection}
@@ -388,6 +505,13 @@ export function SchedulesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                          onCheckedChange={toggleAll}
+                          aria-label="Select all schedules"
+                        />
+                      </TableHead>
                       <TableHead className="w-10" />
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden md:table-cell">Workflow</TableHead>
@@ -405,7 +529,7 @@ export function SchedulesPage() {
                             <TableCell>
                               <Skeleton className="h-4 w-4" />
                             </TableCell>
-                            {Array.from({ length: 7 }).map((_, cell) => (
+                            {Array.from({ length: 8 }).map((_, cell) => (
                               <TableCell key={`cell-${cell}`}>
                                 <Skeleton className="h-5 w-full" />
                               </TableCell>
@@ -434,9 +558,17 @@ export function SchedulesPage() {
                               key={schedule.id}
                               id={schedule.id}
                               disabled={isDragDisabled}
+                              data-state={selectedIds.has(schedule.id) ? 'selected' : undefined}
                             >
                               {({ handleProps }) => (
                                 <>
+                                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selectedIds.has(schedule.id)}
+                                      onCheckedChange={() => toggleId(schedule.id)}
+                                      aria-label={`Select ${schedule.name}`}
+                                    />
+                                  </TableCell>
                                   <DragHandle {...handleProps} disabled={isDragDisabled} />
                                   <TableCell className="font-medium">
                                     <div className="flex flex-col">
@@ -485,6 +617,7 @@ export function SchedulesPage() {
                                         className="gap-1 h-8 px-2 md:px-3"
                                         onClick={() => handleRunNow(schedule)}
                                         disabled={isActionBusy(schedule.id)}
+                                        aria-label={`Run ${schedule.name} now`}
                                       >
                                         <PlayCircle className="h-4 w-4" />
                                         <span className="hidden md:inline">Run</span>
@@ -495,6 +628,11 @@ export function SchedulesPage() {
                                         className="gap-1 h-8 px-2 md:px-3"
                                         onClick={() => handlePauseResume(schedule)}
                                         disabled={isActionBusy(schedule.id)}
+                                        aria-label={
+                                          isPaused
+                                            ? `Resume ${schedule.name}`
+                                            : `Pause ${schedule.name}`
+                                        }
                                       >
                                         {isPaused ? (
                                           <>
@@ -548,7 +686,7 @@ export function SchedulesPage() {
                     ) : null}
                     {!isLoading && !hasData && (
                       <TableRow>
-                        <TableCell colSpan={8}>
+                        <TableCell colSpan={9}>
                           <EmptyState
                             icon={CalendarClock}
                             title="No schedules found"

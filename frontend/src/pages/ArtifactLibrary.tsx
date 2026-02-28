@@ -122,6 +122,7 @@ export function ArtifactLibrary() {
             className="gap-2"
             onClick={handleRefresh}
             disabled={libraryLoading}
+            aria-label="Refresh artifacts"
           >
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Refresh</span>
@@ -322,6 +323,7 @@ function ArtifactLibraryRow({
                       size="sm"
                       className="h-7 gap-1 px-2 text-xs"
                       onClick={() => onCopyRemoteUri(remote.uri)}
+                      aria-label={`Copy URI ${remote.uri}`}
                     >
                       <Copy className="h-3 w-3" />
                       <span className="hidden lg:inline">
@@ -371,6 +373,7 @@ function ArtifactLibraryRow({
                   onDelete();
                 }}
                 disabled={isDeleting}
+                aria-label={`Delete ${artifact.name}`}
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden md:inline">{isDeleting ? 'Deleting…' : 'Delete'}</span>
@@ -382,6 +385,7 @@ function ArtifactLibraryRow({
                 className="gap-1 md:gap-2 h-8 px-2 md:px-3"
                 onClick={onDownload}
                 disabled={isDownloading}
+                aria-label={`Download ${artifact.name}`}
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden md:inline">
