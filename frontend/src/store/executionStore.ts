@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { TERMINAL_STATUSES } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
+import { logger } from '@/lib/logger';
 import {
   executionStatusOptions,
   executionTraceOptions,
@@ -227,7 +228,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
 
       return executionId;
     } catch (error: unknown) {
-      console.error('Failed to start execution:', error);
+      logger.error('Failed to start execution:', error);
       set({ status: 'failed' });
       throw error;
     }
@@ -255,7 +256,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           set({ status: 'cancelled' });
         }
       } catch (statusError: unknown) {
-        console.warn('Failed to fetch final status after stop:', statusError);
+        logger.warn('Failed to fetch final status after stop:', statusError);
         set({ status: 'cancelled' });
       }
 
@@ -266,7 +267,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         invalidateRunsForWorkflow(workflowId);
       }
     } catch (error: unknown) {
-      console.error('Failed to stop execution:', error);
+      logger.error('Failed to stop execution:', error);
       // Still stop polling on cancel failure to avoid zombie polling
       get().stopPolling();
       set({ status: 'cancelled' });
@@ -304,7 +305,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     get()
       .connectStream(runId)
       .catch((error: unknown) => {
-        console.error('[ExecutionStore] Failed to connect stream in monitorRun:', error);
+        logger.error('[ExecutionStore] Failed to connect stream in monitorRun:', error);
       });
   },
 
@@ -366,7 +367,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         }
       }
     } catch (error: unknown) {
-      console.error('Failed to poll execution status:', error);
+      logger.error('Failed to poll execution status:', error);
     }
   },
 
@@ -429,7 +430,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             };
           });
         } catch (error: unknown) {
-          console.error('Failed to parse trace payload from stream', error);
+          logger.error('Failed to parse trace payload from stream', error);
         }
       });
 
@@ -452,7 +453,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             get().stopPolling();
           }
         } catch (error: unknown) {
-          console.error('Failed to parse status update from stream', error);
+          logger.error('Failed to parse status update from stream', error);
         }
       });
 
@@ -465,7 +466,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           const { useExecutionTimelineStore } = await import('./executionTimelineStore');
           useExecutionTimelineStore.getState().appendDataFlows(payload.packets);
         } catch (error: unknown) {
-          console.error('Failed to parse dataflow payload from stream', error);
+          logger.error('Failed to parse dataflow payload from stream', error);
         }
       });
 
@@ -513,7 +514,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             };
           });
         } catch (error: unknown) {
-          console.error(
+          logger.error(
             'Failed to parse terminal payload from stream',
             error,
             (event as MessageEvent).data,
@@ -560,7 +561,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             };
           });
         } catch (error: unknown) {
-          console.error(
+          logger.error(
             'Failed to parse logs payload from stream',
             error,
             (event as MessageEvent).data,
@@ -596,7 +597,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
             set({ pollingInterval: backupPoll });
           }
         } catch (error: unknown) {
-          console.error('Failed to parse ready event from stream', error);
+          logger.error('Failed to parse ready event from stream', error);
         }
       });
 
@@ -605,14 +606,14 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       });
 
       source.onerror = (event) => {
-        console.warn('Execution stream error', event);
+        logger.warn('Execution stream error', event);
         source.close();
         set({ eventSource: null, streamingMode: 'none' });
       };
 
       set({ eventSource: source, streamingMode: 'connecting' });
     } catch (error: unknown) {
-      console.error('Failed to open execution stream', error);
+      logger.error('Failed to open execution stream', error);
     }
   },
 
@@ -672,7 +673,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         };
       });
     } catch (error: unknown) {
-      console.error('Failed to fetch terminal chunks', error);
+      logger.error('Failed to fetch terminal chunks', error);
     }
   },
 
@@ -719,7 +720,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         logMode: 'scrubbing',
       }));
     } catch (error: unknown) {
-      console.error('Failed to fetch logs for time range', error);
+      logger.error('Failed to fetch logs for time range', error);
     }
   },
 
@@ -735,7 +736,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         logMode: 'historical',
       }));
     } catch (error: unknown) {
-      console.error('Failed to fetch historical logs', error);
+      logger.error('Failed to fetch historical logs', error);
     }
   },
 
@@ -792,6 +793,6 @@ export const initializeExecutionStore = () => {
       );
     })
     .catch((error: unknown) => {
-      console.error('Failed to initialize execution store timeline subscription', error);
+      logger.error('Failed to initialize execution store timeline subscription', error);
     });
 };

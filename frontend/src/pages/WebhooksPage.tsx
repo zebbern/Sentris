@@ -26,6 +26,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RefreshCw, Plus, Trash2, ExternalLink, Link2, Copy, RotateCw } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -98,7 +99,7 @@ export function WebhooksPage() {
 
   const { data: workflowsRaw = [], isLoading: workflowsLoading } = useWorkflowsSummary();
   const workflowOptions: WorkflowOption[] = useMemo(
-    () => workflowsRaw.map((w: any) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
+    () => workflowsRaw.map((w) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
     [workflowsRaw],
   );
 
@@ -317,14 +318,7 @@ export function WebhooksPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between">
-              <span>{error}</span>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                Try again
-              </Button>
-            </div>
-          )}
+          {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">

@@ -1,6 +1,7 @@
 import type { Node, Edge, Connection } from 'reactflow';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
+import { logger } from '@/lib/logger';
 import {
   arePortTypesCompatible,
   describePortType,
@@ -108,7 +109,7 @@ export function validateConnection(
           ];
         }
       } catch (error: unknown) {
-        console.error('Failed to parse runtimeInputs for validation:', error);
+        logger.error('Failed to parse runtimeInputs for validation:', error);
       }
     }
   }

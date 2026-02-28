@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import { Search, Plus, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useMcpServers,
@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
 import type { McpHealthStatus } from '@shipsec/shared';
 import { cn } from '@/lib/utils';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -307,24 +308,6 @@ export function McpLibraryPage() {
     }
   };
 
-  // ------ Error state ------
-  if (error) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="text-center py-12">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Failed to load MCP servers</h2>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Button
-            onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() })}
-          >
-            Try again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   // ------ Main render ------
   return (
     <div className="container mx-auto py-8 px-4">
@@ -367,6 +350,14 @@ export function McpLibraryPage() {
           <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
         </Button>
       </div>
+
+      {error && (
+        <ErrorBanner
+          message={error}
+          onRetry={() => queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() })}
+          className="mb-6"
+        />
+      )}
 
       {/* Group Templates */}
       <GroupTemplatesSection

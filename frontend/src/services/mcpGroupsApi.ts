@@ -1,4 +1,5 @@
 import { api } from '@/services/api';
+import { logger } from '@/lib/logger';
 
 // Types matching backend DTOs
 export interface McpGroupResponse {
@@ -122,7 +123,7 @@ export const mcpGroupsApi = {
       return data.statuses || {};
     } catch {
       // Health check failures should not throw - return empty status
-      console.warn('Failed to fetch group health status');
+      logger.warn('Failed to fetch group health status');
       return {};
     }
   },

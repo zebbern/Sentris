@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { ExternalLink, KeyRound, Plug, RefreshCcw, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 
 import {
   useIntegrationProviders,
@@ -33,6 +34,7 @@ import { env } from '@/config/env';
 import { formatTimestamp, getProviderConnection } from './integrations/utils';
 import type { IntegrationProvider, IntegrationConnection } from './integrations/utils';
 import { ProviderConfigDialog } from './integrations/ProviderConfigDialog';
+import { logger } from '@/lib/logger';
 import { IntegrationCallbackBridge } from './integrations/IntegrationCallbackBridge';
 
 export function IntegrationsManager() {
@@ -211,7 +213,7 @@ export function IntegrationsManager() {
     queryClient
       .invalidateQueries({ queryKey: queryKeys.integrations.providers() })
       .catch((err: unknown) => {
-        console.error('Failed to refresh providers', err);
+        logger.error('Failed to refresh providers', err);
       });
 
     const title =
@@ -240,6 +242,18 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-8 px-4">
+        {error && (
+          <ErrorBanner
+            message={error}
+            onRetry={() => {
+              queryClient.invalidateQueries({ queryKey: queryKeys.integrations.providers() });
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.integrations.connections(userId),
+              });
+            }}
+            className="mb-4 md:mb-6"
+          />
+        )}
         <section className="mb-10">
           <div className="flex items-center justify-between mb-4">
             <div>

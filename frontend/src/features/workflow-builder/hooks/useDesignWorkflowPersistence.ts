@@ -12,6 +12,7 @@ import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
 import type { SecretSummary } from '@/schemas/secret';
+import { logger } from '@/lib/logger';
 
 interface WorkflowMetadataShape {
   id: string | null;
@@ -361,7 +362,7 @@ export function useDesignWorkflowPersistence({
           }
         }
       } catch (error: unknown) {
-        console.error('Failed to save workflow:', error);
+        logger.error('Failed to save workflow:', error);
 
         const isNetworkError =
           error instanceof Error &&

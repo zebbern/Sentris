@@ -3,7 +3,7 @@ import type { ScheduleStatus } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 
-type StatusFilter = ScheduleStatus | 'all';
+export type StatusFilter = ScheduleStatus | 'all';
 
 interface ScheduleQueryFilters {
   workflowId?: string | null;

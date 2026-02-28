@@ -16,6 +16,7 @@ import { useProviderConfig } from '@/hooks/queries/useIntegrationQueries';
 import { api } from '@/services/api';
 import { formatTimestamp } from './utils';
 import type { IntegrationProvider } from './utils';
+import { logger } from '@/lib/logger';
 
 interface ProviderConfigDialogProps {
   provider: IntegrationProvider | null;
@@ -162,7 +163,7 @@ export function ProviderConfigDialog({
       setCopiedRedirect(true);
       setTimeout(() => setCopiedRedirect(false), 2000);
     } catch (err: unknown) {
-      console.error('Failed to copy redirect URL', err);
+      logger.error('Failed to copy redirect URL', err);
       setError('Unable to copy redirect URL. Please copy it manually.');
     }
   };

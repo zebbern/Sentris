@@ -16,8 +16,9 @@ import { useWorkflowStore } from '@/store/workflowStore';
 import { track, Events } from '@/features/analytics/events';
 import { computeGraphSignature, ENTRY_DEFAULT_RUNTIME_INPUTS } from '../workflowBuilderUtils';
 import type { FrontendNodeData } from '@/schemas/node';
-import type { ToastContextValue } from '@/components/ui/toast-context';
 import type { ComponentMetadata } from '@/schemas/component';
+import type { ToastContextValue } from '@/components/ui/toast-context';
+import { logger } from '@/lib/logger';
 
 interface WorkflowMetadataShape {
   id: string | null;
@@ -296,10 +297,10 @@ export function useWorkflowLoader({
             }
           }
         } catch (error: unknown) {
-          console.error('Failed to check for active runs:', error);
+          logger.error('Failed to check for active runs:', error);
         }
       } catch (error: unknown) {
-        console.error('Failed to load workflow:', error);
+        logger.error('Failed to load workflow:', error);
 
         // Check if it's a network error (backend not available)
         const isNetworkError =

@@ -3,6 +3,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { TERMINAL_STATUSES } from '@shipsec/shared';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
+import { logger } from '@/lib/logger';
 import {
   executionEventsOptions,
   executionDataFlowsOptions,
@@ -636,7 +637,7 @@ export const useExecutionTimelineStore = create<TimelineStore>()(
           nodeStates: calculateNodeStates(events, dataFlows, initialCurrentTime, timelineStartTime),
         });
       } catch (error: unknown) {
-        console.error('Failed to load timeline:', error);
+        logger.error('Failed to load timeline:', error);
       }
     },
 
@@ -1074,6 +1075,6 @@ export const initializeTimelineStore = () => {
       });
     })
     .catch((error: unknown) => {
-      console.error('Failed to initialize timeline store subscription', error);
+      logger.error('Failed to initialize timeline store subscription', error);
     });
 };

@@ -34,6 +34,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -42,6 +43,7 @@ import {
   useResumeSchedule,
   useRunSchedule,
   useDeleteSchedule,
+  type StatusFilter,
 } from '@/hooks/queries/useScheduleQueries';
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -97,7 +99,7 @@ export function SchedulesPage() {
   const initialWorkflowId = searchParams.get('workflowId') || null;
   const [filters, setFilters] = useState<{
     search: string;
-    status: string;
+    status: StatusFilter;
     workflowId: string | null;
   }>({ search: '', status: 'all', workflowId: initialWorkflowId });
 
@@ -107,13 +109,13 @@ export function SchedulesPage() {
     error: schedulesError,
   } = useSchedules({
     workflowId: filters.workflowId,
-    status: filters.status as any,
+    status: filters.status,
   });
   const error = schedulesError?.message ?? null;
 
   const { data: workflowsRaw = [], isLoading: workflowsLoading } = useWorkflowsSummary();
   const workflowOptions: WorkflowOption[] = useMemo(
-    () => workflowsRaw.map((w: any) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
+    () => workflowsRaw.map((w) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
     [workflowsRaw],
   );
 
@@ -323,14 +325,7 @@ export function SchedulesPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between">
-              <span>{error}</span>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                Try again
-              </Button>
-            </div>
-          )}
+          {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">

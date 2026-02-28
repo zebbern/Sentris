@@ -19,6 +19,7 @@ import type { FrontendNodeData } from '@/schemas/node';
 import { useReactFlow } from 'reactflow';
 import { API_V1_URL, api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
+import { logger } from '@/lib/logger';
 import { useApiKeys, useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { WorkflowSchedule } from '@shipsec/shared';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
@@ -284,7 +285,7 @@ export function ConfigPanel({
           }
         }
       } catch (e: unknown) {
-        console.error('Failed to resolve dynamic ports', e);
+        logger.error('Failed to resolve dynamic ports', e);
       }
     }, 500); // 500ms debounce
 

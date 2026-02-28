@@ -23,6 +23,7 @@ import { CheckCircle, XCircle, RefreshCw, Search, Clock, Zap, ExternalLink } fro
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -215,14 +216,7 @@ export function ActionCenterPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center justify-between">
-              <span>{error}</span>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                Try again
-              </Button>
-            </div>
-          )}
+          {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
           {/* Table */}
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">

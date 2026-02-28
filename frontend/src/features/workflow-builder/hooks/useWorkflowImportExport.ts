@@ -17,6 +17,7 @@ import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { getComponentFromCache } from '@/hooks/queries/useComponentQueries';
 import type { SecretSummary } from '@/schemas/secret';
+import { logger } from '@/lib/logger';
 interface WorkflowMetadataShape {
   id: string | null;
   name: string;
@@ -163,7 +164,7 @@ export function useWorkflowImportExport({
             // If value is a string (ID) and not in available secrets, remove it
             if (typeof val === 'string' && val.trim().length > 0) {
               if (!secretIds.has(val)) {
-                console.warn(
+                logger.warn(
                   `[Import] Removing invalid secret reference for param "${param.id}" in node "${node.id}" (secret ID: ${val})`,
                 );
                 removedSecrets.push({ param: param.id, node: node.id, secretId: val });
@@ -174,7 +175,7 @@ export function useWorkflowImportExport({
           });
         });
       } catch (error: unknown) {
-        console.error('Failed to validate secrets during import:', error);
+        logger.error('Failed to validate secrets during import:', error);
         // Continue with import even if validation fails
       }
 
@@ -288,7 +289,7 @@ export function useWorkflowImportExport({
         description: `${safeName}.json saved to your device.`,
       });
     } catch (error: unknown) {
-      console.error('Failed to export workflow:', error);
+      logger.error('Failed to export workflow:', error);
       toast({
         variant: 'destructive',
         title: 'Failed to export workflow',

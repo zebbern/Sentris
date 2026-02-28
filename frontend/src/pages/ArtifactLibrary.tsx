@@ -1,16 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  AlertTriangle,
-  Download,
-  FileBox,
-  RefreshCw,
-  Search,
-  Copy,
-  ExternalLink,
-  Trash2,
-} from 'lucide-react';
+import { Download, FileBox, RefreshCw, Search, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -38,6 +30,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
 import { humanizeApiError } from '@/lib/humanizeApiError';
+import { logger } from '@/lib/logger';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -77,7 +70,7 @@ export function ArtifactLibrary() {
 
   const { data: workflowsRaw = [] } = useWorkflowsSummary();
   const workflows: Record<string, string> = {};
-  workflowsRaw.forEach((w: any) => {
+  workflowsRaw.forEach((w) => {
     if (w.id) workflows[w.id] = w.name;
   });
 
@@ -171,16 +164,7 @@ export function ArtifactLibrary() {
               </TableBody>
             </Table>
           ) : libraryError ? (
-            <EmptyState
-              icon={AlertTriangle}
-              title="Failed to load artifacts"
-              description={libraryError}
-              action={
-                <Button type="button" variant="outline" size="sm" onClick={handleRefresh}>
-                  Try again
-                </Button>
-              }
-            />
+            <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
           ) : library.length === 0 ? (
             <EmptyState
               icon={FileBox}
@@ -245,7 +229,7 @@ export function ArtifactLibrary() {
                           setCopiedRemoteUri((current) => (current === uri ? null : current));
                         }, 2000);
                       } catch (error: unknown) {
-                        console.error('Failed to copy remote URI', error);
+                        logger.error('Failed to copy remote URI', error);
                       }
                     }}
                     copiedRemoteUri={copiedRemoteUri}

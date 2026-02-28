@@ -6,15 +6,16 @@ import { PostHogProvider } from 'posthog-js/react';
 import posthog from 'posthog-js';
 import { initializeTheme } from '@/store/themeStore';
 import { isAnalyticsEnabled } from '@/features/analytics/config';
+import { logger } from '@/lib/logger';
 
 const hasPostHog = isAnalyticsEnabled();
 
 // Print analytics status (dev-only)
 if (import.meta.env.DEV) {
   if (hasPostHog) {
-    console.log('📊 Analytics enabled - PostHog is collecting usage data');
+    logger.info('📊 Analytics enabled - PostHog is collecting usage data');
   } else {
-    console.log('📊 Analytics disabled - No usage data will be collected');
+    logger.info('📊 Analytics disabled - No usage data will be collected');
   }
 }
 

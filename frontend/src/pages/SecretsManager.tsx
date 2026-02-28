@@ -3,6 +3,7 @@ import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -37,6 +38,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
+import { logger } from '@/lib/logger';
 
 interface FormState {
   name: string;
@@ -480,7 +482,7 @@ export function SecretsManager() {
                   setListSuccess(null);
                   queryClient
                     .invalidateQueries({ queryKey: queryKeys.secrets.all() })
-                    .catch((err: unknown) => console.error('Failed to refresh secrets', err));
+                    .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
                 }}
                 disabled={loading}
                 className="self-start sm:self-auto flex-shrink-0"
@@ -489,7 +491,13 @@ export function SecretsManager() {
               </Button>
             </div>
 
-            {error && <div className="mb-4 text-xs md:text-sm text-destructive">{error}</div>}
+            {error && (
+              <ErrorBanner
+                message={error}
+                onRetry={() => queryClient.invalidateQueries({ queryKey: queryKeys.secrets.all() })}
+                className="mb-4"
+              />
+            )}
             {listSuccess && (
               <div className="mb-4 text-xs md:text-sm text-success">{listSuccess}</div>
             )}

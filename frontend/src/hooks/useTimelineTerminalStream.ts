@@ -6,6 +6,7 @@ import {
 } from './useTerminalStream';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { api } from '@/services/api';
+import { logger } from '@/lib/logger';
 
 export interface UseTimelineTerminalStreamOptions extends UseTerminalStreamOptions {
   /**
@@ -106,7 +107,7 @@ export function useTimelineTerminalStream(
         setAllChunks(sorted);
         fetchedRunIdRef.current = terminalOptions.runId;
       } catch (error: unknown) {
-        console.error('[useTimelineTerminalStream] Failed to fetch chunks', error);
+        logger.error('[useTimelineTerminalStream] Failed to fetch chunks', error);
       } finally {
         setIsFetchingTimeline(false);
       }

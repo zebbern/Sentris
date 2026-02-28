@@ -30,6 +30,7 @@ import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { useWorkflowsSummary, useDeleteWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { logger } from '@/lib/logger';
 import {
   DndContext,
   closestCenter,
@@ -154,7 +155,7 @@ export function WorkflowList() {
       setWorkflows((prev) => prev.filter((workflow) => workflow.id !== workflowToDelete.id));
       handleDeleteDialogChange(false);
     } catch (err: unknown) {
-      console.error('Failed to delete workflow:', err);
+      logger.error('Failed to delete workflow:', err);
       toast({
         title: 'Delete failed',
         description: 'Failed to delete workflow. Please try again.',

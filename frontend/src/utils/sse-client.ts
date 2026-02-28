@@ -3,6 +3,7 @@
  * This allows us to send custom headers (like Authorization) which
  * native EventSource doesn't support.
  */
+import { logger } from '@/lib/logger';
 export class FetchEventSource implements EventSource {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
@@ -227,7 +228,7 @@ export class FetchEventSource implements EventSource {
         try {
           listener(event as MessageEvent);
         } catch (error: unknown) {
-          console.error(`Error in SSE event listener for ${type}:`, error);
+          logger.error(`Error in SSE event listener for ${type}:`, error);
         }
       }
     }

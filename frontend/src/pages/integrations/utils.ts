@@ -1,4 +1,5 @@
 import type { components } from '@shipsec/backend-client';
+import { logger } from '@/lib/logger';
 
 export type IntegrationProvider = components['schemas']['IntegrationProviderResponse'];
 export type IntegrationConnection = components['schemas']['IntegrationConnectionResponse'];
@@ -17,7 +18,7 @@ export function formatTimestamp(iso: string | null | undefined): string {
       minute: '2-digit',
     }).format(new Date(iso));
   } catch (error: unknown) {
-    console.error('Failed to format timestamp', error);
+    logger.error('Failed to format timestamp', error);
     return iso;
   }
 }

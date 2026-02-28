@@ -27,6 +27,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useApiKeys,
@@ -35,6 +36,8 @@ import {
   useDeleteApiKey,
   useApiKeyUiStore,
 } from '@/hooks/queries/useApiKeyQueries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import type { CreateApiKeyInput } from '@/schemas/apiKey';
@@ -79,6 +82,7 @@ export function ApiKeysManager() {
   const roles = useAuthStore((state) => state.roles);
   const canManageKeys = hasAdminRole(roles);
   const isReadOnly = !canManageKeys;
+  const queryClient = useQueryClient();
 
   const { data: apiKeys = [], isLoading: loading, error: apiKeysError } = useApiKeys();
   const error = apiKeysError?.message ?? null;
@@ -129,7 +133,7 @@ export function ApiKeysManager() {
       permissions: {
         ...prev.permissions,
         [category]: {
-          ...(prev.permissions[category] as any),
+          ...(prev.permissions[category] as Record<string, boolean>),
           [action]: checked,
         },
       },
@@ -213,9 +217,11 @@ export function ApiKeysManager() {
         </div>
 
         {error && (
-          <div className="mb-4 md:mb-6 rounded-md bg-destructive/10 p-3 md:p-4 text-xs md:text-sm text-destructive">
-            {error}
-          </div>
+          <ErrorBanner
+            message={error}
+            onRetry={() => queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all() })}
+            className="mb-4 md:mb-6"
+          />
         )}
 
         {successMessage && (

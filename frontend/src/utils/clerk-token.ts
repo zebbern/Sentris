@@ -2,6 +2,7 @@
  * Utility to get fresh Clerk tokens on-demand
  * This is used by the API client to fetch fresh tokens before each request
  */
+import { logger } from '@/lib/logger';
 
 let clerkGetToken: ((options?: { template?: string }) => Promise<string | null>) | null = null;
 
@@ -28,7 +29,7 @@ export async function getFreshClerkToken(): Promise<string | null> {
     const token = await clerkGetToken(jwtTemplate ? { template: jwtTemplate } : undefined);
     return token;
   } catch (error: unknown) {
-    console.error('[Clerk Token] Failed to get fresh token:', error);
+    logger.error('[Clerk Token] Failed to get fresh token:', error);
     return null;
   }
 }

@@ -6,6 +6,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { api } from '@/services/api';
 import { track, Events } from '@/features/analytics/events';
+import { logger } from '@/lib/logger';
 
 type ToastFn = (params: {
   title: string;
@@ -349,14 +350,14 @@ function handleExecutionError(
   nodes: ReactFlowNode<FrontendNodeData>[],
   setNodes: Dispatch<SetStateAction<ReactFlowNode<FrontendNodeData>[]>>,
 ) {
-  console.group('❌ Workflow Execution Failed');
-  console.error('Error object:', error);
-  if (error instanceof Error) {
-    console.error('Message:', error.message);
-    if (error.stack) console.error('Stack:', error.stack);
-    if ((error as any).cause) console.error('Cause:', (error as any).cause);
-  }
-  console.groupEnd();
+  logger.error('Workflow Execution Failed', {
+    error,
+    ...(error instanceof Error && {
+      message: error.message,
+      stack: error.stack,
+      cause: 'cause' in error ? error.cause : undefined,
+    }),
+  });
 
   let errorMessage = 'An unknown error occurred';
   let stackTrace: string | undefined;

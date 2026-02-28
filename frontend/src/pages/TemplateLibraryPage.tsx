@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import {
   Eye,
   Filter,
@@ -21,7 +22,6 @@ import {
   Tag,
   X,
   CheckCircle2,
-  AlertCircle,
   Shield,
   Activity,
   Zap,
@@ -62,6 +62,25 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// Workflow graph data
+// ---------------------------------------------------------------------------
+
+interface WorkflowGraphData {
+  nodes: { id: string; [key: string]: unknown }[];
+  edges?: { source: string; target: string; [key: string]: unknown }[];
+}
+
+function hasGraphNodes(graph: unknown): graph is WorkflowGraphData {
+  return (
+    typeof graph === 'object' &&
+    graph !== null &&
+    'nodes' in graph &&
+    Array.isArray((graph as WorkflowGraphData).nodes) &&
+    (graph as WorkflowGraphData).nodes.length > 0
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Category styling
@@ -183,11 +202,7 @@ function PreviewSection({ graph }: { graph?: Record<string, unknown>; category?:
   const [zoom, setZoom] = useState(1);
   const [origin, setOrigin] = useState({ x: 50, y: 50 }); // percentage-based origin
   const containerRef = useRef<HTMLDivElement>(null);
-  const hasGraph =
-    graph &&
-    (graph as any)?.nodes &&
-    Array.isArray((graph as any).nodes) &&
-    (graph as any).nodes.length > 0;
+  const hasGraph = hasGraphNodes(graph);
 
   // Track cursor position for zoom origin
   const updateOrigin = (e: React.MouseEvent) => {
@@ -628,11 +643,7 @@ function TemplateDetailModal({
 
   const catStyle = getCategoryStyle(template.category);
   const CategoryIcon = catStyle.icon;
-  const hasGraph =
-    template.graph &&
-    (template.graph as any)?.nodes &&
-    Array.isArray((template.graph as any).nodes) &&
-    (template.graph as any).nodes.length > 0;
+  const hasGraph = hasGraphNodes(template.graph);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -745,7 +756,7 @@ export function TemplateLibraryPage() {
   }, [selectedCategory, searchQuery, selectedTags]);
 
   // Server state via TanStack Query
-  const { data: templates = [], isLoading, error } = useTemplates(filters);
+  const { data: templates = [], isLoading, error, refetch } = useTemplates(filters);
   const { data: categories = [] } = useTemplateCategories();
   const { data: tags = [] } = useTemplateTags();
   const syncMutation = useSyncTemplates();
@@ -898,17 +909,7 @@ export function TemplateLibraryPage() {
 
         {/* Error State */}
         {error && (
-          <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="h-4 w-4 text-destructive" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-destructive">Error loading templates</p>
-                <p className="text-xs text-destructive/70 truncate">{error.message}</p>
-              </div>
-            </div>
-          </div>
+          <ErrorBanner message={error.message} onRetry={() => refetch()} className="mb-6" />
         )}
 
         {/* Grid */}

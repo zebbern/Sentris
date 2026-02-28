@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/services/api';
+import { logger } from '@/lib/logger';
 
 type TerminalChunk = Awaited<ReturnType<typeof api.executions.getTerminalChunks>>['chunks'][number];
 
@@ -86,7 +87,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
           setMode(autoConnect ? 'live' : 'replay');
         }
       } catch (err: unknown) {
-        console.error('[useTerminalStream] hydrate failed', err);
+        logger.error('[useTerminalStream] hydrate failed', err);
         setError(err instanceof Error ? err.message : 'Failed to load terminal output');
       } finally {
         setIsHydrating(false);
@@ -112,7 +113,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
       setChunks((prev) => mergeTerminalChunks(prev, result.chunks));
       setMode('replay');
     } catch (err: unknown) {
-      console.error('[useTerminalStream] fetchMore failed', err);
+      logger.error('[useTerminalStream] fetchMore failed', err);
       setError(err instanceof Error ? err.message : 'Failed to load additional chunks');
     }
   }, [runId, nodeId, stream]);
@@ -194,7 +195,7 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
             setChunks((prev) => mergeTerminalChunks(prev, relevant));
             setMode('live');
           } catch (err: unknown) {
-            console.error('[useTerminalStream] failed to parse terminal SSE', err);
+            logger.error('[useTerminalStream] failed to parse terminal SSE', err);
           }
         };
 
@@ -207,12 +208,12 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
         source.addEventListener('terminal', handleTerminal);
         source.addEventListener('complete', handleComplete);
         source.addEventListener('error', (event) => {
-          console.error('[useTerminalStream] SSE error event', event);
+          logger.error('[useTerminalStream] SSE error event', event);
           setIsStreaming(false);
         });
       } catch (err: unknown) {
         if (isMounted) {
-          console.error('[useTerminalStream] SSE connection failed', err);
+          logger.error('[useTerminalStream] SSE connection failed', err);
           setError('Failed to connect to terminal stream');
           setIsStreaming(false);
         }
