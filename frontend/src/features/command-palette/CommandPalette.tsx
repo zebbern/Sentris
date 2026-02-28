@@ -6,6 +6,11 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { useThemeStore } from '@/store/themeStore';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useWorkflowsList } from '@/hooks/queries/useWorkflowQueries';
+import { useTemplates } from '@/hooks/queries/useTemplateQueries';
+import { useSchedules } from '@/hooks/queries/useScheduleQueries';
+import { useSecrets } from '@/hooks/queries/useSecretQueries';
+import { useApiKeys } from '@/hooks/queries/useApiKeyQueries';
+import { useWebhooks } from '@/hooks/queries/useWebhookQueries';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
@@ -29,13 +34,24 @@ import {
   Webhook,
   Zap,
   ServerCog,
+  LayoutTemplate,
 } from 'lucide-react';
 import { env } from '@/config/env';
 import { WorkflowMetadataSchema } from '@/schemas/workflow';
 import type { ComponentMetadata } from '@/schemas/component';
 
 // Command types
-type CommandCategory = 'navigation' | 'workflows' | 'actions' | 'settings' | 'components';
+type CommandCategory =
+  | 'navigation'
+  | 'workflows'
+  | 'actions'
+  | 'settings'
+  | 'components'
+  | 'templates'
+  | 'schedules'
+  | 'secrets'
+  | 'api-keys'
+  | 'webhooks';
 
 interface BaseCommand {
   id: string;
@@ -78,15 +94,56 @@ const categoryLabels: Record<CommandCategory, string> = {
   actions: 'Quick Actions',
   settings: 'Settings',
   components: 'Add Component',
+  templates: 'Templates',
+  schedules: 'Schedules',
+  secrets: 'Secrets',
+  'api-keys': 'API Keys',
+  webhooks: 'Webhooks',
 };
 
 const categoryOrder: CommandCategory[] = [
   'actions',
-  'components',
   'navigation',
   'workflows',
+  'templates',
+  'schedules',
+  'components',
+  'secrets',
+  'webhooks',
+  'api-keys',
   'settings',
 ];
+
+const MAX_RESULTS_PER_CATEGORY = 5;
+
+/** Score how well `text` matches a search `term`. Higher = better. 0 = no match. */
+function scoreMatch(text: string, term: string): number {
+  const lower = text.toLowerCase();
+  if (lower === term) return 100;
+  if (lower.startsWith(term)) return 80;
+  // Word boundary match (e.g. "cron" matches "my-cron-job")
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (new RegExp(`\\b${escaped}`).test(lower)) return 70;
+  if (lower.includes(term)) return 60;
+  return 0;
+}
+
+/** Score a command against multiple search terms. All terms must match. */
+function scoreCommand(
+  cmd: { label: string; description?: string; keywords?: string[] },
+  terms: string[],
+): number {
+  let total = 0;
+  for (const term of terms) {
+    const labelScore = scoreMatch(cmd.label, term);
+    const descScore = scoreMatch(cmd.description ?? '', term) * 0.8;
+    const kwScores = (cmd.keywords ?? []).map((kw) => scoreMatch(kw, term) * 0.9);
+    const best = Math.max(labelScore, descScore, ...kwScores);
+    if (best === 0) return 0; // every term must match somewhere
+    total += best;
+  }
+  return total;
+}
 
 export function CommandPalette() {
   const { isOpen, close } = useCommandPaletteStore();
@@ -97,6 +154,11 @@ export function CommandPalette() {
   const storeComponents = componentIndex?.byId ?? {};
   const mode = useWorkflowUiStore((state) => state.mode);
   const { data: rawWorkflows = [], isLoading: isLoadingWorkflows } = useWorkflowsList();
+  const { data: templates = [] } = useTemplates();
+  const { data: schedules = [] } = useSchedules();
+  const { data: secrets = [] } = useSecrets();
+  const { data: apiKeys = [] } = useApiKeys();
+  const { data: webhooks = [] } = useWebhooks();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -359,56 +421,161 @@ export function CommandPalette() {
     });
   }, [allComponents]);
 
-  // Combine all commands
-  const allCommands = useMemo<Command[]>(() => {
-    return [...staticCommands, ...workflowCommands, ...componentCommands];
-  }, [staticCommands, workflowCommands, componentCommands]);
+  // Build template commands
+  const templateCommands = useMemo<Command[]>(
+    () =>
+      templates.map((t) => ({
+        id: `template-${t.id}`,
+        type: 'navigation' as const,
+        label: t.name,
+        description: t.description || `Template · ${t.category ?? 'General'}`,
+        category: 'templates' as const,
+        icon: LayoutTemplate,
+        keywords: [
+          t.name.toLowerCase(),
+          'template',
+          ...(t.category ? [t.category.toLowerCase()] : []),
+          ...(t.tags ?? []).map((tag) => tag.toLowerCase()),
+        ],
+        href: `/templates?id=${t.id}`,
+      })),
+    [templates],
+  );
 
-  // Filter commands based on query
+  // Build schedule commands
+  const scheduleCommands = useMemo<Command[]>(
+    () =>
+      schedules.map((s) => ({
+        id: `schedule-${s.id}`,
+        type: 'navigation' as const,
+        label: s.name,
+        description: `${s.cronExpression} · ${s.status}`,
+        category: 'schedules' as const,
+        icon: CalendarClock,
+        keywords: [s.name.toLowerCase(), 'schedule', 'cron', s.cronExpression, s.status],
+        href: `/schedules?highlight=${s.id}`,
+      })),
+    [schedules],
+  );
+
+  // Build secret commands
+  const secretCommands = useMemo<Command[]>(
+    () =>
+      secrets.map((s) => ({
+        id: `secret-${s.id}`,
+        type: 'navigation' as const,
+        label: s.name,
+        description: s.description || 'Secret',
+        category: 'secrets' as const,
+        icon: KeyRound,
+        keywords: [s.name.toLowerCase(), 'secret', 'credential'],
+        href: '/secrets',
+      })),
+    [secrets],
+  );
+
+  // Build API key commands
+  const apiKeyCommands = useMemo<Command[]>(
+    () =>
+      apiKeys.map((k) => ({
+        id: `apikey-${k.id}`,
+        type: 'navigation' as const,
+        label: k.name,
+        description: k.description || `API Key · ${k.keyHint}`,
+        category: 'api-keys' as const,
+        icon: Shield,
+        keywords: [k.name.toLowerCase(), 'api', 'key', k.keyHint],
+        href: '/api-keys',
+      })),
+    [apiKeys],
+  );
+
+  // Build webhook commands
+  const webhookCommands = useMemo<Command[]>(
+    () =>
+      webhooks.map((w) => ({
+        id: `webhook-${w.id}`,
+        type: 'navigation' as const,
+        label: w.name,
+        description: `Webhook · ${w.status}`,
+        category: 'webhooks' as const,
+        icon: Webhook,
+        keywords: [w.name.toLowerCase(), 'webhook', 'hook', w.status],
+        href: `/webhooks?id=${w.id}`,
+      })),
+    [webhooks],
+  );
+
+  // Combine all commands
+  const allCommands = useMemo<Command[]>(
+    () => [
+      ...staticCommands,
+      ...workflowCommands,
+      ...componentCommands,
+      ...templateCommands,
+      ...scheduleCommands,
+      ...secretCommands,
+      ...apiKeyCommands,
+      ...webhookCommands,
+    ],
+    [
+      staticCommands,
+      workflowCommands,
+      componentCommands,
+      templateCommands,
+      scheduleCommands,
+      secretCommands,
+      apiKeyCommands,
+      webhookCommands,
+    ],
+  );
+
+  // Filter and score commands based on query
   const filteredCommands = useMemo(() => {
     if (!query.trim()) {
-      // Show all static commands and limited workflows/components when no query
+      // Show static commands + limited entity results when no query
       return [
         ...staticCommands,
-        ...(canPlaceComponents ? componentCommands.slice(0, 5) : []), // Show first 5 components if on workflow page
-        ...workflowCommands.slice(0, 5), // Show first 5 workflows
+        ...(canPlaceComponents ? componentCommands.slice(0, MAX_RESULTS_PER_CATEGORY) : []),
+        ...workflowCommands.slice(0, MAX_RESULTS_PER_CATEGORY),
       ];
     }
 
-    const searchTerms = query.toLowerCase().split(' ').filter(Boolean);
+    const terms = query.toLowerCase().split(' ').filter(Boolean);
 
-    return allCommands.filter((cmd) => {
-      const searchableText = [cmd.label, cmd.description || '', ...(cmd.keywords || [])]
-        .join(' ')
-        .toLowerCase();
-
-      return searchTerms.every((term) => searchableText.includes(term));
-    });
+    return allCommands
+      .map((cmd) => ({ cmd, score: scoreCommand(cmd, terms) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((item) => item.cmd);
   }, [query, allCommands, staticCommands, workflowCommands, componentCommands, canPlaceComponents]);
 
-  // Group commands by category
+  // Group commands by category with counts
   const groupedCommands = useMemo(() => {
-    const groups: Record<CommandCategory, Command[]> = {
-      navigation: [],
-      workflows: [],
-      actions: [],
-      settings: [],
-      components: [],
-    };
+    const groups = Object.fromEntries(categoryOrder.map((cat) => [cat, [] as Command[]])) as Record<
+      CommandCategory,
+      Command[]
+    >;
 
-    filteredCommands.forEach((cmd) => {
+    for (const cmd of filteredCommands) {
       groups[cmd.category].push(cmd);
-    });
+    }
 
-    // Return sorted by category order, filtering empty categories
+    const hasQuery = query.trim().length > 0;
+
     return categoryOrder
       .filter((cat) => groups[cat].length > 0)
-      .map((cat) => ({
-        category: cat,
-        label: categoryLabels[cat],
-        commands: groups[cat],
-      }));
-  }, [filteredCommands]);
+      .map((cat) => {
+        const all = groups[cat];
+        return {
+          category: cat,
+          label: categoryLabels[cat],
+          totalCount: all.length,
+          commands: hasQuery ? all.slice(0, MAX_RESULTS_PER_CATEGORY) : all,
+          hasMore: hasQuery && all.length > MAX_RESULTS_PER_CATEGORY,
+        };
+      });
+  }, [filteredCommands, query]);
 
   // Flat list for keyboard navigation
   const flatCommandList = useMemo(() => {
@@ -567,6 +734,11 @@ export function CommandPalette() {
                   <span className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">
                     {group.label}
                   </span>
+                  {query.trim() && group.totalCount > 0 && (
+                    <span className="text-xs text-muted-foreground/50 tabular-nums">
+                      ({group.totalCount})
+                    </span>
+                  )}
                   {group.category === 'components' && !canPlaceComponents && (
                     <span className="text-xs text-muted-foreground/50 normal-case tracking-normal">
                       (open a workflow first)
@@ -643,6 +815,28 @@ export function CommandPalette() {
                     </button>
                   );
                 })}
+                {group.hasMore && (
+                  <button
+                    onClick={() => {
+                      const categoryRoutes: Partial<Record<CommandCategory, string>> = {
+                        templates: '/templates',
+                        schedules: '/schedules',
+                        secrets: '/secrets',
+                        'api-keys': '/api-keys',
+                        webhooks: '/webhooks',
+                        workflows: '/',
+                      };
+                      const route = categoryRoutes[group.category];
+                      if (route) {
+                        navigate(route);
+                        close();
+                      }
+                    }}
+                    className="w-full px-4 py-1.5 text-left text-xs text-primary hover:underline"
+                  >
+                    View all {group.totalCount} results
+                  </button>
+                )}
               </div>
             );
           })}
