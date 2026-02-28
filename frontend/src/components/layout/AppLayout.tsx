@@ -407,6 +407,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <img
                   src="/favicon.ico"
                   alt="ShipSec Studio"
+                  width={24}
+                  height={24}
                   className="w-6 h-6"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
