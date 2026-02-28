@@ -46,3 +46,23 @@ export function useDeleteWorkflow() {
     },
   });
 }
+
+export function useCloneWorkflow() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const source = await api.workflows.get(id);
+      return api.workflows.create({
+        name: `${source.name} (Copy)`,
+        description: source.description ?? '',
+        nodes: source.graph.nodes,
+        edges: source.graph.edges,
+        viewport: source.graph.viewport,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+      qc.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+    },
+  });
+}

@@ -4,13 +4,13 @@ import type { CSSProperties, MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -29,14 +29,28 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Workflow, AlertCircle, Trash2, Info, GripVertical, Search } from 'lucide-react';
+import {
+  Workflow,
+  AlertCircle,
+  Trash2,
+  Info,
+  GripVertical,
+  Search,
+  MoreHorizontal,
+  Copy,
+} from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { type WorkflowSummary } from '@/services/api';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
-import { useWorkflowsSummary, useDeleteWorkflow } from '@/hooks/queries/useWorkflowQueries';
+import {
+  useWorkflowsSummary,
+  useDeleteWorkflow,
+  useCloneWorkflow,
+} from '@/hooks/queries/useWorkflowQueries';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { logger } from '@/lib/logger';
 import { DndContext } from '@dnd-kit/core';
@@ -69,9 +83,9 @@ export function WorkflowList() {
   const organizationId = useAuthStore((state) => state.organizationId);
   const canManageWorkflows = hasAdminRole(roles);
   const isReadOnly = !canManageWorkflows;
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowSummary | null>(null);
+  const { confirm, dialogProps } = useConfirmDialog();
   const deleteWorkflow = useDeleteWorkflow();
+  const cloneWorkflow = useCloneWorkflow();
 
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,36 +129,50 @@ export function WorkflowList() {
     disabled: hasActiveFilters,
   });
 
-  const handleDeleteClick = (event: MouseEvent, workflow: WorkflowSummary) => {
+  const handleDeleteClick = async (event: MouseEvent, workflow: WorkflowSummary) => {
     event.stopPropagation();
-    if (!canManageWorkflows) {
-      return;
-    }
-    setWorkflowToDelete(workflow);
-    deleteWorkflow.reset();
-    setIsDeleteDialogOpen(true);
-  };
+    if (!canManageWorkflows) return;
 
-  const handleDeleteDialogChange = (open: boolean) => {
-    setIsDeleteDialogOpen(open);
-    if (!open) {
-      setWorkflowToDelete(null);
-      deleteWorkflow.reset();
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!workflowToDelete || !canManageWorkflows) return;
+    const ok = await confirm({
+      title: 'Delete workflow',
+      description: `This action permanently removes "${workflow.name}" and its configuration. Runs and logs remain available for auditing purposes.`,
+      confirmLabel: 'Delete workflow',
+      cancelLabel: 'Cancel',
+      destructive: true,
+    });
+    if (!ok) return;
 
     try {
-      await deleteWorkflow.mutateAsync(workflowToDelete.id);
-      // The query cache is invalidated by the mutation; no local state to update.
-      handleDeleteDialogChange(false);
+      await deleteWorkflow.mutateAsync(workflow.id);
     } catch (err: unknown) {
       logger.error('Failed to delete workflow:', err);
       toast({
         title: 'Delete failed',
         description: 'Failed to delete workflow. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCloneClick = async (event: MouseEvent, workflow: WorkflowSummary) => {
+    event.stopPropagation();
+    if (!canManageWorkflows) return;
+
+    try {
+      const newWorkflow = await cloneWorkflow.mutateAsync(workflow.id);
+      track(Events.WorkflowDuplicated, {
+        source_workflow_id: workflow.id,
+        new_workflow_id: newWorkflow.id,
+      });
+      toast({
+        title: 'Workflow duplicated',
+        description: `"${newWorkflow.name}" has been created.`,
+      });
+    } catch (err: unknown) {
+      logger.error('Failed to clone workflow:', err);
+      toast({
+        title: 'Duplicate failed',
+        description: 'Failed to duplicate workflow. Please try again.',
         variant: 'destructive',
       });
     }
@@ -381,11 +409,12 @@ export function WorkflowList() {
                           workflow={workflow}
                           canManageWorkflows={canManageWorkflows}
                           isDeleting={deleteWorkflow.isPending}
-                          isLoading={isLoading}
+                          isCloning={cloneWorkflow.isPending}
                           isDragDisabled={isDragDisabled}
                           formatDate={formatDate}
                           onRowClick={() => navigate(`/workflows/${workflow.id}`)}
                           onDeleteClick={handleDeleteClick}
+                          onCloneClick={handleCloneClick}
                         />
                       ))}
                     </SortableContext>
@@ -397,51 +426,7 @@ export function WorkflowList() {
         )}
       </div>
 
-      {canManageWorkflows && (
-        <Dialog open={isDeleteDialogOpen} onOpenChange={handleDeleteDialogChange}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete workflow</DialogTitle>
-              <DialogDescription>
-                This action permanently removes the workflow and its configuration. Runs and logs
-                remain available for auditing purposes.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="text-sm">
-                <span className="font-medium">Workflow:</span> <span>{workflowToDelete?.name}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                ID: <span className="font-mono">{workflowToDelete?.id}</span>
-              </div>
-              {deleteWorkflow.error && (
-                <p className="text-sm text-destructive">
-                  {deleteWorkflow.error instanceof Error
-                    ? deleteWorkflow.error.message
-                    : 'Failed to delete workflow'}
-                </p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleDeleteDialogChange(false)}
-                disabled={deleteWorkflow.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleConfirmDelete}
-                disabled={deleteWorkflow.isPending}
-              >
-                {deleteWorkflow.isPending ? 'Deleting…' : 'Delete workflow'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
@@ -450,22 +435,24 @@ interface WorkflowRowItemProps {
   workflow: WorkflowSummary;
   canManageWorkflows: boolean;
   isDeleting: boolean;
-  isLoading: boolean;
+  isCloning: boolean;
   isDragDisabled?: boolean;
   formatDate: (dateString: string) => string;
   onRowClick: () => void;
   onDeleteClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
+  onCloneClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
 }
 
 function WorkflowRowItem({
   workflow,
   canManageWorkflows,
   isDeleting,
-  isLoading,
+  isCloning,
   isDragDisabled = false,
   formatDate,
   onRowClick,
   onDeleteClick,
+  onCloneClick,
 }: WorkflowRowItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: workflow.id,
@@ -546,16 +533,37 @@ function WorkflowRowItem({
       </TableCell>
       {canManageWorkflows && (
         <TableCell className="text-right">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-            onClick={(event) => onDeleteClick(event, workflow)}
-            disabled={isLoading || isDeleting}
-            aria-label={`Delete workflow ${workflow.name}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Actions for ${workflow.name}`}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => onCloneClick(e as unknown as MouseEvent, workflow)}
+                disabled={isCloning}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={(e) => onDeleteClick(e as unknown as MouseEvent, workflow)}
+                disabled={isDeleting}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </TableCell>
       )}
     </TableRow>

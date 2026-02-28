@@ -5,6 +5,7 @@ import { hasAdminRole } from '@/utils/auth';
 import { AuditLogSettings } from '@/pages/settings/AuditLogSettings';
 import { GeneralSettings } from '@/pages/settings/GeneralSettings';
 import { AppearanceSettings } from '@/pages/settings/AppearanceSettings';
+import { NotificationSettings } from '@/pages/settings/NotificationSettings';
 import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -22,6 +23,11 @@ export function SettingsPage() {
     {
       label: 'Appearance',
       to: '/settings/appearance',
+      adminOnly: false,
+    },
+    {
+      label: 'Notifications',
+      to: '/settings/notifications',
       adminOnly: false,
     },
     {
@@ -60,6 +66,7 @@ export function SettingsPage() {
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />
             <Route path="appearance" element={<AppearanceSettings />} />
+            <Route path="notifications" element={<NotificationSettings />} />
             {isAdmin && <Route path="audit" element={<AuditLogSettings />} />}
           </Routes>
         </div>
