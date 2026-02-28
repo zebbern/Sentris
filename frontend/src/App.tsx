@@ -1,6 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { QueryClientProvider } from '@tanstack/react-query';
 const ReactQueryDevtools = lazy(() =>
   import('@tanstack/react-query-devtools').then((mod) => ({
@@ -165,7 +164,7 @@ function LandingPageRedirect() {
     if (defaultLandingPage && defaultLandingPage !== '/') {
       navigate(defaultLandingPage, { replace: true });
     }
-  }, []);
+  }, [location.pathname, navigate]);
 
   return null;
 }
@@ -174,63 +173,194 @@ function AnimatedRoutes() {
   const location = useLocation();
 
   return (
-    <AnimatePresence>
-      <PageTransition key={location.pathname}>
-        <Routes location={location}>
-          <Route path="/" element={<WorkflowList />} />
-          <Route path="/templates" element={<TemplateLibraryPage />} />
+    <PageTransition key={location.pathname}>
+      <Routes location={location}>
+        <Route
+          path="/"
+          element={
+            <ErrorBoundary>
+              <WorkflowList />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <ErrorBoundary>
+              <TemplateLibraryPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/workflows/:id"
+          element={
+            <ErrorBoundary>
+              <WorkflowBuilder />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/workflows/:id/runs"
+          element={
+            <ErrorBoundary>
+              <WorkflowBuilder />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/workflows/:id/runs/:runId"
+          element={
+            <ErrorBoundary>
+              <WorkflowBuilder />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/secrets"
+          element={
+            <ErrorBoundary>
+              <SecretsManager />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/api-keys"
+          element={
+            <ErrorBoundary>
+              <ApiKeysManager />
+            </ErrorBoundary>
+          }
+        />
+        {env.VITE_ENABLE_CONNECTIONS ? (
           <Route
-            path="/workflows/:id"
+            path="/integrations"
             element={
               <ErrorBoundary>
-                <WorkflowBuilder />
+                <IntegrationsManager />
               </ErrorBoundary>
             }
           />
+        ) : (
+          <Route path="/integrations" element={<Navigate to="/" replace />} />
+        )}
+        <Route
+          path="/webhooks"
+          element={
+            <ErrorBoundary>
+              <WebhooksPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/webhooks/new"
+          element={
+            <ErrorBoundary>
+              <WebhookEditorPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/webhooks/:id"
+          element={
+            <ErrorBoundary>
+              <WebhookEditorPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/webhooks/:id/deliveries"
+          element={
+            <ErrorBoundary>
+              <WebhookEditorPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/webhooks/:id/settings"
+          element={
+            <ErrorBoundary>
+              <WebhookEditorPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/schedules"
+          element={
+            <ErrorBoundary>
+              <SchedulesPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/action-center"
+          element={
+            <ErrorBoundary>
+              <ActionCenterPage />
+            </ErrorBoundary>
+          }
+        />
+        {env.VITE_OPENSEARCH_DASHBOARDS_URL ? (
           <Route
-            path="/workflows/:id/runs"
+            path="/analytics-settings"
             element={
               <ErrorBoundary>
-                <WorkflowBuilder />
+                <AnalyticsSettingsPage />
               </ErrorBoundary>
             }
           />
-          <Route
-            path="/workflows/:id/runs/:runId"
-            element={
-              <ErrorBoundary>
-                <WorkflowBuilder />
-              </ErrorBoundary>
-            }
-          />
-          <Route path="/secrets" element={<SecretsManager />} />
-          <Route path="/api-keys" element={<ApiKeysManager />} />
-          {env.VITE_ENABLE_CONNECTIONS ? (
-            <Route path="/integrations" element={<IntegrationsManager />} />
-          ) : (
-            <Route path="/integrations" element={<Navigate to="/" replace />} />
-          )}
-          <Route path="/webhooks" element={<WebhooksPage />} />
-          <Route path="/webhooks/new" element={<WebhookEditorPage />} />
-          <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
-          <Route path="/webhooks/:id/deliveries" element={<WebhookEditorPage />} />
-          <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
-          <Route path="/schedules" element={<SchedulesPage />} />
-          <Route path="/action-center" element={<ActionCenterPage />} />
-          {env.VITE_OPENSEARCH_DASHBOARDS_URL ? (
-            <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
-          ) : (
-            <Route path="/analytics-settings" element={<Navigate to="/settings" replace />} />
-          )}
-          <Route path="/settings/*" element={<SettingsPage />} />
-          <Route path="/artifacts" element={<ArtifactLibrary />} />
-          <Route path="/mcp-library" element={<McpLibraryPage />} />
-          <Route path="/runs/:runId" element={<RunRedirect />} />
-          <Route path="/integrations/callback/:provider" element={<IntegrationCallback />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </PageTransition>
-    </AnimatePresence>
+        ) : (
+          <Route path="/analytics-settings" element={<Navigate to="/settings" replace />} />
+        )}
+        <Route
+          path="/settings/*"
+          element={
+            <ErrorBoundary>
+              <SettingsPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/artifacts"
+          element={
+            <ErrorBoundary>
+              <ArtifactLibrary />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/mcp-library"
+          element={
+            <ErrorBoundary>
+              <McpLibraryPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/runs/:runId"
+          element={
+            <ErrorBoundary>
+              <RunRedirect />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/integrations/callback/:provider"
+          element={
+            <ErrorBoundary>
+              <IntegrationCallback />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <ErrorBoundary>
+              <NotFound />
+            </ErrorBoundary>
+          }
+        />
+      </Routes>
+    </PageTransition>
   );
 }
 
