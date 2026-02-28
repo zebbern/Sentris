@@ -109,7 +109,6 @@ export function useAuthStoreIntegration() {
     // Handle auth errors
     if (error) {
       logger.error('Authentication error:', error);
-      // You might want to show a toast notification here
     }
   }, [
     authProvider.name,

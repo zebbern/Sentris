@@ -220,7 +220,7 @@ export function ApiKeysManager() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // You might want to show a toast here
+    toast({ title: 'Copied', description: 'API key copied to clipboard.' });
   };
 
   return (
