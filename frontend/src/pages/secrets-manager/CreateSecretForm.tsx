@@ -62,7 +62,7 @@ export function CreateSecretForm({
             }
           />
           {createNameError && (
-            <p id="create-name-error" className="text-xs text-destructive" role="alert">
+            <p id="create-name-error" className="text-sm text-destructive" role="alert">
               {createNameError}
             </p>
           )}

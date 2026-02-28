@@ -174,7 +174,7 @@ function AnimatedRoutes() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       <PageTransition key={location.pathname}>
         <Routes location={location}>
           <Route path="/" element={<WorkflowList />} />

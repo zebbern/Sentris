@@ -74,7 +74,7 @@ export function EditSecretDialog({
               }
             />
             {editNameError && (
-              <p id="edit-name-error" className="text-xs text-destructive" role="alert">
+              <p id="edit-name-error" className="text-sm text-destructive" role="alert">
                 {editNameError}
               </p>
             )}
@@ -118,6 +118,7 @@ export function EditSecretDialog({
               disabled={disableEditing}
               rows={4}
               placeholder="Provide only if you want to rotate the secret"
+              aria-describedby={editError ? 'edit-secret-error' : undefined}
             />
             <p className="text-xs text-muted-foreground">
               The plaintext encrypts immediately. Leave blank to keep the current value.
