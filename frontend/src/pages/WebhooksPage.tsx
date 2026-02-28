@@ -399,7 +399,7 @@ export function WebhooksPage() {
                 collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">
@@ -412,7 +412,7 @@ export function WebhooksPage() {
                       <TableHead className="w-10" />
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                      <TableHead>Webhook URL</TableHead>
+                      <TableHead className="hidden sm:table-cell">Webhook URL</TableHead>
                       <TableHead className="hidden lg:table-cell whitespace-nowrap">
                         Created
                       </TableHead>
@@ -485,7 +485,7 @@ export function WebhooksPage() {
                                       </span>
                                     </div>
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="hidden sm:table-cell">
                                     <div className="flex items-center gap-1 max-w-[200px]">
                                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate flex-1">
                                         /{webhook.webhookPath.slice(0, 20)}...

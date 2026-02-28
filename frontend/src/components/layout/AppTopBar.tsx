@@ -133,7 +133,7 @@ export function AppTopBar({
     }
 
     return {
-      title: 'ShipSec Studio',
+      title: 'Page Not Found',
       shortTitle: 'Not Found',
       subtitle: '',
     };

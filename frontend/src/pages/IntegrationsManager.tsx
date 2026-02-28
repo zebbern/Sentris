@@ -243,7 +243,7 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-8 px-4">
-        <PageToolbar title="Integrations" className="mb-4 md:mb-6" />
+        <PageToolbar className="mb-4 md:mb-6" />
 
         {error && (
           <ErrorBanner
@@ -404,7 +404,7 @@ export function IntegrationsManager() {
                 };
 
                 const domain = domainMap[providerId.toLowerCase()];
-                if (!domain) return null;
+                if (!domain || !env.VITE_LOGO_DEV_PUBLIC_KEY) return null;
 
                 // Logo.dev provides colored brand logos via CDN (free alternative to Clearbit)
                 // Read public key from environment variable
@@ -459,7 +459,12 @@ export function IntegrationsManager() {
                     <Input
                       id={`additional-scopes-${provider.id}`}
                       value={additionalScopesValue}
-                      placeholder="repo delete_repo"
+                      placeholder={
+                        {
+                          github: 'repo delete_repo',
+                          zoom: 'recording:read chat:write',
+                        }[provider.id] || 'scope1 scope2'
+                      }
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           event.preventDefault();

@@ -20,6 +20,7 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PageTransition } from '@/components/shared/PageTransition';
+import { logger } from '@/lib/logger';
 
 // Lazy-loaded page components
 const WorkflowList = lazy(() =>
@@ -214,9 +215,16 @@ function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
     <>
       {children}
       {hasOpened && (
-        <Suspense fallback={null}>
-          <CommandPalette />
-        </Suspense>
+        <ErrorBoundary
+          fallback={({ error }) => {
+            logger.error('[CommandPalette] Failed to load:', error);
+            return null;
+          }}
+        >
+          <Suspense fallback={null}>
+            <CommandPalette />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </>
   );

@@ -611,7 +611,7 @@ export function SecretsManager() {
                   collisionDetection={collisionDetection}
                   onDragEnd={handleDragEnd}
                 >
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow className="text-muted-foreground">
                         <TableHead className="w-10">

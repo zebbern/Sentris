@@ -506,9 +506,14 @@ function WorkflowRowItem({
         )}
       </TableCell>
       <TableCell className="font-medium">
-        <div className="max-w-[200px] truncate" title={workflow.name}>
-          {workflow.name}
-        </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="max-w-[200px] truncate">{workflow.name}</div>
+            </TooltipTrigger>
+            <TooltipContent>{workflow.name}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </TableCell>
       <TableCell className="hidden sm:table-cell">
         <Badge variant="secondary" className="text-xs">

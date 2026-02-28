@@ -116,6 +116,7 @@ export function ApiKeysManager() {
   const clearLastCreatedKey = useApiKeyUiStore((state) => state.clearLastCreatedKey);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formState, setFormState] = useState<CreateApiKeyInput>(INITIAL_FORM);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -144,6 +145,14 @@ export function ApiKeysManager() {
     () => orderedApiKeys.some((k) => selectedIds.has(k.id) && k.isActive),
     [orderedApiKeys, selectedIds],
   );
+
+  const filteredApiKeys = useMemo(() => {
+    if (!searchQuery.trim()) return orderedApiKeys;
+    const q = searchQuery.toLowerCase();
+    return orderedApiKeys.filter(
+      (k) => k.name.toLowerCase().includes(q) || k.description?.toLowerCase().includes(q),
+    );
+  }, [orderedApiKeys, searchQuery]);
 
   useEffect(() => {
     if (!successMessage) return;
@@ -329,6 +338,9 @@ export function ApiKeysManager() {
     <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <PageToolbar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search API keys..."
           actions={
             <div className="flex items-center gap-2">
               <Button
@@ -460,12 +472,23 @@ export function ApiKeysManager() {
                         />
                       </TableCell>
                     </TableRow>
+                  ) : filteredApiKeys.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9}>
+                        <EmptyState
+                          icon={Key}
+                          title="No matching keys"
+                          description="No API keys match your search query."
+                          className="py-10"
+                        />
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     <SortableContext
-                      items={orderedApiKeys.map((k) => k.id)}
+                      items={filteredApiKeys.map((k) => k.id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {orderedApiKeys.map((key) => (
+                      {filteredApiKeys.map((key) => (
                         <SortableTableRow
                           key={key.id}
                           id={key.id}
