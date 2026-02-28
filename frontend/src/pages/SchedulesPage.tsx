@@ -375,13 +375,13 @@ export function SchedulesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[120px]">Name</TableHead>
-                    <TableHead className="min-w-[120px] hidden md:table-cell">Workflow</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Cadence</TableHead>
-                    <TableHead className="min-w-[100px] hidden sm:table-cell">Next run</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Last run</TableHead>
-                    <TableHead className="min-w-[80px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                    <TableHead className="hidden lg:table-cell">Cadence</TableHead>
+                    <TableHead className="hidden sm:table-cell">Next run</TableHead>
+                    <TableHead className="hidden lg:table-cell">Last run</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

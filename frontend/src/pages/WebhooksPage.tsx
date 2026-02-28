@@ -331,14 +331,14 @@ export function WebhooksPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[120px]">Name</TableHead>
-                    <TableHead className="min-w-[100px] hidden md:table-cell">Workflow</TableHead>
-                    <TableHead className="min-w-[180px]">Webhook URL</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell whitespace-nowrap">
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                    <TableHead>Webhook URL</TableHead>
+                    <TableHead className="hidden lg:table-cell whitespace-nowrap">
                       Created
                     </TableHead>
-                    <TableHead className="min-w-[80px] whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right min-w-[150px]">Actions</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

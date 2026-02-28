@@ -297,11 +297,6 @@ export function NodeTerminalPanel({
 
     if (isSeekingBackward) {
       // Backward: reset terminal and render all chunks from start
-      console.debug('[NodeTerminalPanel] Seeking backward - resetting terminal', {
-        from: lastTimelineTimeRef.current,
-        to: currentTime,
-      });
-
       setTerminalKey((k) => k + 1); // Recreate terminal
       lastRenderedChunkIndex.current = -1;
       lastTimelineTimeRef.current = currentTime;

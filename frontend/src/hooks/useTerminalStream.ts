@@ -155,21 +155,8 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
     void hydrate();
   }, [pendingRunKey, runId, hydrate, closeStream]);
 
-  // Separate effect to ensure SSE connects after hydration completes
-  useEffect(() => {
-    // If we have chunks but SSE isn't connected and autoConnect is true, ensure connection
-    if (runId && autoConnect && chunks.length > 0 && !isStreaming && mode === 'live') {
-      console.debug('[useTerminalStream] chunks exist but SSE not connected, ensuring connection', {
-        runId,
-        chunksCount: chunks.length,
-      });
-      // The SSE connection effect should handle this, but let's make sure it triggers
-    }
-  }, [runId, autoConnect, chunks.length, isStreaming, mode]);
-
   useEffect(() => {
     if (!runId || !autoConnect) {
-      console.debug('[useTerminalStream] SSE connection skipped', { runId, autoConnect });
       return;
     }
 
@@ -178,12 +165,6 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
 
     const connect = async () => {
       try {
-        console.debug('[useTerminalStream] connecting to SSE', {
-          runId,
-          nodeId,
-          stream,
-          cursor: cursorRef.current,
-        });
         source = await api.executions.stream(runId, {
           terminalCursor: cursorRef.current ?? undefined,
         });
@@ -194,47 +175,23 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
         eventSourceRef.current = source;
         setIsStreaming(true);
         setMode((prev) => (prev === 'idle' ? 'live' : prev));
-        console.debug('[useTerminalStream] SSE connected successfully', { runId, nodeId, stream });
 
         const handleTerminal = (event: MessageEvent) => {
           try {
             const payload = JSON.parse(event.data) as Awaited<
               ReturnType<typeof api.executions.getTerminalChunks>
             >;
-            console.debug('[useTerminalStream] terminal SSE event received', {
-              totalChunks: payload.chunks?.length,
-              nodeId,
-              stream,
-              cursor: payload.cursor,
-            });
             if (!payload.chunks?.length) {
-              console.debug('[useTerminalStream] no chunks in payload');
               return;
             }
             const relevant = payload.chunks.filter(
               (chunk) => chunk.nodeRef === nodeId && chunk.stream === stream,
             );
-            console.debug('[useTerminalStream] filtered chunks', {
-              relevantCount: relevant.length,
-              totalCount: payload.chunks.length,
-              nodeRefs: payload.chunks.map((c) => c.nodeRef),
-              streams: payload.chunks.map((c) => c.stream),
-            });
             if (relevant.length === 0) {
-              console.debug('[useTerminalStream] no relevant chunks for nodeId/stream');
               return;
             }
             cursorRef.current = payload.cursor ?? cursorRef.current;
-            setChunks((prev) => {
-              const merged = mergeTerminalChunks(prev, relevant);
-              console.debug('[useTerminalStream] updating chunks', {
-                prevCount: prev.length,
-                newCount: relevant.length,
-                mergedCount: merged.length,
-                lastChunkIndex: merged[merged.length - 1]?.chunkIndex,
-              });
-              return merged;
-            });
+            setChunks((prev) => mergeTerminalChunks(prev, relevant));
             setMode('live');
           } catch (err: unknown) {
             console.error('[useTerminalStream] failed to parse terminal SSE', err);
@@ -252,12 +209,6 @@ export function useTerminalStream(options: UseTerminalStreamOptions): UseTermina
         source.addEventListener('error', (event) => {
           console.error('[useTerminalStream] SSE error event', event);
           setIsStreaming(false);
-        });
-        source.addEventListener('open', () => {
-          console.debug('[useTerminalStream] SSE connection opened');
-        });
-        source.addEventListener('ready', (event) => {
-          console.debug('[useTerminalStream] SSE ready event', event);
         });
       } catch (err: unknown) {
         if (isMounted) {

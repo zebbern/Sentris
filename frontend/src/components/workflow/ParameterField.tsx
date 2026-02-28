@@ -228,23 +228,8 @@ export function ParameterField({
     }
   }, [parameter.type, secrets, currentValue, onChange, isReceivingInput]);
 
-  useEffect(() => {
-    if (parameter.type !== 'secret') {
-      return;
-    }
-    // Log connection status for debugging secret input flow
-    console.debug(
-      `[ParameterField] secret parameter "${parameter.id}" connection state:`,
-      connectedInput ?? 'manual',
-    );
-  }, [parameter.type, parameter.id, connectedInput]);
-
   const updateSecretValue = (nextValue: any) => {
     if (isReceivingInput) {
-      console.debug(
-        `[ParameterField] manual update blocked for secret "${parameter.id}" while receiving from upstream.`,
-        connectedInput,
-      );
       return;
     }
     onChange(nextValue);
