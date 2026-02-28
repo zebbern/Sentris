@@ -21,7 +21,7 @@ function buildApiFilters(filters?: ScheduleQueryFilters) {
   };
 }
 
-export function useSchedules(filters?: ScheduleQueryFilters) {
+export function useSchedules(filters?: ScheduleQueryFilters, options?: { enabled?: boolean }) {
   const apiFilters = buildApiFilters(filters);
   return useQuery({
     queryKey: queryKeys.schedules.all(apiFilters as Record<string, unknown>),
@@ -30,6 +30,7 @@ export function useSchedules(filters?: ScheduleQueryFilters) {
     retry: 2,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 10_000),
     placeholderData: EMPTY_SCHEDULES,
+    enabled: options?.enabled,
   });
 }
 

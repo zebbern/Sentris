@@ -154,11 +154,11 @@ export function CommandPalette() {
   const storeComponents = componentIndex?.byId ?? {};
   const mode = useWorkflowUiStore((state) => state.mode);
   const { data: rawWorkflows = [], isLoading: isLoadingWorkflows } = useWorkflowsList();
-  const { data: templates = [] } = useTemplates();
-  const { data: schedules = [] } = useSchedules();
-  const { data: secrets = [] } = useSecrets();
-  const { data: apiKeys = [] } = useApiKeys();
-  const { data: webhooks = [] } = useWebhooks();
+  const { data: templates = [] } = useTemplates(undefined, { enabled: isOpen });
+  const { data: schedules = [] } = useSchedules(undefined, { enabled: isOpen });
+  const { data: secrets = [] } = useSecrets({ enabled: isOpen });
+  const { data: apiKeys = [] } = useApiKeys({ enabled: isOpen });
+  const { data: webhooks = [] } = useWebhooks({ enabled: isOpen });
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

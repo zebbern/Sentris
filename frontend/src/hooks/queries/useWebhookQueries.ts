@@ -3,11 +3,12 @@ import type { WebhookConfiguration } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 
-export function useWebhooks() {
+export function useWebhooks(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.webhooks.all(),
     queryFn: () => api.webhooks.list(),
     staleTime: 60_000,
+    enabled: options?.enabled,
   });
 }
 

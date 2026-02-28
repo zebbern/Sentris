@@ -5,12 +5,16 @@ import type { Template, TemplateCategory } from '@/types/templates';
 
 export type { Template, TemplateCategory } from '@/types/templates';
 
-export function useTemplates(filters?: { category?: string; search?: string; tags?: string[] }) {
+export function useTemplates(
+  filters?: { category?: string; search?: string; tags?: string[] },
+  options?: { enabled?: boolean },
+) {
   return useQuery<Template[]>({
     queryKey: queryKeys.templates.all(filters as Record<string, unknown>),
     queryFn: () => api.templates.list(filters),
     staleTime: Infinity,
     gcTime: Infinity,
+    enabled: options?.enabled,
   });
 }
 

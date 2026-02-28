@@ -8,13 +8,14 @@ import type {
   RotateSecretInput,
 } from '@/schemas/secret';
 
-export function useSecrets() {
+export function useSecrets(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.secrets.all(),
     queryFn: () => api.secrets.list(),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     select: (data: SecretSummary[]) => [...data].sort((a, b) => a.name.localeCompare(b.name)),
+    enabled: options?.enabled,
   });
 }
 

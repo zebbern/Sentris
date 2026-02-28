@@ -21,13 +21,14 @@ export const useApiKeyUiStore = create<ApiKeyUiState>((set) => ({
   clearLastCreatedKey: () => set({ lastCreatedKey: null }),
 }));
 
-export function useApiKeys() {
+export function useApiKeys(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.apiKeys.all(),
     queryFn: () => api.apiKeys.list(),
     staleTime: 60_000,
     select: (data: ApiKeyResponseDto[]) =>
       [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    enabled: options?.enabled,
   });
 }
 
