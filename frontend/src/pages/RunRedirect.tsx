@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useExecutionRun } from '@/hooks/queries/useExecutionQueries';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 /**
@@ -33,12 +34,9 @@ export function RunRedirect() {
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-destructive">{error}</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-4 text-sm text-primary hover:underline"
-          >
+          <Button variant="link" onClick={() => navigate('/')} className="mt-4">
             Go to Dashboard
-          </button>
+          </Button>
         </div>
       </div>
     );

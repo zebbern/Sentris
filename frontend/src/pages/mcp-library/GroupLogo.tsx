@@ -22,6 +22,8 @@ export function GroupLogo({ slug, name, className }: GroupLogoProps) {
     <img
       src={logoUrl ?? undefined}
       alt={`${name} logo`}
+      width={20}
+      height={20}
       className={cn('h-5 w-5 object-contain', className)}
       onError={(event) => {
         event.currentTarget.style.display = 'none';

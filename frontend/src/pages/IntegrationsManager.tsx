@@ -250,8 +250,8 @@ export function IntegrationsManager() {
   };
 
   return (
-    <div className="flex-1 bg-background">
-      <div className="container mx-auto py-8 px-4">
+    <div className="flex-1 bg-background" aria-busy={loadingProviders || loadingConnections}>
+      <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <PageToolbar className="mb-4 md:mb-6" />
 
         {error && (
@@ -476,6 +476,8 @@ export function IntegrationsManager() {
                           <img
                             src={logoUrl}
                             alt={`${provider.name} logo`}
+                            width={40}
+                            height={40}
                             className="h-full w-full object-contain rounded-full"
                             onError={(e) => {
                               // Hide logo container if image fails to load
@@ -584,6 +586,7 @@ export function IntegrationsManager() {
                       className="absolute bottom-2 right-2 h-8 w-8 p-0"
                       onClick={() => window.open(provider.docsUrl, '_blank', 'noopener noreferrer')}
                       title="View documentation"
+                      aria-label="View documentation"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>

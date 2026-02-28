@@ -408,6 +408,8 @@ export function ConfigPanel({
               <img
                 src={component.logo}
                 alt={component.name}
+                width={24}
+                height={24}
                 className="h-6 w-6 object-contain"
                 onError={(e) => {
                   // Fallback to icon if image fails to load

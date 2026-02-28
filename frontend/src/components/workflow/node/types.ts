@@ -1,8 +1,8 @@
 import type { NodeStatus, FrontendNodeData } from '@/schemas/node';
 import type { NodeVisualState } from '@/store/executionTimelineStore';
-import type { InputPort, OutputPort } from '@/schemas/component';
+import type { InputPort, OutputPort, Parameter } from '@/schemas/component';
 
-export type { NodeStatus, FrontendNodeData, NodeVisualState, InputPort, OutputPort };
+export type { NodeStatus, FrontendNodeData, NodeVisualState, InputPort, OutputPort, Parameter };
 
 /**
  * Props for the TerminalButton component.
@@ -25,8 +25,8 @@ export interface TerminalButtonProps {
  * Props for the ParametersDisplay component
  */
 export interface ParametersDisplayProps {
-  componentParameters: InputPort[];
-  requiredParams: string[];
+  componentParameters: Parameter[];
+  requiredParams: Parameter[];
   nodeParameters: Record<string, unknown> | undefined;
   position?: 'top' | 'bottom';
 }

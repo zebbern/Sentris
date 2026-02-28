@@ -331,7 +331,10 @@ export function McpLibraryPage() {
 
   // ------ Main render ------
   return (
-    <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
+    <div
+      className="container mx-auto py-4 md:py-8 px-3 md:px-4"
+      aria-busy={isLoading || isLoadingTemplates}
+    >
       <PageToolbar
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}

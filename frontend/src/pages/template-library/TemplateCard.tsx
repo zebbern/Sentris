@@ -26,6 +26,8 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={cn(
         'group flex flex-col rounded-2xl cursor-pointer',
         'bg-card dark:bg-zinc-900',
@@ -34,8 +36,15 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
         'transition-all duration-300 ease-out',
         'hover:shadow-lg hover:-translate-y-1',
         'dark:hover:border-white/10',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       )}
       onClick={() => onPreview(template)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPreview(template);
+        }
+      }}
     >
       {/* Content wrapper with padding */}
       <div className="flex flex-col flex-1 p-5 md:p-6 gap-6">

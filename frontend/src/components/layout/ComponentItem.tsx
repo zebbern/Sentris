@@ -77,6 +77,8 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
             <img
               src={component.logo}
               alt={component.name}
+              width={20}
+              height={20}
               className="h-5 w-5 object-contain"
               onError={(e) => {
                 // Fallback to icon if image fails to load
@@ -129,6 +131,8 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
           <img
             src={component.logo}
             alt={component.name}
+            width={32}
+            height={32}
             className="h-8 w-8 flex-shrink-0 object-contain"
             onError={(e) => {
               // Fallback to icon if image fails to load
@@ -153,6 +157,8 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
             <img
               src={component.logo}
               alt={component.name}
+              width={24}
+              height={24}
               className="h-6 w-6 flex-shrink-0 object-contain"
               onError={(e) => {
                 // Fallback to icon if image fails to load

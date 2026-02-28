@@ -601,6 +601,8 @@ export function CommandPalette() {
                           <img
                             src={(command as ComponentCommand & { iconUrl: string }).iconUrl}
                             alt=""
+                            width={20}
+                            height={20}
                             className="w-5 h-5 object-contain"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';

@@ -88,6 +88,8 @@ export function AdminLoginForm() {
           <img
             src="/favicon.ico"
             alt="ShipSec Studio"
+            width={48}
+            height={48}
             className="h-12 w-12"
             onError={(e) => {
               e.currentTarget.style.display = 'none';

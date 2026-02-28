@@ -182,6 +182,8 @@ export function AppTopBar({
               <img
                 src="/favicon.ico"
                 alt="ShipSec"
+                width={24}
+                height={24}
                 className="w-6 h-6"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';

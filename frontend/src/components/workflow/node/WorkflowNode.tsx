@@ -605,6 +605,8 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
             <img
               src={component.logo}
               alt={component.name}
+              width={20}
+              height={20}
               className="h-5 w-5 mt-0.5 flex-shrink-0 object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
