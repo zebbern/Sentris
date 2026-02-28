@@ -7,6 +7,14 @@ import { cn } from '@/lib/utils';
 import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
 import { useQueryClient } from '@tanstack/react-query';
 
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
 interface McpLibraryConfigProps {
   /** Currently selected server IDs */
   value: string[];
@@ -294,7 +302,7 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
                     {server.transportType === 'http' && server.endpoint && (
                       <div className="flex items-center gap-1 truncate" title={server.endpoint}>
                         <span className="font-mono text-[10px] opacity-70">
-                          {new URL(server.endpoint).hostname}
+                          {safeHostname(server.endpoint)}
                         </span>
                       </div>
                     )}
