@@ -53,6 +53,19 @@ import {
 } from './canvas-node-factory';
 import { useNodeUpdater } from './canvas-node-updater';
 
+/** Defined at module scope to avoid React Flow warnings about nodeTypes recreation on every render. */
+const nodeTypes = {
+  workflow: WorkflowNode,
+  /** @deprecated Terminal nodes replaced by TerminalDockPanel. Kept to avoid ReactFlow warnings. */
+  terminal: TerminalNode,
+};
+
+/** Defined at module scope to avoid React Flow warnings about edgeTypes recreation on every render. */
+const edgeTypes = {
+  dataFlow: DataFlowEdge,
+  default: DataFlowEdge, // Default to our enhanced edge
+};
+
 interface CanvasProps {
   className?: string;
   nodes: Node<NodeData>[];
@@ -160,23 +173,6 @@ export function Canvas({
   const lastSelectedNodeIdRef = useRef<string | null>(null);
   const configPanelWidth = 432;
   const [canvasOpacity, setCanvasOpacity] = useState(1); // For fade transition
-
-  const nodeTypes = useMemo(
-    () => ({
-      workflow: WorkflowNode,
-      /** @deprecated Terminal nodes replaced by TerminalDockPanel. Kept to avoid ReactFlow warnings. */
-      terminal: TerminalNode,
-    }),
-    [],
-  );
-
-  const edgeTypes = useMemo(
-    () => ({
-      dataFlow: DataFlowEdge,
-      default: DataFlowEdge, // Default to our enhanced edge
-    }),
-    [],
-  );
 
   useEffect(() => {
     if (mode === 'execution') {
