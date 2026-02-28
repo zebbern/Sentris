@@ -332,6 +332,19 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     );
   }, [designNodes, selectedRunId]);
 
+  const handleLoadVersion = useCallback(
+    (graph: {
+      nodes: unknown[];
+      edges: unknown[];
+      viewport?: { x: number; y: number; zoom: number };
+    }) => {
+      setDesignNodes(graph.nodes as ReactFlowNode<FrontendNodeData>[]);
+      setDesignEdges(graph.edges as ReactFlowEdge[]);
+      markDirty();
+    },
+    [setDesignNodes, setDesignEdges, markDirty],
+  );
+
   const shouldShowInitialLoader =
     isLoading && designNodes.length === 0 && executionNodes.length === 0 && !isNewWorkflow;
 
@@ -366,19 +379,6 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       hasAnalyticsSink={hasAnalyticsSink}
       onToggleVersionHistory={() => setVersionHistoryPanelOpen(!versionHistoryPanelOpen)}
     />
-  );
-
-  const handleLoadVersion = useCallback(
-    (graph: {
-      nodes: unknown[];
-      edges: unknown[];
-      viewport?: { x: number; y: number; zoom: number };
-    }) => {
-      setDesignNodes(graph.nodes as ReactFlowNode<FrontendNodeData>[]);
-      setDesignEdges(graph.edges as ReactFlowEdge[]);
-      markDirty();
-    },
-    [setDesignNodes, setDesignEdges, markDirty],
   );
 
   const designerCanvas = (
