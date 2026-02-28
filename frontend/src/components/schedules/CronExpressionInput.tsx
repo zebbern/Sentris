@@ -31,7 +31,7 @@ export function CronExpressionInput({ form, cronError, onFieldChange }: CronExpr
             className={cn('font-mono text-sm', cronError && 'border-destructive')}
           />
           {cronError ? (
-            <p className="text-xs text-destructive">{cronError}</p>
+            <p className="text-sm text-destructive">{cronError}</p>
           ) : (
             <p className="text-xs text-muted-foreground">
               Use standard cron syntax. Temporal handles catch-up windows.

@@ -262,12 +262,12 @@ export function ParameterField({
         </select>
 
         {workflowOptionsError && (
-          <p className="text-xs text-destructive">
+          <p className="text-sm text-destructive">
             Failed to load workflows: {workflowOptionsError}
           </p>
         )}
         {workflowPortSyncError && (
-          <p className="text-xs text-destructive">
+          <p className="text-sm text-destructive">
             Failed to load entrypoint inputs: {workflowPortSyncError}
           </p>
         )}
@@ -332,7 +332,7 @@ export function ParameterField({
           <p className="text-xs text-muted-foreground">Loading connections…</p>
         )}
 
-        {integrationError && <p className="text-xs text-destructive">{integrationError}</p>}
+        {integrationError && <p className="text-sm text-destructive">{integrationError}</p>}
 
         {!integrationLoading && githubConnections.length === 0 && (
           <p className="text-xs text-muted-foreground">
@@ -632,7 +632,7 @@ export function ParameterField({
             </p>
           )}
 
-          {secretsError && <p className="text-xs text-destructive">{secretsError}</p>}
+          {secretsError && <p className="text-sm text-destructive">{secretsError}</p>}
 
           <SecretSelect
             value={typeof currentValue === 'string' ? currentValue : ''}
@@ -734,7 +734,7 @@ export function ParameterField({
             rows={Math.min(parameter.rows || 4, 4)}
             placeholder={parameter.placeholder || '{\n  "key": "value"\n}'}
           />
-          {jsonError && <p className="text-xs text-red-500">{jsonError}</p>}
+          {jsonError && <p className="text-sm text-red-500">{jsonError}</p>}
         </div>
       );
     }

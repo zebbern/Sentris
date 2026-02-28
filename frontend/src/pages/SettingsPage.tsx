@@ -47,7 +47,7 @@ export function SettingsPage() {
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <div className="flex flex-col gap-4">
-          <div className="flex gap-2 border-b overflow-x-auto">
+          <div className="flex gap-2 border-b overflow-x-auto scrollbar-hide">
             {visibleTabs.map((tab) => (
               <NavLink
                 key={tab.to}
