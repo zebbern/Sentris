@@ -1,6 +1,7 @@
 import { Loader2, History as LucideHistory } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/EmptyState';
 import type { NavigateFunction } from 'react-router-dom';
 import type { WebhookDelivery } from '@shipsec/shared';
 
@@ -26,16 +27,16 @@ export function WebhookDeliveryLog({
   if (deliveries.length > 0) {
     return (
       <div className="border rounded-md">
-        <div className="grid grid-cols-4 gap-4 p-4 border-b bg-muted/40 font-medium text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border-b bg-muted/40 font-medium text-sm">
           <div>Status</div>
-          <div>Run ID</div>
-          <div>Timestamp</div>
+          <div className="hidden sm:block">Run ID</div>
+          <div className="hidden sm:block">Timestamp</div>
           <div className="text-right">Action</div>
         </div>
         {deliveries.map((delivery) => (
           <div
             key={delivery.id}
-            className="grid grid-cols-4 gap-4 p-4 border-b last:border-0 items-center text-sm"
+            className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 border-b last:border-0 items-center text-sm"
           >
             <div className="flex items-center gap-2">
               {delivery.status === 'delivered' ? (
@@ -44,8 +45,8 @@ export function WebhookDeliveryLog({
                 <Badge variant="destructive">Failed</Badge>
               )}
             </div>
-            <div className="font-mono text-xs">{delivery.workflowRunId || '-'}</div>
-            <div className="text-muted-foreground">
+            <div className="hidden sm:block font-mono text-xs">{delivery.workflowRunId || '-'}</div>
+            <div className="hidden sm:block text-muted-foreground">
               {new Date(delivery.createdAt).toLocaleString()}
             </div>
             <div className="text-right">
@@ -65,9 +66,10 @@ export function WebhookDeliveryLog({
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-4 py-12">
-      <LucideHistory className="h-12 w-12 opacity-20" />
-      <p>No deliveries found for this webhook.</p>
-    </div>
+    <EmptyState
+      icon={LucideHistory}
+      title="No deliveries yet"
+      description="Deliveries will appear here once this webhook receives events."
+    />
   );
 }
