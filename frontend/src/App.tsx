@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { QueryClientProvider } from '@tanstack/react-query';
 const ReactQueryDevtools = lazy(() =>
@@ -21,6 +21,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { logger } from '@/lib/logger';
+import { env } from '@/config/env';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
+import { useExecutionNotifications } from '@/hooks/useExecutionNotifications';
 
 // Lazy-loaded page components
 const WorkflowList = lazy(() =>
@@ -144,6 +147,36 @@ function RouteChangeAnnouncer() {
   return null;
 }
 
+/**
+ * Redirects to the user's preferred landing page on initial app load.
+ * Only fires once when the current path is exactly "/".
+ */
+function LandingPageRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hasChecked = useRef(false);
+
+  useEffect(() => {
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+
+    if (location.pathname !== '/') return;
+
+    const { defaultLandingPage } = useUserPreferencesStore.getState();
+    if (defaultLandingPage && defaultLandingPage !== '/') {
+      navigate(defaultLandingPage, { replace: true });
+    }
+  }, []);
+
+  return null;
+}
+
+/** Wires execution-lifecycle toast notifications to user preferences. */
+function ExecutionNotifier() {
+  useExecutionNotifications();
+  return null;
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
 
@@ -179,7 +212,11 @@ function AnimatedRoutes() {
           />
           <Route path="/secrets" element={<SecretsManager />} />
           <Route path="/api-keys" element={<ApiKeysManager />} />
-          <Route path="/integrations" element={<IntegrationsManager />} />
+          {env.VITE_ENABLE_CONNECTIONS ? (
+            <Route path="/integrations" element={<IntegrationsManager />} />
+          ) : (
+            <Route path="/integrations" element={<Navigate to="/" replace />} />
+          )}
           <Route path="/webhooks" element={<WebhooksPage />} />
           <Route path="/webhooks/new" element={<WebhookEditorPage />} />
           <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
@@ -187,7 +224,11 @@ function AnimatedRoutes() {
           <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
           <Route path="/schedules" element={<SchedulesPage />} />
           <Route path="/action-center" element={<ActionCenterPage />} />
-          <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
+          {env.VITE_OPENSEARCH_DASHBOARDS_URL ? (
+            <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
+          ) : (
+            <Route path="/analytics-settings" element={<Navigate to="/settings" replace />} />
+          )}
           <Route path="/settings/*" element={<SettingsPage />} />
           <Route path="/artifacts" element={<ArtifactLibrary />} />
           <Route path="/mcp-library" element={<McpLibraryPage />} />
@@ -242,6 +283,8 @@ function App() {
                 <AnalyticsRouterListener />
                 <PostHogClerkBridge />
                 <RouteChangeAnnouncer />
+                <LandingPageRedirect />
+                <ExecutionNotifier />
                 <AppLayout>
                   <ProtectedRoute>
                     <Suspense fallback={<PageSkeleton />}>

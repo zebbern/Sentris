@@ -39,6 +39,7 @@ import { env } from '@/config/env';
 import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes, prefetchRoute } from '@/lib/prefetch-routes';
 
@@ -99,6 +100,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const showUserButton = isAuthenticated || authProvider.name === 'clerk';
   const { theme, startTransition } = useThemeStore();
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
+  const sidebarDensity = useUserPreferencesStore((s) => s.sidebarDensity);
+  const isCompact = sidebarDensity === 'compact';
 
   // Get git SHA for version display (monorepo - same for frontend and backend)
   const gitSha = env.VITE_GIT_SHA;
@@ -441,7 +444,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
           <SidebarContent className="py-0">
             <nav aria-label="Main navigation">
-              <ul className={cn('list-none px-2 mt-2 space-y-1')}>
+              <ul className={cn('list-none px-2 mt-2', isCompact ? 'space-y-0.5' : 'space-y-1')}>
                 {navigationItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
@@ -467,14 +470,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                           <SidebarItem
                             isActive={false}
                             className={cn(
-                              'flex items-center gap-3',
+                              'flex items-center',
+                              isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
                               sidebarOpen ? 'justify-start px-4' : 'justify-center',
                             )}
                           >
-                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            <Icon
+                              className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')}
+                            />
                             <span
                               className={cn(
                                 'transition-all duration-300 whitespace-nowrap overflow-hidden flex-1',
+                                isCompact && 'text-xs',
                                 sidebarOpen ? 'opacity-100' : 'opacity-0 max-w-0',
                               )}
                               style={{
@@ -517,14 +524,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                         <SidebarItem
                           isActive={active}
                           className={cn(
-                            'flex items-center gap-3',
+                            'flex items-center',
+                            isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
                             sidebarOpen ? 'justify-start px-4' : 'justify-center',
                           )}
                         >
-                          <Icon className="h-5 w-5 flex-shrink-0" />
+                          <Icon
+                            className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')}
+                          />
                           <span
                             className={cn(
                               'transition-all duration-300 whitespace-nowrap overflow-hidden flex-1',
+                              isCompact && 'text-xs',
                               sidebarOpen ? 'opacity-100' : 'opacity-0 max-w-0',
                             )}
                             style={{
@@ -548,16 +559,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                   aria-expanded={settingsOpen}
                   aria-controls="manage-nav-section"
                   className={cn(
-                    'w-full flex items-center gap-3 py-2 rounded-lg transition-colors',
+                    'w-full flex items-center rounded-lg transition-colors',
+                    isCompact ? 'gap-2 py-1.5' : 'gap-3 py-2',
                     'hover:bg-muted/50 text-muted-foreground hover:text-foreground',
                     sidebarOpen ? 'justify-between px-4' : 'justify-center',
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <Settings className="h-5 w-5 flex-shrink-0" />
+                  <div className={cn('flex items-center', isCompact ? 'gap-2' : 'gap-3')}>
+                    <Settings className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
                     <span
                       className={cn(
-                        'transition-all duration-300 whitespace-nowrap overflow-hidden text-sm font-medium',
+                        'transition-all duration-300 whitespace-nowrap overflow-hidden font-medium',
+                        isCompact ? 'text-xs' : 'text-sm',
                         sidebarOpen ? 'opacity-100' : 'opacity-0 max-w-0',
                       )}
                       style={{
@@ -583,7 +596,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   id="manage-nav-section"
                   className={cn(
                     'list-none overflow-hidden transition-[max-height] duration-300',
-                    settingsOpen && sidebarOpen ? 'max-h-96 mt-1 space-y-1' : 'max-h-0',
+                    settingsOpen && sidebarOpen ? 'max-h-96 mt-1 space-y-0.5' : 'max-h-0',
                   )}
                 >
                   {settingsItems.map((item) => {
@@ -611,14 +624,18 @@ export function AppLayout({ children }: AppLayoutProps) {
                           <SidebarItem
                             isActive={active}
                             className={cn(
-                              'flex items-center gap-3',
+                              'flex items-center',
+                              isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
                               sidebarOpen ? 'justify-start px-4' : 'justify-center',
                             )}
                           >
-                            <Icon className="h-4 w-4 flex-shrink-0" />
+                            <Icon
+                              className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+                            />
                             <span
                               className={cn(
-                                'transition-all duration-300 whitespace-nowrap overflow-hidden flex-1 text-sm',
+                                'transition-all duration-300 whitespace-nowrap overflow-hidden flex-1',
+                                isCompact ? 'text-xs' : 'text-sm',
                                 sidebarOpen ? 'opacity-100' : 'opacity-0 max-w-0',
                               )}
                               style={{

@@ -3,6 +3,7 @@ import type { WorkflowSchedule } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { useSchedules } from '@/hooks/queries/useScheduleQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 
 type ToastVariant = 'default' | 'destructive' | 'warning' | 'success';
 
@@ -102,7 +103,10 @@ export function useWorkflowSchedules({
           toast({ title: 'Schedule resumed', description: schedule.name });
         } else {
           await api.schedules.runNow(schedule.id);
-          toast({ title: 'Schedule triggered', description: schedule.name });
+          const { notifyOnScheduleTriggered } = useUserPreferencesStore.getState();
+          if (notifyOnScheduleTriggered) {
+            toast({ title: 'Schedule triggered', description: schedule.name });
+          }
         }
         void refreshSchedules();
       } catch (err: unknown) {
