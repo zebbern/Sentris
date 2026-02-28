@@ -43,11 +43,6 @@ export function HistoryDebugger() {
       isDraggingRef.current = false;
     };
 
-    if (isDraggingRef.current) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-
     // Always add listeners to window to catch releases outside the element
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);

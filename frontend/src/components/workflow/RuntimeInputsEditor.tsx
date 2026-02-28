@@ -109,7 +109,7 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
       ) : (
         <div className="space-y-3">
           {inputs.map((input, index) => (
-            <div key={index} className="p-3 border rounded-lg bg-background space-y-3">
+            <div key={input.id} className="p-3 border rounded-lg bg-background space-y-3">
               {/* Header with drag handle and delete */}
               <div className="flex items-center gap-2">
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />

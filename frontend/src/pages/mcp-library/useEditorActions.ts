@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -37,10 +37,23 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
   // Manual tab discovery
   const [discoveryStatus, setDiscoveryStatus] = useState<DiscoveryStatusState | null>(null);
 
+  // Poll interval ref for cleanup on unmount
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Mutations
   const createServerMutation = useCreateMcpServer();
   const updateServerMutation = useUpdateMcpServer();
   const testConnectionMutation = useTestMcpConnection();
+
+  // Cleanup poll interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Populate header entries when editing a server
   useEffect(() => {
@@ -146,30 +159,37 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
       const { workflowId } = await mcpDiscoveryApi.discover(input);
       setDiscoveryStatus({ workflowId, status: 'running' });
 
-      const pollInterval = setInterval(async () => {
+      // Clear any existing poll interval before starting a new one
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+
+      pollIntervalRef.current = setInterval(async () => {
         try {
           const result = await mcpDiscoveryApi.getStatus(workflowId);
           if (result.status === 'completed') {
-            clearInterval(pollInterval);
+            clearInterval(pollIntervalRef.current!);
+            pollIntervalRef.current = null;
             setDiscoveryStatus({
               status: 'completed',
               tools: result.tools,
               toolCount: result.toolCount,
             });
           } else if (result.status === 'failed') {
-            clearInterval(pollInterval);
+            clearInterval(pollIntervalRef.current!);
+            pollIntervalRef.current = null;
             setDiscoveryStatus({ status: 'failed', error: result.error });
           }
         } catch (error: unknown) {
-          clearInterval(pollInterval);
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
           setDiscoveryStatus({
             status: 'failed',
             error: error instanceof Error ? error.message : 'Discovery failed',
           });
         }
       }, 2000);
-
-      return () => clearInterval(pollInterval);
     } catch (error: unknown) {
       setDiscoveryStatus({
         status: 'failed',
@@ -209,7 +229,13 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
             await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
             await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
           })
-          .catch(() => {})
+          .catch(() => {
+            toast({
+              title: 'Connection test failed',
+              description: 'Server updated, but the connection test did not succeed.',
+              variant: 'destructive',
+            });
+          })
           .finally(() => {
             setCheckingServers((prev) => {
               const next = new Set(prev);
@@ -233,7 +259,13 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
               });
             }
           })
-          .catch(() => {})
+          .catch(() => {
+            toast({
+              title: 'Connection test failed',
+              description: 'Server created, but the connection test did not succeed.',
+              variant: 'destructive',
+            });
+          })
           .finally(() => {
             setCheckingServers((prev) => {
               const next = new Set(prev);

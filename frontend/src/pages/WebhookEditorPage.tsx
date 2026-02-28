@@ -61,8 +61,18 @@ export function WebhookEditorPage() {
         onDelete={handleDelete}
         onBack={handleBack}
         onCopyPath={(path) => {
-          navigator.clipboard.writeText(window.location.host + path);
-          toast({ title: 'Copied path' });
+          navigator.clipboard
+            .writeText(window.location.host + path)
+            .then(() => {
+              toast({ title: 'Copied path' });
+            })
+            .catch(() => {
+              toast({
+                title: 'Copy failed',
+                description: 'Failed to copy to clipboard.',
+                variant: 'destructive',
+              });
+            });
         }}
       />
 

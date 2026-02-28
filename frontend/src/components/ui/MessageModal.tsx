@@ -59,7 +59,9 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
     return DOMPurify.sanitize(au.ansi_to_html(message));
   }, [colorize, hasAnsi, message]);
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(message);
+    navigator.clipboard.writeText(message).catch(() => {
+      // Clipboard API may fail in insecure contexts or iframes
+    });
   };
 
   return (

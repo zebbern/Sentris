@@ -112,9 +112,15 @@ export function WebhookDetails({
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        // Clipboard API may fail in insecure contexts or iframes
+      });
   };
 
   return (

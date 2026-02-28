@@ -270,8 +270,18 @@ export function ApiKeysManager() {
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: 'Copied', description: 'API key copied to clipboard.' });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast({ title: 'Copied', description: 'API key copied to clipboard.' });
+      })
+      .catch(() => {
+        toast({
+          title: 'Copy failed',
+          description: 'Failed to copy to clipboard.',
+          variant: 'destructive',
+        });
+      });
   };
 
   const handleBulkRevoke = async () => {

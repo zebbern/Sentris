@@ -29,7 +29,7 @@ export function HeaderEntriesSection({
       {headerEntries.length > 0 ? (
         <div className="space-y-2">
           {headerEntries.map((entry, index) => (
-            <div key={index} className="flex gap-2 items-center">
+            <div key={`${index}-${entry.key}`} className="flex gap-2 items-center">
               <Input
                 value={entry.key}
                 onChange={(e) => onUpdateHeader(index, 'key', e.target.value)}
