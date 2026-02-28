@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { api } from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
+import { formatDateTime } from '@/utils/timeFormat';
 
 export interface HumanInputRequest {
   id: string;
@@ -60,18 +61,6 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
   rejected: 'destructive',
   expired: 'outline',
   cancelled: 'outline',
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    timeZoneName: 'short',
-  }).format(date);
 };
 
 export function HumanInputResolutionView({

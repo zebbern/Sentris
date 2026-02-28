@@ -40,3 +40,48 @@ export function formatStartTime(timestamp: string): string {
     minute: '2-digit',
   });
 }
+
+/**
+ * Format a date-time string for display using en-US locale with timezone.
+ * Returns an em-dash for falsy values.
+ * @param value ISO timestamp string, or null/undefined
+ * @returns Formatted string like "Jan 5, 3:42 PM EST" or "—"
+ */
+export function formatDateTime(value?: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
+/**
+ * Format a future timestamp as relative remaining time.
+ * Returns empty string for falsy values, "Expired" for past dates.
+ * @param value ISO timestamp string, or null/undefined
+ * @returns Formatted string like "2d 5h left", "30m left", "Expired", or ""
+ */
+export function formatRelativeTime(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  const now = new Date();
+  const diff = date.getTime() - now.getTime();
+
+  if (diff < 0) return 'Expired';
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (hours > 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h left`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m left`;
+  }
+  return `${minutes}m left`;
+}

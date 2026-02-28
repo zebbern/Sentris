@@ -58,6 +58,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useSortableList } from '@/hooks/useSortableList';
 import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { useAuthStore } from '@/store/authStore';
+import { formatDateTime } from '@/utils/timeFormat';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -70,18 +71,6 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
   active: 'default',
   paused: 'secondary',
   error: 'destructive',
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    timeZoneName: 'short',
-  }).format(date);
 };
 
 const getWorkflowName = (workflowId: string, workflows: WorkflowOption[]): string => {

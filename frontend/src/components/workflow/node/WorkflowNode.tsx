@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import {
   Handle,
   NodeResizer,
@@ -119,9 +119,39 @@ function ComponentNotFoundCard({ componentRef }: { componentRef: string | undefi
 }
 
 /**
+ * Shallow-compare two FrontendNodeData objects by own enumerable keys.
+ * Avoids deep comparison while catching new data references that ReactFlow
+ * may create on every render even when the underlying values haven't changed.
+ */
+function areWorkflowNodePropsEqual(
+  prev: NodeProps<FrontendNodeData>,
+  next: NodeProps<FrontendNodeData>,
+): boolean {
+  // Fast-path: identity check on primitives / referentially-stable props
+  if (prev.id !== next.id) return false;
+  if (prev.selected !== next.selected) return false;
+  if (prev.type !== next.type) return false;
+  if (prev.dragging !== next.dragging) return false;
+
+  // data: reference equality first, then shallow compare
+  if (prev.data !== next.data) {
+    const prevData = prev.data;
+    const nextData = next.data;
+    const prevKeys = Object.keys(prevData) as (keyof typeof prevData)[];
+    const nextKeys = Object.keys(nextData) as (keyof typeof nextData)[];
+    if (prevKeys.length !== nextKeys.length) return false;
+    for (const key of prevKeys) {
+      if (prevData[key] !== nextData[key]) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Enhanced WorkflowNode - Visual representation with timeline states
  */
-export const WorkflowNode = ({ data, selected, id }: NodeProps<FrontendNodeData>) => {
+const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) => {
   // Store hooks
   const { data: componentIndex, isLoading: loading } = useComponents();
   const getComponent = (ref: string) => {
@@ -1335,3 +1365,6 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<FrontendNodeData>
     </div>
   );
 };
+
+export const WorkflowNode = memo(WorkflowNodeInner, areWorkflowNodePropsEqual);
+WorkflowNode.displayName = 'WorkflowNode';

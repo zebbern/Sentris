@@ -43,6 +43,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { env } from '@/config/env';
 import { useAuthStore } from '@/store/authStore';
+import { formatDateTime } from '@/utils/timeFormat';
 import type { WebhookConfiguration } from '@shipsec/shared';
 
 interface WorkflowOption {
@@ -60,18 +61,6 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
   active: 'default',
   inactive: 'secondary',
   error: 'destructive',
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    timeZoneName: 'short',
-  }).format(date);
 };
 
 const getWorkflowName = (workflowId: string, workflows: WorkflowOption[]): string => {

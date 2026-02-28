@@ -25,6 +25,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
+import { formatDateTime, formatRelativeTime } from '@/utils/timeFormat';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
@@ -41,39 +42,6 @@ const STATUS_ICONS: Record<string, typeof CheckCircle> = {
   rejected: XCircle,
   expired: Clock,
   cancelled: XCircle,
-};
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    timeZoneName: 'short',
-  }).format(date);
-};
-
-const formatRelativeTime = (value?: string | null) => {
-  if (!value) return '';
-  const date = new Date(value);
-  const now = new Date();
-  const diff = date.getTime() - now.getTime();
-
-  if (diff < 0) return 'Expired';
-
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-  if (hours > 24) {
-    const days = Math.floor(hours / 24);
-    return `${days}d ${hours % 24}h left`;
-  }
-  if (hours > 0) {
-    return `${hours}h ${minutes}m left`;
-  }
-  return `${minutes}m left`;
 };
 
 import {
