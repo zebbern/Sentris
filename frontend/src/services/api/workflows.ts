@@ -109,19 +109,31 @@ export const workflowsApi = {
   },
 
   commit: async (id: string) => {
-    const response: any = await apiClient.commitWorkflow(id);
+    const response = (await apiClient.commitWorkflow(id)) as ApiResponse<WorkflowResponseDto>;
     if (response.error) {
-      const message = response.error?.message || 'Failed to commit workflow';
-      throw new Error(message);
+      const err = response.error;
+      const errorMessage =
+        typeof err === 'object' && err.message
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Failed to commit workflow';
+      throw new Error(errorMessage);
     }
     return response.data;
   },
 
   run: async (id: string, body?: { inputs?: Record<string, unknown> }) => {
-    const response: any = await apiClient.runWorkflow(id, body);
+    const response = (await apiClient.runWorkflow(id, body)) as ApiResponse;
     if (response.error) {
-      const message = response.error?.message || 'Failed to run workflow';
-      throw new Error(message);
+      const err = response.error;
+      const errorMessage =
+        typeof err === 'object' && err.message
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Failed to run workflow';
+      throw new Error(errorMessage);
     }
     return response.data;
   },

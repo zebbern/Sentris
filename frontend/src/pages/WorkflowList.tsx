@@ -29,16 +29,9 @@ import {
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Workflow,
-  AlertCircle,
-  Trash2,
-  Info,
-  GripVertical,
-  MoreHorizontal,
-  Copy,
-} from 'lucide-react';
+import { Workflow, Trash2, Info, GripVertical, MoreHorizontal, Copy } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { type WorkflowSummary } from '@/services/api';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
@@ -304,14 +297,11 @@ export function WorkflowList() {
             </div>
           </div>
         ) : error ? (
-          <div className="text-center py-12 border rounded-lg bg-card border-destructive">
-            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-            <h3 className="text-lg font-semibold mb-2">Failed to load workflows</h3>
-            <p className="text-muted-foreground mb-4">{error?.message ?? 'Unknown error'}</p>
-            <Button onClick={() => refetch()} variant="outline">
-              Try Again
-            </Button>
-          </div>
+          <ErrorBanner
+            message={error?.message ?? 'Failed to load workflows'}
+            onRetry={() => refetch()}
+            className="mb-6"
+          />
         ) : orderedWorkflows.length === 0 ? (
           <div className="border rounded-lg bg-card">
             <EmptyState

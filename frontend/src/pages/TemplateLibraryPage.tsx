@@ -54,8 +54,17 @@ export function TemplateLibraryPage() {
 
   // Server state via TanStack Query
   const { data: templates = [], isLoading, error, refetch } = useTemplates(filters);
-  const { data: categories = [] } = useTemplateCategories();
+  const { data: categoriesRaw = [] } = useTemplateCategories();
   const { data: tags = [] } = useTemplateTags();
+
+  // Filter out null-category entries — TemplateFilters expects category: string (non-null)
+  const categories = useMemo<{ category: string; count: number }[]>(
+    () =>
+      categoriesRaw
+        .filter((c): c is { category: string; count: number } => c.category !== null)
+        .map((c) => ({ category: c.category, count: c.count })),
+    [categoriesRaw],
+  );
   const syncMutation = useSyncTemplates();
   const { toast } = useToast();
 

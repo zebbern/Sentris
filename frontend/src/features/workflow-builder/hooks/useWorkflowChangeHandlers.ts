@@ -44,7 +44,7 @@ export function useWorkflowChangeHandlers({
   workflowId,
 }: UseWorkflowChangeHandlersParams) {
   const onNodesChange = useCallback(
-    (changes: any[]) => {
+    (changes: NodeChange[]) => {
       if (changes.length === 0) {
         return;
       }
@@ -90,10 +90,10 @@ export function useWorkflowChangeHandlers({
       // Capture snapshot for structural changes or drag end
       if (mode === 'design') {
         const hasStructuralChange = filteredChanges.some(
-          (c: any) => c.type === 'add' || c.type === 'remove',
+          (c: NodeChange) => c.type === 'add' || c.type === 'remove',
         );
         const positionDragEnded = filteredChanges.some(
-          (c: any) => c.type === 'position' && c.dragging === false,
+          (c: NodeChange) => c.type === 'position' && c.dragging === false,
         );
 
         if (hasStructuralChange || positionDragEnded) {
@@ -106,8 +106,8 @@ export function useWorkflowChangeHandlers({
           // This prevents the "deleted node but restored edges" artifact
           let nextEdges = currentEdges;
           const removedNodeIds = filteredChanges
-            .filter((c: any) => c.type === 'remove')
-            .map((c: any) => c.id);
+            .filter((c: NodeChange) => c.type === 'remove')
+            .map((c: NodeChange) => (c as NodeChange & { id: string }).id);
 
           if (removedNodeIds.length > 0) {
             nextEdges = currentEdges.filter(
@@ -131,13 +131,13 @@ export function useWorkflowChangeHandlers({
   );
 
   const onEdgesChange = useCallback(
-    (changes: any[]) => {
+    (changes: EdgeChange[]) => {
       // Capture snapshot for edge changes (add/remove)
       // Note: Edge removals due to node deletion are handled by onNodesChange,
       // so we only need to capture explicit edge changes here
       if (mode === 'design' && changes.length > 0) {
         const hasStructuralChange = changes.some(
-          (c: any) => c.type === 'add' || c.type === 'remove',
+          (c: EdgeChange) => c.type === 'add' || c.type === 'remove',
         );
         if (hasStructuralChange) {
           const currentNodes = designNodesRef.current;

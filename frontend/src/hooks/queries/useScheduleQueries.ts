@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ScheduleStatus } from '@shipsec/shared';
+import type { ScheduleStatus, WorkflowSchedule } from '@shipsec/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+
+/** Stable empty array to avoid new-reference re-renders when data is undefined. */
+const EMPTY_SCHEDULES: WorkflowSchedule[] = [];
 
 export type StatusFilter = ScheduleStatus | 'all';
 
@@ -24,6 +27,9 @@ export function useSchedules(filters?: ScheduleQueryFilters) {
     queryKey: queryKeys.schedules.all(apiFilters as Record<string, unknown>),
     queryFn: () => api.schedules.list(apiFilters),
     staleTime: 60_000,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 10_000),
+    placeholderData: EMPTY_SCHEDULES,
   });
 }
 

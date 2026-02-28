@@ -277,7 +277,49 @@ export function IntegrationsManager() {
             </div>
           </div>
 
-          {connections.length === 0 ? (
+          {loadingConnections && connections.length === 0 ? (
+            <div className="overflow-x-auto border rounded-lg">
+              <Table className="table-fixed w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Provider</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden sm:table-cell">Scopes</TableHead>
+                    <TableHead className="hidden md:table-cell">Expires</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-[120px] mb-1" />
+                        <Skeleton className="h-3 w-[80px]" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-[60px] rounded-full" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <div className="flex gap-2">
+                          <Skeleton className="h-5 w-[50px] rounded-full" />
+                          <Skeleton className="h-5 w-[70px] rounded-full" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Skeleton className="h-4 w-[100px]" />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : !loadingConnections && connections.length === 0 ? (
             <div className="border rounded-lg bg-muted/30">
               <EmptyState
                 icon={Plug}

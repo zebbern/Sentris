@@ -25,9 +25,9 @@ export interface TerminalButtonProps {
  * Props for the ParametersDisplay component
  */
 export interface ParametersDisplayProps {
-  componentParameters: any[];
-  requiredParams: any[];
-  nodeParameters: Record<string, any> | undefined;
+  componentParameters: InputPort[];
+  requiredParams: string[];
+  nodeParameters: Record<string, unknown> | undefined;
   position?: 'top' | 'bottom';
 }
 

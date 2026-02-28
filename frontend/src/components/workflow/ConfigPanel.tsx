@@ -26,6 +26,21 @@ import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ENTRY_COMPONENT_ID } from '@/utils/entryPointUtils';
 import { normalizeRuntimeInputs } from '@/utils/runtimeInputUtils';
+import type { InputPort, OutputPort } from '@/schemas/component';
+
+/** Minimal shape of a JSON Schema property descriptor. */
+interface JsonSchemaProperty {
+  type?: string | string[];
+  description?: string;
+  default?: unknown;
+  enum?: unknown[];
+}
+
+/** Shape returned by normalizeRuntimeInputs for entry-point runtime inputs. */
+interface RuntimeInputDefinition {
+  id: string;
+  type?: string;
+}
 
 interface ConfigPanelProps {
   selectedNode: Node<FrontendNodeData> | null;
@@ -108,7 +123,7 @@ export function ConfigPanel({
   // Fixed width on desktop, full width on mobile
   const effectiveWidth = isMobile ? '100%' : PANEL_WIDTH;
 
-  const handleParamValueChange = (paramId: string, value: any) => {
+  const handleParamValueChange = (paramId: string, value: unknown) => {
     if (!selectedNode || !onUpdateNode) return;
 
     const nodeData: FrontendNodeData = selectedNode.data;
@@ -133,7 +148,7 @@ export function ConfigPanel({
     });
   };
 
-  const handleInputOverrideChange = (inputId: string, value: any) => {
+  const handleInputOverrideChange = (inputId: string, value: unknown) => {
     if (!selectedNode || !onUpdateNode) return;
 
     const nodeData: FrontendNodeData = selectedNode.data;
@@ -231,8 +246,8 @@ export function ConfigPanel({
   const inputOverrides = (nodeData.config?.inputOverrides ?? {}) as Record<string, unknown>;
 
   // Dynamic Ports Resolution
-  const [dynamicInputs, setDynamicInputs] = useState<any[] | null>(null);
-  const [dynamicOutputs, setDynamicOutputs] = useState<any[] | null>(null);
+  const [dynamicInputs, setDynamicInputs] = useState<InputPort[] | null>(null);
+  const [dynamicOutputs, setDynamicOutputs] = useState<OutputPort[] | null>(null);
 
   // Node name editing state
   const [isEditingNodeName, setIsEditingNodeName] = useState(false);
@@ -322,7 +337,7 @@ export function ConfigPanel({
       }
     }
     if (typeof component.toolSchema === 'object') {
-      return component.toolSchema as Record<string, any>;
+      return component.toolSchema as Record<string, unknown>;
     }
     return null;
   }, [component.toolSchema]);
@@ -330,7 +345,7 @@ export function ConfigPanel({
     const properties = toolSchemaObject?.properties ?? {};
     const required = new Set((toolSchemaObject?.required as string[]) ?? []);
     return Object.entries(properties).map(([id, schema]) => {
-      const typed = schema as Record<string, any>;
+      const typed = schema as JsonSchemaProperty;
       const type =
         typeof typed.type === 'string'
           ? typed.type
@@ -340,7 +355,7 @@ export function ConfigPanel({
       return {
         id,
         type,
-        description: typed.description as string | undefined,
+        description: typed.description,
         required: required.has(id),
         defaultValue: typed.default,
         enumValues: Array.isArray(typed.enum) ? typed.enum : undefined,
@@ -348,9 +363,11 @@ export function ConfigPanel({
     });
   }, [toolSchemaObject]);
   const isEntryPointComponent = component.id === ENTRY_COMPONENT_ID;
-  const runtimeInputDefinitions = normalizeRuntimeInputs(manualParameters.runtimeInputs);
+  const runtimeInputDefinitions = normalizeRuntimeInputs<RuntimeInputDefinition>(
+    manualParameters.runtimeInputs,
+  );
   const entryPointPayload = {
-    inputs: runtimeInputDefinitions.reduce<Record<string, unknown>>((acc, input: any) => {
+    inputs: runtimeInputDefinitions.reduce<Record<string, unknown>>((acc, input) => {
       if (input?.id) {
         acc[input.id] = buildSampleValueForRuntimeInput(input.type, input.id);
       }
