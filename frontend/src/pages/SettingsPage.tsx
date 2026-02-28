@@ -8,10 +8,8 @@ import { AppearanceSettings } from '@/pages/settings/AppearanceSettings';
 import { NotificationSettings } from '@/pages/settings/NotificationSettings';
 import { KeyboardShortcutsSettings } from '@/pages/settings/KeyboardShortcutsSettings';
 import { cn } from '@/lib/utils';
-import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function SettingsPage() {
-  useDocumentTitle('Settings');
   const roles = useAuthStore((state) => state.roles);
   const isAdmin = hasAdminRole(roles);
 

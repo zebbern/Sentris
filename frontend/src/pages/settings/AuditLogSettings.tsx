@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorBanner } from '@/components/ui/error-banner';
 import { useAuditLogs } from '@/hooks/queries/useAuditLogQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { humanizeApiError } from '@/lib/humanizeApiError';
@@ -160,13 +161,12 @@ function MultiSelectFilter({
             const lab = typeof option === 'string' ? option : option.label;
             const isChecked = selectedValues.includes(val);
             return (
-              <div
+              <label
                 key={val}
                 className={cn(
                   'flex items-center gap-2.5 px-2.5 py-2 hover:bg-muted rounded-md cursor-pointer transition-colors select-none',
                   isChecked && 'bg-accent text-accent-foreground',
                 )}
-                onClick={() => onToggle(val)}
               >
                 <Checkbox
                   checked={isChecked}
@@ -174,7 +174,7 @@ function MultiSelectFilter({
                   className="h-4 w-4"
                 />
                 <span className="text-sm truncate leading-none pt-0.5">{lab}</span>
-              </div>
+              </label>
             );
           })}
         </div>
@@ -363,7 +363,7 @@ function DateTimeRangePicker({ from, to, onSelect }: DateTimeRangePickerProps) {
 }
 
 export function AuditLogSettings() {
-  useDocumentTitle('Audit Log');
+  useDocumentTitle('Settings · Audit Log');
   const roles = useAuthStore((state) => state.roles);
   const isAdmin = hasAdminRole(roles);
 
@@ -493,20 +493,22 @@ export function AuditLogSettings() {
 
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden flex flex-col">
         {errorMessage && (
-          <div className="bg-destructive/10 px-6 py-3 text-sm text-destructive border-b font-medium">
-            Error: {errorMessage}
-          </div>
+          <ErrorBanner
+            message={errorMessage}
+            onRetry={() => void refetch()}
+            className="mx-4 mt-4"
+          />
         )}
 
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[160px]">Time</TableHead>
                 <TableHead className="min-w-[120px]">Actor</TableHead>
                 <TableHead className="min-w-[200px]">Action</TableHead>
-                <TableHead className="min-w-[180px]">Resource</TableHead>
-                <TableHead>Details</TableHead>
+                <TableHead className="min-w-[180px] hidden md:table-cell">Resource</TableHead>
+                <TableHead className="hidden sm:table-cell">Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -543,7 +545,7 @@ export function AuditLogSettings() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm font-medium">{row.action}</TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm hidden md:table-cell">
                     <div className="flex flex-col gap-0.5">
                       <span className="font-medium">{row.resourceType}</span>
                       <span className="text-xs text-muted-foreground font-mono leading-tight truncate max-w-[180px]">
@@ -551,7 +553,7 @@ export function AuditLogSettings() {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-mono truncate max-w-[300px]">
+                  <TableCell className="text-xs text-muted-foreground font-mono truncate max-w-[300px] hidden sm:table-cell">
                     {safeJsonPreview(row.metadata)}
                   </TableCell>
                 </TableRow>

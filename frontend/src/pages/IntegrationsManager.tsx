@@ -279,13 +279,13 @@ export function IntegrationsManager() {
             </div>
           ) : (
             <div className="overflow-x-auto border rounded-lg">
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Provider</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Scopes</TableHead>
-                    <TableHead>Expires</TableHead>
+                    <TableHead className="hidden sm:table-cell">Scopes</TableHead>
+                    <TableHead className="hidden md:table-cell">Expires</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -310,7 +310,7 @@ export function IntegrationsManager() {
                             {connection.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <div className="flex flex-wrap gap-2">
                             {connection.scopes.map((scope) => (
                               <Badge key={scope} variant="outline" className="text-[11px]">
@@ -322,7 +322,7 @@ export function IntegrationsManager() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground hidden md:table-cell">
                           {formatTimestamp(connection.expiresAt ?? null)}
                         </TableCell>
                         <TableCell className="text-right">

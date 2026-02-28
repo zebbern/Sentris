@@ -210,7 +210,7 @@ export function ActionCenterPage() {
                 collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10" />
