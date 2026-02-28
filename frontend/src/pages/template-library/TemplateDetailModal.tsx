@@ -42,18 +42,7 @@ export function TemplateDetailModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto p-0">
         {/* Graph preview */}
-        <div
-          className="relative w-full h-72 sm:h-80 overflow-hidden rounded-t-lg"
-          style={{
-            background: 'linear-gradient(180deg, #F8FAFF 0%, #F1F5FF 100%)',
-          }}
-        >
-          <div
-            className="absolute inset-0 hidden dark:block"
-            style={{
-              background: 'linear-gradient(180deg, #111827 0%, #0B1220 100%)',
-            }}
-          />
+        <div className="relative w-full h-72 sm:h-80 overflow-hidden rounded-t-lg bg-gradient-to-b from-muted/30 to-muted/60 dark:from-gray-900 dark:to-[hsl(222,47%,10%)]">
           <div
             className="absolute inset-0 hidden dark:block pointer-events-none"
             style={{

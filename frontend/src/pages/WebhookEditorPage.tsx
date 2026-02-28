@@ -1,4 +1,5 @@
-import { Code, History as LucideHistory, Loader2, Settings } from 'lucide-react';
+import { Code, History as LucideHistory, Settings } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -42,8 +43,40 @@ export function WebhookEditorPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex flex-col h-full bg-background overflow-hidden">
+        {/* Header skeleton */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b">
+          <Skeleton className="h-8 w-8 rounded" />
+          <Skeleton className="h-6 w-48" />
+          <div className="ml-auto flex gap-2">
+            <Skeleton className="h-9 w-20 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
+          </div>
+        </div>
+        {/* Tabs skeleton */}
+        <div className="px-6 py-2 border-b bg-muted/40">
+          <div className="flex gap-2">
+            <Skeleton className="h-8 w-28 rounded-md" />
+            <Skeleton className="h-8 w-24 rounded-md" />
+            <Skeleton className="h-8 w-24 rounded-md" />
+          </div>
+        </div>
+        {/* Content skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-x">
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-24 w-full rounded-md" />
+          </div>
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-40 w-full rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
+          </div>
+        </div>
       </div>
     );
   }

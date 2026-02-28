@@ -169,14 +169,19 @@ export function ArtifactLibrary() {
                 ))}
               </TableBody>
             </Table>
-          ) : libraryError ? (
+          ) : libraryError && library.length > 0 ? (
             <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
           ) : library.length === 0 ? (
-            <EmptyState
-              icon={FileBox}
-              title="No artifacts found"
-              description="Run workflows with artifact saving enabled to populate this library."
-            />
+            <>
+              {libraryError && (
+                <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
+              )}
+              <EmptyState
+                icon={FileBox}
+                title="No artifacts found"
+                description="Run workflows with artifact saving enabled to populate this library."
+              />
+            </>
           ) : (
             <DndContext
               sensors={sensors}

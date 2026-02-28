@@ -111,7 +111,7 @@ export function AppTopBar({
     if (location.pathname === '/mcp-library') {
       return {
         title: 'MCP Servers',
-        shortTitle: 'MCP',
+        shortTitle: 'MCP Servers',
         subtitle: 'Discover and manage MCP server configurations',
       };
     }

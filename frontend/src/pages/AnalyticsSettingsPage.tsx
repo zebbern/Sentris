@@ -171,6 +171,9 @@ export function AnalyticsSettingsPage() {
         {/* Loading state */}
         {isLoading && <SettingsSkeleton />}
 
+        {/* Placeholder when error with no data */}
+        {error && !isLoading && !settings && <SettingsSkeleton />}
+
         {/* Settings form */}
         {settings && !isLoading && (
           <div className="space-y-6">

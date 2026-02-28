@@ -509,7 +509,7 @@ export function SchedulesPage() {
                       <TableHead className="hidden lg:table-cell">Cadence</TableHead>
                       <TableHead className="hidden sm:table-cell">Next run</TableHead>
                       <TableHead className="hidden lg:table-cell">Last run</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="hidden sm:table-cell">Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -597,7 +597,7 @@ export function SchedulesPage() {
                                   <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
                                     {formatDateTime(schedule.lastRunAt)}
                                   </TableCell>
-                                  <TableCell className="whitespace-nowrap">
+                                  <TableCell className="hidden sm:table-cell whitespace-nowrap">
                                     {renderStatusBadge(schedule.status)}
                                   </TableCell>
                                   <TableCell className="text-right">

@@ -101,6 +101,7 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const initialMountRef = useRef(true);
 
   // Check if we're on a workflow builder page
   const isOnWorkflowPage =
@@ -486,8 +487,12 @@ export function CommandPalette() {
     }
   }, [selectedIndex]);
 
-  // Close on location change
+  // Close on location change (skip initial mount to avoid closing on lazy-load)
   useEffect(() => {
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      return;
+    }
     close();
   }, [location.pathname, close]);
 
