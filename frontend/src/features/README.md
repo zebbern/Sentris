@@ -11,10 +11,13 @@ Feature-specific modules that encapsulate related components, hooks, and busines
 - **secrets** - Secrets management and credential handling
 - **integrations** - OAuth connections and third-party services
 - **artifacts** - File management and artifact browser
+- **command-palette** - Global search across all entity types (templates, schedules, secrets, API keys, webhooks) with relevance scoring
+- **templates** - Template library browsing, 4-step publishing wizard (Configure → Review → Publish → Done), and workflow import
 
 ## Feature Module Structure
 
 Each feature module follows this organization:
+
 ```
 feature/
 ├── components/     # Feature-specific UI components

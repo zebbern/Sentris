@@ -152,7 +152,10 @@ Before writing ANY frontend code that fetches data or adds a page, you MUST read
 7. **Query keys** go in `frontend/src/lib/queryKeys.ts` (org-scoped, factory functions).
 8. **After mutations**, invalidate the relevant query cache via `queryClient.invalidateQueries()` — do not manually update local state.
 9. **Derive data** from query results using `useMemo`, not by copying into separate `useState`.
-10. **Zustand stores** are for client-only UI state (canvas, timeline, auth). Never store API data in Zustand.
+10. **Zustand stores** are for client-only UI state (canvas, timeline, auth, notifications, command palette). Never store API data in Zustand.
+    - `notificationStore` — Notification history, unread count, persistent via localStorage (max 50, FIFO).
+    - `commandPaletteStore` — Global search command palette open/close state.
+11. **Per-route ErrorBoundary**: Every lazy-loaded route in `App.tsx` is wrapped in an `<ErrorBoundary>` so a crash in one page does not break the entire app.
 
 See `frontend/docs/state.md` for patterns, anti-patterns, and the full decision guide.
 

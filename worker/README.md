@@ -142,7 +142,14 @@ componentRegistry.register(definition);
 - **Workflow Orchestration**: Topological sorting and dependency resolution
 - **Join Strategies**: Handle multiple parent dependencies (all, any, first)
 - **Error Handling**: Retry policies and graceful degradation
-- **Heartbeating**: Long-running activity support
+
+### Heartbeats
+
+Temporal heartbeats are emitted at key checkpoints during activity execution (`inputs-resolved`, `secrets-resolved`, `validated`, `execution-complete`). The `heartbeatTimeout` is set to 30 seconds for `runComponentActivity` and 10 seconds for MCP discovery. If an activity fails to heartbeat within the timeout, Temporal cancels it and retries.
+
+### Graceful Shutdown
+
+The dev worker registers `SIGTERM` and `SIGINT` handlers in `dev.worker.ts`. On signal receipt, the worker stops accepting new tasks and drains in-flight activities before exiting. PM2 sends `SIGINT` on restart; container orchestrators send `SIGTERM`.
 
 ### Worker Configuration
 
@@ -175,9 +182,21 @@ src/
 │   └── terminal-stream.adapter.ts
 ├── temporal/          # Workflow orchestration
 │   ├── workflows/     # Workflow definitions
+│   │   ├── index.ts             # Main workflow orchestration
+│   │   └── workflow-helpers.ts   # Pure helper functions (6 functions + 2 constants)
 │   ├── activities/    # Activity implementations
-│   └── workers/       # Worker configuration
-└── utils/             # Utilities and helpers
+│   │   ├── run-component.activity.ts  # Main component execution (orchestrator)
+│   │   ├── spill-resolver.ts          # Spill file resolution
+│   │   ├── secret-resolver.ts         # Secret environment variable injection
+│   │   ├── input-validator.ts         # Input parameter validation
+│   │   └── error-handler.ts           # Component error processing
+│   ├── workers/       # Worker configuration
+│   │   ├── dev.worker.ts        # Dev worker entry (graceful shutdown)
+│   │   ├── worker-config.ts     # Worker configuration
+│   │   └── service-factory.ts   # Service initialization factory
+│   └── utils/         # Temporal-scoped utilities
+│       └── string-helpers.ts    # String utility functions
+└── utils/             # General utilities and helpers
 ```
 
 ## Container Execution

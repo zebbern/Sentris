@@ -46,6 +46,8 @@ Once complete, visit **http://localhost** to access ShipSec Studio.
 ### Top Bar
 
 - **Navigation**: Logo and workspace name
+- **Search (Ctrl+K)**: Opens the global command palette to search across all entities
+- **Notifications**: Bell icon shows notification history with unread badge
 - **Controls**: Save, Run, and Stop workflow buttons
 - **User Menu**: Account settings and logout
 
@@ -95,6 +97,7 @@ Once complete, visit **http://localhost** to access ShipSec Studio.
 2. **Export**: Export workflows as JSON for version control
 3. **Share**: Generate shareable links for collaboration
 4. **Templates**: Save workflows as templates for reuse
+5. **Publish as Template**: Use the Template Publishing wizard in the workflow builder to publish workflows to the community template library via a GitHub PR
 
 ## Components
 
@@ -200,6 +203,29 @@ Once complete, visit **http://localhost** to access ShipSec Studio.
 - **Use**: CI/CD pipeline security, code review
 
 ## Advanced Features
+
+### Global Search (Ctrl+K)
+
+Press **Ctrl+K** (or **⌘K** on macOS) to open the command palette. It searches across Workflows, Templates, Schedules, Secrets, API Keys, and Webhooks with result scoring and category grouping. Select a result to navigate directly to that item.
+
+### Notification Center
+
+Click the **bell icon** in the top bar to open the notification center. It displays a history of execution lifecycle notifications (completions, failures) with an unread badge. You can mark individual notifications as read, dismiss them, or clear the entire history. Notifications persist across sessions via localStorage.
+
+### Version History
+
+Access version history from the workflow builder's **More menu (⋮)**. The side panel shows committed versions with timestamps. You can view the JSON of any previous version and restore it to replace the current workflow definition.
+
+### Template Publishing
+
+Publish a workflow as a community template using the 4-step wizard in the workflow builder:
+
+1. **Configure** — Set template name, category, and tags
+2. **Review** — Preview the generated JSON definition
+3. **Publish** — Submit as a GitHub pull request
+4. **Done** — Confirmation with a link to the PR
+
+The wizard auto-detects whether the workflow matches an existing template and offers to update it.
 
 ### Human-in-the-Loop
 

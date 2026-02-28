@@ -7,9 +7,14 @@ ShipSec Studio’s UI is composed of three primary layers: layout scaffolding, w
 - `src/components/layout/TopBar.tsx` – Navigation + run/save controls. Keep it dumb; business logic belongs in stores/hooks.
 - `src/components/layout/Sidebar.tsx` – Component catalogue browser. Pull metadata through `useComponentStore`.
 - `src/components/layout/BottomPanel.tsx` – Tabs for Logs, Results, and History. Connects to execution/timeline stores.
+- `src/components/layout/NotificationCenter.tsx` – Bell icon with unread badge. Popover lists workflow completion/failure notifications from `useNotificationStore`.
 - `src/components/timeline/*` – Run history timeline cards and filters.
 
 Keep layout components stateless. Use TanStack Query hooks for API data and Zustand selectors for client-only UI state to avoid re-renders.
+
+## Error Boundaries
+
+Every lazy-loaded route in `App.tsx` is wrapped in a per-route `<ErrorBoundary>` so a crash in one page does not break the entire app. The outer App-level boundary remains as a last-resort fallback.
 
 ## Workflow Canvas
 

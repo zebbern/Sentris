@@ -87,6 +87,7 @@ export const queryKeys = {
 | `useRunQueries.ts`         | Workflow runs (`useRuns`, `useRunDetail`)                                                                                                    |
 | `useArtifactQueries.ts`    | Artifacts library + per-run artifacts                                                                                                        |
 | `useIntegrationQueries.ts` | Integration providers, connections, provider config (`useIntegrationProviders`, `useIntegrationConnections`, `useProviderConfig`)            |
+| `useWorkflowQueries.ts`    | Also exports `useWorkflowVersions` — fetches version history via `GET /workflows/:id/versions`                                               |
 
 ### Writing a New Query Hook
 
@@ -156,10 +157,12 @@ Zustand stores handle **client-only UI state** that has no backend equivalent. T
 | Store                       | File                                  | What it owns                                                            |
 | --------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | `useWorkflowStore`          | `src/store/workflowStore.ts`          | In-flight builder graph (nodes, edges, metadata) and persistence hooks. |
-| `useWorkflowUiStore`        | `src/store/workflowUiStore.ts`        | Canvas UI toggles, panel sizing, minimap state.                         |
+| `useWorkflowUiStore`        | `src/store/workflowUiStore.ts`        | Canvas UI toggles, panel sizing, minimap, version history panel.        |
 | `useExecutionStore`         | `src/store/executionStore.ts`         | Workflow run lifecycle, SSE stream wiring, log/event aggregation.       |
 | `useExecutionTimelineStore` | `src/store/executionTimelineStore.ts` | Timeline playback state and selected run/node.                          |
 | `useAuthStore`              | `src/store/authStore.ts`              | Auth session, org/user IDs (used by queryKeys for org scoping).         |
+| `useNotificationStore`      | `src/store/notificationStore.ts`      | In-app notification list (Zustand + persist, max 50 items).             |
+| `useCommandPaletteStore`    | `src/store/commandPaletteStore.ts`    | Command palette open/close state and search query.                      |
 
 Stores expose selectors (e.g. `getNodeLogs`) to avoid manual traversal in components. Prefer selectors and derived helpers over duplicating logic inside React components.
 

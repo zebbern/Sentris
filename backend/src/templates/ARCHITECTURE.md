@@ -21,6 +21,8 @@ Templates are published via GitHub's web flow, removing the need for backend API
 
 ### Step-by-Step Process
 
+The frontend `PublishTemplateModal` guides users through a 4-step wizard: **Configure** → **Review** → **Publish** → **Done**.
+
 ```
 User                Frontend           GitHub               Backend
  |                      |                 |                    |

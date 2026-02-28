@@ -70,6 +70,7 @@ GITHUB_CLIENT_SECRET=xxx
 ### GitHub Token Permissions
 
 The GitHub personal access token needs the following permissions:
+
 - `repo` (full control of private repositories)
 - `pull_requests` (to create PRs)
 
@@ -180,24 +181,32 @@ The TemplatesModule is already imported in `backend/src/app.module.ts`.
 
 1. Create a workflow in the Workflow Builder
 2. Click "Publish as Template" in the top bar
-3. Fill in template metadata
-4. Submit - a PR will be created
-5. Wait for PR review and merge
-6. Template appears in library after sync
+3. Complete the 4-step publishing wizard:
+   - **Configure** — Fill in template metadata (name, description, category, tags, author)
+   - **Review** — Preview the sanitized template JSON
+   - **Publish** — Copy the generated JSON and open the GitHub repository page to create a PR
+   - **Done** — Confirmation with a link to the PR
+4. Wait for PR review and merge
+5. Template appears in library after sync
+
+> **Note:** Publishing uses a GitHub web flow — the frontend generates the template JSON and opens the GitHub "new file" page with pre-filled content. No backend GitHub token is required.
 
 ## Template Types
 
 ### Community Templates
+
 - Submitted by users
 - Reviewed before appearing in library
 - Tagged with relevant categories
 
 ### Official Templates
+
 - Created and maintained by ShipSec team
 - Verified and tested
 - Marked with "Official" badge
 
 ### Enterprise Templates
+
 - Organization-specific templates
 - Private to organization
 - Custom workflows for internal use

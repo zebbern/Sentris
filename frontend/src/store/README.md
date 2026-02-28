@@ -7,10 +7,12 @@ Client-only UI state management using Zustand.
 ## Store Files
 
 - **workflowStore.ts** — Current workflow editor state (nodes, edges, viewport)
-- **workflowUiStore.ts** — Canvas UI toggles, panel sizing, minimap state
+- **workflowUiStore.ts** — Canvas UI toggles, panel sizing, minimap state, `versionHistoryPanelOpen` toggle for the Version History side panel
 - **executionStore.ts** — Workflow run lifecycle, SSE stream wiring, log/event aggregation
 - **executionTimelineStore.ts** — Timeline playback state, selected run/node
 - **authStore.ts** — Authentication and user session state (used by `queryKeys.ts` for org scoping)
+- **notificationStore.ts** — Notification history, unread count, mark read/clear/dismiss, persistent via localStorage (max 50 notifications, FIFO)
+- **commandPaletteStore.ts** — Command palette open/close state for the global search (Ctrl+K)
 
 ## When to Use Zustand vs TanStack Query
 

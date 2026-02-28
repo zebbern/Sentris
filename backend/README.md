@@ -120,6 +120,8 @@ INTEGRATION_STORE_MASTER_KEY=your-32-character-integ-key!!!!!
 - `PUT /api/v1/workflows/{id}` - Update workflow
 - `DELETE /api/v1/workflows/{id}` - Delete workflow
 - `POST /api/v1/workflows/{id}/runs` - Execute workflow
+- `GET /api/v1/workflows/{id}/versions` - List workflow version history
+- `GET /api/v1/workflows/{id}/versions/{versionId}` - Get specific workflow version
 
 ### Execution Monitoring
 
@@ -140,6 +142,12 @@ INTEGRATION_STORE_MASTER_KEY=your-32-character-integ-key!!!!!
 - `POST /api/v1/secrets` - Create secret
 - `GET /api/v1/integrations/providers` - List OAuth providers
 - `POST /api/v1/integrations/{provider}/start` - Start OAuth flow
+
+### Security & Validation
+
+- **Rate limiting**: `@nestjs/throttler` with Redis storage is applied globally. Per-controller overrides: secrets (30 req/min), API keys (20 req/min), inbound webhooks (60 req/min).
+- **Zod validation pipes**: Controllers use `ZodValidationPipe` from `nestjs-zod` with `createZodDto` pattern for request body and query parameter validation.
+- **Timing-safe auth**: Internal service token comparison uses `crypto.timingSafeEqual` in `auth.guard.ts` to prevent timing side-channel attacks.
 
 ## Project Structure
 

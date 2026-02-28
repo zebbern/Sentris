@@ -46,13 +46,18 @@ bun test
 - **Component Catalog**: Extensible library of security components
 - **Secrets Management**: Secure credential storage and management
 - **OAuth Integrations**: Third-party service connections (GitHub, Zoom, etc.)
+- **Notification Center**: Bell icon with persistent notification history, unread badge, mark-read/clear actions
+- **Version History**: Browse and restore committed workflow versions from the builder
+- **Global Search (Ctrl+K)**: Command palette that searches across all entities with scoring and category grouping
+- **Template Publishing**: 4-step wizard (Configure → Review → Publish → Done) with automatic GitHub PR flow
+- **Integrations**: OAuth provider connections for GitHub, Zoom, and more
 
 ## Key Concepts
 
 ### State Management
 
 - **Server State**: TanStack Query hooks in `src/hooks/queries/` — all API data fetching, caching, and mutations. See `docs/state.md` for patterns.
-- **Client UI State**: Zustand stores in `src/store/` — canvas, timeline playback, auth session
+- **Client UI State**: Zustand stores in `src/store/` — canvas, timeline playback, auth session, `notificationStore` (persistent notification history), `commandPaletteStore` (global search open/close)
 - **Component State**: Local `useState` for UI-only state scoped to one component
 - **Derived State**: `useMemo` to filter/transform data from query hooks
 

@@ -14,6 +14,7 @@ Top-level page components representing application routes.
 ## Page Architecture
 
 Each page follows this structure:
+
 ```typescript
 export default function PageName() {
   // Page-level state and hooks
@@ -34,9 +35,10 @@ export default function PageName() {
 ## Routing
 
 Pages are connected to the React Router configuration in `App.tsx`:
+
 - Protected routes require authentication
 - Organization-scoped routes enforce multi-tenancy
-- Error boundaries catch and handle page-level errors
+- **Per-route ErrorBoundary**: Every lazy-loaded route element is wrapped in its own `<ErrorBoundary>` so a crash in one page does not break the entire app. The outer App-level boundary remains as a last-resort fallback.
 
 ## Data Loading
 
