@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,6 +19,10 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { CheckCircle, XCircle, RefreshCw, Search, Clock, Zap, ExternalLink } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
@@ -49,6 +53,7 @@ import {
   type HumanInputRequest,
 } from '@/components/workflow/HumanInputResolutionView';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useAuthStore } from '@/store/authStore';
 
 export function ActionCenterPage() {
   useDocumentTitle('Action Center');
@@ -58,6 +63,8 @@ export function ActionCenterPage() {
     'pending',
   );
   const [actionState] = useState<Record<string, 'approve' | 'reject' | 'view'>>({});
+
+  const organizationId = useAuthStore((state) => state.organizationId);
 
   const status = statusFilter === 'all' ? undefined : statusFilter;
   const { data: rawApprovals = [], isLoading, error: queryError } = useHumanInputs({ status });
@@ -81,6 +88,23 @@ export function ActionCenterPage() {
       return matchesSearch;
     });
   }, [search, approvals]);
+
+  const hasActiveFilters = search.trim().length > 0 || statusFilter !== 'all';
+
+  const getApprovalId = useCallback((a: HumanInputRequest) => a.id, []);
+
+  const {
+    orderedItems: orderedApprovals,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: filteredApprovals,
+    getId: getApprovalId,
+    storageKey: `shipsec:sort:actioncenter:${organizationId}`,
+    disabled: hasActiveFilters,
+  });
 
   const pendingCount = approvals.filter((a) => a.status === 'pending').length;
 
@@ -119,7 +143,7 @@ export function ActionCenterPage() {
     );
   };
 
-  const hasData = filteredApprovals.length > 0;
+  const hasData = orderedApprovals.length > 0;
 
   return (
     <TooltipProvider>
@@ -181,161 +205,191 @@ export function ActionCenterPage() {
           {/* Table */}
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead className="hidden md:table-cell">Node</TableHead>
-                    <TableHead className="hidden lg:table-cell">Run ID</TableHead>
-                    <TableHead className="hidden sm:table-cell whitespace-nowrap">
-                      Created
-                    </TableHead>
-                    <TableHead className="hidden lg:table-cell whitespace-nowrap">
-                      Timeout
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && !hasData
-                    ? Array.from({ length: 4 }).map((_, index) => (
-                        <TableRow key={`skeleton-${index}`}>
-                          {Array.from({ length: 7 }).map((_, cell) => (
-                            <TableCell key={`cell-${cell}`}>
-                              <Skeleton className="h-5 w-full" />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    : null}
-                  {!isLoading && hasData
-                    ? filteredApprovals.map((approval) => {
-                        const isPending = approval.status === 'pending';
-
-                        return (
-                          <TableRow key={approval.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col min-w-0">
-                                <span className="truncate">{approval.title}</span>
-                                {approval.description && (
-                                  <span className="text-xs text-muted-foreground truncate">
-                                    {approval.description}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
-                                {approval.nodeRef}
-                              </code>
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <a
-                                    href={`/workflows/${approval.workflowId}/runs/${approval.runId}`}
-                                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                                  >
-                                    {approval.runId.substring(0, 12)}...
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                </TooltipTrigger>
-                                <TooltipContent>View run details</TooltipContent>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
-                              {formatDateTime(approval.createdAt)}
-                            </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
-                              {approval.timeoutAt ? (
-                                <span
-                                  className={approval.status === 'pending' ? 'text-warning' : ''}
-                                >
-                                  {formatRelativeTime(approval.timeoutAt)}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">No timeout</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{renderStatusBadge(approval)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {isPending ? (
-                                  <>
-                                    {approval.inputType === 'approval' ||
-                                    approval.inputType === 'review' ? (
-                                      <>
-                                        <Button
-                                          variant="default"
-                                          size="sm"
-                                          className="gap-1 h-8"
-                                          onClick={() => openResolveDialog(approval, 'approve')}
-                                          disabled={isActionBusy(approval.id)}
-                                        >
-                                          <CheckCircle className="h-4 w-4" />
-                                          Approve
-                                        </Button>
-                                        <Button
-                                          variant="destructive"
-                                          size="sm"
-                                          className="gap-1 h-8"
-                                          onClick={() => openResolveDialog(approval, 'reject')}
-                                          disabled={isActionBusy(approval.id)}
-                                        >
-                                          <XCircle className="h-4 w-4" />
-                                          Reject
-                                        </Button>
-                                      </>
-                                    ) : (
-                                      <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="gap-1 h-8"
-                                        onClick={() => openResolveDialog(approval, 'approve')}
-                                        disabled={isActionBusy(approval.id)}
-                                      >
-                                        {approval.inputType === 'acknowledge'
-                                          ? 'Acknowledge'
-                                          : 'Respond'}
-                                      </Button>
-                                    )}
-                                  </>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1 h-8"
-                                    onClick={() => openResolveDialog(approval, 'view')}
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                    View Details
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    : null}
-                  {!isLoading && !hasData && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={collisionDetection}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7}>
-                        <EmptyState
-                          icon={Zap}
-                          title="No pending actions"
-                          description={
-                            statusFilter === 'pending'
-                              ? 'All requests have been handled. Check back later or view all statuses.'
-                              : 'No requests match your filters. Try adjusting the search or status filter.'
-                          }
-                          className="py-10"
-                        />
-                      </TableCell>
+                      <TableHead className="w-10" />
+                      <TableHead>Title</TableHead>
+                      <TableHead className="hidden md:table-cell">Node</TableHead>
+                      <TableHead className="hidden lg:table-cell">Run ID</TableHead>
+                      <TableHead className="hidden sm:table-cell whitespace-nowrap">
+                        Created
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell whitespace-nowrap">
+                        Timeout
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading && !hasData
+                      ? Array.from({ length: 4 }).map((_, index) => (
+                          <TableRow key={`skeleton-${index}`}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-4" />
+                            </TableCell>
+                            {Array.from({ length: 7 }).map((_, cell) => (
+                              <TableCell key={`cell-${cell}`}>
+                                <Skeleton className="h-5 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      : null}
+                    {!isLoading && hasData ? (
+                      <SortableContext
+                        items={orderedApprovals.map((a) => a.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {orderedApprovals.map((approval) => {
+                          const isPending = approval.status === 'pending';
+
+                          return (
+                            <SortableTableRow
+                              key={approval.id}
+                              id={approval.id}
+                              disabled={isDragDisabled}
+                            >
+                              {({ handleProps }) => (
+                                <>
+                                  <DragHandle {...handleProps} disabled={isDragDisabled} />
+                                  <TableCell className="font-medium">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="truncate">{approval.title}</span>
+                                      {approval.description && (
+                                        <span className="text-xs text-muted-foreground truncate">
+                                          {approval.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                                      {approval.nodeRef}
+                                    </code>
+                                  </TableCell>
+                                  <TableCell className="hidden lg:table-cell">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <a
+                                          href={`/workflows/${approval.workflowId}/runs/${approval.runId}`}
+                                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                                        >
+                                          {approval.runId.substring(0, 12)}...
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                      </TooltipTrigger>
+                                      <TooltipContent>View run details</TooltipContent>
+                                    </Tooltip>
+                                  </TableCell>
+                                  <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
+                                    {formatDateTime(approval.createdAt)}
+                                  </TableCell>
+                                  <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
+                                    {approval.timeoutAt ? (
+                                      <span
+                                        className={
+                                          approval.status === 'pending' ? 'text-warning' : ''
+                                        }
+                                      >
+                                        {formatRelativeTime(approval.timeoutAt)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">No timeout</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{renderStatusBadge(approval)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      {isPending ? (
+                                        <>
+                                          {approval.inputType === 'approval' ||
+                                          approval.inputType === 'review' ? (
+                                            <>
+                                              <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="gap-1 h-8"
+                                                onClick={() =>
+                                                  openResolveDialog(approval, 'approve')
+                                                }
+                                                disabled={isActionBusy(approval.id)}
+                                              >
+                                                <CheckCircle className="h-4 w-4" />
+                                                Approve
+                                              </Button>
+                                              <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                className="gap-1 h-8"
+                                                onClick={() =>
+                                                  openResolveDialog(approval, 'reject')
+                                                }
+                                                disabled={isActionBusy(approval.id)}
+                                              >
+                                                <XCircle className="h-4 w-4" />
+                                                Reject
+                                              </Button>
+                                            </>
+                                          ) : (
+                                            <Button
+                                              variant="default"
+                                              size="sm"
+                                              className="gap-1 h-8"
+                                              onClick={() => openResolveDialog(approval, 'approve')}
+                                              disabled={isActionBusy(approval.id)}
+                                            >
+                                              {approval.inputType === 'acknowledge'
+                                                ? 'Acknowledge'
+                                                : 'Respond'}
+                                            </Button>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-1 h-8"
+                                          onClick={() => openResolveDialog(approval, 'view')}
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                          View Details
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </>
+                              )}
+                            </SortableTableRow>
+                          );
+                        })}
+                      </SortableContext>
+                    ) : null}
+                    {!isLoading && !hasData && (
+                      <TableRow>
+                        <TableCell colSpan={8}>
+                          <EmptyState
+                            icon={Zap}
+                            title="No pending actions"
+                            description={
+                              statusFilter === 'pending'
+                                ? 'All requests have been handled. Check back later or view all statuses.'
+                                : 'No requests match your filters. Try adjusting the search or status filter.'
+                            }
+                            className="py-10"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
           </div>
         </div>

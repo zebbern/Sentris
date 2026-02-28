@@ -17,8 +17,16 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'nestjs-zod';
+
 import { TemplateService } from './templates.service';
 import { GitHubSyncService } from './github-sync.service';
+import {
+  PublishTemplateDto,
+  PublishTemplateSchema,
+  UseTemplateDto,
+  UseTemplateSchema,
+} from './dto/templates.dto';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -146,15 +154,8 @@ export class TemplatesController {
   @ApiResponse({ status: 202, description: 'Template validation result' })
   async publishTemplate(
     @CurrentAuth() auth: { userId?: string; organizationId?: string },
-    @Body()
-    dto: {
-      workflowId: string;
-      name: string;
-      description: string;
-      category: string;
-      tags: string[];
-      author: string;
-    },
+    @Body(new ZodValidationPipe(PublishTemplateSchema))
+    dto: PublishTemplateDto,
   ) {
     return await this.templateService.publishTemplate({
       ...dto,
@@ -174,11 +175,8 @@ export class TemplatesController {
   async useTemplate(
     @Param('id') id: string,
     @CurrentAuth() auth: { userId?: string; organizationId?: string },
-    @Body()
-    dto: {
-      workflowName: string;
-      secretMappings?: Record<string, string>;
-    },
+    @Body(new ZodValidationPipe(UseTemplateSchema))
+    dto: UseTemplateDto,
   ) {
     return await this.templateService.useTemplate(id, {
       ...dto,

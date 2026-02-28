@@ -18,7 +18,12 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import { SecurityAnalyticsService } from './security-analytics.service';
 import { OrganizationSettingsService } from './organization-settings.service';
 import { OpenSearchTenantService } from './opensearch-tenant.service';
-import { AnalyticsQueryRequestDto, AnalyticsQueryResponseDto } from './dto/analytics-query.dto';
+import {
+  AnalyticsQueryRequestDto,
+  AnalyticsQueryRequestSchema,
+  AnalyticsQueryResponseDto,
+} from './dto/analytics-query.dto';
+import { EnsureTenantDto, EnsureTenantSchema } from './dto/analytics-tenant.dto';
 import {
   AnalyticsSettingsResponseDto,
   UpdateAnalyticsSettingsDto,
@@ -29,13 +34,6 @@ import { AuditLogService } from '../audit/audit-log.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import { Public } from '../auth/public.decorator';
 import type { AuthContext } from '../auth/types';
-
-const MAX_QUERY_SIZE = 1000;
-const MAX_QUERY_FROM = 10000;
-
-function isValidNonNegativeInt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
-}
 
 @ApiTags('analytics')
 @Controller('analytics')
@@ -72,7 +70,7 @@ export class AnalyticsController {
   })
   async queryAnalytics(
     @CurrentAuth() auth: AuthContext | null,
-    @Body() queryDto: AnalyticsQueryRequestDto,
+    @Body(new ZodValidationPipe(AnalyticsQueryRequestSchema)) queryDto: AnalyticsQueryRequestDto,
   ): Promise<AnalyticsQueryResponseDto> {
     // Require authentication
     if (!auth || !auth.isAuthenticated) {
@@ -84,34 +82,9 @@ export class AnalyticsController {
       throw new UnauthorizedException('Organization context required');
     }
 
-    // Validate query syntax
-    if (queryDto.query && typeof queryDto.query !== 'object') {
-      throw new BadRequestException('Invalid query syntax: query must be an object');
-    }
-
-    if (queryDto.aggs && typeof queryDto.aggs !== 'object') {
-      throw new BadRequestException('Invalid query syntax: aggs must be an object');
-    }
-
     // Set defaults
     const size = queryDto.size ?? 10;
     const from = queryDto.from ?? 0;
-
-    if (!isValidNonNegativeInt(size)) {
-      throw new BadRequestException('Invalid size: must be a non-negative integer');
-    }
-
-    if (!isValidNonNegativeInt(from)) {
-      throw new BadRequestException('Invalid from: must be a non-negative integer');
-    }
-
-    if (size > MAX_QUERY_SIZE) {
-      throw new BadRequestException(`Invalid size: maximum is ${MAX_QUERY_SIZE}`);
-    }
-
-    if (from > MAX_QUERY_FROM) {
-      throw new BadRequestException(`Invalid from: maximum is ${MAX_QUERY_FROM}`);
-    }
 
     this.auditLogService.record(auth, {
       action: 'analytics.query',
@@ -278,7 +251,7 @@ export class AnalyticsController {
   })
   async ensureTenant(
     @Headers('x-internal-token') internalToken: string | undefined,
-    @Body() body: { organizationId: string },
+    @Body(new ZodValidationPipe(EnsureTenantSchema)) body: EnsureTenantDto,
   ): Promise<{ success: boolean; securityEnabled: boolean; message: string }> {
     // Validate internal service token
     if (!this.internalServiceToken) {
@@ -288,15 +261,7 @@ export class AnalyticsController {
       throw new UnauthorizedException('Invalid internal service token');
     }
 
-    // Validate request body
-    if (!body.organizationId || typeof body.organizationId !== 'string') {
-      throw new BadRequestException('organizationId is required');
-    }
-
-    const orgId = body.organizationId.trim();
-    if (!orgId) {
-      throw new BadRequestException('organizationId cannot be empty');
-    }
+    const orgId = body.organizationId;
 
     // Check if security mode is enabled
     if (!this.openSearchTenantService.isSecurityEnabled()) {

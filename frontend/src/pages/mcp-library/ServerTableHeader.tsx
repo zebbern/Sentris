@@ -1,9 +1,14 @@
 import { TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-export function ServerTableHeader() {
+interface ServerTableHeaderProps {
+  showDragHandle?: boolean;
+}
+
+export function ServerTableHeader({ showDragHandle }: ServerTableHeaderProps) {
   return (
     <TableHeader>
       <TableRow>
+        {showDragHandle && <TableHead className="w-10" />}
         <TableHead className="w-[200px]">Name</TableHead>
         <TableHead className="w-[100px]">Type</TableHead>
         <TableHead>Connection</TableHead>

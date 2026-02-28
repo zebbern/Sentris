@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, RefreshCw } from 'lucide-react';
@@ -23,6 +23,8 @@ import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useSortableList } from '@/hooks/useSortableList';
+import { useAuthStore } from '@/store/authStore';
 import {
   GroupTemplatesSection,
   ImportedGroupsSection,
@@ -42,6 +44,7 @@ export function McpLibraryPage() {
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
+  const organizationId = useAuthStore((state) => state.organizationId);
 
   // ------ Data queries ------
   const { data: servers = [], isLoading, error: serversError } = useMcpServers();
@@ -127,6 +130,24 @@ export function McpLibraryPage() {
         s.endpoint?.toLowerCase().includes(query),
     );
   }, [servers, searchQuery, groupedServerIds]);
+
+  // ------ Drag-to-reorder (custom servers only) ------
+  const hasActiveFilters = searchQuery.trim().length > 0;
+
+  const getServerId = useCallback((s: { id: string }) => s.id, []);
+
+  const {
+    orderedItems: orderedCustomServers,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: filteredCustomServers,
+    getId: getServerId,
+    storageKey: `shipsec:sort:mcp-custom:${organizationId}`,
+    disabled: hasActiveFilters,
+  });
 
   const importedGroupSlugs = useMemo(() => new Set(groups.map((g) => g.slug)), [groups]);
 
@@ -389,7 +410,7 @@ export function McpLibraryPage() {
 
       {/* Custom Servers */}
       <CustomServersTable
-        servers={filteredCustomServers}
+        servers={orderedCustomServers}
         isLoading={isLoading}
         searchQuery={searchQuery}
         checkingServers={checkingServers}
@@ -404,6 +425,10 @@ export function McpLibraryPage() {
           setServerToDelete(serverId);
           setDeleteDialogOpen(true);
         }}
+        sensors={sensors}
+        collisionDetection={collisionDetection}
+        onDragEnd={handleDragEnd}
+        isDragDisabled={isDragDisabled}
       />
 
       {/* Editor Sheet */}

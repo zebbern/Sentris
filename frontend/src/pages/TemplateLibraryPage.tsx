@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
@@ -61,6 +61,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableCard, CardDragHandle } from '@/components/ui/sortable-card';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -739,6 +743,7 @@ export function TemplateLibraryPage() {
   useDocumentTitle('Templates');
   const navigate = useNavigate();
   const roles = useAuthStore((state) => state.roles);
+  const organizationId = useAuthStore((state) => state.organizationId);
   const canManageWorkflows = hasAdminRole(roles);
 
   // UI-only filter state (not server data, so local useState is correct)
@@ -817,6 +822,21 @@ export function TemplateLibraryPage() {
 
   const isSyncing = syncMutation.isPending;
   const hasFilters = Boolean(selectedCategory || selectedTags.length > 0 || searchQuery);
+
+  const getTemplateId = useCallback((t: Template) => t.id, []);
+
+  const {
+    orderedItems: orderedTemplates,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: templates,
+    getId: getTemplateId,
+    storageKey: `shipsec:sort:templates:${organizationId}`,
+    disabled: hasFilters,
+  });
 
   return (
     <div className="flex-1 bg-background">
@@ -922,17 +942,39 @@ export function TemplateLibraryPage() {
         ) : templates.length === 0 ? (
           <EmptyState hasFilters={hasFilters} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map((template) => (
-              <TemplateCard
-                key={template.id}
-                template={template}
-                onUse={handleUseTemplate}
-                onPreview={setPreviewTemplate}
-                canUse={canManageWorkflows}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={orderedTemplates.map((t) => t.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {orderedTemplates.map((template) => (
+                  <SortableCard
+                    key={template.id}
+                    id={template.id}
+                    disabled={isDragDisabled}
+                    className="group relative"
+                  >
+                    {({ handleProps }) => (
+                      <>
+                        <CardDragHandle {...handleProps} disabled={isDragDisabled} />
+                        <TemplateCard
+                          template={template}
+                          onUse={handleUseTemplate}
+                          onPreview={setPreviewTemplate}
+                          canUse={canManageWorkflows}
+                        />
+                      </>
+                    )}
+                  </SortableCard>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 

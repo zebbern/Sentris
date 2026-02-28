@@ -1,46 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class AnalyticsQueryRequestDto {
-  @ApiProperty({
-    description: 'OpenSearch DSL query object',
-    example: { match_all: {} },
-    required: false,
-  })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch DSL query is untyped
-  query?: Record<string, any>;
+export const AnalyticsQueryRequestSchema = z.object({
+  query: z.record(z.string(), z.unknown()).optional(),
+  size: z.number().int().nonnegative().max(1000).optional(),
+  from: z.number().int().nonnegative().max(10000).optional(),
+  aggs: z.record(z.string(), z.unknown()).optional(),
+});
 
-  @ApiProperty({
-    description: 'Number of results to return',
-    example: 10,
-    default: 10,
-    minimum: 0,
-    maximum: 1000,
-    required: false,
-  })
-  size?: number;
-
-  @ApiProperty({
-    description: 'Offset for pagination',
-    example: 0,
-    default: 0,
-    minimum: 0,
-    maximum: 10000,
-    required: false,
-  })
-  from?: number;
-
-  @ApiProperty({
-    description: 'OpenSearch aggregations object',
-    example: {
-      components: {
-        terms: { field: 'component_id' },
-      },
-    },
-    required: false,
-  })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation is untyped
-  aggs?: Record<string, any>;
-}
+export class AnalyticsQueryRequestDto extends createZodDto(AnalyticsQueryRequestSchema) {}
 
 export class AnalyticsQueryResponseDto {
   @ApiProperty({

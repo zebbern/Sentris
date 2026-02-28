@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +19,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Workflow, AlertCircle, Trash2, Info, GripVertical } from 'lucide-react';
+import { Workflow, AlertCircle, Trash2, Info, GripVertical, Search } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { type WorkflowSummary } from '@/services/api';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
@@ -31,103 +39,81 @@ import { track, Events } from '@/features/analytics/events';
 import { useWorkflowsSummary, useDeleteWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { logger } from '@/lib/logger';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useSortableList } from '@/hooks/useSortableList';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 
-const WORKFLOW_ORDER_KEY = 'workflow-list-order';
-
 // Stable reference to avoid creating a new [] on every render when query data is undefined.
-// Without this, the destructuring default `data: rawWorkflows = []` would create a new
-// array reference each render, triggering the useEffect → setState → re-render loop.
 const EMPTY_WORKFLOWS: WorkflowSummary[] = [];
 
-function getSavedOrder(): string[] {
-  try {
-    const saved = localStorage.getItem(WORKFLOW_ORDER_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveOrder(ids: string[]) {
-  localStorage.setItem(WORKFLOW_ORDER_KEY, JSON.stringify(ids));
-}
-
-function applyOrder<T extends { id: string }>(items: T[], savedOrder: string[]): T[] {
-  if (savedOrder.length === 0) return items;
-  const orderMap = new Map(savedOrder.map((id, idx) => [id, idx]));
-  return [...items].sort((a, b) => {
-    const aIdx = orderMap.get(a.id) ?? Infinity;
-    const bIdx = orderMap.get(b.id) ?? Infinity;
-    return aIdx - bIdx;
-  });
-}
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'running', label: 'Running' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
 export function WorkflowList() {
   useDocumentTitle('Workflows');
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: rawWorkflows = EMPTY_WORKFLOWS, isLoading, error, refetch } = useWorkflowsSummary();
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const trackedRef = useRef(false);
 
   const roles = useAuthStore((state) => state.roles);
+  const organizationId = useAuthStore((state) => state.organizationId);
   const canManageWorkflows = hasAdminRole(roles);
   const isReadOnly = !canManageWorkflows;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<WorkflowSummary | null>(null);
   const deleteWorkflow = useDeleteWorkflow();
 
-  // Sync ordered workflows from query data
-  useEffect(() => {
-    if (rawWorkflows.length > 0) {
-      setWorkflows(applyOrder(rawWorkflows, getSavedOrder()));
-      if (!trackedRef.current) {
-        track(Events.WorkflowListViewed, { workflows_count: rawWorkflows.length });
-        trackedRef.current = true;
-      }
-    } else if (!isLoading) {
-      setWorkflows((prev) => (prev.length === 0 ? prev : []));
-    }
-  }, [rawWorkflows, isLoading]);
+  // Search & filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  // Track first view
+  if (rawWorkflows.length > 0 && !trackedRef.current) {
+    track(Events.WorkflowListViewed, { workflows_count: rawWorkflows.length });
+    trackedRef.current = true;
+  }
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setWorkflows((prev) => {
-      const oldIndex = prev.findIndex((w) => w.id === active.id);
-      const newIndex = prev.findIndex((w) => w.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const reordered = arrayMove(prev, oldIndex, newIndex);
-        saveOrder(reordered.map((w) => w.id));
-        return reordered;
-      }
-      return prev;
+  // Client-side filtering
+  const filteredWorkflows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return rawWorkflows.filter((w) => {
+      const matchesSearch =
+        query.length === 0 ||
+        w.name.toLowerCase().includes(query) ||
+        (w.description?.toLowerCase().includes(query) ?? false);
+      const matchesStatus =
+        statusFilter === 'all' || w.latestRunStatus?.toLowerCase() === statusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, []);
+  }, [rawWorkflows, searchQuery, statusFilter]);
+
+  const hasActiveFilters = searchQuery.trim().length > 0 || statusFilter !== 'all';
+
+  // DnD via shared hook
+  const getWorkflowId = useCallback((w: WorkflowSummary) => w.id, []);
+
+  const {
+    orderedItems: orderedWorkflows,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: filteredWorkflows,
+    getId: getWorkflowId,
+    storageKey: `shipsec:sort:workflows:${organizationId}`,
+    disabled: hasActiveFilters,
+  });
 
   const handleDeleteClick = (event: MouseEvent, workflow: WorkflowSummary) => {
     event.stopPropagation();
@@ -152,7 +138,7 @@ export function WorkflowList() {
 
     try {
       await deleteWorkflow.mutateAsync(workflowToDelete.id);
-      setWorkflows((prev) => prev.filter((workflow) => workflow.id !== workflowToDelete.id));
+      // The query cache is invalidated by the mutation; no local state to update.
       handleDeleteDialogChange(false);
     } catch (err: unknown) {
       logger.error('Failed to delete workflow:', err);
@@ -185,25 +171,43 @@ export function WorkflowList() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
+      <div className="container mx-auto py-4 md:py-8 px-3 md:px-4 space-y-4 md:space-y-6">
         {isReadOnly && (
-          <div className="mb-4 md:mb-6 rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
+          <div className="rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
             You are viewing workflows with read-only access. Administrators can create and edit
             workflows.
           </div>
         )}
 
-        {/* <div className="mb-6 flex flex-wrap gap-3">
-          <Button
-            onClick={() => navigate('/workflows/new')}
-            size="lg"
-            className="gap-2"
-            disabled={isLoading}
-          >
-            <Plus className="h-5 w-5" />
-            New Workflow
-          </Button>
-        </div> */}
+        {/* Filters */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="flex-1 space-y-2">
+            <label className="text-xs uppercase text-muted-foreground flex items-center gap-2">
+              <Search className="h-3.5 w-3.5" />
+              Search workflows
+            </label>
+            <Input
+              type="search"
+              placeholder="Filter by name or description"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {isLoading ? (
           <div className="border rounded-lg bg-card overflow-hidden">
@@ -289,16 +293,32 @@ export function WorkflowList() {
               Try Again
             </Button>
           </div>
-        ) : workflows.length === 0 ? (
+        ) : orderedWorkflows.length === 0 ? (
           <div className="border rounded-lg bg-card">
             <EmptyState
               icon={Workflow}
-              title="No workflows yet"
-              description="Create your first workflow to get started"
+              title={hasActiveFilters ? 'No matching workflows' : 'No workflows yet'}
+              description={
+                hasActiveFilters
+                  ? 'Try adjusting your search or filter criteria'
+                  : 'Create your first workflow to get started'
+              }
               action={
-                <Button onClick={handleCreateWorkflow} disabled={isReadOnly} size="default">
-                  Create Workflow
-                </Button>
+                hasActiveFilters ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setStatusFilter('all');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button onClick={handleCreateWorkflow} disabled={isReadOnly} size="default">
+                    Create Workflow
+                  </Button>
+                )
               }
             />
           </div>
@@ -307,7 +327,7 @@ export function WorkflowList() {
             <div className="overflow-x-auto">
               <DndContext
                 sensors={sensors}
-                collisionDetection={closestCenter}
+                collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
                 <Table>
@@ -352,16 +372,17 @@ export function WorkflowList() {
                   </TableHeader>
                   <TableBody>
                     <SortableContext
-                      items={workflows.map((w) => w.id)}
+                      items={orderedWorkflows.map((w) => w.id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {workflows.map((workflow) => (
+                      {orderedWorkflows.map((workflow) => (
                         <WorkflowRowItem
                           key={workflow.id}
                           workflow={workflow}
                           canManageWorkflows={canManageWorkflows}
                           isDeleting={deleteWorkflow.isPending}
                           isLoading={isLoading}
+                          isDragDisabled={isDragDisabled}
                           formatDate={formatDate}
                           onRowClick={() => navigate(`/workflows/${workflow.id}`)}
                           onDeleteClick={handleDeleteClick}
@@ -430,6 +451,7 @@ interface WorkflowRowItemProps {
   canManageWorkflows: boolean;
   isDeleting: boolean;
   isLoading: boolean;
+  isDragDisabled?: boolean;
   formatDate: (dateString: string) => string;
   onRowClick: () => void;
   onDeleteClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
@@ -440,12 +462,14 @@ function WorkflowRowItem({
   canManageWorkflows,
   isDeleting,
   isLoading,
+  isDragDisabled = false,
   formatDate,
   onRowClick,
   onDeleteClick,
 }: WorkflowRowItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: workflow.id,
+    disabled: isDragDisabled,
   });
 
   const style: CSSProperties = {
@@ -488,14 +512,20 @@ function WorkflowRowItem({
       )}
     >
       <TableCell className="w-10 px-2 hidden sm:table-cell">
-        <div
-          className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-          {...attributes}
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-4 w-4" />
-        </div>
+        {isDragDisabled ? (
+          <div className="text-muted-foreground/30">
+            <GripVertical className="h-4 w-4" />
+          </div>
+        ) : (
+          <div
+            className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+        )}
       </TableCell>
       <TableCell className="font-medium">
         <div className="max-w-[200px] truncate" title={workflow.name}>

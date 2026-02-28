@@ -1,5 +1,6 @@
 import { Controller, Get, Logger, NotFoundException, Param, Post, Body } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 // Ensure all worker components are registered before accessing the registry
 import '@shipsec/studio-worker/components';
@@ -11,6 +12,7 @@ import {
   type CachedComponentMetadata,
 } from '@shipsec/component-sdk';
 import { categorizeComponent, getCategoryConfig } from './utils/categorization';
+import { ResolvePortsDto, ResolvePortsSchema } from './dto/components.dto';
 
 function serializeComponent(entry: CachedComponentMetadata) {
   const component = entry.definition;
@@ -379,7 +381,10 @@ export class ComponentsController {
   @ApiOkResponse({
     description: 'Resolve dynamic ports based on parameters',
   })
-  resolvePorts(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+  resolvePorts(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ResolvePortsSchema)) body: ResolvePortsDto,
+  ) {
     const entry = componentRegistry.getMetadata(id);
 
     if (!entry) {
