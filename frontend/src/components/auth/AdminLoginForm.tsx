@@ -7,8 +7,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { sanitizeRedirectUrl } from '@/utils/urlSecurity';
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
 export function AdminLoginForm() {
+  useDocumentTitle('Login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);

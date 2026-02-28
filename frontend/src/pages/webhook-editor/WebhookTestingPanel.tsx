@@ -30,7 +30,7 @@ export function WebhookTestingPanel({
     <div className="flex flex-col h-full overflow-hidden bg-muted/10">
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <h3 className="font-medium flex items-center gap-2">
-          <Play className="h-4 w-4 text-emerald-500" /> Test Console
+          <Play className="h-4 w-4 text-success" /> Test Console
         </h3>
         <Button size="sm" onClick={onTest} disabled={isTesting}>
           {isTesting ? (
@@ -84,7 +84,7 @@ export function WebhookTestingPanel({
                   <div
                     className={cn(
                       'flex items-center gap-2 font-medium pb-2 border-b',
-                      testResult.success ? 'text-emerald-600' : 'text-destructive',
+                      testResult.success ? 'text-success' : 'text-destructive',
                     )}
                   >
                     {testResult.success ? (
@@ -120,7 +120,7 @@ export function WebhookTestingPanel({
                           {isMissing ? (
                             <AlertTriangle className="h-3 w-3" />
                           ) : (
-                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                            <CheckCircle2 className="h-3 w-3 text-success" />
                           )}
                           <span>
                             {input.id}:{' '}
