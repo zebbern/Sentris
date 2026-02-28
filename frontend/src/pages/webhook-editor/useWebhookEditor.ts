@@ -219,13 +219,19 @@ export function useWebhookEditor() {
 
       if (isNew) {
         const created = await createWebhook.mutateAsync(payload);
-        toast({ title: 'Webhook created' });
+        toast({
+          title: 'Webhook created',
+          description: 'Your webhook is now active and listening for events.',
+        });
         setInitialForm(payload);
         navigate(`/webhooks/${(created as WebhookConfiguration).id}`, { replace: true });
       } else {
         await updateWebhook.mutateAsync({ id: id!, payload });
         setInitialForm(payload);
-        toast({ title: 'Webhook saved' });
+        toast({
+          title: 'Webhook saved',
+          description: 'Webhook configuration updated.',
+        });
       }
     } catch (error: unknown) {
       toast({

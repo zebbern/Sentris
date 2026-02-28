@@ -1,5 +1,6 @@
 import { useCallback, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Layers } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import {
@@ -19,10 +20,10 @@ import { DndContext } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
 import { SortableCard, CardDragHandle } from '@/components/ui/sortable-card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
   TemplateCard,
   CardSkeleton,
-  EmptyState,
   TemplateDetailModal,
   TemplateFilters,
 } from './template-library';
@@ -168,7 +169,15 @@ export function TemplateLibraryPage() {
             ))}
           </div>
         ) : templates.length === 0 ? (
-          <EmptyState hasFilters={hasFilters} />
+          <EmptyState
+            icon={Layers}
+            title="No templates found"
+            description={
+              hasFilters
+                ? "Try adjusting your filters or search query to find what you're looking for."
+                : 'No templates available yet. Sync from GitHub to load templates.'
+            }
+          />
         ) : (
           <DndContext
             sensors={sensors}

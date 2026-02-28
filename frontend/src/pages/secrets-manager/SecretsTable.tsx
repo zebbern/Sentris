@@ -26,12 +26,10 @@ export interface SecretsTableProps {
   secrets: SecretSummary[];
   loading: boolean;
   error: string | null;
-  listSuccess: string | null;
   isReadOnly: boolean;
 
   // Refresh
   onRefresh: () => void;
-  onClearListSuccess: () => void;
 
   // DnD
   sensors: SensorDescriptor<Record<string, unknown>>[];
@@ -102,10 +100,8 @@ export function SecretsTable({
   secrets,
   loading,
   error,
-  listSuccess,
   isReadOnly,
   onRefresh,
-  onClearListSuccess,
   sensors,
   collisionDetection,
   onDragEnd,
@@ -132,15 +128,7 @@ export function SecretsTable({
           </div>
         }
         actions={
-          <Button
-            variant="outline"
-            onClick={() => {
-              onClearListSuccess();
-              onRefresh();
-            }}
-            disabled={loading}
-            className="gap-2"
-          >
+          <Button variant="outline" onClick={onRefresh} disabled={loading} className="gap-2">
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
@@ -149,7 +137,6 @@ export function SecretsTable({
       />
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} className="mb-4" />}
-      {listSuccess && <div className="mb-4 text-xs md:text-sm text-success">{listSuccess}</div>}
 
       {loading && secrets.length === 0 ? (
         <TableSkeleton />

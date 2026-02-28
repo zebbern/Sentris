@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,7 +45,6 @@ export function ApiKeysManager() {
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
 
@@ -63,12 +62,6 @@ export function ApiKeysManager() {
     () => orderedApiKeys.some((k) => selectedIds.has(k.id) && k.isActive),
     [orderedApiKeys, selectedIds],
   );
-
-  useEffect(() => {
-    if (!successMessage) return;
-    const timer = setTimeout(() => setSuccessMessage(null), 5000);
-    return () => clearTimeout(timer);
-  }, [successMessage]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard
@@ -95,7 +88,7 @@ export function ApiKeysManager() {
     if (!ok) return;
     try {
       await revokeApiKeyMutation.mutateAsync(key.id);
-      setSuccessMessage(`API Key "${key.name}" revoked.`);
+      toast({ title: 'Key revoked', description: `API Key "${key.name}" revoked.` });
     } catch (err: unknown) {
       toast({
         title: 'Revoke failed',
@@ -114,7 +107,7 @@ export function ApiKeysManager() {
     if (!ok) return;
     try {
       await deleteApiKeyMutation.mutateAsync(key.id);
-      setSuccessMessage(`API Key "${key.name}" deleted.`);
+      toast({ title: 'Key deleted', description: `API Key "${key.name}" deleted.` });
     } catch (err: unknown) {
       toast({
         title: 'Delete failed',
@@ -148,7 +141,10 @@ export function ApiKeysManager() {
     clearSelection();
 
     if (failed === 0) {
-      setSuccessMessage(`Revoked ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`);
+      toast({
+        title: 'Keys revoked',
+        description: `Revoked ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`,
+      });
     } else {
       toast({
         title: 'Partial failure',
@@ -176,7 +172,10 @@ export function ApiKeysManager() {
     clearSelection();
 
     if (failed === 0) {
-      setSuccessMessage(`Deleted ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`);
+      toast({
+        title: 'Keys deleted',
+        description: `Deleted ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`,
+      });
     } else {
       toast({
         title: 'Partial failure',
@@ -194,7 +193,6 @@ export function ApiKeysManager() {
           orderedApiKeys={orderedApiKeys}
           loading={loading}
           error={error}
-          successMessage={successMessage}
           isReadOnly={isReadOnly}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -221,7 +219,6 @@ export function ApiKeysManager() {
         isOpen={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         canManageKeys={canManageKeys}
-        onSuccess={setSuccessMessage}
         onCopy={copyToClipboard}
       />
 

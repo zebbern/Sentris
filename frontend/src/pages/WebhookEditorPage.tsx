@@ -97,7 +97,7 @@ export function WebhookEditorPage() {
           navigator.clipboard
             .writeText(window.location.host + path)
             .then(() => {
-              toast({ title: 'Copied path' });
+              toast({ title: 'Copied path', description: 'Webhook path copied to clipboard.' });
             })
             .catch(() => {
               toast({

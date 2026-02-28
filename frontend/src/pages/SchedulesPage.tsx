@@ -179,7 +179,10 @@ export function SchedulesPage() {
     clearSelection();
 
     if (failed === 0) {
-      toast({ title: `Paused ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+      toast({
+        title: `Paused ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
+        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} paused and will not trigger until resumed.`,
+      });
     } else {
       toast({
         title: 'Partial failure',
@@ -205,7 +208,10 @@ export function SchedulesPage() {
     clearSelection();
 
     if (failed === 0) {
-      toast({ title: `Resumed ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+      toast({
+        title: `Resumed ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
+        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} resumed and will trigger on their next cron window.`,
+      });
     } else {
       toast({
         title: 'Partial failure',
@@ -235,7 +241,10 @@ export function SchedulesPage() {
     clearSelection();
 
     if (failed === 0) {
-      toast({ title: `Deleted ${succeeded} schedule${succeeded !== 1 ? 's' : ''}` });
+      toast({
+        title: `Deleted ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
+        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} permanently removed.`,
+      });
     } else {
       toast({
         title: 'Partial failure',

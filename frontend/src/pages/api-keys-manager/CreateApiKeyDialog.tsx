@@ -14,6 +14,7 @@ import {
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import type { CreateApiKeyInput } from '@/schemas/apiKey';
 import { useCreateApiKey, useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
+import { useToast } from '@/components/ui/use-toast';
 import { SecretKeyDisplay } from './SecretKeyDisplay';
 import { INITIAL_FORM, API_KEY_NAME_MAX_LENGTH } from './types';
 
@@ -21,7 +22,6 @@ export interface CreateApiKeyDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   canManageKeys: boolean;
-  onSuccess: (message: string) => void;
   onCopy: (text: string) => void;
 }
 
@@ -29,9 +29,9 @@ export function CreateApiKeyDialog({
   isOpen,
   onOpenChange,
   canManageKeys,
-  onSuccess,
   onCopy,
 }: CreateApiKeyDialogProps) {
+  const { toast } = useToast();
   const createApiKeyMutation = useCreateApiKey();
   const lastCreatedKey = useApiKeyUiStore((state) => state.lastCreatedKey);
   const clearLastCreatedKey = useApiKeyUiStore((state) => state.clearLastCreatedKey);
@@ -104,7 +104,7 @@ export function CreateApiKeyDialog({
         name: trimmedName,
         description: formState.description?.trim() || undefined,
       });
-      onSuccess('API Key created successfully.');
+      toast({ title: 'Key created', description: 'API Key created successfully.' });
     } catch (err: unknown) {
       const message = humanizeApiError(err);
       setCreateError(message);

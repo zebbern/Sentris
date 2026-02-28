@@ -170,7 +170,10 @@ export function WebhooksPage() {
     clearSelection();
 
     if (failed === 0) {
-      toast({ title: `Deleted ${succeeded} webhook${succeeded !== 1 ? 's' : ''}` });
+      toast({
+        title: `Deleted ${succeeded} webhook${succeeded !== 1 ? 's' : ''}`,
+        description: `${succeeded} webhook${succeeded !== 1 ? 's' : ''} permanently removed.`,
+      });
     } else {
       toast({
         title: 'Partial failure',

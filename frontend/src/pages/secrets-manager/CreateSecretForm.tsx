@@ -13,7 +13,6 @@ export interface CreateSecretFormProps {
   ) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
   formError: string | null;
-  formSuccess: string | null;
   isFormValid: boolean;
   disableCreate: boolean;
   isSubmitting: boolean;
@@ -24,7 +23,6 @@ export function CreateSecretForm({
   onChange,
   onSubmit,
   formError,
-  formSuccess,
   isFormValid,
   disableCreate,
   isSubmitting,
@@ -124,8 +122,6 @@ export function CreateSecretForm({
             {formError}
           </p>
         )}
-
-        {formSuccess && <p className="text-sm text-success">{formSuccess}</p>}
 
         <Button type="submit" disabled={!isFormValid || disableCreate}>
           {isSubmitting ? 'Saving…' : 'Create secret'}

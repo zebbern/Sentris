@@ -1,7 +1,6 @@
 // Sub-components
 export { PreviewSection } from './PreviewSection';
 export { TemplateCard, CardSkeleton } from './TemplateCard';
-export { EmptyState } from './EmptyState';
 export { TemplateDetailModal } from './TemplateDetailModal';
 export { TemplateFilters } from './TemplateFilters';
 

@@ -30,7 +30,6 @@ export interface ApiKeysTableProps {
   orderedApiKeys: ApiKeyResponseDto[];
   loading: boolean;
   error: string | null;
-  successMessage: string | null;
   isReadOnly: boolean;
 
   // Search
@@ -104,7 +103,6 @@ export function ApiKeysTable({
   orderedApiKeys,
   loading,
   error,
-  successMessage,
   isReadOnly,
   searchQuery,
   onSearchChange,
@@ -158,12 +156,6 @@ export function ApiKeysTable({
       />
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} className="mb-4 md:mb-6" />}
-
-      {successMessage && (
-        <div className="mb-4 md:mb-6 rounded-md bg-success/10 p-3 md:p-4 text-xs md:text-sm text-success">
-          {successMessage}
-        </div>
-      )}
 
       <div className="border rounded-md bg-card overflow-hidden">
         <div className="overflow-x-auto">

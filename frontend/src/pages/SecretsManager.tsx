@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import type { SecretSummary } from '@/schemas/secret';
@@ -63,23 +63,8 @@ export function SecretsManager() {
 
   const [formState, setFormState] = useState<FormState>(INITIAL_FORM);
   const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const disableCreate = isReadOnly || isSubmitting;
-
-  const [listSuccess, setListSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!formSuccess) return;
-    const timer = setTimeout(() => setFormSuccess(null), 5000);
-    return () => clearTimeout(timer);
-  }, [formSuccess]);
-
-  useEffect(() => {
-    if (!listSuccess) return;
-    const timer = setTimeout(() => setListSuccess(null), 5000);
-    return () => clearTimeout(timer);
-  }, [listSuccess]);
 
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
@@ -112,7 +97,10 @@ export function SecretsManager() {
     clearSelection();
 
     if (failed === 0) {
-      setListSuccess(`Deleted ${succeeded} secret${succeeded !== 1 ? 's' : ''}.`);
+      toast({
+        title: 'Secrets deleted',
+        description: `Deleted ${succeeded} secret${succeeded !== 1 ? 's' : ''}.`,
+      });
     } else {
       toast({
         title: 'Partial failure',
@@ -128,12 +116,6 @@ export function SecretsManager() {
   const [editError, setEditError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const disableEditing = isReadOnly || isEditing;
-
-  useEffect(() => {
-    if (error) {
-      setListSuccess(null);
-    }
-  }, [error]);
 
   const handleChange =
     (field: keyof FormState) =>
@@ -160,8 +142,6 @@ export function SecretsManager() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError(null);
-    setFormSuccess(null);
-    setListSuccess(null);
 
     if (!canManageSecrets) {
       setFormError('Only workspace administrators can create or update secrets.');
@@ -189,7 +169,10 @@ export function SecretsManager() {
         tag_count: normalizedTags?.length,
         name_length: normalizedName.length,
       });
-      setFormSuccess('Secret created successfully. You can now reference it from workflows.');
+      toast({
+        title: 'Secret created',
+        description: 'Secret created. You can now reference it from workflows.',
+      });
       setFormState(INITIAL_FORM);
     } catch (err: unknown) {
       const message = humanizeApiError(err);
@@ -200,7 +183,6 @@ export function SecretsManager() {
   };
 
   const openEditDialog = (secret: SecretSummary) => {
-    setListSuccess(null);
     setEditingSecret(secret);
     setEditFormState({
       name: secret.name,
@@ -234,7 +216,6 @@ export function SecretsManager() {
     }
 
     setEditError(null);
-    setListSuccess(null);
     setIsEditing(true);
 
     const trimmedName = editFormState.name.trim();
@@ -276,7 +257,10 @@ export function SecretsManager() {
       const actionSummary =
         actions.length === 0 ? 'unchanged' : `${actions.join(' and ')} successfully`;
 
-      setListSuccess(`Secret "${latest.name}" ${actionSummary}.`);
+      toast({
+        title: 'Secret updated',
+        description: `Secret "${latest.name}" ${actionSummary}.`,
+      });
       handleEditDialogChange(false);
     } catch (err: unknown) {
       const message = humanizeApiError(err);
@@ -287,7 +271,6 @@ export function SecretsManager() {
   };
 
   const handleDeleteSecret = async (secret: SecretSummary) => {
-    setListSuccess(null);
     const ok = await confirm({
       title: 'Delete secret',
       description: `Are you sure you want to delete "${secret.name}"? This action permanently removes the secret and its encrypted versions. Workflows referencing this secret will need to be updated.`,
@@ -298,7 +281,7 @@ export function SecretsManager() {
     try {
       await deleteSecretMutation.mutateAsync(secret.id);
       track(Events.SecretDeleted, { name_length: secret.name.trim().length });
-      setListSuccess(`Secret "${secret.name}" deleted.`);
+      toast({ title: 'Secret deleted', description: `Secret "${secret.name}" deleted.` });
     } catch (err: unknown) {
       toast({
         title: 'Delete failed',
@@ -313,8 +296,6 @@ export function SecretsManager() {
       .invalidateQueries({ queryKey: queryKeys.secrets.all() })
       .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
   }, [queryClient]);
-
-  const handleClearListSuccess = useCallback(() => setListSuccess(null), []);
 
   return (
     <div className="flex-1 bg-background" aria-busy={loading}>
@@ -332,7 +313,6 @@ export function SecretsManager() {
             onChange={handleChange}
             onSubmit={handleSubmit}
             formError={formError}
-            formSuccess={formSuccess}
             isFormValid={isFormValid}
             disableCreate={disableCreate}
             isSubmitting={isSubmitting}
@@ -342,10 +322,8 @@ export function SecretsManager() {
             secrets={orderedSecrets}
             loading={loading}
             error={error}
-            listSuccess={listSuccess}
             isReadOnly={isReadOnly}
             onRefresh={handleRefresh}
-            onClearListSuccess={handleClearListSuccess}
             sensors={sensors}
             collisionDetection={collisionDetection}
             onDragEnd={handleDragEnd}
