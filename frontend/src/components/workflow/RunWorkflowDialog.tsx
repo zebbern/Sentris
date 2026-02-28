@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { logger } from '@/lib/logger';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -83,7 +84,7 @@ export function RunWorkflowDialog({
       const fileData = await api.files.upload(file);
       setInputs((prev) => ({ ...prev, [inputId]: fileData.id }));
     } catch (error: unknown) {
-      console.error('File upload failed:', error);
+      logger.error('File upload failed:', error);
       setErrors((prev) => ({
         ...prev,
         [inputId]: error instanceof Error ? error.message : 'Upload failed',

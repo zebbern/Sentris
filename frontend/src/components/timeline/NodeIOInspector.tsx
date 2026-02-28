@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { MessageModal } from '@/components/ui/MessageModal';
 
 interface NodeIO {
@@ -161,7 +162,7 @@ export function NodeIOInspector() {
         content,
       });
     } catch (err: any) {
-      console.error('Failed to fetch full node I/O', err);
+      logger.error('Failed to fetch full node I/O', err);
     } finally {
       setLoadingDetail(false);
     }

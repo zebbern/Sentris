@@ -31,6 +31,7 @@ import { useWorkflowStore } from '@/store/workflowStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { env } from '@/config/env';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
@@ -185,7 +186,7 @@ export function TopBar({
       setIsImporting(true);
       await onImport(file);
     } catch (error: unknown) {
-      console.error('Failed to import workflow:', error);
+      logger.error('Failed to import workflow:', error);
     } finally {
       setIsImporting(false);
     }

@@ -1,6 +1,7 @@
 import { useContext } from 'react';
 import { GlobalAuthContext } from './auth-context-def';
 import type { FrontendAuthProvider } from './types';
+import { logger } from '@/lib/logger';
 
 const FALLBACK_AUTH_PROVIDER: FrontendAuthProvider = {
   name: 'none',
@@ -11,9 +12,9 @@ const FALLBACK_AUTH_PROVIDER: FrontendAuthProvider = {
     isAuthenticated: false,
     error: 'No auth provider available',
   },
-  signIn: () => console.warn('No auth provider available'),
-  signUp: () => console.warn('No auth provider available'),
-  signOut: () => console.warn('No auth provider available'),
+  signIn: () => logger.warn('No auth provider available'),
+  signUp: () => logger.warn('No auth provider available'),
+  signOut: () => logger.warn('No auth provider available'),
   SignInComponent: () => null,
   SignUpComponent: () => null,
   UserButtonComponent: () => null,

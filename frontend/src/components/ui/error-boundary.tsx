@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { ErrorFallback } from '@/components/ui/error-fallback';
+import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -30,7 +31,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
+    logger.error('[ErrorBoundary] Uncaught error:', error, info.componentStack);
   }
 
   resetErrorBoundary = (): void => {

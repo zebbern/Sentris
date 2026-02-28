@@ -8,6 +8,7 @@ import type { WebhookConfiguration } from '@shipsec/shared';
 import { WebhookDetails } from './WebhookDetails';
 import { useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { Node as ReactFlowNode } from 'reactflow';
+import { logger } from '@/lib/logger';
 import type { FrontendNodeData } from '@/schemas/node';
 
 import { API_V1_URL } from '@/services/api';
@@ -53,7 +54,7 @@ export function WorkflowWebhooksSidebar({
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err: unknown) {
-      console.error('Failed to copy:', err);
+      logger.error('Failed to copy:', err);
     }
   };
 

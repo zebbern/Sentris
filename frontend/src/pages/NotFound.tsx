@@ -9,15 +9,18 @@ export function NotFound() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="container mx-auto py-16 px-4">
+      <div className="container mx-auto px-3 md:px-4 flex items-center justify-center min-h-[60vh]">
         <div className="max-w-md mx-auto text-center">
-          <div className="mb-8">
-            <h1 className="text-9xl font-bold text-muted-foreground/20 mb-4">404</h1>
-            <h2 className="text-3xl font-bold mb-2">Page Not Found</h2>
-            <p className="text-muted-foreground mb-8">
-              The page you&apos;re looking for doesn&apos;t exist or has been moved.
-            </p>
-          </div>
+          <p
+            aria-hidden="true"
+            className="text-7xl md:text-9xl font-bold text-muted-foreground/20 mb-4 select-none"
+          >
+            404
+          </p>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">Page Not Found</h1>
+          <p className="text-muted-foreground mb-8">
+            The page you&apos;re looking for doesn&apos;t exist or has been moved.
+          </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button onClick={() => navigate('/')} className="gap-2">

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useTimelineTerminalStream } from '@/hooks/useTimelineTerminalStream';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useThemeStore } from '@/store/themeStore';
+import { logger } from '@/lib/logger';
 
 interface NodeTerminalPanelProps {
   nodeId: string;
@@ -95,7 +96,7 @@ export function NodeTerminalPanel({
     try {
       await navigator.clipboard.writeText(decoded);
     } catch (error: unknown) {
-      console.error('[NodeTerminalPanel] Failed to copy to clipboard', error);
+      logger.error('[NodeTerminalPanel] Failed to copy to clipboard', error);
     }
   }, [chunks]);
 
@@ -159,7 +160,7 @@ export function NodeTerminalPanel({
       try {
         term.open(container);
       } catch (error: unknown) {
-        console.warn('[NodeTerminalPanel] Failed to open terminal:', error);
+        logger.warn('[NodeTerminalPanel] Failed to open terminal:', error);
         // If opening fails, dispose and return early
         term.dispose();
         return;
@@ -180,7 +181,7 @@ export function NodeTerminalPanel({
               terminalReadyRef.current = true;
               setIsTerminalReady(true);
             } catch (error: unknown) {
-              console.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
+              logger.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
               // Mark as ready anyway to allow rendering
               terminalReadyRef.current = true;
               setIsTerminalReady(true);

@@ -1,5 +1,6 @@
 import { api } from '@/services/api';
 import type { SecretSummary } from '@/schemas/secret';
+import { logger } from '@/lib/logger';
 export type { SecretSummary } from '@/schemas/secret';
 
 export interface Secret {
@@ -19,7 +20,7 @@ export async function fetchSecrets(): Promise<SecretSummary[]> {
   try {
     return await api.secrets.list();
   } catch (error: unknown) {
-    console.error('Failed to fetch secrets:', error);
+    logger.error('Failed to fetch secrets:', error);
     return [];
   }
 }
@@ -33,7 +34,7 @@ export async function fetchSecret(id: string): Promise<SecretSummary | null> {
     const secrets = await api.secrets.list();
     return secrets.find((secret) => secret.id === id) || null;
   } catch (error: unknown) {
-    console.error(`Failed to fetch secret ${id}:`, error);
+    logger.error(`Failed to fetch secret ${id}:`, error);
     return null;
   }
 }

@@ -3,6 +3,7 @@ import { ClerkAuthProvider } from './providers/clerk-provider';
 import type { FrontendAuthProvider, FrontendAuthProviderComponent } from './types';
 import { useAuthStore } from '../store/authStore';
 import { GlobalAuthContext } from './auth-context-def';
+import { logger } from '@/lib/logger';
 
 // Auth provider registry - easy to add new providers
 // Determine which provider to use based on environment
@@ -26,7 +27,7 @@ function getAuthProviderName(): string {
   // If explicitly set to clerk, use it (if key is available)
   if (envProvider === 'clerk') {
     if (!hasClerkKey) {
-      console.warn(
+      logger.warn(
         'Auth provider set to Clerk, but no publishable key configured. Falling back to local auth.',
       );
       return 'local';
@@ -88,10 +89,10 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
         error: null,
       },
       signIn: () => {
-        console.warn('Local auth: signIn not implemented - use AdminLoginForm');
+        logger.warn('Local auth: signIn not implemented - use AdminLoginForm');
       },
       signUp: () => {
-        console.warn('Local auth: signUp not implemented');
+        logger.warn('Local auth: signUp not implemented');
       },
       signOut: async () => {
         // Clear session cookie via backend logout endpoint
@@ -102,7 +103,7 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
             credentials: 'include',
           });
         } catch (error: unknown) {
-          console.warn('Failed to clear session cookie:', error);
+          logger.warn('Failed to clear session cookie:', error);
         }
         // Clear admin credentials from store
         useAuthStore.getState().clear();

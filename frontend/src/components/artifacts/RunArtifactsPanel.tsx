@@ -7,6 +7,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
+import { logger } from '@/lib/logger';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -49,7 +50,7 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
         setCopiedId((current) => (current === artifactId ? null : current));
       }, 2000);
     } catch (error: unknown) {
-      console.error('Failed to copy artifact ID', error);
+      logger.error('Failed to copy artifact ID', error);
     }
   }, []);
 
@@ -126,7 +127,7 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
                       setCopiedRemoteUri((current) => (current === uri ? null : current));
                     }, 2000);
                   } catch (error: unknown) {
-                    console.error('Failed to copy remote URI', error);
+                    logger.error('Failed to copy remote URI', error);
                   }
                 }}
                 copiedRemoteUri={copiedRemoteUri}

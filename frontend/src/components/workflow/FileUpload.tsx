@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Upload, File, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/services/api';
+import { logger } from '@/lib/logger';
 
 interface FileUploadProps {
   onFileUploaded?: (fileId: string, fileName: string) => void;
@@ -35,7 +36,7 @@ export function FileUpload({ onFileUploaded }: FileUploadProps) {
       setUploadedFileId(fileId);
       onFileUploaded?.(fileId, selectedFile.name);
     } catch (err: unknown) {
-      console.error('Failed to upload file:', err);
+      logger.error('Failed to upload file:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload file');
     } finally {
       setIsUploading(false);

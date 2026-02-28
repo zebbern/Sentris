@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export function AdminLoginForm() {
   const [username, setUsername] = useState('');
@@ -49,7 +50,7 @@ export function AdminLoginForm() {
         if (loginResponse.status === 401) {
           throw new Error('Invalid username or password');
         }
-        console.error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
+        logger.error(`Login failed: ${loginResponse.status} ${loginResponse.statusText}`);
         throw new Error('Unable to log in. Please try again or contact your administrator.');
       }
 
@@ -71,7 +72,7 @@ export function AdminLoginForm() {
       // Clear credentials on error
       useAuthStore.getState().clear();
       if (err instanceof TypeError && err.message.includes('fetch')) {
-        console.error('Network error during login:', err);
+        logger.error('Network error during login:', err);
         setError('Unable to connect to the server. Please check your connection.');
       } else {
         setError(err instanceof Error ? err.message : 'Login failed');

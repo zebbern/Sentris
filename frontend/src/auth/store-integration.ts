@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth, useAuthProvider } from './auth-context';
 import { useAuthStore } from '../store/authStore';
 import { queryClient } from '@/lib/queryClient';
+import { logger } from '@/lib/logger';
 
 /**
  * Hook to integrate the new auth system with the existing Zustand store
@@ -107,7 +108,7 @@ export function useAuthStoreIntegration() {
 
     // Handle auth errors
     if (error) {
-      console.error('Authentication error:', error);
+      logger.error('Authentication error:', error);
       // You might want to show a toast notification here
     }
   }, [
@@ -144,7 +145,7 @@ export function useAuthProviderSync() {
     const backendProvider = import.meta.env.VITE_API_AUTH_PROVIDER || configuredFrontendProvider;
 
     if (configuredFrontendProvider !== backendProvider) {
-      console.warn(
+      logger.warn(
         `Auth provider mismatch: frontend=${configuredFrontendProvider}, backend=${backendProvider}. ` +
           'This may cause authentication issues.',
       );
@@ -182,7 +183,7 @@ export function useAuthMigration() {
     // If user has a manually set token in store but no provider auth,
     // we might need to migrate them
     if (storeToken && !isAuthenticated && !providerToken) {
-      console.info(
+      logger.info(
         'Found existing token in store. You may need to sign in with the new auth system to continue.',
       );
 

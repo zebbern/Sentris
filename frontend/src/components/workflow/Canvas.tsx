@@ -45,6 +45,7 @@ import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { isEntryPointComponentRef, isEntryPointNode } from '@/utils/entryPointUtils';
+import { logger } from '@/lib/logger';
 
 interface CanvasProps {
   className?: string;
@@ -291,7 +292,7 @@ export function Canvas({
       const validation = validateConnection(params, nodes, edges, getComponent);
 
       if (!validation.isValid) {
-        console.warn('Invalid connection:', validation.error);
+        logger.warn('Invalid connection:', validation.error);
         toast({
           variant: 'destructive',
           title: 'Invalid connection',
@@ -433,7 +434,7 @@ export function Canvas({
                 nodes: currentWorkflowNodes, // Only fit workflow nodes, exclude terminals
               });
             } catch (error: unknown) {
-              console.warn('Failed to fit view:', error);
+              logger.warn('Failed to fit view:', error);
             }
           });
         });
@@ -457,7 +458,7 @@ export function Canvas({
 
       const component = getComponent(componentId);
       if (!component) {
-        console.error('Component not found:', componentId);
+        logger.error('Component not found:', componentId);
         return;
       }
 
@@ -1157,7 +1158,7 @@ export function Canvas({
                   try {
                     instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.85 });
                   } catch (error: unknown) {
-                    console.warn('Failed to fit view on init:', error);
+                    logger.warn('Failed to fit view on init:', error);
                   }
                 }
               }}

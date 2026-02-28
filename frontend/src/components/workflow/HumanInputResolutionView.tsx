@@ -15,6 +15,7 @@ import { MarkdownView } from '@/components/ui/markdown';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import { api } from '@/services/api';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -94,7 +95,7 @@ export function HumanInputResolutionView({
     try {
       return JSON.parse(request.inputSchema);
     } catch (e: unknown) {
-      console.error('Failed to parse inputSchema:', e);
+      logger.error('Failed to parse inputSchema:', e);
       return null;
     }
   }, [request.inputSchema]);

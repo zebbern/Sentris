@@ -2,6 +2,7 @@ import posthog from 'posthog-js';
 import type { Properties } from 'posthog-js';
 import { z } from 'zod';
 import { isAnalyticsEnabled } from './config';
+import { logger } from '@/lib/logger';
 
 // Event names (prefix ui_ to separate from server events later)
 export const Events = {
@@ -79,9 +80,9 @@ export function track<T extends EventName>(event: T, payload: unknown = {}): voi
     const data = schema.parse(payload) as Properties;
     posthog.capture(event, data);
     if (import.meta.env.DEV) {
-      console.debug('[analytics]', event, data);
+      logger.info('[analytics]', event, data);
     }
   } catch (err: unknown) {
-    console.warn('[analytics] capture failed', event, err);
+    logger.warn('[analytics] capture failed', event, err);
   }
 }

@@ -3,6 +3,7 @@ import { ChevronDown, Play, Clock, Wifi, RefreshCw, Link2, Loader2 } from 'lucid
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/lib/logger';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -221,7 +222,7 @@ export function RunSelector({
           throw new Error('Clipboard API is unavailable');
         }
       } catch (error: unknown) {
-        console.error('Failed to copy run link:', error);
+        logger.error('Failed to copy run link:', error);
         toast({
           variant: 'destructive',
           title: 'Unable to copy link automatically',

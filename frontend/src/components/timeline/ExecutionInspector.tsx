@@ -8,6 +8,7 @@ import { MessageModal } from '@/components/ui/MessageModal';
 import { StopCircle, RefreshCw, Link2, Globe, Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
+import { logger } from '@/lib/logger';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
@@ -34,7 +35,7 @@ const formatStructured = (value: Record<string, unknown>) => {
   try {
     return JSON.stringify(value, null, 2);
   } catch (error: unknown) {
-    console.error('Failed to stringify structured log data', error);
+    logger.error('Failed to stringify structured log data', error);
     return String(value);
   }
 };
@@ -213,7 +214,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         throw new Error('Clipboard API is unavailable');
       }
     } catch (error: unknown) {
-      console.error('Failed to copy run link:', error);
+      logger.error('Failed to copy run link:', error);
       toast({
         variant: 'destructive',
         title: 'Unable to copy link automatically',

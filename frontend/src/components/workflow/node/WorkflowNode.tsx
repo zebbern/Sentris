@@ -8,6 +8,7 @@ import {
   useUpdateNodeInternals,
 } from 'reactflow';
 import { ExecutionErrorView } from '../ExecutionErrorView';
+import { logger } from '@/lib/logger';
 import {
   Activity,
   AlertCircle,
@@ -182,7 +183,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
       try {
         await prefetchTerminal(id, 'pty', selectedRunId ?? undefined);
       } catch (error: unknown) {
-        console.error('Failed to prefetch terminal output', error);
+        logger.error('Failed to prefetch terminal output', error);
       } finally {
         if (!cancelled) setIsTerminalLoading(false);
       }
@@ -366,7 +367,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
         }));
       }
     } catch (error: unknown) {
-      console.error('Failed to parse runtimeInputs:', error);
+      logger.error('Failed to parse runtimeInputs:', error);
     }
   }
 

@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { RuntimeInputsEditor } from './RuntimeInputsEditor';
 import { SimpleVariableListEditor } from './SimpleVariableListEditor';
 import { ScriptCodeEditor } from './ScriptCodeEditor';
+import { logger } from '@/lib/logger';
 import { FormFieldsEditor } from './FormFieldsEditor';
 import { SelectionOptionsEditor } from './SelectionOptionsEditor';
 import { McpLibraryConfig } from './McpLibraryConfig';
@@ -197,7 +198,7 @@ export function ParameterField({
     try {
       await queryClient.invalidateQueries({ queryKey: ['integrationConnections'] });
     } catch (error: unknown) {
-      console.error('Failed to refresh integration connections', error);
+      logger.error('Failed to refresh integration connections', error);
     }
   };
 
@@ -683,7 +684,7 @@ export function ParameterField({
             textValue = JSON.stringify(value, null, 2);
             needsNormalization = true;
           } catch (error: unknown) {
-            console.error('Failed to serialize JSON parameter value', error);
+            logger.error('Failed to serialize JSON parameter value', error);
             return;
           }
         }

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import {
   Select,
   SelectContent,
@@ -209,7 +210,7 @@ function toInternal(value: any): InternalFormField[] {
         }));
       }
     } catch (e: unknown) {
-      console.warn('Failed to parse legacy form fields', e);
+      logger.warn('Failed to parse legacy form fields', e);
     }
   }
   return list.map((v: any) => ({ ...v, _uid: generateUid() }));

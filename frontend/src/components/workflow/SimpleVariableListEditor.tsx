@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import {
   Select,
   SelectContent,
@@ -133,7 +134,7 @@ function toInternal(value: any): InternalVariable[] {
         list = parsed;
       }
     } catch (e: unknown) {
-      console.warn('Failed to parse legacy variables', e);
+      logger.warn('Failed to parse legacy variables', e);
     }
   }
   return list.map((v) => ({ ...v, _id: generateId() }));

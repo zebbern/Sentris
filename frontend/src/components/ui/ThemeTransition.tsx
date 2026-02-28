@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useThemeStore } from '@/store/themeStore';
 import { Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 type Theme = 'light' | 'dark';
 
@@ -25,7 +26,7 @@ export const ThemeTransition = () => {
 
       // Set a safety timeout to force-clear stuck transitions
       safetyTimeoutRef.current = setTimeout(() => {
-        console.warn('Theme transition stuck, forcing cleanup');
+        logger.warn('Theme transition stuck, forcing cleanup');
         endTransition();
         setStage('idle');
         setTransitionTarget(null);
@@ -62,7 +63,7 @@ export const ThemeTransition = () => {
     const checkStuck = setTimeout(() => {
       // If still transitioning after mount and stage is idle, it's likely stuck
       if (isTransitioning && stage === 'idle') {
-        console.warn('Detected stuck transition state on mount, clearing');
+        logger.warn('Detected stuck transition state on mount, clearing');
         endTransition();
         setStage('idle');
         setTransitionTarget(null);

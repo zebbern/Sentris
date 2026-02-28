@@ -12,6 +12,7 @@ import {
 
 import type { FrontendAuthProvider, FrontendAuthUser, FrontendAuthToken } from '../types';
 import { registerClerkTokenGetter } from '../../utils/clerk-token';
+import { logger } from '@/lib/logger';
 
 const clerkConfig = {
   publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '',
@@ -25,9 +26,7 @@ interface ClerkProviderProps {
 
 export const ClerkAuthProvider: React.FC<ClerkProviderProps> = ({ children, onProviderChange }) => {
   if (!clerkConfig.publishableKey) {
-    console.warn(
-      'Clerk publishable key is not configured; skipping Clerk provider initialisation.',
-    );
+    logger.warn('Clerk publishable key is not configured; skipping Clerk provider initialisation.');
     onProviderChange?.(null);
     return <>{children}</>;
   }
@@ -82,7 +81,7 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
           }
         }
       } catch (err: unknown) {
-        console.error('Failed to retrieve Clerk token', err);
+        logger.error('Failed to retrieve Clerk token', err);
         if (!cancelled) {
           setError('Failed to retrieve authentication token');
         }
@@ -154,7 +153,7 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
         try {
           await signOut();
         } catch (signOutError: unknown) {
-          console.error('Failed to sign out from Clerk', signOutError);
+          logger.error('Failed to sign out from Clerk', signOutError);
         }
       },
       SignInComponent: ClerkSignInModal,

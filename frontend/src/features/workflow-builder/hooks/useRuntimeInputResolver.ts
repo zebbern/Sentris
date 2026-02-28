@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { Node as ReactFlowNode } from 'reactflow';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
+import { logger } from '@/lib/logger';
 
 interface UseRuntimeInputResolverParams {
   nodes: ReactFlowNode<FrontendNodeData>[];
@@ -43,7 +44,7 @@ export function useRuntimeInputResolver({ nodes, getComponent }: UseRuntimeInput
         }));
       }
     } catch (error: unknown) {
-      console.error('Failed to parse runtime inputs:', error);
+      logger.error('Failed to parse runtime inputs:', error);
     }
 
     return [];
