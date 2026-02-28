@@ -26,6 +26,7 @@ import {
 } from './workflow-scheduler';
 import { createLightweightSummary } from './utils/component-output';
 import { buildActionPayload } from './input-resolver';
+import { isComponentFailure, extractFailureMessage } from './workflows/workflow-helpers';
 import type { ArtifactServiceFactory } from './artifact-factory';
 
 export interface ExecuteWorkflowOptions {
@@ -501,26 +502,6 @@ export async function executeWorkflow(
       error: error instanceof Error ? error.message : String(error),
     };
   }
-}
-
-function isComponentFailure(value: unknown): value is { success: boolean; error?: unknown } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'success' in value &&
-    (value as { success?: unknown }).success === false
-  );
-}
-
-function extractFailureMessage(value: { success: boolean; error?: unknown }): string {
-  if (!value) {
-    return 'Component reported failure';
-  }
-  const errorMessage = value.error;
-  if (typeof errorMessage === 'string' && errorMessage.trim().length > 0) {
-    return errorMessage;
-  }
-  return 'Component reported failure';
 }
 
 function maskSecretOutputs(outputPorts: ComponentPortMetadata[], output: unknown): unknown {
