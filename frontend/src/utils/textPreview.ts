@@ -1,9 +1,9 @@
-export interface PreviewOptions {
+interface PreviewOptions {
   charLimit?: number;
   lineLimit?: number;
 }
 
-export interface PreviewResult {
+interface PreviewResult {
   text: string;
   truncated: boolean;
 }

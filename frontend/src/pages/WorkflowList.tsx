@@ -1,15 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Table,
@@ -29,11 +21,10 @@ import {
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Workflow, Trash2, Info, GripVertical, MoreHorizontal, Copy } from 'lucide-react';
+import { Workflow, Info } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { type WorkflowSummary } from '@/services/api';
-import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
@@ -46,11 +37,10 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { logger } from '@/lib/logger';
 import { DndContext } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { WorkflowRow } from './WorkflowRow';
 
 // Stable reference to avoid creating a new [] on every render when query data is undefined.
 const EMPTY_WORKFLOWS: WorkflowSummary[] = [];
@@ -385,7 +375,7 @@ export function WorkflowList() {
                       strategy={verticalListSortingStrategy}
                     >
                       {orderedWorkflows.map((workflow) => (
-                        <WorkflowRowItem
+                        <WorkflowRow
                           key={workflow.id}
                           workflow={workflow}
                           canManageWorkflows={canManageWorkflows}
@@ -409,149 +399,5 @@ export function WorkflowList() {
 
       <ConfirmDialog {...dialogProps} />
     </div>
-  );
-}
-
-interface WorkflowRowItemProps {
-  workflow: WorkflowSummary;
-  canManageWorkflows: boolean;
-  isDeleting: boolean;
-  isCloning: boolean;
-  isDragDisabled?: boolean;
-  formatDate: (dateString: string) => string;
-  onRowClick: () => void;
-  onDeleteClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
-  onCloneClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
-}
-
-function WorkflowRowItem({
-  workflow,
-  canManageWorkflows,
-  isDeleting,
-  isCloning,
-  isDragDisabled = false,
-  formatDate,
-  onRowClick,
-  onDeleteClick,
-  onCloneClick,
-}: WorkflowRowItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: workflow.id,
-    disabled: isDragDisabled,
-  });
-
-  const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    position: 'relative',
-    zIndex: isDragging ? 50 : undefined,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const nodeCount = workflow.nodeCount;
-
-  const statusBadge = workflow.latestRunStatus ? (
-    <Badge
-      variant="outline"
-      className={getStatusBadgeClassFromStatus(
-        workflow.latestRunStatus,
-        'text-xs whitespace-nowrap',
-      )}
-    >
-      {formatStatusText(workflow.latestRunStatus)}
-    </Badge>
-  ) : (
-    <Badge
-      variant="outline"
-      className={getStatusBadgeClassFromStatus('NONE', 'text-xs whitespace-nowrap')}
-    >
-      {formatStatusText('NOT TRIGGERED')}
-    </Badge>
-  );
-
-  return (
-    <TableRow
-      ref={setNodeRef}
-      style={style}
-      onClick={onRowClick}
-      className={cn(
-        'cursor-pointer transition-colors duration-150 hover:bg-accent/50 dark:hover:bg-accent/30',
-        isDragging && 'bg-accent/50 shadow-lg',
-      )}
-    >
-      <TableCell className="w-10 px-2 hidden sm:table-cell">
-        {isDragDisabled ? (
-          <div className="text-muted-foreground/30">
-            <GripVertical className="h-4 w-4" />
-          </div>
-        ) : (
-          <div
-            className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="h-4 w-4" />
-          </div>
-        )}
-      </TableCell>
-      <TableCell className="font-medium">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="max-w-[200px] truncate">{workflow.name}</div>
-            </TooltipTrigger>
-            <TooltipContent>{workflow.name}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </TableCell>
-      <TableCell className="hidden sm:table-cell">
-        <Badge variant="secondary" className="text-xs">
-          {nodeCount}
-        </Badge>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">{statusBadge}</TableCell>
-      <TableCell className="text-muted-foreground text-sm hidden md:table-cell">
-        {workflow.lastRun ? formatDate(workflow.lastRun) : 'N/A'}
-      </TableCell>
-      <TableCell className="text-muted-foreground text-sm hidden lg:table-cell">
-        {formatDate(workflow.updatedAt)}
-      </TableCell>
-      {canManageWorkflows && (
-        <TableCell className="text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Actions for ${workflow.name}`}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={(e) => onCloneClick(e as unknown as MouseEvent, workflow)}
-                disabled={isCloning}
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => onDeleteClick(e as unknown as MouseEvent, workflow)}
-                disabled={isDeleting}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TableCell>
-      )}
-    </TableRow>
   );
 }
