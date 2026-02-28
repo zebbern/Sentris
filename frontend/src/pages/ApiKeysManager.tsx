@@ -3,6 +3,7 @@ import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import {
   Dialog,
   DialogContent,
@@ -327,26 +328,29 @@ export function ApiKeysManager() {
   return (
     <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setIsCreateOpen(true)}
-              disabled={isReadOnly}
-              className="self-start sm:self-auto"
-            >
-              Create new key
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => refetch()}
-              disabled={loading}
-              className="gap-2"
-            >
-              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          </div>
-        </div>
+        <PageToolbar
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setIsCreateOpen(true)}
+                disabled={isReadOnly}
+                className="self-start sm:self-auto"
+              >
+                Create new key
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => refetch()}
+                disabled={loading}
+                className="gap-2"
+              >
+                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                <span className="hidden sm:inline">Refresh</span>
+              </Button>
+            </div>
+          }
+          className="sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8"
+        />
 
         {error && (
           <ErrorBanner

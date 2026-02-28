@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import {
   Select,
   SelectContent,
@@ -301,78 +302,83 @@ export function WebhooksPage() {
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           {/* Filters Row */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-            <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="space-y-2">
-                <label className="text-xs uppercase text-muted-foreground">Search</label>
-                <Input
-                  type="search"
-                  placeholder="Filter by name, workflow, or URL"
-                  value={filters.search}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                />
+          <PageToolbar
+            filters={
+              <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase text-muted-foreground">Search</label>
+                  <Input
+                    type="search"
+                    placeholder="Filter by name, workflow, or URL"
+                    value={filters.search}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase text-muted-foreground">Status</label>
+                  <Select value={filters.status} onValueChange={handleStatusFilterChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase text-muted-foreground">Workflow</label>
+                  <Select
+                    value={filters.workflowId ?? 'all'}
+                    onValueChange={handleWorkflowFilterChange}
+                    disabled={workflowsLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All workflows" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All workflows</SelectItem>
+                      {workflowOptions.map((workflow) => (
+                        <SelectItem key={workflow.id} value={workflow.id}>
+                          {workflow.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase text-muted-foreground">Status</label>
-                <Select value={filters.status} onValueChange={handleStatusFilterChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            }
+            actions={
+              <div className="flex flex-col shrink-0">
+                <label className="text-xs uppercase text-muted-foreground invisible hidden lg:block">
+                  &nbsp;
+                </label>
+                <div className="flex gap-2 mt-2 lg:mt-0">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleRefresh}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                    <span className="hidden sm:inline">Refresh</span>
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="gap-2"
+                    onClick={() => navigate('/webhooks/new')}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden sm:inline">New webhook</span>
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase text-muted-foreground">Workflow</label>
-                <Select
-                  value={filters.workflowId ?? 'all'}
-                  onValueChange={handleWorkflowFilterChange}
-                  disabled={workflowsLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All workflows" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All workflows</SelectItem>
-                    {workflowOptions.map((workflow) => (
-                      <SelectItem key={workflow.id} value={workflow.id}>
-                        {workflow.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex flex-col shrink-0">
-              <label className="text-xs uppercase text-muted-foreground invisible hidden lg:block">
-                &nbsp;
-              </label>
-              <div className="flex gap-2 mt-2 lg:mt-0">
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-                <Button
-                  variant="default"
-                  className="gap-2"
-                  onClick={() => navigate('/webhooks/new')}
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New webhook</span>
-                </Button>
-              </div>
-            </div>
-          </div>
+            }
+            className="gap-4 lg:flex-row lg:items-end"
+          />
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 

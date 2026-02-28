@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { QueryClientProvider } from '@tanstack/react-query';
 const ReactQueryDevtools = lazy(() =>
   import('@tanstack/react-query-devtools').then((mod) => ({
@@ -18,6 +19,7 @@ import { useCommandPaletteKeyboard } from '@/features/command-palette/useCommand
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { PageTransition } from '@/components/shared/PageTransition';
 
 // Lazy-loaded page components
 const WorkflowList = lazy(() =>
@@ -141,6 +143,62 @@ function RouteChangeAnnouncer() {
   return null;
 }
 
+function AnimatedRoutes() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <PageTransition key={location.pathname}>
+        <Routes location={location}>
+          <Route path="/" element={<WorkflowList />} />
+          <Route path="/templates" element={<TemplateLibraryPage />} />
+          <Route
+            path="/workflows/:id"
+            element={
+              <ErrorBoundary>
+                <WorkflowBuilder />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="/workflows/:id/runs"
+            element={
+              <ErrorBoundary>
+                <WorkflowBuilder />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="/workflows/:id/runs/:runId"
+            element={
+              <ErrorBoundary>
+                <WorkflowBuilder />
+              </ErrorBoundary>
+            }
+          />
+          <Route path="/secrets" element={<SecretsManager />} />
+          <Route path="/api-keys" element={<ApiKeysManager />} />
+          <Route path="/integrations" element={<IntegrationsManager />} />
+          <Route path="/webhooks" element={<WebhooksPage />} />
+          <Route path="/webhooks/new" element={<WebhookEditorPage />} />
+          <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
+          <Route path="/webhooks/:id/deliveries" element={<WebhookEditorPage />} />
+          <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
+          <Route path="/schedules" element={<SchedulesPage />} />
+          <Route path="/action-center" element={<ActionCenterPage />} />
+          <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
+          <Route path="/settings/*" element={<SettingsPage />} />
+          <Route path="/artifacts" element={<ArtifactLibrary />} />
+          <Route path="/mcp-library" element={<McpLibraryPage />} />
+          <Route path="/runs/:runId" element={<RunRedirect />} />
+          <Route path="/integrations/callback/:provider" element={<IntegrationCallback />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </PageTransition>
+    </AnimatePresence>
+  );
+}
+
 function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   useCommandPaletteKeyboard();
   const isOpen = useCommandPaletteStore((state) => state.isOpen);
@@ -180,54 +238,7 @@ function App() {
                   <ProtectedRoute>
                     <Suspense fallback={<PageSkeleton />}>
                       <ErrorBoundary>
-                        <Routes>
-                          <Route path="/" element={<WorkflowList />} />
-                          <Route path="/templates" element={<TemplateLibraryPage />} />
-                          <Route
-                            path="/workflows/:id"
-                            element={
-                              <ErrorBoundary>
-                                <WorkflowBuilder />
-                              </ErrorBoundary>
-                            }
-                          />
-                          <Route
-                            path="/workflows/:id/runs"
-                            element={
-                              <ErrorBoundary>
-                                <WorkflowBuilder />
-                              </ErrorBoundary>
-                            }
-                          />
-                          <Route
-                            path="/workflows/:id/runs/:runId"
-                            element={
-                              <ErrorBoundary>
-                                <WorkflowBuilder />
-                              </ErrorBoundary>
-                            }
-                          />
-                          <Route path="/secrets" element={<SecretsManager />} />
-                          <Route path="/api-keys" element={<ApiKeysManager />} />
-                          <Route path="/integrations" element={<IntegrationsManager />} />
-                          <Route path="/webhooks" element={<WebhooksPage />} />
-                          <Route path="/webhooks/new" element={<WebhookEditorPage />} />
-                          <Route path="/webhooks/:id" element={<WebhookEditorPage />} />
-                          <Route path="/webhooks/:id/deliveries" element={<WebhookEditorPage />} />
-                          <Route path="/webhooks/:id/settings" element={<WebhookEditorPage />} />
-                          <Route path="/schedules" element={<SchedulesPage />} />
-                          <Route path="/action-center" element={<ActionCenterPage />} />
-                          <Route path="/analytics-settings" element={<AnalyticsSettingsPage />} />
-                          <Route path="/settings/*" element={<SettingsPage />} />
-                          <Route path="/artifacts" element={<ArtifactLibrary />} />
-                          <Route path="/mcp-library" element={<McpLibraryPage />} />
-                          <Route path="/runs/:runId" element={<RunRedirect />} />
-                          <Route
-                            path="/integrations/callback/:provider"
-                            element={<IntegrationCallback />}
-                          />
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
+                        <AnimatedRoutes />
                       </ErrorBoundary>
                     </Suspense>
                   </ProtectedRoute>

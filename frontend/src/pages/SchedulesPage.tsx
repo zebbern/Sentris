@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -19,13 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   PauseCircle,
   PlayCircle,
   RefreshCw,
-  Search,
   Edit3,
   Plus,
   Trash2,
@@ -422,37 +421,29 @@ export function SchedulesPage() {
     <TooltipProvider>
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="flex-1 space-y-2">
-              <label className="text-xs uppercase text-muted-foreground flex items-center gap-2">
-                <Search className="h-3.5 w-3.5" />
-                Search schedules or workflows
-              </label>
-              <Input
-                type="search"
-                placeholder="Filter by schedule or workflow"
-                value={filters.search}
-                onChange={(event) =>
-                  setFilters((prev) => ({ ...prev, search: event.target.value }))
-                }
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleRefresh}
-                disabled={isLoading}
-              >
-                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-              <Button variant="default" className="gap-2" onClick={openCreateDrawer}>
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">New schedule</span>
-              </Button>
-            </div>
-          </div>
+          <PageToolbar
+            searchValue={filters.search}
+            onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+            searchLabel="Search schedules or workflows"
+            searchPlaceholder="Filter by schedule or workflow"
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                <Button variant="default" className="gap-2" onClick={openCreateDrawer}>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">New schedule</span>
+                </Button>
+              </>
+            }
+          />
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 

@@ -34,7 +34,6 @@ import { validateConnection } from '@/utils/connectionValidation';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
-import { track, Events } from '@/features/analytics/events';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
@@ -45,9 +44,14 @@ import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder
 import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { isEntryPointComponentRef, isEntryPointNode } from '@/utils/entryPointUtils';
+import { isEntryPointNode } from '@/utils/entryPointUtils';
 import { logger } from '@/lib/logger';
 import { useCanvasKeyboardShortcuts } from '@/hooks/useCanvasKeyboardShortcuts';
+import {
+  createNodeFromComponent as createNodeFromComponentUtil,
+  type CreateNodeContext,
+} from './canvas-node-factory';
+import { useNodeUpdater } from './canvas-node-updater';
 
 interface CanvasProps {
   className?: string;
@@ -150,7 +154,6 @@ export function Canvas({
   const applyEdgesChange = onEdgesChange;
 
   const hasUserInteractedRef = useRef(false);
-  const snapshotDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevModeRef = useRef<typeof mode>(mode);
   const prevNodesLengthRef = useRef(nodes.length);
   const prevEdgesLengthRef = useRef(edges.length);
@@ -457,107 +460,19 @@ export function Canvas({
   // Helper function to create node from component ID and screen position
   const createNodeFromComponent = useCallback(
     (componentId: string, clientX: number, clientY: number) => {
-      if (mode !== 'design') return;
-
-      const component = getComponent(componentId);
-      if (!component) {
-        logger.error('Component not found:', componentId);
-        return;
-      }
-
-      const isEntryComponent =
-        isEntryPointComponentRef(component.id) ||
-        isEntryPointComponentRef(component.slug ?? component.id);
-      if (isEntryComponent) {
-        const existingEntry = nodes.some(isEntryPointNode);
-        if (existingEntry) {
-          toast({
-            title: 'Entry Point already exists',
-            description: 'Each workflow can only have one Entry Point.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      }
-
-      const position = reactFlowInstance?.screenToFlowPosition({
-        x: clientX,
-        y: clientY,
-      });
-
-      if (!position) return;
-
-      const initialParameters: Record<string, unknown> = {};
-
-      if (Array.isArray(component.parameters)) {
-        component.parameters.forEach((parameter) => {
-          if (parameter.default !== undefined) {
-            const defaultValue = parameter.default;
-            if (defaultValue !== null && typeof defaultValue === 'object') {
-              try {
-                initialParameters[parameter.id] = JSON.parse(JSON.stringify(defaultValue));
-              } catch {
-                initialParameters[parameter.id] = defaultValue;
-              }
-            } else {
-              initialParameters[parameter.id] = defaultValue;
-            }
-          }
-        });
-      }
-
-      if ((component.slug ?? component.id) === 'entry-point') {
-        initialParameters.runtimeInputs = [
-          {
-            id: 'input1',
-            label: 'Input 1',
-            type: 'array',
-            required: true,
-            description: '',
-          },
-        ];
-      }
-
-      const newNode: Node<FrontendNodeData> = {
-        id: `${component.slug ?? component.id}-${Date.now()}`,
-        type: 'workflow',
-        position,
-        data: {
-          // Backend fields (required)
-          label: component.name,
-          config: {
-            params: initialParameters,
-            inputOverrides: {},
-          },
-          // Frontend fields
-          componentId: component.id,
-          componentSlug: component.slug ?? component.id,
-          componentVersion: component.version,
-          inputs: {},
-          status: 'idle',
-          // Pass workflowId to node data for entry point webhook URL
-          workflowId: workflowId ?? undefined,
-        },
+      const ctx: CreateNodeContext = {
+        reactFlowInstance,
+        getComponent,
+        nodes,
+        edges,
+        mode,
+        workflowId,
+        toast,
+        onSnapshot,
+        setNodes,
+        markDirty,
       };
-
-      // Update nodes and capture snapshot
-      const nextNodes = nodes.concat(newNode);
-      setNodes(nextNodes);
-      onSnapshot?.(nextNodes, edges);
-
-      // Analytics: node added
-      try {
-        const workflowId = useWorkflowStore.getState().metadata.id;
-        track(Events.NodeAdded, {
-          workflow_id: workflowId ?? undefined,
-          component_slug: String(component.slug ?? component.id),
-        });
-      } catch {
-        // Ignore analytics tracking errors
-      }
-
-      // Mark workflow as dirty
-      markDirty();
+      createNodeFromComponentUtil(componentId, clientX, clientY, ctx);
     },
     [
       reactFlowInstance,
@@ -733,98 +648,14 @@ export function Canvas({
   );
 
   // Handle node data update from config panel
-  const handleUpdateNode = useCallback(
-    (nodeId: string, data: Partial<FrontendNodeData>) => {
-      let updatedNodes = nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node,
-      );
-
-      let updatedEdges = edges;
-      const edgesToRemove: Edge[] = [];
-
-      // Check for dynamic outputs change (e.g. Entry Point inputs renamed)
-      const dynamicOutputs = data.dynamicOutputs;
-      if (dynamicOutputs && Array.isArray(dynamicOutputs)) {
-        const validOutputIds = new Set(dynamicOutputs.map((p: any) => p.id));
-        updatedEdges.forEach((edge) => {
-          if (
-            edge.source === nodeId &&
-            edge.sourceHandle &&
-            !validOutputIds.has(edge.sourceHandle)
-          ) {
-            edgesToRemove.push(edge);
-          }
-        });
-      }
-
-      // Check for dynamic inputs change
-      const dynamicInputs = data.dynamicInputs;
-      if (dynamicInputs && Array.isArray(dynamicInputs)) {
-        const validInputIds = new Set(dynamicInputs.map((p: any) => p.id));
-        updatedEdges.forEach((edge) => {
-          if (
-            edge.target === nodeId &&
-            edge.targetHandle &&
-            !validInputIds.has(edge.targetHandle)
-          ) {
-            edgesToRemove.push(edge);
-          }
-        });
-      }
-
-      // Perform cleanup if edges were invalidated
-      if (edgesToRemove.length > 0) {
-        updatedEdges = updatedEdges.filter((e) => !edgesToRemove.includes(e));
-
-        // Cleanup input mappings on target nodes of removed edges
-        updatedNodes = updatedNodes.map((node) => {
-          const incomingRemovedEdges = edgesToRemove.filter((e) => e.target === node.id);
-          if (incomingRemovedEdges.length === 0) return node;
-
-          const originalInputs = (node.data.inputs as Record<string, unknown>) || {};
-          const keysToRemove = new Set(
-            incomingRemovedEdges
-              .filter((e) => e.targetHandle && originalInputs[e.targetHandle])
-              .map((e) => e.targetHandle as string),
-          );
-
-          if (keysToRemove.size === 0) return node;
-
-          // Build new inputs object excluding the keys to remove
-          const inputs = Object.fromEntries(
-            Object.entries(originalInputs).filter(([key]) => !keysToRemove.has(key)),
-          );
-
-          if (Object.keys(inputs).length === Object.keys(originalInputs).length) return node;
-
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              inputs,
-            },
-          };
-        });
-      }
-
-      setNodes(updatedNodes);
-      setEdges(updatedEdges);
-
-      // Debounce history snapshot to avoid creating history entries for every keystroke
-      if (snapshotDebounceRef.current) {
-        clearTimeout(snapshotDebounceRef.current);
-      }
-
-      snapshotDebounceRef.current = setTimeout(() => {
-        onSnapshot?.(updatedNodes, updatedEdges);
-        snapshotDebounceRef.current = null;
-      }, 500);
-
-      // Mark workflow as dirty immediately so Save button enables
-      markDirty();
-    },
-    [nodes, edges, setNodes, setEdges, markDirty, onSnapshot],
-  );
+  const handleUpdateNode = useNodeUpdater({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    markDirty,
+    onSnapshot,
+  });
 
   // Sync selectedNode with the latest node data from nodes array
   useEffect(() => {

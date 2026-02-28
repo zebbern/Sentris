@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -27,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -35,7 +35,6 @@ import {
   Trash2,
   Info,
   GripVertical,
-  Search,
   MoreHorizontal,
   Copy,
 } from 'lucide-react';
@@ -208,20 +207,12 @@ export function WorkflowList() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="flex-1 space-y-2">
-            <label className="text-xs uppercase text-muted-foreground flex items-center gap-2">
-              <Search className="h-3.5 w-3.5" />
-              Search workflows
-            </label>
-            <Input
-              type="search"
-              placeholder="Filter by name or description"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <PageToolbar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchLabel="Search workflows"
+          searchPlaceholder="Filter by name or description"
+          filters={
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
@@ -234,8 +225,8 @@ export function WorkflowList() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          }
+        />
 
         {isLoading ? (
           <div className="border rounded-lg bg-card overflow-hidden">

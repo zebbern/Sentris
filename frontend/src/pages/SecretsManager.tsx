@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { KeyRound, RefreshCw } from 'lucide-react';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
@@ -502,29 +503,34 @@ export function SecretsManager() {
           </div>
 
           <div className="border rounded-lg bg-card p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  Only metadata is shown. Use the Secret Fetch component or parameter selectors to
-                  reference a secret.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setListSuccess(null);
-                  queryClient
-                    .invalidateQueries({ queryKey: queryKeys.secrets.all() })
-                    .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
-                }}
-                disabled={loading}
-                className="gap-2"
-              >
-                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
-            </div>
+            <PageToolbar
+              filters={
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>
+                  <p className="text-xs md:text-sm text-muted-foreground">
+                    Only metadata is shown. Use the Secret Fetch component or parameter selectors to
+                    reference a secret.
+                  </p>
+                </div>
+              }
+              actions={
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setListSuccess(null);
+                    queryClient
+                      .invalidateQueries({ queryKey: queryKeys.secrets.all() })
+                      .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
+                  }}
+                  disabled={loading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+              }
+              className="sm:flex-row sm:items-center justify-between gap-3 mb-4"
+            />
 
             {error && (
               <ErrorBanner

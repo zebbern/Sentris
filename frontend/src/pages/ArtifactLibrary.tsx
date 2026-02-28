@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, FileBox, RefreshCw, Search, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import { Download, FileBox, RefreshCw, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,8 +21,8 @@ import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import type { ArtifactMetadata } from '@shipsec/shared';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
@@ -103,31 +103,25 @@ export function ArtifactLibrary() {
   return (
     <div className="flex-1 bg-background" aria-busy={libraryLoading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="relative flex-1 sm:flex-none">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search artifacts..."
-                className="pl-8 w-full sm:w-auto"
-                autoComplete="off"
-              />
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            className="gap-2"
-            onClick={handleRefresh}
-            disabled={libraryLoading}
-            aria-label="Refresh artifacts"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-        </div>
+        <PageToolbar
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          searchPlaceholder="Search artifacts..."
+          actions={
+            <Button
+              type="button"
+              variant="ghost"
+              className="gap-2"
+              onClick={handleRefresh}
+              disabled={libraryLoading}
+              aria-label="Refresh artifacts"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          }
+          className="gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6"
+        />
 
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
           {libraryLoading ? (
