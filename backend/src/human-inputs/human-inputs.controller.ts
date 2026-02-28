@@ -12,13 +12,18 @@ import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
+import { ZodValidationPipe } from 'nestjs-zod';
+
 import { HumanInputsService } from './human-inputs.service';
 import {
   ResolveHumanInputDto,
+  ResolveHumanInputSchema,
   ListHumanInputsQueryDto,
+  ListHumanInputsQuerySchema,
   HumanInputResponseDto,
   PublicResolveResultDto,
   ResolveByTokenDto,
+  ResolveByTokenSchema,
 } from './dto/human-inputs.dto';
 
 @ApiTags('Human Inputs')
@@ -31,7 +36,10 @@ export class HumanInputsController {
   @ApiSecurity('api-key')
   @ApiOperation({ summary: 'List human input requests' })
   @ApiResponse({ status: 200, type: [HumanInputResponseDto] })
-  async list(@Query() query: ListHumanInputsQueryDto, @CurrentAuth() auth: AuthContext | null) {
+  async list(
+    @Query(new ZodValidationPipe(ListHumanInputsQuerySchema)) query: ListHumanInputsQueryDto,
+    @CurrentAuth() auth: AuthContext | null,
+  ) {
     if (!auth || !auth.organizationId) {
       throw new UnauthorizedException('Authentication required');
     }
@@ -57,7 +65,7 @@ export class HumanInputsController {
   @ApiResponse({ status: 200, type: HumanInputResponseDto })
   async resolve(
     @Param('id') id: string,
-    @Body() dto: ResolveHumanInputDto,
+    @Body(new ZodValidationPipe(ResolveHumanInputSchema)) dto: ResolveHumanInputDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
     if (!auth || !auth.organizationId) {
@@ -70,7 +78,10 @@ export class HumanInputsController {
   @Post('resolve/:token')
   @ApiOperation({ summary: 'Resolve input via public token' })
   @ApiResponse({ status: 200, type: PublicResolveResultDto })
-  async resolveByToken(@Param('token') token: string, @Body() body: ResolveByTokenDto) {
+  async resolveByToken(
+    @Param('token') token: string,
+    @Body(new ZodValidationPipe(ResolveByTokenSchema)) body: ResolveByTokenDto,
+  ) {
     return this.service.resolveByToken(token, body.action || 'resolve', body.data);
   }
 }

@@ -1,12 +1,16 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse as SwaggerApiResponse } from '@nestjs/swagger';
 
+import { ZodValidationPipe } from 'nestjs-zod';
+
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
 import {
   DiscoveryInputDto,
+  DiscoveryInputSchema,
   DiscoveryStatusDto,
   DiscoveryStartResponseDto,
   GroupDiscoveryInputDto,
+  GroupDiscoveryInputSchema,
   GroupDiscoveryStartResponseDto,
   GroupDiscoveryStatusDto,
 } from './dto/mcp-discovery.dto';
@@ -32,7 +36,9 @@ export class McpDiscoveryController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid input parameters',
   })
-  async discover(@Body() input: DiscoveryInputDto): Promise<DiscoveryStartResponseDto> {
+  async discover(
+    @Body(new ZodValidationPipe(DiscoveryInputSchema)) input: DiscoveryInputDto,
+  ): Promise<DiscoveryStartResponseDto> {
     return this.orchestrator.startDiscovery(input);
   }
 
@@ -68,7 +74,7 @@ export class McpDiscoveryController {
     type: GroupDiscoveryStartResponseDto,
   })
   async discoverGroup(
-    @Body() input: GroupDiscoveryInputDto,
+    @Body(new ZodValidationPipe(GroupDiscoveryInputSchema)) input: GroupDiscoveryInputDto,
   ): Promise<GroupDiscoveryStartResponseDto> {
     return this.orchestrator.startGroupDiscovery(input);
   }

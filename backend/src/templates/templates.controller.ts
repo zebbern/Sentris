@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
   HttpCode,
@@ -132,7 +133,7 @@ export class TemplatesController {
   @Get(':id')
   @ApiOperation({ summary: 'Get template by ID' })
   @ApiOkResponse({ description: 'Returns template details' })
-  async getTemplate(@Param('id') id: string) {
+  async getTemplate(@Param('id', new ParseUUIDPipe()) id: string) {
     const template = await this.templateService.getTemplateById(id);
     if (!template) {
       throw new HttpException('Template not found', HttpStatus.NOT_FOUND);
@@ -173,7 +174,7 @@ export class TemplatesController {
   @ApiOperation({ summary: 'Use a template to create a new workflow' })
   @ApiCreatedResponse({ description: 'Created workflow from template' })
   async useTemplate(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentAuth() auth: { userId?: string; organizationId?: string },
     @Body(new ZodValidationPipe(UseTemplateSchema))
     dto: UseTemplateDto,

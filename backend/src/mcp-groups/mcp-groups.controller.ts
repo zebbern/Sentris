@@ -21,17 +21,24 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 
+import { ZodValidationPipe } from 'nestjs-zod';
+
 import { McpGroupsService } from './mcp-groups.service';
 import {
   CreateMcpGroupDto,
+  CreateMcpGroupSchema,
   UpdateMcpGroupDto,
+  UpdateMcpGroupSchema,
   McpGroupResponse,
   McpGroupServerResponse,
   AddServerToGroupDto,
+  AddServerToGroupSchema,
   UpdateServerInGroupDto,
+  UpdateServerInGroupSchema,
   SyncTemplatesResponse,
   GroupTemplateDto,
   ImportTemplateRequestDto,
+  ImportTemplateRequestSchema,
   ImportGroupTemplateResponse,
 } from './dto/mcp-groups.dto';
 import { Roles } from '../auth/roles.decorator';
@@ -86,7 +93,7 @@ export class McpGroupsController {
   @ApiCreatedResponse({ type: McpGroupResponse })
   async createGroup(
     @CurrentAuth() auth: AuthContext | null,
-    @Body() body: CreateMcpGroupDto,
+    @Body(new ZodValidationPipe(CreateMcpGroupSchema)) body: CreateMcpGroupDto,
   ): Promise<McpGroupResponse> {
     return this.mcpGroupsService.createGroup(auth, body);
   }
@@ -97,7 +104,7 @@ export class McpGroupsController {
   async updateGroup(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: UpdateMcpGroupDto,
+    @Body(new ZodValidationPipe(UpdateMcpGroupSchema)) body: UpdateMcpGroupDto,
   ): Promise<McpGroupResponse> {
     return this.mcpGroupsService.updateGroup(auth, id, body);
   }
@@ -132,7 +139,7 @@ export class McpGroupsController {
   async addServerToGroup(
     @CurrentAuth() _auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: AddServerToGroupDto,
+    @Body(new ZodValidationPipe(AddServerToGroupSchema)) body: AddServerToGroupDto,
   ): Promise<McpGroupServerResponse[]> {
     return this.mcpGroupsService.addServerToGroup(id, body);
   }
@@ -145,7 +152,7 @@ export class McpGroupsController {
     @CurrentAuth() _auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('serverId', new ParseUUIDPipe()) serverId: string,
-    @Body() body: UpdateServerInGroupDto,
+    @Body(new ZodValidationPipe(UpdateServerInGroupSchema)) body: UpdateServerInGroupDto,
   ): Promise<McpGroupServerResponse[]> {
     return this.mcpGroupsService.updateServerInGroup(id, serverId, body);
   }
@@ -180,7 +187,7 @@ export class McpGroupsController {
   async importTemplate(
     @CurrentAuth() auth: AuthContext | null,
     @Param('slug') slug: string,
-    @Body() body: ImportTemplateRequestDto,
+    @Body(new ZodValidationPipe(ImportTemplateRequestSchema)) body: ImportTemplateRequestDto,
   ): Promise<ImportGroupTemplateResponse> {
     if (!auth?.organizationId) {
       throw new UnauthorizedException('Organization context is required to import a template');

@@ -19,10 +19,14 @@ import {
   ApiOperation,
 } from '@nestjs/swagger';
 
+import { ZodValidationPipe } from 'nestjs-zod';
+
 import { McpServersService } from './mcp-servers.service';
 import {
   CreateMcpServerDto,
+  CreateMcpServerSchema,
   UpdateMcpServerDto,
+  UpdateMcpServerSchema,
   McpServerResponse,
   McpToolResponse,
   TestConnectionResponse,
@@ -97,7 +101,7 @@ export class McpServersController {
   @ApiCreatedResponse({ type: McpServerResponse })
   async createServer(
     @CurrentAuth() auth: AuthContext | null,
-    @Body() body: CreateMcpServerDto,
+    @Body(new ZodValidationPipe(CreateMcpServerSchema)) body: CreateMcpServerDto,
   ): Promise<McpServerResponse> {
     return this.mcpServersService.createServer(auth, body);
   }
@@ -108,7 +112,7 @@ export class McpServersController {
   async updateServer(
     @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: UpdateMcpServerDto,
+    @Body(new ZodValidationPipe(UpdateMcpServerSchema)) body: UpdateMcpServerDto,
   ): Promise<McpServerResponse> {
     return this.mcpServersService.updateServer(auth, id, body);
   }
