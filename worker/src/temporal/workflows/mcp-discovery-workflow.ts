@@ -121,6 +121,7 @@ const { discoverMcpToolsActivity, discoverMcpGroupToolsActivity, cacheDiscoveryR
     }): Promise<void>;
   }>({
     startToCloseTimeout: '30 seconds',
+    heartbeatTimeout: '10 seconds',
   });
 
 /**

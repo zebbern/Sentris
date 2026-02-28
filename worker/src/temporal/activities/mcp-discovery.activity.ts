@@ -1,4 +1,5 @@
 import { startMcpDockerServer } from '../../components/core/mcp-runtime';
+import { Context } from '@temporalio/activity';
 import { createExecutionContext } from '@shipsec/component-sdk';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -79,6 +80,7 @@ export async function getCachedDiscoveryActivity(input: {
 export async function discoverMcpToolsActivity(
   input: DiscoveryActivityInput,
 ): Promise<DiscoveryActivityOutput> {
+  const ctx = Context.current();
   let containerId: string | undefined;
 
   try {
@@ -91,6 +93,7 @@ export async function discoverMcpToolsActivity(
       }
       endpoint = input.endpoint;
       await testMcpConnection(endpoint, input.headers);
+      ctx.heartbeat('http-connected');
     }
     // STDIO: spawn Docker container
     else if (input.transport === 'stdio') {
@@ -107,14 +110,17 @@ export async function discoverMcpToolsActivity(
         throw new Error('Container ID is required for STDIO transport');
       }
       endpoint = result.endpoint;
+      ctx.heartbeat('container-spawned');
       // Wait for container to be ready with health check
       await waitForContainerReady(endpoint);
+      ctx.heartbeat('container-ready');
     } else {
       throw new Error(`Unsupported transport: ${(input as any).transport}`);
     }
 
     // Discover tools
     const tools = await listMcpTools(endpoint, input.headers);
+    ctx.heartbeat('tools-discovered');
     return { tools };
   } finally {
     // Always cleanup
@@ -131,6 +137,7 @@ export async function discoverMcpToolsActivity(
 export async function discoverMcpGroupToolsActivity(
   input: GroupDiscoveryActivityInput,
 ): Promise<GroupDiscoveryActivityOutput> {
+  const ctx = Context.current();
   let containerId: string | undefined;
   let baseEndpoint: string | undefined;
 
@@ -145,7 +152,9 @@ export async function discoverMcpGroupToolsActivity(
       });
       containerId = spawn.containerId;
       baseEndpoint = spawn.baseEndpoint;
+      ctx.heartbeat('container-spawned');
       await waitForContainerReady(`${baseEndpoint}/health`);
+      ctx.heartbeat('container-ready');
     }
 
     const results: GroupDiscoveryActivityResult[] = [];
@@ -158,6 +167,7 @@ export async function discoverMcpGroupToolsActivity(
         await testMcpConnection(server.endpoint, server.headers);
         const tools = await listMcpTools(server.endpoint, server.headers);
         results.push({ name: server.name, tools });
+        ctx.heartbeat(`http-discovered:${server.name}`);
       } catch (error: unknown) {
         results.push({
           name: server.name,
@@ -176,6 +186,7 @@ export async function discoverMcpGroupToolsActivity(
         await waitForContainerReady(`${baseEndpoint}/health`);
         const tools = await listMcpTools(endpoint, server.headers);
         results.push({ name: server.name, tools });
+        ctx.heartbeat(`stdio-discovered:${server.name}`);
       } catch (error: unknown) {
         results.push({
           name: server.name,

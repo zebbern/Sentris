@@ -74,6 +74,7 @@ const {
   }): Promise<{ ready: boolean }>;
 }>({
   startToCloseTimeout: '10 minutes',
+  heartbeatTimeout: '30 seconds',
 });
 
 const { cleanupRunResourcesActivity, finalizeRunActivity } = proxyActivities<{
@@ -704,6 +705,7 @@ export async function shipsecWorkflowRun(
                 ): Promise<RunComponentActivityOutput>;
               }>({
                 startToCloseTimeout: '10 minutes',
+                heartbeatTimeout: '30 seconds',
                 retry: retryOptions,
               });
 
@@ -799,6 +801,7 @@ export async function shipsecWorkflowRun(
           ): Promise<RunComponentActivityOutput>;
         }>({
           startToCloseTimeout: '10 minutes',
+          heartbeatTimeout: '30 seconds',
           retry: retryOptions,
         });
 

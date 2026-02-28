@@ -101,7 +101,8 @@ export async function runComponentActivity(
   input: RunComponentActivityInput,
 ): Promise<RunComponentActivityOutput> {
   const { action, inputs, params, warnings = [] } = input;
-  const activityInfo = Context.current().info;
+  const ctx = Context.current();
+  const activityInfo = ctx.info;
   const component = componentRegistry.get(action.componentId);
   if (!component) {
     console.error(`[Activity] Component not found: ${action.componentId}`);
@@ -208,6 +209,7 @@ export async function runComponentActivity(
 
   await unspill(resolvedParams, 'Parameter', svc.storage, spilledObjectsCache, warningsToReport);
   await unspill(resolvedInputs, 'Input', svc.storage, spilledObjectsCache, warningsToReport);
+  ctx.heartbeat('inputs-resolved');
 
   // Resolve secret references for input overrides
   await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
@@ -221,6 +223,7 @@ export async function runComponentActivity(
     secrets: svc.secrets,
     component,
   });
+  ctx.heartbeat('secrets-resolved');
 
   // Validate required inputs and log warnings
   validateRequiredInputs(warningsToReport, component, resolvedParams, context.trace, action.ref);
@@ -238,6 +241,7 @@ export async function runComponentActivity(
   const parsedParams = component.parameters
     ? component.parameters.parse(resolvedParams)
     : resolvedParams;
+  ctx.heartbeat('validated');
 
   try {
     // Execute the component logic directly so that any
@@ -245,6 +249,7 @@ export async function runComponentActivity(
     // Docker/remote execution should be invoked from within
     // the component via `runComponentWithRunner`.
     let output = await component.execute({ inputs: parsedInputs, params: parsedParams }, context);
+    ctx.heartbeat('execution-complete');
 
     // Check if component requested suspension (e.g. approval gate)
     const isSuspended =
