@@ -311,14 +311,8 @@ export function McpLibraryPage() {
   // ------ Main render ------
   return (
     <div className="container mx-auto py-8 px-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">MCP Servers</h1>
-          <p className="text-muted-foreground">
-            Configure Model Context Protocol servers for AI agents
-          </p>
-        </div>
+      {/* Header actions */}
+      <div className="flex items-center justify-end mb-6">
         <Button onClick={editor.handleCreateNew}>
           <Plus className="h-4 w-4 mr-2" />
           Add Server
