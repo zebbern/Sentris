@@ -9,12 +9,15 @@ import type { IFileStorageService, ITraceService, ISecretsService } from '@ships
 import type { ArtifactServiceFactory } from '../artifact-factory';
 import { isTraceMetadataAware } from '../utils/trace-metadata';
 
-// Global service container (set by worker initialization)
-let globalStorage: IFileStorageService | undefined;
-let globalTrace: ITraceService | undefined;
-let globalLogs: WorkflowLogSink | undefined;
-let globalSecrets: ISecretsService | undefined;
-let globalArtifacts: ArtifactServiceFactory | undefined;
+interface WorkflowActivityServices {
+  storage: IFileStorageService;
+  trace: ITraceService;
+  logs: WorkflowLogSink | undefined;
+  secrets: ISecretsService | undefined;
+  artifacts: ArtifactServiceFactory | undefined;
+}
+
+let workflowServices: WorkflowActivityServices | null = null;
 
 export function initializeActivityServices(
   storage: IFileStorageService,
@@ -23,11 +26,23 @@ export function initializeActivityServices(
   secrets?: ISecretsService,
   artifacts?: ArtifactServiceFactory,
 ) {
-  globalStorage = storage;
-  globalTrace = trace;
-  globalLogs = logs;
-  globalSecrets = secrets;
-  globalArtifacts = artifacts;
+  if (workflowServices !== null) {
+    throw new Error('Workflow activity services already initialized');
+  }
+  workflowServices = Object.freeze({
+    storage,
+    trace,
+    logs,
+    secrets,
+    artifacts,
+  });
+}
+
+function getWorkflowServices(): WorkflowActivityServices {
+  if (workflowServices === null) {
+    throw new Error('Workflow activity services not initialized');
+  }
+  return workflowServices;
 }
 
 export async function runWorkflowActivity(
@@ -43,9 +58,11 @@ export async function runWorkflowActivity(
   console.log(`╚══════════════════════════════════════════════════════════════════════════════╝`);
   const startTime = Date.now();
 
+  const svc = getWorkflowServices();
+
   try {
-    if (isTraceMetadataAware(globalTrace)) {
-      globalTrace.setRunMetadata(input.runId, {
+    if (isTraceMetadataAware(svc.trace)) {
+      svc.trace.setRunMetadata(input.runId, {
         workflowId: input.workflowId,
         organizationId: input.organizationId ?? null,
       });
@@ -60,12 +77,12 @@ export async function runWorkflowActivity(
       },
       {
         runId: input.runId,
-        storage: globalStorage,
-        secrets: globalSecrets,
-        trace: globalTrace,
-        logs: globalLogs,
+        storage: svc.storage,
+        secrets: svc.secrets,
+        trace: svc.trace,
+        logs: svc.logs,
         organizationId: input.organizationId ?? null,
-        artifacts: globalArtifacts,
+        artifacts: svc.artifacts,
         workflowId: input.workflowId,
         workflowVersionId: input.workflowVersionId ?? null,
       },
@@ -92,9 +109,9 @@ export async function runWorkflowActivity(
     );
     throw error;
   } finally {
-    if (isTraceMetadataAware(globalTrace) && typeof globalTrace.finalizeRun === 'function') {
+    if (isTraceMetadataAware(svc.trace) && typeof svc.trace.finalizeRun === 'function') {
       console.log(`🧹 [ACTIVITY] Finalizing trace metadata for ${input.runId}`);
-      globalTrace.finalizeRun(input.runId);
+      svc.trace.finalizeRun(input.runId);
     }
   }
 }

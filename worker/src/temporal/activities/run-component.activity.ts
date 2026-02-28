@@ -32,14 +32,18 @@ import type {
 import type { ArtifactServiceFactory } from '../artifact-factory';
 import { isTraceMetadataAware } from '../utils/trace-metadata';
 
-let globalStorage: IFileStorageService | undefined;
-let globalSecrets: ISecretsService | undefined;
-let globalArtifacts: ArtifactServiceFactory | undefined;
-let globalTrace: ITraceService | undefined;
-let globalNodeIO: INodeIOService | undefined;
-let globalLogs: WorkflowLogSink | undefined;
-let globalTerminal: RedisTerminalStreamAdapter | undefined;
-let globalAgentTracePublisher: AgentTracePublisher | undefined;
+interface ComponentActivityServices {
+  storage: IFileStorageService | undefined;
+  secrets: ISecretsService | undefined;
+  artifacts: ArtifactServiceFactory | undefined;
+  trace: ITraceService | undefined;
+  nodeIO: INodeIOService | undefined;
+  logs: WorkflowLogSink | undefined;
+  terminal: RedisTerminalStreamAdapter | undefined;
+  agentTracePublisher: AgentTracePublisher | undefined;
+}
+
+let componentServices: ComponentActivityServices | null = null;
 
 const ERROR_LOG_LIMIT = 600;
 
@@ -86,14 +90,26 @@ export function initializeComponentActivityServices(options: {
   terminalStream?: RedisTerminalStreamAdapter;
   agentTracePublisher?: AgentTracePublisher;
 }) {
-  globalStorage = options.storage;
-  globalSecrets = options.secrets;
-  globalArtifacts = options.artifacts;
-  globalTrace = options.trace;
-  globalNodeIO = options.nodeIO;
-  globalLogs = options.logs;
-  globalTerminal = options.terminalStream;
-  globalAgentTracePublisher = options.agentTracePublisher;
+  if (componentServices !== null) {
+    throw new Error('Component activity services already initialized');
+  }
+  componentServices = Object.freeze({
+    storage: options.storage,
+    secrets: options.secrets,
+    artifacts: options.artifacts,
+    trace: options.trace,
+    nodeIO: options.nodeIO,
+    logs: options.logs,
+    terminal: options.terminalStream,
+    agentTracePublisher: options.agentTracePublisher,
+  });
+}
+
+function getComponentServices(): ComponentActivityServices {
+  if (componentServices === null) {
+    throw new Error('Component activity services not initialized');
+  }
+  return componentServices;
 }
 
 export async function setRunMetadataActivity(input: {
@@ -101,8 +117,9 @@ export async function setRunMetadataActivity(input: {
   workflowId: string;
   organizationId?: string | null;
 }): Promise<void> {
-  if (isTraceMetadataAware(globalTrace)) {
-    globalTrace.setRunMetadata(input.runId, {
+  const { trace } = getComponentServices();
+  if (isTraceMetadataAware(trace)) {
+    trace.setRunMetadata(input.runId, {
       workflowId: input.workflowId,
       organizationId: input.organizationId ?? null,
     });
@@ -110,8 +127,9 @@ export async function setRunMetadataActivity(input: {
 }
 
 export async function finalizeRunActivity(input: { runId: string }): Promise<void> {
-  if (isTraceMetadataAware(globalTrace) && typeof globalTrace.finalizeRun === 'function') {
-    globalTrace.finalizeRun(input.runId);
+  const { trace } = getComponentServices();
+  if (isTraceMetadataAware(trace) && typeof trace.finalizeRun === 'function') {
+    trace.finalizeRun(input.runId);
   }
 }
 
@@ -137,9 +155,10 @@ export async function runComponentActivity(
   const failure = nodeMetadata.failure;
   const connectedToolNodeIds = nodeMetadata.connectedToolNodeIds;
   const correlationId = `${input.runId}:${action.ref}:${activityInfo.activityId}`;
+  const svc = getComponentServices();
 
-  const scopedArtifacts = globalArtifacts
-    ? globalArtifacts({
+  const scopedArtifacts = svc.artifacts
+    ? svc.artifacts({
         runId: input.runId,
         workflowId: input.workflowId,
         workflowVersionId: input.workflowVersionId ?? null,
@@ -168,13 +187,13 @@ export async function runComponentActivity(
       connectedToolNodeIds,
       organizationId: input.organizationId ?? undefined,
     } as any,
-    storage: globalStorage,
-    secrets: allowSecrets ? globalSecrets : undefined,
+    storage: svc.storage,
+    secrets: allowSecrets ? svc.secrets : undefined,
     artifacts: scopedArtifacts,
-    trace: globalTrace,
-    logCollector: globalLogs
+    trace: svc.trace,
+    logCollector: svc.logs
       ? (entry) => {
-          void globalLogs
+          void svc.logs
             ?.append({
               runId: entry.runId,
               nodeRef: entry.nodeRef,
@@ -190,18 +209,18 @@ export async function runComponentActivity(
             });
         }
       : undefined,
-    terminalCollector: globalTerminal
+    terminalCollector: svc.terminal
       ? (chunk) => {
-          void globalTerminal?.append(chunk).catch((error: unknown) => {
+          void svc.terminal?.append(chunk).catch((error: unknown) => {
             console.error('[Terminal] Failed to append chunk', error);
           });
         }
       : undefined,
-    agentTracePublisher: globalAgentTracePublisher,
+    agentTracePublisher: svc.agentTracePublisher,
   });
 
   // Record node I/O start (using raw inputs/params from workflow)
-  await globalNodeIO?.recordStart({
+  await svc.nodeIO?.recordStart({
     runId: input.runId,
     nodeRef: action.ref,
     workflowId: input.workflowId,
@@ -226,7 +245,7 @@ export async function runComponentActivity(
   async function unspill(obj: Record<string, any>, contextLabel: string) {
     for (const [key, value] of Object.entries(obj)) {
       if (isSpilledDataMarker(value)) {
-        if (!globalStorage) {
+        if (!svc.storage) {
           console.warn(
             `[Activity] ${contextLabel} '${key}' is spilled but no storage service is available`,
           );
@@ -238,7 +257,7 @@ export async function runComponentActivity(
           if (spilledObjectsCache.has(value.storageRef)) {
             fullData = spilledObjectsCache.get(value.storageRef);
           } else {
-            const content = await globalStorage.downloadFile(value.storageRef);
+            const content = await svc.storage!.downloadFile(value.storageRef);
             fullData = JSON.parse(content.buffer.toString('utf8'));
             spilledObjectsCache.set(value.storageRef, fullData);
           }
@@ -289,7 +308,7 @@ export async function runComponentActivity(
     inputs: Record<string, unknown>,
     inputOverrides: Record<string, unknown>,
   ) => {
-    if (!globalSecrets) {
+    if (!svc.secrets) {
       return;
     }
 
@@ -302,8 +321,8 @@ export async function runComponentActivity(
         if (resolved?.inputs) {
           inputsSchema = resolved.inputs;
         }
-      } catch (err: unknown) {
-        console.warn(`[Activity] Failed to resolve ports for secret check: ${err}`);
+      } catch (_err: unknown) {
+        console.warn('[Activity] Failed to resolve ports for secret check');
       }
     }
 
@@ -326,16 +345,18 @@ export async function runComponentActivity(
 
       // This is a secret reference, resolve it
       try {
-        console.log(`[Activity] Resolving secret '${key}'...`);
-        const resolved = await globalSecrets.get(value);
+        console.log(`[Activity] Resolving secret reference for input '${key}'...`);
+        const resolved = await svc.secrets.get(value);
         if (resolved?.value) {
           inputs[key] = resolved.value;
           console.log(`[Activity] Successfully resolved secret reference for input '${key}'`);
         } else {
-          console.warn(`[Activity] Secret '${value}' not found in store for input '${key}'`);
+          console.warn(`[Activity] Secret reference not found in store for input '${key}'`);
         }
       } catch (err: unknown) {
-        console.warn(`[Activity] Error resolving secret '${value}' for input '${key}': ${err}`);
+        console.warn(
+          `[Activity] Error resolving secret reference for input '${key}': ${err instanceof Error ? err.message : 'unknown error'}`,
+        );
       }
     }
   };
@@ -348,7 +369,7 @@ export async function runComponentActivity(
     params: Record<string, unknown>,
     rawParams: Record<string, unknown>,
   ) => {
-    if (!globalSecrets || !component.parameters) {
+    if (!svc.secrets || !component.parameters) {
       return;
     }
 
@@ -370,16 +391,18 @@ export async function runComponentActivity(
       }
 
       try {
-        console.log(`[Activity] Resolving secret '${key}'...`);
-        const resolved = await globalSecrets.get(value);
+        console.log(`[Activity] Resolving secret reference for param '${key}'...`);
+        const resolved = await svc.secrets.get(value);
         if (resolved?.value) {
           params[key] = resolved.value;
           console.log(`[Activity] Successfully resolved secret reference for param '${key}'`);
         } else {
-          console.warn(`[Activity] Secret '${value}' not found in store for param '${key}'`);
+          console.warn(`[Activity] Secret reference not found in store for param '${key}'`);
         }
       } catch (err: unknown) {
-        console.warn(`[Activity] Error resolving secret '${value}' for param '${key}': ${err}`);
+        console.warn(
+          `[Activity] Error resolving secret reference for param '${key}': ${err instanceof Error ? err.message : 'unknown error'}`,
+        );
       }
     }
   };
@@ -486,10 +509,10 @@ export async function runComponentActivity(
           const outputStr = JSON.stringify(output);
           const size = Buffer.byteLength(outputStr, 'utf8');
 
-          if (size > TEMPORAL_SPILL_THRESHOLD_BYTES && globalStorage) {
+          if (size > TEMPORAL_SPILL_THRESHOLD_BYTES && svc.storage) {
             const fileId = crypto.randomUUID();
 
-            await globalStorage.uploadFile(
+            await svc.storage.uploadFile(
               fileId,
               'output.json',
               Buffer.from(outputStr),
@@ -510,7 +533,7 @@ export async function runComponentActivity(
       }
 
       // Record node I/O completion
-      await globalNodeIO?.recordCompletion({
+      await svc.nodeIO?.recordCompletion({
         runId: input.runId,
         nodeRef: action.ref,
         componentId: action.componentId,
@@ -601,7 +624,7 @@ export async function runComponentActivity(
     });
 
     // Record node I/O failure
-    await globalNodeIO?.recordCompletion({
+    await svc.nodeIO?.recordCompletion({
       runId: input.runId,
       nodeRef: action.ref,
       componentId: action.componentId,
