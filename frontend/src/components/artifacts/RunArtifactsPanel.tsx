@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Download, RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import type { ArtifactMetadata } from '@shipsec/shared';
 import { useQueryClient } from '@tanstack/react-query';
@@ -7,7 +7,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
-import { logger } from '@/lib/logger';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -39,20 +39,7 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
     error,
   } = useRunArtifacts(runId ?? undefined);
   const downloadArtifactMutation = useDownloadArtifact();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [copiedRemoteUri, setCopiedRemoteUri] = useState<string | null>(null);
-
-  const handleCopy = useCallback(async (artifactId: string) => {
-    try {
-      await navigator.clipboard.writeText(artifactId);
-      setCopiedId(artifactId);
-      setTimeout(() => {
-        setCopiedId((current) => (current === artifactId ? null : current));
-      }, 2000);
-    } catch (error: unknown) {
-      logger.error('Failed to copy artifact ID', error);
-    }
-  }, []);
+  const { copy, isCopied } = useCopyToClipboard();
 
   const handleRefresh = useCallback(() => {
     if (runId) {
@@ -117,20 +104,10 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
                 onDownload={() =>
                   downloadArtifactMutation.mutate({ artifact, runId: runId ?? undefined })
                 }
-                onCopy={() => handleCopy(artifact.id)}
-                copied={copiedId === artifact.id}
                 onCopyRemoteUri={async (uri: string) => {
-                  try {
-                    await navigator.clipboard.writeText(uri);
-                    setCopiedRemoteUri(uri);
-                    setTimeout(() => {
-                      setCopiedRemoteUri((current) => (current === uri ? null : current));
-                    }, 2000);
-                  } catch (error: unknown) {
-                    logger.error('Failed to copy remote URI', error);
-                  }
+                  await copy(uri, { showToast: false });
                 }}
-                copiedRemoteUri={copiedRemoteUri}
+                copiedRemoteUri={isCopied}
                 isDownloading={
                   downloadArtifactMutation.isPending &&
                   downloadArtifactMutation.variables?.artifact.id === artifact.id
@@ -148,9 +125,8 @@ export function RunArtifactsPanel({ runId }: RunArtifactsPanelProps) {
     error,
     handleRefresh,
     downloadArtifactMutation,
-    handleCopy,
-    copiedId,
-    copiedRemoteUri,
+    isCopied,
+    copy,
   ]);
 
   const handleDownloadAll = () => {
@@ -209,10 +185,8 @@ function ArtifactRow({
 }: {
   artifact: ArtifactMetadata;
   onDownload: () => void;
-  onCopy: () => void;
-  copied: boolean;
   onCopyRemoteUri: (uri: string) => void;
-  copiedRemoteUri: string | null;
+  copiedRemoteUri: (text: string) => boolean;
   isDownloading: boolean;
 }) {
   const remoteUploads = getRemoteUploads(artifact);
@@ -241,7 +215,7 @@ function ArtifactRow({
                   onClick={() => onCopyRemoteUri(remote.uri)}
                 >
                   <Copy className="h-3 w-3" />
-                  {copiedRemoteUri === remote.uri ? 'Copied' : 'Copy URI'}
+                  {copiedRemoteUri(remote.uri) ? 'Copied' : 'Copy URI'}
                 </Button>
                 {remote.url ? (
                   <a
@@ -266,10 +240,6 @@ function ArtifactRow({
       </td>
       <td className="px-4 py-3 align-top text-right overflow-x-auto">
         <div className="flex flex-wrap justify-end gap-2">
-          {/* <Button type="button" variant="ghost" size="sm" onClick={onCopy} className="gap-2">
-            <Copy className="h-4 w-4" />
-            {copied ? 'Copied' : 'Copy ID'}
-          </Button> */}
           <Button
             type="button"
             variant="ghost"

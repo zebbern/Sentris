@@ -16,7 +16,7 @@ import { useProviderConfig } from '@/hooks/queries/useIntegrationQueries';
 import { api } from '@/services/api';
 import { formatTimestamp } from './utils';
 import type { IntegrationProvider } from './utils';
-import { logger } from '@/lib/logger';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 interface ProviderConfigDialogProps {
   provider: IntegrationProvider | null;
@@ -38,7 +38,7 @@ export function ProviderConfigDialog({
   const [configuredBy, setConfiguredBy] = useState<'environment' | 'user'>('user');
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copiedRedirect, setCopiedRedirect] = useState(false);
+  const { copy, isCopied } = useCopyToClipboard();
 
   const callbackUrl = provider
     ? `${window.location.origin}/integrations/callback/${provider.id}`
@@ -56,7 +56,6 @@ export function ProviderConfigDialog({
     if (!open) {
       setClientSecret('');
       setError(null);
-      setCopiedRedirect(false);
       return;
     }
     // Reset fields when dialog opens with a new provider
@@ -87,10 +86,6 @@ export function ProviderConfigDialog({
       setError(message);
     }
   }, [configError, open]);
-
-  useEffect(() => {
-    setCopiedRedirect(false);
-  }, [callbackUrl]);
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -158,12 +153,12 @@ export function ProviderConfigDialog({
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(callbackUrl);
-      setCopiedRedirect(true);
-      setTimeout(() => setCopiedRedirect(false), 2000);
-    } catch (err: unknown) {
-      logger.error('Failed to copy redirect URL', err);
+    const success = await copy(callbackUrl, {
+      successDescription: 'Redirect URL copied to clipboard.',
+      errorDescription: 'Unable to copy redirect URL. Please copy it manually.',
+      showToast: false,
+    });
+    if (!success) {
       setError('Unable to copy redirect URL. Please copy it manually.');
     }
   };
@@ -211,6 +206,7 @@ export function ProviderConfigDialog({
               placeholder="e.g. github-client-id"
               autoComplete="off"
               disabled={isBusy}
+              aria-describedby={error ? 'provider-config-error' : undefined}
             />
           </div>
 
@@ -245,8 +241,12 @@ export function ProviderConfigDialog({
                   onClick={handleCopyRedirect}
                   className="gap-2"
                 >
-                  {copiedRedirect ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copiedRedirect ? 'Copied' : 'Copy'}
+                  {isCopied(callbackUrl) ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                  {isCopied(callbackUrl) ? 'Copied' : 'Copy'}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -256,7 +256,11 @@ export function ProviderConfigDialog({
             </div>
           )}
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p id="provider-config-error" className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
 
           <DialogFooter className="gap-2 sm:justify-between sm:flex-row">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

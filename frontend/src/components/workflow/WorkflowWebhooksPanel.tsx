@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Loader2, Plus, X, Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,8 @@ import type { WebhookConfiguration } from '@shipsec/shared';
 import { WebhookDetails } from './WebhookDetails';
 import { useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { Node as ReactFlowNode } from 'reactflow';
-import { logger } from '@/lib/logger';
 import type { FrontendNodeData } from '@/schemas/node';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 import { API_V1_URL } from '@/services/api';
 
@@ -46,16 +46,10 @@ export function WorkflowWebhooksSidebar({
     [allWebhooks, workflowId],
   );
   const error = queryError?.message ?? null;
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyToClipboard();
 
-  const handleCopy = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (err: unknown) {
-      logger.error('Failed to copy:', err);
-    }
+  const handleCopy = async (text: string) => {
+    await copy(text, { showToast: false });
   };
 
   // Calculate default entrypoint payload from nodes
@@ -172,11 +166,11 @@ export function WorkflowWebhooksSidebar({
               size="icon"
               variant="ghost"
               className="h-7 w-7 shrink-0"
-              onClick={() => handleCopy(defaultWebhookUrl, 'default')}
+              onClick={() => handleCopy(defaultWebhookUrl)}
               title="Copy URL"
               aria-label="Copy default webhook URL"
             >
-              {copiedId === 'default' ? (
+              {isCopied(defaultWebhookUrl) ? (
                 <Check className="h-3.5 w-3.5 text-green-500" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
@@ -271,12 +265,12 @@ export function WorkflowWebhooksSidebar({
                       className="h-7 w-7 shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleCopy(webhookUrl, webhook.id);
+                        handleCopy(webhookUrl);
                       }}
                       title="Copy URL"
                       aria-label="Copy webhook URL"
                     >
-                      {copiedId === webhook.id ? (
+                      {isCopied(webhookUrl) ? (
                         <Check className="h-3.5 w-3.5 text-green-500" />
                       ) : (
                         <Copy className="h-3.5 w-3.5" />

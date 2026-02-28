@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useApiKeys, useRevokeApiKey, useDeleteApiKey } from '@/hooks/queries/useApiKeyQueries';
@@ -46,6 +47,7 @@ export function ApiKeysManager() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
+  const { copy } = useCopyToClipboard();
   const { confirm, dialogProps } = useConfirmDialog();
 
   const {
@@ -64,18 +66,7 @@ export function ApiKeysManager() {
   );
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        toast({ title: 'Copied', description: 'API key copied to clipboard.' });
-      })
-      .catch(() => {
-        toast({
-          title: 'Copy failed',
-          description: 'Failed to copy to clipboard.',
-          variant: 'destructive',
-        });
-      });
+    void copy(text, { successDescription: 'API key copied to clipboard.' });
   };
 
   const handleRevoke = async (key: ApiKeyResponseDto) => {

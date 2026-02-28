@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   Dialog,
   DialogContent,
@@ -273,7 +274,8 @@ export function PublishTemplateModal({
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [generatedTemplateJson, setGeneratedTemplateJson] = useState<string>('');
-  const [copied, setCopied] = useState(false);
+  const { copy: copyToClipboard, copiedText } = useCopyToClipboard();
+  const [hasCopiedOnSubmit, setHasCopiedOnSubmit] = useState(false);
   const [repoUrl, setRepoUrl] = useState(`https://github.com/${DEFAULT_GITHUB_TEMPLATE_REPO}`);
 
   const handleSubmit = useCallback(
@@ -326,12 +328,8 @@ export function PublishTemplateModal({
         const filename = `templates/${sanitizeFilename(name.trim())}`;
 
         // Copy template code to clipboard so user can paste it in GitHub
-        try {
-          await navigator.clipboard.writeText(templateJson);
-          setCopied(true);
-        } catch {
-          // Clipboard API may fail in some browsers — user can still copy manually
-        }
+        const copied = await copyToClipboard(templateJson, { showToast: false });
+        if (copied) setHasCopiedOnSubmit(true);
 
         // Store the template JSON so user can re-copy from the success view
         setGeneratedTemplateJson(templateJson);
@@ -374,7 +372,7 @@ export function PublishTemplateModal({
         setIsLoading(false);
       }
     },
-    [workflowId, name, description, category, tags, author, onSuccess],
+    [workflowId, name, description, category, tags, author, copyToClipboard, onSuccess],
   );
 
   const handleAddTag = () => {
@@ -407,8 +405,8 @@ export function PublishTemplateModal({
         setAuthor('');
         setError(null);
         setSuccess(false);
+        setHasCopiedOnSubmit(false);
         setGeneratedTemplateJson('');
-        setCopied(false);
         setRepoUrl(`https://github.com/${DEFAULT_GITHUB_TEMPLATE_REPO}`);
       }, 200);
     }
@@ -442,7 +440,7 @@ export function PublishTemplateModal({
                   changes.
                 </p>
                 <p className="text-sm font-medium mt-2">
-                  {copied
+                  {hasCopiedOnSubmit
                     ? 'Template code has been copied to your clipboard.'
                     : 'Copy the template code below and paste it in the GitHub editor.'}
                 </p>
@@ -453,16 +451,10 @@ export function PublishTemplateModal({
                 variant="outline"
                 className="w-full gap-2"
                 onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(generatedTemplateJson);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 3000);
-                  } catch {
-                    // fallback handled by the code block below
-                  }
+                  await copyToClipboard(generatedTemplateJson, { showToast: false });
                 }}
               >
-                {copied ? (
+                {copiedText !== null ? (
                   <>
                     <ClipboardCheck className="h-4 w-4 text-success" />
                     Copied to Clipboard!

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnsiUp } from 'ansi_up';
 import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 interface MessageModalProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
   const hasAnsi = /\u001b\[[0-9;]*m/.test(message);
   const [wrap, setWrap] = useState(true);
   const [colorize, setColorize] = useState(true);
+  const { copy } = useCopyToClipboard();
 
   // Load persisted prefs on mount; default colorize to hasAnsi if unset
   useEffect(() => {
@@ -58,11 +60,6 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
     const au = new AnsiUp();
     return DOMPurify.sanitize(au.ansi_to_html(message));
   }, [colorize, hasAnsi, message]);
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(message).catch(() => {
-      // Clipboard API may fail in insecure contexts or iframes
-    });
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,7 +95,7 @@ export function MessageModal({ open, onOpenChange, title, message }: MessageModa
             <Button
               variant="outline"
               size="sm"
-              onClick={copyToClipboard}
+              onClick={() => copy(message, { successDescription: 'Message copied to clipboard.' })}
               className="flex items-center gap-2"
             >
               <Copy className="h-4 w-4" />

@@ -35,7 +35,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
 import { humanizeApiError } from '@/lib/humanizeApiError';
-import { logger } from '@/lib/logger';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes)) return '—';
@@ -72,7 +72,7 @@ export function ArtifactLibrary() {
 
   const downloadArtifactMutation = useDownloadArtifact();
   const deleteArtifactMutation = useDeleteArtifact();
-  const [copiedRemoteUri, setCopiedRemoteUri] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyToClipboard();
 
   const { data: workflowsRaw = [] } = useWorkflowsSummary();
   const workflows: Record<string, string> = {};
@@ -244,17 +244,9 @@ export function ArtifactLibrary() {
                           deleteArtifactMutation.variables === artifact.id
                         }
                         onCopyRemoteUri={async (uri: string) => {
-                          try {
-                            await navigator.clipboard.writeText(uri);
-                            setCopiedRemoteUri(uri);
-                            setTimeout(() => {
-                              setCopiedRemoteUri((current) => (current === uri ? null : current));
-                            }, 2000);
-                          } catch (error: unknown) {
-                            logger.error('Failed to copy remote URI', error);
-                          }
+                          await copy(uri, { showToast: false });
                         }}
-                        copiedRemoteUri={copiedRemoteUri}
+                        copiedRemoteUri={isCopied}
                         isDownloading={downloadArtifactMutation.isPending}
                       />
                     ))}
@@ -286,7 +278,7 @@ function ArtifactLibraryRow({
   onDownload: () => void;
   onDelete: () => void;
   onCopyRemoteUri: (uri: string) => void;
-  copiedRemoteUri: string | null;
+  copiedRemoteUri: (text: string) => boolean;
   isDownloading: boolean;
   isDeleting: boolean;
   isDragDisabled: boolean;
@@ -326,7 +318,7 @@ function ArtifactLibraryRow({
                     >
                       <Copy className="h-3 w-3" />
                       <span className="hidden lg:inline">
-                        {copiedRemoteUri === remote.uri ? 'Copied' : 'Copy URI'}
+                        {copiedRemoteUri(remote.uri) ? 'Copied' : 'Copy URI'}
                       </span>
                     </Button>
                     {remote.url ? (

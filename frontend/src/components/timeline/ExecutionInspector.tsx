@@ -13,7 +13,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useWorkflowStore } from '@/store/workflowStore';
-import { useToast } from '@/components/ui/use-toast';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useParams } from 'react-router-dom';
 import { useWorkflowRuns } from '@/hooks/queries/useRunQueries';
 import { cn } from '@/lib/utils';
@@ -189,7 +189,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
       return value <= threshold;
     });
   }, [rawLogs, logLevelFilter]);
-  const { toast } = useToast();
+  const { copy } = useCopyToClipboard();
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId),
@@ -204,25 +204,13 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
     const basePath = `/workflows/${selectedRun.workflowId}/runs/${selectedRun.id}`;
     const absoluteUrl =
       typeof window !== 'undefined' ? `${window.location.origin}${basePath}` : basePath;
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(absoluteUrl);
-        toast({
-          title: 'Run link copied',
-          description: 'Share this URL to open the execution directly.',
-        });
-      } else {
-        throw new Error('Clipboard API is unavailable');
-      }
-    } catch (error: unknown) {
-      logger.error('Failed to copy run link:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Unable to copy link automatically',
-        description: absoluteUrl,
-      });
-    }
-  }, [selectedRun, toast]);
+    await copy(absoluteUrl, {
+      successTitle: 'Run link copied',
+      successDescription: 'Share this URL to open the execution directly.',
+      errorTitle: 'Unable to copy link automatically',
+      errorDescription: absoluteUrl,
+    });
+  }, [selectedRun, copy]);
 
   useEffect(() => {
     // Switch log mode based on timeline playback mode

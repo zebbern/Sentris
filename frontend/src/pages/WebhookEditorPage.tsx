@@ -2,6 +2,7 @@ import { Code, History as LucideHistory, Settings } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   useWebhookEditor,
   WebhookEditorHeader,
@@ -38,8 +39,8 @@ export function WebhookEditorPage() {
     handleBack,
     navigate,
     dialogProps,
-    toast,
   } = useWebhookEditor();
+  const { copy } = useCopyToClipboard();
 
   if (isLoading) {
     return (
@@ -94,18 +95,9 @@ export function WebhookEditorPage() {
         onDelete={handleDelete}
         onBack={handleBack}
         onCopyPath={(path) => {
-          navigator.clipboard
-            .writeText(window.location.host + path)
-            .then(() => {
-              toast({ title: 'Copied path', description: 'Webhook path copied to clipboard.' });
-            })
-            .catch(() => {
-              toast({
-                title: 'Copy failed',
-                description: 'Failed to copy to clipboard.',
-                variant: 'destructive',
-              });
-            });
+          void copy(window.location.host + path, {
+            successDescription: 'Webhook path copied to clipboard.',
+          });
         }}
       />
 

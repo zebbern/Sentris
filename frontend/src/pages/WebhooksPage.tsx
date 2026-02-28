@@ -20,6 +20,7 @@ import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   useWebhooks,
   useDeleteWebhook,
@@ -64,6 +65,7 @@ export function WebhooksPage() {
     {},
   );
   const organizationId = useAuthStore((state) => state.organizationId);
+  const { copy } = useCopyToClipboard();
 
   const initialWorkflowId = searchParams.get('workflowId') || null;
   const [filters, setFilters] = useState<{
@@ -180,19 +182,12 @@ export function WebhooksPage() {
 
   const handleCopyUrl = async (webhook: WebhookConfiguration) => {
     const url = `${WEBHOOK_BASE_URL}/webhooks/inbound/${webhook.webhookPath}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast({
-        title: 'Webhook URL copied',
-        description: 'The webhook URL has been copied to your clipboard.',
-      });
-    } catch (_err: unknown) {
-      toast({
-        title: 'Failed to copy',
-        description: 'Could not copy the webhook URL to clipboard.',
-        variant: 'destructive',
-      });
-    }
+    await copy(url, {
+      successTitle: 'Webhook URL copied',
+      successDescription: 'The webhook URL has been copied to your clipboard.',
+      errorTitle: 'Failed to copy',
+      errorDescription: 'Could not copy the webhook URL to clipboard.',
+    });
   };
 
   const handleRefresh = async () => {

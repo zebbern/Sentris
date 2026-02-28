@@ -3,7 +3,6 @@ import { ChevronDown, Play, Clock, Wifi, RefreshCw, Link2, Loader2 } from 'lucid
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { logger } from '@/lib/logger';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +22,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/components/ui/use-toast';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { formatDuration, formatStartTime } from '@/utils/timeFormat';
 import { RunInfoDisplay } from '@/components/timeline/RunInfoDisplay';
 import { isRunLive } from '@/features/workflow-builder/utils/executionRuns';
@@ -49,7 +48,7 @@ export function RunSelector({
   const navigate = useNavigate();
   const location = useLocation();
   const { id: routeWorkflowId, runId: routeRunId } = useParams<{ id?: string; runId?: string }>();
-  const { toast } = useToast();
+  const { copy } = useCopyToClipboard();
   const { selectedRunId, playbackMode, selectRun } = useExecutionTimelineStore();
   const workflowMetadata = useWorkflowStore((state) => state.metadata);
   const workflowId = workflowMetadata.id;
@@ -211,26 +210,14 @@ export function RunSelector({
       const basePath = `/workflows/${run.workflowId}/runs/${run.id}`;
       const absoluteUrl =
         typeof window !== 'undefined' ? `${window.location.origin}${basePath}` : basePath;
-      try {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(absoluteUrl);
-          toast({
-            title: 'Run link copied',
-            description: 'Share this URL to open the execution directly.',
-          });
-        } else {
-          throw new Error('Clipboard API is unavailable');
-        }
-      } catch (error: unknown) {
-        logger.error('Failed to copy run link:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Unable to copy link automatically',
-          description: absoluteUrl,
-        });
-      }
+      await copy(absoluteUrl, {
+        successTitle: 'Run link copied',
+        successDescription: 'Share this URL to open the execution directly.',
+        errorTitle: 'Unable to copy link automatically',
+        errorDescription: absoluteUrl,
+      });
     },
-    [toast],
+    [copy],
   );
 
   const handleSelectRun = (runId: string) => {

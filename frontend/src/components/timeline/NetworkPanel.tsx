@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 // HAR Types (simplified from har-format)
 interface HarHeader {
@@ -133,12 +134,10 @@ interface HeadersTableProps {
 }
 
 function HeadersTable({ headers, title }: HeadersTableProps) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyToClipboard();
 
-  const handleCopy = async (value: string, name: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(name);
-    setTimeout(() => setCopied(null), 1500);
+  const handleCopy = async (value: string) => {
+    await copy(value, { showToast: false });
   };
 
   if (headers.length === 0) {
@@ -161,10 +160,10 @@ function HeadersTable({ headers, title }: HeadersTableProps) {
             </span>
             <span className="text-foreground break-all flex-1">{header.value}</span>
             <button
-              onClick={() => handleCopy(header.value, header.name)}
+              onClick={() => handleCopy(header.value)}
               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
             >
-              {copied === header.name ? (
+              {isCopied(header.value) ? (
                 <Check className="h-3 w-3 text-emerald-500" />
               ) : (
                 <Copy className="h-3 w-3 text-muted-foreground" />

@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { Copy, Check, Terminal, FileCode, Braces, Code2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ export function WebhookDetails({
   onOpenChange,
   hideAuth = false,
 }: WebhookDetailsProps) {
-  const [copied, setCopied] = useState(false);
+  const { copy, copiedText } = useCopyToClipboard();
   const navigate = useNavigate();
   const safePayload = JSON.stringify(payload, null, 2);
   const safePayloadSingleLine = JSON.stringify(payload).replace(/'/g, "\\'");
@@ -111,16 +111,8 @@ export function WebhookDetails({
     go: replacePlaceholders(codeSnippets.go, 'go'),
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {
-        // Clipboard API may fail in insecure contexts or iframes
-      });
+  const handleCopySnippet = async (text: string) => {
+    await copy(text, { showToast: false });
   };
 
   return (
@@ -217,9 +209,9 @@ export function WebhookDetails({
                         variant="outline"
                         size="sm"
                         className="h-8 text-xs gap-1.5 bg-background shadow-lg border hover:bg-muted"
-                        onClick={() => copyToClipboard(code)}
+                        onClick={() => handleCopySnippet(code)}
                       >
-                        {copied ? (
+                        {copiedText !== null ? (
                           <>
                             <Check className="h-3 w-3 text-green-500" />
                             <span className="text-green-600">Copied</span>

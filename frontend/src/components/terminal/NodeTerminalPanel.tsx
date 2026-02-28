@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useTimelineTerminalStream } from '@/hooks/useTimelineTerminalStream';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useThemeStore } from '@/store/themeStore';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { logger } from '@/lib/logger';
 
 interface NodeTerminalPanelProps {
@@ -89,6 +90,8 @@ export function NodeTerminalPanel({
 
   const session = useMemo(() => ({ chunks }), [chunks]);
 
+  const { copy } = useCopyToClipboard();
+
   const copyToClipboard = useCallback(async () => {
     if (!chunks.length) return;
     const decoded = chunks
@@ -100,12 +103,8 @@ export function NodeTerminalPanel({
         }
       })
       .join('');
-    try {
-      await navigator.clipboard.writeText(decoded);
-    } catch (error: unknown) {
-      logger.error('[NodeTerminalPanel] Failed to copy to clipboard', error);
-    }
-  }, [chunks]);
+    await copy(decoded, { successDescription: 'Terminal output copied to clipboard.' });
+  }, [chunks, copy]);
 
   // Initialize terminal
   useEffect(() => {
