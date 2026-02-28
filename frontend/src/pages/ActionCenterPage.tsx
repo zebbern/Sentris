@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -23,11 +22,12 @@ import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
 import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
-import { CheckCircle, XCircle, RefreshCw, Search, Clock, Zap, ExternalLink } from 'lucide-react';
+import { CheckCircle, XCircle, RefreshCw, Clock, Zap, ExternalLink } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { PageToolbar } from '@/components/shared/PageToolbar';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { formatDateTime, formatRelativeTime } from '@/utils/timeFormat';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
@@ -159,20 +159,12 @@ export function ActionCenterPage() {
           )}
 
           {/* Filters */}
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div className="flex-1 space-y-2">
-              <label className="text-xs uppercase text-muted-foreground flex items-center gap-2">
-                <Search className="h-3.5 w-3.5" />
-                Search requests
-              </label>
-              <Input
-                type="search"
-                placeholder="Filter by title, node, or run ID"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <PageToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Filter by title, node, or run ID"
+            searchLabel="Search requests"
+            filters={
               <Select
                 value={statusFilter}
                 onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
@@ -188,6 +180,8 @@ export function ActionCenterPage() {
                   ))}
                 </SelectContent>
               </Select>
+            }
+            actions={
               <Button
                 variant="outline"
                 className="gap-2"
@@ -197,8 +191,8 @@ export function ActionCenterPage() {
                 <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Refresh</span>
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 

@@ -96,16 +96,18 @@ export function validateConnection(
         if (Array.isArray(runtimeInputs) && runtimeInputs.length > 0) {
           sourceOutputs = [
             ...sourceOutputs,
-            ...runtimeInputs.map((input: any) => {
-              const runtimeType = (input.type || 'text') as string;
-              const connectionType = runtimeInputTypeToConnectionType(runtimeType);
-              return {
-                id: input.id,
-                label: input.label,
-                connectionType,
-                description: input.description || `Runtime input: ${input.label}`,
-              };
-            }),
+            ...runtimeInputs.map(
+              (input: { id: string; label: string; type?: string; description?: string }) => {
+                const runtimeType = (input.type || 'text') as string;
+                const connectionType = runtimeInputTypeToConnectionType(runtimeType);
+                return {
+                  id: input.id,
+                  label: input.label,
+                  connectionType,
+                  description: input.description || `Runtime input: ${input.label}`,
+                };
+              },
+            ),
           ];
         }
       } catch (error: unknown) {
@@ -117,8 +119,8 @@ export function validateConnection(
   // 2. DYNAMIC INPUTS from target
   const targetInputs = targetNode.data.dynamicInputs || targetComponent.inputs || [];
 
-  const sourcePort = sourceOutputs.find((p: any) => p.id === sourceHandle);
-  const targetPort = targetInputs.find((p: any) => p.id === targetHandle);
+  const sourcePort = sourceOutputs.find((p) => p.id === sourceHandle);
+  const targetPort = targetInputs.find((p) => p.id === targetHandle);
 
   if (!sourcePort || !targetPort) {
     const detail = !sourcePort

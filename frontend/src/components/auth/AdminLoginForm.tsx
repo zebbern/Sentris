@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { logger } from '@/lib/logger';
+import { sanitizeRedirectUrl } from '@/utils/urlSecurity';
 
 export function AdminLoginForm() {
   const [username, setUsername] = useState('');
@@ -58,15 +59,12 @@ export function AdminLoginForm() {
       setAdminCredentials(trimmedUsername, trimmedPassword);
 
       // Success - redirect to returnTo URL or home
-      if (returnTo) {
-        // For paths like /analytics/*, use full page navigation since they're served by nginx
-        if (returnTo.startsWith('/analytics')) {
-          window.location.href = returnTo;
-        } else {
-          navigate(returnTo);
-        }
+      const safeReturnTo = sanitizeRedirectUrl(returnTo);
+      // For paths like /analytics/*, use full page navigation since they're served by nginx
+      if (safeReturnTo.startsWith('/analytics')) {
+        window.location.href = safeReturnTo;
       } else {
-        navigate('/');
+        navigate(safeReturnTo);
       }
     } catch (err: unknown) {
       // Clear credentials on error

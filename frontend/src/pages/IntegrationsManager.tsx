@@ -36,6 +36,7 @@ import { formatTimestamp, getProviderConnection } from './integrations/utils';
 import type { IntegrationProvider, IntegrationConnection } from './integrations/utils';
 import { ProviderConfigDialog } from './integrations/ProviderConfigDialog';
 import { logger } from '@/lib/logger';
+import { isAllowedOAuthDomain } from '@/utils/urlSecurity';
 import { IntegrationCallbackBridge } from './integrations/IntegrationCallbackBridge';
 
 export function IntegrationsManager() {
@@ -132,6 +133,14 @@ export function IntegrationsManager() {
         redirectUri,
         scopes: buildRequestedScopes(provider),
       });
+      if (!isAllowedOAuthDomain(response.authorizationUrl)) {
+        toast({
+          title: 'Invalid OAuth provider URL',
+          description: 'The authorization URL does not point to a known OAuth provider.',
+          variant: 'destructive',
+        });
+        return;
+      }
       window.location.href = response.authorizationUrl;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to start OAuth session';

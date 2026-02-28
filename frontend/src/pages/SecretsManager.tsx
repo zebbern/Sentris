@@ -75,6 +75,19 @@ const INITIAL_EDIT_FORM: EditFormState = {
   value: '',
 };
 
+const SECRET_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const SECRET_NAME_MAX_LENGTH = 128;
+
+function validateSecretName(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return 'Secret name is required.';
+  if (trimmed.length > SECRET_NAME_MAX_LENGTH)
+    return `Name must be at most ${SECRET_NAME_MAX_LENGTH} characters.`;
+  if (!SECRET_NAME_PATTERN.test(trimmed))
+    return 'Name may only contain letters, numbers, hyphens, and underscores.';
+  return null;
+}
+
 function parseTags(raw: string): string[] | undefined {
   if (!raw.trim()) {
     return undefined;
@@ -113,14 +126,16 @@ function areTagsEqual(current: string[] | null | undefined, next: string[]): boo
   return normalizedCurrent.every((tag, index) => tag === normalizedNext[index]);
 }
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso));
+  return dateFormatter.format(new Date(iso));
 }
 
 export function SecretsManager() {
@@ -243,11 +258,21 @@ export function SecretsManager() {
     };
 
   const isFormValid = useMemo(() => {
-    return formState.name.trim().length > 0 && formState.value.trim().length > 0;
+    return validateSecretName(formState.name) === null && formState.value.trim().length > 0;
   }, [formState.name, formState.value]);
 
+  const createNameError = useMemo(() => {
+    if (formState.name.length === 0) return null;
+    return validateSecretName(formState.name);
+  }, [formState.name]);
+
   const isEditValid = useMemo(() => {
-    return editFormState.name.trim().length > 0;
+    return validateSecretName(editFormState.name) === null;
+  }, [editFormState.name]);
+
+  const editNameError = useMemo(() => {
+    if (editFormState.name.length === 0) return null;
+    return validateSecretName(editFormState.name);
   }, [editFormState.name]);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -432,11 +457,23 @@ export function SecretsManager() {
                   value={formState.name}
                   onChange={handleChange('name')}
                   disabled={disableCreate}
-                  maxLength={100}
+                  maxLength={SECRET_NAME_MAX_LENGTH}
                   required
                   aria-required="true"
-                  aria-describedby={formError ? 'create-secret-error' : undefined}
+                  aria-invalid={createNameError ? true : undefined}
+                  aria-describedby={
+                    createNameError
+                      ? 'create-name-error'
+                      : formError
+                        ? 'create-secret-error'
+                        : undefined
+                  }
                 />
+                {createNameError && (
+                  <p id="create-name-error" className="text-xs text-destructive" role="alert">
+                    {createNameError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -757,11 +794,19 @@ export function SecretsManager() {
                 value={editFormState.name}
                 onChange={handleEditChange('name')}
                 disabled={disableEditing}
-                maxLength={100}
+                maxLength={SECRET_NAME_MAX_LENGTH}
                 required
                 aria-required="true"
-                aria-describedby={editError ? 'edit-secret-error' : undefined}
+                aria-invalid={editNameError ? true : undefined}
+                aria-describedby={
+                  editNameError ? 'edit-name-error' : editError ? 'edit-secret-error' : undefined
+                }
               />
+              {editNameError && (
+                <p id="edit-name-error" className="text-xs text-destructive" role="alert">
+                  {editNameError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

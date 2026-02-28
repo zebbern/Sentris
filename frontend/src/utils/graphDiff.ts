@@ -6,7 +6,25 @@ interface GraphState {
   edges: Edge[];
 }
 
-const areObjectsEqual = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
+function areObjectsEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((item, i) => areObjectsEqual(item, (b as unknown[])[i]));
+  }
+
+  const keysA = Object.keys(a as Record<string, unknown>);
+  const keysB = Object.keys(b as Record<string, unknown>);
+  if (keysA.length !== keysB.length) return false;
+
+  return keysA.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(b, key) &&
+      areObjectsEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+  );
+}
 
 export function getGraphChangeDescription(
   prev: Partial<GraphState>,

@@ -73,6 +73,7 @@ export function SettingsPage() {
             <Route path="notifications" element={<NotificationSettings />} />
             <Route path="shortcuts" element={<KeyboardShortcutsSettings />} />
             {isAdmin && <Route path="audit" element={<AuditLogSettings />} />}
+            <Route path="*" element={<Navigate to="/settings/general" replace />} />
           </Routes>
         </div>
       </div>

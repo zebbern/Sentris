@@ -74,12 +74,14 @@ const INITIAL_FORM: CreateApiKeyInput = {
   },
 };
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso));
+  return dateFormatter.format(new Date(iso));
 }
 
 function truncateKey(keyHint: string) {
