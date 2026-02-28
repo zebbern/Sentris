@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { useTemplates } from '@/hooks/queries/useTemplateQueries';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,12 @@ import {
   ExternalLink,
   Copy,
   ClipboardCheck,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  Search,
+  RefreshCw,
+  Info,
 } from 'lucide-react';
 import { API_BASE_URL, getApiAuthHeaders } from '@/services/api';
 import { cn } from '@/lib/utils';
@@ -97,6 +104,130 @@ interface TemplateJson {
   _metadata: TemplateMetadata;
   graph: Record<string, unknown>;
   requiredSecrets: { name: string; type: string; description?: string }[];
+}
+
+type PublishStep = 'configure' | 'review' | 'publish' | 'done';
+
+const PUBLISH_STEPS: { key: PublishStep; label: string }[] = [
+  { key: 'configure', label: 'Configure' },
+  { key: 'review', label: 'Review' },
+  { key: 'publish', label: 'Publish' },
+  { key: 'done', label: 'Done' },
+];
+
+function StepIndicator({ currentStep }: { currentStep: PublishStep }) {
+  const currentIndex = PUBLISH_STEPS.findIndex((s) => s.key === currentStep);
+
+  return (
+    <nav aria-label="Publishing progress" className="flex items-center gap-1 w-full mb-4">
+      {PUBLISH_STEPS.map((step, index) => {
+        const isCompleted = index < currentIndex;
+        const isCurrent = index === currentIndex;
+
+        return (
+          <div key={step.key} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={cn(
+                  'flex items-center justify-center h-7 w-7 rounded-full text-xs font-medium transition-colors',
+                  isCompleted && 'bg-success text-success-foreground',
+                  isCurrent && 'bg-primary text-primary-foreground',
+                  !isCompleted && !isCurrent && 'bg-muted text-muted-foreground',
+                )}
+              >
+                {isCompleted ? <Check className="h-3.5 w-3.5" /> : index + 1}
+              </div>
+              <span
+                className={cn(
+                  'text-[10px] font-medium whitespace-nowrap',
+                  isCurrent ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {step.label}
+              </span>
+            </div>
+            {index < PUBLISH_STEPS.length - 1 && (
+              <div
+                className={cn(
+                  'flex-1 h-0.5 mx-1.5 mt-[-14px]',
+                  index < currentIndex ? 'bg-success' : 'bg-muted',
+                )}
+              />
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function formatJsonSize(json: string): string {
+  const bytes = new Blob([json]).size;
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function JsonPreview({
+  json,
+  defaultOpen,
+  onCopy,
+  isCopied,
+}: {
+  json: string;
+  defaultOpen: boolean;
+  onCopy: () => void;
+  isCopied: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3 py-2 text-left bg-muted/30 hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {isOpen ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+          <span className="text-sm font-medium">Template JSON</span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            {formatJsonSize(json)}
+          </Badge>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+        >
+          {isCopied ? (
+            <>
+              <ClipboardCheck className="h-3.5 w-3.5 text-success" />
+              Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              Copy
+            </>
+          )}
+        </Button>
+      </button>
+      {isOpen && (
+        <pre className="px-3 py-2 text-xs font-mono overflow-x-auto max-h-64 overflow-y-auto bg-muted/10 border-t whitespace-pre text-muted-foreground leading-relaxed">
+          {json}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -264,6 +395,7 @@ export function PublishTemplateModal({
   onOpenChange,
   onSuccess,
 }: PublishTemplateModalProps) {
+  const [step, setStep] = useState<PublishStep>('configure');
   const [name, setName] = useState(workflowName);
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>('');
@@ -272,108 +404,159 @@ export function PublishTemplateModal({
   const [author, setAuthor] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [generatedTemplateJson, setGeneratedTemplateJson] = useState<string>('');
   const { copy: copyToClipboard, copiedText } = useCopyToClipboard();
   const [hasCopiedOnSubmit, setHasCopiedOnSubmit] = useState(false);
   const [repoUrl, setRepoUrl] = useState(`https://github.com/${DEFAULT_GITHUB_TEMPLATE_REPO}`);
+  const [returnedFromGithub, setReturnedFromGithub] = useState(false);
+  const focusListenerRef = useRef(false);
+  const [existingTemplate, setExistingTemplate] = useState<{ name: string; path: string } | null>(
+    null,
+  );
 
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
+  // Check for existing templates that match this workflow
+  const { data: templates = [] } = useTemplates();
+
+  useEffect(() => {
+    if (open && templates.length > 0 && name.trim()) {
+      const normalizedName = name.trim().toLowerCase();
+      const match = templates.find(
+        (t) => t.name.toLowerCase() === normalizedName || t.path?.includes(sanitizeFilename(name)),
+      );
+      setExistingTemplate(match ? { name: match.name, path: match.path } : null);
+    }
+  }, [open, templates, name]);
+
+  // Window focus listener for GitHub return detection
+  useEffect(() => {
+    if (!focusListenerRef.current) return;
+
+    const handleFocus = () => {
+      if (focusListenerRef.current) {
+        setReturnedFromGithub(true);
+        focusListenerRef.current = false;
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [step]);
+
+  // Clean up focus listener on unmount or modal close
+  useEffect(() => {
+    if (!open) {
+      focusListenerRef.current = false;
+    }
+  }, [open]);
+
+  const handleConfigure = useCallback(
+    (e: React.FormEvent) => {
       e.preventDefault();
       setError(null);
-      setIsLoading(true);
 
       if (!name.trim()) {
         setError('Please enter a template name');
-        setIsLoading(false);
         return;
       }
-
       if (!category) {
         setError('Please select a category');
-        setIsLoading(false);
         return;
       }
-
       if (!author.trim()) {
         setError('Please enter your name or organization');
-        setIsLoading(false);
         return;
       }
 
-      try {
-        // Fetch the workflow data from the backend
-        const headers = await getApiAuthHeaders();
-        const response = await fetch(`${API_BASE_URL}/api/v1/workflows/${workflowId}`, {
-          headers,
-        });
-        if (!response.ok) {
-          throw new Error('Failed to fetch workflow data');
-        }
-
-        const workflow: WorkflowResponse = await response.json();
-
-        // Generate the template JSON
-        const metadata: TemplateMetadata = {
-          name: name.trim(),
-          description: description.trim() || undefined,
-          category: category || '',
-          tags,
-          author: author.trim(),
-          version: '1.0.0',
-        };
-
-        const templateJson = generateTemplateJson(workflow, metadata);
-        const filename = `templates/${sanitizeFilename(name.trim())}`;
-
-        // Copy template code to clipboard so user can paste it in GitHub
-        const copied = await copyToClipboard(templateJson, { showToast: false });
-        if (copied) setHasCopiedOnSubmit(true);
-
-        // Store the template JSON so user can re-copy from the success view
-        setGeneratedTemplateJson(templateJson);
-
-        // Fetch repo config from backend, fall back to defaults
-        let owner: string;
-        let repo: string;
-        let branch: string;
+      // Move to review step — generate template JSON preview
+      setIsLoading(true);
+      (async () => {
         try {
-          const repoInfoRes = await fetch(`${API_BASE_URL}/api/v1/templates/repo-info`);
-          if (repoInfoRes.ok) {
-            const repoInfo = await repoInfoRes.json();
-            owner = repoInfo.owner;
-            repo = repoInfo.repo;
-            branch = repoInfo.branch;
-          } else {
-            [owner, repo] = DEFAULT_GITHUB_TEMPLATE_REPO.split('/');
-            branch = DEFAULT_GITHUB_BRANCH;
+          const headers = await getApiAuthHeaders();
+          const response = await fetch(`${API_BASE_URL}/api/v1/workflows/${workflowId}`, {
+            headers,
+          });
+          if (!response.ok) {
+            throw new Error('Failed to fetch workflow data');
           }
-        } catch {
+
+          const workflow: WorkflowResponse = await response.json();
+
+          const metadata: TemplateMetadata = {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            category: category || '',
+            tags,
+            author: author.trim(),
+            version: '1.0.0',
+          };
+
+          const templateJson = generateTemplateJson(workflow, metadata);
+          setGeneratedTemplateJson(templateJson);
+          setStep('review');
+        } catch (err: unknown) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to prepare template for publishing',
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    },
+    [workflowId, name, description, category, tags, author],
+  );
+
+  const handlePublish = useCallback(async () => {
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const filename = `templates/${sanitizeFilename(name.trim())}`;
+
+      // Copy template code to clipboard
+      const copied = await copyToClipboard(generatedTemplateJson, { showToast: false });
+      if (copied) setHasCopiedOnSubmit(true);
+
+      // Fetch repo config from backend, fall back to defaults
+      let owner: string;
+      let repo: string;
+      let branch: string;
+      try {
+        const repoInfoRes = await fetch(`${API_BASE_URL}/api/v1/templates/repo-info`);
+        if (repoInfoRes.ok) {
+          const repoInfo = await repoInfoRes.json();
+          owner = repoInfo.owner;
+          repo = repoInfo.repo;
+          branch = repoInfo.branch;
+        } else {
           [owner, repo] = DEFAULT_GITHUB_TEMPLATE_REPO.split('/');
           branch = DEFAULT_GITHUB_BRANCH;
-          setRepoUrl(`https://github.com/${DEFAULT_GITHUB_TEMPLATE_REPO}`);
         }
-
-        setRepoUrl(`https://github.com/${owner}/${repo}`);
-
-        // Generate GitHub URL without content (avoids long URL errors)
-        const githubUrl = generateGitHubUrl(owner, repo, branch, filename, name.trim());
-
-        // Open the GitHub URL in a new tab
-        window.open(githubUrl, '_blank', 'noopener,noreferrer');
-
-        // Show success state
-        setSuccess(true);
-        onSuccess?.();
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to prepare template for publishing');
-      } finally {
-        setIsLoading(false);
+      } catch {
+        [owner, repo] = DEFAULT_GITHUB_TEMPLATE_REPO.split('/');
+        branch = DEFAULT_GITHUB_BRANCH;
       }
-    },
-    [workflowId, name, description, category, tags, author, copyToClipboard, onSuccess],
-  );
+
+      setRepoUrl(`https://github.com/${owner}/${repo}`);
+
+      // Generate GitHub URL without content (avoids long URL errors)
+      const githubUrl = generateGitHubUrl(owner, repo, branch, filename, name.trim());
+
+      // Activate focus listener before opening new tab
+      focusListenerRef.current = true;
+      setReturnedFromGithub(false);
+
+      // Open the GitHub URL in a new tab
+      window.open(githubUrl, '_blank', 'noopener,noreferrer');
+
+      // Move to publish step (awaiting user return)
+      setStep('publish');
+      onSuccess?.();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to prepare template for publishing');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [name, generatedTemplateJson, copyToClipboard, onSuccess]);
 
   const handleAddTag = () => {
     const tag = tagInput.trim().toLowerCase();
@@ -398,18 +581,30 @@ export function PublishTemplateModal({
       onOpenChange(false);
       // Reset form after a delay to avoid visual glitch
       setTimeout(() => {
+        setStep('configure');
         setName(workflowName);
         setDescription('');
         setCategory('');
         setTags([]);
         setAuthor('');
         setError(null);
-        setSuccess(false);
         setHasCopiedOnSubmit(false);
         setGeneratedTemplateJson('');
         setRepoUrl(`https://github.com/${DEFAULT_GITHUB_TEMPLATE_REPO}`);
+        setReturnedFromGithub(false);
+        setExistingTemplate(null);
+        focusListenerRef.current = false;
       }, 200);
     }
+  };
+
+  const handleCheckPrStatus = () => {
+    const prSearchUrl = `${repoUrl}/pulls?q=is%3Apr+author%3A%40me+is%3Aopen`;
+    window.open(prSearchUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleConfirmDone = () => {
+    setStep('done');
   };
 
   return (
@@ -418,33 +613,102 @@ export function PublishTemplateModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitPullRequest className="h-5 w-5" />
-            Publish as Template
+            {existingTemplate ? 'Update Template' : 'Publish as Template'}
           </DialogTitle>
           <DialogDescription>
-            Submit your workflow as a template via a GitHub pull request.
+            {existingTemplate
+              ? 'Update your existing template via a GitHub pull request.'
+              : 'Submit your workflow as a template via a GitHub pull request.'}
           </DialogDescription>
         </DialogHeader>
 
-        {success ? (
-          // Success State
+        <StepIndicator currentStep={step} />
+
+        {/* Existing template notice */}
+        {existingTemplate && step === 'configure' && (
+          <div className="flex items-start gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              This workflow was previously published as &ldquo;{existingTemplate.name}&rdquo;.
+              Publishing again will create a new PR to update it.
+            </p>
+          </div>
+        )}
+
+        {step === 'done' ? (
+          /* Done State */
           <div className="py-6">
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
                 <CheckCircle2 className="h-6 w-6 text-success" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Template Ready for Submission!</h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Templates are submitted as pull requests to our GitHub repository. A GitHub editor
-                  has opened in a new tab &mdash; paste the template code there to propose your
-                  changes.
-                </p>
-                <p className="text-sm font-medium mt-2">
-                  {hasCopiedOnSubmit
-                    ? 'Template code has been copied to your clipboard.'
-                    : 'Copy the template code below and paste it in the GitHub editor.'}
+                <h3 className="text-lg font-semibold">Template Submitted!</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your template has been submitted for review. You&apos;ll be notified once
+                  it&apos;s approved and added to the library.
                 </p>
               </div>
+
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" className="flex-1 gap-2" onClick={handleCheckPrStatus}>
+                  <Search className="h-4 w-4" />
+                  Check PR Status
+                </Button>
+                <Button className="flex-1" onClick={handleClose}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : step === 'publish' ? (
+          /* Publish / Awaiting GitHub Step */
+          <div className="py-4">
+            <div className="flex flex-col items-center text-center space-y-4">
+              {returnedFromGithub ? (
+                <>
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <GitPullRequest className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Welcome back!</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Did you create the pull request on GitHub?
+                    </p>
+                  </div>
+                  <div className="flex gap-2 w-full">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setReturnedFromGithub(false)}
+                    >
+                      Not yet
+                    </Button>
+                    <Button className="flex-1 gap-2" onClick={handleConfirmDone}>
+                      <Check className="h-4 w-4" />
+                      Yes, I created it
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <ExternalLink className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Create Your Pull Request</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      A GitHub editor has opened in a new tab. Paste the template code there to
+                      propose your changes.
+                    </p>
+                    <p className="text-sm font-medium mt-2">
+                      {hasCopiedOnSubmit
+                        ? 'Template code has been copied to your clipboard.'
+                        : 'Copy the template code below and paste it in the GitHub editor.'}
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* Copy Template Code Button */}
               <Button
@@ -461,15 +725,27 @@ export function PublishTemplateModal({
                   </>
                 ) : (
                   <>
-                    <Copy className="h-4 w-4" />
-                    Copy Template Code
+                    <RefreshCw className="h-4 w-4" />
+                    Copy Template Code Again
                   </>
                 )}
               </Button>
 
+              {/* Collapsible JSON preview — collapsed in publish state */}
+              <div className="w-full">
+                <JsonPreview
+                  json={generatedTemplateJson}
+                  defaultOpen={false}
+                  onCopy={async () => {
+                    await copyToClipboard(generatedTemplateJson, { showToast: false });
+                  }}
+                  isCopied={copiedText !== null}
+                />
+              </div>
+
               <div className="w-full p-3 rounded-lg bg-muted/50 space-y-3 text-sm">
                 <p className="text-left">
-                  <strong>Next steps:</strong>
+                  <strong>Instructions:</strong>
                 </p>
                 <ol className="text-left list-decimal list-inside space-y-2 text-muted-foreground">
                   <li>
@@ -488,24 +764,97 @@ export function PublishTemplateModal({
                   <strong>Note:</strong> Creating a PR allows reviewers to check your template
                   before it&apos;s added to the library.
                 </div>
-                <a
-                  href={repoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline flex items-center gap-1"
-                >
-                  View Repository on GitHub <ExternalLink className="h-3 w-3" />
-                </a>
               </div>
-              <p className="text-xs text-muted-foreground max-w-sm">
-                Your workflow will be reviewed before being added to the template library.
-                You&apos;ll be notified once it&apos;s approved.
-              </p>
+
+              {!returnedFromGithub && (
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" className="flex-1 gap-2" onClick={handleCheckPrStatus}>
+                    <Search className="h-4 w-4" />
+                    Check PR Status
+                  </Button>
+                  <Button className="flex-1 gap-2" onClick={handleConfirmDone}>
+                    <Check className="h-4 w-4" />
+                    I&apos;ve Created the PR
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
+        ) : step === 'review' ? (
+          /* Review Step */
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Name:</span>
+                  <p className="font-medium">{name}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Category:</span>
+                  <p className="font-medium capitalize">{category}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Author:</span>
+                  <p className="font-medium">{author}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Version:</span>
+                  <p className="font-medium">1.0.0</p>
+                </div>
+              </div>
+              {description && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Description:</span>
+                  <p className="font-medium">{description}</p>
+                </div>
+              )}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* JSON Preview — expanded in review step */}
+            <JsonPreview
+              json={generatedTemplateJson}
+              defaultOpen={true}
+              onCopy={async () => {
+                await copyToClipboard(generatedTemplateJson, { showToast: false });
+              }}
+              isCopied={copiedText !== null}
+            />
+
+            {error && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/50">
+                <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep('configure')}
+                disabled={isLoading}
+              >
+                Back
+              </Button>
+              <Button onClick={handlePublish} disabled={isLoading} className="gap-2">
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                <ExternalLink className="h-4 w-4" />
+                Copy &amp; Open GitHub
+              </Button>
+            </DialogFooter>
+          </div>
         ) : (
-          // Form
-          <form onSubmit={handleSubmit} className="space-y-4">
+          /* Configure Form */
+          <form onSubmit={handleConfigure} className="space-y-4">
             {/* Template Name */}
             <div className="space-y-2">
               <Label htmlFor="template-name">Template Name *</Label>
@@ -607,8 +956,8 @@ export function PublishTemplateModal({
             <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
               <p>
                 <strong>Note:</strong> Your workflow will be sanitized before publishing. All secret
-                references will be removed and replaced with placeholders. Clicking submit will open
-                GitHub in a new tab where you can review and create a pull request.
+                references will be removed and replaced with placeholders. Clicking
+                &ldquo;Next&rdquo; will generate a preview for your review.
               </p>
             </div>
 
@@ -626,7 +975,7 @@ export function PublishTemplateModal({
               </Button>
               <Button type="submit" disabled={isLoading} className="gap-2">
                 {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Submit Template
+                Next: Review
               </Button>
             </DialogFooter>
           </form>
