@@ -1,4 +1,3 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
@@ -11,29 +10,16 @@ export const AnalyticsQueryRequestSchema = z.object({
 
 export class AnalyticsQueryRequestDto extends createZodDto(AnalyticsQueryRequestSchema) {}
 
-export class AnalyticsQueryResponseDto {
-  @ApiProperty({
-    description: 'Total number of matching documents',
-    example: 100,
-  })
-  total!: number;
+export const AnalyticsQueryResponseSchema = z.object({
+  total: z.number().int().nonnegative(),
+  hits: z.array(
+    z.object({
+      _id: z.string(),
+      _source: z.record(z.string(), z.any()),
+      _score: z.number().optional(),
+    }),
+  ),
+  aggregations: z.record(z.string(), z.any()).optional(),
+});
 
-  @ApiProperty({
-    description: 'Search hits',
-    type: 'array',
-    items: { type: 'object' },
-  })
-  hits!: {
-    _id: string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
-    _source: Record<string, any>;
-    _score?: number;
-  }[];
-
-  @ApiProperty({
-    description: 'Aggregation results',
-    required: false,
-  })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch aggregation result is untyped
-  aggregations?: Record<string, any>;
-}
+export class AnalyticsQueryResponseDto extends createZodDto(AnalyticsQueryResponseSchema) {}
