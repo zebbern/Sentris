@@ -12,6 +12,7 @@ export function useHumanInputs(filters?: HumanInputFilters) {
     queryKey: queryKeys.humanInputs.all(apiFilters as Record<string, unknown>),
     queryFn: () => api.humanInputs.list(apiFilters),
     staleTime: 30_000,
+    refetchInterval: filters?.status === 'pending' ? 15_000 : false,
   });
 }
 

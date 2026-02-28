@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -67,10 +67,32 @@ export function ActionCenterPage() {
   const organizationId = useAuthStore((state) => state.organizationId);
 
   const status = statusFilter === 'all' ? undefined : statusFilter;
-  const { data: rawApprovals = [], isLoading, error: queryError } = useHumanInputs({ status });
+  const {
+    data: rawApprovals = [],
+    isLoading,
+    error: queryError,
+    dataUpdatedAt,
+  } = useHumanInputs({ status });
   const approvals = rawApprovals as HumanInputRequest[];
   const invalidateHumanInputs = useInvalidateHumanInputs();
   const error = queryError?.message ?? null;
+
+  // Tick every 5s to keep the "Last updated" relative time current
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 5_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const lastUpdatedText = useMemo(() => {
+    if (!dataUpdatedAt) return null;
+    const diffSeconds = Math.floor((now - dataUpdatedAt) / 1000);
+    if (diffSeconds < 5) return 'just now';
+    if (diffSeconds < 60) return `${diffSeconds}s ago`;
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    return `${Math.floor(diffMinutes / 60)}h ago`;
+  }, [dataUpdatedAt, now]);
 
   // Resolve dialog state
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
@@ -182,15 +204,22 @@ export function ActionCenterPage() {
               </Select>
             }
             actions={
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={handleRefresh}
-                disabled={isLoading}
-              >
-                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                <span className="hidden sm:inline">Refresh</span>
-              </Button>
+              <div className="flex items-center gap-3">
+                {lastUpdatedText && (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    Updated {lastUpdatedText}
+                  </span>
+                )}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+              </div>
             }
           />
 
