@@ -28,6 +28,7 @@ export function NotificationSettings() {
   const setNotifyOnRunComplete = useUserPreferencesStore((s) => s.setNotifyOnRunComplete);
   const notifyOnRunFailed = useUserPreferencesStore((s) => s.notifyOnRunFailed);
   const setNotifyOnRunFailed = useUserPreferencesStore((s) => s.setNotifyOnRunFailed);
+  const notifyOnScheduleTriggered = useUserPreferencesStore((s) => s.notifyOnScheduleTriggered);
   const setNotifyOnScheduleTriggered = useUserPreferencesStore(
     (s) => s.setNotifyOnScheduleTriggered,
   );
@@ -51,10 +52,8 @@ export function NotificationSettings() {
       id: 'schedule-triggered',
       label: 'Schedule triggered',
       description: 'Get notified when a scheduled workflow is automatically triggered.',
-      checked: false,
+      checked: notifyOnScheduleTriggered,
       onChange: setNotifyOnScheduleTriggered,
-      disabled: true,
-      disabledReason: 'Coming soon',
     },
   ];
 
