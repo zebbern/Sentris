@@ -1,36 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { Button } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorBanner } from '@/components/ui/error-banner';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { KeyRound, RefreshCw } from 'lucide-react';
-import { PageToolbar } from '@/components/shared/PageToolbar';
-import { DndContext } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { useSortableList } from '@/hooks/useSortableList';
-import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import type { SecretSummary } from '@/schemas/secret';
 import {
   useSecrets,
@@ -45,98 +15,24 @@ import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
-import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-
-interface FormState {
-  name: string;
-  description: string;
-  tags: string;
-  value: string;
-}
-
-type EditFormState = Pick<FormState, 'name' | 'description' | 'tags' | 'value'>;
-
-const INITIAL_FORM: FormState = {
-  name: '',
-  description: '',
-  tags: '',
-  value: '',
-};
-
-const INITIAL_EDIT_FORM: EditFormState = {
-  name: '',
-  description: '',
-  tags: '',
-  value: '',
-};
-
-const SECRET_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
-const SECRET_NAME_MAX_LENGTH = 128;
-
-function validateSecretName(name: string): string | null {
-  const trimmed = name.trim();
-  if (trimmed.length === 0) return 'Secret name is required.';
-  if (trimmed.length > SECRET_NAME_MAX_LENGTH)
-    return `Name must be at most ${SECRET_NAME_MAX_LENGTH} characters.`;
-  if (!SECRET_NAME_PATTERN.test(trimmed))
-    return 'Name may only contain letters, numbers, hyphens, and underscores.';
-  return null;
-}
-
-function parseTags(raw: string): string[] | undefined {
-  if (!raw.trim()) {
-    return undefined;
-  }
-
-  const tags = raw
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0);
-
-  return tags.length > 0 ? tags : undefined;
-}
-
-function formatTags(tags?: string[] | null): string {
-  return tags?.join(', ') ?? '';
-}
-
-function normalizeDescriptionInput(raw: string): string {
-  return raw.trim();
-}
-
-function normalizeTagsForUpdate(raw: string): string[] {
-  const tags = parseTags(raw);
-  return tags ?? [];
-}
-
-function areTagsEqual(current: string[] | null | undefined, next: string[]): boolean {
-  if (!current || current.length === 0) {
-    return next.length === 0;
-  }
-  if (current.length !== next.length) {
-    return false;
-  }
-  const normalizedCurrent = [...current].sort();
-  const normalizedNext = [...next].sort();
-  return normalizedCurrent.every((tag, index) => tag === normalizedNext[index]);
-}
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-function formatDate(iso: string) {
-  return dateFormatter.format(new Date(iso));
-}
+import { useSortableList } from '@/hooks/useSortableList';
+import type { FormState, EditFormState } from './secrets-manager/types';
+import { INITIAL_FORM, INITIAL_EDIT_FORM } from './secrets-manager/types';
+import {
+  validateSecretName,
+  parseTags,
+  formatTags,
+  normalizeDescriptionInput,
+  normalizeTagsForUpdate,
+  areTagsEqual,
+} from './secrets-manager/helpers';
+import { CreateSecretForm } from './secrets-manager/CreateSecretForm';
+import { EditSecretDialog } from './secrets-manager/EditSecretDialog';
+import { SecretsTable } from './secrets-manager/SecretsTable';
 
 export function SecretsManager() {
   useDocumentTitle('Secrets');
@@ -260,20 +156,6 @@ export function SecretsManager() {
   const isFormValid = useMemo(() => {
     return validateSecretName(formState.name) === null && formState.value.trim().length > 0;
   }, [formState.name, formState.value]);
-
-  const createNameError = useMemo(() => {
-    if (formState.name.length === 0) return null;
-    return validateSecretName(formState.name);
-  }, [formState.name]);
-
-  const isEditValid = useMemo(() => {
-    return validateSecretName(editFormState.name) === null;
-  }, [editFormState.name]);
-
-  const editNameError = useMemo(() => {
-    if (editFormState.name.length === 0) return null;
-    return validateSecretName(editFormState.name);
-  }, [editFormState.name]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -426,6 +308,14 @@ export function SecretsManager() {
     }
   };
 
+  const handleRefresh = useCallback(() => {
+    queryClient
+      .invalidateQueries({ queryKey: queryKeys.secrets.all() })
+      .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
+  }, [queryClient]);
+
+  const handleClearListSuccess = useCallback(() => setListSuccess(null), []);
+
   return (
     <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
@@ -437,444 +327,51 @@ export function SecretsManager() {
         )}
 
         <div className="grid gap-4 md:gap-6 lg:grid-cols-[2fr,3fr]">
-          <div className="border rounded-lg bg-card p-4 md:p-6 space-y-4">
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold mb-1">Add a new secret</h2>
-              <p className="text-xs md:text-sm text-muted-foreground">
-                Secret values are encrypted at rest. The plaintext you provide here is only used
-                during creation.
-              </p>
-            </div>
+          <CreateSecretForm
+            formState={formState}
+            onChange={handleChange}
+            onSubmit={handleSubmit}
+            formError={formError}
+            formSuccess={formSuccess}
+            isFormValid={isFormValid}
+            disableCreate={disableCreate}
+            isSubmitting={isSubmitting}
+          />
 
-            <form className="space-y-3 md:space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <label htmlFor="secret-name" className="text-sm font-medium">
-                  Secret name
-                </label>
-                <Input
-                  id="secret-name"
-                  placeholder="ex: shodan-api-key"
-                  value={formState.name}
-                  onChange={handleChange('name')}
-                  disabled={disableCreate}
-                  maxLength={SECRET_NAME_MAX_LENGTH}
-                  required
-                  aria-required="true"
-                  aria-invalid={createNameError ? true : undefined}
-                  aria-describedby={
-                    createNameError
-                      ? 'create-name-error'
-                      : formError
-                        ? 'create-secret-error'
-                        : undefined
-                  }
-                />
-                {createNameError && (
-                  <p id="create-name-error" className="text-xs text-destructive" role="alert">
-                    {createNameError}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="secret-description" className="text-sm font-medium">
-                  Description
-                  <span className="text-muted-foreground"> (optional)</span>
-                </label>
-                <Input
-                  id="secret-description"
-                  placeholder="Describe how this secret is used"
-                  value={formState.description}
-                  onChange={handleChange('description')}
-                  disabled={disableCreate}
-                  maxLength={500}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="secret-tags" className="text-sm font-medium">
-                  Tags
-                  <span className="text-muted-foreground"> (comma separated)</span>
-                </label>
-                <Input
-                  id="secret-tags"
-                  placeholder="prod, security, reconnaissance"
-                  value={formState.tags}
-                  onChange={handleChange('tags')}
-                  disabled={disableCreate}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="secret-value" className="text-sm font-medium">
-                  Secret value
-                </label>
-                <Textarea
-                  id="secret-value"
-                  placeholder="Paste the secret value"
-                  value={formState.value}
-                  onChange={handleChange('value')}
-                  disabled={disableCreate}
-                  rows={4}
-                  required
-                  aria-required="true"
-                  aria-describedby={formError ? 'create-secret-error' : undefined}
-                />
-                <p className="text-xs text-muted-foreground">
-                  The plaintext is never shown again after creation.
-                </p>
-              </div>
-
-              {formError && (
-                <p id="create-secret-error" className="text-sm text-destructive" role="alert">
-                  {formError}
-                </p>
-              )}
-
-              {formSuccess && <p className="text-sm text-success">{formSuccess}</p>}
-
-              <Button type="submit" disabled={!isFormValid || disableCreate}>
-                {isSubmitting ? 'Saving…' : 'Create secret'}
-              </Button>
-            </form>
-          </div>
-
-          <div className="border rounded-lg bg-card p-4 md:p-6">
-            <PageToolbar
-              filters={
-                <div>
-                  <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>
-                  <p className="text-xs md:text-sm text-muted-foreground">
-                    Only metadata is shown. Use the Secret Fetch component or parameter selectors to
-                    reference a secret.
-                  </p>
-                </div>
-              }
-              actions={
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setListSuccess(null);
-                    queryClient
-                      .invalidateQueries({ queryKey: queryKeys.secrets.all() })
-                      .catch((err: unknown) => logger.error('Failed to refresh secrets', err));
-                  }}
-                  disabled={loading}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-              }
-              className="sm:flex-row sm:items-center justify-between gap-3 mb-4"
-            />
-
-            {error && (
-              <ErrorBanner
-                message={error}
-                onRetry={() => queryClient.invalidateQueries({ queryKey: queryKeys.secrets.all() })}
-                className="mb-4"
-              />
-            )}
-            {listSuccess && (
-              <div className="mb-4 text-xs md:text-sm text-success">{listSuccess}</div>
-            )}
-
-            {loading && secrets.length === 0 ? (
-              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="text-muted-foreground">
-                      <TableHead className="min-w-[120px]">Name</TableHead>
-                      <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
-                      <TableHead className="min-w-[120px] hidden md:table-cell">
-                        Active Version
-                      </TableHead>
-                      <TableHead className="min-w-[100px] hidden lg:table-cell">Updated</TableHead>
-                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from({ length: 4 }).map((_, idx) => (
-                      <TableRow key={`skeleton-${idx}`}>
-                        <TableCell>
-                          <Skeleton className="h-4 w-[120px]" />
-                          <Skeleton className="h-3 w-[80px] mt-1" />
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <div className="flex gap-1">
-                            <Skeleton className="h-5 w-[50px]" />
-                            <Skeleton className="h-5 w-[40px]" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Skeleton className="h-4 w-[60px]" />
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          <Skeleton className="h-4 w-[100px]" />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Skeleton className="h-8 w-[50px]" />
-                            <Skeleton className="h-8 w-[60px]" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : orderedSecrets.length === 0 ? (
-              <EmptyState
-                icon={KeyRound}
-                title="No secrets yet"
-                description="Store and manage sensitive values like API keys, credentials, and tokens for use in workflows."
-                className="py-12"
-              />
-            ) : (
-              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                <BulkActionBar
-                  selectedCount={selectedCount}
-                  actions={[
-                    {
-                      label: `Delete selected (${selectedCount})`,
-                      onClick: handleBulkDelete,
-                      variant: 'destructive',
-                    },
-                  ]}
-                />
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={collisionDetection}
-                  onDragEnd={handleDragEnd}
-                >
-                  <Table className="table-fixed w-full">
-                    <TableHeader>
-                      <TableRow className="text-muted-foreground">
-                        <TableHead className="w-10">
-                          <Checkbox
-                            checked={isAllSelected || (isIndeterminate && 'indeterminate')}
-                            onCheckedChange={toggleAll}
-                            aria-label="Select all secrets"
-                          />
-                        </TableHead>
-                        <TableHead className="w-10" />
-                        <TableHead className="min-w-[120px]">Name</TableHead>
-                        <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
-                        <TableHead className="min-w-[120px] hidden md:table-cell">
-                          Active Version
-                        </TableHead>
-                        <TableHead className="min-w-[100px] hidden lg:table-cell">
-                          Updated
-                        </TableHead>
-                        <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <SortableContext
-                        items={orderedSecrets.map((s) => s.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {orderedSecrets.map((secret) => (
-                          <SortableTableRow
-                            key={secret.id}
-                            id={secret.id}
-                            data-state={selectedIds.has(secret.id) ? 'selected' : undefined}
-                          >
-                            {({ handleProps }) => (
-                              <>
-                                <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox
-                                    checked={selectedIds.has(secret.id)}
-                                    onCheckedChange={() => toggleId(secret.id)}
-                                    aria-label={`Select ${secret.name}`}
-                                  />
-                                </TableCell>
-                                <DragHandle {...handleProps} />
-                                <TableCell className="align-top">
-                                  <div className="font-medium truncate max-w-[150px] md:max-w-none">
-                                    {secret.name}
-                                  </div>
-                                  <div className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[150px] md:max-w-none">
-                                    ID: <span className="font-mono">{secret.id}</span>
-                                  </div>
-                                  {secret.description && (
-                                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                      {secret.description}
-                                    </div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="align-top hidden sm:table-cell">
-                                  <div className="flex flex-wrap gap-1">
-                                    {secret.tags?.length ? (
-                                      secret.tags.map((tag) => (
-                                        <Badge key={tag} variant="secondary" className="text-xs">
-                                          {tag}
-                                        </Badge>
-                                      ))
-                                    ) : (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="align-top hidden md:table-cell">
-                                  {secret.activeVersion ? (
-                                    <div>
-                                      <div className="font-mono text-xs">
-                                        v{secret.activeVersion.version}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Created {formatDate(secret.activeVersion.createdAt)}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      No active version
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="align-top hidden lg:table-cell">
-                                  <div className="text-xs text-muted-foreground">
-                                    {formatDate(secret.updatedAt)}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="align-top">
-                                  <div className="flex justify-end gap-1 md:gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openEditDialog(secret)}
-                                      disabled={isReadOnly}
-                                      aria-disabled={isReadOnly}
-                                      className="text-xs px-2 md:px-3"
-                                    >
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() => handleDeleteSecret(secret)}
-                                      disabled={isReadOnly}
-                                      aria-disabled={isReadOnly}
-                                      className="text-xs px-2 md:px-3"
-                                    >
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </>
-                            )}
-                          </SortableTableRow>
-                        ))}
-                      </SortableContext>
-                    </TableBody>
-                  </Table>
-                </DndContext>
-              </div>
-            )}
-          </div>
+          <SecretsTable
+            secrets={orderedSecrets}
+            loading={loading}
+            error={error}
+            listSuccess={listSuccess}
+            isReadOnly={isReadOnly}
+            onRefresh={handleRefresh}
+            onClearListSuccess={handleClearListSuccess}
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragEnd={handleDragEnd}
+            selectedIds={selectedIds}
+            toggleId={toggleId}
+            toggleAll={toggleAll}
+            isAllSelected={isAllSelected}
+            isIndeterminate={isIndeterminate}
+            selectedCount={selectedCount}
+            onBulkDelete={handleBulkDelete}
+            onEdit={openEditDialog}
+            onDelete={handleDeleteSecret}
+          />
         </div>
       </div>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit secret metadata</DialogTitle>
-            <DialogDescription>
-              Update the name, description, tags, or provide a new value to rotate this secret.
-            </DialogDescription>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={handleEditSubmit}>
-            <div className="space-y-2">
-              <label htmlFor="edit-secret-name" className="text-sm font-medium">
-                Secret name
-              </label>
-              <Input
-                id="edit-secret-name"
-                value={editFormState.name}
-                onChange={handleEditChange('name')}
-                disabled={disableEditing}
-                maxLength={SECRET_NAME_MAX_LENGTH}
-                required
-                aria-required="true"
-                aria-invalid={editNameError ? true : undefined}
-                aria-describedby={
-                  editNameError ? 'edit-name-error' : editError ? 'edit-secret-error' : undefined
-                }
-              />
-              {editNameError && (
-                <p id="edit-name-error" className="text-xs text-destructive" role="alert">
-                  {editNameError}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="edit-secret-description" className="text-sm font-medium">
-                Description
-                <span className="text-muted-foreground"> (optional)</span>
-              </label>
-              <Input
-                id="edit-secret-description"
-                value={editFormState.description}
-                onChange={handleEditChange('description')}
-                disabled={disableEditing}
-                maxLength={500}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="edit-secret-tags" className="text-sm font-medium">
-                Tags
-                <span className="text-muted-foreground"> (comma separated)</span>
-              </label>
-              <Input
-                id="edit-secret-tags"
-                value={editFormState.tags}
-                onChange={handleEditChange('tags')}
-                disabled={disableEditing}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="edit-secret-value" className="text-sm font-medium">
-                New secret value<span className="text-muted-foreground"> (optional)</span>
-              </label>
-              <Textarea
-                id="edit-secret-value"
-                value={editFormState.value}
-                onChange={handleEditChange('value')}
-                disabled={disableEditing}
-                rows={4}
-                placeholder="Provide only if you want to rotate the secret"
-              />
-              <p className="text-xs text-muted-foreground">
-                The plaintext encrypts immediately. Leave blank to keep the current value.
-              </p>
-            </div>
-
-            {editError && (
-              <p id="edit-secret-error" className="text-sm text-destructive" role="alert">
-                {editError}
-              </p>
-            )}
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleEditDialogChange(false)}
-                disabled={isEditing}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={!isEditValid || disableEditing}>
-                {isEditing ? 'Saving…' : 'Save changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EditSecretDialog
+        isOpen={isEditDialogOpen}
+        onOpenChange={handleEditDialogChange}
+        editFormState={editFormState}
+        onChange={handleEditChange}
+        onSubmit={handleEditSubmit}
+        editError={editError}
+        disableEditing={disableEditing}
+        isEditing={isEditing}
+      />
 
       <ConfirmDialog {...dialogProps} />
     </div>
