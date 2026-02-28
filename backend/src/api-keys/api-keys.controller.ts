@@ -12,6 +12,8 @@ import {
 import { ZodValidationPipe } from 'nestjs-zod';
 import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { Throttle } from '@nestjs/throttler';
+
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 import { ApiKeysService } from './api-keys.service';
@@ -33,6 +35,7 @@ import { Roles } from '../auth/roles.decorator';
 @ApiTags('api-keys')
 @Controller('api-keys')
 @UseGuards(AuthGuard, RolesGuard)
+@Throttle({ default: { ttl: 60000, limit: 20 } })
 export class ApiKeysController {
   constructor(private readonly apiKeysService: ApiKeysService) {}
 

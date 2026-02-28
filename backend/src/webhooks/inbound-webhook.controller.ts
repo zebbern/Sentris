@@ -8,12 +8,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { WebhooksService } from './webhooks.service';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('webhooks')
 @Controller('webhooks/inbound')
+@Throttle({ default: { ttl: 60000, limit: 60 } })
 export class InboundWebhookController {
   private readonly logger = new Logger(InboundWebhookController.name);
 

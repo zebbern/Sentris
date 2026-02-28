@@ -23,6 +23,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { Throttle } from '@nestjs/throttler';
+
 import { SecretsService } from './secrets.service';
 import {
   CreateSecretDto,
@@ -39,6 +41,7 @@ import type { AuthContext } from '../auth/types';
 
 @ApiTags('secrets')
 @Controller('secrets')
+@Throttle({ default: { ttl: 60000, limit: 30 } })
 export class SecretsController {
   constructor(private readonly secretsService: SecretsService) {}
 
