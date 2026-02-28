@@ -307,7 +307,7 @@ export function SecretsManager() {
           </div>
         )}
 
-        <div className="grid gap-4 md:gap-6 lg:grid-cols-[2fr,3fr]">
+        <div className="grid gap-4 md:gap-6 xl:grid-cols-[1fr,3fr]">
           <CreateSecretForm
             formState={formState}
             onChange={handleChange}
