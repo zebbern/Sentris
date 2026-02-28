@@ -43,6 +43,7 @@ import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes, prefetchRoute } from '@/lib/prefetch-routes';
 import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationCenter } from '@/components/layout/NotificationCenter';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -782,10 +783,22 @@ export function AppLayout({ children }: AppLayoutProps) {
               <AppTopBar
                 sidebarOpen={sidebarOpen}
                 onSidebarToggle={handleToggle}
-                actions={getPageActions()}
+                actions={
+                  <>
+                    <NotificationCenter />
+                    {getPageActions()}
+                  </>
+                }
                 isMobile={isMobile}
               />
             )}
+          {/* Notification bell on workflow/webhook pages where AppTopBar is hidden */}
+          {(location.pathname.startsWith('/workflows') ||
+            location.pathname.startsWith('/webhooks/')) && (
+            <div className="absolute top-2 right-4 z-40">
+              <NotificationCenter />
+            </div>
+          )}
           <div className="flex-1 overflow-auto">{children}</div>
         </main>
       </div>

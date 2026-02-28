@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useExecutionLifecycleStore, type ExecutionLifecycle } from '@/store/executionStore';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
+import { useNotificationStore } from '@/store/notificationStore';
 import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { useToast } from '@/components/ui/use-toast';
 import { logger } from '@/lib/logger';
@@ -61,20 +62,28 @@ export function useNotifications(): void {
         notifiedRef.current.add(notifyKey);
 
         const label = run.workflowName ?? `Run ${run.runId.slice(0, 8)}`;
+        const title = isCompleted ? 'Workflow completed' : 'Workflow failed';
+        const description = isCompleted
+          ? `"${label}" finished successfully.`
+          : `"${label}" encountered an error.`;
+        const variant = isCompleted ? ('success' as const) : ('destructive' as const);
+
+        // Persist to notification store (additive — does not replace browser/toast)
+        useNotificationStore.getState().push({
+          title,
+          description,
+          variant,
+          runId: run.runId,
+        });
 
         if (currentPermission === 'granted') {
           // Browser notification
           try {
-            const notification = new Notification(
-              isCompleted ? 'Workflow completed' : 'Workflow failed',
-              {
-                body: isCompleted
-                  ? `"${label}" finished successfully.`
-                  : `"${label}" encountered an error.`,
-                tag: notifyKey, // Prevents duplicate OS-level notifications
-                icon: '/favicon.ico',
-              },
-            );
+            const notification = new Notification(title, {
+              body: description,
+              tag: notifyKey, // Prevents duplicate OS-level notifications
+              icon: '/favicon.ico',
+            });
             notification.onclick = () => {
               window.focus();
               notification.close();
