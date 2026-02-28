@@ -4,8 +4,7 @@ import { api } from '@/services/api';
 import { useSchedules } from '@/hooks/queries/useScheduleQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
-
-type ToastVariant = 'default' | 'destructive' | 'warning' | 'success';
+import type { ToastVariant } from '@/components/ui/toast-context';
 
 interface ToastParams {
   title: string;

@@ -1,5 +1,6 @@
 import type { Node, Edge } from 'reactflow';
 
+import type { ToastVariant } from '@/components/ui/toast-context';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import { isEntryPointComponentRef, isEntryPointNode } from '@/utils/entryPointUtils';
@@ -14,7 +15,7 @@ export interface CreateNodeContext {
   edges: Edge[];
   mode: string;
   workflowId?: string | null;
-  toast: (opts: { title: string; description: string; variant: string }) => void;
+  toast: (opts: { title: string; description: string; variant?: ToastVariant }) => void;
   onSnapshot?: (nodes?: Node<NodeData>[], edges?: Edge[]) => void;
   setNodes: React.Dispatch<React.SetStateAction<Node<NodeData>[]>>;
   markDirty: () => void;
