@@ -2,6 +2,7 @@ import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Injectable, Logger, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { timingSafeEqual } from 'crypto';
 import type { Request } from 'express';
 
 import { AuthService } from './auth.service';
@@ -84,6 +85,11 @@ export class AuthGuard implements CanActivate {
     return true;
   }
 
+  private timingSafeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  }
+
   private tryInternalAuth(request: Request): AuthContext | null {
     const provided = request.header('x-internal-token');
     const intCfg = this.configService.get<IntegrationsEnvConfig>('integrations')!;
@@ -93,7 +99,7 @@ export class AuthGuard implements CanActivate {
       return null;
     }
 
-    if (provided !== expected) {
+    if (!this.timingSafeCompare(provided, expected)) {
       throw new UnauthorizedException('Invalid internal access token');
     }
 
