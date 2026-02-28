@@ -2,31 +2,46 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 type Theme = 'light' | 'dark';
+type ThemePreference = 'light' | 'dark' | 'system';
 
 interface ThemeState {
   theme: Theme;
+  themePreference: ThemePreference;
   isTransitioning: boolean;
   setTheme: (theme: Theme) => void;
+  setThemePreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
   startTransition: () => void;
   endTransition: () => void;
+}
+
+function resolveTheme(preference: ThemePreference): Theme {
+  if (preference === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return preference;
 }
 
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
       theme: 'light',
+      themePreference: 'light',
       isTransitioning: false,
       setTheme: (theme) => {
-        set({ theme });
+        set({ theme, themePreference: theme });
         applyTheme(theme);
+      },
+      setThemePreference: (preference) => {
+        const resolved = resolveTheme(preference);
+        set({ themePreference: preference, theme: resolved });
+        applyTheme(resolved);
       },
       toggleTheme: () => {
         const current = get().theme;
         const next = current === 'light' ? 'dark' : 'light';
-        // If we want to use the transition, we should probably call startTransition from the UI
-        // But for backward compatibility, if toggleTheme is called directly, just switch
-        set({ theme: next });
+        // When toggling directly, set explicit preference (not system)
+        set({ theme: next, themePreference: next });
         applyTheme(next);
       },
       startTransition: () => set({ isTransitioning: true }),
@@ -34,18 +49,37 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'shipsec-theme',
-      partialize: (state) => ({ theme: state.theme }), // Only persist theme, not isTransitioning
+      partialize: (state) => ({
+        theme: state.theme,
+        themePreference: state.themePreference,
+      }),
       onRehydrateStorage: () => (state) => {
         // Apply theme when store is rehydrated from localStorage
         // Always reset isTransitioning to false on rehydrate to prevent stuck states
         if (state) {
           state.isTransitioning = false;
+          // Re-resolve in case system preference changed since last visit
+          if (state.themePreference === 'system') {
+            state.theme = resolveTheme('system');
+          }
           applyTheme(state.theme);
         }
       },
     },
   ),
 );
+
+// Listen for system theme changes when preference is 'system'
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    const { themePreference } = useThemeStore.getState();
+    if (themePreference === 'system') {
+      const resolved: Theme = e.matches ? 'dark' : 'light';
+      useThemeStore.setState({ theme: resolved });
+      applyTheme(resolved);
+    }
+  });
+}
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,11 @@ import {
   type WorkflowOption,
 } from '@/components/schedules/ScheduleEditorDrawer';
 import type { WorkflowSchedule } from '@shipsec/shared';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
+import { useAuthStore } from '@/store/authStore';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -91,6 +96,7 @@ export function SchedulesPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [actionState, setActionState] = useState<Record<string, 'run' | 'toggle'>>({});
+  const organizationId = useAuthStore((state) => state.organizationId);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
   const [activeSchedule, setActiveSchedule] = useState<WorkflowSchedule | null>(null);
@@ -137,6 +143,24 @@ export function SchedulesPage() {
       return matchesSearch;
     });
   }, [filters.search, schedules, workflowOptions]);
+
+  const hasActiveFilters =
+    filters.search.trim().length > 0 || filters.status !== 'all' || filters.workflowId !== null;
+
+  const getScheduleId = useCallback((s: WorkflowSchedule) => s.id, []);
+
+  const {
+    orderedItems: orderedSchedules,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: filteredSchedules,
+    getId: getScheduleId,
+    storageKey: `shipsec:sort:schedules:${organizationId}`,
+    disabled: hasActiveFilters,
+  });
 
   const markAction = (id: string, action: 'run' | 'toggle') => {
     setActionState((state) => ({ ...state, [id]: action }));
@@ -287,7 +311,7 @@ export function SchedulesPage() {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
-  const hasData = filteredSchedules.length > 0;
+  const hasData = orderedSchedules.length > 0;
 
   return (
     <TooltipProvider>
@@ -367,160 +391,187 @@ export function SchedulesPage() {
 
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                    <TableHead className="hidden lg:table-cell">Cadence</TableHead>
-                    <TableHead className="hidden sm:table-cell">Next run</TableHead>
-                    <TableHead className="hidden lg:table-cell">Last run</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && !hasData
-                    ? Array.from({ length: 4 }).map((_, index) => (
-                        <TableRow key={`skeleton-${index}`}>
-                          {Array.from({ length: 7 }).map((_, cell) => (
-                            <TableCell key={`cell-${cell}`}>
-                              <Skeleton className="h-5 w-full" />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    : null}
-                  {!isLoading && hasData
-                    ? filteredSchedules.map((schedule) => {
-                        const workflowName = getWorkflowName(schedule.workflowId, workflowOptions);
-                        const cadenceLabel = schedule.humanLabel
-                          ? `${schedule.humanLabel} (${schedule.cronExpression})`
-                          : schedule.cronExpression;
-
-                        const isPaused = schedule.status !== 'active';
-
-                        return (
-                          <TableRow key={schedule.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col">
-                                <span className="truncate max-w-[120px] md:max-w-none">
-                                  {schedule.name}
-                                </span>
-                                {schedule.description && (
-                                  <span className="text-xs text-muted-foreground truncate max-w-[120px] md:max-w-none">
-                                    {schedule.description}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <div className="flex flex-col">
-                                <span className="font-medium truncate max-w-[120px]">
-                                  {workflowName}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                                  {schedule.workflowId}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">
-                              <div className="flex flex-col">
-                                <span className="text-sm">{cadenceLabel}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {schedule.timezone}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
-                              {formatDateTime(schedule.nextRunAt)}
-                            </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
-                              {formatDateTime(schedule.lastRunAt)}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {renderStatusBadge(schedule.status)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1 md:gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-1 h-8 px-2 md:px-3"
-                                  onClick={() => handleRunNow(schedule)}
-                                  disabled={isActionBusy(schedule.id)}
-                                >
-                                  <PlayCircle className="h-4 w-4" />
-                                  <span className="hidden md:inline">Run</span>
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  className="gap-1 h-8 px-2 md:px-3"
-                                  onClick={() => handlePauseResume(schedule)}
-                                  disabled={isActionBusy(schedule.id)}
-                                >
-                                  {isPaused ? (
-                                    <>
-                                      <PlayCircle className="h-4 w-4" />
-                                      <span className="hidden md:inline">Resume</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <PauseCircle className="h-4 w-4" />
-                                      <span className="hidden md:inline">Pause</span>
-                                    </>
-                                  )}
-                                </Button>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Edit schedule"
-                                      onClick={() => handleEdit(schedule)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Edit3 className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Edit schedule configuration</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Delete schedule"
-                                      onClick={() => handleDelete(schedule)}
-                                      disabled={isActionBusy(schedule.id)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Delete schedule</TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    : null}
-                  {!isLoading && !hasData && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={collisionDetection}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7}>
-                        <EmptyState
-                          icon={CalendarClock}
-                          title="No schedules found"
-                          description='Create your first cadence with the "New schedule" button or adjust the filters above.'
-                          className="py-10"
-                        />
-                      </TableCell>
+                      <TableHead className="w-10" />
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                      <TableHead className="hidden lg:table-cell">Cadence</TableHead>
+                      <TableHead className="hidden sm:table-cell">Next run</TableHead>
+                      <TableHead className="hidden lg:table-cell">Last run</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading && !hasData
+                      ? Array.from({ length: 4 }).map((_, index) => (
+                          <TableRow key={`skeleton-${index}`}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-4" />
+                            </TableCell>
+                            {Array.from({ length: 7 }).map((_, cell) => (
+                              <TableCell key={`cell-${cell}`}>
+                                <Skeleton className="h-5 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      : null}
+                    {!isLoading && hasData ? (
+                      <SortableContext
+                        items={orderedSchedules.map((s) => s.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {orderedSchedules.map((schedule) => {
+                          const workflowName = getWorkflowName(
+                            schedule.workflowId,
+                            workflowOptions,
+                          );
+                          const cadenceLabel = schedule.humanLabel
+                            ? `${schedule.humanLabel} (${schedule.cronExpression})`
+                            : schedule.cronExpression;
+
+                          const isPaused = schedule.status !== 'active';
+
+                          return (
+                            <SortableTableRow
+                              key={schedule.id}
+                              id={schedule.id}
+                              disabled={isDragDisabled}
+                            >
+                              {({ handleProps }) => (
+                                <>
+                                  <DragHandle {...handleProps} disabled={isDragDisabled} />
+                                  <TableCell className="font-medium">
+                                    <div className="flex flex-col">
+                                      <span className="truncate max-w-[120px] md:max-w-none">
+                                        {schedule.name}
+                                      </span>
+                                      {schedule.description && (
+                                        <span className="text-xs text-muted-foreground truncate max-w-[120px] md:max-w-none">
+                                          {schedule.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium truncate max-w-[120px]">
+                                        {workflowName}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                        {schedule.workflowId}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden lg:table-cell">
+                                    <div className="flex flex-col">
+                                      <span className="text-sm">{cadenceLabel}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {schedule.timezone}
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm hidden sm:table-cell whitespace-nowrap">
+                                    {formatDateTime(schedule.nextRunAt)}
+                                  </TableCell>
+                                  <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
+                                    {formatDateTime(schedule.lastRunAt)}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {renderStatusBadge(schedule.status)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1 md:gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1 h-8 px-2 md:px-3"
+                                        onClick={() => handleRunNow(schedule)}
+                                        disabled={isActionBusy(schedule.id)}
+                                      >
+                                        <PlayCircle className="h-4 w-4" />
+                                        <span className="hidden md:inline">Run</span>
+                                      </Button>
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="gap-1 h-8 px-2 md:px-3"
+                                        onClick={() => handlePauseResume(schedule)}
+                                        disabled={isActionBusy(schedule.id)}
+                                      >
+                                        {isPaused ? (
+                                          <>
+                                            <PlayCircle className="h-4 w-4" />
+                                            <span className="hidden md:inline">Resume</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <PauseCircle className="h-4 w-4" />
+                                            <span className="hidden md:inline">Pause</span>
+                                          </>
+                                        )}
+                                      </Button>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Edit schedule"
+                                            onClick={() => handleEdit(schedule)}
+                                            className="h-8 w-8"
+                                          >
+                                            <Edit3 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Edit schedule configuration</TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Delete schedule"
+                                            onClick={() => handleDelete(schedule)}
+                                            disabled={isActionBusy(schedule.id)}
+                                            className="h-8 w-8"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Delete schedule</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  </TableCell>
+                                </>
+                              )}
+                            </SortableTableRow>
+                          );
+                        })}
+                      </SortableContext>
+                    ) : null}
+                    {!isLoading && !hasData && (
+                      <TableRow>
+                        <TableCell colSpan={8}>
+                          <EmptyState
+                            icon={CalendarClock}
+                            title="No schedules found"
+                            description='Create your first cadence with the "New schedule" button or adjust the filters above.'
+                            className="py-10"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
           </div>
         </div>

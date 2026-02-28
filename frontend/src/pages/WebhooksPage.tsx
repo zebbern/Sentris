@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RefreshCw, Plus, Trash2, ExternalLink, Link2, Copy, RotateCw } from 'lucide-react';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -38,6 +42,7 @@ import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { env } from '@/config/env';
+import { useAuthStore } from '@/store/authStore';
 import type { WebhookConfiguration } from '@shipsec/shared';
 
 interface WorkflowOption {
@@ -86,6 +91,7 @@ export function WebhooksPage() {
   const [actionState, setActionState] = useState<Record<string, 'delete' | 'regenerate' | 'test'>>(
     {},
   );
+  const organizationId = useAuthStore((state) => state.organizationId);
 
   const initialWorkflowId = searchParams.get('workflowId') || null;
   const [filters, setFilters] = useState<{
@@ -122,6 +128,24 @@ export function WebhooksPage() {
       return matchesSearch && matchesStatus;
     });
   }, [filters.search, filters.status, webhooks, workflowOptions]);
+
+  const hasActiveFilters =
+    filters.search.trim().length > 0 || filters.status !== 'all' || filters.workflowId !== null;
+
+  const getWebhookId = useCallback((w: WebhookConfiguration) => w.id, []);
+
+  const {
+    orderedItems: orderedWebhooks,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+    isDragDisabled,
+  } = useSortableList({
+    items: filteredWebhooks,
+    getId: getWebhookId,
+    storageKey: `shipsec:sort:webhooks:${organizationId}`,
+    disabled: hasActiveFilters,
+  });
 
   const handleWorkflowFilterChange = (value: string) => {
     const workflowId = value === 'all' ? null : value;
@@ -238,7 +262,7 @@ export function WebhooksPage() {
     }
   };
 
-  const hasData = filteredWebhooks.length > 0;
+  const hasData = orderedWebhooks.length > 0;
 
   return (
     <TooltipProvider>
@@ -322,173 +346,195 @@ export function WebhooksPage() {
 
           <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                    <TableHead>Webhook URL</TableHead>
-                    <TableHead className="hidden lg:table-cell whitespace-nowrap">
-                      Created
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap">Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && !hasData
-                    ? Array.from({ length: 4 }).map((_, index) => (
-                        <TableRow key={`skeleton-${index}`}>
-                          {Array.from({ length: 6 }).map((_, cell) => (
-                            <TableCell key={`cell-${cell}`}>
-                              <Skeleton className="h-5 w-full" />
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    : null}
-                  {!isLoading && hasData
-                    ? filteredWebhooks.map((webhook) => {
-                        const workflowName = getWorkflowName(webhook.workflowId, workflowOptions);
-
-                        return (
-                          <TableRow
-                            key={webhook.id}
-                            className="cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => navigate(`/webhooks/${webhook.id}`)}
-                          >
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col">
-                                <span className="truncate max-w-[140px]">{webhook.name}</span>
-                                {webhook.description && (
-                                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">
-                                    {webhook.description}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <div className="flex flex-col">
-                                <span className="font-medium truncate max-w-[120px]">
-                                  {workflowName}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                                  {webhook.workflowId.slice(0, 8)}...
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1 max-w-[200px]">
-                                <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate flex-1">
-                                  /{webhook.webhookPath.slice(0, 20)}...
-                                </code>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 shrink-0"
-                                      aria-label="Copy webhook URL"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleCopyUrl(webhook);
-                                      }}
-                                    >
-                                      <Copy className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Copy webhook URL</TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
-                              {formatDateTime(webhook.createdAt)}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              {renderStatusBadge(webhook.status)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1 md:gap-2">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="gap-1 h-8 px-2 md:px-3"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/webhooks/${webhook.id}/deliveries`);
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                      <span className="hidden md:inline">History</span>
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>View delivery history</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      aria-label="Regenerate URL"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRegeneratePath(webhook);
-                                      }}
-                                      disabled={isActionBusy(webhook.id)}
-                                      className="h-8 w-8"
-                                    >
-                                      <RotateCw
-                                        className={cn(
-                                          'h-4 w-4',
-                                          isActionBusy(webhook.id) && 'animate-spin',
-                                        )}
-                                      />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Regenerate webhook URL (old URL will stop working)
-                                  </TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Delete webhook"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDelete(webhook);
-                                      }}
-                                      disabled={isActionBusy(webhook.id)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Delete webhook</TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    : null}
-                  {!isLoading && !hasData && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={collisionDetection}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6}>
-                        <EmptyState
-                          icon={Link2}
-                          title="No webhooks found"
-                          description='Create your first webhook with the "New webhook" button or tweak the filters above.'
-                          className="py-10"
-                        />
-                      </TableCell>
+                      <TableHead className="w-10" />
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                      <TableHead>Webhook URL</TableHead>
+                      <TableHead className="hidden lg:table-cell whitespace-nowrap">
+                        Created
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading && !hasData
+                      ? Array.from({ length: 4 }).map((_, index) => (
+                          <TableRow key={`skeleton-${index}`}>
+                            <TableCell>
+                              <Skeleton className="h-4 w-4" />
+                            </TableCell>
+                            {Array.from({ length: 6 }).map((_, cell) => (
+                              <TableCell key={`cell-${cell}`}>
+                                <Skeleton className="h-5 w-full" />
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      : null}
+                    {!isLoading && hasData ? (
+                      <SortableContext
+                        items={orderedWebhooks.map((w) => w.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {orderedWebhooks.map((webhook) => {
+                          const workflowName = getWorkflowName(webhook.workflowId, workflowOptions);
+
+                          return (
+                            <SortableTableRow
+                              key={webhook.id}
+                              id={webhook.id}
+                              disabled={isDragDisabled}
+                              className="cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => navigate(`/webhooks/${webhook.id}`)}
+                            >
+                              {({ handleProps }) => (
+                                <>
+                                  <DragHandle {...handleProps} disabled={isDragDisabled} />
+                                  <TableCell className="font-medium">
+                                    <div className="flex flex-col">
+                                      <span className="truncate max-w-[140px]">{webhook.name}</span>
+                                      {webhook.description && (
+                                        <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+                                          {webhook.description}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium truncate max-w-[120px]">
+                                        {workflowName}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                        {webhook.workflowId.slice(0, 8)}...
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1 max-w-[200px]">
+                                      <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate flex-1">
+                                        /{webhook.webhookPath.slice(0, 20)}...
+                                      </code>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 shrink-0"
+                                            aria-label="Copy webhook URL"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleCopyUrl(webhook);
+                                            }}
+                                          >
+                                            <Copy className="h-3 w-3" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Copy webhook URL</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
+                                    {formatDateTime(webhook.createdAt)}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {renderStatusBadge(webhook.status)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-1 md:gap-2">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-1 h-8 px-2 md:px-3"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigate(`/webhooks/${webhook.id}/deliveries`);
+                                            }}
+                                          >
+                                            <ExternalLink className="h-4 w-4" />
+                                            <span className="hidden md:inline">History</span>
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>View delivery history</TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            aria-label="Regenerate URL"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleRegeneratePath(webhook);
+                                            }}
+                                            disabled={isActionBusy(webhook.id)}
+                                            className="h-8 w-8"
+                                          >
+                                            <RotateCw
+                                              className={cn(
+                                                'h-4 w-4',
+                                                isActionBusy(webhook.id) && 'animate-spin',
+                                              )}
+                                            />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          Regenerate webhook URL (old URL will stop working)
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label="Delete webhook"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDelete(webhook);
+                                            }}
+                                            disabled={isActionBusy(webhook.id)}
+                                            className="h-8 w-8"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Delete webhook</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  </TableCell>
+                                </>
+                              )}
+                            </SortableTableRow>
+                          );
+                        })}
+                      </SortableContext>
+                    ) : null}
+                    {!isLoading && !hasData && (
+                      <TableRow>
+                        <TableCell colSpan={7}>
+                          <EmptyState
+                            icon={Link2}
+                            title="No webhooks found"
+                            description='Create your first webhook with the "New webhook" button or tweak the filters above.'
+                            className="py-10"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { KeyRound } from 'lucide-react';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -117,8 +121,22 @@ export function SecretsManager() {
   const canManageSecrets = hasAdminRole(roles);
   const isReadOnly = !canManageSecrets;
   const queryClient = useQueryClient();
+  const organizationId = useAuthStore((state) => state.organizationId);
   const { data: secrets = [], isLoading: loading, error: secretsError } = useSecrets();
   const error = secretsError?.message ?? null;
+
+  const getSecretId = useCallback((s: SecretSummary) => s.id, []);
+
+  const {
+    orderedItems: orderedSecrets,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+  } = useSortableList({
+    items: secrets,
+    getId: getSecretId,
+    storageKey: `shipsec:sort:secrets:${organizationId}`,
+  });
   const createSecretMutation = useCreateSecret();
   const updateSecretMutation = useUpdateSecret();
   const rotateSecretMutation = useRotateSecret();
@@ -546,7 +564,7 @@ export function SecretsManager() {
                   </TableBody>
                 </Table>
               </div>
-            ) : secrets.length === 0 ? (
+            ) : orderedSecrets.length === 0 ? (
               <EmptyState
                 icon={KeyRound}
                 title="No secrets yet"
@@ -555,94 +573,115 @@ export function SecretsManager() {
               />
             ) : (
               <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="text-muted-foreground">
-                      <TableHead className="min-w-[120px]">Name</TableHead>
-                      <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
-                      <TableHead className="min-w-[120px] hidden md:table-cell">
-                        Active Version
-                      </TableHead>
-                      <TableHead className="min-w-[100px] hidden lg:table-cell">Updated</TableHead>
-                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {secrets.map((secret) => (
-                      <TableRow key={secret.id}>
-                        <TableCell className="align-top">
-                          <div className="font-medium truncate max-w-[150px] md:max-w-none">
-                            {secret.name}
-                          </div>
-                          <div className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[150px] md:max-w-none">
-                            ID: <span className="font-mono">{secret.id}</span>
-                          </div>
-                          {secret.description && (
-                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                              {secret.description}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top hidden sm:table-cell">
-                          <div className="flex flex-wrap gap-1">
-                            {secret.tags?.length ? (
-                              secret.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="text-xs">
-                                  {tag}
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="align-top hidden md:table-cell">
-                          {secret.activeVersion ? (
-                            <div>
-                              <div className="font-mono text-xs">
-                                v{secret.activeVersion.version}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                Created {formatDate(secret.activeVersion.createdAt)}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">No active version</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top hidden lg:table-cell">
-                          <div className="text-xs text-muted-foreground">
-                            {formatDate(secret.updatedAt)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <div className="flex justify-end gap-1 md:gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditDialog(secret)}
-                              disabled={isReadOnly}
-                              aria-disabled={isReadOnly}
-                              className="text-xs px-2 md:px-3"
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => openDeleteDialog(secret)}
-                              disabled={isReadOnly}
-                              aria-disabled={isReadOnly}
-                              className="text-xs px-2 md:px-3"
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </TableCell>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={collisionDetection}
+                  onDragEnd={handleDragEnd}
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="text-muted-foreground">
+                        <TableHead className="w-10" />
+                        <TableHead className="min-w-[120px]">Name</TableHead>
+                        <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
+                        <TableHead className="min-w-[120px] hidden md:table-cell">
+                          Active Version
+                        </TableHead>
+                        <TableHead className="min-w-[100px] hidden lg:table-cell">
+                          Updated
+                        </TableHead>
+                        <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      <SortableContext
+                        items={orderedSecrets.map((s) => s.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {orderedSecrets.map((secret) => (
+                          <SortableTableRow key={secret.id} id={secret.id}>
+                            {({ handleProps }) => (
+                              <>
+                                <DragHandle {...handleProps} />
+                                <TableCell className="align-top">
+                                  <div className="font-medium truncate max-w-[150px] md:max-w-none">
+                                    {secret.name}
+                                  </div>
+                                  <div className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[150px] md:max-w-none">
+                                    ID: <span className="font-mono">{secret.id}</span>
+                                  </div>
+                                  {secret.description && (
+                                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                      {secret.description}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="align-top hidden sm:table-cell">
+                                  <div className="flex flex-wrap gap-1">
+                                    {secret.tags?.length ? (
+                                      secret.tags.map((tag) => (
+                                        <Badge key={tag} variant="secondary" className="text-xs">
+                                          {tag}
+                                        </Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="align-top hidden md:table-cell">
+                                  {secret.activeVersion ? (
+                                    <div>
+                                      <div className="font-mono text-xs">
+                                        v{secret.activeVersion.version}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Created {formatDate(secret.activeVersion.createdAt)}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">
+                                      No active version
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="align-top hidden lg:table-cell">
+                                  <div className="text-xs text-muted-foreground">
+                                    {formatDate(secret.updatedAt)}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="align-top">
+                                  <div className="flex justify-end gap-1 md:gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditDialog(secret)}
+                                      disabled={isReadOnly}
+                                      aria-disabled={isReadOnly}
+                                      className="text-xs px-2 md:px-3"
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => openDeleteDialog(secret)}
+                                      disabled={isReadOnly}
+                                      aria-disabled={isReadOnly}
+                                      className="text-xs px-2 md:px-3"
+                                    >
+                                      Delete
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </>
+                            )}
+                          </SortableTableRow>
+                        ))}
+                      </SortableContext>
+                    </TableBody>
+                  </Table>
+                </DndContext>
               </div>
             )}
           </div>

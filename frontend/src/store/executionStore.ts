@@ -19,6 +19,16 @@ import type { NodeStatus } from '@/schemas/node';
 
 type ExecutionLifecycle = 'idle' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
+export interface TrackedRun {
+  runId: string;
+  workflowId: string;
+  workflowName?: string;
+  status: ExecutionLifecycle;
+  startedAt?: string;
+}
+
+const MAX_TRACKED_RUNS = 10;
+
 interface ExecutionStoreState {
   runId: string | null;
   workflowId: string | null;
@@ -37,6 +47,7 @@ interface ExecutionStoreState {
   pollingInterval: NodeJS.Timeout | null;
   eventSource: EventSource | null;
   streamingMode: 'realtime' | 'polling' | 'none' | 'connecting';
+  trackedRuns: TrackedRun[];
 }
 
 interface ExecutionStoreActions {
@@ -71,6 +82,9 @@ interface ExecutionStoreActions {
   fetchHistoricalLogs: (runId: string) => Promise<void>;
   setLogMode: (mode: 'live' | 'scrubbing' | 'historical') => void;
   getDisplayLogs: () => ExecutionLog[];
+  addTrackedRun: (run: { runId: string; workflowId: string; workflowName?: string }) => void;
+  removeTrackedRun: (runId: string) => void;
+  switchToRun: (runId: string) => void;
 }
 
 type ExecutionStore = ExecutionStoreState & ExecutionStoreActions;
@@ -175,6 +189,7 @@ const INITIAL_STATE: ExecutionStoreState = {
   pollingInterval: null,
   eventSource: null,
   streamingMode: 'none',
+  trackedRuns: [],
 };
 
 export const useExecutionStore = create<ExecutionStore>((set, get) => ({
@@ -221,6 +236,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         // Terminal streams will be populated as new run progresses
         terminalStreams: {},
       });
+      get().addTrackedRun({ runId: executionId, workflowId });
       invalidateRunsForWorkflow(workflowId);
 
       await get().pollOnce();
@@ -285,6 +301,9 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     if (workflowId) {
       set({ workflowId });
     }
+
+    // Auto-track when monitoring a run
+    get().addTrackedRun({ runId, workflowId: workflowId ?? get().workflowId ?? '' });
 
     // Skip the first poll tick — selectRun → loadTimeline already fetches
     // initial events, dataflows, and status. Start polling after a double
@@ -357,6 +376,9 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
           events: mergedEvents,
           nodeStates,
           cursor: traceEnvelope.cursor ?? state.cursor,
+          trackedRuns: state.trackedRuns.map((r) =>
+            r.runId === runId ? { ...r, status: lifecycle } : r,
+          ),
         };
       });
 
@@ -388,7 +410,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       clearInterval(interval);
     }
     get().disconnectStream();
-    set({ ...INITIAL_STATE, streamingMode: 'none' });
+    set({ ...INITIAL_STATE, streamingMode: 'none', trackedRuns: [] });
   },
 
   connectStream: async (runId: string) => {
@@ -448,6 +470,9 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               runStatus: statusPayload,
               status: lifecycle,
               workflowId: state.workflowId ?? statusPayload.workflowId,
+              trackedRuns: state.trackedRuns.map((r) =>
+                r.runId === runId ? { ...r, status: lifecycle } : r,
+              ),
             };
           });
 
@@ -758,6 +783,48 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       default:
         return state.liveLogs;
     }
+  },
+
+  addTrackedRun: ({ runId, workflowId, workflowName }) => {
+    set((state) => {
+      // Already tracked — just update status
+      const existing = state.trackedRuns.find((r) => r.runId === runId);
+      if (existing) {
+        return {
+          trackedRuns: state.trackedRuns.map((r) =>
+            r.runId === runId
+              ? { ...r, status: state.status, workflowName: workflowName ?? r.workflowName }
+              : r,
+          ),
+        };
+      }
+
+      const newRun: TrackedRun = {
+        runId,
+        workflowId,
+        workflowName,
+        status: state.status === 'idle' ? 'running' : state.status,
+        startedAt: new Date().toISOString(),
+      };
+
+      // FIFO: keep only the most recent MAX_TRACKED_RUNS
+      const runs = [...state.trackedRuns, newRun];
+      return { trackedRuns: runs.slice(-MAX_TRACKED_RUNS) };
+    });
+  },
+
+  removeTrackedRun: (runId: string) => {
+    set((state) => ({
+      trackedRuns: state.trackedRuns.filter((r) => r.runId !== runId),
+    }));
+  },
+
+  switchToRun: (runId: string) => {
+    const tracked = get().trackedRuns.find((r) => r.runId === runId);
+    if (!tracked) return;
+
+    // Use monitorRun to reconnect SSE and set the active run
+    get().monitorRun(runId, tracked.workflowId);
   },
 }));
 

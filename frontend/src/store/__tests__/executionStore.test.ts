@@ -320,4 +320,182 @@ describe('useExecutionStore', () => {
       expect(useExecutionStore.getState().streamingMode).toBe('polling');
     });
   });
+
+  describe('Tracked runs', () => {
+    it('addTrackedRun adds a run to trackedRuns', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+        workflowName: 'Test Workflow',
+      });
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(1);
+      expect(trackedRuns[0].runId).toBe('run-1');
+      expect(trackedRuns[0].workflowId).toBe('wf-1');
+      expect(trackedRuns[0].workflowName).toBe('Test Workflow');
+    });
+
+    it('addTrackedRun updates existing run instead of duplicating', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+        workflowName: 'Original Name',
+      });
+
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+        workflowName: 'Updated Name',
+      });
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(1);
+      expect(trackedRuns[0].workflowName).toBe('Updated Name');
+    });
+
+    it('addTrackedRun enforces MAX_TRACKED_RUNS limit (FIFO)', () => {
+      // Add 11 runs — the limit is 10
+      for (let i = 0; i < 11; i++) {
+        useExecutionStore.getState().addTrackedRun({
+          runId: `run-${i}`,
+          workflowId: 'wf-1',
+        });
+      }
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(10);
+      // First run should have been pruned
+      expect(trackedRuns[0].runId).toBe('run-1');
+      expect(trackedRuns[9].runId).toBe('run-10');
+    });
+
+    it('removeTrackedRun removes a run by id', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+      });
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-2',
+        workflowId: 'wf-1',
+      });
+
+      useExecutionStore.getState().removeTrackedRun('run-1');
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(1);
+      expect(trackedRuns[0].runId).toBe('run-2');
+    });
+
+    it('removeTrackedRun is a no-op for unknown id', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+      });
+
+      useExecutionStore.getState().removeTrackedRun('run-unknown');
+
+      expect(useExecutionStore.getState().trackedRuns).toHaveLength(1);
+    });
+
+    it('reset clears all tracked runs', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+      });
+
+      useExecutionStore.getState().reset();
+
+      expect(useExecutionStore.getState().trackedRuns).toHaveLength(0);
+    });
+  });
+
+  describe('monitorRun', () => {
+    it('sets runId when monitoring a run', () => {
+      useExecutionStore.getState().monitorRun('run-123', 'wf-1');
+
+      expect(useExecutionStore.getState().runId).toBe('run-123');
+    });
+
+    it('sets workflowId when provided', () => {
+      useExecutionStore.getState().monitorRun('run-123', 'wf-42');
+
+      expect(useExecutionStore.getState().workflowId).toBe('wf-42');
+    });
+
+    it('auto-tracks the monitored run in trackedRuns', () => {
+      useExecutionStore.getState().monitorRun('run-123', 'wf-1');
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(1);
+      expect(trackedRuns[0].runId).toBe('run-123');
+      expect(trackedRuns[0].workflowId).toBe('wf-1');
+    });
+
+    it('does not clear other tracked runs when monitoring a new run', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'existing-run',
+        workflowId: 'wf-1',
+        workflowName: 'Existing',
+      });
+
+      useExecutionStore.getState().monitorRun('new-run', 'wf-2');
+
+      const { trackedRuns } = useExecutionStore.getState();
+      expect(trackedRuns).toHaveLength(2);
+      expect(trackedRuns.find((r) => r.runId === 'existing-run')).toBeTruthy();
+      expect(trackedRuns.find((r) => r.runId === 'new-run')).toBeTruthy();
+    });
+
+    it('is a no-op when runId is empty', () => {
+      useExecutionStore.getState().monitorRun('', 'wf-1');
+
+      expect(useExecutionStore.getState().runId).toBeNull();
+      expect(useExecutionStore.getState().trackedRuns).toHaveLength(0);
+    });
+
+    it('clears existing polling interval before starting new one', () => {
+      const existingInterval = setInterval(() => {}, 1000);
+      useExecutionStore.setState({ pollingInterval: existingInterval });
+
+      useExecutionStore.getState().monitorRun('run-1', 'wf-1');
+
+      // The old interval should have been cleared and a new one set
+      const { pollingInterval } = useExecutionStore.getState();
+      expect(pollingInterval).not.toBeNull();
+      expect(pollingInterval).not.toBe(existingInterval);
+
+      // Cleanup
+      if (pollingInterval) clearInterval(pollingInterval);
+    });
+  });
+
+  describe('switchToRun', () => {
+    it('switches active runId to the specified tracked run', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+      });
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-2',
+        workflowId: 'wf-2',
+      });
+
+      useExecutionStore.getState().switchToRun('run-2');
+
+      expect(useExecutionStore.getState().runId).toBe('run-2');
+    });
+
+    it('is a no-op when runId is not in trackedRuns', () => {
+      useExecutionStore.getState().addTrackedRun({
+        runId: 'run-1',
+        workflowId: 'wf-1',
+      });
+      useExecutionStore.setState({ runId: 'run-1' });
+
+      useExecutionStore.getState().switchToRun('run-unknown');
+
+      expect(useExecutionStore.getState().runId).toBe('run-1');
+    });
+  });
 });

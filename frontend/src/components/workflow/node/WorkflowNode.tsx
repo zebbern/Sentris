@@ -143,8 +143,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<FrontendNodeData>
   const terminalSession = useExecutionStore((state) => state.getTerminalSession(id, 'pty'));
   const theme = useThemeStore((state) => state.theme);
   const lastCreatedKey = useApiKeyUiStore((state) => state.lastCreatedKey);
-  // @ts-expect-error - FIXME: Check actual store structure
-  const workflowIdFromStore = useWorkflowStore((state) => state.workflow?.id);
+  const workflowIdFromStore = useWorkflowStore((state) => state.metadata.id);
   const {
     onOpenScheduleSidebar,
     onOpenWebhooksSidebar,

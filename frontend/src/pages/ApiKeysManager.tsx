@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,10 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Copy, Trash2, ShieldOff, AlertTriangle, Key } from 'lucide-react';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortableList } from '@/hooks/useSortableList';
+import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -84,8 +88,22 @@ export function ApiKeysManager() {
   const isReadOnly = !canManageKeys;
   const queryClient = useQueryClient();
 
+  const organizationId = useAuthStore((state) => state.organizationId);
   const { data: apiKeys = [], isLoading: loading, error: apiKeysError } = useApiKeys();
   const error = apiKeysError?.message ?? null;
+
+  const getApiKeyId = useCallback((k: ApiKeyResponseDto) => k.id, []);
+
+  const {
+    orderedItems: orderedApiKeys,
+    sensors,
+    collisionDetection,
+    handleDragEnd,
+  } = useSortableList({
+    items: apiKeys,
+    getId: getApiKeyId,
+    storageKey: `shipsec:sort:apikeys:${organizationId}`,
+  });
   const createApiKeyMutation = useCreateApiKey();
   const revokeApiKeyMutation = useRevokeApiKey();
   const deleteApiKeyMutation = useDeleteApiKey();
@@ -232,147 +250,171 @@ export function ApiKeysManager() {
 
         <div className="border rounded-md bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[120px]">Name</TableHead>
-                  <TableHead className="min-w-[80px]">Key Hint</TableHead>
-                  <TableHead className="min-w-[120px] hidden md:table-cell">Permissions</TableHead>
-                  <TableHead className="min-w-[80px]">Status</TableHead>
-                  <TableHead className="min-w-[100px] hidden sm:table-cell">Created</TableHead>
-                  <TableHead className="min-w-[100px] hidden lg:table-cell">Last Used</TableHead>
-                  <TableHead className="text-right min-w-[80px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading && apiKeys.length === 0 ? (
-                  Array.from({ length: 4 }).map((_, idx) => (
-                    <TableRow key={`skeleton-${idx}`}>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[120px]" />
-                        <Skeleton className="h-3 w-[80px] mt-1" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-[60px]" />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex gap-1">
-                          <Skeleton className="h-5 w-[70px]" />
-                          <Skeleton className="h-5 w-[50px]" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-[60px]" />
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <Skeleton className="h-4 w-[80px]" />
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <Skeleton className="h-4 w-[80px]" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Skeleton className="h-8 w-8 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : apiKeys.length === 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={collisionDetection}
+              onDragEnd={handleDragEnd}
+            >
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7}>
-                      <EmptyState
-                        icon={Key}
-                        title="No API keys"
-                        description="Create your first API key to enable programmatic access."
-                        className="py-10"
-                      />
-                    </TableCell>
+                    <TableHead className="w-10" />
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="min-w-[80px]">Key Hint</TableHead>
+                    <TableHead className="min-w-[120px] hidden md:table-cell">
+                      Permissions
+                    </TableHead>
+                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <TableHead className="min-w-[100px] hidden sm:table-cell">Created</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Last Used</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  apiKeys.map((key) => (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium">
-                        <div className="truncate max-w-[150px] md:max-w-none">{key.name}</div>
-                        {key.description && (
-                          <div className="text-xs text-muted-foreground truncate max-w-[150px] md:max-w-none">
-                            {key.description}
+                </TableHeader>
+                <TableBody>
+                  {loading && apiKeys.length === 0 ? (
+                    Array.from({ length: 4 }).map((_, idx) => (
+                      <TableRow key={`skeleton-${idx}`}>
+                        <TableCell>
+                          <Skeleton className="h-4 w-4" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-[120px]" />
+                          <Skeleton className="h-3 w-[80px] mt-1" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-[60px]" />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex gap-1">
+                            <Skeleton className="h-5 w-[70px]" />
+                            <Skeleton className="h-5 w-[50px]" />
                           </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {truncateKey(key.keyHint)}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(key.permissions).map(([resource, actions]) =>
-                            Object.entries(actions as Record<string, boolean>)
-                              .filter(([, enabled]) => enabled)
-                              .map(([action]) => (
-                                <Badge
-                                  key={`${resource}:${action}`}
-                                  variant="secondary"
-                                  className="text-[10px]"
-                                >
-                                  {resource}:{action}
-                                </Badge>
-                              )),
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {key.isActive ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-success/10 text-success border-success/20 text-xs"
-                          >
-                            Active
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="bg-muted text-muted-foreground text-xs"
-                          >
-                            Revoked
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
-                        {formatDate(key.createdAt)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs hidden lg:table-cell">
-                        {key.lastUsedAt ? formatDate(key.lastUsedAt) : 'Never'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {key.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title="Revoke Key"
-                              aria-label="Revoke key"
-                              onClick={() => handleRevoke(key)}
-                              disabled={isReadOnly}
-                              className="h-8 w-8"
-                            >
-                              <ShieldOff className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Delete Key"
-                            aria-label="Delete key"
-                            onClick={() => handleDelete(key)}
-                            disabled={isReadOnly}
-                            className="h-8 w-8"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-[60px]" />
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell">
+                          <Skeleton className="h-4 w-[80px]" />
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Skeleton className="h-4 w-[80px]" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="h-8 w-8 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : apiKeys.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8}>
+                        <EmptyState
+                          icon={Key}
+                          title="No API keys"
+                          description="Create your first API key to enable programmatic access."
+                          className="py-10"
+                        />
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    <SortableContext
+                      items={orderedApiKeys.map((k) => k.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {orderedApiKeys.map((key) => (
+                        <SortableTableRow key={key.id} id={key.id}>
+                          {({ handleProps }) => (
+                            <>
+                              <DragHandle {...handleProps} />
+                              <TableCell className="font-medium">
+                                <div className="truncate max-w-[150px] md:max-w-none">
+                                  {key.name}
+                                </div>
+                                {key.description && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[150px] md:max-w-none">
+                                    {key.description}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {truncateKey(key.keyHint)}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(key.permissions).map(([resource, actions]) =>
+                                    Object.entries(actions as Record<string, boolean>)
+                                      .filter(([, enabled]) => enabled)
+                                      .map(([action]) => (
+                                        <Badge
+                                          key={`${resource}:${action}`}
+                                          variant="secondary"
+                                          className="text-[10px]"
+                                        >
+                                          {resource}:{action}
+                                        </Badge>
+                                      )),
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {key.isActive ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-success/10 text-success border-success/20 text-xs"
+                                  >
+                                    Active
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="bg-muted text-muted-foreground text-xs"
+                                  >
+                                    Revoked
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-xs hidden sm:table-cell">
+                                {formatDate(key.createdAt)}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-xs hidden lg:table-cell">
+                                {key.lastUsedAt ? formatDate(key.lastUsedAt) : 'Never'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {key.isActive && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      title="Revoke Key"
+                                      aria-label="Revoke key"
+                                      onClick={() => handleRevoke(key)}
+                                      disabled={isReadOnly}
+                                      className="h-8 w-8"
+                                    >
+                                      <ShieldOff className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Delete Key"
+                                    aria-label="Delete key"
+                                    onClick={() => handleDelete(key)}
+                                    disabled={isReadOnly}
+                                    className="h-8 w-8"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
+                        </SortableTableRow>
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
           </div>
         </div>
       </div>

@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuditLogs } from '@/hooks/queries/useAuditLogQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { hasAdminRole } from '@/utils/auth';
@@ -401,7 +402,7 @@ export function AuditLogSettings() {
   } = useAuditLogs(filters, isAdmin);
   const items = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
   const loading = isLoading || (isFetching && !isFetchingNextPage);
-  const errorMessage = error instanceof Error ? error.message : null;
+  const errorMessage = error ? humanizeApiError(error) : null;
 
   const clearFilters = () => {
     setSelectedActions([]);

@@ -21,12 +21,22 @@ export function humanizeApiError(error: unknown): string {
         return 'Conflict — another change was made';
       case 422:
         return 'Validation error';
+      case 502:
+      case 503:
+      case 504:
+        return 'Service temporarily unavailable';
     }
   }
 
   // If we have a useful error message, prefer it over the generic fallback
   if (error instanceof Error && error.message) {
-    return error.message;
+    // Strip raw HTML responses (e.g. nginx error pages)
+    if (error.message.includes('<html') || error.message.includes('<body')) {
+      return 'Service temporarily unavailable';
+    }
+    return (
+      error.message.replace(/<[^>]*>/g, '').trim() || 'Something went wrong — please try again'
+    );
   }
 
   return 'Something went wrong — please try again';

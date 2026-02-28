@@ -37,6 +37,22 @@ type CreateApiKeyDto = components['schemas']['CreateApiKeyDto'];
 type UpdateApiKeyDto = components['schemas']['UpdateApiKeyDto'];
 type ListAuditLogsResponseDto = components['schemas']['ListAuditLogsResponseDto'];
 
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+
+export interface AnalyticsSettingsResponse {
+  organizationId: string;
+  subscriptionTier: SubscriptionTier;
+  analyticsRetentionDays: number;
+  maxRetentionDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateAnalyticsSettingsInput {
+  analyticsRetentionDays?: number;
+  subscriptionTier?: SubscriptionTier;
+}
+
 export interface TerminalChunkResponse {
   runId: string;
   cursor?: string;
@@ -1145,6 +1161,39 @@ export const api = {
       const response = await apiClient.listDeliveries(id);
       if (response.error) throw new Error('Failed to fetch webhook deliveries');
       return (response.data || []) as WebhookDelivery[];
+    },
+  },
+
+  analyticsSettings: {
+    get: async (): Promise<AnalyticsSettingsResponse> => {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_V1_URL}/analytics/settings`, { headers });
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ message: 'Failed to fetch analytics settings' }));
+        throw new Error(error.message || 'Failed to fetch analytics settings');
+      }
+      return response.json();
+    },
+
+    update: async (data: UpdateAnalyticsSettingsInput): Promise<AnalyticsSettingsResponse> => {
+      const headers: Record<string, string> = {
+        ...(await getAuthHeaders()),
+        'Content-Type': 'application/json',
+      };
+      const response = await fetch(`${API_V1_URL}/analytics/settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response
+          .json()
+          .catch(() => ({ message: 'Failed to update analytics settings' }));
+        throw new Error(error.message || 'Failed to update analytics settings');
+      }
+      return response.json();
     },
   },
 

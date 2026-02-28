@@ -38,7 +38,6 @@ import { useAuth, useAuthProvider } from '@/auth/auth-context';
 import { env } from '@/config/env';
 import { useThemeStore } from '@/store/themeStore';
 import { cn } from '@/lib/utils';
-import { setMobilePlacementSidebarClose } from '@/components/layout/sidebar-state';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes, prefetchRoute } from '@/lib/prefetch-routes';
@@ -139,19 +138,6 @@ export function AppLayout({ children }: AppLayoutProps) {
       setSettingsOpen(true);
     }
   }, [location.pathname, settingsOpen]);
-
-  // Set up sidebar close callback for mobile component placement
-  useEffect(() => {
-    if (isMobile) {
-      setMobilePlacementSidebarClose(() => {
-        setSidebarOpen(false);
-        setWasExplicitlyOpened(false);
-      });
-    }
-    return () => {
-      setMobilePlacementSidebarClose(() => {});
-    };
-  }, [isMobile]);
 
   // Handle hover to expand sidebar when collapsed (desktop only)
   const handleMouseEnter = () => {
@@ -340,6 +326,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   ];
 
   const isActive = (path: string) => {
+    // Settings pages have no corresponding sidebar item — nothing should highlight
+    if (location.pathname.startsWith('/settings')) {
+      return false;
+    }
     if (path === '/') {
       return location.pathname === '/' || location.pathname.startsWith('/workflows');
     }

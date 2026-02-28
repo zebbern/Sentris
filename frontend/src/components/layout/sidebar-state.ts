@@ -51,26 +51,3 @@ export const usePlacementStore = create<PlacementState & PlacementActions>((set,
     return state.isActive && state.workflowId === workflowId;
   },
 }));
-
-// Legacy exports for backward compatibility during migration
-// TODO: Remove these after all usages are migrated to usePlacementStore
-export const mobilePlacementState = {
-  get componentId() {
-    return usePlacementStore.getState().componentId;
-  },
-  get componentName() {
-    return usePlacementStore.getState().componentName;
-  },
-  get isActive() {
-    return usePlacementStore.getState().isActive;
-  },
-  onSidebarClose: null as (() => void) | null,
-};
-
-export const setMobilePlacementSidebarClose = (callback: () => void) => {
-  mobilePlacementState.onSidebarClose = callback;
-};
-
-export const clearMobilePlacement = () => {
-  usePlacementStore.getState().clearPlacement();
-};

@@ -23,6 +23,7 @@ import { AgentTracePanel } from '@/components/timeline/AgentTracePanel';
 import { NodeIOInspector } from '@/components/timeline/NodeIOInspector';
 import { NetworkPanel } from '@/components/timeline/NetworkPanel';
 import { getTriggerDisplay } from '@/utils/triggerDisplay';
+import { ExecutionTabs } from '@/components/execution/ExecutionTabs';
 import { RunInfoDisplay } from '@/components/timeline/RunInfoDisplay';
 import { isRunLive } from '@/features/workflow-builder/utils/executionRuns';
 
@@ -251,6 +252,8 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
   return (
     <>
       <aside className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
+        {/* Multi-run tab bar — only visible when 2+ runs are tracked */}
+        <ExecutionTabs />
         {/* Header - Run Selector */}
         <div className="border-b px-3 py-2.5 flex items-center justify-between gap-2">
           <RunSelector
