@@ -246,7 +246,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
       try {
         const statusPayload = await queryClient.fetchQuery(executionStatusOptions(runId));
         if (statusPayload) {
-          const status = (statusPayload as any)?.status as ExecutionStatus | undefined;
+          const status = (statusPayload as ExecutionStatusResponse).status;
           const lifecycle = mapStatusToLifecycle(status);
           set({
             runStatus: statusPayload as ExecutionStatusResponse,
@@ -328,8 +328,10 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         throw new Error('Failed to fetch execution data');
       }
 
-      // Filter events to ensure they match ExecutionLog type (required fields)
-      const rawEvents = (traceEnvelope.events || []) as any[];
+      // Filter events to ensure they match ExecutionLog type (required fields).
+      // Cast to Record[] because the trace envelope's event type union is narrower
+      // than ExecutionLog's type union (e.g. missing AWAITING_INPUT, SKIPPED, etc.).
+      const rawEvents = (traceEnvelope.events || []) as Record<string, unknown>[];
       const validEvents = rawEvents.filter(
         (e): e is ExecutionLog =>
           typeof e === 'object' &&
@@ -346,7 +348,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
 
         const mergedEvents = mergeEvents(state.events, validEvents);
         const nodeStates = deriveNodeStates(mergedEvents);
-        const status = (statusPayload as any)?.status as ExecutionStatus | undefined;
+        const status = (statusPayload as ExecutionStatusResponse).status;
         const lifecycle = mapStatusToLifecycle(status);
 
         return {
@@ -358,7 +360,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
         };
       });
 
-      const status = (statusPayload as any)?.status as ExecutionStatus | undefined;
+      const status = (statusPayload as ExecutionStatusResponse).status;
       if (status && TERMINAL_STATUSES.includes(status)) {
         get().stopPolling();
         const currentWorkflowId = get().workflowId;
@@ -529,7 +531,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               id: string;
               runId: string;
               nodeId: string;
-              level: string;
+              level: ExecutionLog['level'];
               message: string;
               timestamp: string;
             }[];
@@ -547,7 +549,7 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
               runId: log.runId,
               nodeId: log.nodeId,
               type: 'PROGRESS' as const,
-              level: log.level as any,
+              level: log.level,
               timestamp: log.timestamp,
               message: log.message,
             }));

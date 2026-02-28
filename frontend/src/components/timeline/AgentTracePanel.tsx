@@ -127,13 +127,8 @@ export function AgentTracePanel({ runId }: AgentTracePanelProps) {
     });
 
     Object.entries(outputs).forEach(([nodeId, payload]) => {
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'agentRunId' in payload &&
-        typeof (payload as any).agentRunId === 'string'
-      ) {
-        entries.set(nodeId, (payload as any).agentRunId as string);
+      if (payload && typeof payload.agentRunId === 'string') {
+        entries.set(nodeId, payload.agentRunId);
       }
     });
 
@@ -956,7 +951,8 @@ function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
   };
 
   parts.forEach((entry) => {
-    const chunk = entry.chunk as any;
+    // UIMessageChunk may not include all agent-specific stream types from the backend
+    const chunk = entry.chunk as { type?: string; [key: string]: unknown };
     if (chunk?.type === 'tool-input-available') {
       createSnapshotStep({
         toolCallId: ensureString(chunk.toolCallId),

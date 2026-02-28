@@ -93,7 +93,9 @@ export function useScheduleEditorState({
     const entryNode = workflowDetail.graph.nodes.find(
       (node: any) => node.type === ENTRY_COMPONENT_ID,
     );
-    return normalizeRuntimeInputs((entryNode?.data as any)?.config?.params?.runtimeInputs);
+    return normalizeRuntimeInputs(
+      (entryNode?.data?.config?.params as Record<string, unknown> | undefined)?.runtimeInputs,
+    );
   }, [workflowDetail]);
 
   const resetForm = () => {
@@ -348,7 +350,10 @@ export function useScheduleEditorState({
       catchupWindowSeconds: Number(form.catchupWindowSeconds) || 0,
       inputPayload: {
         runtimeInputs: normalizedRuntimeValues,
-        nodeOverrides: parsedOverrides as any,
+        nodeOverrides: parsedOverrides as Record<
+          string,
+          { params: Record<string, unknown>; inputOverrides: Record<string, unknown> }
+        >,
       },
     };
 

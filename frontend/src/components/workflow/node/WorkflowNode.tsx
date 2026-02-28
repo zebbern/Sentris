@@ -40,7 +40,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useExecutionTimelineStore, type NodeVisualState } from '@/store/executionTimelineStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { getNodeStyle } from '../nodeStyles';
-import type { NodeData, FrontendNodeData } from '@/schemas/node';
+import type { FrontendNodeData } from '@/schemas/node';
 import type { InputPort } from '@/schemas/component';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -121,7 +121,7 @@ function ComponentNotFoundCard({ componentRef }: { componentRef: string | undefi
 /**
  * Enhanced WorkflowNode - Visual representation with timeline states
  */
-export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
+export const WorkflowNode = ({ data, selected, id }: NodeProps<FrontendNodeData>) => {
   // Store hooks
   const { data: componentIndex, isLoading: loading } = useComponents();
   const getComponent = (ref: string) => {
@@ -166,7 +166,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
   const activeApiKey = lastCreatedKey;
 
   const [textSize, setTextSize] = useState<{ width: number; height: number }>(() => {
-    const uiSize = (data as any)?.ui?.size as { width?: number; height?: number } | undefined;
+    const uiSize = data.ui?.size;
     return {
       width: uiSize?.width ?? DEFAULT_TEXT_WIDTH,
       height: uiSize?.height ?? DEFAULT_TEXT_HEIGHT,
@@ -195,8 +195,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
     };
   }, [id, isTerminalOpen, prefetchTerminal, selectedRunId]);
 
-  // Cast to access extended frontend fields
-  const nodeData = data as FrontendNodeData;
+  const nodeData = data;
   const componentRef: string | undefined = nodeData.componentId ?? nodeData.componentSlug;
   const component = componentRef ? getComponent(componentRef) : null;
   const isTextBlock = component?.id === 'core.ui.text';
@@ -205,12 +204,10 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
   const componentCategory = component?.category ?? 'input';
   const isToolModeOnly = component?.id ? TOOL_MODE_ONLY_COMPONENTS.has(component.id) : false;
   const showMcpBadge = componentCategory === 'mcp' || isToolModeOnly;
-  const isToolMode = Boolean(
-    (nodeData.config as any)?.isToolMode || (nodeData.config as any)?.mode === 'tool',
-  );
+  const isToolMode = Boolean(nodeData.config?.isToolMode || nodeData.config?.mode === 'tool');
 
   // Workflow ID resolution
-  const workflowIdFromNode = (nodeData as any)?.workflowId as string | undefined;
+  const workflowIdFromNode = nodeData.workflowId;
   const params = useParams<{ id?: string }>();
   const workflowIdFromRoute = params?.id && params.id !== 'new' ? params.id : undefined;
   const workflowId = workflowIdFromStore || workflowIdFromNode || workflowIdFromRoute;
@@ -223,7 +220,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== id) return n;
-        const currentConfig = (n.data as any).config || {};
+        const currentConfig = (n.data as FrontendNodeData).config || {};
         return {
           ...n,
           data: {
@@ -261,7 +258,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
   // Text size sync effect
   useEffect(() => {
     if (!isTextBlock) return;
-    const uiSize = (nodeData as any)?.ui?.size as { width?: number; height?: number } | undefined;
+    const uiSize = nodeData.ui?.size;
     if (!uiSize) return;
     setTextSize((current) => {
       const nextWidth = uiSize.width ?? current.width;
@@ -295,9 +292,9 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
           ? {
               ...node,
               data: {
-                ...(node.data as any),
+                ...(node.data as FrontendNodeData),
                 ui: {
-                  ...(node.data as any).ui,
+                  ...(node.data as FrontendNodeData).ui,
                   size: { width: clampedWidth, height: clampedHeight },
                 },
               },
@@ -437,7 +434,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== id) return n;
-        const currentConfig = (n.data as any).config || {};
+        const currentConfig = (n.data as FrontendNodeData).config || {};
         return {
           ...n,
           data: {
@@ -846,7 +843,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
                 setNodes((nds) =>
                   nds.map((n) => {
                     if (n.id !== id) return n;
-                    const currentConfig = (n.data as any).config || {
+                    const currentConfig = (n.data as FrontendNodeData).config || {
                       params: {},
                       inputOverrides: {},
                     };
@@ -1029,7 +1026,7 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
                       const sourceLabels = sourceNodes
                         .map((sourceNode) => {
                           if (!sourceNode) return null;
-                          return (sourceNode.data as any)?.label || sourceNode.id;
+                          return (sourceNode.data as FrontendNodeData)?.label || sourceNode.id;
                         })
                         .filter(Boolean) as string[];
                       if (sourceLabels.length > 0) {
@@ -1043,10 +1040,10 @@ export const WorkflowNode = ({ data, selected, id }: NodeProps<NodeData>) => {
                       } else if (!isToolsPort) {
                         const sourceNode = getNodes().find((n) => n.id === connection.source);
                         if (sourceNode) {
-                          const sourceComponent = getComponent(
-                            (sourceNode.data as any).componentId ??
-                              (sourceNode.data as any).componentSlug,
-                          );
+                          const sourceRef =
+                            (sourceNode.data as FrontendNodeData).componentId ??
+                            (sourceNode.data as FrontendNodeData).componentSlug;
+                          const sourceComponent = sourceRef ? getComponent(sourceRef) : null;
                           if (sourceComponent) {
                             const sourceOutput = sourceComponent.outputs.find(
                               (o) => o.id === connection.sourceHandle,

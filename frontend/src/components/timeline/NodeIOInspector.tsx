@@ -52,21 +52,27 @@ export function NodeIOInspector() {
 
   const nodeIOList = useMemo(() => {
     if (!rawNodeIOData) return [];
-    const nodes = (rawNodeIOData.nodes || []) as any[];
-    return nodes.map((n: any) => ({
-      ...n,
-      nodeRef: n.nodeRef || 'unknown',
-      componentId: n.componentId || 'unknown',
-      status: n.status || 'running',
-      startedAt: n.startedAt || null,
-      completedAt: n.completedAt || null,
-      durationMs: n.durationMs ?? null,
-      inputs: n.inputs || null,
-      outputs: n.outputs || null,
-      inputsTruncated: !!n.inputsTruncated,
-      outputsTruncated: !!n.outputsTruncated,
-      errorMessage: n.errorMessage || null,
-    })) as NodeIO[];
+    const nodes = rawNodeIOData.nodes || [];
+    return nodes.map(
+      (n): NodeIO => ({
+        ...n,
+        nodeRef: n.nodeRef || 'unknown',
+        componentId: n.componentId || 'unknown',
+        status: n.status || 'running',
+        startedAt: n.startedAt || null,
+        completedAt: n.completedAt || null,
+        durationMs: n.durationMs ?? null,
+        inputs: n.inputs || null,
+        outputs: n.outputs || null,
+        inputsSize: n.inputsSize ?? 0,
+        outputsSize: n.outputsSize ?? 0,
+        inputsSpilled: n.inputsSpilled ?? false,
+        outputsSpilled: n.outputsSpilled ?? false,
+        inputsTruncated: !!(n as Record<string, unknown>).inputsTruncated,
+        outputsTruncated: !!(n as Record<string, unknown>).outputsTruncated,
+        errorMessage: n.errorMessage || null,
+      }),
+    );
   }, [rawNodeIOData]);
 
   useEffect(() => {

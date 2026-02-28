@@ -39,6 +39,8 @@ export const NodeConfigSchema = z
     streamId: z.string().optional(),
     groupId: z.string().optional(),
     maxConcurrency: z.number().int().positive().optional(),
+    isToolMode: z.boolean().optional(),
+    mode: z.enum(['normal', 'tool']).optional(),
   })
   .passthrough(); // Allow additional fields like dynamic ports
 
@@ -87,11 +89,15 @@ export interface FrontendNodeData extends NodeData {
   componentId?: string;
   componentSlug?: string;
   componentVersion?: string;
+  workflowId?: string;
   inputs?: Record<string, InputMapping>;
   dynamicInputs?: InputPort[];
   dynamicOutputs?: InputPort[];
   status?: NodeStatus;
   executionTime?: number;
   error?: string;
-  ui?: Record<string, unknown>;
+  ui?: {
+    size?: { width: number; height: number };
+    [key: string]: unknown;
+  };
 }

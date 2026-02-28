@@ -133,7 +133,9 @@ export function ParameterField({
         const graph = workflow.graph;
         const entrypoint = graph.nodes.find((node) => node.type === 'core.workflow.entrypoint');
 
-        const runtimeInputsCandidate = (entrypoint?.data as any)?.config?.runtimeInputs;
+        const runtimeInputsCandidate = (
+          entrypoint?.data?.config as Record<string, unknown> | undefined
+        )?.runtimeInputs;
 
         const runtimeInputs = Array.isArray(runtimeInputsCandidate) ? runtimeInputsCandidate : [];
 
@@ -152,7 +154,7 @@ export function ParameterField({
     if (!isWorkflowSelector) return;
     if (!selectedWorkflowId) return;
 
-    const existingRuntimeInputs = (parameters as any)?.childRuntimeInputs;
+    const existingRuntimeInputs = parameters?.childRuntimeInputs;
     const shouldSync = !Array.isArray(existingRuntimeInputs) || existingRuntimeInputs.length === 0;
 
     if (!shouldSync) return;

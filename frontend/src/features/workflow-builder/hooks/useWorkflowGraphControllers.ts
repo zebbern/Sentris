@@ -3,6 +3,7 @@ import {
   useNodesState,
   useEdgesState,
   type NodeChange,
+  type NodeAddChange,
   type EdgeChange,
   type Node as ReactFlowNode,
   type Edge as ReactFlowEdge,
@@ -96,7 +97,7 @@ const createNodesChangeHandler =
 
     const filteredChanges = changes.filter((change) => {
       if (change.type === 'add' && 'item' in change) {
-        const node = (change as any).item as ReactFlowNode<FrontendNodeData>;
+        const node = (change as NodeAddChange<FrontendNodeData>).item;
         if (isEntryPointNode(node) && currentNodes.some(isEntryPointNode)) {
           toast({
             variant: 'destructive',

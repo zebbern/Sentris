@@ -32,23 +32,28 @@ export function humanizeApiError(error: unknown): string {
   return 'Something went wrong — please try again';
 }
 
+function hasNumericStatus(obj: object): obj is { status: number } {
+  return 'status' in obj && typeof (obj as { status: unknown }).status === 'number';
+}
+
+function hasResponseWithStatus(obj: object): obj is { response: { status: number } } {
+  if (!('response' in obj)) return false;
+  const resp = (obj as { response: unknown }).response;
+  return typeof resp === 'object' && resp !== null && hasNumericStatus(resp as object);
+}
+
 /** Attempts to pull a numeric HTTP status from common error shapes. */
 function extractStatusCode(error: unknown): number | null {
   if (error == null || typeof error !== 'object') return null;
 
   // Standard Response-like objects
-  if ('status' in error && typeof (error as any).status === 'number') {
-    return (error as any).status;
+  if (hasNumericStatus(error)) {
+    return error.status;
   }
 
   // Axios-style errors
-  if (
-    'response' in error &&
-    typeof (error as any).response === 'object' &&
-    (error as any).response !== null &&
-    typeof (error as any).response.status === 'number'
-  ) {
-    return (error as any).response.status;
+  if (hasResponseWithStatus(error)) {
+    return error.response.status;
   }
 
   // Errors whose message includes the status code, e.g. "Request failed with status 409"

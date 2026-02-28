@@ -164,9 +164,7 @@ export function ConfigPanel({
 
   const nodeData: FrontendNodeData = selectedNode.data;
   const componentRef: string | undefined = nodeData.componentId ?? nodeData.componentSlug;
-  const isToolMode = Boolean(
-    (nodeData.config as any)?.isToolMode || (nodeData.config as any)?.mode === 'tool',
-  );
+  const isToolMode = Boolean(nodeData.config?.isToolMode || nodeData.config?.mode === 'tool');
   const component = componentRef ? getComponent(componentRef) : null;
 
   if (!component) {

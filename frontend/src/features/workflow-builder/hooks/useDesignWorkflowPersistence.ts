@@ -162,13 +162,18 @@ export function useDesignWorkflowPersistence({
       const allIssues: string[] = [];
 
       designNodes.forEach((node) => {
-        const nodeData = node.data as any;
+        const nodeData = node.data as FrontendNodeData;
         const componentRef = nodeData.componentId ?? nodeData.componentSlug;
         const component = getComponentFromCache(componentRef);
 
         if (!component) return;
 
-        const warnings = getNodeValidationWarnings(node as any, designEdges, component, secrets);
+        const warnings = getNodeValidationWarnings(
+          node as ReactFlowNode<FrontendNodeData>,
+          designEdges,
+          component,
+          secrets,
+        );
         warnings.forEach((w) => allIssues.push(`${nodeData.label || node.id}: ${w}`));
       });
 

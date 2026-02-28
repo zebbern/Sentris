@@ -25,7 +25,7 @@ const COLLAPSE_THRESHOLD = 2; // Collapse when more than 2 issues
 
 export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDockProps) {
   const { data: componentIndex } = useComponents();
-  const getComponent = (ref: string) => {
+  const getComponent = (ref: string | undefined) => {
     if (!componentIndex || !ref) return null;
     if (componentIndex.byId[ref]) return componentIndex.byId[ref];
     const idFromSlug = componentIndex.slugIndex[ref];
@@ -46,12 +46,11 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
 
     const issues: ValidationIssue[] = [];
 
-    nodes.forEach((node) => {
-      const nodeData = node.data as any;
-      const componentRef = nodeData.componentId ?? nodeData.componentSlug;
-      const component = getComponent(componentRef);
+    for (const node of nodes) {
+      const nodeData = node.data as FrontendNodeData;
+      const component = getComponent(nodeData.componentId ?? nodeData.componentSlug);
 
-      if (!component) return;
+      if (!component) continue;
 
       // Get validation warnings using the existing utility
       // FrontendNodeData extends NodeData, so this cast is safe
@@ -69,7 +68,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
           message: warning,
         });
       });
-    });
+    }
 
     return issues;
   }, [nodes, edges, componentIndex, isDesignMode, secrets]);

@@ -26,24 +26,17 @@ const TRUSTED_IFRAME_DOMAINS = [
   'player.vimeo.com',
 ];
 
-// Type definitions for DOMPurify hooks
-interface SanitizeElementHookEvent {
-  tagName: string;
-  allowedTags: Record<string, boolean>;
-}
-
-interface SanitizeAttributeHookEvent {
-  attrName: string;
-  attrValue: string;
-  keepAttr: boolean;
+/** HTMLDivElement with custom properties attached for markdown checkbox toggling. */
+interface MarkdownContainerElement extends HTMLDivElement {
+  __markdownContent?: string;
+  __dataTestId?: string;
 }
 
 // Configure DOMPurify with security-focused settings
 function configureDOMPurify(): void {
   // Hook to validate iframes before allowing them
-  DOMPurify.addHook('uponSanitizeElement' as any, (node: Element, data: any) => {
-    const hookData = data as SanitizeElementHookEvent;
-    if (hookData.tagName === 'iframe') {
+  DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+    if (data.tagName === 'iframe' && node instanceof Element) {
       const src = node.getAttribute('src') || '';
       try {
         const url = new URL(src);
@@ -66,23 +59,22 @@ function configureDOMPurify(): void {
   });
 
   // Hook to validate attributes and block dangerous patterns
-  DOMPurify.addHook('uponSanitizeAttribute' as any, (_node: Element, data: any) => {
-    const hookData = data as SanitizeAttributeHookEvent;
+  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
     // Block javascript: and data: URLs in href/src attributes
-    if (hookData.attrName === 'href' || hookData.attrName === 'src') {
-      const value = hookData.attrValue.toLowerCase().trim();
+    if (data.attrName === 'href' || data.attrName === 'src') {
+      const value = data.attrValue.toLowerCase().trim();
       if (
         value.startsWith('javascript:') ||
         value.startsWith('data:') ||
         value.startsWith('vbscript:')
       ) {
-        hookData.keepAttr = false;
+        data.keepAttr = false;
       }
     }
 
     // Block event handlers (onclick, onerror, etc.)
-    if (hookData.attrName.startsWith('on')) {
-      hookData.keepAttr = false;
+    if (data.attrName.startsWith('on')) {
+      data.keepAttr = false;
     }
   });
 }
@@ -355,13 +347,13 @@ export const MarkdownView = memo(function MarkdownView({
       e.stopPropagation();
 
       // Find which checkbox was clicked
-      const container = e.currentTarget as HTMLDivElement;
+      const container = e.currentTarget as MarkdownContainerElement;
       const checkboxes = container.querySelectorAll('input[type="checkbox"]');
       const index = Array.from(checkboxes).indexOf(target as HTMLInputElement);
 
       if (index !== -1) {
         // Get current normalized content for toggling
-        const currentContent = (container as any).__markdownContent || '';
+        const currentContent = container.__markdownContent || '';
         const toggled = toggleNthTask(currentContent, index);
 
         // 1. Toggle the checkbox visually in the DOM (prevents flicker)
@@ -369,10 +361,10 @@ export const MarkdownView = memo(function MarkdownView({
         checkbox.checked = !checkbox.checked;
 
         // 2. Update the stored content so future toggles work correctly
-        (container as any).__markdownContent = toggled;
+        container.__markdownContent = toggled;
 
         // 3. Register expected content to skip the re-render when parent updates
-        const key = (container as any).__dataTestId || '__default__';
+        const key = container.__dataTestId || '__default__';
         pendingCheckboxUpdates.set(key, toggled);
 
         // 4. Notify parent of the change (for persistence)
@@ -413,7 +405,7 @@ export const MarkdownView = memo(function MarkdownView({
   const setRef = (el: HTMLDivElement | null) => {
     containerRef.current = el;
     if (el) {
-      const element = el as any;
+      const element = el as MarkdownContainerElement;
       element.__markdownContent = normalized;
       element.__dataTestId = dataTestId;
     }

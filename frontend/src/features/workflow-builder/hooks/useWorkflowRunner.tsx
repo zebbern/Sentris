@@ -365,17 +365,19 @@ function handleExecutionError(
   if (error instanceof Error) {
     errorMessage = error.message;
     stackTrace = error.stack;
-    const errorObj = error as any;
-    if (errorObj.response?.data?.message) {
-      errorMessage = errorObj.response.data.message;
-      stackTrace = errorObj.response.data.stack || stackTrace;
+    const axiosError = error as Error & {
+      response?: { data?: { message?: string; stack?: string } };
+    };
+    if (axiosError.response?.data?.message) {
+      errorMessage = axiosError.response.data.message;
+      stackTrace = axiosError.response.data.stack || stackTrace;
     }
   } else if (typeof error === 'string') {
     errorMessage = error;
   } else if (error && typeof error === 'object' && 'message' in error) {
-    errorMessage = String((error as any).message);
+    errorMessage = String((error as { message: unknown }).message);
     if ('stack' in error) {
-      stackTrace = String((error as any).stack);
+      stackTrace = String((error as { stack: unknown }).stack);
     }
   }
 

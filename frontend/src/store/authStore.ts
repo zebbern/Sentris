@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const DEFAULT_ORG_ENV = (import.meta as any)?.env?.VITE_DEFAULT_ORG;
+const DEFAULT_ORG_ENV = import.meta.env.VITE_DEFAULT_ORG;
 export const DEFAULT_ORG_ID =
   typeof DEFAULT_ORG_ENV === 'string' && DEFAULT_ORG_ENV.trim().length > 0
     ? DEFAULT_ORG_ENV.trim()

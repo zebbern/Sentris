@@ -1,5 +1,18 @@
 import { useMemo } from 'react';
 
+interface PreviewGraphNode {
+  id: string;
+  type?: string;
+  position?: { x: number; y: number };
+  data?: { componentId?: string; componentSlug?: string; label?: string };
+}
+
+interface PreviewGraphEdge {
+  id?: string;
+  source: string;
+  target: string;
+}
+
 interface WorkflowPreviewProps {
   graph?: Record<string, unknown>;
   className?: string;
@@ -17,9 +30,11 @@ const PAD = 40;
  */
 export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
   const svgContent = useMemo(() => {
-    const graphData = graph as any;
-    const rawNodes: any[] = graphData?.nodes || [];
-    const rawEdges: any[] = graphData?.edges || [];
+    const graphData = graph as
+      | { nodes?: PreviewGraphNode[]; edges?: PreviewGraphEdge[] }
+      | undefined;
+    const rawNodes = graphData?.nodes ?? [];
+    const rawEdges = graphData?.edges ?? [];
 
     // Filter out terminal nodes
     const nodes = rawNodes.filter((n) => n.type !== 'terminal');
@@ -67,7 +82,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
 
     // Generate bezier edge paths (from right-center of source to left-center of target)
     const edgePaths = edges
-      .map((edge: any) => {
+      .map((edge) => {
         const s = nodeMap.get(edge.source);
         const t = nodeMap.get(edge.target);
         if (!s || !t) return null;

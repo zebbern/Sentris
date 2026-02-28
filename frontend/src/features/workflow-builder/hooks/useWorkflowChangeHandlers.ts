@@ -5,6 +5,7 @@ import {
   type Node as ReactFlowNode,
   type Edge as ReactFlowEdge,
   type NodeChange,
+  type NodeAddChange,
   type EdgeChange,
 } from 'reactflow';
 import { isEntryPointNode } from '@/utils/entryPointUtils';
@@ -67,7 +68,7 @@ export function useWorkflowChangeHandlers({
 
       const filteredChanges = changes.filter((change) => {
         if (change.type === 'add' && 'item' in change) {
-          const node = (change as any).item as ReactFlowNode<FrontendNodeData>;
+          const node = (change as NodeAddChange<FrontendNodeData>).item;
           const currentNodes =
             mode === 'design' ? designNodesRef.current : executionNodesRef.current;
           if (isEntryPointNode(node) && currentNodes.some(isEntryPointNode)) {

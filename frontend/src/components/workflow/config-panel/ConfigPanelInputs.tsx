@@ -22,7 +22,7 @@ import {
   resolvePortType,
 } from '@/utils/portUtils';
 import type { InputPort } from '@/schemas/component';
-import type { InputMapping } from '@/schemas/node';
+import type { FrontendNodeData, InputMapping } from '@/schemas/node';
 import type { Edge, Node as RFNode } from 'reactflow';
 
 export interface ConfigPanelInputsProps {
@@ -101,7 +101,7 @@ export function ConfigPanelInputs({
             ? toolEdges
                 .map((edge) => {
                   const sourceNode = getNodes().find((n) => n.id === edge.source);
-                  return (sourceNode?.data as any)?.label || edge.source;
+                  return (sourceNode?.data as FrontendNodeData)?.label || edge.source;
                 })
                 .filter(Boolean)
             : connection

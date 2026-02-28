@@ -11,7 +11,7 @@ export function useIsMac(): boolean {
 
     // navigator.platform is deprecated but still widely supported and accurate.
     // Fall back to navigator.userAgent for newer browsers that may remove platform.
-    const platform = (navigator as any).userAgentData?.platform ?? navigator.platform ?? '';
+    const platform = navigator.userAgentData?.platform ?? navigator.platform ?? '';
 
     if (/mac/i.test(platform)) return true;
 

@@ -2,6 +2,7 @@ import { describe, it, afterEach, expect, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { ReactFlowProvider } from 'reactflow';
 import { MemoryRouter } from 'react-router-dom';
+import type { FrontendNodeData } from '@/schemas/node';
 
 const noopStorage = {
   getItem: () => null,
@@ -97,7 +98,7 @@ describe('WorkflowNode – text block rendering', () => {
   });
 
   it('renders configured content inside the node body', () => {
-    const nodeData = {
+    const nodeData: FrontendNodeData = {
       label: 'Text',
       config: {
         params: {
@@ -117,7 +118,7 @@ describe('WorkflowNode – text block rendering', () => {
         <ReactFlowProvider>
           <WorkflowNode
             id="node-1"
-            data={nodeData as any}
+            data={nodeData}
             selected={false}
             type="workflow"
             xPos={0}
@@ -137,7 +138,7 @@ describe('WorkflowNode – text block rendering', () => {
   });
 
   it('falls back to helper text when no content is provided', () => {
-    const nodeData = {
+    const nodeData: FrontendNodeData = {
       label: 'Text',
       config: {
         params: {
@@ -157,7 +158,7 @@ describe('WorkflowNode – text block rendering', () => {
         <ReactFlowProvider>
           <WorkflowNode
             id="node-2"
-            data={nodeData as any}
+            data={nodeData}
             selected={false}
             type="workflow"
             xPos={0}

@@ -31,12 +31,20 @@ export function RunBreadcrumbs({ currentRun, className, variant = 'inline' }: Ru
 
   const parentRun = useMemo<RunInfo | null>(() => {
     if (!parentRunData) return null;
+    // The API response may include extra fields beyond the OpenAPI schema
+    const data = parentRunData as {
+      id: string;
+      workflowId: string;
+      workflowName?: string;
+      parentRunId?: string | null;
+      parentNodeRef?: string | null;
+    };
     return {
-      id: parentRunData.id as string,
-      workflowId: parentRunData.workflowId as string,
-      workflowName: (parentRunData as any).workflowName || 'Parent Workflow',
-      parentRunId: (parentRunData as any).parentRunId,
-      parentNodeRef: (parentRunData as any).parentNodeRef,
+      id: data.id,
+      workflowId: data.workflowId,
+      workflowName: data.workflowName || 'Parent Workflow',
+      parentRunId: data.parentRunId,
+      parentNodeRef: data.parentNodeRef,
     };
   }, [parentRunData]);
 
