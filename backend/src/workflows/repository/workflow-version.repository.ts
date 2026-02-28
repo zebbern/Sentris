@@ -75,15 +75,18 @@ export class WorkflowVersionRepository {
     return record;
   }
 
-  async findAllByWorkflowId(
-    workflowId: string,
-    options: { organizationId?: string | null } = {},
-  ): Promise<WorkflowVersionRecord[]> {
+  async findAllByWorkflowId(workflowId: string, options: { organizationId?: string | null } = {}) {
     return this.db
-      .select()
+      .select({
+        id: workflowVersionsTable.id,
+        workflowId: workflowVersionsTable.workflowId,
+        version: workflowVersionsTable.version,
+        createdAt: workflowVersionsTable.createdAt,
+      })
       .from(workflowVersionsTable)
       .where(this.buildWorkflowFilter(workflowId, options.organizationId))
-      .orderBy(desc(workflowVersionsTable.version));
+      .orderBy(desc(workflowVersionsTable.version))
+      .limit(100);
   }
 
   async findByWorkflowAndVersion(

@@ -1365,6 +1365,10 @@ export class WorkflowsService {
 
   async listVersions(workflowId: string, auth?: AuthContext | null) {
     const organizationId = this.requireOrganizationId(auth);
+    const workflow = await this.repository.findById(workflowId, { organizationId });
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
     const versions = await this.versionRepository.findAllByWorkflowId(workflowId, {
       organizationId,
     });
