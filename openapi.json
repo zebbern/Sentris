@@ -84,6 +84,7 @@
             "description": "Returns stored agent trace parts"
           }
         },
+        "summary": "Get stored agent trace parts",
         "tags": [
           "agents"
         ]
@@ -107,6 +108,7 @@
             "description": "AI SDK-compatible SSE for agent run"
           }
         },
+        "summary": "Stream agent chat via SSE",
         "tags": [
           "agents"
         ]
@@ -127,7 +129,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "",
             "content": {
               "application/json": {
@@ -138,6 +140,7 @@
             }
           }
         },
+        "summary": "Create a new workflow",
         "tags": [
           "workflows"
         ]
@@ -160,6 +163,7 @@
             }
           }
         },
+        "summary": "List all workflows",
         "tags": [
           "workflows"
         ]
@@ -200,6 +204,7 @@
             }
           }
         },
+        "summary": "Update a workflow",
         "tags": [
           "workflows"
         ]
@@ -228,6 +233,7 @@
             }
           }
         },
+        "summary": "Get a workflow by ID",
         "tags": [
           "workflows"
         ]
@@ -246,9 +252,10 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Workflow deleted successfully"
           }
         },
+        "summary": "Delete a workflow",
         "tags": [
           "workflows"
         ]
@@ -289,6 +296,72 @@
             }
           }
         },
+        "summary": "Update workflow metadata",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/v1/workflows/summary": {
+      "get": {
+        "operationId": "WorkflowsController_listSummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lightweight workflow list without graph data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "isSystem": {
+                        "type": "boolean"
+                      },
+                      "templateId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "lastRun": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "runCount": {
+                        "type": "integer"
+                      },
+                      "nodeCount": {
+                        "type": "integer"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List workflow summaries",
         "tags": [
           "workflows"
         ]
@@ -323,6 +396,17 @@
               "minimum": 1,
               "maximum": 200,
               "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "default": 0,
               "type": "integer"
             }
           }
@@ -435,6 +519,7 @@
             }
           }
         },
+        "summary": "List workflow runs",
         "tags": [
           "workflows"
         ]
@@ -554,6 +639,7 @@
             }
           }
         },
+        "summary": "Get a workflow run",
         "tags": [
           "workflows"
         ]
@@ -619,6 +705,7 @@
             }
           }
         },
+        "summary": "List child workflow runs",
         "tags": [
           "workflows"
         ]
@@ -649,6 +736,41 @@
             }
           }
         },
+        "summary": "Get workflow runtime inputs",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/v1/workflows/{workflowId}/versions": {
+      "get": {
+        "operationId": "WorkflowsController_listVersions",
+        "parameters": [
+          {
+            "name": "workflowId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowVersionSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List all versions of a workflow",
         "tags": [
           "workflows"
         ]
@@ -687,6 +809,7 @@
             }
           }
         },
+        "summary": "Get a specific workflow version",
         "tags": [
           "workflows"
         ]
@@ -769,6 +892,7 @@
             }
           }
         },
+        "summary": "Commit a workflow version",
         "tags": [
           "workflows"
         ]
@@ -848,6 +972,7 @@
             }
           }
         },
+        "summary": "Run a workflow",
         "tags": [
           "workflows"
         ]
@@ -880,6 +1005,7 @@
             "description": "Current Temporal execution status"
           }
         },
+        "summary": "Get workflow run status",
         "tags": [
           "workflows"
         ]
@@ -912,6 +1038,7 @@
             "description": "Resolved workflow result payload"
           }
         },
+        "summary": "Get workflow run result",
         "tags": [
           "workflows"
         ]
@@ -963,6 +1090,7 @@
             }
           }
         },
+        "summary": "Get workflow run configuration",
         "tags": [
           "workflows"
         ]
@@ -995,6 +1123,7 @@
             "description": "Cancels a running workflow execution"
           }
         },
+        "summary": "Cancel a workflow run",
         "tags": [
           "workflows"
         ]
@@ -1204,6 +1333,7 @@
             }
           }
         },
+        "summary": "Get workflow run trace events",
         "tags": [
           "workflows"
         ]
@@ -1413,6 +1543,7 @@
             }
           }
         },
+        "summary": "Get workflow run event timeline",
         "tags": [
           "workflows"
         ]
@@ -1497,6 +1628,7 @@
             }
           }
         },
+        "summary": "Get workflow run data flows",
         "tags": [
           "workflows"
         ]
@@ -1527,6 +1659,7 @@
             }
           }
         },
+        "summary": "List workflow run artifacts",
         "tags": [
           "workflows"
         ]
@@ -1560,6 +1693,7 @@
             "description": "Download artifact for a specific run"
           }
         },
+        "summary": "Download a workflow run artifact",
         "tags": [
           "workflows"
         ]
@@ -1658,6 +1792,7 @@
             }
           }
         },
+        "summary": "List node inputs and outputs for a workflow run",
         "tags": [
           "workflows"
         ]
@@ -1768,6 +1903,7 @@
             }
           }
         },
+        "summary": "Get specific node input/output for a workflow run",
         "tags": [
           "workflows"
         ]
@@ -1827,6 +1963,7 @@
             "description": "Server-sent events stream for workflow run updates"
           }
         },
+        "summary": "Stream workflow run updates via SSE",
         "tags": [
           "workflows"
         ]
@@ -1982,6 +2119,7 @@
             }
           }
         },
+        "summary": "Get workflow run logs",
         "tags": [
           "workflows"
         ]
@@ -2055,6 +2193,7 @@
             "description": "Terminal chunks for a workflow run"
           }
         },
+        "summary": "Get workflow run terminal output",
         "tags": [
           "workflows"
         ]
@@ -2095,6 +2234,7 @@
             }
           }
         },
+        "summary": "Archive terminal output for a workflow run",
         "tags": [
           "workflows"
         ]
@@ -2123,6 +2263,7 @@
             }
           }
         },
+        "summary": "List terminal archive recordings for a workflow run",
         "tags": [
           "workflows"
         ]
@@ -2156,32 +2297,9 @@
             "description": "Download terminal recording"
           }
         },
+        "summary": "Download a terminal archive recording",
         "tags": [
           "workflows"
-        ]
-      }
-    },
-    "/api/v1/internal/runs": {
-      "post": {
-        "operationId": "InternalRunsController_prepareRun",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PrepareRunRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalRuns"
         ]
       }
     },
@@ -2240,6 +2358,7 @@
             }
           }
         },
+        "summary": "Upload a file",
         "tags": [
           "files"
         ]
@@ -2295,6 +2414,7 @@
             }
           }
         },
+        "summary": "List uploaded files",
         "tags": [
           "files"
         ]
@@ -2320,6 +2440,7 @@
             "description": "Get file metadata"
           }
         },
+        "summary": "Get file metadata",
         "tags": [
           "files"
         ]
@@ -2343,6 +2464,7 @@
             "description": "Delete file"
           }
         },
+        "summary": "Delete a file",
         "tags": [
           "files"
         ]
@@ -2376,6 +2498,7 @@
             }
           }
         },
+        "summary": "Download a file",
         "tags": [
           "files"
         ]
@@ -2450,6 +2573,7 @@
             }
           }
         },
+        "summary": "List workspace artifacts",
         "tags": [
           "artifacts"
         ]
@@ -2483,6 +2607,7 @@
             }
           }
         },
+        "summary": "Download an artifact",
         "tags": [
           "artifacts"
         ]
@@ -2508,6 +2633,7 @@
             "description": "Artifact deleted successfully"
           }
         },
+        "summary": "Delete an artifact",
         "tags": [
           "artifacts"
         ]
@@ -2558,6 +2684,7 @@
             }
           }
         },
+        "summary": "Query analytics data",
         "tags": [
           "analytics"
         ]
@@ -2579,6 +2706,7 @@
             }
           }
         },
+        "summary": "Get analytics settings",
         "tags": [
           "analytics"
         ]
@@ -2608,6 +2736,7 @@
             }
           }
         },
+        "summary": "Update analytics settings",
         "tags": [
           "analytics"
         ]
@@ -2626,6 +2755,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnsureTenantDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Ensure tenant resources exist for organization",
@@ -2649,6 +2788,7 @@
             }
           }
         },
+        "summary": "Ensure tenant resources exist for an organization",
         "tags": [
           "analytics"
         ]
@@ -2706,6 +2846,7 @@
             }
           }
         },
+        "summary": "List API keys",
         "tags": [
           "api-keys"
         ]
@@ -2735,6 +2876,7 @@
             }
           }
         },
+        "summary": "Create a new API key",
         "tags": [
           "api-keys"
         ]
@@ -2765,6 +2907,7 @@
             }
           }
         },
+        "summary": "Get an API key by ID",
         "tags": [
           "api-keys"
         ]
@@ -2803,6 +2946,7 @@
             }
           }
         },
+        "summary": "Update an API key",
         "tags": [
           "api-keys"
         ]
@@ -2831,6 +2975,7 @@
             }
           }
         },
+        "summary": "Delete an API key",
         "tags": [
           "api-keys"
         ]
@@ -2861,6 +3006,7 @@
             }
           }
         },
+        "summary": "Revoke an API key",
         "tags": [
           "api-keys"
         ]
@@ -3232,6 +3378,7 @@
             }
           }
         },
+        "summary": "List all registered components",
         "tags": [
           "components"
         ]
@@ -3495,6 +3642,7 @@
             }
           }
         },
+        "summary": "Get a component by ID",
         "tags": [
           "components"
         ]
@@ -3513,11 +3661,22 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePortsDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Resolve dynamic ports based on parameters"
           }
         },
+        "summary": "Resolve dynamic ports for a component",
         "tags": [
           "components"
         ]
@@ -3542,6 +3701,7 @@
             }
           }
         },
+        "summary": "List all secrets",
         "tags": [
           "secrets"
         ]
@@ -3571,6 +3731,7 @@
             }
           }
         },
+        "summary": "Create a new secret",
         "tags": [
           "secrets"
         ]
@@ -3601,6 +3762,7 @@
             }
           }
         },
+        "summary": "Get a secret by ID",
         "tags": [
           "secrets"
         ]
@@ -3639,6 +3801,7 @@
             }
           }
         },
+        "summary": "Update secret metadata",
         "tags": [
           "secrets"
         ]
@@ -3657,9 +3820,10 @@
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Secret deleted"
           }
         },
+        "summary": "Delete a secret",
         "tags": [
           "secrets"
         ]
@@ -3699,6 +3863,7 @@
             }
           }
         },
+        "summary": "Get a secret value",
         "tags": [
           "secrets"
         ]
@@ -3739,6 +3904,7 @@
             }
           }
         },
+        "summary": "Rotate a secret value",
         "tags": [
           "secrets"
         ]
@@ -3763,6 +3929,7 @@
             }
           }
         },
+        "summary": "List all integration providers",
         "tags": [
           "integrations"
         ]
@@ -3793,6 +3960,7 @@
             }
           }
         },
+        "summary": "Get provider OAuth configuration",
         "tags": [
           "integrations"
         ]
@@ -3831,6 +3999,7 @@
             }
           }
         },
+        "summary": "Create or update provider OAuth configuration",
         "tags": [
           "integrations"
         ]
@@ -3849,9 +4018,10 @@
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Provider configuration deleted"
           }
         },
+        "summary": "Delete provider OAuth configuration",
         "tags": [
           "integrations"
         ]
@@ -3885,6 +4055,7 @@
             }
           }
         },
+        "summary": "List integration connections",
         "tags": [
           "integrations"
         ]
@@ -3925,6 +4096,7 @@
             }
           }
         },
+        "summary": "Start OAuth authorization flow",
         "tags": [
           "integrations"
         ]
@@ -3965,6 +4137,7 @@
             }
           }
         },
+        "summary": "Complete OAuth token exchange",
         "tags": [
           "integrations"
         ]
@@ -4005,6 +4178,7 @@
             }
           }
         },
+        "summary": "Refresh an integration connection",
         "tags": [
           "integrations"
         ]
@@ -4038,6 +4212,7 @@
             "description": "Connection removed"
           }
         },
+        "summary": "Disconnect an integration connection",
         "tags": [
           "integrations"
         ]
@@ -4076,6 +4251,7 @@
             }
           }
         },
+        "summary": "Issue a connection access token",
         "tags": [
           "integrations"
         ]
@@ -4111,11 +4287,22 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
+        "summary": "List schedules",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       },
       "post": {
@@ -4133,11 +4320,19 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponseDto"
+                }
+              }
+            }
           }
         },
+        "summary": "Create a schedule",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       }
     },
@@ -4156,11 +4351,19 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponseDto"
+                }
+              }
+            }
           }
         },
+        "summary": "Get a schedule by ID",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       },
       "patch": {
@@ -4187,11 +4390,19 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponseDto"
+                }
+              }
+            }
           }
         },
+        "summary": "Update a schedule",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       },
       "delete": {
@@ -4208,11 +4419,12 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Schedule deleted"
           }
         },
+        "summary": "Delete a schedule",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       }
     },
@@ -4230,12 +4442,20 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponseDto"
+                }
+              }
+            }
           }
         },
+        "summary": "Pause a schedule",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       }
     },
@@ -4253,12 +4473,20 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponseDto"
+                }
+              }
+            }
           }
         },
+        "summary": "Resume a schedule",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       }
     },
@@ -4276,12 +4504,13 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
+        "summary": "Trigger a schedule immediately",
         "tags": [
-          "Schedules"
+          "schedules"
         ]
       }
     },
@@ -4294,6 +4523,7 @@
             "description": ""
           }
         },
+        "summary": "List workflows accessible via webhook",
         "tags": [
           "webhooks"
         ]
@@ -4317,6 +4547,7 @@
             "description": ""
           }
         },
+        "summary": "Get a workflow by ID via webhook",
         "tags": [
           "webhooks"
         ]
@@ -4350,6 +4581,7 @@
             "description": ""
           }
         },
+        "summary": "Run a workflow via webhook",
         "tags": [
           "webhooks"
         ]
@@ -4373,6 +4605,7 @@
             "description": ""
           }
         },
+        "summary": "Get workflow run status",
         "tags": [
           "webhooks"
         ]
@@ -4396,6 +4629,7 @@
             "description": ""
           }
         },
+        "summary": "Get workflow run result",
         "tags": [
           "webhooks"
         ]
@@ -4419,6 +4653,7 @@
             "description": ""
           }
         },
+        "summary": "Cancel a workflow run",
         "tags": [
           "webhooks"
         ]
@@ -5378,6 +5613,14 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "includeServers",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5906,110 +6149,6 @@
         ]
       }
     },
-    "/api/v1/internal/mcp/generate-token": {
-      "post": {
-        "operationId": "InternalMcpController_generateToken",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
-    "/api/v1/internal/mcp/register-component": {
-      "post": {
-        "operationId": "InternalMcpController_registerComponent",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterComponentToolInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
-    "/api/v1/internal/mcp/register-mcp-server": {
-      "post": {
-        "operationId": "InternalMcpController_registerMcpServer",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterMcpServerInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
-    "/api/v1/internal/mcp/cleanup": {
-      "post": {
-        "operationId": "InternalMcpController_cleanupRun",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
-    "/api/v1/internal/mcp/tools-ready": {
-      "post": {
-        "operationId": "InternalMcpController_areToolsReady",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
-    "/api/v1/internal/mcp/register-group-server": {
-      "post": {
-        "operationId": "InternalMcpController_registerGroupServer",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "InternalMcp"
-        ]
-      }
-    },
     "/api/v1/mcp/discover": {
       "post": {
         "description": "Initiates an asynchronous discovery workflow for an MCP server. Returns 202 ACCEPTED with a workflow ID for tracking progress.",
@@ -6146,6 +6285,325 @@
         ]
       }
     },
+    "/api/v1/studio-mcp": {
+      "get": {
+        "operationId": "StudioMcpController_handleMcp_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "post": {
+        "operationId": "StudioMcpController_handleMcp_post",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "put": {
+        "operationId": "StudioMcpController_handleMcp_put",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "delete": {
+        "operationId": "StudioMcpController_handleMcp_delete",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "patch": {
+        "operationId": "StudioMcpController_handleMcp_patch",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "options": {
+        "operationId": "StudioMcpController_handleMcp_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "head": {
+        "operationId": "StudioMcpController_handleMcp_head",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      },
+      "search": {
+        "operationId": "StudioMcpController_handleMcp_search",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Studio MCP endpoint (Streamable HTTP) for external agents",
+        "tags": [
+          "studio-mcp"
+        ]
+      }
+    },
+    "/api/v1/templates": {
+      "get": {
+        "operationId": "TemplatesController_listTemplates",
+        "parameters": [
+          {
+            "name": "category",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tags",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns filtered list of templates"
+          }
+        },
+        "summary": "List all templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/categories": {
+      "get": {
+        "operationId": "TemplatesController_getCategories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns available template categories"
+          }
+        },
+        "summary": "List template categories",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/tags": {
+      "get": {
+        "operationId": "TemplatesController_getTags",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns available template tags"
+          }
+        },
+        "summary": "List template tags",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/my": {
+      "get": {
+        "operationId": "TemplatesController_getMyTemplates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns templates submitted by the current user"
+          }
+        },
+        "summary": "Get my submitted templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/repo-info": {
+      "get": {
+        "operationId": "TemplatesController_getRepoInfo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns GitHub repository information"
+          }
+        },
+        "summary": "Get template repository info",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/submissions": {
+      "get": {
+        "operationId": "TemplatesController_getSubmissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns template submissions for the current user"
+          }
+        },
+        "summary": "Get template submissions",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{id}": {
+      "get": {
+        "operationId": "TemplatesController_getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns template details"
+          }
+        },
+        "summary": "Get template by ID",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/publish": {
+      "post": {
+        "operationId": "TemplatesController_publishTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Template validation result"
+          }
+        },
+        "summary": "Validate a workflow for template submission",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{id}/use": {
+      "post": {
+        "operationId": "TemplatesController_useTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UseTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created workflow from template"
+          }
+        },
+        "summary": "Use a template to create a new workflow",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/sync": {
+      "post": {
+        "operationId": "TemplatesController_syncTemplates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sync result"
+          }
+        },
+        "summary": "Sync templates from GitHub",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
     "/api/v1/audit-logs": {
       "get": {
         "operationId": "AuditLogsController_list",
@@ -6162,104 +6620,9 @@
             }
           }
         },
+        "summary": "List audit log events",
         "tags": [
           "audit-logs"
-        ]
-      }
-    },
-    "/api/v1/testing/webhooks": {
-      "post": {
-        "operationId": "TestingWebhookController_acceptWebhook",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 100,
-              "maximum": 599,
-              "type": "integer"
-            }
-          },
-          {
-            "name": "delayMs",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 0,
-              "maximum": 60000,
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "TestingWebhook"
-        ]
-      },
-      "get": {
-        "operationId": "TestingWebhookController_listRecords",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "TestingWebhook"
-        ]
-      },
-      "delete": {
-        "operationId": "TestingWebhookController_clearRecords",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "TestingWebhook"
-        ]
-      }
-    },
-    "/api/v1/testing/webhooks/latest": {
-      "get": {
-        "operationId": "TestingWebhookController_latestRecord",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "TestingWebhook"
-        ]
-      }
-    },
-    "/api/v1/testing/webhooks/{id}": {
-      "get": {
-        "operationId": "TestingWebhookController_getRecord",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "TestingWebhook"
         ]
       }
     }
@@ -7076,6 +7439,31 @@
           "inputs"
         ]
       },
+      "WorkflowVersionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workflowId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflowId",
+          "version",
+          "createdAt"
+        ]
+      },
       "WorkflowVersionResponseDto": {
         "type": "object",
         "properties": {
@@ -7638,102 +8026,6 @@
           "records"
         ]
       },
-      "PrepareRunRequestDto": {
-        "type": "object",
-        "properties": {
-          "inputs": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {}
-          },
-          "versionId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "workflowId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "nodeOverrides": {
-            "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {
-              "type": "object",
-              "properties": {
-                "params": {
-                  "default": {},
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
-                },
-                "inputOverrides": {
-                  "default": {},
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
-                }
-              }
-            }
-          },
-          "trigger": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "manual",
-                  "schedule",
-                  "api",
-                  "webhook"
-                ]
-              },
-              "sourceId": {
-                "type": "string",
-                "nullable": true
-              },
-              "label": {
-                "type": "string",
-                "nullable": true
-              }
-            },
-            "required": [
-              "type"
-            ]
-          },
-          "runId": {
-            "type": "string"
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "parentRunId": {
-            "type": "string"
-          },
-          "parentNodeRef": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "workflowId"
-        ]
-      },
       "ArtifactListResponseDto": {
         "type": "object",
         "properties": {
@@ -7885,37 +8177,27 @@
         "properties": {
           "query": {
             "type": "object",
-            "description": "OpenSearch DSL query object",
-            "example": {
-              "match_all": {}
-            }
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
           },
           "size": {
-            "type": "number",
-            "description": "Number of results to return",
-            "example": 10,
-            "default": 10,
+            "type": "integer",
             "minimum": 0,
             "maximum": 1000
           },
           "from": {
-            "type": "number",
-            "description": "Offset for pagination",
-            "example": 0,
-            "default": 0,
+            "type": "integer",
             "minimum": 0,
             "maximum": 10000
           },
           "aggs": {
             "type": "object",
-            "description": "OpenSearch aggregations object",
-            "example": {
-              "components": {
-                "terms": {
-                  "field": "component_id"
-                }
-              }
-            }
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
           }
         }
       },
@@ -7923,20 +8205,41 @@
         "type": "object",
         "properties": {
           "total": {
-            "type": "number",
-            "description": "Total number of matching documents",
-            "example": 100
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           },
           "hits": {
             "type": "array",
-            "description": "Search hits",
             "items": {
-              "type": "object"
+              "type": "object",
+              "properties": {
+                "_id": {
+                  "type": "string"
+                },
+                "_source": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "_score": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "_id",
+                "_source"
+              ]
             }
           },
           "aggregations": {
             "type": "object",
-            "description": "Aggregation results"
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
           }
         },
         "required": [
@@ -7948,41 +8251,35 @@
         "type": "object",
         "properties": {
           "organizationId": {
-            "type": "string",
-            "description": "Organization ID",
-            "example": "org_abc123"
+            "type": "string"
           },
           "subscriptionTier": {
             "type": "string",
-            "description": "Subscription tier",
             "enum": [
               "free",
               "pro",
               "enterprise"
-            ],
-            "example": "free"
+            ]
           },
           "analyticsRetentionDays": {
-            "type": "number",
-            "description": "Data retention period in days",
-            "example": 30
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           },
           "maxRetentionDays": {
-            "type": "number",
-            "description": "Maximum retention days allowed for this tier",
-            "example": 30
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           },
           "createdAt": {
-            "format": "date-time",
             "type": "string",
-            "description": "Timestamp when settings were created",
-            "example": "2026-01-20T00:00:00.000Z"
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           },
           "updatedAt": {
-            "format": "date-time",
             "type": "string",
-            "description": "Timestamp when settings were last updated",
-            "example": "2026-01-20T00:00:00.000Z"
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
           }
         },
         "required": [
@@ -7998,15 +8295,12 @@
         "type": "object",
         "properties": {
           "analyticsRetentionDays": {
-            "type": "number",
-            "description": "Data retention period in days (must be within tier limits)",
-            "example": 30,
+            "type": "integer",
             "minimum": 1,
             "maximum": 365
           },
           "subscriptionTier": {
             "type": "string",
-            "description": "Subscription tier (optional - usually set by billing system)",
             "enum": [
               "free",
               "pro",
@@ -8014,6 +8308,18 @@
             ]
           }
         }
+      },
+      "EnsureTenantDto": {
+        "type": "object",
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "organizationId"
+        ]
       },
       "ApiKeyResponseDto": {
         "type": "object",
@@ -8048,6 +8354,15 @@
                   },
                   "read": {
                     "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8081,6 +8396,68 @@
                 "required": [
                   "read"
                 ]
+              },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "schedules": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "secrets": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "human-inputs": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "resolve": {
+                    "type": "boolean"
+                  }
+                }
               }
             },
             "required": [
@@ -8158,6 +8535,15 @@
                   },
                   "read": {
                     "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8191,6 +8577,68 @@
                 "required": [
                   "read"
                 ]
+              },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "schedules": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "secrets": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "human-inputs": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "resolve": {
+                    "type": "boolean"
+                  }
+                }
               }
             },
             "required": [
@@ -8251,6 +8699,15 @@
                   },
                   "read": {
                     "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8284,6 +8741,68 @@
                 "required": [
                   "read"
                 ]
+              },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "schedules": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "secrets": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "human-inputs": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "resolve": {
+                    "type": "boolean"
+                  }
+                }
               }
             },
             "required": [
@@ -8366,6 +8885,15 @@
                   },
                   "read": {
                     "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8399,6 +8927,68 @@
                 "required": [
                   "read"
                 ]
+              },
+              "artifacts": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "schedules": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "secrets": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "boolean"
+                  },
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "create": {
+                    "type": "boolean"
+                  },
+                  "update": {
+                    "type": "boolean"
+                  },
+                  "delete": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "human-inputs": {
+                "type": "object",
+                "properties": {
+                  "read": {
+                    "type": "boolean"
+                  },
+                  "resolve": {
+                    "type": "boolean"
+                  }
+                }
               }
             },
             "required": [
@@ -8428,6 +9018,13 @@
         "required": [
           "success"
         ]
+      },
+      "ResolvePortsDto": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
       },
       "SecretVersionResponse": {
         "type": "object",
@@ -8519,18 +9116,16 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Human-readable unique secret name"
+            "minLength": 1
           },
           "value": {
             "type": "string",
-            "description": "Secret plaintext value"
+            "minLength": 1
           },
           "description": {
-            "type": "string",
-            "description": "Optional description for operators"
+            "type": "string"
           },
           "tags": {
-            "description": "Optional tags to help organize secrets",
             "type": "array",
             "items": {
               "type": "string"
@@ -8547,7 +9142,7 @@
         "properties": {
           "value": {
             "type": "string",
-            "description": "New plaintext secret value"
+            "minLength": 1
           }
         },
         "required": [
@@ -8559,18 +9154,18 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Updated secret name (must remain unique)"
+            "minLength": 1
           },
           "description": {
             "type": "string",
-            "description": "Updated description for the secret"
+            "nullable": true
           },
           "tags": {
-            "description": "Updated tags for the secret",
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "nullable": true
           }
         }
       },
@@ -8650,11 +9245,11 @@
         "properties": {
           "clientId": {
             "type": "string",
-            "description": "OAuth client identifier used for this provider"
+            "minLength": 1
           },
           "clientSecret": {
             "type": "string",
-            "description": "OAuth client secret. Required when configuring the provider for the first time."
+            "minLength": 1
           }
         },
         "required": [
@@ -8731,14 +9326,13 @@
         "properties": {
           "userId": {
             "type": "string",
-            "description": "Application user identifier to associate the connection with"
+            "minLength": 1
           },
           "redirectUri": {
             "type": "string",
-            "description": "Frontend callback URL that receives the OAuth code"
+            "format": "uri"
           },
           "scopes": {
-            "description": "Optional override of scopes to request",
             "type": "array",
             "items": {
               "type": "string"
@@ -8780,14 +9374,13 @@
         "properties": {
           "userId": {
             "type": "string",
-            "description": "Application user identifier to associate the connection with"
+            "minLength": 1
           },
           "redirectUri": {
             "type": "string",
-            "description": "Frontend callback URL that receives the OAuth code"
+            "format": "uri"
           },
           "scopes": {
-            "description": "Optional override of scopes to request",
             "type": "array",
             "items": {
               "type": "string"
@@ -8795,11 +9388,11 @@
           },
           "state": {
             "type": "string",
-            "description": "Opaque OAuth state returned from the authorize redirect"
+            "minLength": 1
           },
           "code": {
             "type": "string",
-            "description": "Authorization code issued by the provider"
+            "minLength": 1
           }
         },
         "required": [
@@ -8814,7 +9407,7 @@
         "properties": {
           "userId": {
             "type": "string",
-            "description": "Application user identifier that owns the connection"
+            "minLength": 1
           }
         },
         "required": [
@@ -8826,7 +9419,7 @@
         "properties": {
           "userId": {
             "type": "string",
-            "description": "Application user identifier that owns the connection"
+            "minLength": 1
           }
         },
         "required": [
@@ -8864,6 +9457,167 @@
           "accessToken",
           "tokenType",
           "scopes"
+        ]
+      },
+      "ScheduleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "workflowId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "workflowVersionId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "workflowVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "cronExpression": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "humanLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "overlapPolicy": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "buffer",
+              "allow"
+            ]
+          },
+          "catchupWindowSeconds": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "error"
+            ]
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "nullable": true
+          },
+          "nextRunAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+            "nullable": true
+          },
+          "inputPayload": {
+            "type": "object",
+            "properties": {
+              "runtimeInputs": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "nodeOverrides": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "params": {
+                      "default": {},
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "inputOverrides": {
+                      "default": {},
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "temporalScheduleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "temporalSnapshot": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "organizationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflowId",
+          "workflowVersionId",
+          "workflowVersion",
+          "name",
+          "description",
+          "cronExpression",
+          "timezone",
+          "humanLabel",
+          "overlapPolicy",
+          "status",
+          "lastRunAt",
+          "nextRunAt",
+          "inputPayload",
+          "temporalScheduleId",
+          "organizationId",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CreateScheduleRequestDto": {
@@ -10545,14 +11299,6 @@
           "group"
         ]
       },
-      "RegisterComponentToolInput": {
-        "type": "object",
-        "properties": {}
-      },
-      "RegisterMcpServerInput": {
-        "type": "object",
-        "properties": {}
-      },
       "DiscoveryInputDto": {
         "type": "object",
         "properties": {
@@ -10903,6 +11649,63 @@
           "status"
         ]
       },
+      "PublishTemplateDto": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "author": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflowId",
+          "name",
+          "description",
+          "category",
+          "tags",
+          "author"
+        ]
+      },
+      "UseTemplateDto": {
+        "type": "object",
+        "properties": {
+          "workflowName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "secretMappings": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "workflowName"
+        ]
+      },
       "ListAuditLogsResponseDto": {
         "type": "object",
         "properties": {
@@ -10948,7 +11751,11 @@
                     "api_key",
                     "webhook",
                     "artifact",
-                    "analytics"
+                    "analytics",
+                    "schedule",
+                    "mcp_server",
+                    "mcp_group",
+                    "human_input"
                   ]
                 },
                 "resourceId": {

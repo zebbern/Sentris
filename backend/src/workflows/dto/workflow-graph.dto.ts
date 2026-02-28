@@ -235,6 +235,15 @@ export const WorkflowVersionResponseSchema = z.object({
 
 export class WorkflowVersionResponseDto extends createZodDto(WorkflowVersionResponseSchema) {}
 
+export const WorkflowVersionSummarySchema = z.object({
+  id: z.string(),
+  workflowId: z.string(),
+  version: z.number().int().positive(),
+  createdAt: z.string(),
+});
+
+export class WorkflowVersionSummaryDto extends createZodDto(WorkflowVersionSummarySchema) {}
+
 // Runtime input definition for Entry Point
 export const RuntimeInputSchema = z.object({
   id: z.string(),

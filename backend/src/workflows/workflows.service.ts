@@ -1363,6 +1363,19 @@ export class WorkflowsService {
     };
   }
 
+  async listVersions(workflowId: string, auth?: AuthContext | null) {
+    const organizationId = this.requireOrganizationId(auth);
+    const versions = await this.versionRepository.findAllByWorkflowId(workflowId, {
+      organizationId,
+    });
+    return versions.map((v) => ({
+      id: v.id,
+      workflowId: v.workflowId,
+      version: v.version,
+      createdAt: v.createdAt instanceof Date ? v.createdAt.toISOString() : v.createdAt,
+    }));
+  }
+
   async getWorkflowVersion(workflowId: string, versionId: string, auth?: AuthContext | null) {
     const organizationId = this.requireOrganizationId(auth);
     const version = await this.versionRepository.findById(versionId, { organizationId });

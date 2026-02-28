@@ -47,6 +47,7 @@ import {
   WorkflowResponseDto,
   ServiceWorkflowResponse,
   WorkflowVersionResponseDto,
+  WorkflowVersionSummaryDto,
   WorkflowRuntimeInputsResponseDto,
   ENTRY_POINT_COMPONENT_IDS,
   type RuntimeInput,
@@ -542,6 +543,16 @@ export class WorkflowsController {
       workflowId: workflow.id,
       inputs,
     };
+  }
+
+  @Get(':workflowId/versions')
+  @ApiOperation({ summary: 'List all versions of a workflow' })
+  @ApiOkResponse({ type: [WorkflowVersionSummaryDto] })
+  async listVersions(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('workflowId') workflowId: string,
+  ): Promise<WorkflowVersionSummaryDto[]> {
+    return this.workflowsService.listVersions(workflowId, auth);
   }
 
   @Get(':workflowId/versions/:versionId')

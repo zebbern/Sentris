@@ -75,6 +75,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get stored agent trace parts */
         get: operations["AgentsController_parts"];
         put?: never;
         post?: never;
@@ -93,6 +94,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Stream agent chat via SSE */
         post: operations["AgentsController_chat"];
         delete?: never;
         options?: never;
@@ -107,8 +109,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List all workflows */
         get: operations["WorkflowsController_findAll"];
         put?: never;
+        /** Create a new workflow */
         post: operations["WorkflowsController_create"];
         delete?: never;
         options?: never;
@@ -123,9 +127,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a workflow by ID */
         get: operations["WorkflowsController_findOne"];
+        /** Update a workflow */
         put: operations["WorkflowsController_update"];
         post?: never;
+        /** Delete a workflow */
         delete: operations["WorkflowsController_remove"];
         options?: never;
         head?: never;
@@ -145,7 +152,25 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** Update workflow metadata */
         patch: operations["WorkflowsController_updateMetadata"];
+        trace?: never;
+    };
+    "/api/v1/workflows/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List workflow summaries */
+        get: operations["WorkflowsController_listSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/workflows/runs": {
@@ -155,6 +180,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List workflow runs */
         get: operations["WorkflowsController_listRuns"];
         put?: never;
         post?: never;
@@ -171,6 +197,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a workflow run */
         get: operations["WorkflowsController_getRun"];
         put?: never;
         post?: never;
@@ -187,6 +214,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List child workflow runs */
         get: operations["WorkflowsController_listChildRuns"];
         put?: never;
         post?: never;
@@ -203,7 +231,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow runtime inputs */
         get: operations["WorkflowsController_getRuntimeInputs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/{workflowId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all versions of a workflow */
+        get: operations["WorkflowsController_listVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -219,6 +265,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a specific workflow version */
         get: operations["WorkflowsController_findVersion"];
         put?: never;
         post?: never;
@@ -237,6 +284,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Commit a workflow version */
         post: operations["WorkflowsController_commit"];
         delete?: never;
         options?: never;
@@ -253,6 +301,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Run a workflow */
         post: operations["WorkflowsController_run"];
         delete?: never;
         options?: never;
@@ -267,6 +316,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run status */
         get: operations["WorkflowsController_status"];
         put?: never;
         post?: never;
@@ -283,6 +333,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run result */
         get: operations["WorkflowsController_result"];
         put?: never;
         post?: never;
@@ -299,6 +350,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run configuration */
         get: operations["WorkflowsController_config"];
         put?: never;
         post?: never;
@@ -317,6 +369,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Cancel a workflow run */
         post: operations["WorkflowsController_cancel"];
         delete?: never;
         options?: never;
@@ -331,6 +384,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run trace events */
         get: operations["WorkflowsController_trace"];
         put?: never;
         post?: never;
@@ -347,6 +401,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run event timeline */
         get: operations["WorkflowsController_events"];
         put?: never;
         post?: never;
@@ -363,6 +418,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run data flows */
         get: operations["WorkflowsController_dataflows"];
         put?: never;
         post?: never;
@@ -379,6 +435,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List workflow run artifacts */
         get: operations["WorkflowsController_runArtifacts"];
         put?: never;
         post?: never;
@@ -395,6 +452,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Download a workflow run artifact */
         get: operations["WorkflowsController_downloadRunArtifact"];
         put?: never;
         post?: never;
@@ -411,6 +469,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List node inputs and outputs for a workflow run */
         get: operations["WorkflowsController_getNodeIO"];
         put?: never;
         post?: never;
@@ -427,6 +486,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get specific node input/output for a workflow run */
         get: operations["WorkflowsController_getNodeIODetail"];
         put?: never;
         post?: never;
@@ -443,6 +503,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Stream workflow run updates via SSE */
         get: operations["WorkflowsController_stream"];
         put?: never;
         post?: never;
@@ -459,6 +520,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run logs */
         get: operations["WorkflowsController_logs"];
         put?: never;
         post?: never;
@@ -475,6 +537,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run terminal output */
         get: operations["WorkflowsController_terminalChunks"];
         put?: never;
         post?: never;
@@ -491,8 +554,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List terminal archive recordings for a workflow run */
         get: operations["WorkflowsController_listTerminalArchives"];
         put?: never;
+        /** Archive terminal output for a workflow run */
         post: operations["WorkflowsController_archiveTerminal"];
         delete?: never;
         options?: never;
@@ -507,25 +572,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Download a terminal archive recording */
         get: operations["WorkflowsController_downloadTerminalArchive"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalRunsController_prepareRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -541,6 +591,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Upload a file */
         post: operations["FilesController_uploadFile"];
         delete?: never;
         options?: never;
@@ -555,6 +606,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List uploaded files */
         get: operations["FilesController_listFiles"];
         put?: never;
         post?: never;
@@ -571,9 +623,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get file metadata */
         get: operations["FilesController_getFile"];
         put?: never;
         post?: never;
+        /** Delete a file */
         delete: operations["FilesController_deleteFile"];
         options?: never;
         head?: never;
@@ -587,6 +641,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Download a file */
         get: operations["FilesController_downloadFile"];
         put?: never;
         post?: never;
@@ -603,6 +658,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List workspace artifacts */
         get: operations["ArtifactsController_listArtifacts"];
         put?: never;
         post?: never;
@@ -619,6 +675,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Download an artifact */
         get: operations["ArtifactsController_downloadArtifact"];
         put?: never;
         post?: never;
@@ -638,6 +695,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
+        /** Delete an artifact */
         delete: operations["ArtifactsController_deleteArtifact"];
         options?: never;
         head?: never;
@@ -653,6 +711,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Query analytics data */
         post: operations["AnalyticsController_queryAnalytics"];
         delete?: never;
         options?: never;
@@ -667,7 +726,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get analytics settings */
         get: operations["AnalyticsController_getAnalyticsSettings"];
+        /** Update analytics settings */
         put: operations["AnalyticsController_updateAnalyticsSettings"];
         post?: never;
         delete?: never;
@@ -685,6 +746,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Ensure tenant resources exist for an organization */
         post: operations["AnalyticsController_ensureTenant"];
         delete?: never;
         options?: never;
@@ -699,8 +761,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List API keys */
         get: operations["ApiKeysController_list"];
         put?: never;
+        /** Create a new API key */
         post: operations["ApiKeysController_create"];
         delete?: never;
         options?: never;
@@ -715,12 +779,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get an API key by ID */
         get: operations["ApiKeysController_get"];
         put?: never;
         post?: never;
+        /** Delete an API key */
         delete: operations["ApiKeysController_delete"];
         options?: never;
         head?: never;
+        /** Update an API key */
         patch: operations["ApiKeysController_update"];
         trace?: never;
     };
@@ -733,6 +800,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Revoke an API key */
         post: operations["ApiKeysController_revoke"];
         delete?: never;
         options?: never;
@@ -747,6 +815,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List all registered components */
         get: operations["ComponentsController_listComponents"];
         put?: never;
         post?: never;
@@ -763,6 +832,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a component by ID */
         get: operations["ComponentsController_getComponent"];
         put?: never;
         post?: never;
@@ -781,6 +851,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Resolve dynamic ports for a component */
         post: operations["ComponentsController_resolvePorts"];
         delete?: never;
         options?: never;
@@ -795,8 +866,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List all secrets */
         get: operations["SecretsController_listSecrets"];
         put?: never;
+        /** Create a new secret */
         post: operations["SecretsController_createSecret"];
         delete?: never;
         options?: never;
@@ -811,12 +884,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a secret by ID */
         get: operations["SecretsController_getSecret"];
         put?: never;
         post?: never;
+        /** Delete a secret */
         delete: operations["SecretsController_deleteSecret"];
         options?: never;
         head?: never;
+        /** Update secret metadata */
         patch: operations["SecretsController_updateSecret"];
         trace?: never;
     };
@@ -827,6 +903,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a secret value */
         get: operations["SecretsController_getSecretValue"];
         put?: never;
         post?: never;
@@ -844,6 +921,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Rotate a secret value */
         put: operations["SecretsController_rotateSecret"];
         post?: never;
         delete?: never;
@@ -859,6 +937,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List all integration providers */
         get: operations["IntegrationsController_listProviders"];
         put?: never;
         post?: never;
@@ -875,9 +954,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get provider OAuth configuration */
         get: operations["IntegrationsController_getProviderConfiguration"];
+        /** Create or update provider OAuth configuration */
         put: operations["IntegrationsController_upsertProviderConfiguration"];
         post?: never;
+        /** Delete provider OAuth configuration */
         delete: operations["IntegrationsController_deleteProviderConfiguration"];
         options?: never;
         head?: never;
@@ -891,6 +973,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List integration connections */
         get: operations["IntegrationsController_listConnections"];
         put?: never;
         post?: never;
@@ -909,6 +992,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Start OAuth authorization flow */
         post: operations["IntegrationsController_startOAuth"];
         delete?: never;
         options?: never;
@@ -925,6 +1009,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Complete OAuth token exchange */
         post: operations["IntegrationsController_completeOAuth"];
         delete?: never;
         options?: never;
@@ -941,6 +1026,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Refresh an integration connection */
         post: operations["IntegrationsController_refreshConnection"];
         delete?: never;
         options?: never;
@@ -958,6 +1044,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
+        /** Disconnect an integration connection */
         delete: operations["IntegrationsController_disconnectConnection"];
         options?: never;
         head?: never;
@@ -973,6 +1060,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Issue a connection access token */
         post: operations["IntegrationsController_issueConnectionToken"];
         delete?: never;
         options?: never;
@@ -987,8 +1075,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List schedules */
         get: operations["SchedulesController_list"];
         put?: never;
+        /** Create a schedule */
         post: operations["SchedulesController_create"];
         delete?: never;
         options?: never;
@@ -1003,12 +1093,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a schedule by ID */
         get: operations["SchedulesController_getOne"];
         put?: never;
         post?: never;
+        /** Delete a schedule */
         delete: operations["SchedulesController_delete"];
         options?: never;
         head?: never;
+        /** Update a schedule */
         patch: operations["SchedulesController_update"];
         trace?: never;
     };
@@ -1021,6 +1114,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Pause a schedule */
         post: operations["SchedulesController_pause"];
         delete?: never;
         options?: never;
@@ -1037,6 +1131,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Resume a schedule */
         post: operations["SchedulesController_resume"];
         delete?: never;
         options?: never;
@@ -1053,6 +1148,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Trigger a schedule immediately */
         post: operations["SchedulesController_trigger"];
         delete?: never;
         options?: never;
@@ -1067,6 +1163,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List workflows accessible via webhook */
         get: operations["WebhooksController_listWorkflows"];
         put?: never;
         post?: never;
@@ -1083,6 +1180,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get a workflow by ID via webhook */
         get: operations["WebhooksController_getWorkflow"];
         put?: never;
         post?: never;
@@ -1101,6 +1199,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Run a workflow via webhook */
         post: operations["WebhooksController_runWorkflow"];
         delete?: never;
         options?: never;
@@ -1115,6 +1214,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run status */
         get: operations["WebhooksController_getRunStatus"];
         put?: never;
         post?: never;
@@ -1131,6 +1231,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get workflow run result */
         get: operations["WebhooksController_getRunResult"];
         put?: never;
         post?: never;
@@ -1149,6 +1250,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Cancel a workflow run */
         post: operations["WebhooksController_cancelRun"];
         delete?: never;
         options?: never;
@@ -1703,102 +1805,6 @@ export interface paths {
         patch: operations["McpGatewayController_handleGateway_patch"];
         trace?: never;
     };
-    "/api/v1/internal/mcp/generate-token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_generateToken"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/mcp/register-component": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_registerComponent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/mcp/register-mcp-server": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_registerMcpServer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/mcp/cleanup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_cleanupRun"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/mcp/tools-ready": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_areToolsReady"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/internal/mcp/register-group-server": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["InternalMcpController_registerGroupServer"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/mcp/discover": {
         parameters: {
             query?: never;
@@ -1879,6 +1885,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/studio-mcp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        get: operations["StudioMcpController_handleMcp_get"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        put: operations["StudioMcpController_handleMcp_put"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        post: operations["StudioMcpController_handleMcp_post"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        delete: operations["StudioMcpController_handleMcp_delete"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        options: operations["StudioMcpController_handleMcp_options"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        head: operations["StudioMcpController_handleMcp_head"];
+        /** Studio MCP endpoint (Streamable HTTP) for external agents */
+        patch: operations["StudioMcpController_handleMcp_patch"];
+        trace?: never;
+    };
+    "/api/v1/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all templates */
+        get: operations["TemplatesController_listTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List template categories */
+        get: operations["TemplatesController_getCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List template tags */
+        get: operations["TemplatesController_getTags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/my": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get my submitted templates */
+        get: operations["TemplatesController_getMyTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/repo-info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get template repository info */
+        get: operations["TemplatesController_getRepoInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get template submissions */
+        get: operations["TemplatesController_getSubmissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get template by ID */
+        get: operations["TemplatesController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate a workflow for template submission */
+        post: operations["TemplatesController_publishTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{id}/use": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Use a template to create a new workflow */
+        post: operations["TemplatesController_useTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync templates from GitHub */
+        post: operations["TemplatesController_syncTemplates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -1886,55 +2085,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List audit log events */
         get: operations["AuditLogsController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/testing/webhooks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TestingWebhookController_listRecords"];
-        put?: never;
-        post: operations["TestingWebhookController_acceptWebhook"];
-        delete: operations["TestingWebhookController_clearRecords"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/testing/webhooks/latest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TestingWebhookController_latestRecord"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/testing/webhooks/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["TestingWebhookController_getRecord"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2196,6 +2348,12 @@ export interface components {
                 defaultValue?: unknown;
             }[];
         };
+        WorkflowVersionSummaryDto: {
+            id: string;
+            workflowId: string;
+            version: number;
+            createdAt: string;
+        };
         WorkflowVersionResponseDto: {
             id: string;
             workflowId: string;
@@ -2360,38 +2518,6 @@ export interface components {
                 createdAt: string;
             }[];
         };
-        PrepareRunRequestDto: {
-            inputs?: {
-                [key: string]: unknown;
-            };
-            /** Format: uuid */
-            versionId?: string;
-            version?: number;
-            /** Format: uuid */
-            workflowId: string;
-            nodeOverrides?: {
-                [key: string]: {
-                    /** @default {} */
-                    params: {
-                        [key: string]: unknown;
-                    };
-                    /** @default {} */
-                    inputOverrides: {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            trigger?: {
-                /** @enum {string} */
-                type: "manual" | "schedule" | "api" | "webhook";
-                sourceId?: string | null;
-                label?: string | null;
-            };
-            runId?: string;
-            idempotencyKey?: string;
-            parentRunId?: string;
-            parentNodeRef?: string;
-        };
         ArtifactListResponseDto: {
             artifacts: {
                 /** Format: uuid */
@@ -2434,94 +2560,46 @@ export interface components {
             }[];
         };
         AnalyticsQueryRequestDto: {
-            /**
-             * @description OpenSearch DSL query object
-             * @example {
-             *       "match_all": {}
-             *     }
-             */
-            query?: Record<string, never>;
-            /**
-             * @description Number of results to return
-             * @default 10
-             * @example 10
-             */
-            size: number;
-            /**
-             * @description Offset for pagination
-             * @default 0
-             * @example 0
-             */
-            from: number;
-            /**
-             * @description OpenSearch aggregations object
-             * @example {
-             *       "components": {
-             *         "terms": {
-             *           "field": "component_id"
-             *         }
-             *       }
-             *     }
-             */
-            aggs?: Record<string, never>;
+            query?: {
+                [key: string]: unknown;
+            };
+            size?: number;
+            from?: number;
+            aggs?: {
+                [key: string]: unknown;
+            };
         };
         AnalyticsQueryResponseDto: {
-            /**
-             * @description Total number of matching documents
-             * @example 100
-             */
             total: number;
-            /** @description Search hits */
-            hits: Record<string, never>[];
-            /** @description Aggregation results */
-            aggregations?: Record<string, never>;
+            hits: {
+                _id: string;
+                _source: {
+                    [key: string]: unknown;
+                };
+                _score?: number;
+            }[];
+            aggregations?: {
+                [key: string]: unknown;
+            };
         };
         AnalyticsSettingsResponseDto: {
-            /**
-             * @description Organization ID
-             * @example org_abc123
-             */
             organizationId: string;
-            /**
-             * @description Subscription tier
-             * @example free
-             * @enum {string}
-             */
+            /** @enum {string} */
             subscriptionTier: "free" | "pro" | "enterprise";
-            /**
-             * @description Data retention period in days
-             * @example 30
-             */
             analyticsRetentionDays: number;
-            /**
-             * @description Maximum retention days allowed for this tier
-             * @example 30
-             */
             maxRetentionDays: number;
-            /**
-             * Format: date-time
-             * @description Timestamp when settings were created
-             * @example 2026-01-20T00:00:00.000Z
-             */
+            /** Format: date-time */
             createdAt: string;
-            /**
-             * Format: date-time
-             * @description Timestamp when settings were last updated
-             * @example 2026-01-20T00:00:00.000Z
-             */
+            /** Format: date-time */
             updatedAt: string;
         };
         UpdateAnalyticsSettingsDto: {
-            /**
-             * @description Data retention period in days (must be within tier limits)
-             * @example 30
-             */
             analyticsRetentionDays?: number;
-            /**
-             * @description Subscription tier (optional - usually set by billing system)
-             * @enum {string}
-             */
+            /** @enum {string} */
             subscriptionTier?: "free" | "pro" | "enterprise";
+        };
+        EnsureTenantDto: {
+            organizationId: string;
         };
         ApiKeyResponseDto: {
             id: string;
@@ -2534,6 +2612,9 @@ export interface components {
                     run: boolean;
                     list: boolean;
                     read: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
                 };
                 runs: {
                     read: boolean;
@@ -2541,6 +2622,28 @@ export interface components {
                 };
                 audit: {
                     read: boolean;
+                };
+                artifacts?: {
+                    read?: boolean;
+                    delete?: boolean;
+                };
+                schedules?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                secrets?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                "human-inputs"?: {
+                    read?: boolean;
+                    resolve?: boolean;
                 };
             };
             isActive: boolean;
@@ -2562,6 +2665,9 @@ export interface components {
                     run: boolean;
                     list: boolean;
                     read: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
                 };
                 runs: {
                     read: boolean;
@@ -2569,6 +2675,28 @@ export interface components {
                 };
                 audit: {
                     read: boolean;
+                };
+                artifacts?: {
+                    read?: boolean;
+                    delete?: boolean;
+                };
+                schedules?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                secrets?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                "human-inputs"?: {
+                    read?: boolean;
+                    resolve?: boolean;
                 };
             };
             /** Format: date-time */
@@ -2587,6 +2715,9 @@ export interface components {
                     run: boolean;
                     list: boolean;
                     read: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
                 };
                 runs: {
                     read: boolean;
@@ -2594,6 +2725,28 @@ export interface components {
                 };
                 audit: {
                     read: boolean;
+                };
+                artifacts?: {
+                    read?: boolean;
+                    delete?: boolean;
+                };
+                schedules?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                secrets?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                "human-inputs"?: {
+                    read?: boolean;
+                    resolve?: boolean;
                 };
             };
             isActive: boolean;
@@ -2617,6 +2770,9 @@ export interface components {
                     run: boolean;
                     list: boolean;
                     read: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
                 };
                 runs: {
                     read: boolean;
@@ -2625,12 +2781,37 @@ export interface components {
                 audit: {
                     read: boolean;
                 };
+                artifacts?: {
+                    read?: boolean;
+                    delete?: boolean;
+                };
+                schedules?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                secrets?: {
+                    list?: boolean;
+                    read?: boolean;
+                    create?: boolean;
+                    update?: boolean;
+                    delete?: boolean;
+                };
+                "human-inputs"?: {
+                    read?: boolean;
+                    resolve?: boolean;
+                };
             };
             isActive?: boolean;
             rateLimit?: number | null;
         };
         DeleteApiKeyResponseDto: {
             success: boolean;
+        };
+        ResolvePortsDto: {
+            [key: string]: unknown;
         };
         SecretVersionResponse: {
             id: string;
@@ -2658,26 +2839,18 @@ export interface components {
             value: string;
         };
         CreateSecretDto: {
-            /** @description Human-readable unique secret name */
             name: string;
-            /** @description Secret plaintext value */
             value: string;
-            /** @description Optional description for operators */
             description?: string;
-            /** @description Optional tags to help organize secrets */
             tags?: string[];
         };
         RotateSecretDto: {
-            /** @description New plaintext secret value */
             value: string;
         };
         UpdateSecretDto: {
-            /** @description Updated secret name (must remain unique) */
             name?: string;
-            /** @description Updated description for the secret */
-            description?: string;
-            /** @description Updated tags for the secret */
-            tags?: string[];
+            description?: string | null;
+            tags?: string[] | null;
         };
         IntegrationProviderResponse: {
             id: string;
@@ -2704,9 +2877,7 @@ export interface components {
             updatedAt?: string;
         };
         UpsertProviderConfigDto: {
-            /** @description OAuth client identifier used for this provider */
             clientId: string;
-            /** @description OAuth client secret. Required when configuring the provider for the first time. */
             clientSecret?: string;
         };
         IntegrationConnectionResponse: {
@@ -2727,11 +2898,9 @@ export interface components {
             metadata?: Record<string, never>;
         };
         StartOAuthDto: {
-            /** @description Application user identifier to associate the connection with */
             userId: string;
-            /** @description Frontend callback URL that receives the OAuth code */
+            /** Format: uri */
             redirectUri: string;
-            /** @description Optional override of scopes to request */
             scopes?: string[];
         };
         OAuthStartResponseDto: {
@@ -2745,23 +2914,17 @@ export interface components {
             expiresIn: number;
         };
         CompleteOAuthDto: {
-            /** @description Application user identifier to associate the connection with */
             userId: string;
-            /** @description Frontend callback URL that receives the OAuth code */
+            /** Format: uri */
             redirectUri: string;
-            /** @description Optional override of scopes to request */
             scopes?: string[];
-            /** @description Opaque OAuth state returned from the authorize redirect */
             state: string;
-            /** @description Authorization code issued by the provider */
             code: string;
         };
         RefreshConnectionDto: {
-            /** @description Application user identifier that owns the connection */
             userId: string;
         };
         DisconnectConnectionDto: {
-            /** @description Application user identifier that owns the connection */
             userId: string;
         };
         ConnectionTokenResponseDto: {
@@ -2771,6 +2934,57 @@ export interface components {
             tokenType: string;
             scopes: string[];
             expiresAt?: string;
+        };
+        ScheduleResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            workflowId: string;
+            /** Format: uuid */
+            workflowVersionId: string | null;
+            workflowVersion: number | null;
+            name: string;
+            description: string | null;
+            cronExpression: string;
+            timezone: string;
+            humanLabel: string | null;
+            /** @enum {string} */
+            overlapPolicy: "skip" | "buffer" | "allow";
+            /** @default 0 */
+            catchupWindowSeconds: number;
+            /** @enum {string} */
+            status: "active" | "paused" | "error";
+            /** Format: date-time */
+            lastRunAt: string | null;
+            /** Format: date-time */
+            nextRunAt: string | null;
+            inputPayload: {
+                /** @default {} */
+                runtimeInputs: {
+                    [key: string]: unknown;
+                };
+                /** @default {} */
+                nodeOverrides: {
+                    [key: string]: {
+                        /** @default {} */
+                        params: {
+                            [key: string]: unknown;
+                        };
+                        /** @default {} */
+                        inputOverrides: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            temporalScheduleId: string | null;
+            /** @default {} */
+            temporalSnapshot: {
+                [key: string]: unknown;
+            };
+            organizationId: string | null;
+            createdAt: string;
+            updatedAt: string;
         };
         CreateScheduleRequestDto: {
             /** Format: uuid */
@@ -3258,8 +3472,6 @@ export interface components {
                 updatedAt: string;
             };
         };
-        RegisterComponentToolInput: Record<string, never>;
-        RegisterMcpServerInput: Record<string, never>;
         DiscoveryInputDto: {
             /**
              * @description Transport type for MCP server
@@ -3411,6 +3623,20 @@ export interface components {
             error?: string;
             errorCode?: string;
         };
+        PublishTemplateDto: {
+            workflowId: string;
+            name: string;
+            description: string;
+            category: string;
+            tags: string[];
+            author: string;
+        };
+        UseTemplateDto: {
+            workflowName: string;
+            secretMappings?: {
+                [key: string]: string;
+            };
+        };
         ListAuditLogsResponseDto: {
             items: {
                 /** Format: uuid */
@@ -3422,7 +3648,7 @@ export interface components {
                 actorDisplay: string | null;
                 action: string;
                 /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics";
+                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input";
                 resourceId: string | null;
                 resourceName: string | null;
                 metadata: {
@@ -3586,7 +3812,7 @@ export interface operations {
             };
         };
         responses: {
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3653,6 +3879,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Workflow deleted successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3686,12 +3913,49 @@ export interface operations {
             };
         };
     };
+    WorkflowsController_listSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lightweight workflow list without graph data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        name?: string;
+                        description?: string | null;
+                        isSystem?: boolean;
+                        /** Format: uuid */
+                        templateId?: string | null;
+                        /** Format: date-time */
+                        lastRun?: string | null;
+                        runCount?: number;
+                        nodeCount?: number;
+                        /** Format: date-time */
+                        createdAt?: string;
+                        /** Format: date-time */
+                        updatedAt?: string;
+                    }[];
+                };
+            };
+        };
+    };
     WorkflowsController_listRuns: {
         parameters: {
             query?: {
                 workflowId?: string;
                 status?: string;
                 limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -3848,6 +4112,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowRuntimeInputsResponseDto"];
+                };
+            };
+        };
+    };
+    WorkflowsController_listVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersionSummaryDto"][];
                 };
             };
         };
@@ -4549,27 +4834,6 @@ export interface operations {
             };
         };
     };
-    InternalRunsController_prepareRun: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PrepareRunRequestDto"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     FilesController_uploadFile: {
         parameters: {
             query?: never;
@@ -4851,7 +5115,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnsureTenantDto"];
+            };
+        };
         responses: {
             /** @description Ensure tenant resources exist for organization */
             200: {
@@ -5228,7 +5496,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolvePortsDto"];
+            };
+        };
         responses: {
             /** @description Resolve dynamic ports based on parameters */
             200: {
@@ -5313,6 +5585,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Secret deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -5471,6 +5744,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Provider configuration deleted */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -5638,7 +5912,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"][];
+                };
             };
         };
     };
@@ -5659,7 +5935,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"];
+                };
             };
         };
     };
@@ -5678,7 +5956,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"];
+                };
             };
         };
     };
@@ -5693,6 +5973,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Schedule deleted */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5720,7 +6001,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"];
+                };
             };
         };
     };
@@ -5735,11 +6018,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"];
+                };
             };
         };
     };
@@ -5754,11 +6039,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ScheduleResponseDto"];
+                };
             };
         };
     };
@@ -5773,7 +6060,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6523,6 +6810,7 @@ export interface operations {
         parameters: {
             query?: {
                 enabled?: boolean;
+                includeServers?: boolean;
             };
             header?: never;
             path?: never;
@@ -6923,116 +7211,6 @@ export interface operations {
             };
         };
     };
-    InternalMcpController_generateToken: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InternalMcpController_registerComponent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterComponentToolInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InternalMcpController_registerMcpServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterMcpServerInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InternalMcpController_cleanupRun: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InternalMcpController_areToolsReady: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    InternalMcpController_registerGroupServer: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     McpDiscoveryController_discover: {
         parameters: {
             query?: never;
@@ -7139,6 +7317,321 @@ export interface operations {
             };
         };
     };
+    StudioMcpController_handleMcp_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_head: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StudioMcpController_handleMcp_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_listTemplates: {
+        parameters: {
+            query: {
+                category: string;
+                search: string;
+                tags: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns filtered list of templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns available template categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns available template tags */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getMyTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns templates submitted by the current user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getRepoInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns GitHub repository information */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getSubmissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns template submissions for the current user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns template details */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_publishTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishTemplateDto"];
+            };
+        };
+        responses: {
+            /** @description Template validation result */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_useTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UseTemplateDto"];
+            };
+        };
+        responses: {
+            /** @description Created workflow from template */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_syncTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sync result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AuditLogsController_list: {
         parameters: {
             query?: never;
@@ -7156,96 +7649,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ListAuditLogsResponseDto"];
                 };
-            };
-        };
-    };
-    TestingWebhookController_listRecords: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TestingWebhookController_acceptWebhook: {
-        parameters: {
-            query?: {
-                status?: number;
-                delayMs?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TestingWebhookController_clearRecords: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TestingWebhookController_latestRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TestingWebhookController_getRecord: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
