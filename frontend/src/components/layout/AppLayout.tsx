@@ -42,6 +42,7 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes, prefetchRoute } from '@/lib/prefetch-routes';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -80,6 +81,7 @@ const settingsItems = [
 
 export function AppLayout({ children }: AppLayoutProps) {
   usePrefetchOnIdle();
+  useNotifications();
 
   // Prefetch all route chunks during idle time
   useEffect(() => {

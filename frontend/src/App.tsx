@@ -23,7 +23,6 @@ import { PageTransition } from '@/components/shared/PageTransition';
 import { logger } from '@/lib/logger';
 import { env } from '@/config/env';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
-import { useExecutionNotifications } from '@/hooks/useExecutionNotifications';
 
 // Lazy-loaded page components
 const WorkflowList = lazy(() =>
@@ -171,12 +170,6 @@ function LandingPageRedirect() {
   return null;
 }
 
-/** Wires execution-lifecycle toast notifications to user preferences. */
-function ExecutionNotifier() {
-  useExecutionNotifications();
-  return null;
-}
-
 function AnimatedRoutes() {
   const location = useLocation();
 
@@ -284,7 +277,6 @@ function App() {
                 <PostHogClerkBridge />
                 <RouteChangeAnnouncer />
                 <LandingPageRedirect />
-                <ExecutionNotifier />
                 <AppLayout>
                   <ProtectedRoute>
                     <Suspense fallback={<PageSkeleton />}>
