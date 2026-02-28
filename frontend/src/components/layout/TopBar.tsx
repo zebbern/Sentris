@@ -36,6 +36,7 @@ import { logger } from '@/lib/logger';
 import { env } from '@/config/env';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
+import { NotificationCenter } from '@/components/layout/NotificationCenter';
 
 interface TopBarProps {
   workflowId?: string;
@@ -487,6 +488,9 @@ export function TopBar({
                   </DropdownMenu>
                 )}
               </div>
+
+              {/* Notification bell - integrated here instead of floating absolute */}
+              <NotificationCenter />
 
               {/* Vertical three-dots menu: Undo, Redo, Import, Export */}
               {mode === 'design' && (

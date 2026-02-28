@@ -792,9 +792,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                 isMobile={isMobile}
               />
             )}
-          {/* Notification bell on workflow/webhook pages where AppTopBar is hidden */}
-          {(location.pathname.startsWith('/workflows') ||
-            location.pathname.startsWith('/webhooks/')) && (
+          {/* Notification bell on webhook pages where AppTopBar is hidden */}
+          {/* (Workflow pages get it via TopBar integration) */}
+          {location.pathname.startsWith('/webhooks/') && (
             <div className="absolute top-2 right-4 z-40">
               <NotificationCenter />
             </div>

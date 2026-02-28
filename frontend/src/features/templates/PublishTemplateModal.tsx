@@ -182,10 +182,17 @@ function JsonPreview({
 
   return (
     <div className="rounded-lg border overflow-hidden">
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 text-left bg-muted/30 hover:bg-muted/50 transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+        className="w-full flex items-center justify-between px-3 py-2 text-left bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-2">
           {isOpen ? (
@@ -220,7 +227,7 @@ function JsonPreview({
             </>
           )}
         </Button>
-      </button>
+      </div>
       {isOpen && (
         <pre className="px-3 py-2 text-xs font-mono overflow-x-auto max-h-64 overflow-y-auto bg-muted/10 border-t whitespace-pre text-muted-foreground leading-relaxed">
           {json}
