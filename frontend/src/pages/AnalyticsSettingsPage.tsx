@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BarChart3, Save, Shield, Clock, Info } from 'lucide-react';
+import { Save, Shield, Clock, Info } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -159,19 +159,6 @@ export function AnalyticsSettingsPage() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4 max-w-3xl">
-        {/* Header */}
-        <div className="mb-4 md:mb-8">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-xl md:text-2xl font-semibold text-foreground">
-              Analytics Settings
-            </h1>
-          </div>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Configure data retention and storage settings for workflow analytics
-          </p>
-        </div>
-
         {/* Error state */}
         {error && (
           <ErrorBanner

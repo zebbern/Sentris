@@ -108,17 +108,17 @@ export function ArtifactLibrary() {
                 Search
               </Button>
             </form>
-            <Button
-              type="button"
-              variant="ghost"
-              className="gap-2"
-              onClick={handleRefresh}
-              disabled={libraryLoading}
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-2"
+            onClick={handleRefresh}
+            disabled={libraryLoading}
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         </div>
 
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">

@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import {
   ReactFlowProvider,
   type Node as ReactFlowNode,
@@ -39,7 +39,7 @@ import { useWorkflowLoader } from './hooks/useWorkflowLoader';
 import { useWorkflowModeSwitching } from './hooks/useWorkflowModeSwitching';
 import { useRuntimeInputResolver } from './hooks/useRuntimeInputResolver';
 
-function WorkflowBuilderContent() {
+const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
   const { id, runId: routeRunId } = useParams<{ id: string; runId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -458,7 +458,9 @@ function WorkflowBuilderContent() {
       )}
     </>
   );
-}
+});
+
+WorkflowBuilderContent.displayName = 'WorkflowBuilderContent';
 
 export function WorkflowBuilder() {
   const { id } = useParams<{ id: string }>();

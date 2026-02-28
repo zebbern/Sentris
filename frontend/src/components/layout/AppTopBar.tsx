@@ -134,9 +134,9 @@ export function AppTopBar({
     }
 
     return {
-      title: 'Security Workflow Builder',
-      shortTitle: 'Workflows',
-      subtitle: 'Create and manage security automation workflows',
+      title: 'ShipSec Studio',
+      shortTitle: 'ShipSec',
+      subtitle: '',
     };
   };
 

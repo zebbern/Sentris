@@ -218,9 +218,9 @@ export function WorkflowList() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-10" />
+                    <TableHead className="w-10 hidden sm:table-cell" />
                     <TableHead>Name</TableHead>
-                    <TableHead>Nodes</TableHead>
+                    <TableHead className="hidden sm:table-cell">Nodes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="hidden md:table-cell">
                       <TooltipProvider>
@@ -258,13 +258,13 @@ export function WorkflowList() {
                 <TableBody>
                   {Array.from({ length: 5 }).map((_, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="w-10 px-2">
+                      <TableCell className="w-10 px-2 hidden sm:table-cell">
                         <Skeleton className="h-4 w-4 bg-muted" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-[220px] bg-muted" />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <Skeleton className="h-5 w-[80px] bg-muted" />
                       </TableCell>
                       <TableCell>
@@ -320,10 +320,10 @@ export function WorkflowList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10" />
-                      <TableHead className="min-w-[150px]">Name</TableHead>
-                      <TableHead className="min-w-[80px]">Nodes</TableHead>
-                      <TableHead className="min-w-[100px]">Status</TableHead>
+                      <TableHead className="w-10 hidden sm:table-cell" />
+                      <TableHead>Name</TableHead>
+                      <TableHead className="hidden sm:table-cell">Nodes</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead className="min-w-[140px] hidden md:table-cell">
                         <TooltipProvider>
                           <Tooltip>
@@ -354,9 +354,7 @@ export function WorkflowList() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      {canManageWorkflows && (
-                        <TableHead className="text-right min-w-[60px]">Actions</TableHead>
-                      )}
+                      {canManageWorkflows && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -470,12 +468,18 @@ function WorkflowRowItem({
   const statusBadge = workflow.latestRunStatus ? (
     <Badge
       variant="outline"
-      className={getStatusBadgeClassFromStatus(workflow.latestRunStatus, 'text-xs')}
+      className={getStatusBadgeClassFromStatus(
+        workflow.latestRunStatus,
+        'text-xs whitespace-nowrap',
+      )}
     >
       {workflow.latestRunStatus}
     </Badge>
   ) : (
-    <Badge variant="outline" className={getStatusBadgeClassFromStatus('NONE', 'text-xs')}>
+    <Badge
+      variant="outline"
+      className={getStatusBadgeClassFromStatus('NONE', 'text-xs whitespace-nowrap')}
+    >
       NOT TRIGGERED
     </Badge>
   );
@@ -490,7 +494,7 @@ function WorkflowRowItem({
         isDragging && 'bg-accent/50 shadow-lg',
       )}
     >
-      <TableCell className="w-10 px-2">
+      <TableCell className="w-10 px-2 hidden sm:table-cell">
         <div
           className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
           {...attributes}
@@ -505,12 +509,12 @@ function WorkflowRowItem({
           {workflow.name}
         </div>
       </TableCell>
-      <TableCell>
+      <TableCell className="hidden sm:table-cell">
         <Badge variant="secondary" className="text-xs">
           {nodeCount}
         </Badge>
       </TableCell>
-      <TableCell>{statusBadge}</TableCell>
+      <TableCell className="whitespace-nowrap">{statusBadge}</TableCell>
       <TableCell className="text-muted-foreground text-sm hidden md:table-cell">
         {workflow.lastRun ? formatDate(workflow.lastRun) : 'N/A'}
       </TableCell>
