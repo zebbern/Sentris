@@ -25,6 +25,8 @@ import { Label } from '@/components/ui/label';
 import { Copy, Trash2, ShieldOff, AlertTriangle, Key, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
@@ -126,6 +128,21 @@ export function ApiKeysManager() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
+
+  const {
+    selectedIds,
+    toggleId,
+    toggleAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+    selectedCount,
+  } = useBulkSelection(orderedApiKeys);
+
+  const hasActiveSelected = useMemo(
+    () => orderedApiKeys.some((k) => selectedIds.has(k.id) && k.isActive),
+    [orderedApiKeys, selectedIds],
+  );
 
   useEffect(() => {
     if (!successMessage) return;
@@ -245,6 +262,68 @@ export function ApiKeysManager() {
     toast({ title: 'Copied', description: 'API key copied to clipboard.' });
   };
 
+  const handleBulkRevoke = async () => {
+    const activeIds = orderedApiKeys
+      .filter((k) => selectedIds.has(k.id) && k.isActive)
+      .map((k) => k.id);
+    const count = activeIds.length;
+    if (count === 0) return;
+
+    const ok = await confirm({
+      title: `Revoke ${count} API key${count !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to revoke ${count} active key${count !== 1 ? 's' : ''}? Applications using these keys will immediately stop working.`,
+      confirmLabel: 'Revoke',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const results = await Promise.allSettled(
+      activeIds.map((id) => revokeApiKeyMutation.mutateAsync(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      setSuccessMessage(`Revoked ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`);
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Revoked ${succeeded} of ${count} keys (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const count = selectedCount;
+    const ok = await confirm({
+      title: `Delete ${count} API key${count !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to delete ${count} API key${count !== 1 ? 's' : ''}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(ids.map((id) => deleteApiKeyMutation.mutateAsync(id)));
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      setSuccessMessage(`Deleted ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`);
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Deleted ${succeeded} of ${count} keys (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="flex-1 bg-background" aria-busy={loading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
@@ -285,6 +364,26 @@ export function ApiKeysManager() {
 
         <div className="border rounded-md bg-card overflow-hidden">
           <div className="overflow-x-auto">
+            <BulkActionBar
+              selectedCount={selectedCount}
+              actions={[
+                ...(hasActiveSelected
+                  ? [
+                      {
+                        label: 'Revoke selected',
+                        onClick: handleBulkRevoke,
+                        variant: 'default' as const,
+                      },
+                    ]
+                  : []),
+                {
+                  label: `Delete selected (${selectedCount})`,
+                  onClick: handleBulkDelete,
+                  variant: 'destructive' as const,
+                },
+              ]}
+              className="mx-2 mt-2"
+            />
             <DndContext
               sensors={sensors}
               collisionDetection={collisionDetection}
@@ -293,6 +392,13 @@ export function ApiKeysManager() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all API keys"
+                      />
+                    </TableHead>
                     <TableHead className="w-10" />
                     <TableHead className="min-w-[120px]">Name</TableHead>
                     <TableHead className="min-w-[80px]">Key Hint</TableHead>
@@ -341,7 +447,7 @@ export function ApiKeysManager() {
                     ))
                   ) : apiKeys.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={9}>
                         <EmptyState
                           icon={Key}
                           title="No API keys"
@@ -356,9 +462,20 @@ export function ApiKeysManager() {
                       strategy={verticalListSortingStrategy}
                     >
                       {orderedApiKeys.map((key) => (
-                        <SortableTableRow key={key.id} id={key.id}>
+                        <SortableTableRow
+                          key={key.id}
+                          id={key.id}
+                          data-state={selectedIds.has(key.id) ? 'selected' : undefined}
+                        >
                           {({ handleProps }) => (
                             <>
+                              <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={selectedIds.has(key.id)}
+                                  onCheckedChange={() => toggleId(key.id)}
+                                  aria-label={`Select ${key.name}`}
+                                />
+                              </TableCell>
                               <DragHandle {...handleProps} />
                               <TableCell className="font-medium">
                                 <div className="truncate max-w-[150px] md:max-w-none">

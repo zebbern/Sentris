@@ -13,6 +13,8 @@ interface SortableTableRowProps {
   disabled?: boolean;
   className?: string;
   onClick?: () => void;
+  /** Forwarded to the underlying <tr> for CSS selectors like data-[state=selected]:bg-muted */
+  'data-state'?: string;
   children: (props: {
     /** Spread onto the drag-handle element. */
     handleProps: {
@@ -28,6 +30,7 @@ export function SortableTableRow({
   disabled,
   className,
   onClick,
+  'data-state': dataState,
   children,
 }: SortableTableRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -48,6 +51,7 @@ export function SortableTableRow({
       ref={setNodeRef}
       style={style}
       onClick={onClick}
+      data-state={dataState}
       className={cn(
         'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted',
         isDragging && 'bg-accent/50 shadow-lg',

@@ -21,6 +21,7 @@ import { SortableTableRow, DragHandle } from '@/components/ui/sortable';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,11 @@ import { hasAdminRole } from '@/utils/auth';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/use-toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 
 interface FormState {
   name: string;
@@ -163,18 +169,53 @@ export function SecretsManager() {
     return () => clearTimeout(timer);
   }, [listSuccess]);
 
+  const { toast } = useToast();
+  const { confirm, dialogProps } = useConfirmDialog();
+
+  const {
+    selectedIds,
+    toggleId,
+    toggleAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+    selectedCount,
+  } = useBulkSelection(orderedSecrets);
+
+  const handleBulkDelete = async () => {
+    const count = selectedCount;
+    const ok = await confirm({
+      title: `Delete ${count} secret${count !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to delete ${count} secret${count !== 1 ? 's' : ''}? This action permanently removes them and their encrypted versions.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(ids.map((id) => deleteSecretMutation.mutateAsync(id)));
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    clearSelection();
+
+    if (failed === 0) {
+      setListSuccess(`Deleted ${succeeded} secret${succeeded !== 1 ? 's' : ''}.`);
+    } else {
+      toast({
+        title: 'Partial failure',
+        description: `Deleted ${succeeded} of ${count} secrets (${failed} failed).`,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingSecret, setEditingSecret] = useState<SecretSummary | null>(null);
   const [editFormState, setEditFormState] = useState<EditFormState>(INITIAL_EDIT_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const disableEditing = isReadOnly || isEditing;
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<SecretSummary | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const disableDeleting = isReadOnly || isDeleting;
 
   useEffect(() => {
     if (error) {
@@ -337,50 +378,25 @@ export function SecretsManager() {
     }
   };
 
-  const openDeleteDialog = (secret: SecretSummary) => {
+  const handleDeleteSecret = async (secret: SecretSummary) => {
     setListSuccess(null);
-    setDeleteTarget(secret);
-    setDeleteError(null);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleDeleteDialogChange = (open: boolean) => {
-    setIsDeleteDialogOpen(open);
-    if (!open) {
-      setDeleteTarget(null);
-      setDeleteError(null);
-      setIsDeleting(false);
-    }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) {
-      return;
-    }
-
-    if (!canManageSecrets) {
-      setDeleteError('Only workspace administrators can delete secrets.');
-      return;
-    }
-
-    setDeleteError(null);
-    setListSuccess(null);
-    setIsDeleting(true);
-
-    const secretName = deleteTarget.name;
-    const secretNameLength = secretName.trim().length;
-
+    const ok = await confirm({
+      title: 'Delete secret',
+      description: `Are you sure you want to delete "${secret.name}"? This action permanently removes the secret and its encrypted versions. Workflows referencing this secret will need to be updated.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     try {
-      await deleteSecretMutation.mutateAsync(deleteTarget.id);
-      // Avoid emitting the raw secret name to analytics.
-      track(Events.SecretDeleted, { name_length: secretNameLength });
-      setListSuccess(`Secret "${secretName}" deleted.`);
-      handleDeleteDialogChange(false);
+      await deleteSecretMutation.mutateAsync(secret.id);
+      track(Events.SecretDeleted, { name_length: secret.name.trim().length });
+      setListSuccess(`Secret "${secret.name}" deleted.`);
     } catch (err: unknown) {
-      const message = humanizeApiError(err);
-      setDeleteError(message);
-    } finally {
-      setIsDeleting(false);
+      toast({
+        title: 'Delete failed',
+        description: humanizeApiError(err),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -574,6 +590,16 @@ export function SecretsManager() {
               />
             ) : (
               <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                <BulkActionBar
+                  selectedCount={selectedCount}
+                  actions={[
+                    {
+                      label: `Delete selected (${selectedCount})`,
+                      onClick: handleBulkDelete,
+                      variant: 'destructive',
+                    },
+                  ]}
+                />
                 <DndContext
                   sensors={sensors}
                   collisionDetection={collisionDetection}
@@ -582,6 +608,13 @@ export function SecretsManager() {
                   <Table>
                     <TableHeader>
                       <TableRow className="text-muted-foreground">
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                            onCheckedChange={toggleAll}
+                            aria-label="Select all secrets"
+                          />
+                        </TableHead>
                         <TableHead className="w-10" />
                         <TableHead className="min-w-[120px]">Name</TableHead>
                         <TableHead className="min-w-[100px] hidden sm:table-cell">Tags</TableHead>
@@ -600,9 +633,20 @@ export function SecretsManager() {
                         strategy={verticalListSortingStrategy}
                       >
                         {orderedSecrets.map((secret) => (
-                          <SortableTableRow key={secret.id} id={secret.id}>
+                          <SortableTableRow
+                            key={secret.id}
+                            id={secret.id}
+                            data-state={selectedIds.has(secret.id) ? 'selected' : undefined}
+                          >
                             {({ handleProps }) => (
                               <>
+                                <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedIds.has(secret.id)}
+                                    onCheckedChange={() => toggleId(secret.id)}
+                                    aria-label={`Select ${secret.name}`}
+                                  />
+                                </TableCell>
                                 <DragHandle {...handleProps} />
                                 <TableCell className="align-top">
                                   <div className="font-medium truncate max-w-[150px] md:max-w-none">
@@ -666,7 +710,7 @@ export function SecretsManager() {
                                     <Button
                                       variant="destructive"
                                       size="sm"
-                                      onClick={() => openDeleteDialog(secret)}
+                                      onClick={() => handleDeleteSecret(secret)}
                                       disabled={isReadOnly}
                                       aria-disabled={isReadOnly}
                                       className="text-xs px-2 md:px-3"
@@ -781,39 +825,7 @@ export function SecretsManager() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={handleDeleteDialogChange}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete secret</DialogTitle>
-            <DialogDescription>
-              This action permanently removes the secret and its encrypted versions. Workflows
-              referencing this secret will need to be updated.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="text-sm">
-              <span className="font-medium">Secret:</span> <span>{deleteTarget?.name}</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              ID: <span className="font-mono">{deleteTarget?.id}</span>
-            </div>
-            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleDeleteDialogChange(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete} disabled={disableDeleting}>
-              {isDeleting ? 'Deleting…' : 'Delete secret'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog {...dialogProps} />
     </div>
   );
 }
