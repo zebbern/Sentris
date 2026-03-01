@@ -3,6 +3,13 @@ import { BaseEdge, EdgeLabelRenderer, getBezierPath, EdgeProps, Position } from 
 import { Package, FileText, Database, Code } from 'lucide-react';
 import { useExecutionTimelineStore, type DataPacket } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
+import { useThemeStore } from '@/store/themeStore';
+import {
+  getEdgeColor,
+  getEdgeStrokeDasharray,
+  getEdgeDasharraySum,
+  getEdgeStatusGlowColor,
+} from '@/components/workflow/edge-colors';
 import { cn } from '@/lib/utils';
 
 // Data packet icon mapping
@@ -20,6 +27,9 @@ interface DataFlowEdgeProps extends EdgeProps {
   data?: {
     packets?: DataPacket[];
     isHighlighted?: boolean;
+    sourcePortColor?: string;
+    isBranching?: boolean;
+    portType?: string;
   };
 }
 
@@ -89,6 +99,16 @@ export const DataFlowEdge = memo(
     const dataFlows = useExecutionTimelineStore((s) => s.dataFlows);
     const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
     const mode = useWorkflowUiStore((s) => s.mode);
+    const isDark = useThemeStore((s) => s.theme === 'dark');
+
+    const edgeStrokeColor = useMemo(
+      () => getEdgeColor(data?.sourcePortColor, isDark),
+      [data?.sourcePortColor, isDark],
+    );
+
+    const edgeDasharray = useMemo(() => getEdgeStrokeDasharray(data?.portType), [data?.portType]);
+
+    const edgeDasharraySum = useMemo(() => getEdgeDasharraySum(data?.portType), [data?.portType]);
 
     const nodeStates = useExecutionTimelineStore((state) => state.nodeStates);
     const sourceNodeState = nodeStates[source];
@@ -258,11 +278,65 @@ export const DataFlowEdge = memo(
     };
 
     if (mode !== 'execution' || !selectedRunId) {
-      return <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} />;
+      return (
+        <>
+          <BaseEdge
+            id={id}
+            path={edgePath}
+            markerEnd={markerEnd}
+            style={{
+              stroke: edgeStrokeColor,
+              ...(edgeDasharray ? { strokeDasharray: edgeDasharray } : {}),
+            }}
+          />
+          {/* Subtle animated dash overlay — flows source→target */}
+          <path
+            d={edgePath}
+            fill="none"
+            stroke={edgeStrokeColor}
+            strokeWidth={2}
+            strokeDasharray={edgeDasharray ?? '8 16'}
+            strokeOpacity={0.25}
+            className="edge-flow-pulse"
+            style={
+              {
+                '--edge-dashoffset': edgeDasharraySum,
+                animation: `edge-flow-pulse ${edgeDasharray ? '2s' : '4s'} linear infinite`,
+              } as React.CSSProperties
+            }
+            pointerEvents="none"
+          />
+        </>
+      );
     }
+
+    const glowColor = useMemo(() => {
+      if (isDimmed || !sourceNodeState) return null;
+      return getEdgeStatusGlowColor(sourceNodeState.status, isDark);
+    }, [isDimmed, sourceNodeState, isDark]);
+
+    const isRunning = sourceNodeState?.status === 'running';
 
     return (
       <>
+        {/* Glow path — rendered before the main edge so it sits behind it */}
+        {glowColor && (
+          <path
+            d={edgePath}
+            fill="none"
+            stroke={glowColor}
+            strokeWidth={6}
+            strokeLinecap="round"
+            opacity={isRunning ? undefined : 0.6}
+            filter="blur(3px)"
+            pointerEvents="none"
+            className={isRunning ? 'edge-glow-pulse' : undefined}
+            style={
+              isRunning ? { animation: 'edge-glow-pulse 1.5s ease-in-out infinite' } : undefined
+            }
+          />
+        )}
+
         {/* Base edge */}
         <BaseEdge
           id={id}
@@ -272,10 +346,13 @@ export const DataFlowEdge = memo(
             isDimmed
               ? {
                   stroke: 'hsl(var(--muted-foreground) / 0.2)',
-                  strokeDasharray: '5,5',
+                  strokeDasharray: edgeDasharray ?? '5,5',
                   opacity: 0.5,
                 }
-              : {}
+              : {
+                  stroke: edgeStrokeColor,
+                  ...(edgeDasharray ? { strokeDasharray: edgeDasharray } : {}),
+                }
           }
         />
 

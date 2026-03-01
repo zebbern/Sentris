@@ -25,6 +25,8 @@ import { TerminalNode } from './TerminalNode';
 import { ValidationDock } from './ValidationDock';
 import { DataFlowEdge } from '../timeline/DataFlowEdge';
 import { PlacementIndicator } from './PlacementIndicator';
+import { ConnectionLine } from './ConnectionLine';
+import { ConnectionPreviewContext, type ConnectingFromHandle } from './connection-preview-context';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
@@ -103,6 +105,60 @@ export function Canvas({
   const selectNode = useExecutionTimelineStore((s) => s.selectNode);
   const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
+
+  // --- Connection preview state (drag-to-connect) ---
+  const [connectingFromHandle, setConnectingFromHandle] = useState<ConnectingFromHandle | null>(
+    null,
+  );
+
+  const onConnectStart = useCallback(
+    (
+      _event: React.MouseEvent | React.TouchEvent,
+      params: {
+        nodeId: string | null;
+        handleId: string | null;
+        handleType: 'source' | 'target' | null;
+      },
+    ) => {
+      if (mode !== 'design') return;
+      if (!params.nodeId || !params.handleId || params.handleType !== 'source') return;
+
+      const sourceNode = nodes.find((n) => n.id === params.nodeId);
+      if (!sourceNode) return;
+
+      let portColor = 'green';
+      let portType: ConnectingFromHandle['portType'] = 'regular';
+
+      if (params.handleId === 'tools') {
+        portColor = 'purple';
+        portType = 'tool';
+      } else {
+        const componentRef = (sourceNode.data.componentId ?? sourceNode.data.componentSlug) as
+          | string
+          | undefined;
+        const comp = componentRef ? getComponent(componentRef) : null;
+        if (comp) {
+          const outputPort = comp.outputs?.find((o) => o.id === params.handleId);
+          if (outputPort?.isBranching) {
+            portType = 'branching';
+            portColor = outputPort.branchColor || 'amber';
+          }
+        }
+      }
+
+      setConnectingFromHandle({
+        nodeId: params.nodeId,
+        handleId: params.handleId,
+        portColor,
+        portType,
+      });
+    },
+    [mode, nodes, getComponent],
+  );
+
+  const onConnectEnd = useCallback(() => {
+    setConnectingFromHandle(null);
+  }, []);
   const { toast } = useToast();
   const setConfigPanelOpen = useWorkflowUiStore((s) => s.setConfigPanelOpen);
   const isMobile = useIsMobile();
@@ -307,7 +363,7 @@ export function Canvas({
         <div className="flex h-full">
           <div
             ref={canvasContainerRef}
-            className="flex-1 relative bg-background overflow-hidden"
+            className={`flex-1 relative bg-background overflow-hidden${connectingFromHandle ? ' connecting-from-port' : ''}`}
             style={{
               opacity: canvasOpacity,
               transition: 'opacity 200ms ease-in-out',
@@ -327,56 +383,61 @@ export function Canvas({
               mode={mode}
               onNodeClick={handleValidationNodeClick}
             />
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={handleEdgesChange}
-              onConnect={onConnect}
-              onInit={(instance: ReactFlowInstance) => {
-                setReactFlowInstance(instance);
-                if (nodes.length > 0) {
-                  try {
-                    instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.85 });
-                  } catch (error: unknown) {
-                    logger.warn('Failed to fit view on init:', error);
+            <ConnectionPreviewContext.Provider value={connectingFromHandle}>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={handleEdgesChange}
+                onConnect={onConnect}
+                onConnectStart={onConnectStart}
+                onConnectEnd={onConnectEnd}
+                connectionLineComponent={ConnectionLine}
+                onInit={(instance: ReactFlowInstance) => {
+                  setReactFlowInstance(instance);
+                  if (nodes.length > 0) {
+                    try {
+                      instance.fitView({ padding: 0.2, duration: 0, maxZoom: 0.85 });
+                    } catch (error: unknown) {
+                      logger.warn('Failed to fit view on init:', error);
+                    }
                   }
-                }
-              }}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onNodeClick={onNodeClick}
-              onNodeDoubleClick={onNodeDoubleClick}
-              onPaneClick={onPaneClick}
-              onMoveStart={() => {
-                hasUserInteractedRef.current = true;
-              }}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              nodesDraggable={mode === 'design'}
-              nodesConnectable={mode === 'design'}
-              edgesUpdatable={mode === 'design'}
-              deleteKeyCode={mode === 'design' ? ['Backspace', 'Delete'] : []}
-              elementsSelectable
-              className={isPlacementActive ? '[&_.react-flow__pane]:!cursor-crosshair' : ''}
-            >
-              <Background
-                gap={16}
-                className="!bg-background [&>pattern>circle]:!fill-muted-foreground/30"
-              />
-              <Controls
-                position="bottom-left"
-                className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
-              />
-              <MiniMap
-                position="bottom-right"
-                pannable
-                zoomable
-                className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
-                maskColor="hsl(var(--background) / 0.7)"
-                nodeColor={getNodeStatusColor}
-              />
-            </ReactFlow>
+                }}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onNodeClick={onNodeClick}
+                onNodeDoubleClick={onNodeDoubleClick}
+                onPaneClick={onPaneClick}
+                onMoveStart={() => {
+                  hasUserInteractedRef.current = true;
+                }}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                nodesDraggable={mode === 'design'}
+                nodesConnectable={mode === 'design'}
+                edgesUpdatable={mode === 'design'}
+                deleteKeyCode={mode === 'design' ? ['Backspace', 'Delete'] : []}
+                elementsSelectable
+                className={isPlacementActive ? '[&_.react-flow__pane]:!cursor-crosshair' : ''}
+              >
+                <Background
+                  gap={16}
+                  className="!bg-background [&>pattern>circle]:!fill-muted-foreground/30"
+                />
+                <Controls
+                  position="bottom-left"
+                  className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
+                />
+                <MiniMap
+                  position="bottom-right"
+                  pannable
+                  zoomable
+                  className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
+                  maskColor="hsl(var(--background) / 0.7)"
+                  nodeColor={getNodeStatusColor}
+                />
+              </ReactFlow>
+            </ConnectionPreviewContext.Provider>
           </div>
 
           {mode === 'design' && selectedNode && (

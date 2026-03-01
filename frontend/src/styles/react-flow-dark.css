@@ -203,3 +203,21 @@ textarea {
   border: none !important;
   outline: none !important;
 }
+
+/* ==========================================================================
+ * Drag-to-connect preview — target handle highlighting
+ * When dragging from a source handle, valid target handles pulse to invite
+ * the user to drop. Works in both light and dark mode.
+ * ========================================================================== */
+
+.connecting-from-port .react-flow__handle[data-handlepos="left"] {
+  animation: handle-connect-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 6px 2px hsl(var(--primary) / 0.5);
+  border-color: hsl(var(--primary)) !important;
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+
+/* The connection line itself — dash animation to show directionality */
+.connection-line-preview {
+  animation: connection-line-dash 0.6s linear infinite;
+}

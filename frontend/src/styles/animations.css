@@ -23,6 +23,29 @@
   100% { transform: translateX(100%);  opacity: 0; }
 }
 
+/* Design-mode edge flow pulse — subtle dash animation showing data direction */
+@keyframes edge-flow-pulse {
+  from { stroke-dashoffset: var(--edge-dashoffset, 24); }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Execution-mode edge glow pulse — blue running edges */
+@keyframes edge-glow-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 1; }
+}
+
+/* Drag-to-connect — target handle pulse */
+@keyframes handle-connect-pulse {
+  0%, 100% { box-shadow: 0 0 4px 1px hsl(var(--primary) / 0.3); }
+  50%      { box-shadow: 0 0 8px 3px hsl(var(--primary) / 0.6); }
+}
+
+/* Drag-to-connect — connection line dash scroll */
+@keyframes connection-line-dash {
+  to { stroke-dashoffset: -12; }
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

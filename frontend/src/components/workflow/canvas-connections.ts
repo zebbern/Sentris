@@ -12,6 +12,8 @@ import type { NodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import type { ToastVariant } from '@/components/ui/toast-context';
 import { validateConnection } from '@/utils/connectionValidation';
+import { getEdgeColor } from '@/components/workflow/edge-colors';
+import { useThemeStore } from '@/store/themeStore';
 import { logger } from '@/lib/logger';
 import type { DataPacket } from '@/store/executionTimelineStore';
 
@@ -48,6 +50,8 @@ export function useCanvasConnections({
   onSnapshot,
   dataFlows,
 }: UseCanvasConnectionsDeps) {
+  const isDark = useThemeStore((s) => s.theme === 'dark');
+
   // Enhanced edge change handler that also updates input mappings
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -111,6 +115,36 @@ export function useCanvasConnections({
         return;
       }
 
+      // Resolve source port color for edge stroke
+      let sourcePortColor: string | undefined;
+      let isBranching = false;
+      let portType: 'regular' | 'branching' | 'tool' = 'regular';
+
+      if (params.source && params.sourceHandle) {
+        const sourceNode = nodes.find((n) => n.id === params.source);
+        if (sourceNode) {
+          if (params.sourceHandle === 'tools') {
+            sourcePortColor = 'purple';
+            portType = 'tool';
+          } else {
+            const componentRef = (sourceNode.data.componentId ?? sourceNode.data.componentSlug) as
+              | string
+              | undefined;
+            const comp = componentRef ? getComponent(componentRef) : null;
+            if (comp) {
+              const outputPort = comp.outputs?.find((o) => o.id === params.sourceHandle);
+              if (outputPort?.isBranching) {
+                isBranching = true;
+                portType = 'branching';
+                sourcePortColor = outputPort.branchColor || 'amber';
+              } else {
+                sourcePortColor = 'green';
+              }
+            }
+          }
+        }
+      }
+
       const newEdge = {
         ...params,
         type: 'default',
@@ -119,6 +153,9 @@ export function useCanvasConnections({
         data: {
           packets: [],
           isHighlighted: selectedNodeId === params.source || selectedNodeId === params.target,
+          sourcePortColor,
+          isBranching,
+          portType,
         },
       };
 
@@ -171,20 +208,34 @@ export function useCanvasConnections({
   );
 
   // Update edges with data flow highlighting and packet data
+  // Preserve sourcePortColor, isBranching, and portType from the original edge data
   useEffect(() => {
     setEdges((eds) =>
-      eds.map((edge) => ({
-        ...edge,
-        data: {
-          ...edge.data,
-          packets: dataFlows.filter(
-            (packet) => packet.sourceNode === edge.source && packet.targetNode === edge.target,
-          ),
-          isHighlighted: selectedNodeId === edge.source || selectedNodeId === edge.target,
-        },
-      })),
+      eds.map((edge) => {
+        const portColor = edge.data?.sourcePortColor as string | undefined;
+        const resolvedColor = getEdgeColor(portColor, isDark);
+        return {
+          ...edge,
+          markerEnd: {
+            type: MarkerType.Arrow,
+            width: 30,
+            height: 30,
+            color: resolvedColor,
+          },
+          data: {
+            ...edge.data,
+            packets: dataFlows.filter(
+              (packet) => packet.sourceNode === edge.source && packet.targetNode === edge.target,
+            ),
+            isHighlighted: selectedNodeId === edge.source || selectedNodeId === edge.target,
+            sourcePortColor: portColor,
+            isBranching: edge.data?.isBranching,
+            portType: edge.data?.portType,
+          },
+        };
+      }),
     );
-  }, [dataFlows, selectedNodeId, setEdges]);
+  }, [dataFlows, selectedNodeId, setEdges, isDark]);
 
   return { handleEdgesChange, onConnect };
 }
