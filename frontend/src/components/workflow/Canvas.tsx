@@ -56,6 +56,7 @@ import { getNodeStatusColor } from './canvas-minimap-colors';
 import { CanvasConfigPanel } from './canvas-config-panel';
 import { useNodeStatusSync } from './canvas-status-sync';
 import { EdgeContextMenu } from './EdgeContextMenu';
+import { EdgeBundleLayer } from './EdgeBundleLayer';
 import {
   deleteEdge,
   insertNodeAtEdge,
@@ -118,6 +119,8 @@ export function Canvas({
   const showHeatMap = useWorkflowUiStore((state) => state.showHeatMap);
   const smartRouting = useWorkflowUiStore((state) => state.smartRouting);
   const toggleSmartRouting = useWorkflowUiStore((state) => state.toggleSmartRouting);
+  const edgeBundling = useWorkflowUiStore((state) => state.edgeBundling);
+  const toggleEdgeBundling = useWorkflowUiStore((state) => state.toggleEdgeBundling);
 
   // --- Edge context menu state ---
   const [edgeContextMenu, setEdgeContextMenu] = useState<{
@@ -493,32 +496,64 @@ export function Canvas({
                   className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
                 />
                 <Panel position="top-right" className="!m-2">
-                  <button
-                    onClick={toggleSmartRouting}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
-                      smartRouting
-                        ? 'bg-sky-500 text-white border-sky-600 hover:bg-sky-600'
-                        : 'bg-card text-foreground border-border hover:bg-accent'
-                    }`}
-                    title={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={toggleSmartRouting}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
+                        smartRouting
+                          ? 'bg-sky-500 text-white border-sky-600 hover:bg-sky-600'
+                          : 'bg-card text-foreground border-border hover:bg-accent'
+                      }`}
+                      title={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
                     >
-                      <circle cx="6" cy="19" r="3" />
-                      <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
-                      <circle cx="18" cy="5" r="3" />
-                    </svg>
-                    Smart Routing
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="6" cy="19" r="3" />
+                        <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+                        <circle cx="18" cy="5" r="3" />
+                      </svg>
+                      Smart Routing
+                    </button>
+                    {mode === 'design' && (
+                      <button
+                        onClick={toggleEdgeBundling}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
+                          edgeBundling
+                            ? 'bg-violet-500 text-white border-violet-600 hover:bg-violet-600'
+                            : 'bg-card text-foreground border-border hover:bg-accent'
+                        }`}
+                        title={edgeBundling ? 'Disable edge bundling' : 'Enable edge bundling'}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 12h8" />
+                          <path d="M12 5l8 0" />
+                          <path d="M12 12l8 0" />
+                          <path d="M12 19l8 0" />
+                          <circle cx="12" cy="12" r="1" />
+                        </svg>
+                        Edge Bundling
+                      </button>
+                    )}
+                  </div>
                 </Panel>
                 <MiniMap
                   position="bottom-right"
@@ -528,6 +563,7 @@ export function Canvas({
                   maskColor="hsl(var(--background) / 0.7)"
                   nodeColor={getNodeStatusColor}
                 />
+                <EdgeBundleLayer />
               </ReactFlow>
             </ConnectionPreviewContext.Provider>
 

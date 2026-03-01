@@ -34,6 +34,8 @@ interface WorkflowUiState {
   showHeatMap: boolean;
   /** Whether smart edge routing (orthogonal node-avoidance) is enabled. */
   smartRouting: boolean;
+  /** Whether visual edge bundling (fan-out trunk indicators) is enabled (design mode only). */
+  edgeBundling: boolean;
 }
 
 interface WorkflowUiActions {
@@ -64,6 +66,8 @@ interface WorkflowUiActions {
   toggleHeatMap: () => void;
   /** Toggle smart edge routing on/off. */
   toggleSmartRouting: () => void;
+  /** Toggle visual edge bundling on/off. */
+  toggleEdgeBundling: () => void;
 }
 
 export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
@@ -79,6 +83,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       terminalPanelCollapsed: false,
       showHeatMap: false,
       smartRouting: false,
+      edgeBundling: false,
       setMode: (mode) =>
         set((state) => ({
           mode,
@@ -161,6 +166,8 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       toggleHeatMap: () => set((state) => ({ showHeatMap: !state.showHeatMap })),
 
       toggleSmartRouting: () => set((state) => ({ smartRouting: !state.smartRouting })),
+
+      toggleEdgeBundling: () => set((state) => ({ edgeBundling: !state.edgeBundling })),
     }),
     {
       name: 'workflow-ui-preferences',
@@ -171,6 +178,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         terminalPanelHeight: state.terminalPanelHeight,
         showHeatMap: state.showHeatMap,
         smartRouting: state.smartRouting,
+        edgeBundling: state.edgeBundling,
       }),
       // Merge function to ensure mode is never restored from localStorage
       merge: (persistedState, currentState) => ({
