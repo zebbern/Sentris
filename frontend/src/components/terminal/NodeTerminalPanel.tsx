@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Terminal } from 'xterm';
-import type { FitAddon } from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
 import { Copy, Download, Loader2, PlugZap, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTimelineTerminalStream } from '@/hooks/useTimelineTerminalStream';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
-import { useThemeStore } from '@/store/themeStore';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
-import { logger } from '@/lib/logger';
+import { useXterm } from './useXterm';
+import { decodePayload } from './terminal-utils';
 
 interface NodeTerminalPanelProps {
   nodeId: string;
@@ -32,22 +29,6 @@ interface NodeTerminalPanelProps {
   embedded?: boolean;
 }
 
-const decodePayload = (payload: string): Uint8Array => {
-  if (typeof window === 'undefined' || typeof atob !== 'function') {
-    return new Uint8Array(0);
-  }
-  try {
-    const binary = atob(payload);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  } catch {
-    return new Uint8Array(0);
-  }
-};
-
 export function NodeTerminalPanel({
   nodeId,
   runId,
@@ -57,20 +38,21 @@ export function NodeTerminalPanel({
   embedded = false,
 }: NodeTerminalPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
   const lastRenderedChunkIndex = useRef<number>(-1);
   const lastTimelineTimeRef = useRef<number | null>(null);
   const [terminalKey, setTerminalKey] = useState(0);
-  const terminalReadyRef = useRef<boolean>(false);
-  const [isTerminalReady, setIsTerminalReady] = useState(false);
-  const [isXtermLoaded, setIsXtermLoaded] = useState(false);
-  const [xtermError, setXtermError] = useState<string | null>(null);
+
+  const {
+    containerRef,
+    terminalRef,
+    fitAddonRef,
+    isTerminalReady,
+    isXtermLoaded,
+    xtermError,
+    terminalReadyRef,
+  } = useXterm(terminalKey);
 
   const currentTime = useExecutionTimelineStore((state) => state.currentTime);
-  const theme = useThemeStore((state) => state.theme);
-  const isDarkMode = theme === 'dark';
 
   const {
     chunks,
@@ -107,209 +89,6 @@ export function NodeTerminalPanel({
       .join('');
     await copy(decoded, { successDescription: 'Terminal output copied to clipboard.' });
   }, [chunks, copy]);
-
-  // Initialize terminal
-  useEffect(() => {
-    if (!containerRef.current) {
-      return;
-    }
-
-    let disposed = false;
-
-    (async () => {
-      // Dynamically import xterm to reduce initial bundle size
-      let XtermTerminal: typeof Terminal;
-      let XtermFitAddon: typeof FitAddon;
-
-      try {
-        const [xtermModule, fitModule] = await Promise.all([
-          import('xterm'),
-          import('xterm-addon-fit'),
-        ]);
-        XtermTerminal = xtermModule.Terminal;
-        XtermFitAddon = fitModule.FitAddon;
-      } catch (err) {
-        if (!disposed) {
-          const message = err instanceof Error ? err.message : 'Failed to load terminal';
-          setXtermError(message);
-          logger.error('[NodeTerminalPanel] Failed to load xterm:', err);
-        }
-        return;
-      }
-
-      if (disposed) return;
-      setIsXtermLoaded(true);
-      setXtermError(null);
-
-      // Ensure container has dimensions before opening terminal
-      // This prevents xterm.js from trying to access undefined dimensions
-      const ensureContainerReady = (callback: () => void) => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        // Check if container has dimensions
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          callback();
-          return;
-        }
-
-        // If no dimensions yet, wait for next frame and try again
-        requestAnimationFrame(() => {
-          ensureContainerReady(callback);
-        });
-      };
-
-      ensureContainerReady(() => {
-        if (disposed) return;
-        const container = containerRef.current;
-        if (!container) return;
-
-        const term = new XtermTerminal({
-          convertEol: false,
-          fontSize: 12,
-          disableStdin: true,
-          cursorBlink: false,
-          allowProposedApi: true,
-          allowTransparency: false,
-          macOptionIsMeta: false,
-          macOptionClickForcesSelection: false,
-          rightClickSelectsWord: false,
-          windowsMode: false,
-          theme: {
-            // Use dark terminal colors for both light and dark themes (easier to read)
-            background: '#1e1e1e', // Dark gray/black for both themes
-            foreground: '#d4d4d4', // Light gray text for both themes
-            cursor: '#aeafad', // Visible cursor color for both themes
-            cursorAccent: '#1e1e1e', // Cursor accent for both themes
-          },
-          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        });
-
-        term.options.macOptionIsMeta = false;
-        term.options.macOptionClickForcesSelection = false;
-        term.options.rightClickSelectsWord = false;
-
-        const fitAddon = new XtermFitAddon();
-        term.loadAddon(fitAddon);
-
-        try {
-          term.open(container);
-        } catch (error: unknown) {
-          logger.warn('[NodeTerminalPanel] Failed to open terminal:', error);
-          // If opening fails, dispose and return early
-          term.dispose();
-          return;
-        }
-
-        terminalRef.current = term;
-        fitAddonRef.current = fitAddon;
-        terminalReadyRef.current = false;
-        setIsTerminalReady(false);
-
-        // Wait for terminal to be fully initialized before fitting
-        // Use requestAnimationFrame to ensure DOM and terminal render service are ready
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (fitAddonRef.current && containerRef.current && terminalRef.current === term) {
-              try {
-                fitAddonRef.current.fit();
-                terminalReadyRef.current = true;
-                setIsTerminalReady(true);
-              } catch (error: unknown) {
-                logger.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
-                // Mark as ready anyway to allow rendering
-                terminalReadyRef.current = true;
-                setIsTerminalReady(true);
-              }
-            }
-          });
-        });
-      });
-    })();
-
-    const handleResize = () => {
-      if (fitAddonRef.current) {
-        try {
-          fitAddonRef.current.fit();
-        } catch (_error: unknown) {
-          // Ignore resize errors during terminal recreation
-        }
-      }
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      disposed = true;
-      window.removeEventListener('resize', handleResize);
-      terminalReadyRef.current = false;
-      setIsTerminalReady(false);
-      if (terminalRef.current) {
-        terminalRef.current.dispose();
-      }
-      terminalRef.current = null;
-      fitAddonRef.current = null;
-    };
-  }, [terminalKey]);
-
-  // Update terminal theme when dark mode changes (without recreating terminal)
-  useEffect(() => {
-    if (!terminalRef.current || !containerRef.current) return;
-
-    terminalRef.current.options.theme = {
-      // Use dark terminal colors for both light and dark themes (easier to read)
-      background: '#1e1e1e', // Dark gray/black for both themes
-      foreground: '#d4d4d4', // Light gray text for both themes
-      cursor: '#aeafad', // Visible cursor color for both themes
-      cursorAccent: '#1e1e1e', // Cursor accent for both themes
-    };
-
-    // Update selection color via CSS (xterm.js doesn't support selection in theme)
-    // Use standard terminal selection colors
-    const styleId = 'xterm-selection-style';
-    let styleElement = document.getElementById(styleId) as HTMLStyleElement;
-    if (!styleElement) {
-      styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      document.head.appendChild(styleElement);
-    }
-
-    // Use dark mode selection color for both themes
-    const selectionBg = '#264f78'; // Standard terminal blue selection (works well on dark background)
-
-    styleElement.textContent = `
-      .xterm .xterm-selection {
-        background-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration {
-        background-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-top {
-        border-top-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-bottom {
-        border-bottom-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-left {
-        border-left-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-right {
-        border-right-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-top-left,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-top-right,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-bottom-left,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-bottom-right {
-        background-color: ${selectionBg} !important;
-      }
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-top-left::before,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-top-right::before,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-bottom-left::before,
-      .xterm .xterm-selection .xterm-selection-decoration .xterm-selection-decoration-bottom-right::before {
-        background-color: ${selectionBg} !important;
-      }
-    `;
-  }, [isDarkMode]);
 
   // SIMPLE RENDERING LOGIC:
   // - Forward: render new chunks incrementally
