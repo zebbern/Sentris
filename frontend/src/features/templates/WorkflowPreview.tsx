@@ -98,7 +98,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
           d: `M${sx},${sy} C${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`,
         };
       })
-      .filter(Boolean);
+      .filter((edge): edge is { key: string; d: string } => edge !== null);
 
     return { viewBox, positioned, edgePaths };
   }, [graph]);
@@ -132,7 +132,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
       </defs>
 
       {/* Edges */}
-      {edgePaths.map((edge: any) => (
+      {edgePaths.map((edge) => (
         <path
           key={edge.key}
           d={edge.d}

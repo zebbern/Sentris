@@ -1,5 +1,10 @@
 import type { ReactNode, SetStateAction } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type {
+  Node as ReactFlowNode,
+  Edge as ReactFlowEdge,
+  NodeChange,
+  EdgeChange,
+} from 'reactflow';
 import { Canvas } from '@/components/workflow/Canvas';
 import type { FrontendNodeData } from '@/schemas/node';
 
@@ -12,8 +17,8 @@ interface WorkflowExecutionPaneProps {
   edges: ReactFlowEdge[];
   setNodes: SetNodesFn;
   setEdges: SetEdgesFn;
-  onNodesChange: (changes: any[]) => void;
-  onEdgesChange: (changes: any[]) => void;
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
   overlay?: ReactNode;
 }
 

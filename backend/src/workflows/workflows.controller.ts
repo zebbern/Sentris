@@ -520,8 +520,7 @@ export class WorkflowsController {
 
     // Find the entry point node by checking the component type
     const entryNode = workflow.graph.nodes.find((node) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Component type union mismatch
-      ENTRY_POINT_COMPONENT_IDS.includes(node.type as any),
+      (ENTRY_POINT_COMPONENT_IDS as readonly string[]).includes(node.type),
     );
 
     // Extract runtime inputs from the entry point's config
@@ -952,10 +951,9 @@ export class WorkflowsController {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flushHeaders
-    if (typeof (res as any).flushHeaders === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flushHeaders
-      (res as any).flushHeaders();
+    const rawRes = res as unknown as { flushHeaders?: () => void };
+    if (typeof rawRes.flushHeaders === 'function') {
+      rawRes.flushHeaders();
     }
 
     await this.workflowsService.ensureRunAccess(runId, auth);
@@ -983,10 +981,9 @@ export class WorkflowsController {
         res.write(`event: ${event}\n`);
         res.write(`data: ${JSON.stringify(payload)}\n\n`);
         // Flush headers if available (helps with immediate delivery)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flush
-        if (typeof (res as any).flush === 'function') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Express Response type lacks flush
-          (res as any).flush();
+        const rawRes = res as unknown as { flush?: () => void };
+        if (typeof rawRes.flush === 'function') {
+          rawRes.flush();
         }
       } catch (error: unknown) {
         // Connection closed or error writing
@@ -1109,8 +1106,17 @@ export class WorkflowsController {
     let useRealtime = false;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Accessing private repository for realtime subscription
-      const traceRepo = (this.traceService as any).repository;
+      // Access repository for realtime subscription (private in TraceService, exposed via type assertion)
+      const traceRepo = (
+        this.traceService as unknown as {
+          repository: {
+            subscribeToRun?: (
+              runId: string,
+              cb: (payload: string) => Promise<void>,
+            ) => Promise<() => Promise<void>>;
+          };
+        }
+      ).repository;
       if (traceRepo && typeof traceRepo.subscribeToRun === 'function') {
         unsubscribe = await traceRepo.subscribeToRun(runId, async (payload: string) => {
           if (!active) return;

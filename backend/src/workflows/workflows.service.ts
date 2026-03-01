@@ -583,8 +583,7 @@ export class WorkflowsService {
       action: 'workflow.delete',
       resourceType: 'workflow',
       resourceId: id,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Audit log record may lack name property
-      resourceName: (existing as any)?.name ?? null,
+      resourceName: existing?.name ?? null,
     });
   }
 
@@ -962,15 +961,7 @@ export class WorkflowsService {
         );
       }
 
-      if (
-        error &&
-        typeof error === 'object' &&
-        'message' in error &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK error type narrowing
-        typeof (error as any).message === 'string' &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK error type narrowing
-        (error as any).message.includes('Workflow execution already started')
-      ) {
+      if (error instanceof Error && error.message.includes('Workflow execution already started')) {
         const existing = await this.runRepository.findByRunId(prepared.runId, {
           organizationId: prepared.organizationId,
         });
@@ -1853,8 +1844,17 @@ export class WorkflowsService {
       return undefined;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal failure object is untyped
-    const failureObj = failure as any;
+    // Temporal failure objects have a known shape but no exported type
+    interface TemporalFailure {
+      message?: string;
+      stackTrace?: string;
+      code?: string;
+      applicationFailureInfo?: { type?: string; details?: unknown };
+      timeoutFailureInfo?: { timeoutType?: string };
+      terminatedFailureInfo?: { reason?: string };
+      serverFailureInfo?: { nonRetryable?: boolean };
+    }
+    const failureObj = failure as TemporalFailure | null | undefined;
     if (!failureObj) {
       return {
         reason: `Workflow run ended with status ${status}`,

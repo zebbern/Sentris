@@ -11,8 +11,10 @@ import {
   ScheduleDescription,
   ScheduleOverlapPolicy as TemporalScheduleOverlapPolicy,
   WorkflowClient,
+  type Workflow,
   type WorkflowExecutionStatusName,
   type WorkflowHandle,
+  type WorkflowOptions,
 } from '@temporalio/client';
 
 // Import workflow functions (for type safety during client.start())
@@ -127,11 +129,9 @@ export class TemporalService implements OnModuleDestroy {
     const handle = await client.start(workflowFn, {
       workflowId,
       taskQueue,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK args type mismatch
-      args: (options.args ?? []) as any,
+      args: (options.args ?? []) as Parameters<typeof workflowFn>,
       memo: options.memo,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK searchAttributes type mismatch
-      searchAttributes: options.searchAttributes as any,
+      searchAttributes: options.searchAttributes as WorkflowOptions['searchAttributes'],
       workflowExecutionTimeout: '2 hours',
     });
 
@@ -177,8 +177,7 @@ export class TemporalService implements OnModuleDestroy {
       closeTime: description.closeTime?.toISOString(),
       historyLength: description.historyLength,
       taskQueue: description.taskQueue,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Temporal SDK status type lacks failure property
-      failure: (description.status as any)?.failure,
+      failure: (description.status as { failure?: unknown })?.failure,
     };
   }
 
@@ -226,7 +225,7 @@ export class TemporalService implements OnModuleDestroy {
     return handle.query(input.queryType, ...(input.args ?? []));
   }
 
-  private async getWorkflowHandle(ref: WorkflowRunReference): Promise<WorkflowHandle<any>> {
+  private async getWorkflowHandle(ref: WorkflowRunReference): Promise<WorkflowHandle<Workflow>> {
     const client = await this.getClient();
     return client.getHandle(ref.workflowId, ref.runId);
   }
