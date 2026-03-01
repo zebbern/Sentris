@@ -498,6 +498,170 @@ export async function getApiKeyRaw(id: string): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
+// Integration helpers
+// ---------------------------------------------------------------------------
+
+/** List available integration providers. */
+export async function listIntegrationProviders(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/integrations/providers`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list integration providers: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get provider OAuth configuration. */
+export async function getProviderConfig(provider: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/integrations/providers/${provider}/config`, {
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get provider config: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Upsert provider OAuth configuration. */
+export async function upsertProviderConfig(
+  provider: string,
+  config: { clientId: string; clientSecret?: string },
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/integrations/providers/${provider}/config`, {
+    method: 'PUT',
+    headers: HEADERS,
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to upsert provider config: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Delete provider OAuth configuration. Returns response status. */
+export async function deleteProviderConfig(provider: string): Promise<number> {
+  const res = await fetch(`${API_BASE}/integrations/providers/${provider}/config`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  return res.status;
+}
+
+/** List integration connections for a user. */
+export async function listConnections(userId: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/integrations/connections?userId=${encodeURIComponent(userId)}`, {
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list connections: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** List connections raw (for asserting error statuses). */
+export async function listConnectionsRaw(query?: string): Promise<Response> {
+  const url = query
+    ? `${API_BASE}/integrations/connections?${query}`
+    : `${API_BASE}/integrations/connections`;
+  return fetch(url, { headers: HEADERS });
+}
+
+// ---------------------------------------------------------------------------
+// MCP Server helpers
+// ---------------------------------------------------------------------------
+
+/** List all MCP servers. */
+export async function listMcpServers(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/mcp-servers`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list MCP servers: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get a specific MCP server by ID. */
+export async function getMcpServer(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp-servers/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get MCP server ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get MCP server raw (for asserting 404s etc.). */
+export async function getMcpServerRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/mcp-servers/${id}`, { headers: HEADERS });
+}
+
+/** Create a new MCP server. */
+export async function createMcpServer(data: {
+  name: string;
+  transportType: 'http' | 'stdio';
+  description?: string;
+  endpoint?: string;
+  command?: string;
+  args?: string[];
+  headers?: Record<string, string>;
+  healthCheckUrl?: string;
+  enabled?: boolean;
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp-servers`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MCP server creation failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Update an MCP server via PATCH. */
+export async function updateMcpServer(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp-servers/${id}`, {
+    method: 'PATCH',
+    headers: HEADERS,
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update MCP server ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Toggle MCP server enabled/disabled. */
+export async function toggleMcpServer(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/mcp-servers/${id}/toggle`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to toggle MCP server ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Delete an MCP server. Returns status code. */
+export async function deleteMcpServer(id: string): Promise<number> {
+  const res = await fetch(`${API_BASE}/mcp-servers/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  return res.status;
+}
+
+// ---------------------------------------------------------------------------
 // Schedule helpers
 // ---------------------------------------------------------------------------
 
