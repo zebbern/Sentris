@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 
@@ -13,6 +15,7 @@ type IntegrationConnection = components['schemas']['IntegrationConnectionRespons
 type CallbackStatus = 'pending' | 'success' | 'error';
 
 export function IntegrationCallback() {
+  useDocumentTitle('Connecting…');
   const { provider } = useParams<{ provider: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

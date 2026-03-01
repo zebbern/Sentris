@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes, Navigate } from 'react-router-dom';
 
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { AuditLogSettings } from '@/pages/settings/AuditLogSettings';
@@ -10,6 +11,7 @@ import { KeyboardShortcutsSettings } from '@/pages/settings/KeyboardShortcutsSet
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
+  useDocumentTitle('Settings');
   const roles = useAuthStore((state) => state.roles);
   const isAdmin = hasAdminRole(roles);
 

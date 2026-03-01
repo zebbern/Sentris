@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+
+import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useExecutionRun } from '@/hooks/queries/useExecutionQueries';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -11,6 +13,7 @@ import { Loader2 } from 'lucide-react';
  * /workflows/:workflowId/runs/:runId
  */
 export function RunRedirect() {
+  useDocumentTitle('Redirecting…');
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const { data: run, error: queryError } = useExecutionRun(runId);
