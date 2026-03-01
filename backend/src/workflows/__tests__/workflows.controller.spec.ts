@@ -8,6 +8,8 @@ import { WorkflowGraphDto, WorkflowGraphSchema } from '../dto/workflow-graph.dto
 import { WorkflowRecord, WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
 import { WorkflowsController } from '../workflows.controller';
+import { WorkflowRunsController } from '../workflow-runs.controller';
+import { WorkflowRunObservabilityController } from '../workflow-run-observability.controller';
 import type { AuthContext } from '../../auth/types';
 
 const TEST_ORG = 'test-org';
@@ -62,6 +64,8 @@ const baseGraph: WorkflowGraphDto = WorkflowGraphSchema.parse({
 
 describe('WorkflowsController', () => {
   let controller: WorkflowsController;
+  let runsController: WorkflowRunsController;
+  let observabilityController: WorkflowRunObservabilityController;
   let repositoryStore: Map<string, WorkflowRecord>;
   let runStore: Map<string, any>;
   let lastCancelledRun: { workflowId: string; runId?: string } | null = null;
@@ -399,7 +403,7 @@ describe('WorkflowsController', () => {
         .fn()
         .mockResolvedValue({ runId: 'sentris-run-controller', artifacts: [] }),
     };
-    const terminalStreamService = {
+    const _terminalStreamService = {
       fetchChunks: vi.fn().mockResolvedValue({ cursor: '{}', chunks: [] }),
     };
     const terminalArchiveService = {
@@ -426,15 +430,14 @@ describe('WorkflowsController', () => {
       listDetails: vi.fn().mockResolvedValue([]),
       getNodeIO: vi.fn().mockResolvedValue(null),
     };
-    controller = new WorkflowsController(
-      workflowsService,
+    controller = new WorkflowsController(workflowsService, { get: () => undefined } as any);
+    runsController = new WorkflowRunsController(workflowsService, terminalArchiveService as any);
+    observabilityController = new WorkflowRunObservabilityController(
       traceService,
-      logStreamService as any,
+      workflowsService,
       artifactsService as any,
-      terminalStreamService as any,
-      terminalArchiveService as any,
       nodeIOService as any,
-      { get: () => undefined } as any,
+      logStreamService as any,
     );
   });
 
@@ -480,7 +483,7 @@ describe('WorkflowsController', () => {
     expect(run.workflowVersion).toBeDefined();
     expect(run.workflowVersionId).toBeDefined();
 
-    const status = await controller.status(
+    const status = await runsController.status(
       run.runId,
       { temporalRunId: run.temporalRunId },
       authContext,
@@ -490,7 +493,7 @@ describe('WorkflowsController', () => {
     expect(status.status).toBe('RUNNING');
     expect(status.progress).toEqual({ completedActions: 1, totalActions: 2 });
 
-    const result = await controller.result(
+    const result = await runsController.result(
       run.runId,
       { temporalRunId: run.temporalRunId },
       authContext,
@@ -500,7 +503,7 @@ describe('WorkflowsController', () => {
       result: { workflowId: run.runId, success: true },
     });
 
-    const cancelResponse = await controller.cancel(
+    const cancelResponse = await runsController.cancel(
       run.runId,
       { temporalRunId: run.temporalRunId },
       authContext,
@@ -511,7 +514,7 @@ describe('WorkflowsController', () => {
       runId: run.temporalRunId,
     });
 
-    const trace = await controller.trace(run.runId, authContext);
+    const trace = await observabilityController.trace(run.runId, authContext);
     expect(trace.runId).toBe(run.runId);
     expect(trace.events).toHaveLength(0);
     expect(trace.cursor).toBeUndefined();
@@ -524,7 +527,7 @@ describe('WorkflowsController', () => {
       inputs: { payload: { value: 'ping' } },
     });
 
-    const summary = await controller.getRun(authContext, run.runId);
+    const summary = await runsController.getRun(authContext, run.runId);
     expect(summary.id).toBe(run.runId);
     expect(summary.workflowId).toBe(created.id);
     expect(summary.workflowName).toBeDefined();

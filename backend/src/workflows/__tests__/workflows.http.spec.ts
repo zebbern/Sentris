@@ -3,7 +3,8 @@ import 'reflect-metadata';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import { WorkflowRunStatusSchema, TraceStreamEnvelopeSchema } from '@sentris/shared';
 
-import { WorkflowsController } from '../workflows.controller';
+import { WorkflowRunsController } from '../workflow-runs.controller';
+import { WorkflowRunObservabilityController } from '../workflow-run-observability.controller';
 import { WorkflowLogsQuerySchema } from '../dto/workflow-graph.dto';
 
 const sampleStatus = WorkflowRunStatusSchema.parse({
@@ -57,7 +58,8 @@ const authContext = {
 };
 
 describe('WorkflowsController contract coverage', () => {
-  let controller: WorkflowsController;
+  let runsController: WorkflowRunsController;
+  let observabilityController: WorkflowRunObservabilityController;
   const workflowService = {
     getRunStatus: vi.fn().mockResolvedValue(sampleStatus),
     getRunResult: vi.fn(),
@@ -74,14 +76,6 @@ describe('WorkflowsController contract coverage', () => {
   const artifactsService = {
     listRunArtifacts: vi.fn().mockResolvedValue({ runId: sampleStatus.runId, artifacts: [] }),
   } as const;
-  const terminalStreamService = {
-    fetchChunks: vi.fn().mockResolvedValue({ cursor: '{}', chunks: [] }),
-  } as const;
-  const terminalArchiveService = {
-    archive: vi.fn(),
-    list: vi.fn(),
-    download: vi.fn(),
-  } as const;
 
   const nodeIOService = {
     listDetails: vi.fn().mockResolvedValue([]),
@@ -89,21 +83,22 @@ describe('WorkflowsController contract coverage', () => {
   } as const;
 
   beforeEach(() => {
-    controller = new WorkflowsController(
+    runsController = new WorkflowRunsController(
       workflowService as any,
+      { archiveRun: vi.fn() } as any,
+    );
+    observabilityController = new WorkflowRunObservabilityController(
       traceService as any,
-      logStreamService as any,
+      workflowService as any,
       artifactsService as any,
-      terminalStreamService as any,
-      terminalArchiveService as any,
       nodeIOService as any,
-      { get: () => undefined } as any,
+      logStreamService as any,
     );
     vi.clearAllMocks();
   });
 
   it('returns status payload matching the shared contract', async () => {
-    const result = await controller.status(
+    const result = await runsController.status(
       'sentris-run-123',
       { temporalRunId: undefined },
       authContext as any,
@@ -119,7 +114,7 @@ describe('WorkflowsController contract coverage', () => {
   });
 
   it('returns trace payload matching the shared contract', async () => {
-    const result = await controller.trace('sentris-run-123', authContext as any);
+    const result = await observabilityController.trace('sentris-run-123', authContext as any);
     const parsed = TraceStreamEnvelopeSchema.parse(result);
     expect(parsed.events).toHaveLength(1);
     expect(traceService.list).toHaveBeenCalledWith('sentris-run-123', authContext);
@@ -127,7 +122,7 @@ describe('WorkflowsController contract coverage', () => {
 
   it('retrieves logs with validated query parameters', async () => {
     const query = WorkflowLogsQuerySchema.parse({ nodeRef: 'node-1', stream: 'stdout', limit: 10 });
-    const result = await controller.logs('sentris-run-123', query, authContext as any);
+    const result = await observabilityController.logs('sentris-run-123', query, authContext as any);
     expect(result).toEqual(sampleLogs);
     expect(logStreamService.fetch).toHaveBeenCalledWith('sentris-run-123', authContext, {
       nodeRef: 'node-1',
@@ -135,6 +130,8 @@ describe('WorkflowsController contract coverage', () => {
       level: undefined,
       limit: 10,
       cursor: undefined,
+      startTime: undefined,
+      endTime: undefined,
     });
   });
 });

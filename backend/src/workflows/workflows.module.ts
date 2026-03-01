@@ -13,6 +13,9 @@ import { WorkflowRoleRepository } from './repository/workflow-role.repository';
 import { TerminalRecordRepository } from './repository/terminal-record.repository';
 import { TerminalArchiveService } from './terminal-archive.service';
 import { WorkflowsController } from './workflows.controller';
+import { WorkflowRunsController } from './workflow-runs.controller';
+import { WorkflowRunObservabilityController } from './workflow-run-observability.controller';
+import { WorkflowRunStreamController } from './workflow-run-stream.controller';
 import { InternalRunsController } from './internal-runs.controller';
 import { WorkflowsService } from './workflows.service';
 import { WorkflowRoleGuard } from './workflow-role.guard';
@@ -27,7 +30,13 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     AnalyticsModule,
     NodeIOModule,
   ],
-  controllers: [WorkflowsController, InternalRunsController],
+  controllers: [
+    WorkflowsController,
+    WorkflowRunsController,
+    WorkflowRunObservabilityController,
+    WorkflowRunStreamController,
+    InternalRunsController,
+  ],
   providers: [
     WorkflowsService,
     WorkflowRepository,
