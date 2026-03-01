@@ -19,6 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useBulkMutation } from '@/hooks/useBulkMutation';
 import { useSortableList } from '@/hooks/useSortableList';
 import type { FormState, EditFormState } from './secrets-manager/types';
 import { INITIAL_FORM, INITIAL_EDIT_FORM } from './secrets-manager/types';
@@ -79,6 +80,17 @@ export function SecretsManager() {
     selectedCount,
   } = useBulkSelection(orderedSecrets);
 
+  const executeBulkDelete = useBulkMutation({
+    mutateAsync: (id: string) => deleteSecretMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: () => 'Secrets deleted',
+      successDescription: (n) => `Deleted ${n} secret${n !== 1 ? 's' : ''}.`,
+      partialDescription: (s, total, f) => `Deleted ${s} of ${total} secrets (${f} failed).`,
+    },
+  });
+
   const handleBulkDelete = async () => {
     const count = selectedCount;
     const ok = await confirm({
@@ -88,26 +100,7 @@ export function SecretsManager() {
       destructive: true,
     });
     if (!ok) return;
-
-    const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(ids.map((id) => deleteSecretMutation.mutateAsync(id)));
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: 'Secrets deleted',
-        description: `Deleted ${succeeded} secret${succeeded !== 1 ? 's' : ''}.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Deleted ${succeeded} of ${count} secrets (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkDelete(Array.from(selectedIds));
   };
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

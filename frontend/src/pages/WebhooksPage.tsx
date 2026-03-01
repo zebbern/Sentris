@@ -16,10 +16,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RefreshCw, Plus } from 'lucide-react';
 import { useSortableList } from '@/hooks/useSortableList';
 import { cn } from '@/lib/utils';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useBulkMutation } from '@/hooks/useBulkMutation';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import {
   useWebhooks,
@@ -131,6 +133,17 @@ export function WebhooksPage() {
     selectedCount,
   } = useBulkSelection(orderedWebhooks);
 
+  const executeBulkDelete = useBulkMutation({
+    mutateAsync: (id: string) => deleteWebhookMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: (n) => `Deleted ${n} webhook${n !== 1 ? 's' : ''}`,
+      successDescription: (n) => `${n} webhook${n !== 1 ? 's' : ''} permanently removed.`,
+      partialDescription: (s, total, f) => `Deleted ${s} of ${total} webhooks (${f} failed).`,
+    },
+  });
+
   const handleBulkDelete = async () => {
     const count = selectedCount;
     const ok = await confirm({
@@ -140,28 +153,7 @@ export function WebhooksPage() {
       destructive: true,
     });
     if (!ok) return;
-
-    const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(
-      ids.map((id) => deleteWebhookMutation.mutateAsync(id)),
-    );
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: `Deleted ${succeeded} webhook${succeeded !== 1 ? 's' : ''}`,
-        description: `${succeeded} webhook${succeeded !== 1 ? 's' : ''} permanently removed.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Deleted ${succeeded} of ${count} webhooks (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkDelete(Array.from(selectedIds));
   };
 
   const handleWorkflowFilterChange = (value: string) => {
@@ -200,7 +192,7 @@ export function WebhooksPage() {
     } catch (_err: unknown) {
       toast({
         title: 'Refresh failed',
-        description: _err instanceof Error ? _err.message : 'Try again in a moment.',
+        description: humanizeApiError(_err),
         variant: 'destructive',
       });
     }
@@ -226,7 +218,7 @@ export function WebhooksPage() {
     } catch (_err: unknown) {
       toast({
         title: 'Failed to delete webhook',
-        description: _err instanceof Error ? _err.message : 'Unknown error occurred',
+        description: humanizeApiError(_err),
         variant: 'destructive',
       });
     } finally {
@@ -255,7 +247,7 @@ export function WebhooksPage() {
     } catch (_err: unknown) {
       toast({
         title: 'Failed to regenerate URL',
-        description: _err instanceof Error ? _err.message : 'Unknown error occurred',
+        description: humanizeApiError(_err),
         variant: 'destructive',
       });
     } finally {

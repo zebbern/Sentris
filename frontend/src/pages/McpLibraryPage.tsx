@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
 import type { McpHealthStatus } from '@sentris/shared';
 import { cn } from '@/lib/utils';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -235,7 +236,7 @@ export function McpLibraryPage() {
     } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to delete server',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
@@ -253,7 +254,7 @@ export function McpLibraryPage() {
     } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to toggle server',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     }
@@ -271,7 +272,7 @@ export function McpLibraryPage() {
     } catch (err: unknown) {
       toast({
         title: 'Test failed',
-        description: err instanceof Error ? err.message : 'Connection test failed',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
@@ -301,7 +302,7 @@ export function McpLibraryPage() {
     } catch (err: unknown) {
       toast({
         title: 'Discovery failed',
-        description: err instanceof Error ? err.message : 'Failed to discover tools',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
@@ -323,7 +324,7 @@ export function McpLibraryPage() {
     } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to toggle tool',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     }

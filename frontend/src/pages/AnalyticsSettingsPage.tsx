@@ -17,6 +17,7 @@ import {
   useUpdateAnalyticsSettings,
 } from '@/hooks/queries/useAnalyticsSettingsQueries';
 import { useAuthStore } from '@/store/authStore';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { hasAdminRole } from '@/utils/auth';
 import type { SubscriptionTier } from '@/services/api';
 
@@ -147,10 +148,9 @@ export function AnalyticsSettingsPage() {
         description: 'Analytics retention settings have been updated.',
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save settings';
       toast({
         title: 'Failed to save',
-        description: message,
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     }
@@ -162,7 +162,7 @@ export function AnalyticsSettingsPage() {
         {/* Error state */}
         {error && (
           <ErrorBanner
-            message={error instanceof Error ? error.message : 'Failed to load analytics settings'}
+            message={humanizeApiError(error)}
             onRetry={() => refetch()}
             className="mb-6"
           />
@@ -263,14 +263,7 @@ export function AnalyticsSettingsPage() {
 
                 {/* Mutation error */}
                 {updateMutation.isError && (
-                  <ErrorBanner
-                    message={
-                      updateMutation.error instanceof Error
-                        ? updateMutation.error.message
-                        : 'Failed to update settings'
-                    }
-                    className="mt-2"
-                  />
+                  <ErrorBanner message={humanizeApiError(updateMutation.error)} className="mt-2" />
                 )}
 
                 {/* Non-admin notice */}

@@ -11,6 +11,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useBulkMutation } from '@/hooks/useBulkMutation';
 import { useSortableList } from '@/hooks/useSortableList';
 import type { components } from '@sentris/backend-client';
 import { ApiKeysTable } from './api-keys-manager/ApiKeysTable';
@@ -65,6 +66,28 @@ export function ApiKeysManager() {
     [orderedApiKeys, selectedIds],
   );
 
+  const executeBulkRevoke = useBulkMutation({
+    mutateAsync: (id: string) => revokeApiKeyMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: () => 'Keys revoked',
+      successDescription: (n) => `Revoked ${n} API key${n !== 1 ? 's' : ''}.`,
+      partialDescription: (s, total, f) => `Revoked ${s} of ${total} keys (${f} failed).`,
+    },
+  });
+
+  const executeBulkDelete = useBulkMutation({
+    mutateAsync: (id: string) => deleteApiKeyMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: () => 'Keys deleted',
+      successDescription: (n) => `Deleted ${n} API key${n !== 1 ? 's' : ''}.`,
+      partialDescription: (s, total, f) => `Deleted ${s} of ${total} keys (${f} failed).`,
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     void copy(text, { successDescription: 'API key copied to clipboard.' });
   };
@@ -112,37 +135,16 @@ export function ApiKeysManager() {
     const activeIds = orderedApiKeys
       .filter((k) => selectedIds.has(k.id) && k.isActive)
       .map((k) => k.id);
-    const count = activeIds.length;
-    if (count === 0) return;
+    if (activeIds.length === 0) return;
 
     const ok = await confirm({
-      title: `Revoke ${count} API key${count !== 1 ? 's' : ''}`,
-      description: `Are you sure you want to revoke ${count} active key${count !== 1 ? 's' : ''}? Applications using these keys will immediately stop working.`,
+      title: `Revoke ${activeIds.length} API key${activeIds.length !== 1 ? 's' : ''}`,
+      description: `Are you sure you want to revoke ${activeIds.length} active key${activeIds.length !== 1 ? 's' : ''}? Applications using these keys will immediately stop working.`,
       confirmLabel: 'Revoke',
       destructive: true,
     });
     if (!ok) return;
-
-    const results = await Promise.allSettled(
-      activeIds.map((id) => revokeApiKeyMutation.mutateAsync(id)),
-    );
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: 'Keys revoked',
-        description: `Revoked ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Revoked ${succeeded} of ${count} keys (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkRevoke(activeIds);
   };
 
   const handleBulkDelete = async () => {
@@ -154,26 +156,7 @@ export function ApiKeysManager() {
       destructive: true,
     });
     if (!ok) return;
-
-    const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(ids.map((id) => deleteApiKeyMutation.mutateAsync(id)));
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: 'Keys deleted',
-        description: `Deleted ${succeeded} API key${succeeded !== 1 ? 's' : ''}.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Deleted ${succeeded} of ${count} keys (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkDelete(Array.from(selectedIds));
   };
 
   return (

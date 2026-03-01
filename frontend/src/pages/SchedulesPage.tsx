@@ -14,10 +14,12 @@ import { RefreshCw, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
+import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
+import { useBulkMutation } from '@/hooks/useBulkMutation';
 import {
   useSchedules,
   usePauseSchedule,
@@ -133,33 +135,48 @@ export function SchedulesPage() {
     selectedCount,
   } = useBulkSelection(orderedSchedules);
 
+  const executeBulkPause = useBulkMutation({
+    mutateAsync: (id: string) => pauseScheduleMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: (n) => `Paused ${n} schedule${n !== 1 ? 's' : ''}`,
+      successDescription: (n) =>
+        `${n} schedule${n !== 1 ? 's' : ''} paused and will not trigger until resumed.`,
+      partialDescription: (s, total, f) => `Paused ${s} of ${total} schedules (${f} failed).`,
+    },
+  });
+
+  const executeBulkResume = useBulkMutation({
+    mutateAsync: (id: string) => resumeScheduleMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: (n) => `Resumed ${n} schedule${n !== 1 ? 's' : ''}`,
+      successDescription: (n) =>
+        `${n} schedule${n !== 1 ? 's' : ''} resumed and will trigger on their next cron window.`,
+      partialDescription: (s, total, f) => `Resumed ${s} of ${total} schedules (${f} failed).`,
+    },
+  });
+
+  const executeBulkDelete = useBulkMutation({
+    mutateAsync: (id: string) => deleteScheduleMutation.mutateAsync(id),
+    clearSelection,
+    toast,
+    messages: {
+      successTitle: (n) => `Deleted ${n} schedule${n !== 1 ? 's' : ''}`,
+      successDescription: (n) => `${n} schedule${n !== 1 ? 's' : ''} permanently removed.`,
+      partialDescription: (s, total, f) => `Deleted ${s} of ${total} schedules (${f} failed).`,
+    },
+  });
+
   const handleBulkPause = async () => {
     const ids = Array.from(selectedIds).filter((id) => {
       const schedule = orderedSchedules.find((s) => s.id === id);
       return schedule?.status === 'active';
     });
     if (ids.length === 0) return;
-
-    const results = await Promise.allSettled(
-      ids.map((id) => pauseScheduleMutation.mutateAsync(id)),
-    );
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: `Paused ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
-        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} paused and will not trigger until resumed.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Paused ${succeeded} of ${ids.length} schedules (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkPause(ids);
   };
 
   const handleBulkResume = async () => {
@@ -168,27 +185,7 @@ export function SchedulesPage() {
       return schedule?.status === 'paused';
     });
     if (ids.length === 0) return;
-
-    const results = await Promise.allSettled(
-      ids.map((id) => resumeScheduleMutation.mutateAsync(id)),
-    );
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: `Resumed ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
-        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} resumed and will trigger on their next cron window.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Resumed ${succeeded} of ${ids.length} schedules (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkResume(ids);
   };
 
   const handleBulkDelete = async () => {
@@ -200,28 +197,7 @@ export function SchedulesPage() {
       destructive: true,
     });
     if (!ok) return;
-
-    const ids = Array.from(selectedIds);
-    const results = await Promise.allSettled(
-      ids.map((id) => deleteScheduleMutation.mutateAsync(id)),
-    );
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
-    clearSelection();
-
-    if (failed === 0) {
-      toast({
-        title: `Deleted ${succeeded} schedule${succeeded !== 1 ? 's' : ''}`,
-        description: `${succeeded} schedule${succeeded !== 1 ? 's' : ''} permanently removed.`,
-      });
-    } else {
-      toast({
-        title: 'Partial failure',
-        description: `Deleted ${succeeded} of ${count} schedules (${failed} failed).`,
-        variant: 'destructive',
-      });
-    }
+    await executeBulkDelete(Array.from(selectedIds));
   };
 
   const bulkActions = useMemo(() => {
@@ -314,7 +290,7 @@ export function SchedulesPage() {
     } catch (err: unknown) {
       toast({
         title: 'Schedule update failed',
-        description: err instanceof Error ? err.message : 'Try again in a moment.',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
@@ -333,7 +309,7 @@ export function SchedulesPage() {
     } catch (err: unknown) {
       toast({
         title: 'Failed to trigger schedule',
-        description: err instanceof Error ? err.message : 'Try again in a moment.',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
@@ -351,7 +327,7 @@ export function SchedulesPage() {
     } catch (err: unknown) {
       toast({
         title: 'Refresh failed',
-        description: err instanceof Error ? err.message : 'Try again in a moment.',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     }
@@ -378,7 +354,7 @@ export function SchedulesPage() {
     } catch (err: unknown) {
       toast({
         title: 'Failed to delete schedule',
-        description: err instanceof Error ? err.message : 'Try again in a moment.',
+        description: humanizeApiError(err),
         variant: 'destructive',
       });
     } finally {
