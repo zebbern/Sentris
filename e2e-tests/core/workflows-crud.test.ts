@@ -6,7 +6,7 @@
  * delete, and trigger-run.
  */
 
-import { expect, beforeAll } from 'bun:test';
+import { expect, beforeAll, afterAll } from 'bun:test';
 
 import {
   API_BASE,
@@ -281,8 +281,7 @@ e2eDescribe('Workflows CRUD E2E Tests', () => {
   // Cleanup
   // ---------------------------------------------------------------------------
 
-  e2eTest('Cleanup test workflows', { timeout: 30000 }, async () => {
+  afterAll(async () => {
     await cleanupWorkflows();
-    console.log('    Cleanup complete');
   });
 });

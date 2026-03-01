@@ -15,6 +15,7 @@ export function useAgentTranscript(agentRunId: string | null): AgentTranscriptSt
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     let cancelled = false;
     if (!agentRunId) {
       setState({ loading: false, error: null, cursor: 0, messages: null, parts: [], steps: [] });
@@ -27,6 +28,7 @@ export function useAgentTranscript(agentRunId: string | null): AgentTranscriptSt
         const headers = await getApiAuthHeaders();
         const response = await fetch(`${API_V1_URL}/agents/${agentRunId}/parts`, {
           headers,
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`Failed to load agent trace for ${agentRunId}`);
@@ -90,6 +92,7 @@ export function useAgentTranscript(agentRunId: string | null): AgentTranscriptSt
     void load();
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [agentRunId]);
 
