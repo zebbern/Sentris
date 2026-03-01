@@ -3,78 +3,17 @@ import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { components } from '@sentris/backend-client';
-
-// Polyfill ResizeObserver for Radix UI components (Checkbox uses it)
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  globalThis.ResizeObserver = class ResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as any;
-}
+import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 type ApiKeyResponseDto = components['schemas']['ApiKeyResponseDto'];
 
 // --- Mock dialog components (passthrough for test rendering) ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
+mock.module('@/components/ui/dialog', createDialogMock);
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
-
-mock.module('@/components/ui/alert-dialog', () => {
-  const AlertDialog = ({ open, children }: any) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null;
-  const AlertDialogContent = ({ children, ...props }: any) => (
-    <div role="alertdialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-
-  return {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader: passthrough,
-    AlertDialogFooter: passthrough,
-    AlertDialogTitle: passthrough,
-    AlertDialogDescription: passthrough,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogPortal: ({ children }: any) => <>{children}</>,
-    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
-    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
-  };
-});
+// --- Mutable auth state ---
+let mockRoles: string[] = ['ADMIN'];
 
 // --- Mutable mock state for API key queries ---
 const mockQueryState: {
@@ -133,9 +72,11 @@ mock.module('@tanstack/react-query', () => ({
   }),
 }));
 
+// --- Auth store ---
+mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
+
 // Import component AFTER all mock.module() calls
 import { ApiKeysManager } from '@/pages/ApiKeysManager';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 
 // --- Fixtures ---
 const ISO = '2024-06-15T12:00:00.000Z';
@@ -191,20 +132,6 @@ interface MockQueryOverrides {
   clearLastCreatedKey?: () => void;
 }
 
-async function resetAuthStore() {
-  const persist = (useAuthStore as typeof useAuthStore & { persist?: any }).persist;
-  if (persist?.clearStorage) {
-    await persist.clearStorage();
-  }
-  useAuthStore.setState({
-    token: null,
-    userId: null,
-    organizationId: DEFAULT_ORG_ID,
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
-}
-
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.apiKeys = overrides.apiKeys ?? [baseApiKey, revokedApiKey];
   mockQueryState.isLoading = overrides.isLoading ?? false;
@@ -246,10 +173,10 @@ afterAll(() =>
 );
 
 describe('ApiKeysManager', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
+    mockRoles = ['ADMIN'];
     setupStore();
-    await resetAuthStore();
     mockWriteText.mockClear();
   });
 
@@ -405,7 +332,7 @@ describe('ApiKeysManager', () => {
   });
 
   it('read-only mode (MEMBER role) disables create button', async () => {
-    useAuthStore.setState({ roles: ['MEMBER'] });
+    mockRoles = ['MEMBER'];
     setupStore();
     renderPage();
 
@@ -414,7 +341,7 @@ describe('ApiKeysManager', () => {
   });
 
   it('read-only mode (MEMBER role) disables action buttons on rows', () => {
-    useAuthStore.setState({ roles: ['MEMBER'] });
+    mockRoles = ['MEMBER'];
     setupStore({ apiKeys: [baseApiKey] });
     renderPage();
 

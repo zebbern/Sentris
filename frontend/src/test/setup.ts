@@ -62,6 +62,14 @@ if (typeof globalThis.HTMLCanvasElement === 'undefined') {
   globalThis.HTMLCanvasElement = HTMLCanvasElementStub as any;
 }
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as any;
+}
+
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,

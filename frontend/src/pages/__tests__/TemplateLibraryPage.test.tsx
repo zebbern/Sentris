@@ -3,6 +3,14 @@ import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Template, TemplateCategory } from '@/types/templates';
+import { createDialogMock } from '@/test/mocks/dialog';
+import {
+  createDndCoreMock,
+  createDndSortableMock,
+  createSortableCardMock,
+  createUseSortableListMock,
+} from '@/test/mocks/dnd-kit';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -32,81 +40,17 @@ let mockRoles: string[] = ['ADMIN'];
 // ---------------------------------------------------------------------------
 
 // --- DnD-kit: passthrough mocks ---
-mock.module('@dnd-kit/core', () => ({
-  ...realModuleExports('@dnd-kit/core'),
-  DndContext: ({ children }: any) => <>{children}</>,
-  useSensor: () => ({}),
-  useSensors: () => [],
-  PointerSensor: class {},
-  KeyboardSensor: class {},
-  closestCenter: () => null,
-}));
-
-mock.module('@dnd-kit/sortable', () => ({
-  ...realModuleExports('@dnd-kit/sortable'),
-  SortableContext: ({ children }: any) => <>{children}</>,
-  rectSortingStrategy: {},
-  verticalListSortingStrategy: {},
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: () => {},
-    transform: null,
-    transition: null,
-    isDragging: false,
-  }),
-  arrayMove: (arr: unknown[]) => arr,
-}));
+mock.module('@dnd-kit/core', createDndCoreMock);
+mock.module('@dnd-kit/sortable', createDndSortableMock);
 
 // --- Sortable card components: passthrough ---
-mock.module('@/components/ui/sortable-card', () => ({
-  SortableCard: ({ children, id }: any) => {
-    const handleProps = { listeners: {}, attributes: {} };
-    return (
-      <div data-testid={`sortable-card-${id}`}>
-        {typeof children === 'function' ? children({ handleProps }) : children}
-      </div>
-    );
-  },
-  CardDragHandle: () => <div />,
-}));
+mock.module('@/components/ui/sortable-card', createSortableCardMock);
 
 // --- useSortableList hook ---
-mock.module('@/hooks/useSortableList', () => ({
-  useSortableList: ({ items }: any) => ({
-    orderedItems: items,
-    sensors: [],
-    collisionDetection: () => null,
-    handleDragEnd: () => {},
-    isDragDisabled: false,
-  }),
-}));
+mock.module('@/hooks/useSortableList', createUseSortableListMock);
 
 // --- Dialog mock ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
-
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
+mock.module('@/components/ui/dialog', createDialogMock);
 
 // --- Tooltip mock ---
 mock.module('@/components/ui/tooltip', () => ({
@@ -150,30 +94,7 @@ mock.module('@/hooks/queries/useTemplateQueries', () => ({
 }));
 
 // --- Auth store ---
-mock.module('@/store/authStore', () => {
-  const real = realModuleExports('@/store/authStore');
-  const useAuthStore: any = (selector?: (state: any) => any) => {
-    const state = {
-      token: 'test-token',
-      userId: 'user-1',
-      organizationId: 'org-001',
-      roles: mockRoles,
-      provider: 'local' as const,
-    };
-    return selector ? selector(state) : state;
-  };
-  useAuthStore.setState = (_partial: any) => {};
-  useAuthStore.getState = () => ({
-    token: 'test-token',
-    userId: 'user-1',
-    organizationId: 'org-001',
-    roles: mockRoles,
-    provider: 'local',
-  });
-  useAuthStore.subscribe = () => () => {};
-  useAuthStore.persist = { clearStorage: async () => {} };
-  return { ...real, useAuthStore, DEFAULT_ORG_ID: 'local-dev' };
-});
+mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
 
 // --- Auth utility ---
 mock.module('@/utils/auth', () => ({

@@ -2,130 +2,26 @@ import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { WebhookConfiguration } from '@sentris/shared';
+import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
+import {
+  createDndCoreMock,
+  createDndSortableMock,
+  createDndUtilitiesMock,
+  createSortableUiMock,
+  createUseSortableListMock,
+} from '@/test/mocks/dnd-kit';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // --- Mock dialog / alert-dialog components (passthrough for test rendering) ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
-
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
-
-mock.module('@/components/ui/alert-dialog', () => {
-  const AlertDialog = ({ open, children }: any) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null;
-  const AlertDialogContent = ({ children, ...props }: any) => (
-    <div role="alertdialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-
-  return {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader: passthrough,
-    AlertDialogFooter: passthrough,
-    AlertDialogTitle: passthrough,
-    AlertDialogDescription: passthrough,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogPortal: ({ children }: any) => <>{children}</>,
-    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
-    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
-  };
-});
+mock.module('@/components/ui/dialog', createDialogMock);
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
 // --- Mock DnD (avoid jsdom issues) ---
-mock.module('@dnd-kit/core', () => {
-  const DndContext = ({ children }: any) => <>{children}</>;
-  return {
-    DndContext,
-    closestCenter: () => null,
-    KeyboardSensor: class {},
-    PointerSensor: class {},
-    useSensor: () => ({}),
-    useSensors: () => [],
-  };
-});
-
-mock.module('@dnd-kit/sortable', () => {
-  const SortableContext = ({ children }: any) => <>{children}</>;
-  return {
-    SortableContext,
-    verticalListSortingStrategy: {},
-    useSortable: () => ({
-      attributes: {},
-      listeners: {},
-      setNodeRef: () => {},
-      transform: null,
-      transition: null,
-      isDragging: false,
-    }),
-    sortableKeyboardCoordinates: () => ({}),
-  };
-});
-
-mock.module('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => '' } },
-}));
-
-// --- Mock sortable UI components ---
-mock.module('@/components/ui/sortable', () => {
-  const SortableTableRow = ({ children, id, className, onClick, ...rest }: any) => {
-    const handleProps = { role: 'button', 'aria-label': 'Drag handle' };
-    return (
-      <tr data-id={id} className={className} onClick={onClick} {...rest}>
-        {typeof children === 'function' ? children({ handleProps }) : children}
-      </tr>
-    );
-  };
-  const DragHandle = (props: any) => (
-    <td>
-      <span {...props}>⠿</span>
-    </td>
-  );
-  return { SortableTableRow, DragHandle };
-});
-
-// --- Mock useSortableList ---
-mock.module('@/hooks/useSortableList', () => ({
-  useSortableList: ({ items }: any) => ({
-    orderedItems: items,
-    sensors: [],
-    collisionDetection: null,
-    handleDragEnd: () => {},
-    isDragDisabled: false,
-  }),
-}));
+mock.module('@dnd-kit/core', createDndCoreMock);
+mock.module('@dnd-kit/sortable', createDndSortableMock);
+mock.module('@dnd-kit/utilities', createDndUtilitiesMock);
+mock.module('@/components/ui/sortable', createSortableUiMock);
+mock.module('@/hooks/useSortableList', createUseSortableListMock);
 
 // --- Mock useConfirmDialog ---
 const mockConfirm = mock().mockResolvedValue(false);
@@ -210,9 +106,11 @@ mock.module('@/hooks/useBulkSelection', () => ({
   useBulkSelection: () => mockBulkSelection,
 }));
 
+// --- Auth store ---
+mock.module('@/store/authStore', () => createAuthStoreMock());
+
 // Import component AFTER all mock.module() calls
 import { WebhooksPage } from '@/pages/WebhooksPage';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 
 // --- Fixtures ---
 const ISO = '2024-06-15T12:00:00.000Z';
@@ -253,20 +151,6 @@ interface MockQueryOverrides {
   regeneratePath?: (...args: any[]) => Promise<void>;
 }
 
-async function resetAuthStore() {
-  const persist = (useAuthStore as typeof useAuthStore & { persist?: any }).persist;
-  if (persist?.clearStorage) {
-    await persist.clearStorage();
-  }
-  useAuthStore.setState({
-    token: null,
-    userId: null,
-    organizationId: DEFAULT_ORG_ID,
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
-}
-
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.webhooks = overrides.webhooks ?? [activeWebhook, inactiveWebhook];
   mockQueryState.isLoading = overrides.isLoading ?? false;
@@ -297,10 +181,9 @@ const renderPage = () =>
 
 // --- Tests ---
 describe('WebhooksPage', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
     setupStore();
-    await resetAuthStore();
   });
 
   afterEach(() => {

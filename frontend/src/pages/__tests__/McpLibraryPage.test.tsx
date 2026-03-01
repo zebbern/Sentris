@@ -2,76 +2,12 @@ import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun
 import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
-// Polyfill ResizeObserver for Radix UI components
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  globalThis.ResizeObserver = class ResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as any;
-}
-
-// --- Mock dialog / sheet components (passthrough for test rendering) ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
-
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
-
-mock.module('@/components/ui/alert-dialog', () => {
-  const AlertDialog = ({ open, children }: any) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null;
-  const AlertDialogContent = ({ children, ...props }: any) => (
-    <div role="alertdialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-
-  return {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader: passthrough,
-    AlertDialogFooter: passthrough,
-    AlertDialogTitle: passthrough,
-    AlertDialogDescription: passthrough,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogPortal: ({ children }: any) => <>{children}</>,
-    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
-    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
-  };
-});
+// --- Mock dialog / alert-dialog components (passthrough for test rendering) ---
+mock.module('@/components/ui/dialog', createDialogMock);
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
 mock.module('@/components/ui/sheet', () => {
   const Sheet = ({ open, children }: any) => (open ? <>{children}</> : null);
@@ -214,9 +150,11 @@ mock.module('@/config/env', () => ({
   },
 }));
 
+// --- Auth store ---
+mock.module('@/store/authStore', () => createAuthStoreMock());
+
 // Import component AFTER all mock.module() calls
 import { McpLibraryPage } from '@/pages/McpLibraryPage';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 
 // --- Fixtures ---
 const ISO = '2024-06-15T12:00:00.000Z';
@@ -278,20 +216,6 @@ interface MockQueryOverrides {
   testConnection?: (...args: any[]) => Promise<any>;
 }
 
-async function resetAuthStore() {
-  const persist = (useAuthStore as typeof useAuthStore & { persist?: any }).persist;
-  if (persist?.clearStorage) {
-    await persist.clearStorage();
-  }
-  useAuthStore.setState({
-    token: null,
-    userId: null,
-    organizationId: DEFAULT_ORG_ID,
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
-}
-
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.servers = overrides.servers ?? [baseServer, secondServer];
   mockQueryState.tools = overrides.tools ?? [baseTool];
@@ -333,10 +257,9 @@ afterAll(() =>
 );
 
 describe('McpLibraryPage', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
     setupStore();
-    await resetAuthStore();
   });
 
   afterEach(() => {

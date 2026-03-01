@@ -3,6 +3,14 @@ import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArtifactMetadata } from '@sentris/shared';
+import { createConfirmDialogMock } from '@/test/mocks/dialog';
+import {
+  createDndCoreMock,
+  createDndSortableMock,
+  createSortableUiMock,
+  createUseSortableListMock,
+} from '@/test/mocks/dnd-kit';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -29,54 +37,14 @@ let mockDownloadIsPending = false;
 // ---------------------------------------------------------------------------
 
 // --- DnD-kit: passthrough mocks ---
-mock.module('@dnd-kit/core', () => ({
-  ...realModuleExports('@dnd-kit/core'),
-  DndContext: ({ children }: any) => <>{children}</>,
-  useSensor: () => ({}),
-  useSensors: () => [],
-  PointerSensor: class {},
-  KeyboardSensor: class {},
-  closestCenter: () => null,
-}));
-
-mock.module('@dnd-kit/sortable', () => ({
-  ...realModuleExports('@dnd-kit/sortable'),
-  SortableContext: ({ children }: any) => <>{children}</>,
-  verticalListSortingStrategy: {},
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: () => {},
-    transform: null,
-    transition: null,
-    isDragging: false,
-  }),
-  arrayMove: (arr: unknown[]) => arr,
-}));
+mock.module('@dnd-kit/core', createDndCoreMock);
+mock.module('@dnd-kit/sortable', createDndSortableMock);
 
 // --- Sortable UI components: render children ---
-mock.module('@/components/ui/sortable', () => ({
-  SortableTableRow: ({ children, id }: any) => {
-    const handleProps = { listeners: {}, attributes: {} };
-    return (
-      <tr data-testid={`sortable-row-${id}`}>
-        {typeof children === 'function' ? children({ handleProps }) : children}
-      </tr>
-    );
-  },
-  DragHandle: () => <td />,
-}));
+mock.module('@/components/ui/sortable', createSortableUiMock);
 
 // --- useSortableList hook ---
-mock.module('@/hooks/useSortableList', () => ({
-  useSortableList: ({ items }: any) => ({
-    orderedItems: items,
-    sensors: [],
-    collisionDetection: () => null,
-    handleDragEnd: () => {},
-    isDragDisabled: false,
-  }),
-}));
+mock.module('@/hooks/useSortableList', createUseSortableListMock);
 
 // --- Artifact queries ---
 mock.module('@/hooks/queries/useArtifactQueries', () => ({
@@ -127,9 +95,7 @@ mock.module('@/hooks/useConfirmDialog', () => ({
 }));
 
 // --- Confirm dialog component (no-op) ---
-mock.module('@/components/ui/confirm-dialog', () => ({
-  ConfirmDialog: () => null,
-}));
+mock.module('@/components/ui/confirm-dialog', createConfirmDialogMock);
 
 // --- Toast ---
 const mockToast = mock((_opts: any) => {});
@@ -139,30 +105,7 @@ mock.module('@/components/ui/use-toast', () => ({
 }));
 
 // --- Auth store ---
-mock.module('@/store/authStore', () => {
-  const real = realModuleExports('@/store/authStore');
-  const useAuthStore: any = (selector?: (state: any) => any) => {
-    const state = {
-      token: 'test-token',
-      userId: 'user-1',
-      organizationId: 'org-001',
-      roles: ['ADMIN'],
-      provider: 'local' as const,
-    };
-    return selector ? selector(state) : state;
-  };
-  useAuthStore.setState = (_partial: any) => {};
-  useAuthStore.getState = () => ({
-    token: 'test-token',
-    userId: 'user-1',
-    organizationId: 'org-001',
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
-  useAuthStore.subscribe = () => () => {};
-  useAuthStore.persist = { clearStorage: async () => {} };
-  return { ...real, useAuthStore, DEFAULT_ORG_ID: 'default' };
-});
+mock.module('@/store/authStore', () => createAuthStoreMock());
 
 // --- Remote uploads utility ---
 mock.module('@/utils/artifacts', () => ({

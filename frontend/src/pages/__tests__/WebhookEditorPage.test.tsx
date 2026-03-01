@@ -1,6 +1,11 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import type { WebhookFormState } from '../webhook-editor/webhookEditorTypes';
+import {
+  createDialogMock,
+  createAlertDialogMock,
+  createConfirmDialogMock,
+} from '@/test/mocks/dialog';
 
 // --- Mock navigate ---
 const mockNavigate = mock();
@@ -13,64 +18,8 @@ mock.module('react-router-dom', () => ({
 }));
 
 // --- Mock dialog / alert-dialog (passthrough) ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
-
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthrough,
-    DialogDescription: passthrough,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
-
-mock.module('@/components/ui/alert-dialog', () => {
-  const AlertDialog = ({ open, children }: any) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null;
-  const AlertDialogContent = ({ children, ...props }: any) => (
-    <div role="alertdialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-
-  return {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader: passthrough,
-    AlertDialogFooter: passthrough,
-    AlertDialogTitle: passthrough,
-    AlertDialogDescription: passthrough,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogPortal: ({ children }: any) => <>{children}</>,
-    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
-    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
-  };
-});
+mock.module('@/components/ui/dialog', createDialogMock);
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
 // --- Mock Tabs (Radix primitives don't work well in jsdom) ---
 let tabChangeCallback: ((value: string) => void) | null = null;
@@ -122,9 +71,7 @@ mock.module('@/components/ui/tabs', () => ({
 }));
 
 // --- Mock confirm dialog component ---
-mock.module('@/components/ui/confirm-dialog', () => ({
-  ConfirmDialog: () => null,
-}));
+mock.module('@/components/ui/confirm-dialog', createConfirmDialogMock);
 
 // --- Mock useDocumentTitle ---
 mock.module('@/hooks/useDocumentTitle', () => ({

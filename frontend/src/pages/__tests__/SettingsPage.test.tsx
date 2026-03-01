@@ -1,22 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // Mutable auth state
 let mockRoles: string[] = ['ADMIN'];
 
-mock.module('@/store/authStore', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
-    const state = {
-      roles: mockRoles,
-      token: null,
-      userId: null,
-      organizationId: 'test-org',
-      provider: 'local' as const,
-    };
-    return selector ? selector(state) : state;
-  },
-}));
+mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
 
 // Stub out child route components to isolate SettingsPage logic
 mock.module('@/pages/settings/GeneralSettings', () => ({

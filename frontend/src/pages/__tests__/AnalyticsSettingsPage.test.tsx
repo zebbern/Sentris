@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { AnalyticsSettingsResponse } from '@/services/api';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -20,18 +21,7 @@ let mockMutationError: Error | null = null;
 // Module mocks
 // ---------------------------------------------------------------------------
 
-mock.module('@/store/authStore', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
-    const state = {
-      roles: mockRoles,
-      token: null,
-      userId: null,
-      organizationId: 'test-org',
-      provider: 'local' as const,
-    };
-    return selector ? selector(state) : state;
-  },
-}));
+mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
 
 mock.module('@/hooks/queries/useAnalyticsSettingsQueries', () => ({
   useAnalyticsSettings: () => ({

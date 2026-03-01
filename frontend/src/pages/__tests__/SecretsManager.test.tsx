@@ -2,31 +2,13 @@ import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, within, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { SecretSummary } from '@/schemas/secret';
+import { createDialogMock } from '@/test/mocks/dialog';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
+mock.module('@/components/ui/dialog', createDialogMock);
 
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
+// --- Mutable auth state ---
+let mockRoles: string[] = ['ADMIN'];
 
 // Mutable mock state for TanStack Query hooks
 const mockQueryState: {
@@ -75,8 +57,10 @@ mock.module('@tanstack/react-query', () => ({
   }),
 }));
 
+// --- Auth store ---
+mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
+
 import { SecretsManager } from '@/pages/SecretsManager';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 
 interface MockQueryOverrides {
   secrets?: SecretSummary[];
@@ -86,20 +70,6 @@ interface MockQueryOverrides {
   updateSecret?: (...args: any[]) => Promise<SecretSummary>;
   rotateSecret?: (...args: any[]) => Promise<SecretSummary>;
   deleteSecret?: (...args: any[]) => Promise<void>;
-}
-
-async function resetAuthStore() {
-  const persist = (useAuthStore as typeof useAuthStore & { persist?: any }).persist;
-  if (persist?.clearStorage) {
-    await persist.clearStorage();
-  }
-  useAuthStore.setState({
-    token: null,
-    userId: null,
-    organizationId: DEFAULT_ORG_ID,
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
 }
 
 const ISO = '2024-01-01T00:00:00.000Z';
@@ -151,10 +121,10 @@ const openEditDialog = async () => {
 };
 
 describe('SecretsManager edit dialog', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
+    mockRoles = ['ADMIN'];
     setupStore();
-    await resetAuthStore();
   });
 
   afterEach(() => {
@@ -162,9 +132,6 @@ describe('SecretsManager edit dialog', () => {
   });
 
   it('updates metadata without rotating when only metadata changes', async () => {
-    // Ensure admin role is set for edit operations
-    useAuthStore.setState({ roles: ['ADMIN'] });
-
     const updateSecret = mock().mockResolvedValue({
       ...baseSecret,
       name: 'Updated Secret',
@@ -198,9 +165,6 @@ describe('SecretsManager edit dialog', () => {
   });
 
   it('rotates secret value without updating metadata when only new value is provided', async () => {
-    // Ensure admin role is set for edit operations
-    useAuthStore.setState({ roles: ['ADMIN'] });
-
     const rotateSecret = mock().mockResolvedValue(baseSecret);
     const updateSecret = mock().mockResolvedValue(baseSecret);
 
@@ -227,9 +191,6 @@ describe('SecretsManager edit dialog', () => {
   });
 
   it('updates metadata and rotates secret value when both are provided', async () => {
-    // Ensure admin role is set for edit operations
-    useAuthStore.setState({ roles: ['ADMIN'] });
-
     const updatedSecret = {
       ...baseSecret,
       name: 'Prod API Key v2',
@@ -269,9 +230,6 @@ describe('SecretsManager edit dialog', () => {
   });
 
   it('does not call update or rotate when no changes are submitted', async () => {
-    // Ensure admin role is set for edit operations
-    useAuthStore.setState({ roles: ['ADMIN'] });
-
     const updateSecret = mock().mockResolvedValue(baseSecret);
     const rotateSecret = mock().mockResolvedValue(baseSecret);
 
@@ -292,10 +250,10 @@ describe('SecretsManager edit dialog', () => {
 });
 
 describe('SecretsManager role gating', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
+    mockRoles = ['ADMIN'];
     setupStore();
-    await resetAuthStore();
   });
 
   afterEach(() => {
@@ -303,7 +261,7 @@ describe('SecretsManager role gating', () => {
   });
 
   it('disables create actions for members', async () => {
-    useAuthStore.setState({ roles: ['MEMBER'] });
+    mockRoles = ['MEMBER'];
     renderSecretsManager();
 
     // Use getAllByText to handle potential multiple renders in CI, then check the first one

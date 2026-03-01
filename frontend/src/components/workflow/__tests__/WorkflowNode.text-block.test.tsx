@@ -4,33 +4,6 @@ import { ReactFlowProvider } from 'reactflow';
 import { MemoryRouter } from 'react-router-dom';
 import type { FrontendNodeData } from '@/schemas/node';
 
-const noopStorage = {
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-  clear: () => {},
-  key: () => null,
-  length: 0,
-};
-
-if (typeof globalThis.localStorage === 'undefined') {
-  Object.defineProperty(globalThis, 'localStorage', {
-    value: noopStorage,
-    writable: true,
-  });
-}
-
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  class ResizeObserverStub {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    value: ResizeObserverStub,
-  });
-}
-
 const textBlockMetadata = {
   id: 'core.ui.text',
   slug: 'text-block',

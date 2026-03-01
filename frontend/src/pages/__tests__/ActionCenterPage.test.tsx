@@ -2,93 +2,25 @@ import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { HumanInputRequest } from '@/components/workflow/HumanInputResolutionView';
+import { createDialogMock } from '@/test/mocks/dialog';
+import {
+  createDndCoreMock,
+  createDndSortableMock,
+  createDndUtilitiesMock,
+  createSortableUiMock,
+  createUseSortableListMock,
+} from '@/test/mocks/dnd-kit';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // --- Mock dialog components (passthrough for test rendering) ---
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: any) => (open ? <>{children}</> : null);
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
-
-  return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
-  };
-});
+mock.module('@/components/ui/dialog', createDialogMock);
 
 // --- Mock DnD (avoid jsdom issues) ---
-mock.module('@dnd-kit/core', () => {
-  const DndContext = ({ children }: any) => <>{children}</>;
-  return {
-    DndContext,
-    closestCenter: () => null,
-    KeyboardSensor: class {},
-    PointerSensor: class {},
-    useSensor: () => ({}),
-    useSensors: () => [],
-  };
-});
-
-mock.module('@dnd-kit/sortable', () => {
-  const SortableContext = ({ children }: any) => <>{children}</>;
-  return {
-    SortableContext,
-    verticalListSortingStrategy: {},
-    useSortable: () => ({
-      attributes: {},
-      listeners: {},
-      setNodeRef: () => {},
-      transform: null,
-      transition: null,
-      isDragging: false,
-    }),
-    sortableKeyboardCoordinates: () => ({}),
-  };
-});
-
-mock.module('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => '' } },
-}));
-
-// --- Mock sortable table components ---
-mock.module('@/components/ui/sortable', () => {
-  const SortableTableRow = ({ children, id }: any) => {
-    const handleProps = { role: 'button', 'aria-label': 'Drag handle' };
-    return (
-      <tr data-id={id}>{typeof children === 'function' ? children({ handleProps }) : children}</tr>
-    );
-  };
-  const DragHandle = (props: any) => (
-    <td>
-      <span {...props}>⠿</span>
-    </td>
-  );
-  return { SortableTableRow, DragHandle };
-});
-
-// --- Mock useSortableList ---
-mock.module('@/hooks/useSortableList', () => ({
-  useSortableList: ({ items }: any) => ({
-    orderedItems: items,
-    sensors: [],
-    collisionDetection: null,
-    handleDragEnd: () => {},
-    isDragDisabled: false,
-  }),
-}));
+mock.module('@dnd-kit/core', createDndCoreMock);
+mock.module('@dnd-kit/sortable', createDndSortableMock);
+mock.module('@dnd-kit/utilities', createDndUtilitiesMock);
+mock.module('@/components/ui/sortable', createSortableUiMock);
+mock.module('@/hooks/useSortableList', createUseSortableListMock);
 
 // --- Mock HumanInputResolutionView ---
 mock.module('@/components/workflow/HumanInputResolutionView', () => ({
@@ -117,9 +49,11 @@ mock.module('@/hooks/queries/useHumanInputQueries', () => ({
   useInvalidateHumanInputs: () => mockInvalidateHumanInputs,
 }));
 
+// --- Auth store ---
+mock.module('@/store/authStore', () => createAuthStoreMock());
+
 // Import component AFTER all mock.module() calls
 import { ActionCenterPage } from '@/pages/ActionCenterPage';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 
 // --- Fixtures ---
 const ISO = '2024-06-15T12:00:00.000Z';
@@ -173,20 +107,6 @@ interface MockQueryOverrides {
   error?: Error | null;
 }
 
-async function resetAuthStore() {
-  const persist = (useAuthStore as typeof useAuthStore & { persist?: any }).persist;
-  if (persist?.clearStorage) {
-    await persist.clearStorage();
-  }
-  useAuthStore.setState({
-    token: null,
-    userId: null,
-    organizationId: DEFAULT_ORG_ID,
-    roles: ['ADMIN'],
-    provider: 'local',
-  });
-}
-
 const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.approvals = overrides.approvals ?? [pendingApproval, resolvedApproval];
   mockQueryState.isLoading = overrides.isLoading ?? false;
@@ -204,10 +124,9 @@ const renderPage = () =>
 
 // --- Tests ---
 describe('ActionCenterPage', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanup();
     setupStore();
-    await resetAuthStore();
   });
 
   afterEach(() => {

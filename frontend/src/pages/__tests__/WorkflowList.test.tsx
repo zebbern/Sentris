@@ -1,8 +1,15 @@
 import { describe, it, beforeEach, afterEach, afterAll, expect, vi, mock } from 'bun:test';
 import { render, screen, fireEvent, within, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { ReactNode } from 'react';
 import type { WorkflowSummary } from '@/services/api';
+import { createAlertDialogMock } from '@/test/mocks/dialog';
+import {
+  createDndCoreMock,
+  createDndSortableMock,
+  createDndUtilitiesMock,
+  createUseSortableListMock,
+} from '@/test/mocks/dnd-kit';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -20,40 +27,7 @@ const mockToast = mock((_opts: any) => {});
 // ---------------------------------------------------------------------------
 
 // --- AlertDialog: passthrough for ConfirmDialog rendering ---
-mock.module('@/components/ui/alert-dialog', () => {
-  const AlertDialog = ({ open, children }: { open: boolean; children: ReactNode }) =>
-    open ? <>{children}</> : null;
-  const AlertDialogContent = ({ children, ...props }: any) => (
-    <div role="alertdialog" {...props}>
-      {children}
-    </div>
-  );
-  const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  );
-
-  return {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader: passthrough,
-    AlertDialogFooter: passthrough,
-    AlertDialogTitle: passthrough,
-    AlertDialogDescription: passthrough,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogPortal: ({ children }: any) => <>{children}</>,
-    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
-    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
-  };
-});
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
 // --- DropdownMenu: render items directly for testability ---
 mock.module('@/components/ui/dropdown-menu', () => ({
@@ -86,41 +60,10 @@ mock.module('@/components/ui/select', () => ({
 }));
 
 // --- DnD-kit: passthrough ---
-mock.module('@dnd-kit/core', () => ({
-  DndContext: ({ children }: any) => <>{children}</>,
-  useSensor: () => ({}),
-  useSensors: () => [],
-  PointerSensor: class {},
-  KeyboardSensor: class {},
-  closestCenter: () => null,
-}));
-
-mock.module('@dnd-kit/sortable', () => ({
-  SortableContext: ({ children }: any) => <>{children}</>,
-  verticalListSortingStrategy: {},
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: () => {},
-    transform: null,
-    transition: null,
-    isDragging: false,
-  }),
-}));
-
-mock.module('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => undefined } },
-}));
-
-mock.module('@/hooks/useSortableList', () => ({
-  useSortableList: ({ items }: any) => ({
-    orderedItems: items,
-    sensors: [],
-    collisionDetection: () => null,
-    handleDragEnd: () => {},
-    isDragDisabled: false,
-  }),
-}));
+mock.module('@dnd-kit/core', createDndCoreMock);
+mock.module('@dnd-kit/sortable', createDndSortableMock);
+mock.module('@dnd-kit/utilities', createDndUtilitiesMock);
+mock.module('@/hooks/useSortableList', createUseSortableListMock);
 
 // --- Workflow query hooks (replaces direct @/services/api mock) ---
 mock.module('@/hooks/queries/useWorkflowQueries', () => ({
@@ -141,27 +84,7 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
 }));
 
 // --- Auth store ---
-const mockAuthStore: any = {
-  roles: ['ADMIN'],
-  token: 'test-token',
-  userId: 'user-1',
-  organizationId: 'local-dev',
-  provider: 'local' as const,
-};
-
-mock.module('@/store/authStore', () => {
-  const useAuthStoreMock = ((selector: (state: typeof mockAuthStore) => any) =>
-    selector(mockAuthStore)) as any;
-  useAuthStoreMock.setState = (partial: any) => {
-    const nextState = typeof partial === 'function' ? partial(mockAuthStore) : partial;
-    if (nextState && typeof nextState === 'object') {
-      Object.assign(mockAuthStore, nextState);
-    }
-  };
-  useAuthStoreMock.getState = () => mockAuthStore;
-  useAuthStoreMock.persist = { clearStorage: async () => {} };
-  return { useAuthStore: useAuthStoreMock, DEFAULT_ORG_ID: 'local-dev' };
-});
+mock.module('@/store/authStore', () => createAuthStoreMock());
 
 // --- Auth utility ---
 mock.module('@/utils/auth', () => ({
@@ -240,7 +163,6 @@ describe('WorkflowList delete workflow flow', () => {
     mockDeleteIsPending = false;
     mockCloneIsPending = false;
     mockToast.mockReset();
-    mockAuthStore.roles = ['ADMIN'];
   });
 
   afterEach(() => {
