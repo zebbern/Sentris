@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, screen, within, cleanup, waitFor, act } from '@testing-library/react';
+import { fireEvent, screen, within, cleanup, waitFor } from '@testing-library/react';
 import type { components } from '@sentris/backend-client';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
@@ -277,23 +277,20 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     const revokeButton = screen.getByRole('button', { name: /Revoke key/i });
-    await act(async () => {
-      fireEvent.click(revokeButton);
-    });
+    fireEvent.click(revokeButton);
 
     // Wait for the confirm dialog to appear
-    await screen.findByRole('alertdialog');
+    const alertDialog = await screen.findByRole('alertdialog');
+    expect(alertDialog).toBeInTheDocument();
 
     // Find the confirm action button inside the alert dialog
-    const actionButtons = screen.getAllByRole('button', { name: /Revoke/i });
-    const confirmActionBtn = actionButtons.find(
-      (btn) => btn.closest('[role="alertdialog"]') !== null,
-    );
-    expect(confirmActionBtn).toBeTruthy();
-    fireEvent.click(confirmActionBtn!);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(revokeApiKey).toHaveBeenCalledTimes(1);
-    expect(revokeApiKey).toHaveBeenCalledWith(baseApiKey.id);
+    const confirmActionBtn = within(alertDialog).getByRole('button', { name: /Revoke/i });
+    fireEvent.click(confirmActionBtn);
+
+    await waitFor(() => {
+      expect(revokeApiKey).toHaveBeenCalledTimes(1);
+      expect(revokeApiKey).toHaveBeenCalledWith(baseApiKey.id);
+    });
   });
 
   it('clicking Delete button shows confirm dialog, confirming calls deleteApiKeyMutation.mutateAsync', async () => {
@@ -302,21 +299,20 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     const deleteButton = screen.getByRole('button', { name: /Delete key/i });
-    await act(async () => {
-      fireEvent.click(deleteButton);
-    });
+    fireEvent.click(deleteButton);
 
-    // Confirm dialog should appear
-    const actionButtons = await screen.findAllByRole('button', { name: /Delete/i });
-    const confirmActionBtn = actionButtons.find(
-      (btn) => btn.closest('[role="alertdialog"]') !== null,
-    );
-    if (confirmActionBtn) {
-      fireEvent.click(confirmActionBtn);
-      await new Promise((r) => setTimeout(r, 10));
+    // Wait for the confirm dialog to appear
+    const alertDialog = await screen.findByRole('alertdialog');
+    expect(alertDialog).toBeInTheDocument();
+
+    // Find the confirm action button inside the alert dialog
+    const confirmActionBtn = within(alertDialog).getByRole('button', { name: /Delete/i });
+    fireEvent.click(confirmActionBtn);
+
+    await waitFor(() => {
       expect(deleteApiKey).toHaveBeenCalledTimes(1);
       expect(deleteApiKey).toHaveBeenCalledWith(baseApiKey.id);
-    }
+    });
   });
 
   it('read-only mode (MEMBER role) disables create button', async () => {
