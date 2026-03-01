@@ -195,7 +195,7 @@ export function ImportedGroupsSection({
                 <AccordionContent className="px-4 pb-4">
                   {serverCount === 0 ? (
                     <div className="border rounded-lg overflow-x-auto">
-                      <Table>
+                      <Table aria-label="MCP servers">
                         <ServerTableHeader />
                         <TableBody>
                           <TableRow>
@@ -210,7 +210,7 @@ export function ImportedGroupsSection({
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-x-auto">
-                      <Table>
+                      <Table aria-label="MCP servers">
                         <ServerTableHeader />
                         <TableBody>
                           {groupServerList.map((server) => {

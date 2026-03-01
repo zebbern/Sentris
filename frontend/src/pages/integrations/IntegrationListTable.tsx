@@ -31,7 +31,7 @@ interface IntegrationListTableProps {
 function ConnectionsTableSkeleton() {
   return (
     <div className="overflow-x-auto border rounded-lg">
-      <Table className="table-fixed w-full">
+      <Table className="table-fixed w-full" aria-label="Integration connections">
         <TableHeader>
           <TableRow>
             <TableHead>Provider</TableHead>
@@ -104,7 +104,7 @@ export function IntegrationListTable({
 
   return (
     <div className="overflow-x-auto border rounded-lg">
-      <Table className="table-fixed w-full">
+      <Table className="table-fixed w-full" aria-label="Integration connections">
         <TableHeader>
           <TableRow>
             <TableHead>Provider</TableHead>

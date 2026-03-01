@@ -207,7 +207,7 @@ export function WorkflowList() {
         {isLoading ? (
           <div className="border rounded-lg bg-card overflow-hidden">
             <div className="overflow-x-auto">
-              <Table className="table-fixed w-full">
+              <Table className="table-fixed w-full" aria-label="Workflows">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10 hidden sm:table-cell" />
@@ -322,7 +322,7 @@ export function WorkflowList() {
                 collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
-                <Table className="table-fixed w-full">
+                <Table className="table-fixed w-full" aria-label="Workflows">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10 hidden sm:table-cell" />

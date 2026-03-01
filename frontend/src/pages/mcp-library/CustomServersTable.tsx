@@ -78,7 +78,7 @@ export function CustomServersTable({
       </div>
       <div className="border rounded-lg">
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
-          <Table>
+          <Table aria-label="Custom MCP servers">
             {(servers.length > 0 || isLoading) && <ServerTableHeader showDragHandle />}
             <TableBody>
               {isLoading && servers.length === 0 ? (

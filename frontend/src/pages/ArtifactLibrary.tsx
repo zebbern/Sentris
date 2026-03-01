@@ -126,7 +126,7 @@ export function ArtifactLibrary() {
 
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
           {libraryLoading ? (
-            <Table className="table-fixed w-full min-w-[600px]">
+            <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
               <TableHeader>
                 <TableRow className="text-xs uppercase text-muted-foreground">
                   <TableHead className="w-10" />
@@ -189,7 +189,7 @@ export function ArtifactLibrary() {
               collisionDetection={collisionDetection}
               onDragEnd={handleDragEnd}
             >
-              <Table className="table-fixed w-full min-w-[600px]">
+              <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
                 <TableHeader>
                   <TableRow className="text-xs uppercase text-muted-foreground">
                     <TableHead className="w-10" />
