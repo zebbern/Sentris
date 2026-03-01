@@ -356,12 +356,12 @@ export function TopBar({
               </span>
             )}
           </div>
-          {/* Mode toggle - flex-centered, z-10 ensures it stays clickable above adjacent fixed-width sections */}
-          <div className="flex-1 flex justify-center min-w-0 relative z-10">
-            <div className="flex-shrink-0">{modeToggle}</div>
+          {/* Mode toggle - flex-centered, pointer-events-none prevents the flex-1 area from blocking adjacent buttons */}
+          <div className="flex-1 flex justify-center min-w-0 relative pointer-events-none">
+            <div className="flex-shrink-0 pointer-events-auto">{modeToggle}</div>
           </div>
           {/* Actions on the right - fixed width to match left section for consistent centering */}
-          <div className="flex items-center justify-end gap-1 md:gap-2 flex-shrink-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px]">
+          <div className="flex items-center justify-end gap-1 md:gap-2 flex-shrink-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px] relative z-10">
             <div className="flex items-center gap-1 md:gap-2">
               {mode === 'design' && (
                 <>
