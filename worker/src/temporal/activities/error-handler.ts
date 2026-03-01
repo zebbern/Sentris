@@ -8,23 +8,13 @@
 
 import { ApplicationFailure } from '@temporalio/common';
 import { ValidationError } from '@shipsec/component-sdk';
-import type { INodeIOService } from '@shipsec/component-sdk';
+import type { INodeIOService, IScopedTraceService } from '@shipsec/component-sdk';
 import {
   truncateText,
   getErrorMessage,
   truncateDetails,
   ERROR_LOG_LIMIT,
 } from '../utils/string-helpers';
-
-interface TraceRecorder {
-  record(event: {
-    type: string;
-    timestamp: string;
-    message?: string;
-    error?: unknown;
-    level: string;
-  }): void;
-}
 
 interface ErrorHandlerContext {
   actionRef: string;
@@ -36,7 +26,7 @@ interface ErrorHandlerContext {
   joinStrategy?: unknown;
   triggeredBy?: string;
   failure?: unknown;
-  trace: TraceRecorder | undefined;
+  trace: IScopedTraceService | undefined;
   nodeIO: INodeIOService | undefined;
 }
 

@@ -314,7 +314,7 @@ export async function runComponentActivity(
 
     return { output, activeOutputPorts };
   } catch (error: unknown) {
-    await handleComponentError(error, {
+    return await handleComponentError(error, {
       actionRef: action.ref,
       componentId: action.componentId,
       activityId: activityInfo.activityId,

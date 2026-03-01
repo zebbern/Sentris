@@ -183,8 +183,9 @@ export class McpGroupsRepository {
 
     const result = await this.db.execute(query);
     const grouped = new Map<string, McpGroupServerRow[]>();
-    for (const row of result.rows as McpGroupServerRow[]) {
+    for (const row of result.rows as unknown as McpGroupServerRow[]) {
       const groupId = row.group_id;
+      if (!groupId) continue;
       if (!grouped.has(groupId)) {
         grouped.set(groupId, []);
       }
@@ -229,7 +230,7 @@ export class McpGroupsRepository {
     `;
 
     const result = await this.db.execute(query);
-    return result.rows as McpGroupServerRow[];
+    return result.rows as unknown as McpGroupServerRow[];
   }
 
   async addServerToGroup(

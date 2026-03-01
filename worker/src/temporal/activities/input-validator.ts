@@ -10,18 +10,9 @@ import {
   ValidationError,
   type ComponentDefinition,
   type ComponentPortMetadata,
+  type IScopedTraceService,
 } from '@shipsec/component-sdk';
 import type { InputWarning } from './spill-resolver';
-
-interface TraceRecorder {
-  record(event: {
-    type: string;
-    timestamp: string;
-    message?: string;
-    level: string;
-    data?: unknown;
-  }): void;
-}
 
 /**
  * Validate that all required inputs are present and log trace warnings.
@@ -32,7 +23,7 @@ export function validateRequiredInputs(
   warnings: InputWarning[],
   component: ComponentDefinition,
   resolvedParams: Record<string, unknown>,
-  trace: TraceRecorder | undefined,
+  trace: IScopedTraceService | undefined,
   actionRef: string,
 ): void {
   // Get input port metadata to check which inputs are truly required
@@ -69,7 +60,7 @@ export function validateRequiredInputs(
       timestamp: new Date().toISOString(),
       message: `Input '${warning.target}' mapped from ${warning.sourceRef}.${warning.sourceHandle} was undefined`,
       level: isRequired ? 'error' : 'warn',
-      data: warning,
+      data: warning as unknown as Record<string, unknown>,
     });
   }
 
