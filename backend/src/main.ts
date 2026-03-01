@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 import { isVersionCheckDisabled, performVersionCheck } from './version-check';
 import type { AppConfig } from './config/app.config';
@@ -24,6 +25,25 @@ async function bootstrap() {
 
   // Enable cookie parsing for session auth
   app.use(cookieParser());
+
+  // Security headers via helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'blob:'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // Set global prefix for all routes
   app.setGlobalPrefix('api/v1');
