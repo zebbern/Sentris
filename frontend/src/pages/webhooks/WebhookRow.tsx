@@ -100,7 +100,7 @@ export function WebhookRow({
       <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
         {formatDateTime(webhook.createdAt)}
       </TableCell>
-      <TableCell className="whitespace-nowrap">
+      <TableCell className="hidden sm:table-cell whitespace-nowrap">
         <Badge variant={statusBadgeProps.variant}>{statusBadgeProps.label}</Badge>
       </TableCell>
       <TableCell className="text-right">

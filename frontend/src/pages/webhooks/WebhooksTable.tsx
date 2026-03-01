@@ -114,7 +114,7 @@ export function WebhooksTable({
                 <TableHead className="hidden md:table-cell">Workflow</TableHead>
                 <TableHead className="hidden sm:table-cell">Webhook URL</TableHead>
                 <TableHead className="hidden lg:table-cell whitespace-nowrap">Created</TableHead>
-                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="hidden sm:table-cell whitespace-nowrap">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>

@@ -40,7 +40,7 @@ import { isAllowedOAuthDomain } from '@/utils/urlSecurity';
 import { IntegrationCallbackBridge } from './integrations/IntegrationCallbackBridge';
 
 export function IntegrationsManager() {
-  useDocumentTitle('Integrations');
+  useDocumentTitle('Connections');
   const navigate = useNavigate();
   const location = useLocation();
   const userId = getCurrentUserId();

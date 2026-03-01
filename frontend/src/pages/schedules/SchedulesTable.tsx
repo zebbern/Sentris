@@ -151,22 +151,18 @@ export function SchedulesTable({
                   ))}
                 </SortableContext>
               ) : null}
-              {!isLoading && !hasData && (
-                <TableRow>
-                  <TableCell colSpan={9}>
-                    <EmptyState
-                      icon={CalendarClock}
-                      title="No schedules found"
-                      description='Create your first cadence with the "New schedule" button or adjust the filters above.'
-                      className="py-10"
-                    />
-                  </TableCell>
-                </TableRow>
-              )}
             </TableBody>
           </Table>
         </DndContext>
       </div>
+      {!isLoading && !hasData && (
+        <EmptyState
+          icon={CalendarClock}
+          title="No schedules found"
+          description='Create your first cadence with the "New schedule" button or adjust the filters above.'
+          className="py-10"
+        />
+      )}
     </div>
   );
 }

@@ -246,7 +246,9 @@ export function ActionCenterPage() {
                       <TableHead className="hidden lg:table-cell whitespace-nowrap">
                         Timeout
                       </TableHead>
-                      <TableHead className="whitespace-nowrap">Status</TableHead>
+                      <TableHead className="hidden sm:table-cell whitespace-nowrap">
+                        Status
+                      </TableHead>
                       <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -327,7 +329,9 @@ export function ActionCenterPage() {
                                       <span className="text-muted-foreground">No timeout</span>
                                     )}
                                   </TableCell>
-                                  <TableCell>{renderStatusBadge(approval)}</TableCell>
+                                  <TableCell className="hidden sm:table-cell">
+                                    {renderStatusBadge(approval)}
+                                  </TableCell>
                                   <TableCell className="text-right">
                                     <div className="flex items-center justify-end gap-2">
                                       {isPending ? (
