@@ -1,0 +1,2 @@
+export const LIBRARY_PANEL_WIDTH = 320;
+export const LIBRARY_PANEL_WIDTH_MOBILE = 280;
