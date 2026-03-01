@@ -78,9 +78,17 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .addServer('/api/v1', 'API v1')
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  const cleaned = cleanupOpenApiDoc(document);
-  SwaggerModule.setup('api/v1/docs', app, cleaned);
+
+  try {
+    const document = SwaggerModule.createDocument(app, config);
+    const cleaned = cleanupOpenApiDoc(document);
+    SwaggerModule.setup('api/v1/docs', app, cleaned);
+  } catch (err) {
+    Logger.warn(
+      `Swagger doc generation failed — API docs will be unavailable: ${err instanceof Error ? err.message : String(err)}`,
+      'Bootstrap',
+    );
+  }
 
   await app.listen(port, host);
   Logger.log(`🚀 Sentris backend listening on http://${host}:${port}`, 'Bootstrap');
