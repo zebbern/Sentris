@@ -52,6 +52,10 @@ WORKDIR /app/backend
 # Expose port
 EXPOSE 3211
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -sf http://localhost:3211/api || exit 1
+
 # Run migrations first, then start backend
 CMD ["sh", "-c", "bun run migration:push && bun src/main.ts"]
 
@@ -71,6 +75,10 @@ ENV POSTHOG_HOST=${POSTHOG_HOST}
 
 # Set working directory for worker
 WORKDIR /app/worker
+
+# Health check (process-based — worker has no HTTP port)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD pgrep -f "dev.worker" || exit 1
 
 # Run worker with Node + tsx (not bun, due to SWC binding issues)
 CMD ["node", "--import", "tsx/esm", "src/temporal/workers/dev.worker.ts"]
@@ -114,6 +122,10 @@ RUN bun run build
 # Expose port
 EXPOSE 8080
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -sf http://localhost:8080 || exit 1
+
 # Serve the built bundle with Vite preview
 CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "8080"]
 
@@ -154,6 +166,10 @@ USER sentris
 
 # Expose port
 EXPOSE 5173
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -sf http://localhost:5173 || exit 1
 
 # Run development server (non-minified) for debugging
 CMD ["bun", "run", "dev", "--host", "0.0.0.0", "--port", "5173"]
