@@ -1,0 +1,102 @@
+# Secrets Management
+
+Secrets store sensitive credentials — API keys, tokens, passwords — that your workflows need at runtime. Sentris encrypts secret values at rest and never exposes them in logs, analytics, or published templates.
+
+## Opening the Secrets Manager
+
+Navigate to **Secrets** in the sidebar. The page shows a table of all secrets in your organization with columns for name, description, tags, creation date, and last-rotated date.
+
+> You need workspace admin permissions to create, edit, rotate, or delete secrets.
+
+## Creating a Secret
+
+1. Fill in the **Create Secret** form above the table:
+   - **Name** — A unique identifier used to reference this secret in workflows. Only letters, numbers, hyphens, and underscores are allowed (max 128 characters). Example: `github-pat`, `SHODAN_API_KEY`.
+   - **Value** — The sensitive credential. This is encrypted immediately and never displayed again.
+   - **Description** (optional) — A human-readable note explaining what this secret is for.
+   - **Tags** (optional) — Comma-separated labels for organization (e.g., `aws, production`).
+2. Click **Create Secret**.
+3. You see a confirmation toast. The secret now appears in the table.
+
+## Editing a Secret
+
+1. Click the **Edit** action on a secret row (or the row's context menu).
+2. The Edit Secret dialog opens with the current name, description, and tags pre-filled.
+3. Update the fields you want to change:
+   - **Name** — You can rename the secret. Update any workflow references accordingly.
+   - **Description** and **Tags** — Update metadata freely.
+   - **Value** — Leave blank to keep the existing value. Enter a new value to replace it.
+4. Click **Save**. Only changed fields are sent to the backend.
+
+## Rotating a Secret
+
+Rotation replaces the secret value without changing its name or references.
+
+1. Click the **Rotate** action on a secret row.
+2. Confirm the rotation in the dialog.
+3. The secret's `lastRotatedAt` timestamp updates.
+
+Use rotation when a credential is compromised or as part of a periodic key rotation policy.
+
+## Deleting Secrets
+
+### Single Delete
+
+Click the **Delete** action on a secret row and confirm.
+
+### Bulk Delete
+
+1. Select multiple secrets using the checkboxes.
+2. Click **Delete Selected** in the toolbar.
+3. Confirm. All selected secrets are deleted in parallel.
+
+> Deleting a secret removes it permanently. Workflows referencing a deleted secret will fail at runtime.
+
+## Using Secrets in Workflows
+
+Workflow components reference secrets by name. When a component parameter expects a credential:
+
+1. Open the component's configuration panel in the Workflow Builder.
+2. In the parameter field (e.g., `apiKey`, `token`), enter the secret name using the format your component expects — typically the exact secret name.
+3. At runtime, the worker resolves the secret name to its encrypted value and injects it into the component's execution environment.
+
+### Example
+
+A workflow with an HTTP Request component that calls a third-party API:
+
+1. Create secret: Name = `SHODAN_API_KEY`, Value = `abc123...`
+2. In the HTTP Request component, set the `Authorization` header parameter to reference `SHODAN_API_KEY`.
+3. At execution time, the worker fetches and decrypts the value, injecting it into the HTTP call.
+
+## Secret Types and Integration Connections
+
+Secrets work alongside **Integrations** (accessible from the Connections page). The key difference:
+
+| Mechanism        | When to Use                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| **Secrets**      | Static credentials: API keys, tokens, passwords. You manage the value directly.             |
+| **Integrations** | OAuth-based connections (e.g., GitHub, Slack). Sentris handles token refresh automatically. |
+
+If a service supports OAuth, prefer using an Integration connection. For services that only provide static API keys or tokens, use Secrets.
+
+## Security Considerations
+
+- **Encryption at rest** — Secret values are encrypted in the database. They are decrypted only at workflow execution time inside the worker process.
+- **No log exposure** — Secret values are never written to application logs, execution traces, or analytics events.
+- **Template sanitization** — When publishing a workflow as a template, all secret references are stripped and replaced with documented placeholders. See [Template Library](./template-library) for details.
+- **Access control** — Only workspace administrators can create, edit, rotate, or delete secrets. Read-only users can see secret names and metadata but never values.
+- **Rotation support** — Rotate secrets without downtime. Workflows pick up the new value on their next execution.
+
+## Troubleshooting
+
+### "Only workspace administrators can create or update secrets"
+
+You need the admin role in your organization. Contact your organization administrator.
+
+### Workflow fails with "secret not found"
+
+Verify the secret name matches exactly (case-sensitive) in both the Secrets Manager and the workflow component parameter.
+
+### Secret value not updating after rotation
+
+Rotation takes effect on the next workflow execution. In-progress runs continue using the previous value.

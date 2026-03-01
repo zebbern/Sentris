@@ -51,6 +51,8 @@
           {
             "group": "Guides",
             "pages": [
+              "guides/template-library",
+              "guides/secrets-management",
               "aws-credentials",
               "analytics",
               "mcp-library",
