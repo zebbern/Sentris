@@ -7,6 +7,7 @@ import {
   type ToastOptions,
   type ToastVariant,
 } from './toast-context';
+import { toastRef } from '@/lib/toastRef';
 
 interface ToastEntry extends ToastOptions {
   id: string;
@@ -97,6 +98,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       timeoutsRef.current.clear();
     };
   }, []);
+
+  // Register toast function into module-level bridge for non-React consumers (e.g. MutationCache)
+  useEffect(() => {
+    toastRef.current = addToast;
+    return () => {
+      toastRef.current = null;
+    };
+  }, [addToast]);
 
   // Auto-collapse when only 1 toast left
   useEffect(() => {

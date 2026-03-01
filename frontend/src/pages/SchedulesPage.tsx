@@ -287,12 +287,8 @@ export function SchedulesPage() {
           description: `"${schedule.name}" is active again.`,
         });
       }
-    } catch (err: unknown) {
-      toast({
-        title: 'Schedule update failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       clearAction(schedule.id);
     }
@@ -306,12 +302,8 @@ export function SchedulesPage() {
         title: 'Run requested',
         description: `Scheduled cadence "${schedule.name}" is executing now.`,
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Failed to trigger schedule',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       clearAction(schedule.id);
     }
@@ -351,12 +343,8 @@ export function SchedulesPage() {
         title: 'Schedule deleted',
         description: `"${schedule.name}" has been deleted.`,
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Failed to delete schedule',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       clearAction(schedule.id);
     }

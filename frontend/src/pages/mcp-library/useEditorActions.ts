@@ -230,11 +230,7 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
             await queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
           })
           .catch(() => {
-            toast({
-              title: 'Connection test failed',
-              description: 'Server updated, but the connection test did not succeed.',
-              variant: 'destructive',
-            });
+            // Global MutationCache error handler shows the toast
           })
           .finally(() => {
             setCheckingServers((prev) => {
@@ -260,11 +256,7 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
             }
           })
           .catch(() => {
-            toast({
-              title: 'Connection test failed',
-              description: 'Server created, but the connection test did not succeed.',
-              variant: 'destructive',
-            });
+            // Global MutationCache error handler shows the toast
           })
           .finally(() => {
             setCheckingServers((prev) => {
@@ -280,12 +272,8 @@ export function useEditorActions({ servers, setCheckingServers }: UseEditorActio
       setEditingServer(null);
       setFormData(INITIAL_FORM_DATA);
       setDiscoveryStatus(null);
-    } catch (err: unknown) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to save server',
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setIsSaving(false);
     }

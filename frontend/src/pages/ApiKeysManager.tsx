@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
@@ -103,12 +102,8 @@ export function ApiKeysManager() {
     try {
       await revokeApiKeyMutation.mutateAsync(key.id);
       toast({ title: 'Key revoked', description: `API Key "${key.name}" revoked.` });
-    } catch (err: unknown) {
-      toast({
-        title: 'Revoke failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   };
 
@@ -122,12 +117,8 @@ export function ApiKeysManager() {
     try {
       await deleteApiKeyMutation.mutateAsync(key.id);
       toast({ title: 'Key deleted', description: `API Key "${key.name}" deleted.` });
-    } catch (err: unknown) {
-      toast({
-        title: 'Delete failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   };
 

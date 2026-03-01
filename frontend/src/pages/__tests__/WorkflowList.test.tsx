@@ -131,8 +131,9 @@ mock.module('@/hooks/useDocumentTitle', () => ({
 }));
 
 // --- Logger ---
+const mockLoggerError = mock(() => {});
 mock.module('@/lib/logger', () => ({
-  logger: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} },
+  logger: { error: mockLoggerError, warn: () => {}, info: () => {}, debug: () => {} },
 }));
 
 const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -182,6 +183,7 @@ describe('WorkflowList delete workflow flow', () => {
     mockDeleteIsPending = false;
     mockCloneIsPending = false;
     mockToast.mockReset();
+    mockLoggerError.mockReset();
     mockConfirm.mockClear();
     mockConfirm.mockResolvedValue(false);
   });
@@ -236,7 +238,7 @@ describe('WorkflowList delete workflow flow', () => {
     });
   });
 
-  it('shows toast error when delete fails', async () => {
+  it('logs error when delete fails', async () => {
     const workflow = makeWorkflow('33333333-3333-4333-8333-333333333333', 'Gamma Workflow');
     mockWorkflows = [workflow];
     mockConfirm.mockResolvedValue(true);
@@ -251,12 +253,7 @@ describe('WorkflowList delete workflow flow', () => {
     fireEvent.click(deleteItem!);
 
     await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Delete failed',
-          variant: 'destructive',
-        }),
-      );
+      expect(mockLoggerError).toHaveBeenCalledWith('Failed to delete workflow:', expect.any(Error));
     });
   });
 });

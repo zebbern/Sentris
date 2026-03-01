@@ -1,6 +1,21 @@
-import { QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryClient } from '@tanstack/react-query';
+import { humanizeApiError } from '@/lib/humanizeApiError';
+import { showToast } from '@/lib/toastRef';
+
+const mutationCache = new MutationCache({
+  onError(error, _variables, _context, mutation) {
+    if (mutation.meta?.suppressGlobalError === true) return;
+
+    showToast({
+      title: 'Operation failed',
+      description: humanizeApiError(error),
+      variant: 'destructive',
+    });
+  },
+});
 
 export const queryClient = new QueryClient({
+  mutationCache,
   defaultOptions: {
     queries: {
       retry: 1,

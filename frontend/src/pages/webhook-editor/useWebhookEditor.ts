@@ -233,12 +233,8 @@ export function useWebhookEditor() {
           description: 'Webhook configuration updated.',
         });
       }
-    } catch (error: unknown) {
-      toast({
-        title: 'Save failed',
-        description: String(error),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   }, [form, isNew, id, createWebhook, updateWebhook, navigate, toast]);
 
@@ -285,12 +281,8 @@ export function useWebhookEditor() {
       await deleteWebhook.mutateAsync(id!);
       queryClient.removeQueries({ queryKey: queryKeys.webhooks.detail(id!) });
       navigate('/webhooks');
-    } catch (error: unknown) {
-      toast({
-        title: 'Delete failed',
-        description: String(error),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   }, [confirm, queryClient, id, deleteWebhook, navigate, toast]);
 

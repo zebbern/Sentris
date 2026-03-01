@@ -215,12 +215,8 @@ export function WebhooksPage() {
         title: 'Webhook deleted',
         description: `Successfully deleted webhook ${webhook.name}`,
       });
-    } catch (_err: unknown) {
-      toast({
-        title: 'Failed to delete webhook',
-        description: humanizeApiError(_err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setActionState((prev) => {
         const { [webhook.id]: _removed, ...rest } = prev;
@@ -244,12 +240,8 @@ export function WebhooksPage() {
         title: 'URL regenerated',
         description: 'New webhook URL has been generated',
       });
-    } catch (_err: unknown) {
-      toast({
-        title: 'Failed to regenerate URL',
-        description: humanizeApiError(_err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setActionState((prev) => {
         const { [webhook.id]: _removed, ...rest } = prev;

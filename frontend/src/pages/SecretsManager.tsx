@@ -275,12 +275,8 @@ export function SecretsManager() {
       await deleteSecretMutation.mutateAsync(secret.id);
       track(Events.SecretDeleted, { name_length: secret.name.trim().length });
       toast({ title: 'Secret deleted', description: `Secret "${secret.name}" deleted.` });
-    } catch (err: unknown) {
-      toast({
-        title: 'Delete failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   };
 

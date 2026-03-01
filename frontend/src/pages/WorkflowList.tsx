@@ -128,11 +128,7 @@ export function WorkflowList() {
       await deleteWorkflow.mutateAsync(workflow.id);
     } catch (err: unknown) {
       logger.error('Failed to delete workflow:', err);
-      toast({
-        title: 'Delete failed',
-        description: 'Failed to delete workflow. Please try again.',
-        variant: 'destructive',
-      });
+      // Global MutationCache error handler shows the toast
     }
   };
 
@@ -152,11 +148,7 @@ export function WorkflowList() {
       });
     } catch (err: unknown) {
       logger.error('Failed to clone workflow:', err);
-      toast({
-        title: 'Duplicate failed',
-        description: 'Failed to duplicate workflow. Please try again.',
-        variant: 'destructive',
-      });
+      // Global MutationCache error handler shows the toast
     }
   };
 

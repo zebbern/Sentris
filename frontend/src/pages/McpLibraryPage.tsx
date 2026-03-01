@@ -233,12 +233,8 @@ export function McpLibraryPage() {
       toast({ title: 'Server deleted', description: 'MCP server has been removed.' });
       setDeleteDialogOpen(false);
       setServerToDelete(null);
-    } catch (err: unknown) {
-      toast({
-        title: 'Error',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setIsDeleting(false);
     }
@@ -251,12 +247,8 @@ export function McpLibraryPage() {
         title: server.enabled ? 'Server enabled' : 'Server disabled',
         description: `${server.name} has been ${server.enabled ? 'enabled' : 'disabled'}.`,
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Error',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   };
 
@@ -269,12 +261,8 @@ export function McpLibraryPage() {
         description: result.message,
         variant: result.success ? 'default' : 'destructive',
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Test failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setTestingServer(null);
     }
@@ -299,12 +287,8 @@ export function McpLibraryPage() {
         title: 'Tool discovery complete',
         description: `Discovered ${discoveredTools.length} tool(s) from this server.`,
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Discovery failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setDiscoveringServerIds((prev) => {
         const next = new Set(prev);

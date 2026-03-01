@@ -23,6 +23,7 @@ export function useCreateSecret() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateSecretInput) => api.secrets.create(input),
+    meta: { suppressGlobalError: true },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.secrets.all() });
     },
@@ -34,6 +35,7 @@ export function useUpdateSecret() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSecretInput }) =>
       api.secrets.update(id, input),
+    meta: { suppressGlobalError: true },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.secrets.all() });
     },
@@ -45,6 +47,7 @@ export function useRotateSecret() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: RotateSecretInput }) =>
       api.secrets.rotate(id, input),
+    meta: { suppressGlobalError: true },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.secrets.all() });
     },

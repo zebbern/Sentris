@@ -147,12 +147,8 @@ export function AnalyticsSettingsPage() {
         title: 'Settings saved',
         description: 'Analytics retention settings have been updated.',
       });
-    } catch (err: unknown) {
-      toast({
-        title: 'Failed to save',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     }
   }, [retentionDays, validateRetention, updateMutation, toast]);
 

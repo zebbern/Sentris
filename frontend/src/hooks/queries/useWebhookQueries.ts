@@ -77,6 +77,7 @@ export function useRegenerateWebhookPath() {
 
 export function useTestWebhookScript() {
   return useMutation({
+    meta: { suppressGlobalError: true },
     mutationFn: (dto: {
       parsingScript: string;
       testPayload: Record<string, unknown>;

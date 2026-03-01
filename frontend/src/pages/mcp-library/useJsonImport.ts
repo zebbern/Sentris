@@ -203,12 +203,8 @@ export function useJsonImport({
         setEditorOpen(false);
         setEditingServer(null);
         setFormData(INITIAL_FORM_DATA);
-      } catch (err: unknown) {
-        toast({
-          title: 'Error',
-          description: err instanceof Error ? err.message : 'Failed to save server',
-          variant: 'destructive',
-        });
+      } catch {
+        // Global MutationCache error handler shows the toast
       }
       return;
     }
@@ -316,12 +312,8 @@ export function useJsonImport({
 
       setEditorOpen(false);
       setJsonValue('');
-    } catch (err: unknown) {
-      toast({
-        title: 'Import failed',
-        description: err instanceof Error ? err.message : 'Failed to import servers',
-        variant: 'destructive',
-      });
+    } catch {
+      // Global MutationCache error handler shows the toast
     } finally {
       setIsImporting(false);
     }
