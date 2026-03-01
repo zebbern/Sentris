@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 import { compileWorkflowGraph } from '../dsl/compiler';
 // Ensure all worker components are registered before accessing the registry
-import '@sentris/studio-worker/components';
+import '@sentris/worker/components';
 import { componentRegistry, extractPorts } from '@sentris/component-sdk';
 import { WorkflowDefinition } from '../dsl/types';
 import {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import '@sentris/studio-worker/components'; // Register components
+import '@sentris/worker/components'; // Register components
 import { WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { compileWorkflowGraph } from '../../dsl/compiler';
 import { WorkflowDefinition } from '../../dsl/types';

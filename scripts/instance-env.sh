@@ -67,7 +67,7 @@ get_db_url() {
   echo "postgresql://sentris:sentris@localhost:5433/$(get_db_name "$1")"
 }
 
-get_studio_api_url() {
+get_sentris_api_url() {
   echo "http://localhost:$(get_backend_port "$1")/api/v1"
 }
 
@@ -116,7 +116,7 @@ apply_instance_vars() {
       set_var "$file" "PORT" "$(get_backend_port "$instance")"
       ;;
     worker)
-      set_var "$file" "STUDIO_API_BASE_URL" "$(get_studio_api_url "$instance")"
+      set_var "$file" "SENTRIS_API_BASE_URL" "$(get_sentris_api_url "$instance")"
       ;;
     frontend)
       set_var "$file" "VITE_API_URL" "$(get_vite_api_url "$instance")"
@@ -135,7 +135,7 @@ show_summary() {
   echo "Database:      $(get_db_name "$instance")"
   echo "Temporal NS:   $(get_temporal_ns "$instance")"
   echo "API URL:       $(get_vite_api_url "$instance")"
-  echo "Studio API:    $(get_studio_api_url "$instance")"
+  echo "Sentris API:   $(get_sentris_api_url "$instance")"
 }
 
 parse_init_args() {

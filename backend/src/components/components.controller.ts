@@ -3,7 +3,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 // Ensure all worker components are registered before accessing the registry
-import '@sentris/studio-worker/components';
+import '@sentris/worker/components';
 import {
   componentRegistry,
   extractPorts,

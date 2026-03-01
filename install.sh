@@ -15,7 +15,7 @@ set -u -o pipefail
 
 # ---------- Config ----------
 REPO_URL="https://github.com/zebbern/Sentris"
-REPO_DIR="studio"
+REPO_DIR="sentris"
 WAIT_DOCKER_SEC=60
 
 # ---------- Colors ----------
@@ -297,7 +297,7 @@ install_docker() {
           printf "${GREEN}│${NC}  ${BOLD}➡️  Please log out, log back in, then run:${NC}                     ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/SentrisAI/   ${GREEN}│${NC}\n"
-          printf "${GREEN}│${NC}      studio/main/install.sh | bash                              ${GREEN}│${NC}\n"
+          printf "${GREEN}│${NC}      Sentris/main/install.sh | bash                             ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}└─────────────────────────────────────────────────────────────────┘${NC}\n"
           printf "\n"
@@ -351,7 +351,7 @@ install_docker() {
           printf "${GREEN}│${NC}  ${BOLD}➡️  Please log out, log back in, then run:${NC}                     ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/SentrisAI/   ${GREEN}│${NC}\n"
-          printf "${GREEN}│${NC}      studio/main/install.sh | bash                              ${GREEN}│${NC}\n"
+          printf "${GREEN}│${NC}      Sentris/main/install.sh | bash                             ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}└─────────────────────────────────────────────────────────────────┘${NC}\n"
           printf "\n"

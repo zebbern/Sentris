@@ -50,9 +50,9 @@ Images are tagged as:
 
 | Service | Image |
 |---------|-------|
-| Backend | `ghcr.io/zebbern/studio-backend:{version}` |
-| Worker | `ghcr.io/zebbern/studio-worker:{version}` |
-| Frontend | `ghcr.io/zebbern/studio-frontend:{version}` |
+| Backend | `ghcr.io/zebbern/sentris-backend:{version}` |
+| Worker | `ghcr.io/zebbern/sentris-worker:{version}` |
+| Frontend | `ghcr.io/zebbern/sentris-frontend:{version}` |
 
 All images also have a `:latest` tag.
 
@@ -60,10 +60,10 @@ All images also have a `:latest` tag.
 
 ```bash
 # Pull a specific version
-docker pull ghcr.io/zebbern/studio-backend:1.0.0
+docker pull ghcr.io/zebbern/sentris-backend:1.0.0
 
 # Pull latest
-docker pull ghcr.io/zebbern/studio-backend:latest
+docker pull ghcr.io/zebbern/sentris-backend:latest
 ```
 
 ---
@@ -80,7 +80,7 @@ This is a **monorepo** with workspace packages:
 | `@sentris/component-sdk` | v0.1.0 | No (private) |
 | `@sentris/backend-client` | v0.1.0 | No |
 | `@sentris/flow-backend` | v0.1.0 | No |
-| `@sentris/studio-worker` | v0.1.0 | No (private) |
+| `@sentris/worker` | v0.1.0 | No (private) |
 | `@sentris/flow-frontend` | v1.0.0 | No |
 
 <Note>

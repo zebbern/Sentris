@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import '@sentris/studio-worker/components'; // Register components
+import '@sentris/worker/components'; // Register components
 import { WorkflowGraphDto } from '../../workflows/dto/workflow-graph.dto';
 import { componentRegistry } from '@sentris/component-sdk';
 import { compileWorkflowGraph } from '../compiler';

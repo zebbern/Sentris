@@ -10,7 +10,7 @@ describe('github.org.membership.remove component', () => {
   let previousInternalToken: string | undefined;
 
   beforeAll(async () => {
-    process.env.STUDIO_API_BASE_URL = 'http://localhost:3211/api/v1';
+    process.env.SENTRIS_API_BASE_URL = 'http://localhost:3211/api/v1';
     await import('../../index');
   });
 

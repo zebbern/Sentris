@@ -337,9 +337,9 @@ prod action="start":
             echo "📦  Found latest release: $LATEST_TAG"
 
             echo "📥 Pulling matching images from GHCR..."
-            docker pull ghcr.io/zebbern/studio-backend:$LATEST_TAG
-            docker pull ghcr.io/zebbern/studio-frontend:$LATEST_TAG
-            docker pull ghcr.io/zebbern/studio-worker:$LATEST_TAG
+            docker pull ghcr.io/zebbern/sentris-backend:$LATEST_TAG
+            docker pull ghcr.io/zebbern/sentris-frontend:$LATEST_TAG
+            docker pull ghcr.io/zebbern/sentris-worker:$LATEST_TAG
 
             echo "🚀  Starting production environment with version $LATEST_TAG..."
             export SENTRIS_TAG=$LATEST_TAG
@@ -371,19 +371,19 @@ prod-images action="start":
 
             # Check if images exist locally, pull if needed
             echo "🔍 Checking for local images..."
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-frontend"; then
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/sentris-frontend"; then
                 echo "📥 Pulling GHCR images..."
-                docker pull ghcr.io/zebbern/studio-frontend:latest || echo "⚠️  Frontend image not found, will build locally"
+                docker pull ghcr.io/zebbern/sentris-frontend:latest || echo "⚠️  Frontend image not found, will build locally"
             else
                 echo "✅  Frontend image found locally"
             fi
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-backend"; then
-                docker pull ghcr.io/zebbern/studio-backend:latest || echo "⚠️  Backend image not found, will build locally"
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/sentris-backend"; then
+                docker pull ghcr.io/zebbern/sentris-backend:latest || echo "⚠️  Backend image not found, will build locally"
             else
                 echo "✅  Backend image found locally"
             fi
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-worker"; then
-                docker pull ghcr.io/zebbern/studio-worker:latest || echo "⚠️  Worker image not found, will build locally"
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/sentris-worker"; then
+                docker pull ghcr.io/zebbern/sentris-worker:latest || echo "⚠️  Worker image not found, will build locally"
             else
                 echo "✅  Worker image found locally"
             fi
@@ -414,21 +414,21 @@ prod-images action="start":
                 --target frontend-debug \
                 --build-arg VITE_PUBLIC_POSTHOG_KEY=$POSTHOG_API_KEY \
                 --build-arg VITE_PUBLIC_POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/zebbern/studio-frontend:latest \
+                -t ghcr.io/zebbern/sentris-frontend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target backend \
                 --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
                 --build-arg POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/zebbern/studio-backend:latest \
+                -t ghcr.io/zebbern/sentris-backend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target worker \
                 --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
                 --build-arg POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/zebbern/studio-worker:latest \
+                -t ghcr.io/zebbern/sentris-worker:latest \
                 .
 
             echo "✅  Test images built with PostHog analytics"

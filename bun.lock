@@ -48,7 +48,7 @@
         "@sentris/backend-client": "workspace:*",
         "@sentris/component-sdk": "workspace:*",
         "@sentris/shared": "workspace:*",
-        "@sentris/flow-worker": "workspace:*",
+        "@sentris/worker": "workspace:*",
         "@temporalio/client": "^1.14.1",
         "@temporalio/worker": "^1.14.1",
         "@temporalio/workflow": "^1.14.1",
@@ -259,7 +259,7 @@
       },
     },
     "worker": {
-      "name": "@sentris/flow-worker",
+      "name": "@sentris/worker",
       "version": "0.1.0",
       "dependencies": {
         "@ai-sdk/google": "^3.0.13",
@@ -920,13 +920,13 @@
 
     "@sentris/contracts": ["@sentris/contracts@workspace:packages/contracts"],
 
-    "@sentris/shared": ["@sentris/shared@workspace:packages/shared"],
-
     "@sentris/flow-backend": ["@sentris/flow-backend@workspace:backend"],
 
     "@sentris/flow-frontend": ["@sentris/flow-frontend@workspace:frontend"],
 
-    "@sentris/flow-worker": ["@sentris/flow-worker@workspace:worker"],
+    "@sentris/shared": ["@sentris/shared@workspace:packages/shared"],
+
+    "@sentris/worker": ["@sentris/worker@workspace:worker"],
 
     "@smithy/abort-controller": ["@smithy/abort-controller@4.2.8", "", { "dependencies": { "@smithy/types": "^4.12.0", "tslib": "^2.6.2" } }, "sha512-peuVfkYHAmS5ybKxWcfraK7WBBP0J+rkfUcbHJJKQ4ir3UAUNQI+Y4Vt/PqSzGqgloJ5O1dk7+WzNL8wcCSXbw=="],
 
@@ -3284,9 +3284,9 @@
 
     "@sentris/flow-frontend/ai": ["ai@5.0.124", "", { "dependencies": { "@ai-sdk/gateway": "2.0.30", "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.20", "@opentelemetry/api": "1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-Li6Jw9F9qsvFJXZPBfxj38ddP2iURCnMs96f9Q3OeQzrDVcl1hvtwSEAuxA/qmfh6SDV2ERqFUOFzigvr0697g=="],
 
-    "@sentris/flow-worker/@googleapis/admin": ["@googleapis/admin@29.0.0", "", { "dependencies": { "googleapis-common": "^8.0.0" } }, "sha512-lujnbfmDn1aetoJBDeExH4IDKniMZs7Ga8hGagN/lecO8hd0fy9hu+osROp0HFk6u2wCAiA89oXi5qHVXupbOQ=="],
+    "@sentris/worker/@googleapis/admin": ["@googleapis/admin@29.0.0", "", { "dependencies": { "googleapis-common": "^8.0.0" } }, "sha512-lujnbfmDn1aetoJBDeExH4IDKniMZs7Ga8hGagN/lecO8hd0fy9hu+osROp0HFk6u2wCAiA89oXi5qHVXupbOQ=="],
 
-    "@sentris/flow-worker/@types/node": ["@types/node@25.2.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w=="],
+    "@sentris/worker/@types/node": ["@types/node@25.2.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w=="],
 
     "@temporalio/common/ms": ["ms@3.0.0-canary.1", "", {}, "sha512-kh8ARjh8rMN7Du2igDRO9QJnqCb2xYTJxyQYK7vJJS4TvLLmsbyhiKpSW+t+y26gyOyMd0riphX0GeWKU3ky5g=="],
 

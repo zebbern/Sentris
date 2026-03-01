@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Ensure all worker components are registered before accessing the registry
-import '@sentris/studio-worker/components';
+import '@sentris/worker/components';
 import {
   componentRegistry,
   extractPorts,

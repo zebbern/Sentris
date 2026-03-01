@@ -6,7 +6,6 @@ import type { PrepareRunPayloadActivityInput } from '../types';
 type FetchResponse = Awaited<ReturnType<typeof fetch>>;
 
 const DEFAULT_API_BASE_URL =
-  process.env.STUDIO_API_BASE_URL ??
   process.env.SENTRIS_API_BASE_URL ??
   process.env.API_BASE_URL ??
   'http://localhost:3211';

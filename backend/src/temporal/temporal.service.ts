@@ -24,7 +24,7 @@ import {
   mcpDiscoveryWorkflow,
   mcpGroupDiscoveryWorkflow,
   webhookParsingWorkflow,
-} from '@sentris/studio-worker/workflows';
+} from '@sentris/worker/workflows';
 import type { ExecutionTriggerMetadata, ScheduleOverlapPolicy } from '@sentris/shared';
 
 export interface StartWorkflowOptions {

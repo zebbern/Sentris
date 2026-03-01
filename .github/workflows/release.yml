@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/studio
+  IMAGE_PREFIX: ${{ github.repository_owner }}/sentris
 
 jobs:
   build-and-push:
@@ -233,14 +233,14 @@ jobs:
           VERSION_CHECK_ADMIN_SECRET: ${{ secrets.VERSION_CHECK_ADMIN_SECRET }}
         run: |
           echo "🚀 Updating version check service..."
-          echo "   App: studio"
+          echo "   App: sentris"
           echo "   Version: ${{ steps.version.outputs.version_clean }}"
           echo "   Endpoint: $VERSION_CHECK_URL/api/admin/update-version"
 
           response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" -X POST "$VERSION_CHECK_URL/api/admin/update-version" \
             -H "Authorization: Bearer $VERSION_CHECK_ADMIN_SECRET" \
             -H "Content-Type: application/json" \
-            -d "{\"app\":\"studio\",\"version\":\"${{ steps.version.outputs.version_clean }}\"}")
+            -d "{\"app\":\"sentris\",\"version\":\"${{ steps.version.outputs.version_clean }}\"}")
 
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n-1)
@@ -265,7 +265,7 @@ jobs:
           sleep 2
 
           # Check if the version was updated
-          response=$(curl -s --connect-timeout 10 --max-time 30 "$VERSION_CHECK_URL/api/version/check?app=studio&version=0.0.1")
+          response=$(curl -s --connect-timeout 10 --max-time 30 "$VERSION_CHECK_URL/api/version/check?app=sentris&version=0.0.1")
           latest_version=$(echo "$response" | jq -r '.latest_version')
 
           echo "Latest version returned by API: $latest_version"

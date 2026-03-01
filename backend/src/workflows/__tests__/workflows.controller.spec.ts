@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import '@sentris/studio-worker/components'; // Register components
+import '@sentris/worker/components'; // Register components
 import type { TemporalService, WorkflowRunStatus } from '../../temporal/temporal.service';
 import { WorkflowDefinition } from '../../dsl/types';
 import { TraceService } from '../../trace/trace.service';

@@ -191,7 +191,7 @@ export function AppTopBar({
               />
               <div className="flex flex-col leading-none">
                 <span className="font-bold text-base">Sentris</span>
-                <span className="text-xs text-muted-foreground font-medium -mt-1.5">Studio</span>
+                <span className="text-xs text-muted-foreground font-medium -mt-1.5">Flow</span>
               </div>
             </Link>
             {/* Show page title on non-workflow pages */}

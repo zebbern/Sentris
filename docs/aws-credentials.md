@@ -35,7 +35,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-    image: sentris/studio-backend:latest
+    image: sentris/sentris-backend:latest
 
   worker:
     environment:
@@ -43,7 +43,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-    image: sentris/studio-worker:latest
+    image: sentris/sentris-worker:latest
 ```
 
 ### 2. Backend Configuration File
@@ -96,7 +96,7 @@ spec:
       serviceAccountName: sentris-flow-sa
       containers:
         - name: backend
-          image: sentris/studio-backend:latest
+          image: sentris/sentris-backend:latest
           env:
             - name: AWS_ROLE_ARN
               value: arn:aws:iam::123456789012:role/SentrisBackendRole
@@ -149,7 +149,7 @@ spec:
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "sentris/studio-backend:latest",
+      "image": "sentris/sentris-backend:latest",
       "environment": [
         {
           "name": "AWS_ROLE_ARN",
