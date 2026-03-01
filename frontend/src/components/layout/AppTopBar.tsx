@@ -86,9 +86,9 @@ export function AppTopBar({
 
     if (location.pathname === '/integrations') {
       return {
-        title: 'Integrations',
-        shortTitle: 'Integrations',
-        subtitle: 'Connect and manage OAuth providers',
+        title: 'Connections',
+        shortTitle: 'Connections',
+        subtitle: 'Manage third-party connections',
       };
     }
 

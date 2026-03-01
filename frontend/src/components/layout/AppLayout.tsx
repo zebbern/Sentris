@@ -78,6 +78,11 @@ const settingsItems = [
         },
       ]
     : []),
+  {
+    name: 'Settings',
+    href: '/settings',
+    icon: Settings,
+  },
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -328,10 +333,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   ];
 
   const isActive = (path: string) => {
-    // Settings pages have no corresponding sidebar item — nothing should highlight
-    if (location.pathname.startsWith('/settings')) {
-      return false;
-    }
     if (path === '/') {
       return location.pathname === '/' || location.pathname.startsWith('/workflows');
     }

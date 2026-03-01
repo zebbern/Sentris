@@ -369,7 +369,7 @@ export function CommandPalette() {
         id: 'nav-connections',
         type: 'navigation',
         label: 'Connections',
-        description: 'Manage third-party integrations',
+        description: 'Manage third-party connections',
         category: 'navigation',
         icon: Plug,
         keywords: ['connections', 'integrations', 'oauth'],

@@ -96,7 +96,7 @@ export function SchedulesTable({
       <div className="overflow-x-auto">
         <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
-          <Table className="table-fixed w-full">
+          <Table className="table-fixed w-full min-w-[480px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
@@ -113,7 +113,7 @@ export function SchedulesTable({
                 <TableHead className="hidden sm:table-cell">Next run</TableHead>
                 <TableHead className="hidden lg:table-cell">Last run</TableHead>
                 <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
