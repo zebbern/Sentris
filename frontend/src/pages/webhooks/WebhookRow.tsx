@@ -115,6 +115,7 @@ export function WebhookRow({
                   e.stopPropagation();
                   onViewHistory(webhook);
                 }}
+                aria-label="View delivery history"
               >
                 <ExternalLink className="h-4 w-4" />
                 <span className="hidden md:inline">History</span>

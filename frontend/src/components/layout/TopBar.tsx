@@ -1,4 +1,5 @@
 import { useState, useRef, type ChangeEvent, useEffect } from 'react';
+import { useIsMac } from '@/hooks/useIsMac';
 import { buildOpenSearchUrl } from './buildOpenSearchUrl';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,7 @@ export function TopBar({
   onToggleVersionHistory,
 }: TopBarProps) {
   const navigate = useNavigate();
+  const isMac = useIsMac();
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [tempWorkflowName, setTempWorkflowName] = useState('');
@@ -503,12 +505,16 @@ export function TopBar({
                       <DropdownMenuItem onClick={onUndo} disabled={!canEdit || !canUndo}>
                         <Undo2 className="mr-2 h-4 w-4" />
                         <span>Undo</span>
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">⌘Z</span>
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {isMac ? '⌘Z' : 'Ctrl+Z'}
+                        </span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onRedo} disabled={!canEdit || !canRedo}>
                         <Redo2 className="mr-2 h-4 w-4" />
                         <span>Redo</span>
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">⌘⇧Z</span>
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {isMac ? '⌘⇧Z' : 'Ctrl+Shift+Z'}
+                        </span>
                       </DropdownMenuItem>
                       {(onImport || onExport) && <DropdownMenuSeparator />}
                       {onImport && (

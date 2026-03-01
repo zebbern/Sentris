@@ -62,6 +62,7 @@ export function TemplateFilters({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10 h-9"
+            aria-label="Filter templates by name"
           />
         </div>
 
@@ -96,6 +97,7 @@ export function TemplateFilters({
           onClick={onSync}
           disabled={isSyncing || !canManageWorkflows}
           className="gap-2 h-9"
+          aria-label="Sync templates"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
           <span className="hidden sm:inline">Sync</span>
@@ -108,6 +110,7 @@ export function TemplateFilters({
             window.open('https://github.com/zebbern/Sentris', '_blank', 'noopener,noreferrer')
           }
           className="gap-2 h-9"
+          aria-label="Contribute templates"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Contribute</span>
@@ -129,6 +132,7 @@ export function TemplateFilters({
                   ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                   : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted hover:border-border',
               )}
+              aria-pressed={selectedTags.includes(tag)}
             >
               {tag}
             </button>

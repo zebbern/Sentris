@@ -670,6 +670,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground',
                   sidebarOpen ? 'justify-between px-4' : 'justify-center',
                 )}
+                aria-label="Open command palette"
               >
                 <div className="flex items-center gap-3">
                   <Search className="h-4 w-4 flex-shrink-0" />

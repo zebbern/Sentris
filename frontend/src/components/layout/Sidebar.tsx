@@ -211,6 +211,8 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                     size="sm"
                     className={cn('h-6 px-2', viewMode === 'list' && 'bg-muted')}
                     onClick={() => setViewMode('list')}
+                    aria-label="List view"
+                    aria-pressed={viewMode === 'list'}
                   >
                     <List className="h-3.5 w-3.5" />
                   </Button>
@@ -224,6 +226,8 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                     size="sm"
                     className={cn('h-6 px-2', viewMode === 'tiles' && 'bg-muted')}
                     onClick={() => setViewMode('tiles')}
+                    aria-label="Tile view"
+                    aria-pressed={viewMode === 'tiles'}
                   >
                     <Grid3x3 className="h-3.5 w-3.5" />
                   </Button>
@@ -240,6 +244,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="text-sm"
+            aria-label="Search components"
           />
         </div>
 
