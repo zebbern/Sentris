@@ -6,7 +6,7 @@
 FROM oven/bun:latest AS base
 # Install system deps
 RUN apt-get update && \
-    apt-get install -y ca-certificates curl gnupg lsb-release python3 make g++ && \
+    apt-get install -y ca-certificates curl gnupg lsb-release procps python3 make g++ && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     chmod a+r /etc/apt/keyrings/docker.gpg && \
@@ -54,7 +54,7 @@ EXPOSE 3211
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -sf http://localhost:3211/api || exit 1
+  CMD curl -sf http://localhost:3211/api/v1/health || exit 1
 
 # Run migrations first, then start backend
 CMD ["sh", "-c", "bun run migration:push && bun src/main.ts"]
