@@ -12,7 +12,7 @@ export interface NodeHeaderProps {
   component: ComponentMetadata;
   // Label state
   displayLabel: string;
-  hasCustomLabel: boolean | undefined | string;
+  hasCustomLabel: boolean;
   isEditingLabel: boolean;
   editingLabelValue: string;
   labelInputRef: React.RefObject<HTMLInputElement | null>;

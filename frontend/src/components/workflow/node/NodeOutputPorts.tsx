@@ -2,9 +2,10 @@ import { Handle, Position } from 'reactflow';
 import { Check, GitBranch, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NodeVisualState } from '@/store/executionTimelineStore';
+import type { OutputPort } from '@/schemas/component';
 
 export interface NodeOutputPortsProps {
-  effectiveOutputs: any[];
+  effectiveOutputs: OutputPort[];
   isToolMode: boolean;
   isTimelineActive: boolean;
   visualState: NodeVisualState;
@@ -58,15 +59,15 @@ export function NodeOutputPorts({
     );
   }
 
-  const regularOutputs = effectiveOutputs.filter((o: any) => !o.isBranching);
-  const branchingOutputs = effectiveOutputs.filter((o: any) => o.isBranching);
+  const regularOutputs = effectiveOutputs.filter((o) => !o.isBranching);
+  const branchingOutputs = effectiveOutputs.filter((o) => o.isBranching);
 
   return (
     <>
       {/* Regular output ports */}
       {regularOutputs.length > 0 && (
         <div className="space-y-1.5">
-          {regularOutputs.map((output: any) => (
+          {regularOutputs.map((output) => (
             <div key={output.id} className="relative flex items-center justify-end gap-2 text-xs">
               <div className="flex-1 text-right">
                 <div className="text-muted-foreground font-medium">{output.label}</div>
@@ -101,7 +102,7 @@ function BranchingOutputs({
   isTimelineActive,
   visualState,
 }: {
-  branchingOutputs: any[];
+  branchingOutputs: OutputPort[];
   isTimelineActive: boolean;
   visualState: NodeVisualState;
 }) {
@@ -130,7 +131,7 @@ function BranchingOutputs({
           </span>
         </div>
         <div className="flex flex-col flex-1 gap-1">
-          {branchingOutputs.map((output: any) => {
+          {branchingOutputs.map((output) => {
             const isActive =
               isNodeFinished &&
               (activatedPorts

@@ -3,9 +3,10 @@ import { CalendarClock, Settings, Webhook } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useEntryPointActions } from '../entry-point-context';
+import type { OutputPort } from '@/schemas/component';
 
 export interface EntryPointBodyProps {
-  effectiveOutputs: any[];
+  effectiveOutputs: OutputPort[];
   workflowId: string | undefined;
   onOpenWebhookDialog: () => void;
 }

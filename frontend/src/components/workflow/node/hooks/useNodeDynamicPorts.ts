@@ -2,8 +2,16 @@ import { useEffect } from 'react';
 import { useUpdateNodeInternals } from 'reactflow';
 import { logger } from '@/lib/logger';
 import type { FrontendNodeData } from '@/schemas/node';
-import type { ComponentMetadata } from '@/schemas/component';
+import type { ComponentMetadata, OutputPort, InputPort } from '@/schemas/component';
 import { runtimeInputTypeToConnectionType } from '@/utils/portUtils';
+
+/** Shape of a runtime input definition parsed from JSON config. */
+interface RuntimeInputItem {
+  id: string;
+  label: string;
+  type?: string;
+  description?: string;
+}
 
 interface UseNodeDynamicPortsOptions {
   id: string;
@@ -19,8 +27,9 @@ export function useNodeDynamicPorts({ id, nodeData, component }: UseNodeDynamicP
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Dynamic outputs — use stored dynamic outputs or component defaults
-  let effectiveOutputs: any[] =
-    nodeData.dynamicOutputs ?? (Array.isArray(component?.outputs) ? component.outputs : []);
+  let effectiveOutputs: OutputPort[] =
+    (nodeData.dynamicOutputs as OutputPort[] | undefined) ??
+    (Array.isArray(component?.outputs) ? component.outputs : []);
 
   const runtimeInputsVal = nodeData.config?.params?.runtimeInputs;
   if (
@@ -32,7 +41,7 @@ export function useNodeDynamicPorts({ id, nodeData, component }: UseNodeDynamicP
       const runtimeInputs =
         typeof runtimeInputsVal === 'string' ? JSON.parse(runtimeInputsVal) : runtimeInputsVal;
       if (Array.isArray(runtimeInputs) && runtimeInputs.length > 0) {
-        effectiveOutputs = runtimeInputs.map((input: any) => ({
+        effectiveOutputs = (runtimeInputs as RuntimeInputItem[]).map((input) => ({
           id: input.id,
           label: input.label,
           connectionType: runtimeInputTypeToConnectionType(input.type || 'text'),
@@ -44,10 +53,10 @@ export function useNodeDynamicPorts({ id, nodeData, component }: UseNodeDynamicP
     }
   }
 
-  const componentInputs = nodeData.dynamicInputs ?? component?.inputs ?? [];
+  const componentInputs: InputPort[] = nodeData.dynamicInputs ?? component?.inputs ?? [];
 
   const outputIds = effectiveOutputs.map((o) => o.id).join(',');
-  const inputIds = componentInputs.map((i: any) => i.id).join(',');
+  const inputIds = componentInputs.map((i) => i.id).join(',');
 
   // Update node internals when ports change
   useEffect(() => {

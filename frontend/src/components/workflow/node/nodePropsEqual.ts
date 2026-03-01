@@ -42,7 +42,7 @@ export function computeEntryPointPayload(
         ? JSON.parse(params.runtimeInputs)
         : params.runtimeInputs;
     if (!Array.isArray(inputs)) return {};
-    return inputs.reduce((acc: Record<string, unknown>, input: any) => {
+    return inputs.reduce((acc: Record<string, unknown>, input: { id: string; type?: string }) => {
       acc[input.id] = input.type === 'number' ? 0 : input.type === 'boolean' ? false : 'value';
       return acc;
     }, {});

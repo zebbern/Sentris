@@ -23,7 +23,7 @@ export function useNodeLabel({ id, data, componentName, isEntryPoint, mode }: Us
   const labelInputRef = useRef<HTMLInputElement | null>(null);
 
   const displayLabel = data.label || componentName;
-  const hasCustomLabel = data.label && data.label !== componentName;
+  const hasCustomLabel = !!(data.label && data.label !== componentName);
 
   const handleStartEditing = () => {
     if (isEntryPoint || mode !== 'design') return;
