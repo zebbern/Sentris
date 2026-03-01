@@ -16,8 +16,6 @@ interface WorkflowUiState {
   inspectorTab: 'events' | 'logs' | 'artifacts' | 'agent' | 'io' | 'network';
   libraryOpen: boolean;
   inspectorWidth: number;
-  /** @deprecated Use `activeDockedTerminalId` + `dockedTerminals` instead. */
-  focusedTerminalNodeId: string | null;
   showDemoComponents: boolean;
   configPanelOpen: boolean;
   schedulesPanelOpen: boolean;
@@ -40,8 +38,6 @@ interface WorkflowUiActions {
   setLibraryOpen: (open: boolean) => void;
   toggleLibrary: () => void;
   setInspectorWidth: (width: number) => void;
-  /** @deprecated Use `setActiveDockedTerminal` instead. */
-  bringTerminalToFront: (nodeId: string) => void;
   toggleDemoComponents: () => void;
   setConfigPanelOpen: (open: boolean) => void;
   setSchedulesPanelOpen: (open: boolean) => void;
@@ -69,7 +65,6 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       inspectorTab: 'events',
       libraryOpen: true,
       inspectorWidth: 432,
-      focusedTerminalNodeId: null,
       dockedTerminals: [],
       activeDockedTerminalId: null,
       terminalPanelHeight: 300,
@@ -88,7 +83,6 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         set(() => ({
           inspectorWidth: Math.max(320, Math.min(720, Math.round(width))),
         })),
-      bringTerminalToFront: (nodeId) => set({ focusedTerminalNodeId: nodeId }),
       showDemoComponents: false,
       toggleDemoComponents: () =>
         set((state) => ({ showDemoComponents: !state.showDemoComponents })),
