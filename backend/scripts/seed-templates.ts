@@ -11,7 +11,11 @@
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import { readFileSync, readdirSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface TemplateJson {
   _metadata: {

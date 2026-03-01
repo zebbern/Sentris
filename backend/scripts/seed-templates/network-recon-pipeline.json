@@ -1,0 +1,106 @@
+{
+  "_metadata": {
+    "name": "Network Reconnaissance Pipeline",
+    "description": "Comprehensive network reconnaissance workflow that discovers subdomains via Subfinder, resolves DNS records with DNSX, scans open ports using Naabu, and probes live HTTP services with HTTPX. Results are aggregated into a unified recon report and delivered via Slack. Ideal for mapping external attack surface before penetration testing.",
+    "category": "network-security",
+    "tags": ["recon", "subdomain", "dns", "port-scan", "network", "attack-surface"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Network Reconnaissance Pipeline",
+    "description": "Discover subdomains, resolve DNS, scan ports, and probe HTTP services for full attack surface mapping.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "network-security",
+    "tags": ["recon", "subdomain", "dns", "port-scan", "network", "attack-surface"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 7
+  },
+  "graph": {
+    "name": "Network Reconnaissance Pipeline",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": { "label": "Start Recon", "config": { "params": {}, "inputOverrides": {} } }
+      },
+      {
+        "id": "subfinder_1",
+        "type": "sentris.subfinder.run",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Enumerate Subdomains",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "dnsx_1",
+        "type": "sentris.dnsx.run",
+        "position": { "x": 700, "y": 150 },
+        "data": {
+          "label": "Resolve DNS Records",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "naabu_1",
+        "type": "sentris.naabu.scan",
+        "position": { "x": 700, "y": 350 },
+        "data": {
+          "label": "Scan Open Ports",
+          "config": { "params": { "topPorts": "1000" }, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "httpx_1",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Probe HTTP Services",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_report",
+        "type": "core.logic.script",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Aggregate Recon Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Send Recon Report",
+          "config": { "params": { "channel": "#recon-results" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-subfinder_1", "source": "trigger_1", "target": "subfinder_1" },
+      { "id": "subfinder_1-dnsx_1", "source": "subfinder_1", "target": "dnsx_1" },
+      { "id": "subfinder_1-naabu_1", "source": "subfinder_1", "target": "naabu_1" },
+      { "id": "dnsx_1-httpx_1", "source": "dnsx_1", "target": "httpx_1" },
+      { "id": "naabu_1-httpx_1", "source": "naabu_1", "target": "httpx_1" },
+      { "id": "httpx_1-script_report", "source": "httpx_1", "target": "script_report" },
+      {
+        "id": "script_report-notify_results",
+        "source": "script_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for recon results channel"
+    }
+  ]
+}

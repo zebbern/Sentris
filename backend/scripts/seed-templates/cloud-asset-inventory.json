@@ -1,0 +1,135 @@
+{
+  "_metadata": {
+    "name": "Cloud Asset Inventory",
+    "description": "Cloud asset discovery and inventory workflow that authenticates to AWS, runs Prowler to enumerate cloud resources, classifies discovered assets by type and risk tier, audits resource tagging against organizational policy, and produces a comprehensive inventory report. Use for periodic cloud hygiene reviews and compliance audits.",
+    "category": "cloud-security",
+    "tags": ["cloud", "aws", "inventory", "asset-management", "compliance", "prowler"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Cloud Asset Inventory",
+    "description": "Discover cloud resources, classify assets, audit tagging compliance, and generate an inventory report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "cloud-security",
+    "tags": ["cloud", "aws", "inventory", "asset-management", "compliance", "prowler"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 7
+  },
+  "graph": {
+    "name": "Cloud Asset Inventory",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": {
+          "label": "Start Inventory Scan",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "aws_creds",
+        "type": "core.credentials.aws",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Load AWS Credentials",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "prowler_discover",
+        "type": "security.prowler.scan",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Discover Cloud Resources",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_classify",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 150 },
+        "data": {
+          "label": "Classify Assets by Risk",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_tag_audit",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 350 },
+        "data": {
+          "label": "Audit Resource Tags",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_inventory",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Generate Inventory Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_team",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Send Inventory Summary",
+          "config": { "params": { "channel": "#cloud-ops" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-aws_creds", "source": "trigger_1", "target": "aws_creds" },
+      { "id": "aws_creds-prowler_discover", "source": "aws_creds", "target": "prowler_discover" },
+      {
+        "id": "prowler_discover-script_classify",
+        "source": "prowler_discover",
+        "target": "script_classify"
+      },
+      {
+        "id": "prowler_discover-script_tag_audit",
+        "source": "prowler_discover",
+        "target": "script_tag_audit"
+      },
+      {
+        "id": "script_classify-artifact_inventory",
+        "source": "script_classify",
+        "target": "artifact_inventory"
+      },
+      {
+        "id": "script_tag_audit-artifact_inventory",
+        "source": "script_tag_audit",
+        "target": "artifact_inventory"
+      },
+      {
+        "id": "artifact_inventory-notify_team",
+        "source": "artifact_inventory",
+        "target": "notify_team"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "aws_access_key_id",
+      "type": "string",
+      "description": "AWS access key ID for the target account"
+    },
+    {
+      "name": "aws_secret_access_key",
+      "type": "string",
+      "description": "AWS secret access key for the target account"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for cloud operations channel"
+    }
+  ]
+}
