@@ -90,9 +90,7 @@ export function useScheduleEditorState({
 
   const runtimeInputs = useMemo<RuntimeInputDefinition[]>(() => {
     if (!workflowDetail) return [];
-    const entryNode = workflowDetail.graph.nodes.find(
-      (node: any) => node.type === ENTRY_COMPONENT_ID,
-    );
+    const entryNode = workflowDetail.graph.nodes.find((node) => node.type === ENTRY_COMPONENT_ID);
     return normalizeRuntimeInputs(
       (entryNode?.data?.config?.params as Record<string, unknown> | undefined)?.runtimeInputs,
     );

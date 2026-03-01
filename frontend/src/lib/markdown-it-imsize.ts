@@ -10,6 +10,7 @@
  */
 
 import type MarkdownIt from 'markdown-it';
+import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 import type Token from 'markdown-it/lib/token.mjs';
 
 // Regex to extract size from end of src: " =WxH" or " =W" or " =xH"
@@ -74,13 +75,13 @@ export default function markdownItImsize(md: MarkdownIt): void {
  * Based on markdown-it's default image rule
  */
 function createImageRuleWithSize() {
-  return function imageWithSize(state: any, silent: boolean): boolean {
+  return function imageWithSize(state: StateInline, silent: boolean): boolean {
     let code: number;
     let content: string;
     let label = '';
     let pos: number;
-    let ref: any;
-    let res: any;
+    let ref: { href: string; title: string } | undefined;
+    let res: { ok: boolean; pos: number; str: string; width?: string; height?: string };
     let title: string;
     let start: number;
     let href = '';

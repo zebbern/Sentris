@@ -34,9 +34,9 @@ export interface WorkflowOption {
 
 export const DEFAULT_PARSING_SCRIPT = `// Transform the incoming webhook payload into workflow inputs
 export async function script(input: {
-  payload: any
+  payload: Record<string, unknown>
   headers: Record<string, string>
-}): Promise<Record<string, any>> {
+}): Promise<Record<string, unknown>> {
   // Extract data from the payload and return as key-value pairs
   return {
     // Example: input.payload.data

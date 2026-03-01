@@ -56,7 +56,7 @@ export const webhooksApi = {
 
   testScript: async (payload: {
     script: string;
-    payload: any;
+    payload: Record<string, unknown>;
     headers: Record<string, string>;
   }): Promise<TestWebhookScriptResponse> => {
     const response = await apiClient.testWebhookScript({

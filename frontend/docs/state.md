@@ -158,11 +158,16 @@ Zustand stores handle **client-only UI state** that has no backend equivalent. T
 | --------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | `useWorkflowStore`          | `src/store/workflowStore.ts`          | In-flight builder graph (nodes, edges, metadata) and persistence hooks. |
 | `useWorkflowUiStore`        | `src/store/workflowUiStore.ts`        | Canvas UI toggles, panel sizing, minimap, version history panel.        |
+| `useWorkflowHistoryStore`   | `src/store/workflowHistoryStore.ts`   | Undo/redo graph state via zundo (tracks nodes and edges).               |
 | `useExecutionStore`         | `src/store/executionStore.ts`         | Workflow run lifecycle, SSE stream wiring, log/event aggregation.       |
 | `useExecutionTimelineStore` | `src/store/executionTimelineStore.ts` | Timeline playback state and selected run/node.                          |
 | `useAuthStore`              | `src/store/authStore.ts`              | Auth session, org/user IDs (used by queryKeys for org scoping).         |
 | `useNotificationStore`      | `src/store/notificationStore.ts`      | In-app notification list (Zustand + persist, max 50 items).             |
 | `useCommandPaletteStore`    | `src/store/commandPaletteStore.ts`    | Command palette open/close state and search query.                      |
+| `useThemeStore`             | `src/store/themeStore.ts`             | Light/dark/system theme preference with transition support.             |
+| `useUserPreferencesStore`   | `src/store/userPreferencesStore.ts`   | User preferences: landing page, sidebar density, notification prefs.    |
+
+The `src/store/execution/` directory contains sub-modules of the execution system (`executionLifecycleStore`, `executionLogStore`, `terminalStreamStore`, SSE handlers, and shared helpers/types) re-exported via `execution/index.ts`.
 
 Stores expose selectors (e.g. `getNodeLogs`) to avoid manual traversal in components. Prefer selectors and derived helpers over duplicating logic inside React components.
 

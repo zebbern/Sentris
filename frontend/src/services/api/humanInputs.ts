@@ -22,7 +22,11 @@ export const humanInputsApi = {
 
   resolve: async (
     id: string,
-    payload: { status: 'resolved' | 'rejected'; responseData?: any; comment?: string },
+    payload: {
+      status: 'resolved' | 'rejected';
+      responseData?: Record<string, unknown>;
+      comment?: string;
+    },
   ) => {
     const response = await apiClient.resolveHumanInput(id, {
       responseData: {

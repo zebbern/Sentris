@@ -13,30 +13,26 @@ import {
   Background,
   Controls,
   MiniMap,
-  addEdge,
-  MarkerType,
   type Node,
   type Edge,
-  type OnConnect,
-  type NodeMouseHandler,
   type NodeChange,
   type EdgeChange,
+  type ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { WorkflowNode } from './WorkflowNode';
-/** @deprecated Terminal rendering moved to TerminalDockPanel. Kept for backward compatibility. */
 import { TerminalNode } from './TerminalNode';
 import { ConfigPanel } from './ConfigPanel';
 import { ValidationDock } from './ValidationDock';
 import { DataFlowEdge } from '../timeline/DataFlowEdge';
-import { validateConnection } from '@/utils/connectionValidation';
+import { PlacementIndicator } from './PlacementIndicator';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
-import type { NodeData, FrontendNodeData } from '@/schemas/node';
+import type { NodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
 import type { WorkflowSchedule } from '@sentris/shared';
 import { cn } from '@/lib/utils';
@@ -52,19 +48,12 @@ import {
   type CreateNodeContext,
 } from './canvas-node-factory';
 import { useNodeUpdater } from './canvas-node-updater';
+import { useCanvasConnections } from './canvas-connections';
+import { useCanvasViewport } from './canvas-viewport';
+import { useCanvasNodeInteractions } from './canvas-node-interactions';
 
-/** Defined at module scope to avoid React Flow warnings about nodeTypes recreation on every render. */
-const nodeTypes = {
-  workflow: WorkflowNode,
-  /** @deprecated Terminal nodes replaced by TerminalDockPanel. Kept to avoid ReactFlow warnings. */
-  terminal: TerminalNode,
-};
-
-/** Defined at module scope to avoid React Flow warnings about edgeTypes recreation on every render. */
-const edgeTypes = {
-  dataFlow: DataFlowEdge,
-  default: DataFlowEdge, // Default to our enhanced edge
-};
+const nodeTypes = { workflow: WorkflowNode, terminal: TerminalNode };
+const edgeTypes = { dataFlow: DataFlowEdge, default: DataFlowEdge };
 
 interface CanvasProps {
   className?: string;
@@ -116,13 +105,12 @@ export function Canvas({
   onOpenScheduleSidebar,
   onCloseScheduleSidebar,
   onCloseWebhooksSidebar,
-  onClearNodeSelection,
   onNodeSelectionChange,
   onSnapshot,
   schedulePanelExpanded,
   webhooksPanelExpanded,
 }: CanvasProps) {
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const { data: componentIndex } = useComponents();
@@ -144,7 +132,6 @@ export function Canvas({
   const setConfigPanelOpen = useWorkflowUiStore((s) => s.setConfigPanelOpen);
   const isMobile = useIsMobile();
 
-  // Component placement state (for spotlight/sidebar component placement)
   const isPlacementActiveForWorkflow = usePlacementStore((s) => s.isPlacementActiveForWorkflow);
   const placementComponentId = usePlacementStore((s) => s.componentId);
   const placementComponentName = usePlacementStore((s) => s.componentName);
@@ -152,7 +139,6 @@ export function Canvas({
   const setPlacement = usePlacementStore((s) => s.setPlacement);
   const isPlacementActive = isPlacementActiveForWorkflow(workflowId ?? null);
 
-  // Sync selection state with UI store for mobile bottom sheet visibility
   useEffect(() => {
     setConfigPanelOpen(Boolean(selectedNode));
   }, [selectedNode, setConfigPanelOpen]);
@@ -170,93 +156,44 @@ export function Canvas({
     onOpenScheduleSidebar ?? scheduleContext?.onOpenScheduleSidebar;
   const resolvedOnCloseScheduleSidebar =
     onCloseScheduleSidebar ?? scheduleContext?.onCloseScheduleSidebar;
+  const resolvedOnCloseWebhooksSidebar =
+    onCloseWebhooksSidebar ?? scheduleContext?.onCloseWebhooksSidebar;
   const resolvedOnOpenWebhooksSidebar = scheduleContext?.onOpenWebhooksSidebar;
   const applyEdgesChange = onEdgesChange;
 
-  const hasUserInteractedRef = useRef(false);
-  const prevModeRef = useRef<typeof mode>(mode);
-  const prevNodesLengthRef = useRef(nodes.length);
-  const prevEdgesLengthRef = useRef(edges.length);
-  const lastSelectedNodeIdRef = useRef<string | null>(null);
   const configPanelWidth = 432;
-  const [canvasOpacity, setCanvasOpacity] = useState(1); // For fade transition
 
   useEffect(() => {
     if (mode === 'execution') {
       setSelectedNode(null);
     }
-    if (mode === 'design') {
-      useExecutionTimelineStore.setState({ selectedNodeId: null, selectedEventId: null });
-    }
   }, [mode]);
 
-  // Fade transition when mode changes
-  useEffect(() => {
-    const modeChanged = prevModeRef.current !== mode;
-    if (modeChanged) {
-      // Fade out
-      setCanvasOpacity(0);
-      // Fade in after a brief moment (allows viewport to be set)
-      const timeoutId = setTimeout(() => {
-        setCanvasOpacity(1);
-      }, 50); // Very short delay to allow viewport calculation
-      return () => clearTimeout(timeoutId);
-    }
-  }, [mode]);
+  const { handleEdgesChange, onConnect } = useCanvasConnections({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    applyEdgesChange,
+    getComponent,
+    markDirty,
+    mode,
+    toast,
+    selectedNodeId,
+    onSnapshot,
+    dataFlows,
+  });
 
-  // Enhanced edge change handler that also updates input mappings
-  const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      // Handle edge removals by cleaning up input mappings
-      if (mode !== 'design') {
-        const allowedChanges = changes.filter((change) => change.type !== 'remove');
-        if (allowedChanges.length > 0) {
-          applyEdgesChange(allowedChanges);
-        }
-        return;
-      }
+  const { canvasOpacity, hasUserInteractedRef } = useCanvasViewport({
+    reactFlowInstance,
+    nodes,
+    edges,
+    mode,
+    selectedNodeId: selectedNode?.id || null,
+    schedulePanelExpanded,
+    webhooksPanelExpanded,
+  });
 
-      const removedEdges = changes
-        .filter((change) => change.type === 'remove')
-        .map((change) => edges.find((edge) => edge.id === change.id))
-        .filter(Boolean);
-
-      if (removedEdges.length > 0) {
-        setNodes((nds) =>
-          nds.map((node) => {
-            const edgeToRemove = removedEdges.find((edge) => edge && edge.target === node.id);
-            if (
-              edgeToRemove &&
-              edgeToRemove.targetHandle &&
-              edgeToRemove.targetHandle !== 'tools' &&
-              (node.data.inputs as Record<string, unknown>)?.[edgeToRemove.targetHandle]
-            ) {
-              const targetHandle = edgeToRemove.targetHandle;
-              const inputs = node.data.inputs || {};
-              const { [targetHandle]: removed, ...remainingInputs } = inputs as Record<
-                string,
-                unknown
-              >;
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  inputs: remainingInputs,
-                },
-              };
-            }
-            return node;
-          }),
-        );
-      }
-
-      // Apply the original edge changes
-      applyEdgesChange(changes);
-    },
-    [edges, setNodes, applyEdgesChange, mode],
-  );
-
-  // Sync execution node states to canvas nodes
   useEffect(() => {
     if (mode !== 'execution') {
       setNodes((nds) =>
@@ -293,164 +230,6 @@ export function Canvas({
     );
   }, [mode, nodeStates, setNodes]);
 
-  const onConnect: OnConnect = useCallback(
-    (params) => {
-      if (mode !== 'design') {
-        return;
-      }
-      const validation = validateConnection(params, nodes, edges, getComponent);
-
-      if (!validation.isValid) {
-        logger.warn('Invalid connection:', validation.error);
-        toast({
-          variant: 'destructive',
-          title: 'Invalid connection',
-          description: validation.error,
-        });
-        return;
-      }
-
-      // Add the edge with data flow support
-      const newEdge = {
-        ...params,
-        type: 'default', // Use our enhanced DataFlowEdge
-        animated: false,
-        markerEnd: {
-          type: MarkerType.Arrow,
-          width: 30,
-          height: 30,
-        },
-        data: {
-          packets: [], // Will be populated by timeline store
-          isHighlighted: selectedNodeId === params.source || selectedNodeId === params.target,
-        },
-      };
-
-      // Calculate new edges
-      const newEdges = addEdge(newEdge, edges);
-      setEdges(newEdges);
-
-      // Calculate new nodes (if input mapping update is needed)
-      let nextNodes = nodes;
-
-      // Update target node's input mapping (SKIP for 'tools' port)
-      if (
-        params.target &&
-        params.targetHandle &&
-        params.source &&
-        params.sourceHandle &&
-        params.targetHandle !== 'tools'
-      ) {
-        const targetHandle = params.targetHandle;
-        nextNodes = nodes.map((node) =>
-          node.id === params.target
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  inputs: {
-                    ...(node.data.inputs as Record<string, unknown>),
-                    [targetHandle]: {
-                      source: params.source,
-                      output: params.sourceHandle,
-                    },
-                  } as Record<string, unknown>,
-                },
-              }
-            : node,
-        );
-        setNodes(nextNodes);
-      }
-
-      // Capture snapshot for history
-      onSnapshot?.(nextNodes, newEdges);
-
-      // Mark workflow as dirty
-      markDirty();
-    },
-    [
-      setEdges,
-      setNodes,
-      nodes,
-      edges,
-      getComponent,
-      markDirty,
-      mode,
-      toast,
-      selectedNodeId,
-      onSnapshot,
-    ],
-  );
-
-  // Fit view on initial load, when nodes/edges are added/removed, or when switching modes
-  // When switching modes, fitView should center the diagram properly
-  useEffect(() => {
-    if (!reactFlowInstance || nodes.length === 0) {
-      return;
-    }
-
-    const modeChanged = prevModeRef.current !== mode;
-
-    // Count only workflow nodes (exclude terminal nodes) for change detection
-    const workflowNodes = nodes.filter((n) => n.type !== 'terminal');
-    const workflowNodesCount = workflowNodes.length;
-    const prevWorkflowNodesCount = prevNodesLengthRef.current;
-
-    const nodesCountChanged = prevWorkflowNodesCount !== workflowNodesCount;
-    const edgesCountChanged = prevEdgesLengthRef.current !== edges.length;
-
-    // Run fitView when mode changes or when workflow nodes/edges count changes
-    // Don't trigger fitView when terminal nodes are added/removed
-    if (modeChanged || nodesCountChanged || edgesCountChanged) {
-      prevModeRef.current = mode;
-      prevNodesLengthRef.current = workflowNodesCount;
-      prevEdgesLengthRef.current = edges.length;
-
-      // When mode changes, wait a bit longer to ensure nodes are fully set and rendered
-      // This is especially important when switching to execution mode without a run loaded
-      // as execution nodes might be set asynchronously
-      const delay = modeChanged ? 100 : 0;
-
-      setTimeout(() => {
-        if (!reactFlowInstance) return;
-
-        // Double check nodes are still available (they might have been cleared)
-        if (workflowNodes.length === 0) return;
-
-        // Use double requestAnimationFrame to ensure nodes are fully rendered and positioned
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (!reactFlowInstance) return;
-
-            // IMPORTANT: Get CURRENT nodes from ReactFlow instance, not from the stale closure.
-            // When mode switches, execution nodes are set asynchronously by useWorkflowExecutionLifecycle.
-            // The `nodes` variable captured in this closure may be stale (from before the mode switch).
-            // Using getNodes() ensures we get the most up-to-date node positions.
-            const currentNodes = reactFlowInstance.getNodes() as Node<NodeData>[];
-            const currentWorkflowNodes = currentNodes.filter(
-              (n: Node<NodeData>) => n.type !== 'terminal',
-            );
-            if (currentWorkflowNodes.length === 0) return;
-
-            try {
-              // Use simple fitView - ReactFlow handles centering automatically
-              // Exclude terminal nodes from fitView - they should not affect the viewport
-              reactFlowInstance.fitView({
-                padding: 0.2,
-                duration: modeChanged ? 0 : 300, // Instant for mode changes to avoid jarring animation
-                maxZoom: 0.85,
-                includeHiddenNodes: false,
-                nodes: currentWorkflowNodes, // Only fit workflow nodes, exclude terminals
-              });
-            } catch (error: unknown) {
-              logger.warn('Failed to fit view:', error);
-            }
-          });
-        });
-      }, delay);
-    }
-  }, [reactFlowInstance, edges.length, mode, nodes.length]); // Use nodes.length instead of nodes to avoid triggering on position changes
-
   const onDragOver = useCallback(
     (event: React.DragEvent) => {
       if (mode !== 'design') return;
@@ -460,7 +239,6 @@ export function Canvas({
     [mode],
   );
 
-  // Helper function to create node from component ID and screen position
   const createNodeFromComponent = useCallback(
     (componentId: string, clientX: number, clientY: number) => {
       const ctx: CreateNodeContext = {
@@ -494,164 +272,39 @@ export function Canvas({
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-
       if (mode !== 'design') return;
-
       const componentId = event.dataTransfer.getData('application/reactflow');
-
-      if (typeof componentId === 'undefined' || !componentId) {
-        return;
-      }
-
+      if (!componentId) return;
       createNodeFromComponent(componentId, event.clientX, event.clientY);
     },
     [createNodeFromComponent, mode],
   );
 
-  // Handle mobile tap-to-place: when user taps on canvas after selecting a component
-  const handleCanvasTap = useCallback(
-    (event: React.MouseEvent | React.TouchEvent) => {
-      if (mode !== 'design') return;
+  const {
+    handleCanvasTap,
+    onNodeClick,
+    onNodeDoubleClick,
+    onPaneClick,
+    handleValidationNodeClick,
+  } = useCanvasNodeInteractions({
+    nodes,
+    setNodes,
+    reactFlowInstance,
+    mode,
+    selectedNodeId,
+    selectedNode,
+    setSelectedNode,
+    selectNode,
+    selectEvent,
+    onCloseScheduleSidebar: resolvedOnCloseScheduleSidebar,
+    onCloseWebhooksSidebar: resolvedOnCloseWebhooksSidebar,
+    isPlacementActive,
+    placementComponentId,
+    clearPlacement,
+    createNodeFromComponent,
+    hasUserInteractedRef,
+  });
 
-      // Check if there's a component selected for placement (mobile flow)
-      // Only place if the placement is scoped to this workflow
-      if (isPlacementActive && placementComponentId) {
-        let clientX: number;
-        let clientY: number;
-
-        if ('touches' in event) {
-          // Touch event
-          const touch = event.changedTouches?.[0] || event.touches?.[0];
-          if (!touch) return;
-          clientX = touch.clientX;
-          clientY = touch.clientY;
-        } else {
-          // Mouse event
-          clientX = event.clientX;
-          clientY = event.clientY;
-        }
-
-        // Create node at tap position
-        createNodeFromComponent(placementComponentId, clientX, clientY);
-
-        // Clear placement state
-        clearPlacement();
-
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    },
-    [createNodeFromComponent, mode, isPlacementActive, placementComponentId, clearPlacement],
-  );
-
-  // Handle node click for config panel
-  const onNodeClick: NodeMouseHandler = useCallback(
-    (event, node) => {
-      if (mode === 'execution') {
-        event.preventDefault();
-        event.stopPropagation();
-
-        selectNode(node.id);
-        selectEvent(null); // Just select the node, don't seek to events
-
-        return;
-      }
-
-      // If clicking the same node that's already selected, close the config panel
-      if (selectedNode?.id === node.id) {
-        setSelectedNode(null);
-        return;
-      }
-
-      // Close schedule sidebar when opening config panel
-      if (resolvedOnCloseScheduleSidebar) {
-        resolvedOnCloseScheduleSidebar();
-      }
-      setSelectedNode(node as Node<NodeData>);
-    },
-    [mode, selectNode, selectEvent, onCloseScheduleSidebar, selectedNode],
-  );
-
-  // Handle node double-click for text-block editing
-  const onNodeDoubleClick: NodeMouseHandler = useCallback(
-    (event, node) => {
-      if (mode !== 'design') return;
-
-      // Check if this is a text-block node
-      const nodeData = node.data as FrontendNodeData;
-      const componentRef = nodeData?.componentId || nodeData?.componentSlug;
-      const isTextBlock = componentRef === 'core.ui.text';
-
-      if (isTextBlock) {
-        event.stopPropagation();
-        // Select the node to open config panel for editing
-        setSelectedNode(node as Node<NodeData>);
-      }
-    },
-    [mode],
-  );
-
-  // Handle pane click to deselect or place component
-  const onPaneClick = useCallback(
-    (event: React.MouseEvent) => {
-      hasUserInteractedRef.current = true;
-
-      // Check if there's a component selected for placement (from spotlight/sidebar)
-      // Only place if the placement is scoped to this workflow
-      if (mode === 'design' && isPlacementActive && placementComponentId) {
-        // Create node at click position
-        createNodeFromComponent(placementComponentId, event.clientX, event.clientY);
-
-        // Clear placement state
-        clearPlacement();
-
-        return;
-      }
-
-      // Default behavior: deselect node and close all panels
-      setSelectedNode(null);
-      onCloseScheduleSidebar?.();
-      onCloseWebhooksSidebar?.();
-    },
-    [
-      mode,
-      isPlacementActive,
-      placementComponentId,
-      clearPlacement,
-      createNodeFromComponent,
-      onCloseScheduleSidebar,
-      onCloseWebhooksSidebar,
-    ],
-  );
-
-  // Handle validation dock node click - select and scroll to node
-  const handleValidationNodeClick = useCallback(
-    (nodeId: string) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      if (!node || !reactFlowInstance) return;
-
-      // Select the node in React Flow (for visual highlight)
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          selected: n.id === nodeId,
-        })),
-      );
-
-      // Select the node for config panel
-      setSelectedNode(node as Node<NodeData>);
-
-      // Scroll to the node with less zoom (more padding = less zoom)
-      reactFlowInstance.fitView({
-        padding: 2,
-        duration: 300,
-        nodes: [{ id: nodeId }],
-      });
-    },
-    [nodes, reactFlowInstance, setNodes],
-  );
-
-  // Handle node data update from config panel
   const handleUpdateNode = useNodeUpdater({
     nodes,
     edges,
@@ -661,7 +314,6 @@ export function Canvas({
     onSnapshot,
   });
 
-  // Sync selectedNode with the latest node data from nodes array
   useEffect(() => {
     if (selectedNode) {
       const updatedNode = nodes.find((n) => n.id === selectedNode.id);
@@ -674,14 +326,9 @@ export function Canvas({
     }
   }, [nodes, selectedNode]);
 
-  // Notify parent when node selection changes
   useEffect(() => {
     onNodeSelectionChange?.(selectedNode);
   }, [selectedNode, onNodeSelectionChange]);
-
-  // Refs to track panel states for fitView animations
-  const lastSchedulePanelRef = useRef(false);
-  const lastWebhooksPanelRef = useRef(false);
 
   useEffect(() => {
     if (mode !== 'design') return;
@@ -690,77 +337,6 @@ export function Canvas({
     }
   }, [schedulePanelExpanded, webhooksPanelExpanded, mode, selectedNode]);
 
-  // Auto-center on selected node, or zoom to fit all when sidebar closes
-  useEffect(() => {
-    if (mode !== 'design' || !reactFlowInstance) return;
-
-    // Check if any side panel is now open
-    const isAnyPanelOpen = selectedNode?.id || schedulePanelExpanded || webhooksPanelExpanded;
-    const wasAnyPanelOpen =
-      lastSelectedNodeIdRef.current || lastSchedulePanelRef.current || lastWebhooksPanelRef.current;
-
-    // Case 1: Any Panel Opened -> Zoom to Entry Point Node
-    if (isAnyPanelOpen && !wasAnyPanelOpen) {
-      const entryPointNode = nodes.find((n) => isEntryPointNode(n));
-      if (entryPointNode) {
-        setTimeout(() => {
-          if (!reactFlowInstance) return;
-          reactFlowInstance.fitView({
-            nodes: [{ id: entryPointNode.id }],
-            padding: 0.8,
-            minZoom: 0.5,
-            maxZoom: 1.0,
-            duration: 160,
-          });
-        }, 0);
-      }
-    }
-    // Case 2: All Panels Closed -> Zoom Out to Fit All
-    else if (!isAnyPanelOpen && wasAnyPanelOpen) {
-      setTimeout(() => {
-        if (!reactFlowInstance) return;
-        const currentNodes = reactFlowInstance.getNodes();
-        const workflowNodes = currentNodes.filter((n: any) => n.type !== 'terminal');
-        if (workflowNodes.length > 0) {
-          reactFlowInstance.fitView({
-            padding: 0.2,
-            maxZoom: 0.85,
-            duration: 160,
-            nodes: workflowNodes,
-          });
-        }
-      }, 0);
-    }
-
-    lastSelectedNodeIdRef.current = selectedNode?.id || null;
-    lastSchedulePanelRef.current = schedulePanelExpanded || false;
-    lastWebhooksPanelRef.current = webhooksPanelExpanded || false;
-  }, [
-    selectedNode?.id,
-    schedulePanelExpanded,
-    webhooksPanelExpanded,
-    mode,
-    reactFlowInstance,
-    nodes,
-  ]);
-
-  // Update edges with data flow highlighting and packet data
-  useEffect(() => {
-    setEdges((eds) =>
-      eds.map((edge) => ({
-        ...edge,
-        data: {
-          ...edge.data,
-          packets: dataFlows.filter(
-            (packet) => packet.sourceNode === edge.source && packet.targetNode === edge.target,
-          ),
-          isHighlighted: selectedNodeId === edge.source || selectedNodeId === edge.target,
-        },
-      })),
-    );
-  }, [dataFlows, selectedNodeId, setEdges]);
-
-  // Handle keyboard shortcuts (extracted to dedicated hook)
   useCanvasKeyboardShortcuts({
     nodes,
     edges,
@@ -775,25 +351,16 @@ export function Canvas({
 
   const entryPointActionsValue = useMemo(
     () => ({
-      onOpenScheduleSidebar: () => {
-        if (resolvedOnOpenScheduleSidebar) {
-          resolvedOnOpenScheduleSidebar();
-        }
-      },
-      onOpenWebhooksSidebar: () => {
-        if (resolvedOnOpenWebhooksSidebar) {
-          resolvedOnOpenWebhooksSidebar();
-        }
-      },
+      onOpenScheduleSidebar: resolvedOnOpenScheduleSidebar ?? (() => {}),
+      onOpenWebhooksSidebar: resolvedOnOpenWebhooksSidebar ?? (() => {}),
       onScheduleCreate: resolvedOnScheduleCreate,
-      setPlacement: (componentId: string, componentName: string) => {
-        setPlacement(componentId, componentName, workflowId ?? null);
-      },
+      setPlacement: (componentId: string, componentName: string) =>
+        setPlacement(componentId, componentName, workflowId ?? null),
       selectEntryPoint: () => {
-        const entryPointNode = nodes.find((n) => isEntryPointNode(n));
-        if (entryPointNode) {
-          setSelectedNode(entryPointNode);
-          onNodeSelectionChange?.(entryPointNode);
+        const ep = nodes.find((n) => isEntryPointNode(n));
+        if (ep) {
+          setSelectedNode(ep);
+          onNodeSelectionChange?.(ep);
         }
       },
     }),
@@ -801,8 +368,6 @@ export function Canvas({
       resolvedOnOpenScheduleSidebar,
       resolvedOnOpenWebhooksSidebar,
       resolvedOnScheduleCreate,
-      onClearNodeSelection,
-      scheduleContext,
       setPlacement,
       workflowId,
       nodes,
@@ -824,63 +389,12 @@ export function Canvas({
             onClick={handleCanvasTap}
             onTouchEnd={handleCanvasTap}
           >
-            {/* Placement indicator - shows when a component is selected from spotlight/sidebar */}
             {isPlacementActive && placementComponentName && (
-              <div className="absolute top-[52px] left-[10px] z-50">
-                {/* Rotating border wrapper */}
-                <div
-                  className="relative rounded-full p-[2px]"
-                  style={{
-                    background:
-                      'conic-gradient(from var(--angle), hsl(var(--primary)) 0deg, transparent 60deg, transparent 300deg, hsl(var(--primary)) 360deg)',
-                    animation: 'rotate-border 2s linear infinite',
-                  }}
-                >
-                  {/* Inner pill */}
-                  <div className="bg-background px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
-                    <span className="text-xs font-medium text-foreground whitespace-nowrap">
-                      Click to place:{' '}
-                      <span className="text-primary font-semibold">{placementComponentName}</span>
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearPlacement();
-                      }}
-                      className="hover:bg-muted rounded-full p-0.5 transition-colors"
-                      aria-label="Cancel placement"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5 text-muted-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                {/* Keyframe animation with CSS property */}
-                <style>{`
-                  @property --angle {
-                    syntax: '<angle>';
-                    initial-value: 0deg;
-                    inherits: false;
-                  }
-                  @keyframes rotate-border {
-                    from { --angle: 0deg; }
-                    to { --angle: 360deg; }
-                  }
-                `}</style>
-              </div>
+              <PlacementIndicator
+                componentName={placementComponentName}
+                onCancel={clearPlacement}
+              />
             )}
-            {/* Validation Dock - positioned relative to canvas */}
             <ValidationDock
               nodes={nodes}
               edges={edges}
@@ -893,7 +407,7 @@ export function Canvas({
               onNodesChange={onNodesChange}
               onEdgesChange={handleEdgesChange}
               onConnect={onConnect}
-              onInit={(instance: any) => {
+              onInit={(instance: ReactFlowInstance) => {
                 setReactFlowInstance(instance);
                 if (nodes.length > 0) {
                   try {
@@ -934,7 +448,7 @@ export function Canvas({
                 zoomable
                 className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
                 maskColor="hsl(var(--background) / 0.7)"
-                nodeColor={(node: any) => {
+                nodeColor={(node: Node<NodeData>) => {
                   switch (node.data?.status) {
                     case 'running':
                       return '#f59e0b';
@@ -950,7 +464,6 @@ export function Canvas({
             </ReactFlow>
           </div>
 
-          {/* Config Panel - Side panel on desktop, portal on mobile */}
           {mode === 'design' &&
             selectedNode &&
             (isMobile ? (

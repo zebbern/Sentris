@@ -9,6 +9,7 @@ interface ComponentIndex {
   slugIndex: Record<string, string>;
 }
 
+/** Normalizes raw API component data into indexed ComponentMetadata records. */
 function buildIndexes(components: any[]): ComponentIndex {
   const byId: Record<string, ComponentMetadata> = {};
   const slugIndex: Record<string, string> = {};

@@ -42,7 +42,7 @@ const TRIGGER_LABELS: Record<ExecutionTriggerType, string> = {
   webhook: 'Webhook trigger',
 };
 
-const normalizeRun = (run: any): ExecutionRun => {
+const normalizeRun = (run: Record<string, unknown>): ExecutionRun => {
   const startTime = typeof run.startTime === 'string' ? run.startTime : new Date().toISOString();
   const rawEndTime = typeof run.endTime === 'string' ? run.endTime : undefined;
   const status = (

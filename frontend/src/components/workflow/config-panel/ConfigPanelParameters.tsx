@@ -1,5 +1,5 @@
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
-import { ParameterFieldWrapper } from '../ParameterField';
+import { ParameterFieldWrapper } from '../parameter-field/ParameterFieldWrapper';
 import { cn } from '@/lib/utils';
 import type { Parameter } from '@/schemas/component';
 import type { InputMapping } from '@/schemas/node';

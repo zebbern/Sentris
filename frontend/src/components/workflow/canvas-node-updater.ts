@@ -38,7 +38,7 @@ export function useNodeUpdater({
       // Check for dynamic outputs change (e.g. Entry Point inputs renamed)
       const dynamicOutputs = data.dynamicOutputs;
       if (dynamicOutputs && Array.isArray(dynamicOutputs)) {
-        const validOutputIds = new Set(dynamicOutputs.map((p: any) => p.id));
+        const validOutputIds = new Set(dynamicOutputs.map((p: { id: string }) => p.id));
         updatedEdges.forEach((edge) => {
           if (
             edge.source === nodeId &&
@@ -53,7 +53,7 @@ export function useNodeUpdater({
       // Check for dynamic inputs change
       const dynamicInputs = data.dynamicInputs;
       if (dynamicInputs && Array.isArray(dynamicInputs)) {
-        const validInputIds = new Set(dynamicInputs.map((p: any) => p.id));
+        const validInputIds = new Set(dynamicInputs.map((p: { id: string }) => p.id));
         updatedEdges.forEach((edge) => {
           if (
             edge.target === nodeId &&

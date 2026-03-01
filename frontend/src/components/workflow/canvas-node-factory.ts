@@ -1,4 +1,4 @@
-import type { Node, Edge } from 'reactflow';
+import type { Node, Edge, ReactFlowInstance } from 'reactflow';
 
 import type { ToastVariant } from '@/components/ui/toast-context';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
@@ -9,7 +9,7 @@ import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
 
 export interface CreateNodeContext {
-  reactFlowInstance: any;
+  reactFlowInstance: ReactFlowInstance | null;
   getComponent: (ref: string) => ComponentMetadata | null;
   nodes: Node<NodeData>[];
   edges: Edge[];

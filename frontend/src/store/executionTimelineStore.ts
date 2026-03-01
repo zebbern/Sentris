@@ -43,7 +43,7 @@ export interface DataPacket {
   sourceNode: string;
   targetNode: string;
   inputKey?: string;
-  payload: any;
+  payload: unknown;
   timestamp: number;
   size: number; // bytes
   type: 'file' | 'json' | 'text' | 'binary';
@@ -56,7 +56,7 @@ export interface RawDataPacket {
   targetNode: string;
   timestamp: string;
   inputKey?: string;
-  payload?: any;
+  payload?: unknown;
   size?: number;
   type?: string;
   visualTime?: number;

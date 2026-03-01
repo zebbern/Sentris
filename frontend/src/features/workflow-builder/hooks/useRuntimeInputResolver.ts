@@ -38,7 +38,7 @@ export function useRuntimeInputResolver({ nodes, getComponent }: UseRuntimeInput
           : runtimeInputsParam;
 
       if (Array.isArray(parsedInputs) && parsedInputs.length > 0) {
-        return parsedInputs.map((input: any) => ({
+        return parsedInputs.map((input: { type: string; [key: string]: unknown }) => ({
           ...input,
           type: input.type === 'string' ? 'text' : input.type,
         }));

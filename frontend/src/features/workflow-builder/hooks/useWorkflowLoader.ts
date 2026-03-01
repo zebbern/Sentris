@@ -13,6 +13,7 @@ import { api, API_BASE_URL } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
 import { useWorkflowStore } from '@/store/workflowStore';
+import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 import { track, Events } from '@/features/analytics/events';
 import { computeGraphSignature, ENTRY_DEFAULT_RUNTIME_INPUTS } from '../workflowBuilderUtils';
 import type { FrontendNodeData } from '@/schemas/node';
@@ -262,14 +263,15 @@ export function useWorkflowLoader({
         // Skip runs fetch entirely in design mode to avoid the slow /workflows/runs call
         // Runs will be fetched on-demand when the user switches to execution mode
         try {
-          const cachedRunsPage = queryClient.getQueryData<{ runs: any[]; hasMore: boolean }>(
-            queryKeys.runs.byWorkflow(workflow.id),
-          );
+          const cachedRunsPage = queryClient.getQueryData<{
+            runs: ExecutionRun[];
+            hasMore: boolean;
+          }>(queryKeys.runs.byWorkflow(workflow.id));
           const runs = openedInExecutionMode
             ? (cachedRunsPage?.runs ??
               (await fetchRuns({ workflowId: workflow.id }).then(
                 () =>
-                  queryClient.getQueryData<{ runs: any[]; hasMore: boolean }>(
+                  queryClient.getQueryData<{ runs: ExecutionRun[]; hasMore: boolean }>(
                     queryKeys.runs.byWorkflow(workflow.id),
                   )?.runs ?? [],
               )))
