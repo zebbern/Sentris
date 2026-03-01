@@ -16,6 +16,7 @@ export interface WorkflowSchedulesContextValue {
   onOpenScheduleSidebar: () => void;
   onCloseScheduleSidebar: () => void;
   onOpenWebhooksSidebar?: () => void;
+  onCloseWebhooksSidebar?: () => void;
 }
 
 export const WorkflowSchedulesContext = createContext<WorkflowSchedulesContextValue | undefined>(

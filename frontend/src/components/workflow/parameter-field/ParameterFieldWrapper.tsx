@@ -47,7 +47,7 @@ export function ParameterFieldWrapper({
         {parameter.description && (
           <p className="text-xs text-muted-foreground mb-2">{parameter.description}</p>
         )}
-        <RuntimeInputsEditor value={value || []} onChange={onChange} />
+        <RuntimeInputsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
           <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
         )}
@@ -66,7 +66,7 @@ export function ParameterFieldWrapper({
           <p className="text-xs text-muted-foreground mb-2">{parameter.description}</p>
         )}
         <SimpleVariableListEditor
-          value={value || []}
+          value={Array.isArray(value) ? value : []}
           onChange={onChange}
           title={title}
           type={isInput ? 'input' : 'output'}
@@ -85,7 +85,7 @@ export function ParameterFieldWrapper({
         {parameter.description && (
           <p className="text-xs text-muted-foreground mb-2">{parameter.description}</p>
         )}
-        <FormFieldsEditor value={value || []} onChange={onChange} />
+        <FormFieldsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
           <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
         )}
@@ -100,7 +100,7 @@ export function ParameterFieldWrapper({
         {parameter.description && (
           <p className="text-xs text-muted-foreground mb-2">{parameter.description}</p>
         )}
-        <SelectionOptionsEditor value={value || []} onChange={onChange} />
+        <SelectionOptionsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
           <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
         )}
@@ -119,7 +119,7 @@ export function ParameterFieldWrapper({
 
     return (
       <ScriptCodeEditor
-        code={value || ''}
+        code={typeof value === 'string' ? value : ''}
         onCodeChange={onChange}
         inputVariables={inputVariables}
         outputVariables={outputVariables}
@@ -140,7 +140,7 @@ export function ParameterFieldWrapper({
           </label>
           <Switch
             id={parameter.id}
-            checked={value || false}
+            checked={Boolean(value)}
             onCheckedChange={(checked) => onChange(checked)}
           />
         </div>

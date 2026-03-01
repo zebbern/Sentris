@@ -73,7 +73,7 @@ export default tseslint.config(
           ignoreRestSiblings: true,
         },
       ],
-      '@typescript-eslint/no-explicit-any': 'off', // Relaxed as requested
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'error',
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/no-namespace': 'error',
@@ -89,6 +89,13 @@ export default tseslint.config(
       'no-constant-condition': 'error',
       'no-useless-catch': 'error',
       'no-prototype-builtins': 'error',
+    },
+  },
+  // Allow `any` in test files where mocks/stubs justify it
+  {
+    files: ['**/*.test.*', '**/*.spec.*', '**/test/**'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   configPrettier,

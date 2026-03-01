@@ -77,7 +77,7 @@ export function SecretSelect({
   return (
     <LeanSelect
       value={value}
-      onChange={onChange}
+      onChange={(v) => onChange(typeof v === 'string' ? v : undefined)}
       options={options}
       placeholder={placeholder}
       disabled={disabled}

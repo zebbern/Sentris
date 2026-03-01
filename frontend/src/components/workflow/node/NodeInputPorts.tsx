@@ -3,6 +3,7 @@ import { KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { InputPort, ComponentMetadata } from '@/schemas/component';
+import type { SecretSummary } from '@/schemas/secret';
 import { inputSupportsManualValue, isCredentialInput } from '@/utils/portUtils';
 import { manualValueProvidedForInput } from './hooks/useNodeValidation';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
@@ -77,7 +78,7 @@ function InputPortRow({
   getComponent: (ref: string) => ComponentMetadata | null;
   getNodes: ReturnType<typeof useReactFlow>['getNodes'];
   getEdges: ReturnType<typeof useReactFlow>['getEdges'];
-  secrets: { id: string; name: string; [key: string]: unknown }[];
+  secrets: SecretSummary[];
 }) {
   const edges = getEdges();
   const isToolsPort = input.id === 'tools';
@@ -137,7 +138,7 @@ function InputPortRow({
 
   if (isSecretInput && manualDisplayVal) {
     const secret = secrets.find((s) => s.id === manualDisplayVal || s.name === manualDisplayVal);
-    manualDisplay = secret ? getSecretLabel(secret as any) : manualDisplayVal;
+    manualDisplay = secret ? getSecretLabel(secret) : manualDisplayVal;
   }
 
   const previewText = manualDisplay.length > 24 ? `${manualDisplay.slice(0, 24)}…` : manualDisplay;
