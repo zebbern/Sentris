@@ -65,7 +65,7 @@ export const useWorkflowHistory = ({
   onHistoryChange,
 }: UseWorkflowHistoryOptions): UseWorkflowHistoryReturn => {
   const mode = useWorkflowUiStore((state) => state.mode);
-  const { markDirty } = useWorkflowStore();
+  const markDirty = useWorkflowStore((s) => s.markDirty);
 
   // Track the last captured state to avoid duplicates
   const lastCapturedSignatureRef = useRef<string | null>(null);

@@ -7,7 +7,9 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { HumanInputResolutionView, type HumanInputRequest } from './HumanInputResolutionView';
 
 export function HumanInputDialog() {
-  const { humanInputRequestId, humanInputDialogOpen, closeHumanInputDialog } = useWorkflowUiStore();
+  const humanInputRequestId = useWorkflowUiStore((s) => s.humanInputRequestId);
+  const humanInputDialogOpen = useWorkflowUiStore((s) => s.humanInputDialogOpen);
+  const closeHumanInputDialog = useWorkflowUiStore((s) => s.closeHumanInputDialog);
 
   const [request, setRequest] = useState<HumanInputRequest | null>(null);
   const [loading, setLoading] = useState(false);

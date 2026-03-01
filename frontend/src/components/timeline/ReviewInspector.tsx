@@ -18,12 +18,15 @@ const formatTime = (timestamp: string) => {
 };
 
 export function ReviewInspector() {
-  const { selectedRunId, playbackMode, isPlaying } = useExecutionTimelineStore();
+  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
   const { id: workflowId } = useWorkflowStore((state) => state.metadata);
   const { data: runsPage, isLoading: isLoadingRuns } = useWorkflowRuns(workflowId);
   const runs = runsPage?.runs ?? [];
   const displayLogs = useExecutionStore((state) => state.getDisplayLogs());
-  const { inspectorTab, setInspectorTab } = useWorkflowUiStore();
+  const inspectorTab = useWorkflowUiStore((s) => s.inspectorTab);
+  const setInspectorTab = useWorkflowUiStore((s) => s.setInspectorTab);
 
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId),

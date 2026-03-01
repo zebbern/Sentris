@@ -82,9 +82,13 @@ export const DataFlowEdge = memo(
     const [animatedPackets, setAnimatedPackets] = useState<AnimatedPacket[]>([]);
     const animationRef = useRef<number | null>(null);
 
-    const { currentTime, isPlaying, playbackSpeed, playbackMode, dataFlows, selectedRunId } =
-      useExecutionTimelineStore();
-    const { mode } = useWorkflowUiStore();
+    const currentTime = useExecutionTimelineStore((s) => s.currentTime);
+    const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
+    const playbackSpeed = useExecutionTimelineStore((s) => s.playbackSpeed);
+    const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+    const dataFlows = useExecutionTimelineStore((s) => s.dataFlows);
+    const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+    const mode = useWorkflowUiStore((s) => s.mode);
 
     const nodeStates = useExecutionTimelineStore((state) => state.nodeStates);
     const sourceNodeState = nodeStates[source];

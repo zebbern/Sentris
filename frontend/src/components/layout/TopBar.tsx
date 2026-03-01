@@ -88,7 +88,9 @@ export function TopBar({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const { metadata, isDirty, setWorkflowName } = useWorkflowStore();
+  const metadata = useWorkflowStore((s) => s.metadata);
+  const isDirty = useWorkflowStore((s) => s.isDirty);
+  const setWorkflowName = useWorkflowStore((s) => s.setWorkflowName);
   const mode = useWorkflowUiStore((state) => state.mode);
   const organizationId = useAuthStore((s) => s.organizationId);
   const authProvider = useAuthStore((s) => s.provider);

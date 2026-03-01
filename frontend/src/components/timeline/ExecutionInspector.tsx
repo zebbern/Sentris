@@ -100,15 +100,19 @@ const DEFAULT_TIMELINE_HEIGHT = 320;
 
 export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {}) {
   const { runId: routeRunId } = useParams<{ runId?: string }>();
-  const { selectedRunId, playbackMode, isPlaying } = useExecutionTimelineStore();
+  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
   const { id: workflowId, currentVersion: currentWorkflowVersion } = useWorkflowStore(
     (state) => state.metadata,
   );
   const { data: runsPage, isLoading: isLoadingRuns } = useWorkflowRuns(workflowId);
   const runs = runsPage?.runs ?? [];
   const { status, runStatus, stopExecution, runId: liveRunId } = useWorkflowExecution();
-  const { inspectorTab, setInspectorTab } = useWorkflowUiStore();
-  const { getDisplayLogs, setLogMode } = useExecutionStore();
+  const inspectorTab = useWorkflowUiStore((s) => s.inspectorTab);
+  const setInspectorTab = useWorkflowUiStore((s) => s.setInspectorTab);
+  const getDisplayLogs = useExecutionStore((s) => s.getDisplayLogs);
+  const setLogMode = useExecutionStore((s) => s.setLogMode);
   const [logModal, setLogModal] = useState<{ open: boolean; message: string; title: string }>({
     open: false,
     message: '',

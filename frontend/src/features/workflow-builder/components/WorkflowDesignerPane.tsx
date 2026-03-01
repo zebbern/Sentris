@@ -73,7 +73,7 @@ export function WorkflowDesignerPane({
     confirmFn: confirm,
   });
 
-  const { setSchedulesPanelOpen } = useWorkflowUiStore();
+  const setSchedulesPanelOpen = useWorkflowUiStore((s) => s.setSchedulesPanelOpen);
   const isMobile = useIsMobile();
 
   // Webhooks panel state

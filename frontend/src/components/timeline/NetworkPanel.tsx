@@ -375,7 +375,8 @@ function tryFormatJson(text: string): string {
 }
 
 export function NetworkPanel() {
-  const { events, selectedNodeId } = useExecutionTimelineStore();
+  const events = useExecutionTimelineStore((s) => s.events);
+  const selectedNodeId = useExecutionTimelineStore((s) => s.selectedNodeId);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [expandedHosts, setExpandedHosts] = useState<Set<string>>(new Set());
 

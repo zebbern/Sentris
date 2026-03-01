@@ -2,40 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { PostHogProvider } from 'posthog-js/react';
-import posthog from 'posthog-js';
 import { initializeTheme } from '@/store/themeStore';
-import { isAnalyticsEnabled } from '@/features/analytics/config';
-import { logger } from '@/lib/logger';
-
-const hasPostHog = isAnalyticsEnabled();
-
-// Print analytics status (dev-only)
-if (import.meta.env.DEV) {
-  if (hasPostHog) {
-    logger.info('📊 Analytics enabled - PostHog is collecting usage data');
-  } else {
-    logger.info('📊 Analytics disabled - No usage data will be collected');
-  }
-}
-
-// Initialize the global PostHog singleton so helpers using `posthog.capture` work.
-if (hasPostHog) {
-  const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY!;
-  const apiHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST!;
-  posthog.init(apiKey, {
-    api_host: apiHost,
-    autocapture: true,
-    capture_pageview: false, // we capture pageviews via a router listener
-    capture_exceptions: true,
-    session_recording: {
-      maskAllText: false,
-      maskAllInputs: true,
-    },
-    respect_dnt: true,
-    debug: import.meta.env.DEV,
-  });
-}
+import { AnalyticsWrapper } from '@/components/AnalyticsWrapper';
 
 initializeTheme();
 
@@ -47,12 +15,10 @@ setTimeout(() => {
   });
 }, 0);
 
-const appContent = hasPostHog ? (
-  <PostHogProvider client={posthog}>
+const appContent = (
+  <AnalyticsWrapper>
     <App />
-  </PostHogProvider>
-) : (
-  <App />
+  </AnalyticsWrapper>
 );
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

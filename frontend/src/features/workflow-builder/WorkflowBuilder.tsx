@@ -49,8 +49,13 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
   const isNewWorkflow = id === 'new';
   const isRunsRoute = location.pathname.includes('/runs') && !routeRunId;
   const isInWorkflowBuilder = location.pathname.match(/^\/workflows\/[^/]/) !== null;
-  const { metadata, isDirty, setMetadata, setWorkflowId, markClean, markDirty, resetWorkflow } =
-    useWorkflowStore();
+  const metadata = useWorkflowStore((s) => s.metadata);
+  const isDirty = useWorkflowStore((s) => s.isDirty);
+  const setMetadata = useWorkflowStore((s) => s.setMetadata);
+  const setWorkflowId = useWorkflowStore((s) => s.setWorkflowId);
+  const markClean = useWorkflowStore((s) => s.markClean);
+  const markDirty = useWorkflowStore((s) => s.markDirty);
+  const resetWorkflow = useWorkflowStore((s) => s.resetWorkflow);
   const { toast } = useToast();
 
   const { design: designGraph, execution: executionGraph } = useWorkflowGraphControllers({
@@ -89,21 +94,19 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
 
   const roles = useAuthStore((state) => state.roles);
   const canManageWorkflows = hasAdminRole(roles);
-  const {
-    mode,
-    libraryOpen,
-    toggleLibrary,
-    inspectorWidth,
-    setInspectorWidth,
-    setMode,
-    showDemoComponents,
-    toggleDemoComponents,
-    configPanelOpen,
-    schedulesPanelOpen,
-    versionHistoryPanelOpen,
-    setVersionHistoryPanelOpen,
-    setLibraryOpen,
-  } = useWorkflowUiStore();
+  const mode = useWorkflowUiStore((s) => s.mode);
+  const libraryOpen = useWorkflowUiStore((s) => s.libraryOpen);
+  const toggleLibrary = useWorkflowUiStore((s) => s.toggleLibrary);
+  const inspectorWidth = useWorkflowUiStore((s) => s.inspectorWidth);
+  const setInspectorWidth = useWorkflowUiStore((s) => s.setInspectorWidth);
+  const setMode = useWorkflowUiStore((s) => s.setMode);
+  const showDemoComponents = useWorkflowUiStore((s) => s.showDemoComponents);
+  const toggleDemoComponents = useWorkflowUiStore((s) => s.toggleDemoComponents);
+  const configPanelOpen = useWorkflowUiStore((s) => s.configPanelOpen);
+  const schedulesPanelOpen = useWorkflowUiStore((s) => s.schedulesPanelOpen);
+  const versionHistoryPanelOpen = useWorkflowUiStore((s) => s.versionHistoryPanelOpen);
+  const setVersionHistoryPanelOpen = useWorkflowUiStore((s) => s.setVersionHistoryPanelOpen);
+  const setLibraryOpen = useWorkflowUiStore((s) => s.setLibraryOpen);
 
   const selectedRunId = useExecutionTimelineStore((state) => state.selectedRunId);
   const selectedRun = selectedRunId ? (getRunByIdFromCache(selectedRunId) ?? null) : null;

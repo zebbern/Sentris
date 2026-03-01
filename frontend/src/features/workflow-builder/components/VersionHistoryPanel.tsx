@@ -42,8 +42,10 @@ interface VersionHistoryPanelProps {
 
 export function VersionHistoryPanel({ workflowId, onLoadVersion }: VersionHistoryPanelProps) {
   const { data: versions, isLoading } = useWorkflowVersions(workflowId);
-  const { metadata, isDirty } = useWorkflowStore();
-  const { versionHistoryPanelOpen, setVersionHistoryPanelOpen } = useWorkflowUiStore();
+  const metadata = useWorkflowStore((s) => s.metadata);
+  const isDirty = useWorkflowStore((s) => s.isDirty);
+  const versionHistoryPanelOpen = useWorkflowUiStore((s) => s.versionHistoryPanelOpen);
+  const setVersionHistoryPanelOpen = useWorkflowUiStore((s) => s.setVersionHistoryPanelOpen);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

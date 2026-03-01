@@ -146,10 +146,12 @@ function scoreCommand(
 }
 
 export function CommandPalette() {
-  const { isOpen, close } = useCommandPaletteStore();
+  const isOpen = useCommandPaletteStore((s) => s.isOpen);
+  const close = useCommandPaletteStore((s) => s.close);
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, startTransition } = useThemeStore();
+  const theme = useThemeStore((s) => s.theme);
+  const startTransition = useThemeStore((s) => s.startTransition);
   const { data: componentIndex, isLoading: componentsLoading } = useComponents();
   const storeComponents = componentIndex?.byId ?? {};
   const mode = useWorkflowUiStore((state) => state.mode);

@@ -8,7 +8,10 @@ import { logger } from '@/lib/logger';
 type Theme = 'light' | 'dark';
 
 export const ThemeTransition = () => {
-  const { isTransitioning, theme, toggleTheme, endTransition } = useThemeStore();
+  const isTransitioning = useThemeStore((s) => s.isTransitioning);
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const endTransition = useThemeStore((s) => s.endTransition);
   const [stage, setStage] = useState<'idle' | 'in' | 'switching' | 'out'>('idle');
   const [displayTheme, setDisplayTheme] = useState<Theme>(theme);
   const [transitionTarget, setTransitionTarget] = useState<Theme | null>(null);

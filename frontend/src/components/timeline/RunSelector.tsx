@@ -49,7 +49,9 @@ export function RunSelector({
   const location = useLocation();
   const { id: routeWorkflowId, runId: routeRunId } = useParams<{ id?: string; runId?: string }>();
   const { copy } = useCopyToClipboard();
-  const { selectedRunId, playbackMode, selectRun } = useExecutionTimelineStore();
+  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const selectRun = useExecutionTimelineStore((s) => s.selectRun);
   const workflowMetadata = useWorkflowStore((state) => state.metadata);
   const workflowId = workflowMetadata.id;
   const targetWorkflowId = routeWorkflowId ?? workflowId;
@@ -66,7 +68,8 @@ export function RunSelector({
 
   const mode = useWorkflowUiStore((state) => state.mode);
 
-  const { runId: currentLiveRunId, monitorRun } = useExecutionStore();
+  const currentLiveRunId = useExecutionStore((s) => s.runId);
+  const monitorRun = useExecutionStore((s) => s.monitorRun);
 
   const navigateToRun = useCallback(
     (runId?: string, options?: { replace?: boolean }) => {

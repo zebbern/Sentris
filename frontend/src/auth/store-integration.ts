@@ -133,7 +133,7 @@ export function useAuthStoreIntegration() {
  * This ensures the frontend and backend are using the same auth provider
  */
 export function useAuthProviderSync() {
-  const { provider: storeProvider } = useAuthStore();
+  const storeProvider = useAuthStore((s) => s.provider);
   const authProvider = useAuthProvider();
   const providerForStore = resolvedProviderForReturn(authProvider.name);
 
@@ -176,7 +176,8 @@ function resolvedProviderForReturn(name: string): 'local' | 'clerk' | 'custom' {
  */
 export function useAuthMigration() {
   const { token: providerToken, isAuthenticated } = useAuth();
-  const { token: storeToken, clear: clearStore } = useAuthStore();
+  const storeToken = useAuthStore((s) => s.token);
+  const clearStore = useAuthStore((s) => s.clear);
 
   useEffect(() => {
     // If user has a manually set token in store but no provider auth,

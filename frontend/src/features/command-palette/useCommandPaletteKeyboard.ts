@@ -6,7 +6,9 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore';
  * Should be used once at the app root level
  */
 export function useCommandPaletteKeyboard() {
-  const { toggle, isOpen, close } = useCommandPaletteStore();
+  const toggle = useCommandPaletteStore((s) => s.toggle);
+  const isOpen = useCommandPaletteStore((s) => s.isOpen);
+  const close = useCommandPaletteStore((s) => s.close);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

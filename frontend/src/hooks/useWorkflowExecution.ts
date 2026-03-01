@@ -2,7 +2,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 
 export function useWorkflowExecution(workflowId?: string | null) {
-  const { metadata } = useWorkflowStore();
+  const metadata = useWorkflowStore((s) => s.metadata);
   const targetWorkflowId = workflowId ?? metadata.id;
 
   const executionState = useExecutionStore();

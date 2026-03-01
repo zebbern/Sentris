@@ -106,7 +106,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { isAuthenticated } = useAuth();
   const authProvider = useAuthProvider();
   const showUserButton = isAuthenticated || authProvider.name === 'clerk';
-  const { theme, startTransition } = useThemeStore();
+  const theme = useThemeStore((s) => s.theme);
+  const startTransition = useThemeStore((s) => s.startTransition);
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
   const sidebarDensity = useUserPreferencesStore((s) => s.sidebarDensity);
   const isCompact = sidebarDensity === 'compact';

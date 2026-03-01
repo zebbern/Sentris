@@ -133,20 +133,18 @@ export function EventInspector({ className, layoutVariant = 'stacked-soft' }: Ev
   const eventsListRef = useRef<HTMLUListElement>(null);
   const autoScrollRef = useRef<boolean>(true);
 
-  const {
-    selectedRunId,
-    events,
-    currentTime,
-    nodeStates,
-    dataFlows,
-    selectedNodeId,
-    selectedEventId,
-    selectEvent,
-    selectNode,
-    seek,
-    playbackMode,
-    isPlaying,
-  } = useExecutionTimelineStore();
+  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+  const events = useExecutionTimelineStore((s) => s.events);
+  const currentTime = useExecutionTimelineStore((s) => s.currentTime);
+  const nodeStates = useExecutionTimelineStore((s) => s.nodeStates);
+  const dataFlows = useExecutionTimelineStore((s) => s.dataFlows);
+  const selectedNodeId = useExecutionTimelineStore((s) => s.selectedNodeId);
+  const selectedEventId = useExecutionTimelineStore((s) => s.selectedEventId);
+  const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
+  const selectNode = useExecutionTimelineStore((s) => s.selectNode);
+  const seek = useExecutionTimelineStore((s) => s.seek);
+  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
 
   const filteredEvents = useMemo(() => {
     if (!selectedNodeId) {

@@ -133,17 +133,24 @@ export function Canvas({
     if (idFromSlug && componentIndex.byId[idFromSlug]) return componentIndex.byId[idFromSlug];
     return null;
   };
-  const { nodeStates } = useExecutionStore();
-  const { markDirty } = useWorkflowStore();
-  const { dataFlows, selectedNodeId, selectNode, selectEvent } = useExecutionTimelineStore();
+  const nodeStates = useExecutionStore((s) => s.nodeStates);
+  const markDirty = useWorkflowStore((s) => s.markDirty);
+  const dataFlows = useExecutionTimelineStore((s) => s.dataFlows);
+  const selectedNodeId = useExecutionTimelineStore((s) => s.selectedNodeId);
+  const selectNode = useExecutionTimelineStore((s) => s.selectNode);
+  const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
   const { toast } = useToast();
-  const { setConfigPanelOpen } = useWorkflowUiStore();
+  const setConfigPanelOpen = useWorkflowUiStore((s) => s.setConfigPanelOpen);
   const isMobile = useIsMobile();
 
   // Component placement state (for spotlight/sidebar component placement)
-  const placementState = usePlacementStore();
-  const isPlacementActive = placementState.isPlacementActiveForWorkflow(workflowId ?? null);
+  const isPlacementActiveForWorkflow = usePlacementStore((s) => s.isPlacementActiveForWorkflow);
+  const placementComponentId = usePlacementStore((s) => s.componentId);
+  const placementComponentName = usePlacementStore((s) => s.componentName);
+  const clearPlacement = usePlacementStore((s) => s.clearPlacement);
+  const setPlacement = usePlacementStore((s) => s.setPlacement);
+  const isPlacementActive = isPlacementActiveForWorkflow(workflowId ?? null);
 
   // Sync selection state with UI store for mobile bottom sheet visibility
   useEffect(() => {
@@ -508,7 +515,7 @@ export function Canvas({
 
       // Check if there's a component selected for placement (mobile flow)
       // Only place if the placement is scoped to this workflow
-      if (isPlacementActive && placementState.componentId) {
+      if (isPlacementActive && placementComponentId) {
         let clientX: number;
         let clientY: number;
 
@@ -525,16 +532,16 @@ export function Canvas({
         }
 
         // Create node at tap position
-        createNodeFromComponent(placementState.componentId, clientX, clientY);
+        createNodeFromComponent(placementComponentId, clientX, clientY);
 
         // Clear placement state
-        placementState.clearPlacement();
+        clearPlacement();
 
         event.preventDefault();
         event.stopPropagation();
       }
     },
-    [createNodeFromComponent, mode, isPlacementActive, placementState],
+    [createNodeFromComponent, mode, isPlacementActive, placementComponentId, clearPlacement],
   );
 
   // Handle node click for config panel
@@ -591,12 +598,12 @@ export function Canvas({
 
       // Check if there's a component selected for placement (from spotlight/sidebar)
       // Only place if the placement is scoped to this workflow
-      if (mode === 'design' && isPlacementActive && placementState.componentId) {
+      if (mode === 'design' && isPlacementActive && placementComponentId) {
         // Create node at click position
-        createNodeFromComponent(placementState.componentId, event.clientX, event.clientY);
+        createNodeFromComponent(placementComponentId, event.clientX, event.clientY);
 
         // Clear placement state
-        placementState.clearPlacement();
+        clearPlacement();
 
         return;
       }
@@ -609,7 +616,8 @@ export function Canvas({
     [
       mode,
       isPlacementActive,
-      placementState,
+      placementComponentId,
+      clearPlacement,
       createNodeFromComponent,
       onCloseScheduleSidebar,
       onCloseWebhooksSidebar,
@@ -779,7 +787,7 @@ export function Canvas({
       },
       onScheduleCreate: resolvedOnScheduleCreate,
       setPlacement: (componentId: string, componentName: string) => {
-        placementState.setPlacement(componentId, componentName, workflowId ?? null);
+        setPlacement(componentId, componentName, workflowId ?? null);
       },
       selectEntryPoint: () => {
         const entryPointNode = nodes.find((n) => isEntryPointNode(n));
@@ -795,7 +803,7 @@ export function Canvas({
       resolvedOnScheduleCreate,
       onClearNodeSelection,
       scheduleContext,
-      placementState,
+      setPlacement,
       workflowId,
       nodes,
       onNodeSelectionChange,
@@ -817,7 +825,7 @@ export function Canvas({
             onTouchEnd={handleCanvasTap}
           >
             {/* Placement indicator - shows when a component is selected from spotlight/sidebar */}
-            {isPlacementActive && placementState.componentName && (
+            {isPlacementActive && placementComponentName && (
               <div className="absolute top-[52px] left-[10px] z-50">
                 {/* Rotating border wrapper */}
                 <div
@@ -832,14 +840,12 @@ export function Canvas({
                   <div className="bg-background px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2">
                     <span className="text-xs font-medium text-foreground whitespace-nowrap">
                       Click to place:{' '}
-                      <span className="text-primary font-semibold">
-                        {placementState.componentName}
-                      </span>
+                      <span className="text-primary font-semibold">{placementComponentName}</span>
                     </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        placementState.clearPlacement();
+                        clearPlacement();
                       }}
                       className="hover:bg-muted rounded-full p-0.5 transition-colors"
                       aria-label="Cancel placement"

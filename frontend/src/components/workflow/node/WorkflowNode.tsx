@@ -164,16 +164,14 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
   const { data: secrets = [] } = useSecrets();
   const { getNodes, getEdges, setNodes, deleteElements } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
-  const {
-    nodeStates,
-    selectedRunId,
-    selectNode,
-    isPlaying,
-    playbackMode,
-    isLiveFollowing: _isLiveFollowing,
-  } = useExecutionTimelineStore();
-  const { markDirty } = useWorkflowStore();
-  const { mode, openHumanInputDialog } = useWorkflowUiStore();
+  const nodeStates = useExecutionTimelineStore((s) => s.nodeStates);
+  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
+  const selectNode = useExecutionTimelineStore((s) => s.selectNode);
+  const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
+  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const markDirty = useWorkflowStore((s) => s.markDirty);
+  const mode = useWorkflowUiStore((s) => s.mode);
+  const openHumanInputDialog = useWorkflowUiStore((s) => s.openHumanInputDialog);
   const prefetchTerminal = useExecutionStore((state) => state.prefetchTerminal);
   const terminalSession = useExecutionStore((state) => state.getTerminalSession(id, 'pty'));
   const theme = useThemeStore((state) => state.theme);
