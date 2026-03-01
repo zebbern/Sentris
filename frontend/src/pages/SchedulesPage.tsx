@@ -28,7 +28,12 @@ import { useSortableList } from '@/hooks/useSortableList';
 import { useAuthStore } from '@/store/authStore';
 import { getWorkflowName, getStatusBadgeProps } from '@/utils/tableHelpers';
 import type { WorkflowOption, BadgeVariant } from '@/utils/tableHelpers';
-import { SchedulesTable, ScheduleFilters, useScheduleActions, useScheduleEditorDrawer } from './schedules';
+import {
+  SchedulesTable,
+  ScheduleFilters,
+  useScheduleActions,
+  useScheduleEditorDrawer,
+} from './schedules';
 
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   active: 'default',
