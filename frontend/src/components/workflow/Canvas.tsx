@@ -495,7 +495,7 @@ export function Canvas({
                   position="bottom-left"
                   className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
                 />
-                <Panel position="top-right" className="!m-2">
+                <Panel position="top-right" className="!m-2 !z-30">
                   <div className="flex flex-col gap-1.5">
                     <button
                       onClick={toggleSmartRouting}
