@@ -285,6 +285,7 @@ export function WebhooksPage() {
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           {/* Filters Row */}
           <PageToolbar
+            title="Webhooks"
             filters={
               <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">

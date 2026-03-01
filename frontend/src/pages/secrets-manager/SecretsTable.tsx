@@ -118,6 +118,7 @@ export function SecretsTable({
   return (
     <div className="border rounded-lg bg-card p-4 md:p-6">
       <PageToolbar
+        title="Secrets"
         filters={
           <div>
             <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>

@@ -183,6 +183,7 @@ export function WorkflowList() {
 
         {/* Filters */}
         <PageToolbar
+          title="Workflows"
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchLabel="Search workflows"

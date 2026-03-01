@@ -119,7 +119,7 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background" aria-busy={loadingProviders || loadingConnections}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <PageToolbar className="mb-4 md:mb-6" />
+        <PageToolbar title="Connections" className="mb-4 md:mb-6" />
 
         {error && (
           <ErrorBanner

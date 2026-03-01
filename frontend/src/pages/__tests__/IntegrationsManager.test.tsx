@@ -202,6 +202,12 @@ describe('IntegrationsManager', () => {
     expect(screen.getByText('Available providers')).toBeInTheDocument();
   });
 
+  it('renders page heading', () => {
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: /Connections/i })).toBeInTheDocument();
+  });
+
   it('renders section headings', () => {
     renderPage();
 

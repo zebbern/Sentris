@@ -133,6 +133,8 @@ export function TemplateLibraryPage() {
   return (
     <div className="flex-1 bg-background" aria-busy={isLoading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
+        <h1 className="text-2xl font-bold tracking-tight mb-4">Templates</h1>
+
         {/* Filters */}
         <TemplateFilters
           searchQuery={searchQuery}

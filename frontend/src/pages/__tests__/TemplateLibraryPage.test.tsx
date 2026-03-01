@@ -246,6 +246,12 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getByPlaceholderText('Filter by template name')).toBeInTheDocument();
   });
 
+  it('renders page heading', () => {
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: /Templates/i })).toBeInTheDocument();
+  });
+
   it('renders loading skeletons when isLoading is true', () => {
     setupStore({ isLoading: true, templates: [] });
     renderPage();

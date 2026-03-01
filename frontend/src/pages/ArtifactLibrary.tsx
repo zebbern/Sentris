@@ -104,6 +104,7 @@ export function ArtifactLibrary() {
     <div className="flex-1 bg-background" aria-busy={libraryLoading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
         <PageToolbar
+          title="Artifacts"
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchPlaceholder="Filter by name..."

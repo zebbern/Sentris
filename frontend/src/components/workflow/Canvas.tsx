@@ -7,7 +7,6 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ReactFlow,
   Background,
@@ -23,7 +22,6 @@ import 'reactflow/dist/style.css';
 
 import { WorkflowNode } from './WorkflowNode';
 import { TerminalNode } from './TerminalNode';
-import { ConfigPanel } from './ConfigPanel';
 import { ValidationDock } from './ValidationDock';
 import { DataFlowEdge } from '../timeline/DataFlowEdge';
 import { PlacementIndicator } from './PlacementIndicator';
@@ -34,9 +32,6 @@ import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import type { NodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
-import type { WorkflowSchedule } from '@sentris/shared';
-import { cn } from '@/lib/utils';
-import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -51,11 +46,15 @@ import { useNodeUpdater } from './canvas-node-updater';
 import { useCanvasConnections } from './canvas-connections';
 import { useCanvasViewport } from './canvas-viewport';
 import { useCanvasNodeInteractions } from './canvas-node-interactions';
+import { useResolvedScheduleContext, type ScheduleContextProps } from './canvas-schedule-context';
+import { getNodeStatusColor } from './canvas-minimap-colors';
+import { CanvasConfigPanel } from './canvas-config-panel';
+import { useNodeStatusSync } from './canvas-status-sync';
 
 const nodeTypes = { workflow: WorkflowNode, terminal: TerminalNode };
 const edgeTypes = { dataFlow: DataFlowEdge, default: DataFlowEdge };
 
-interface CanvasProps {
+interface CanvasProps extends ScheduleContextProps {
   className?: string;
   nodes: Node<NodeData>[];
   edges: Edge[];
@@ -64,20 +63,6 @@ interface CanvasProps {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   workflowId?: string | null;
-  workflowSchedules?: WorkflowSchedule[];
-  schedulesLoading?: boolean;
-  scheduleError?: string | null;
-  onScheduleCreate?: () => void;
-  onScheduleEdit?: (schedule: WorkflowSchedule) => void;
-  onScheduleAction?: (
-    schedule: WorkflowSchedule,
-    action: 'pause' | 'resume' | 'run',
-  ) => Promise<void> | void;
-  onScheduleDelete?: (schedule: WorkflowSchedule) => Promise<void> | void;
-  onViewSchedules?: () => void;
-  onOpenScheduleSidebar?: () => void;
-  onCloseScheduleSidebar?: () => void;
-  onCloseWebhooksSidebar?: () => void;
   onClearNodeSelection?: () => void;
   onNodeSelectionChange?: (node: Node<NodeData> | null) => void;
   onSnapshot?: (nodes?: Node<NodeData>[], edges?: Edge[]) => void;
@@ -94,21 +79,11 @@ export function Canvas({
   onNodesChange,
   onEdgesChange,
   workflowId,
-  workflowSchedules,
-  schedulesLoading,
-  scheduleError,
-  onScheduleCreate,
-  onScheduleEdit,
-  onScheduleAction,
-  onScheduleDelete,
-  onViewSchedules,
-  onOpenScheduleSidebar,
-  onCloseScheduleSidebar,
-  onCloseWebhooksSidebar,
   onNodeSelectionChange,
   onSnapshot,
   schedulePanelExpanded,
   webhooksPanelExpanded,
+  ...scheduleProps
 }: CanvasProps) {
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
@@ -143,22 +118,7 @@ export function Canvas({
     setConfigPanelOpen(Boolean(selectedNode));
   }, [selectedNode, setConfigPanelOpen]);
 
-  const scheduleContext = useOptionalWorkflowSchedulesContext();
-  const resolvedWorkflowSchedules = workflowSchedules ?? scheduleContext?.schedules ?? [];
-  const resolvedSchedulesLoading = schedulesLoading ?? scheduleContext?.isLoading ?? false;
-  const resolvedScheduleError = scheduleError ?? scheduleContext?.error ?? null;
-  const resolvedOnScheduleCreate = onScheduleCreate ?? scheduleContext?.onScheduleCreate;
-  const resolvedOnScheduleEdit = onScheduleEdit ?? scheduleContext?.onScheduleEdit;
-  const resolvedOnScheduleAction = onScheduleAction ?? scheduleContext?.onScheduleAction;
-  const resolvedOnScheduleDelete = onScheduleDelete ?? scheduleContext?.onScheduleDelete;
-  const resolvedOnViewSchedules = onViewSchedules ?? scheduleContext?.onViewSchedules;
-  const resolvedOnOpenScheduleSidebar =
-    onOpenScheduleSidebar ?? scheduleContext?.onOpenScheduleSidebar;
-  const resolvedOnCloseScheduleSidebar =
-    onCloseScheduleSidebar ?? scheduleContext?.onCloseScheduleSidebar;
-  const resolvedOnCloseWebhooksSidebar =
-    onCloseWebhooksSidebar ?? scheduleContext?.onCloseWebhooksSidebar;
-  const resolvedOnOpenWebhooksSidebar = scheduleContext?.onOpenWebhooksSidebar;
+  const schedule = useResolvedScheduleContext(scheduleProps);
   const applyEdgesChange = onEdgesChange;
 
   const configPanelWidth = 432;
@@ -194,41 +154,7 @@ export function Canvas({
     webhooksPanelExpanded,
   });
 
-  useEffect(() => {
-    if (mode !== 'execution') {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.data.status && node.data.status !== 'idle') {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                status: 'idle',
-              },
-            };
-          }
-          return node;
-        }),
-      );
-      return;
-    }
-
-    setNodes((nds) =>
-      nds.map((node) => {
-        const executionState = nodeStates[node.id];
-        if (executionState && executionState !== node.data.status) {
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              status: executionState,
-            },
-          };
-        }
-        return node;
-      }),
-    );
-  }, [mode, nodeStates, setNodes]);
+  useNodeStatusSync({ mode, nodeStates, setNodes });
 
   const onDragOver = useCallback(
     (event: React.DragEvent) => {
@@ -296,8 +222,8 @@ export function Canvas({
     setSelectedNode,
     selectNode,
     selectEvent,
-    onCloseScheduleSidebar: resolvedOnCloseScheduleSidebar,
-    onCloseWebhooksSidebar: resolvedOnCloseWebhooksSidebar,
+    onCloseScheduleSidebar: schedule.resolvedOnCloseScheduleSidebar,
+    onCloseWebhooksSidebar: schedule.resolvedOnCloseWebhooksSidebar,
     isPlacementActive,
     placementComponentId,
     clearPlacement,
@@ -351,9 +277,9 @@ export function Canvas({
 
   const entryPointActionsValue = useMemo(
     () => ({
-      onOpenScheduleSidebar: resolvedOnOpenScheduleSidebar ?? (() => {}),
-      onOpenWebhooksSidebar: resolvedOnOpenWebhooksSidebar ?? (() => {}),
-      onScheduleCreate: resolvedOnScheduleCreate,
+      onOpenScheduleSidebar: schedule.resolvedOnOpenScheduleSidebar ?? (() => {}),
+      onOpenWebhooksSidebar: schedule.resolvedOnOpenWebhooksSidebar ?? (() => {}),
+      onScheduleCreate: schedule.resolvedOnScheduleCreate,
       setPlacement: (componentId: string, componentName: string) =>
         setPlacement(componentId, componentName, workflowId ?? null),
       selectEntryPoint: () => {
@@ -365,9 +291,9 @@ export function Canvas({
       },
     }),
     [
-      resolvedOnOpenScheduleSidebar,
-      resolvedOnOpenWebhooksSidebar,
-      resolvedOnScheduleCreate,
+      schedule.resolvedOnOpenScheduleSidebar,
+      schedule.resolvedOnOpenWebhooksSidebar,
+      schedule.resolvedOnScheduleCreate,
       setPlacement,
       workflowId,
       nodes,
@@ -448,71 +374,22 @@ export function Canvas({
                 zoomable
                 className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
                 maskColor="hsl(var(--background) / 0.7)"
-                nodeColor={(node: Node<NodeData>) => {
-                  switch (node.data?.status) {
-                    case 'running':
-                      return '#f59e0b';
-                    case 'success':
-                      return '#10b981';
-                    case 'error':
-                      return '#ef4444';
-                    default:
-                      return '#6b7280';
-                  }
-                }}
+                nodeColor={getNodeStatusColor}
               />
             </ReactFlow>
           </div>
 
-          {mode === 'design' &&
-            selectedNode &&
-            (isMobile ? (
-              createPortal(
-                <div className="flex h-full w-full overflow-hidden bg-background">
-                  <ConfigPanel
-                    selectedNode={selectedNode}
-                    onClose={() => setSelectedNode(null)}
-                    onUpdateNode={handleUpdateNode}
-                    workflowId={workflowId}
-                    workflowSchedules={resolvedWorkflowSchedules}
-                    schedulesLoading={resolvedSchedulesLoading}
-                    scheduleError={resolvedScheduleError}
-                    onScheduleCreate={resolvedOnScheduleCreate}
-                    onScheduleEdit={resolvedOnScheduleEdit}
-                    onScheduleAction={resolvedOnScheduleAction}
-                    onScheduleDelete={resolvedOnScheduleDelete}
-                    onViewSchedules={resolvedOnViewSchedules}
-                  />
-                </div>,
-                document.getElementById('mobile-bottom-sheet-portal') || document.body,
-              )
-            ) : (
-              <div
-                className={cn(
-                  'relative overflow-hidden transition-all duration-150 ease-out',
-                  selectedNode ? 'opacity-100' : 'opacity-0 pointer-events-none',
-                )}
-                style={{
-                  width: configPanelWidth,
-                  transition: 'width 150ms ease-out, opacity 150ms ease-out',
-                }}
-              >
-                <ConfigPanel
-                  selectedNode={selectedNode}
-                  onClose={() => setSelectedNode(null)}
-                  onUpdateNode={handleUpdateNode}
-                  workflowId={workflowId}
-                  workflowSchedules={resolvedWorkflowSchedules}
-                  schedulesLoading={resolvedSchedulesLoading}
-                  scheduleError={resolvedScheduleError}
-                  onScheduleCreate={resolvedOnScheduleCreate}
-                  onScheduleEdit={resolvedOnScheduleEdit}
-                  onScheduleAction={resolvedOnScheduleAction}
-                  onScheduleDelete={resolvedOnScheduleDelete}
-                  onViewSchedules={resolvedOnViewSchedules}
-                />
-              </div>
-            ))}
+          {mode === 'design' && selectedNode && (
+            <CanvasConfigPanel
+              selectedNode={selectedNode}
+              isMobile={isMobile}
+              configPanelWidth={configPanelWidth}
+              onClose={() => setSelectedNode(null)}
+              onUpdateNode={handleUpdateNode}
+              workflowId={workflowId}
+              schedule={schedule}
+            />
+          )}
         </div>
       </div>
     </EntryPointActionsContext.Provider>

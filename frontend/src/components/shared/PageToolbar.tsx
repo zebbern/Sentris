@@ -92,6 +92,9 @@ export function PageToolbar({
         </div>
       )}
 
+      {/* Filters-only row — title present but no built-in search */}
+      {hasTitle && !hasSearch && filters && <div className="flex flex-wrap gap-2">{filters}</div>}
+
       {/* Actions/filters-only fallback — no title, no search */}
       {!hasTitle && !hasSearch && (actions || filters) && (
         <>

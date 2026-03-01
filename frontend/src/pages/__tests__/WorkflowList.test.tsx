@@ -192,6 +192,13 @@ describe('WorkflowList delete workflow flow', () => {
     cleanup();
   });
 
+  it('renders page heading', () => {
+    mockWorkflows = [makeWorkflow('11111111-1111-4111-8111-111111111111', 'Test')];
+    renderWorkflowList();
+
+    expect(screen.getByRole('heading', { level: 1, name: /Workflows/i })).toBeInTheDocument();
+  });
+
   it('opens confirmation dialog with workflow details when delete is clicked', async () => {
     const workflow = makeWorkflow('11111111-1111-4111-8111-111111111111', 'Alpha Workflow');
     mockWorkflows = [workflow];

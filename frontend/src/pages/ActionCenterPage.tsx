@@ -182,6 +182,7 @@ export function ActionCenterPage() {
 
           {/* Filters */}
           <PageToolbar
+            title="Action Center"
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Filter by title, node, or run ID"

@@ -198,6 +198,12 @@ describe('ArtifactLibrary', () => {
     expect(screen.getByPlaceholderText('Filter by name...')).toBeInTheDocument();
   });
 
+  it('renders page heading', () => {
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: /Artifacts/i })).toBeInTheDocument();
+  });
+
   it('renders loading skeletons when isLoading is true', () => {
     setupStore({ isLoading: true, library: [] });
     renderPage();

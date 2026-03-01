@@ -321,6 +321,7 @@ export function McpLibraryPage() {
       aria-busy={isLoading || isLoadingTemplates}
     >
       <PageToolbar
+        title="MCP Library"
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Filter by server name"
