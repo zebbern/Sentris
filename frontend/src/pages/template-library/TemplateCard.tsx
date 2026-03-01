@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +24,11 @@ export interface TemplateCardProps {
 export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps) {
   const catStyle = getCategoryStyle(template.category);
   const CategoryIcon = catStyle.icon;
+
+  const filteredTags = useMemo(() => {
+    const categoryLower = (template.category || '').toLowerCase();
+    return (template.tags || []).filter((t) => t.toLowerCase() !== categoryLower);
+  }, [template.category, template.tags]);
 
   return (
     <div
@@ -101,45 +107,38 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
         {/* Tags & Metadata */}
         <div className="space-y-2.5">
           {/* Tags */}
-          {(() => {
-            const categoryLower = (template.category || '').toLowerCase();
-            const filteredTags = (template.tags || []).filter(
-              (t) => t.toLowerCase() !== categoryLower,
-            );
-            if (filteredTags.length === 0) return null;
-            return (
-              <div className="flex flex-wrap gap-1.5">
-                {filteredTags.slice(0, 3).map((tag) => (
-                  <span
-                    key={tag}
-                    className={cn(
-                      'inline-flex items-center px-3 py-1 rounded-full text-xs',
-                      'bg-muted text-muted-foreground border border-border',
-                    )}
-                  >
-                    {tag}
-                  </span>
-                ))}
-                {filteredTags.length > 3 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                          className={cn(
-                            'inline-flex items-center px-3 py-1 rounded-full text-xs cursor-default',
-                            'bg-muted text-muted-foreground border border-border',
-                          )}
-                        >
-                          +{filteredTags.length - 3}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{filteredTags.slice(3).join(', ')}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-            );
-          })()}
+          {filteredTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {filteredTags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className={cn(
+                    'inline-flex items-center px-3 py-1 rounded-full text-xs',
+                    'bg-muted text-muted-foreground border border-border',
+                  )}
+                >
+                  {tag}
+                </span>
+              ))}
+              {filteredTags.length > 3 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          'inline-flex items-center px-3 py-1 rounded-full text-xs cursor-default',
+                          'bg-muted text-muted-foreground border border-border',
+                        )}
+                      >
+                        +{filteredTags.length - 3}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{filteredTags.slice(3).join(', ')}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
 
           {/* Marketplace metadata */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground/60">

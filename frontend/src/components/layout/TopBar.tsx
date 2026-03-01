@@ -1,4 +1,5 @@
 import { useState, useRef, type ChangeEvent, useEffect } from 'react';
+import { buildOpenSearchUrl } from './buildOpenSearchUrl';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -410,33 +411,14 @@ export function TopBar({
                             disabled={!isOrgReady || !hasAnalyticsSink}
                             onClick={() => {
                               if (!isOrgReady || !hasAnalyticsSink) return;
-                              const baseUrl = env.VITE_OPENSEARCH_DASHBOARDS_URL.replace(
-                                /\/+$/,
-                                '',
-                              );
-                              // Filter by run_id if a specific run is selected, otherwise by workflow_id
-                              const filterQuery = selectedRunId
-                                ? `sentris.run_id.keyword:"${selectedRunId}"`
-                                : `sentris.workflow_id.keyword:"${workflowId}"`;
                               // Use the run's backend-resolved org ID when available (matches indexed data),
                               // fall back to auth store org ID for workflow-level queries
-                              const effectiveOrgId = (
-                                selectedRunOrgId || organizationId
-                              ).toLowerCase();
-                              const orgScopedPattern = `security-findings-${effectiveOrgId}-*`;
-                              // OpenSearch Data Explorer URL format
-                              // Use .keyword fields for exact match filtering
-                              // Use 'all time' range (1 year) since run_id is unique - no need to filter by time
-                              const aParam = encodeURIComponent(
-                                `(discover:(columns:!(_source),interval:auto,sort:!()),metadata:(indexPattern:'${orgScopedPattern}',view:discover))`,
-                              );
-                              const qParam = encodeURIComponent(
-                                `(query:(language:kuery,query:'${filterQuery}'))`,
-                              );
-                              const gParam = encodeURIComponent(
-                                '(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-1y,to:now))',
-                              );
-                              const url = `${baseUrl}/app/data-explorer/discover/#?_a=${aParam}&_q=${qParam}&_g=${gParam}`;
+                              const url = buildOpenSearchUrl({
+                                baseUrl: env.VITE_OPENSEARCH_DASHBOARDS_URL,
+                                workflowId,
+                                runId: selectedRunId,
+                                orgId: selectedRunOrgId || organizationId,
+                              });
                               window.open(url, '_blank', 'noopener,noreferrer');
                             }}
                           >

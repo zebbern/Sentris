@@ -3,6 +3,129 @@ import { Button } from '@/components/ui/button';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// ---------------------------------------------------------------------------
+// Route → page info config map
+// ---------------------------------------------------------------------------
+
+interface PageInfo {
+  title: string;
+  shortTitle?: string;
+  subtitle: string;
+}
+
+interface RouteEntry extends PageInfo {
+  path: string;
+  /** When true, matches any pathname starting with `path`. */
+  prefix?: boolean;
+}
+
+const ROUTE_CONFIG: RouteEntry[] = [
+  {
+    path: '/',
+    title: 'Workflow Builder',
+    shortTitle: 'Workflows',
+    subtitle: 'Create and manage security automation workflows',
+  },
+  {
+    path: '/templates',
+    title: 'Template Library',
+    shortTitle: 'Templates',
+    subtitle: 'Browse and use pre-built workflow templates',
+  },
+  {
+    path: '/secrets',
+    title: 'Secrets',
+    shortTitle: 'Secrets',
+    subtitle: 'Store and manage sensitive credentials',
+  },
+  {
+    path: '/webhooks',
+    title: 'Webhooks Manager',
+    shortTitle: 'Webhooks',
+    subtitle: 'Manage and debug incoming webhooks',
+  },
+  {
+    path: '/api-keys',
+    title: 'API Keys',
+    shortTitle: 'API Keys',
+    subtitle: 'Manage API keys for workflow triggers',
+  },
+  {
+    path: '/integrations',
+    title: 'Connections',
+    shortTitle: 'Connections',
+    subtitle: 'Manage third-party connections',
+  },
+  {
+    path: '/artifacts',
+    title: 'Artifact Library',
+    shortTitle: 'Artifacts',
+    subtitle: 'Browse artifacts saved across workflow runs',
+  },
+  {
+    path: '/action-center',
+    title: 'Action Center',
+    shortTitle: 'Action Center',
+    subtitle: 'Review and respond to pending items',
+  },
+  {
+    path: '/mcp-library',
+    title: 'MCP Servers',
+    shortTitle: 'MCP Servers',
+    subtitle: 'Discover and manage MCP server configurations',
+  },
+  {
+    path: '/analytics-settings',
+    title: 'Analytics Settings',
+    shortTitle: 'Analytics Settings',
+    subtitle: 'Configure data retention and storage settings',
+  },
+  // Prefix matches (must come after exact matches for the same prefix)
+  {
+    path: '/workflows',
+    prefix: true,
+    title: 'Workflow Builder',
+    shortTitle: 'Builder',
+    subtitle: 'Design and automate security workflows',
+  },
+  {
+    path: '/schedules',
+    prefix: true,
+    title: 'Workflow Schedules',
+    shortTitle: 'Schedules',
+    subtitle: 'Manage recurring workflow cadences',
+  },
+  {
+    path: '/settings',
+    prefix: true,
+    title: 'Settings',
+    shortTitle: 'Settings',
+    subtitle: 'Organization and workspace configuration',
+  },
+];
+
+const FALLBACK_PAGE_INFO: PageInfo = {
+  title: 'Page Not Found',
+  shortTitle: 'Not Found',
+  subtitle: '',
+};
+
+function getPageInfo(
+  pathname: string,
+  titleOverride?: string,
+  subtitleOverride?: string,
+): PageInfo {
+  if (titleOverride) return { title: titleOverride, subtitle: subtitleOverride ?? '' };
+
+  for (const route of ROUTE_CONFIG) {
+    if (route.prefix ? pathname.startsWith(route.path) : pathname === route.path) {
+      return route;
+    }
+  }
+
+  return FALLBACK_PAGE_INFO;
+}
+
 interface AppTopBarProps {
   title?: string;
   subtitle?: string;
@@ -24,122 +147,7 @@ export function AppTopBar({
 }: AppTopBarProps) {
   const location = useLocation();
 
-  // Determine page title and navigation based on current route
-  const getPageInfo = () => {
-    if (title) return { title, subtitle };
-
-    if (location.pathname === '/') {
-      return {
-        title: 'Workflow Builder',
-        shortTitle: 'Workflows',
-        subtitle: 'Create and manage security automation workflows',
-      };
-    }
-
-    if (location.pathname.startsWith('/workflows')) {
-      return {
-        title: 'Workflow Builder',
-        shortTitle: 'Builder',
-        subtitle: 'Design and automate security workflows',
-      };
-    }
-
-    if (location.pathname === '/templates') {
-      return {
-        title: 'Template Library',
-        shortTitle: 'Templates',
-        subtitle: 'Browse and use pre-built workflow templates',
-      };
-    }
-
-    if (location.pathname.startsWith('/schedules')) {
-      return {
-        title: 'Workflow Schedules',
-        shortTitle: 'Schedules',
-        subtitle: 'Manage recurring workflow cadences',
-      };
-    }
-
-    if (location.pathname === '/secrets') {
-      return {
-        title: 'Secrets',
-        shortTitle: 'Secrets',
-        subtitle: 'Store and manage sensitive credentials',
-      };
-    }
-
-    if (location.pathname === '/webhooks') {
-      return {
-        title: 'Webhooks Manager',
-        shortTitle: 'Webhooks',
-        subtitle: 'Manage and debug incoming webhooks',
-      };
-    }
-
-    if (location.pathname === '/api-keys') {
-      return {
-        title: 'API Keys',
-        shortTitle: 'API Keys',
-        subtitle: 'Manage API keys for workflow triggers',
-      };
-    }
-
-    if (location.pathname === '/integrations') {
-      return {
-        title: 'Connections',
-        shortTitle: 'Connections',
-        subtitle: 'Manage third-party connections',
-      };
-    }
-
-    if (location.pathname === '/artifacts') {
-      return {
-        title: 'Artifact Library',
-        shortTitle: 'Artifacts',
-        subtitle: 'Browse artifacts saved across workflow runs',
-      };
-    }
-
-    if (location.pathname === '/action-center') {
-      return {
-        title: 'Action Center',
-        shortTitle: 'Action Center',
-        subtitle: 'Review and respond to pending items',
-      };
-    }
-
-    if (location.pathname === '/mcp-library') {
-      return {
-        title: 'MCP Servers',
-        shortTitle: 'MCP Servers',
-        subtitle: 'Discover and manage MCP server configurations',
-      };
-    }
-
-    if (location.pathname === '/analytics-settings') {
-      return {
-        title: 'Analytics Settings',
-        shortTitle: 'Analytics Settings',
-        subtitle: 'Configure data retention and storage settings',
-      };
-    }
-
-    if (location.pathname.startsWith('/settings')) {
-      return {
-        title: 'Settings',
-        shortTitle: 'Settings',
-        subtitle: 'Organization and workspace configuration',
-      };
-    }
-
-    return {
-      title: 'Page Not Found',
-      shortTitle: 'Not Found',
-      subtitle: '',
-    };
-  };
-
-  const pageInfo = getPageInfo();
+  const pageInfo = getPageInfo(location.pathname, title, subtitle);
 
   return (
     <div

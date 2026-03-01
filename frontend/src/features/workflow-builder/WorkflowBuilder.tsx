@@ -89,7 +89,6 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     savedSnapshotRef: executionLoadedSnapshotRef,
   } = executionGraph;
 
-  const [_executionDirty, setExecutionDirty] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   const roles = useAuthStore((state) => state.roles);
@@ -222,7 +221,6 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     executionLoadedSnapshotRef,
     setExecutionNodes,
     setExecutionEdges,
-    setExecutionDirty,
   });
 
   useWorkflowModeSwitching({
@@ -239,14 +237,11 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     designSavedSnapshotRef,
     setDesignNodes,
     setDesignEdges,
-    executionNodes,
     executionNodesRef,
     executionEdgesRef,
     preservedExecutionStateRef,
-    executionLoadedSnapshotRef,
     setExecutionNodes,
     setExecutionEdges,
-    setExecutionDirty,
     resetHistoricalTracking,
   });
 

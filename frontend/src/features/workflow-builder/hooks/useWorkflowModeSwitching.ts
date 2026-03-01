@@ -25,21 +25,18 @@ interface UseWorkflowModeSwitchingParams {
   setDesignNodes: (nodes: ReactFlowNode<FrontendNodeData>[]) => void;
   setDesignEdges: (edges: ReactFlowEdge[]) => void;
   // Execution graph refs & setters
-  executionNodes: ReactFlowNode<FrontendNodeData>[];
   executionNodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
   executionEdgesRef: React.MutableRefObject<ReactFlowEdge[]>;
   preservedExecutionStateRef: React.MutableRefObject<GraphSnapshot | null>;
-  executionLoadedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
   setExecutionNodes: (nodes: ReactFlowNode<FrontendNodeData>[]) => void;
   setExecutionEdges: (edges: ReactFlowEdge[]) => void;
   // Execution lifecycle
-  setExecutionDirty: React.Dispatch<React.SetStateAction<boolean>>;
   resetHistoricalTracking: () => void;
 }
 
 /**
  * Extracted from WorkflowBuilderContent: manages mode switching between
- * design and execution, URL-based mode sync, and execution dirty tracking.
+ * design and execution, URL-based mode sync.
  */
 export function useWorkflowModeSwitching({
   id,
@@ -55,41 +52,13 @@ export function useWorkflowModeSwitching({
   designSavedSnapshotRef,
   setDesignNodes,
   setDesignEdges,
-  executionNodes,
   executionNodesRef,
   executionEdgesRef,
   preservedExecutionStateRef,
-  executionLoadedSnapshotRef,
   setExecutionNodes,
   setExecutionEdges,
-  setExecutionDirty,
   resetHistoricalTracking,
 }: UseWorkflowModeSwitchingParams) {
-  // Track execution dirty state: check if node positions differ from loaded snapshot
-  useEffect(() => {
-    if (mode !== 'execution' || !executionLoadedSnapshotRef.current) {
-      return;
-    }
-
-    const currentNodes = executionNodesRef.current;
-    const loadedNodes = executionLoadedSnapshotRef.current.nodes;
-
-    if (currentNodes.length !== loadedNodes.length) {
-      // Node count changed (shouldn't happen in execution mode, but handle it)
-      setExecutionDirty(true);
-      return;
-    }
-
-    // Check if any node positions have changed
-    const positionsChanged = currentNodes.some((node) => {
-      const loadedNode = loadedNodes.find((n) => n.id === node.id);
-      if (!loadedNode) return true; // Node added/removed
-      return node.position.x !== loadedNode.position.x || node.position.y !== loadedNode.position.y;
-    });
-
-    setExecutionDirty(positionsChanged);
-  }, [executionNodes, mode]);
-
   // Handle mode switching: preserve and restore states cleanly
   const prevModeRef = useRef(mode);
 

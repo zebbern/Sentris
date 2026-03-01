@@ -50,7 +50,6 @@ interface UseWorkflowExecutionLifecycleOptions {
   executionLoadedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
   setExecutionNodes: SetNodesFn;
   setExecutionEdges: SetEdgesFn;
-  setExecutionDirty: (dirty: boolean) => void;
 }
 
 interface UseWorkflowExecutionLifecycleResult {
@@ -81,7 +80,6 @@ export function useWorkflowExecutionLifecycle({
   executionLoadedSnapshotRef,
   setExecutionNodes,
   setExecutionEdges,
-  setExecutionDirty,
 }: UseWorkflowExecutionLifecycleOptions): UseWorkflowExecutionLifecycleResult {
   // TanStack Query: only enable fetching when in execution mode or navigating to a specific run.
   // Use workflowId (from route param) rather than metadata.id (from store) to avoid a render
@@ -242,7 +240,6 @@ export function useWorkflowExecutionLifecycle({
 
     if (!targetRunId) {
       preservedExecutionStateRef.current = null;
-      setExecutionDirty(false);
 
       if (designSavedSnapshotRef.current) {
         const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
@@ -325,7 +322,6 @@ export function useWorkflowExecutionLifecycle({
 
     if (runIdChanged) {
       preservedExecutionStateRef.current = null;
-      setExecutionDirty(false);
     }
 
     const loadVersionForRun = async () => {
@@ -374,7 +370,6 @@ export function useWorkflowExecutionLifecycle({
 
       if (!actualVersionId || actualVersionId === metadata.currentVersionId) {
         preservedExecutionStateRef.current = null;
-        setExecutionDirty(false);
 
         if (designSavedSnapshotRef.current) {
           const savedNodes = cloneNodes(designSavedSnapshotRef.current.nodes);
@@ -409,7 +404,6 @@ export function useWorkflowExecutionLifecycle({
       }
 
       preservedExecutionStateRef.current = null;
-      setExecutionDirty(false);
 
       try {
         const workflowIdForRun = runToUse.workflowId ?? metadata.id;
@@ -464,7 +458,6 @@ export function useWorkflowExecutionLifecycle({
     setExecutionEdges,
     executionLoadedSnapshotRef,
     preservedExecutionStateRef,
-    setExecutionDirty,
     toast,
   ]);
 
