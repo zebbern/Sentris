@@ -11,6 +11,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiSecurity } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentAuth } from '../auth/auth-context.decorator';
+import { Public } from '../auth/public.decorator';
 import type { AuthContext } from '../auth/types';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -75,6 +76,7 @@ export class HumanInputsController {
   }
 
   // Public endpoints for resolving via token (no auth guard)
+  @Public()
   @Post('resolve/:token')
   @ApiOperation({ summary: 'Resolve input via public token' })
   @ApiResponse({ status: 200, type: PublicResolveResultDto })
