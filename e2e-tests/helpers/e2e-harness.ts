@@ -323,9 +323,8 @@ export async function resolveHumanInput(
 
 /**
  * Resolve a human input request via token endpoint.
- * NOTE: The controller intends this to be public (no auth) but the @Public()
- * decorator is currently missing, so the global AuthGuard still applies.
- * We send HEADERS (with internal token) to work around this.
+ * The controller route is decorated with @Public(), so no auth is required.
+ * We still send HEADERS here for convenience / consistency with other helpers.
  */
 export async function resolveByToken(
   token: string,

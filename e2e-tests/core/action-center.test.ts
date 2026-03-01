@@ -395,6 +395,57 @@ e2eDescribe('Action Center (Human Inputs) E2E Tests', () => {
   );
 
   // -----------------------------------------------------------------------
+  // Public token resolution WITHOUT auth headers
+  // -----------------------------------------------------------------------
+
+  e2eTest(
+    'Resolve via token endpoint without auth headers (@Public)',
+    { timeout: 120000 },
+    async () => {
+      console.log('\n  Test: Resolve via token without auth headers');
+
+      // 1. Create and run workflow
+      const workflowId = await createWorkflow(
+        buildApprovalWorkflow(`E2E No-Auth Token ${suffix}`),
+      );
+      createdWorkflowIds.push(workflowId);
+
+      const runId = await runWorkflow(workflowId);
+      const awaitingStatus = await pollRunUntilAwaitingInput(runId, 60000);
+      expect(awaitingStatus.status).toBe('AWAITING_INPUT');
+
+      // 2. Find pending input and grab its resolveToken
+      const pendingInputs = await listHumanInputs({ status: 'pending' });
+      const ourInput = pendingInputs.find(
+        (inp: any) => inp.runId === runId || inp.workflowId === workflowId,
+      );
+      expect(ourInput).toBeDefined();
+
+      const detail = await getHumanInput(ourInput.id);
+      expect(detail.resolveToken).toBeDefined();
+      const token = detail.resolveToken;
+
+      // 3. Resolve via token WITHOUT any auth headers — only Content-Type
+      const res = await fetch(`${API_BASE}/human-inputs/resolve/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      expect(res.ok).toBe(true);
+
+      const result = await res.json();
+      expect(result.success).toBe(true);
+      expect(result.input.status).toBe('resolved');
+      console.log('    No-auth token resolution succeeded — @Public() works');
+
+      // 4. Verify workflow completes
+      const finalStatus = await pollRunStatus(runId, 60000);
+      expect(finalStatus.status).toBe('COMPLETED');
+      console.log('    Workflow COMPLETED after no-auth token approval');
+    },
+  );
+
+  // -----------------------------------------------------------------------
   // List resolved inputs — verify status filter for resolved
   // -----------------------------------------------------------------------
 
