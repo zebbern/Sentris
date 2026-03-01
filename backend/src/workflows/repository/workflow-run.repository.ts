@@ -116,21 +116,30 @@ export class WorkflowRunRepository {
       limit?: number;
       offset?: number;
       organizationId?: string | null;
+      parentRunId?: string;
+      onlyRoots?: boolean;
     } = {},
   ): Promise<WorkflowRunRecord[]> {
-    let condition: ReturnType<typeof eq> | undefined;
+    const conditions: SQL[] = [];
 
     if (options.workflowId) {
-      condition = eq(workflowRunsTable.workflowId, options.workflowId);
+      conditions.push(eq(workflowRunsTable.workflowId, options.workflowId));
     }
 
     if (options.organizationId) {
-      const organizationCondition = eq(workflowRunsTable.organizationId, options.organizationId);
-      condition = condition ? and(condition, organizationCondition) : organizationCondition;
+      conditions.push(eq(workflowRunsTable.organizationId, options.organizationId));
+    }
+
+    if (options.parentRunId) {
+      conditions.push(eq(workflowRunsTable.parentRunId, options.parentRunId));
+    }
+
+    if (options.onlyRoots) {
+      conditions.push(sql`${workflowRunsTable.parentRunId} IS NULL`);
     }
 
     const baseQuery = this.db.select().from(workflowRunsTable);
-    const filteredQuery = condition ? baseQuery.where(condition) : baseQuery;
+    const filteredQuery = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
 
     return await filteredQuery
       .orderBy(desc(workflowRunsTable.createdAt))

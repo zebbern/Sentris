@@ -134,6 +134,16 @@ export class TraceRepository implements OnModuleDestroy {
       .orderBy(workflowTracesTable.sequence);
   }
 
+  async countByRunId(runId: string, organizationId?: string | null): Promise<number> {
+    const runFilter = this.buildRunFilter(runId, organizationId);
+    const [result] = await this.db
+      .select({ value: sql<number>`count(*)` })
+      .from(workflowTracesTable)
+      .where(runFilter);
+
+    return Number(result?.value ?? 0);
+  }
+
   async countByType(
     runId: string,
     type: TraceEventType,

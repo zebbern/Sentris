@@ -233,8 +233,7 @@ export function WorkflowWebhooksSidebar({
 
             if (Array.isArray(webhook.expectedInputs)) {
               webhook.expectedInputs.forEach((input: WebhookInputDefinition) => {
-                samplePayload[input.id] =
-                  input.type === 'number' ? 0 : input.type === 'boolean' ? false : 'value';
+                samplePayload[input.id] = input.type === 'number' ? 0 : 'value';
               });
             }
 

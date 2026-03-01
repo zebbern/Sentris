@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="docs/media/splash.png" alt="Sentris AI" width="800">
-</div>
-
 <p align="center">
   <img src="https://img.shields.io/github/v/release/zebbern/Sentris?color=blue&label=version" alt="Version">
   <a href="https://github.com/zebbern/Sentris/tree/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License"></a>
@@ -18,7 +14,7 @@ Sentris Flow provides a visual DSL and runtime for building, executing, and moni
 
 ---
 
-### 🏗️ Core Pillars
+### Core Pillars
 
 - **Durable, resumable workflows** powered by Temporal.io for stateful execution across failures.
 - **Isolated security runtimes** using ephemeral containers with per-run volume management.
@@ -27,7 +23,7 @@ Sentris Flow provides a visual DSL and runtime for building, executing, and moni
 
 ---
 
-## 🚀 Deployment Options
+## Deployment Options
 
 ### 1. Sentris Self-Host with Docker (Recommended)
 
@@ -54,7 +50,7 @@ Access the studio at `http://localhost`.
 
 ---
 
-## � Development Quickstart
+## Development Quickstart
 
 Get the dev environment running in 3 steps:
 
@@ -86,7 +82,7 @@ pm2 status         # Check process status
 
 ---
 
-## �🛠️ Capabilities
+## Capabilities
 
 ### Integrated Tooling
 
@@ -122,17 +118,11 @@ Sentris Flow is designed for enterprise-grade durability and horizontal scalabil
 
 Learn more about our design decisions and system components in the **[Architecture Deep-dive](/docs/architecture.mdx)**.
 
----
-
-## 🤝 Community & Support
-
-- 💬 **[Discord](https://discord.gg/fmMA4BtNXC)** — Real-time support and community discussion.
-- 🗣️ **[GitHub Discussions](https://github.com/zebbern/Sentris/discussions)** — Technical RFCs and feature requests.
-- 📚 **[Documentation](https://github.com/zebbern/Sentris/tree/main/docs)** — Full guides on component development and deployment.
+- **[Documentation](https://github.com/zebbern/Sentris/tree/main/docs)** — Full guides on component development and deployment.
 
 ---
 
-## 🔀 Multi-Instance Development
+## Multi-Instance Development
 
 Run multiple isolated dev instances on one machine for parallel feature work:
 
@@ -152,17 +142,7 @@ Each instance gets its own frontend port, backend port, database, and Temporal n
 
 ---
 
-## ✍️ Contributing
+## Contributing
 
 We welcome contributions to the management plane, worker logic, or new security components.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guidelines and setup instructions.
-
----
-
-## License
-
-Sentris Flow is licensed under the **Apache License 2.0**.
-
-<div align="center">
-  <p>Engineered for security teams by the Sentris Flow team.</p>
-</div>

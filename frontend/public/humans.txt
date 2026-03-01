@@ -1,27 +1,12 @@
 /* HUMANS.TXT */
-/* Sentris Flow - Team & Project Information */
-
-/* TEAM */
-Team: Sentris
-Contact: z_r@tuta.com
-Location: United States
-Website: https://github.com/zebbern/Sentris
-GitHub: https://github.com/SentrisAI
-Twitter: @sentris
-Discord: discord.gg/fmMA4BtNXC
-
-/* ABOUT */
-Mission: Empower security engineers with reliable, accessible security automation
-Founded: 2025
-Purpose: Build the operating system for modern security teams
+/* Sentris Flow - Project Information */
 
 /* PROJECT */
 Project Name: Sentris Flow
 Project URL: https://github.com/zebbern/Sentris
-Project Description: The leading security automation platform purpose-built for security engineers and product security teams. Design, deploy, and monitor security workflows without writing code.
+Project Description: No-Code Security Automation. Turn scattered scripts into reliable, observable systems with a Visual Workflow Builder.
 
 Project Status: Active Development
-Latest Update: December 2025
 
 /* KEY FEATURES */
 - No-code security workflow automation
@@ -31,27 +16,16 @@ Latest Update: December 2025
 - Scheduled security automation
 - AI-powered workflow optimization
 - Enterprise deployment options
-- Open source (Apache 2.0)
 
 /* OPEN SOURCE */
 Repository: https://github.com/zebbern/Sentris
-License: Apache License 2.0
 Contributing: https://github.com/zebbern/Sentris/blob/main/CONTRIBUTING.md
 
 /* COMMUNITY */
 Issues: https://github.com/zebbern/Sentris/issues
-Discord: https://discord.gg/fmMA4BtNXC
 
-/* SECURITY */
+/* SECURITY | SUPPORT */
 Security Contact: z_r@tuta.com
-
-/* SUPPORT */
-Support Email: z_r@tuta.com
-
-/* SOCIAL */
-LinkedIn: https://linkedin.com/company/sentris
-GitHub Discussions: https://github.com/zebbern/Sentris/discussions
-Twitter: https://twitter.com/sentris
 
 /* STANDARDS */
 HTML5: Yes
@@ -73,12 +47,8 @@ Cache: Redis-compatible
 /* FEEDBACK & UPDATES */
 To stay updated on Sentris Flow development:
 - Watch releases: https://github.com/zebbern/Sentris/releases
-- Join Discord: https://discord.gg/fmMA4BtNXC
-- Follow updates: https://twitter.com/sentris
 
 /* CONTRIBUTING */
 We welcome contributions! Please see CONTRIBUTING.md for guidelines.
 All contributions must be signed off (DCO compliance).
 
-/* LAST UPDATED */
-December 22, 2025

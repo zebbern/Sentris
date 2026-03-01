@@ -107,9 +107,6 @@ Resources
 - Website: https://github.com/zebbern/Sentris
 - Documentation: https://github.com/zebbern/Sentris/tree/main/docs
 - Source Code: https://github.com/zebbern/Sentris
-- Community Discord: https://discord.gg/fmMA4BtNXC
-- Updates: https://twitter.com/sentris
-- GitHub Discussions: https://github.com/zebbern/Sentris/discussions
 
 About Sentris
 
