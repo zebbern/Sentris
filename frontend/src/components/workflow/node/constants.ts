@@ -1,4 +1,5 @@
 import { Loader2, CheckCircle, XCircle, Clock, Ban, ShieldAlert } from 'lucide-react';
+import type { NodeVisualState } from '@/store/executionTimelineStore';
 
 /**
  * Status icons mapping for different node states
@@ -33,3 +34,16 @@ export const TERMINAL_DIMENSIONS = {
   HEIGHT: 402, // 360px content + ~40px header + 2px borders
   GAP: 35, // Gap between terminal bottom and parent top
 } as const;
+
+/** Default visual state for nodes without execution data. */
+export const DEFAULT_VISUAL_STATE: NodeVisualState = {
+  status: 'idle',
+  progress: 0,
+  startTime: 0,
+  eventCount: 0,
+  totalEvents: 0,
+  lastEvent: null,
+  dataFlow: { input: [], output: [] },
+  attempts: 0,
+  retryCount: 0,
+};

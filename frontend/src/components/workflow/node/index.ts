@@ -15,4 +15,9 @@ export type {
 } from './types';
 
 // Export constants
-export { STATUS_ICONS, TEXT_BLOCK_SIZES, TERMINAL_DIMENSIONS } from './constants';
+export {
+  STATUS_ICONS,
+  TEXT_BLOCK_SIZES,
+  TERMINAL_DIMENSIONS,
+  DEFAULT_VISUAL_STATE,
+} from './constants';
