@@ -19,103 +19,65 @@
     "edgeCount": 7
   },
   "graph": {
+    "name": "Incident Response Triage",
     "nodes": [
       {
         "id": "trigger_1",
-        "componentId": "entry-point",
-        "componentType": "trigger",
-        "label": "Alert Received",
+        "type": "core.workflow.entrypoint",
         "position": { "x": 100, "y": 300 },
-        "data": {
-          "description": "Triggered when a security alert is received (webhook, SIEM, etc.)"
-        }
+        "data": { "label": "Alert Received", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "script_extract",
-        "componentId": "logic-script",
-        "componentType": "action",
-        "label": "Extract IOCs",
+        "type": "core.logic.script",
         "position": { "x": 350, "y": 300 },
-        "data": {
-          "description": "Parse alert payload and extract IP addresses, domains, and file hashes",
-          "config": {
-            "script": "const alert = input; const ips = alert.indicators?.filter(i => i.type === 'ip') || []; const domains = alert.indicators?.filter(i => i.type === 'domain') || []; const hashes = alert.indicators?.filter(i => i.type === 'hash') || []; return { ips, domains, hashes, alertId: alert.id, severity: alert.severity };"
-          }
-        }
+        "data": { "label": "Extract IOCs", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "vt_check",
-        "componentId": "virustotal",
-        "componentType": "action",
-        "label": "VirusTotal Lookup",
+        "type": "security.virustotal.lookup",
         "position": { "x": 600, "y": 200 },
-        "data": {
-          "description": "Query VirusTotal for reputation data on extracted IOCs",
-          "config": { "indicators": "{{script_extract.output}}" }
-        }
+        "data": { "label": "VirusTotal Lookup", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "abuse_check",
-        "componentId": "abuseipdb",
-        "componentType": "action",
-        "label": "AbuseIPDB Check",
+        "type": "security.abuseipdb.check",
         "position": { "x": 600, "y": 400 },
-        "data": {
-          "description": "Check IP addresses against AbuseIPDB for known malicious activity",
-          "config": { "ips": "{{script_extract.output.ips}}" }
-        }
+        "data": { "label": "AbuseIPDB Check", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "script_assess",
-        "componentId": "logic-script",
-        "componentType": "action",
-        "label": "Assess Severity",
+        "type": "core.logic.script",
         "position": { "x": 900, "y": 300 },
-        "data": {
-          "description": "Combine enrichment data and calculate a risk score for the incident",
-          "config": {
-            "script": "const vt = input.virustotal; const abuse = input.abuseipdb; const riskScore = (vt?.malicious || 0) * 10 + (abuse?.confidenceScore || 0); const severity = riskScore > 80 ? 'critical' : riskScore > 50 ? 'high' : riskScore > 20 ? 'medium' : 'low'; return { riskScore, severity, enrichment: { virustotal: vt, abuseipdb: abuse } };"
-          }
-        }
+        "data": { "label": "Assess Severity", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "http_ticket",
-        "componentId": "http-request",
-        "componentType": "action",
-        "label": "Create Incident Ticket",
+        "type": "core.http.request",
         "position": { "x": 1150, "y": 300 },
         "data": {
-          "description": "Create a ticket in the incident management system with enriched findings",
-          "config": {
-            "method": "POST",
-            "url": "{{REPLACE_WITH_TICKETING_URL}}/api/incidents",
-            "body": "{{script_assess.output}}"
-          }
+          "label": "Create Incident Ticket",
+          "config": { "params": { "method": "POST" }, "inputOverrides": {} }
         }
       },
       {
         "id": "notify_soc",
-        "componentId": "slack",
-        "componentType": "action",
-        "label": "Notify SOC Team",
+        "type": "core.notification.slack",
         "position": { "x": 1400, "y": 300 },
         "data": {
-          "description": "Alert the SOC team in Slack with incident summary and ticket link",
-          "config": {
-            "channel": "#soc-incidents",
-            "message": "New incident: {{script_assess.output.severity}} severity — Ticket created"
-          }
+          "label": "Notify SOC Team",
+          "config": { "params": { "channel": "#soc-incidents" }, "inputOverrides": {} }
         }
       }
     ],
     "edges": [
-      { "source": "trigger_1", "target": "script_extract" },
-      { "source": "script_extract", "target": "vt_check" },
-      { "source": "script_extract", "target": "abuse_check" },
-      { "source": "vt_check", "target": "script_assess" },
-      { "source": "abuse_check", "target": "script_assess" },
-      { "source": "script_assess", "target": "http_ticket" },
-      { "source": "http_ticket", "target": "notify_soc" }
+      { "id": "trigger_1-script_extract", "source": "trigger_1", "target": "script_extract" },
+      { "id": "script_extract-vt_check", "source": "script_extract", "target": "vt_check" },
+      { "id": "script_extract-abuse_check", "source": "script_extract", "target": "abuse_check" },
+      { "id": "vt_check-script_assess", "source": "vt_check", "target": "script_assess" },
+      { "id": "abuse_check-script_assess", "source": "abuse_check", "target": "script_assess" },
+      { "id": "script_assess-http_ticket", "source": "script_assess", "target": "http_ticket" },
+      { "id": "http_ticket-notify_soc", "source": "http_ticket", "target": "notify_soc" }
     ]
   },
   "requiredSecrets": [

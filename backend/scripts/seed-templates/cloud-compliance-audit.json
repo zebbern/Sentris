@@ -19,79 +19,69 @@
     "edgeCount": 5
   },
   "graph": {
+    "name": "Cloud Security Compliance Audit",
     "nodes": [
       {
         "id": "trigger_1",
-        "componentId": "entry-point",
-        "componentType": "trigger",
-        "label": "Start Audit",
+        "type": "core.workflow.entrypoint",
         "position": { "x": 100, "y": 250 },
-        "data": { "description": "Trigger weekly compliance audit (schedule or manual)" }
+        "data": { "label": "Start Audit", "config": { "params": {}, "inputOverrides": {} } }
       },
       {
         "id": "aws_creds",
-        "componentId": "credentials-aws",
-        "componentType": "action",
-        "label": "Load AWS Credentials",
+        "type": "core.credentials.aws",
         "position": { "x": 350, "y": 250 },
-        "data": { "description": "Retrieve AWS credentials for the target account" }
+        "data": {
+          "label": "Load AWS Credentials",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
       },
       {
         "id": "prowler_1",
-        "componentId": "prowler-scan",
-        "componentType": "action",
-        "label": "Run Prowler Scan",
+        "type": "security.prowler.scan",
         "position": { "x": 600, "y": 250 },
         "data": {
-          "description": "Execute Prowler CIS Benchmark checks against the AWS account",
-          "config": { "checks": "cis_level1", "services": "iam,s3,ec2,rds,cloudtrail,kms" }
+          "label": "Run Prowler Scan",
+          "config": {
+            "params": { "checks": "cis_level1", "services": "iam,s3,ec2,rds,cloudtrail,kms" },
+            "inputOverrides": {}
+          }
         }
       },
       {
         "id": "script_analyze",
-        "componentId": "logic-script",
-        "componentType": "action",
-        "label": "Analyze Compliance",
+        "type": "core.logic.script",
         "position": { "x": 850, "y": 250 },
         "data": {
-          "description": "Process Prowler findings and calculate compliance score per service",
-          "config": {
-            "script": "const findings = input.results || []; const passed = findings.filter(f => f.status === 'PASS').length; const failed = findings.filter(f => f.status === 'FAIL').length; const total = passed + failed; const score = total > 0 ? Math.round((passed / total) * 100) : 0; const byService = {}; findings.forEach(f => { if (!byService[f.service]) byService[f.service] = { passed: 0, failed: 0 }; byService[f.service][f.status === 'PASS' ? 'passed' : 'failed']++; }); return { score, passed, failed, total, byService, criticalFindings: findings.filter(f => f.status === 'FAIL' && f.severity === 'critical') };"
-          }
+          "label": "Analyze Compliance",
+          "config": { "params": {}, "inputOverrides": {} }
         }
       },
       {
         "id": "artifact_1",
-        "componentId": "artifact-writer",
-        "componentType": "action",
-        "label": "Save Report Artifact",
+        "type": "core.destination.artifact",
         "position": { "x": 1100, "y": 250 },
         "data": {
-          "description": "Store the full compliance report as a downloadable artifact",
-          "config": { "filename": "compliance-report.json", "content": "{{script_analyze.output}}" }
+          "label": "Save Report Artifact",
+          "config": { "params": { "filename": "compliance-report.json" }, "inputOverrides": {} }
         }
       },
       {
         "id": "notify_1",
-        "componentId": "slack",
-        "componentType": "action",
-        "label": "Send Compliance Summary",
+        "type": "core.notification.slack",
         "position": { "x": 1350, "y": 250 },
         "data": {
-          "description": "Notify the security team with compliance score and critical findings",
-          "config": {
-            "channel": "#compliance",
-            "message": "AWS Compliance Score: {{script_analyze.output.score}}% — {{script_analyze.output.failed}} failures detected"
-          }
+          "label": "Send Compliance Summary",
+          "config": { "params": { "channel": "#compliance" }, "inputOverrides": {} }
         }
       }
     ],
     "edges": [
-      { "source": "trigger_1", "target": "aws_creds" },
-      { "source": "aws_creds", "target": "prowler_1" },
-      { "source": "prowler_1", "target": "script_analyze" },
-      { "source": "script_analyze", "target": "artifact_1" },
-      { "source": "artifact_1", "target": "notify_1" }
+      { "id": "trigger_1-aws_creds", "source": "trigger_1", "target": "aws_creds" },
+      { "id": "aws_creds-prowler_1", "source": "aws_creds", "target": "prowler_1" },
+      { "id": "prowler_1-script_analyze", "source": "prowler_1", "target": "script_analyze" },
+      { "id": "script_analyze-artifact_1", "source": "script_analyze", "target": "artifact_1" },
+      { "id": "artifact_1-notify_1", "source": "artifact_1", "target": "notify_1" }
     ]
   },
   "requiredSecrets": [

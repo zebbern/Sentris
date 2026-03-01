@@ -283,17 +283,24 @@ export class WorkflowsService {
     await this.requireRunAccess(runId, auth);
   }
 
-  async create(dto: WorkflowGraphDto, auth?: AuthContext | null): Promise<ServiceWorkflowResponse> {
+  async create(
+    dto: WorkflowGraphDto,
+    auth?: AuthContext | null,
+    options?: { skipValidation?: boolean },
+  ): Promise<ServiceWorkflowResponse> {
     const input = this.parse(dto);
 
     // Validate workflow graph before saving (including port connections)
-    try {
-      compileWorkflowGraph(input);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new BadRequestException(`Workflow validation failed: ${error.message}`);
+    // Templates skip validation because they are blueprints with unfilled inputs
+    if (!options?.skipValidation) {
+      try {
+        compileWorkflowGraph(input);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          throw new BadRequestException(`Workflow validation failed: ${error.message}`);
+        }
+        throw error;
       }
-      throw error;
     }
 
     this.ensureOrganizationAdmin(auth);
