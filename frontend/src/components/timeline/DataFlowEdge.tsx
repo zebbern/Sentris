@@ -1,5 +1,5 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, EdgeProps, Position } from 'reactflow';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps } from 'reactflow';
 import { Package, FileText, Database, Code } from 'lucide-react';
 import { useExecutionTimelineStore, type DataPacket } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
@@ -10,6 +10,7 @@ import {
   getEdgeDasharraySum,
   getEdgeStatusGlowColor,
 } from '@/components/workflow/edge-colors';
+import { useSmartEdgePath } from '@/components/workflow/useSmartEdgePath';
 import { cn } from '@/lib/utils';
 
 // Data packet icon mapping
@@ -96,6 +97,7 @@ export const DataFlowEdge = memo(
     const [hoveredPacket, setHoveredPacket] = useState<DataPacket | null>(null);
     const [animatedPackets, setAnimatedPackets] = useState<AnimatedPacket[]>([]);
     const animationRef = useRef<number | null>(null);
+    const pathRef = useRef<SVGPathElement | null>(null);
 
     const currentTime = useExecutionTimelineStore((s) => s.currentTime);
     const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
@@ -166,17 +168,7 @@ export const DataFlowEdge = memo(
       );
     }, [data?.packets, dataFlows, source, target, targetHandle, currentTime]);
 
-    const edgePath = useMemo(() => {
-      const [path] = getBezierPath({
-        sourceX,
-        sourceY,
-        sourcePosition: Position.Right,
-        targetX,
-        targetY,
-        targetPosition: Position.Left,
-      });
-      return path;
-    }, [sourceX, sourceY, targetX, targetY]);
+    const { path: edgePath } = useSmartEdgePath(sourceX, sourceY, targetX, targetY, source, target);
 
     const labelPosition = useMemo(
       () => ({
@@ -250,38 +242,46 @@ export const DataFlowEdge = memo(
       isDimmed,
     ]);
 
-    // Position packets along the Bezier curve
-    const getPointOnBezierCurve = (
-      t: number,
-      sourceX: number,
-      sourceY: number,
-      targetX: number,
-      targetY: number,
-    ): { x: number; y: number } => {
-      // Calculate control points for a smooth Bezier curve
-      const controlPointOffsetX = Math.abs(targetX - sourceX) * 0.25;
-      const controlPointOffsetY = Math.abs(targetY - sourceY) * 0.1;
+    // Position packets along the edge path.
+    // For smart-routed (generic) paths we use the SVG path element's
+    // getPointAtLength API which works for any path shape. For standard
+    // bezier we fall back to the analytical formula for accuracy.
+    const getPointOnPath = useCallback(
+      (t: number, sX: number, sY: number, tX: number, tY: number): { x: number; y: number } => {
+        // Try SVG-based approach first (works for any path)
+        if (pathRef.current) {
+          const totalLen = pathRef.current.getTotalLength();
+          if (totalLen > 0) {
+            const pt = pathRef.current.getPointAtLength(t * totalLen);
+            return { x: pt.x, y: pt.y };
+          }
+        }
 
-      const cp1x = sourceX + controlPointOffsetX;
-      const cp1y = sourceY - controlPointOffsetY;
-      const cp2x = targetX - controlPointOffsetX;
-      const cp2y = targetY - controlPointOffsetY;
+        // Fallback: analytical cubic bezier (matches react-flow default)
+        const controlPointOffsetX = Math.abs(tX - sX) * 0.25;
+        const controlPointOffsetY = Math.abs(tY - sY) * 0.1;
 
-      // Cubic Bezier curve formula
-      const x =
-        Math.pow(1 - t, 3) * sourceX +
-        3 * Math.pow(1 - t, 2) * t * cp1x +
-        3 * (1 - t) * Math.pow(t, 2) * cp2x +
-        Math.pow(t, 3) * targetX;
+        const cp1x = sX + controlPointOffsetX;
+        const cp1y = sY - controlPointOffsetY;
+        const cp2x = tX - controlPointOffsetX;
+        const cp2y = tY - controlPointOffsetY;
 
-      const y =
-        Math.pow(1 - t, 3) * sourceY +
-        3 * Math.pow(1 - t, 2) * t * cp1y +
-        3 * (1 - t) * Math.pow(t, 2) * cp2y +
-        Math.pow(t, 3) * targetY;
+        const x =
+          Math.pow(1 - t, 3) * sX +
+          3 * Math.pow(1 - t, 2) * t * cp1x +
+          3 * (1 - t) * Math.pow(t, 2) * cp2x +
+          Math.pow(t, 3) * tX;
 
-      return { x, y };
-    };
+        const y =
+          Math.pow(1 - t, 3) * sY +
+          3 * Math.pow(1 - t, 2) * t * cp1y +
+          3 * (1 - t) * Math.pow(t, 2) * cp2y +
+          Math.pow(t, 3) * tY;
+
+        return { x, y };
+      },
+      [],
+    );
 
     const isPathHighlighted = data?.isPathHighlighted ?? false;
 
@@ -346,6 +346,8 @@ export const DataFlowEdge = memo(
 
     return (
       <>
+        {/* Hidden path for getPointAtLength calculations */}
+        <path ref={pathRef} d={edgePath} fill="none" stroke="none" pointerEvents="none" />
         {/* Glow path — rendered before the main edge so it sits behind it */}
         {/* When heat map is active, use heat color for the glow instead of status glow */}
         {(glowColor || isHeatMapActive) && (
@@ -389,13 +391,7 @@ export const DataFlowEdge = memo(
 
         {/* Animated data packets */}
         {animatedPackets.map((animatedPacket) => {
-          const point = getPointOnBezierCurve(
-            animatedPacket.position,
-            sourceX,
-            sourceY,
-            targetX,
-            targetY,
-          );
+          const point = getPointOnPath(animatedPacket.position, sourceX, sourceY, targetX, targetY);
           return (
             <div
               key={animatedPacket.id}

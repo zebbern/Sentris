@@ -40,6 +40,8 @@ export function ExecutionTimeline() {
 
   const showHeatMap = useWorkflowUiStore((s) => s.showHeatMap);
   const toggleHeatMap = useWorkflowUiStore((s) => s.toggleHeatMap);
+  const smartRouting = useWorkflowUiStore((s) => s.smartRouting);
+  const toggleSmartRouting = useWorkflowUiStore((s) => s.toggleSmartRouting);
 
   const isLiveMode = playbackMode === 'live';
   const overviewDuration = Math.max(eventDuration, totalDuration);
@@ -278,12 +280,14 @@ export function ExecutionTimeline() {
           playbackSpeed={playbackSpeed}
           isLiveFollowing={isLiveFollowing}
           showHeatMap={showHeatMap}
+          smartRouting={smartRouting}
           onPlayPause={handlePlayPause}
           onStepForward={stepForward}
           onStepBackward={stepBackward}
           onSpeedChange={handleSpeedChange}
           onGoLive={goLive}
           onToggleHeatMap={toggleHeatMap}
+          onToggleSmartRouting={toggleSmartRouting}
         />
 
         <TimelineTrack

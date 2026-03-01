@@ -24,12 +24,14 @@ export interface PlaybackControlsProps {
   playbackSpeed: number;
   isLiveFollowing: boolean;
   showHeatMap: boolean;
+  smartRouting: boolean;
   onPlayPause: () => void;
   onStepForward: () => void;
   onStepBackward: () => void;
   onSpeedChange: (speed: number) => void;
   onGoLive: () => void;
   onToggleHeatMap: () => void;
+  onToggleSmartRouting: () => void;
 }
 
 export interface TimelineTrackProps {

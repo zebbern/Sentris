@@ -12,6 +12,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   type Node,
   type Edge,
   type NodeChange,
@@ -115,6 +116,8 @@ export function Canvas({
   const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
   const showHeatMap = useWorkflowUiStore((state) => state.showHeatMap);
+  const smartRouting = useWorkflowUiStore((state) => state.smartRouting);
+  const toggleSmartRouting = useWorkflowUiStore((state) => state.toggleSmartRouting);
 
   // --- Edge context menu state ---
   const [edgeContextMenu, setEdgeContextMenu] = useState<{
@@ -489,6 +492,34 @@ export function Canvas({
                   position="bottom-left"
                   className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
                 />
+                <Panel position="top-right" className="!m-2">
+                  <button
+                    onClick={toggleSmartRouting}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
+                      smartRouting
+                        ? 'bg-sky-500 text-white border-sky-600 hover:bg-sky-600'
+                        : 'bg-card text-foreground border-border hover:bg-accent'
+                    }`}
+                    title={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="6" cy="19" r="3" />
+                      <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+                      <circle cx="18" cy="5" r="3" />
+                    </svg>
+                    Smart Routing
+                  </button>
+                </Panel>
                 <MiniMap
                   position="bottom-right"
                   pannable

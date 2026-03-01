@@ -1,4 +1,4 @@
-import { Play, Pause, SkipBack, SkipForward, Flame } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Flame, Route } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,12 +19,14 @@ export function PlaybackControls({
   playbackSpeed,
   isLiveFollowing,
   showHeatMap,
+  smartRouting,
   onPlayPause,
   onStepForward,
   onStepBackward,
   onSpeedChange,
   onGoLive,
   onToggleHeatMap,
+  onToggleSmartRouting,
 }: PlaybackControlsProps) {
   const isLiveMode = playbackMode === 'live';
 
@@ -102,6 +104,16 @@ export function PlaybackControls({
         >
           <Flame className="h-4 w-4" />
           Heat Map
+        </Button>
+        <Button
+          variant={smartRouting ? 'default' : 'outline'}
+          size="sm"
+          onClick={onToggleSmartRouting}
+          aria-label={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
+          className={cn('gap-1.5', smartRouting && 'bg-sky-500 hover:bg-sky-600 text-white')}
+        >
+          <Route className="h-4 w-4" />
+          Smart Routing
         </Button>
         {isLiveMode && !isLiveFollowing && (
           <div className="flex items-center gap-2">

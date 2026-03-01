@@ -32,6 +32,8 @@ interface WorkflowUiState {
   terminalPanelCollapsed: boolean;
   /** Whether the edge heat map overlay is enabled (execution mode only). */
   showHeatMap: boolean;
+  /** Whether smart edge routing (orthogonal node-avoidance) is enabled. */
+  smartRouting: boolean;
 }
 
 interface WorkflowUiActions {
@@ -60,6 +62,8 @@ interface WorkflowUiActions {
   clearDockedTerminals: () => void;
   /** Toggle the edge heat map overlay on/off. */
   toggleHeatMap: () => void;
+  /** Toggle smart edge routing on/off. */
+  toggleSmartRouting: () => void;
 }
 
 export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
@@ -74,6 +78,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       terminalPanelHeight: 300,
       terminalPanelCollapsed: false,
       showHeatMap: false,
+      smartRouting: false,
       setMode: (mode) =>
         set((state) => ({
           mode,
@@ -154,6 +159,8 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       clearDockedTerminals: () => set({ dockedTerminals: [], activeDockedTerminalId: null }),
 
       toggleHeatMap: () => set((state) => ({ showHeatMap: !state.showHeatMap })),
+
+      toggleSmartRouting: () => set((state) => ({ smartRouting: !state.smartRouting })),
     }),
     {
       name: 'workflow-ui-preferences',
@@ -163,6 +170,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         inspectorWidth: state.inspectorWidth,
         terminalPanelHeight: state.terminalPanelHeight,
         showHeatMap: state.showHeatMap,
+        smartRouting: state.smartRouting,
       }),
       // Merge function to ensure mode is never restored from localStorage
       merge: (persistedState, currentState) => ({
