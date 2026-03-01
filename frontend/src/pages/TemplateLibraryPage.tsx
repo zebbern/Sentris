@@ -34,7 +34,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export function TemplateLibraryPage() {
-  useDocumentTitle('Templates');
+  useDocumentTitle('Template Library');
   const navigate = useNavigate();
   const roles = useAuthStore((state) => state.roles);
   const organizationId = useAuthStore((state) => state.organizationId);

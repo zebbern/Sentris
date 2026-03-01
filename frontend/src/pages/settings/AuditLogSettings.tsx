@@ -234,7 +234,7 @@ export function AuditLogSettings() {
         )}
 
         <div className="overflow-x-auto">
-          <Table className="table-fixed w-full">
+          <Table className="table-fixed w-full" aria-label="Audit log">
             {(items.length > 0 || isLoading) && (
               <TableHeader>
                 <TableRow>

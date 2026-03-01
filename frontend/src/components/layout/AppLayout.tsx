@@ -688,7 +688,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   </span>
                 </div>
                 {sidebarOpen && (
-                  <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1.5 font-mono text-xs font-medium text-muted-foreground">
                     {isMac ? (
                       <>
                         <Command className="h-2.5 w-2.5" />K

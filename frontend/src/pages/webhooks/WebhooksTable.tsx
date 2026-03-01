@@ -104,7 +104,7 @@ export function WebhooksTable({
       <div className="overflow-x-auto">
         <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
-          <Table className="table-fixed w-full">
+          <Table className="table-fixed w-full" aria-label="Webhooks">
             {(hasData || isLoading) && (
               <TableHeader>
                 <TableRow>

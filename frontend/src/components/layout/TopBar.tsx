@@ -228,7 +228,7 @@ export function TopBar({
           <span className="text-xs font-semibold hidden sm:inline">Design</span>
           <span
             className={cn(
-              'text-[10px] hidden xl:inline',
+              'text-xs hidden xl:inline',
               mode === 'design' ? 'text-primary-foreground/80' : 'text-muted-foreground',
             )}
           >
@@ -256,7 +256,7 @@ export function TopBar({
           <span className="text-xs font-semibold hidden sm:inline">Execute</span>
           <span
             className={cn(
-              'text-[10px] hidden xl:inline',
+              'text-xs hidden xl:inline',
               mode === 'execution' ? 'text-primary-foreground/80' : 'text-muted-foreground',
             )}
           >
@@ -388,7 +388,7 @@ export function TopBar({
                     <span className="hidden xl:inline">{saveLabel}</span>
                     <span
                       className={cn(
-                        'text-[10px] font-medium px-1.5 py-0.5 rounded border ml-0 xl:ml-1',
+                        'text-xs font-medium px-1.5 py-0.5 rounded border ml-0 xl:ml-1',
                         saveBadgeTone,
                         'hidden sm:inline-block',
                       )}

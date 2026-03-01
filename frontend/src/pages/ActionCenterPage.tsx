@@ -233,7 +233,7 @@ export function ActionCenterPage() {
                 collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
-                <Table className="table-fixed w-full">
+                <Table className="table-fixed w-full" aria-label="Pending actions">
                   {(hasData || isLoading) && (
                     <TableHeader>
                       <TableRow>

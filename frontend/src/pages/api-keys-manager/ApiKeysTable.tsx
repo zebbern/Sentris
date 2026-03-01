@@ -185,7 +185,7 @@ export function ApiKeysTable({
             collisionDetection={collisionDetection}
             onDragEnd={onDragEnd}
           >
-            <Table className="table-fixed w-full">
+            <Table className="table-fixed w-full" aria-label="API keys">
               {(apiKeys.length > 0 || loading) && (
                 <TableHeader>
                   <TableRow>

@@ -101,7 +101,7 @@ export function SchedulesTable({
       <div className="overflow-x-auto">
         <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
-          <Table className="table-fixed w-full min-w-[480px]">
+          <Table className="table-fixed w-full min-w-[480px]" aria-label="Schedules">
             {(hasData || isLoading) && (
               <TableHeader>
                 <TableRow>

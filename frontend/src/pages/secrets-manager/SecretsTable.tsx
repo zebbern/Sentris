@@ -164,7 +164,7 @@ export function SecretsTable({
             collisionDetection={collisionDetection}
             onDragEnd={onDragEnd}
           >
-            <Table className="table-fixed w-full">
+            <Table className="table-fixed w-full" aria-label="Stored secrets">
               <TableHeader>
                 <TableRow className="text-muted-foreground">
                   <TableHead className="w-10">
