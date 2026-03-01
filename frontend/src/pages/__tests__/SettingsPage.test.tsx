@@ -2,37 +2,45 @@ import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { createThemeStoreMock } from '@/test/mocks/theme-store';
+import { createUserPreferencesStoreMock } from '@/test/mocks/user-preferences-store';
 
+// ---------------------------------------------------------------------------
 // Mutable auth state
+// ---------------------------------------------------------------------------
 let mockRoles: string[] = ['ADMIN'];
 
 mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
 
-// Stub out child route components to isolate SettingsPage logic
-mock.module('@/pages/settings/GeneralSettings', () => ({
-  GeneralSettings: () => <div data-testid="general-settings">General Settings Content</div>,
+// ---------------------------------------------------------------------------
+// Mock stores & hooks used by child settings components so the real components
+// render without errors. Shared factories ensure Zustand-compatible mocks
+// with .setState()/.getState() so other test files aren't contaminated.
+// ---------------------------------------------------------------------------
+
+mock.module('@/store/themeStore', () => createThemeStoreMock());
+
+mock.module('@/store/userPreferencesStore', () => createUserPreferencesStoreMock());
+
+mock.module('@/hooks/useNotificationPermission', () => ({
+  useNotificationPermission: () => ({
+    permission: 'default' as const,
+    requestPermission: mock(() => Promise.resolve('default' as const)),
+    isSupported: true,
+  }),
 }));
 
-mock.module('@/pages/settings/AppearanceSettings', () => ({
-  AppearanceSettings: () => (
-    <div data-testid="appearance-settings">Appearance Settings Content</div>
-  ),
-}));
-
-mock.module('@/pages/settings/AuditLogSettings', () => ({
-  AuditLogSettings: () => <div data-testid="audit-settings">Audit Log Settings Content</div>,
-}));
-
-mock.module('@/pages/settings/NotificationSettings', () => ({
-  NotificationSettings: () => (
-    <div data-testid="notification-settings">Notification Settings Content</div>
-  ),
-}));
-
-mock.module('@/pages/settings/KeyboardShortcutsSettings', () => ({
-  KeyboardShortcutsSettings: () => (
-    <div data-testid="shortcuts-settings">Keyboard Shortcuts Settings Content</div>
-  ),
+mock.module('@/hooks/queries/useAuditLogQueries', () => ({
+  useAuditLogs: () => ({
+    data: undefined,
+    isLoading: false,
+    isFetching: false,
+    isFetchingNextPage: false,
+    hasNextPage: false,
+    fetchNextPage: mock(),
+    refetch: mock(),
+    error: null,
+  }),
 }));
 
 import { SettingsPage } from '../SettingsPage';
@@ -95,23 +103,23 @@ describe('SettingsPage', () => {
 
   it('renders GeneralSettings content on /settings/general', () => {
     renderSettings('/settings/general');
-    expect(screen.getByTestId('general-settings')).toBeTruthy();
+    expect(screen.getByText('Default Landing Page')).toBeTruthy();
   });
 
   it('renders AppearanceSettings content on /settings/appearance', () => {
     renderSettings('/settings/appearance');
-    expect(screen.getByTestId('appearance-settings')).toBeTruthy();
+    expect(screen.getByText('Select your preferred color scheme.')).toBeTruthy();
   });
 
   it('renders AuditLogSettings content on /settings/audit for admin', () => {
     mockRoles = ['ADMIN'];
     renderSettings('/settings/audit');
-    expect(screen.getByTestId('audit-settings')).toBeTruthy();
+    expect(screen.getByText('Audit Log')).toBeTruthy();
   });
 
   it('redirects /settings to /settings/general', () => {
     renderSettings('/settings');
     // After navigate, GeneralSettings should render
-    expect(screen.getByTestId('general-settings')).toBeTruthy();
+    expect(screen.getByText('Default Landing Page')).toBeTruthy();
   });
 });

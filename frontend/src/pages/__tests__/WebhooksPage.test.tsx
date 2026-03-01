@@ -1,6 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, screen, cleanup } from '@testing-library/react';
 import type { WebhookConfiguration } from '@sentris/shared';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import {
@@ -10,11 +9,14 @@ import {
   createSortableUiMock,
   createUseSortableListMock,
 } from '@/test/mocks/dnd-kit';
+import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { renderWithProviders } from '@/test/render-with-providers';
 
-// --- Mock dialog / alert-dialog components (passthrough for test rendering) ---
+// --- Mock dialog / alert-dialog / select components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
+mock.module('@/components/ui/select', createSelectMock);
 
 // --- Mock DnD (avoid jsdom issues) ---
 mock.module('@dnd-kit/core', createDndCoreMock);
@@ -80,14 +82,6 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
   useWorkflowsSummary: () => ({
     data: mockWorkflows,
     isLoading: false,
-  }),
-}));
-
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
   }),
 }));
 
@@ -157,7 +151,6 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.error = overrides.error ?? null;
   mockQueryState.deleteWebhook = overrides.deleteWebhook ?? mock().mockResolvedValue(undefined);
   mockQueryState.regeneratePath = overrides.regeneratePath ?? mock().mockResolvedValue(undefined);
-  mockInvalidateQueries.mockClear();
   mockConfirm.mockClear();
 
   // Reset bulk selection state
@@ -172,12 +165,7 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   return mockQueryState;
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <WebhooksPage />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<WebhooksPage />);
 
 // --- Tests ---
 describe('WebhooksPage', () => {
@@ -212,16 +200,18 @@ describe('WebhooksPage', () => {
     expect(screen.getByText('GitHub Push Hook')).toBeInTheDocument();
     expect(screen.getByText('Slack Notification')).toBeInTheDocument();
 
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    // Use getAllByText — filter dropdown options also contain status text
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Inactive').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders workflow name for each webhook', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByText('Scan Network')).toBeInTheDocument();
-    expect(screen.getByText('Deploy App')).toBeInTheDocument();
+    // Use getAllByText — workflow filter dropdown options also contain these names
+    expect(screen.getAllByText('Scan Network').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Deploy App').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows ErrorBanner when error is set', () => {

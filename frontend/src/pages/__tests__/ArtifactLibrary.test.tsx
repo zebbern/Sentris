@@ -1,7 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, screen, cleanup } from '@testing-library/react';
 import type { ArtifactMetadata } from '@sentris/shared';
 import { createConfirmDialogMock } from '@/test/mocks/dialog';
 import {
@@ -11,6 +10,7 @@ import {
   createUseSortableListMock,
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -78,23 +78,7 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
   }),
 }));
 
-mock.module('@tanstack/react-query', () => ({
-  ...realModuleExports('@tanstack/react-query'),
-  useQueryClient: () => ({
-    invalidateQueries: mock(async () => {}),
-  }),
-}));
-
-// --- Confirm dialog hook ---
-const mockConfirm = mock(async () => false);
-mock.module('@/hooks/useConfirmDialog', () => ({
-  useConfirmDialog: () => ({
-    confirm: mockConfirm,
-    dialogProps: { open: false, onOpenChange: () => {}, title: '', description: '' },
-  }),
-}));
-
-// --- Confirm dialog component (no-op) ---
+// --- Confirm dialog component ---
 mock.module('@/components/ui/confirm-dialog', createConfirmDialogMock);
 
 // --- Toast ---
@@ -173,16 +157,10 @@ const setupStore = (overrides: Partial<typeof mockQueryState> = {}) => {
   mockDownloadIsPending = false;
   mockDownloadMutateAsync.mockClear();
   mockDeleteMutateAsync.mockClear();
-  mockConfirm.mockClear();
   mockToast.mockClear();
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <ArtifactLibrary />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<ArtifactLibrary />);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -196,8 +174,6 @@ afterAll(() =>
     '@/hooks/useSortableList',
     '@/hooks/queries/useArtifactQueries',
     '@/hooks/queries/useWorkflowQueries',
-    '@tanstack/react-query',
-    '@/hooks/useConfirmDialog',
     '@/components/ui/confirm-dialog',
     '@/components/ui/use-toast',
     '@/store/authStore',

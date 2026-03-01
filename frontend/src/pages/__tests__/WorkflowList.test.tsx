@@ -1,8 +1,8 @@
 import { describe, it, beforeEach, afterEach, afterAll, expect, vi, mock } from 'bun:test';
-import { render, screen, fireEvent, within, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { WorkflowSummary } from '@/services/api';
-import { createAlertDialogMock } from '@/test/mocks/dialog';
+import { createAlertDialogMock, createConfirmDialogMock } from '@/test/mocks/dialog';
 import {
   createDndCoreMock,
   createDndSortableMock,
@@ -10,6 +10,7 @@ import {
   createUseSortableListMock,
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { createSelectMock } from '@/test/mocks/radix-select';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -21,6 +22,7 @@ let mockDeleteIsPending = false;
 const cloneMutateAsync = mock(async (_id: string) => ({ id: 'new-id', name: 'Copy' }));
 let mockCloneIsPending = false;
 const mockToast = mock((_opts: any) => {});
+const mockConfirm = mock().mockResolvedValue(false);
 
 // ---------------------------------------------------------------------------
 // Module mocks (BEFORE component import)
@@ -28,6 +30,29 @@ const mockToast = mock((_opts: any) => {});
 
 // --- AlertDialog: passthrough for ConfirmDialog rendering ---
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
+
+// --- ConfirmDialog: shared factory ---
+mock.module('@/components/ui/confirm-dialog', createConfirmDialogMock);
+
+// --- useConfirmDialog: controllable mock matching SchedulesPage/WebhooksPage pattern ---
+// The hook is mocked process-globally by multiple test files. Using a consistent
+// controllable mock avoids cross-file contamination and allows per-test control
+// via mockConfirm.mockResolvedValue(true/false).
+mock.module('@/hooks/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: mockConfirm,
+    dialogProps: {
+      open: false,
+      title: '',
+      description: '',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      destructive: false,
+      onConfirm: () => {},
+      onCancel: () => {},
+    },
+  }),
+}));
 
 // --- DropdownMenu: render items directly for testability ---
 mock.module('@/components/ui/dropdown-menu', () => ({
@@ -51,13 +76,7 @@ mock.module('@/components/ui/tooltip', () => ({
 }));
 
 // --- Select: passthrough ---
-mock.module('@/components/ui/select', () => ({
-  Select: ({ children }: any) => <div>{children}</div>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
-  SelectTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
-}));
+mock.module('@/components/ui/select', createSelectMock);
 
 // --- DnD-kit: passthrough ---
 mock.module('@dnd-kit/core', createDndCoreMock);
@@ -163,6 +182,8 @@ describe('WorkflowList delete workflow flow', () => {
     mockDeleteIsPending = false;
     mockCloneIsPending = false;
     mockToast.mockReset();
+    mockConfirm.mockClear();
+    mockConfirm.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -183,16 +204,24 @@ describe('WorkflowList delete workflow flow', () => {
     expect(deleteItem).toBeDefined();
     fireEvent.click(deleteItem!);
 
-    // ConfirmDialog renders as an AlertDialog with the workflow name
-    const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText(/Alpha Workflow/)).toBeInTheDocument();
-    // "Delete workflow" appears as both title and confirm button
-    expect(within(dialog).getAllByText('Delete workflow').length).toBeGreaterThanOrEqual(1);
+    // Verify confirm() was called with the workflow name and "Delete workflow" title
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
+    });
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Delete workflow',
+        description: expect.stringContaining('Alpha Workflow'),
+        confirmLabel: 'Delete workflow',
+        destructive: true,
+      }),
+    );
   });
 
   it('calls mutation on confirmed delete', async () => {
     const workflow = makeWorkflow('22222222-2222-4222-8222-222222222222', 'Beta Workflow');
     mockWorkflows = [workflow];
+    mockConfirm.mockResolvedValue(true);
 
     renderWorkflowList();
 
@@ -202,10 +231,6 @@ describe('WorkflowList delete workflow flow', () => {
     const deleteItem = deleteItems.find((el) => el.textContent?.includes('Delete'));
     fireEvent.click(deleteItem!);
 
-    const dialog = await screen.findByRole('alertdialog');
-    const confirmButton = within(dialog).getByRole('button', { name: 'Delete workflow' });
-    fireEvent.click(confirmButton);
-
     await waitFor(() => {
       expect(deleteMutateAsync).toHaveBeenCalledWith(workflow.id);
     });
@@ -214,6 +239,7 @@ describe('WorkflowList delete workflow flow', () => {
   it('shows toast error when delete fails', async () => {
     const workflow = makeWorkflow('33333333-3333-4333-8333-333333333333', 'Gamma Workflow');
     mockWorkflows = [workflow];
+    mockConfirm.mockResolvedValue(true);
     deleteMutateAsync.mockRejectedValue(new Error('Delete failed'));
 
     renderWorkflowList();
@@ -223,10 +249,6 @@ describe('WorkflowList delete workflow flow', () => {
     const deleteItems = screen.getAllByRole('menuitem');
     const deleteItem = deleteItems.find((el) => el.textContent?.includes('Delete'));
     fireEvent.click(deleteItem!);
-
-    const dialog = await screen.findByRole('alertdialog');
-    const confirmButton = within(dialog).getByRole('button', { name: 'Delete workflow' });
-    fireEvent.click(confirmButton);
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(

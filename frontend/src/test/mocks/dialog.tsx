@@ -86,6 +86,22 @@ export function createAlertDialogMock() {
 
 export function createConfirmDialogMock() {
   return {
-    ConfirmDialog: () => null,
+    ConfirmDialog: ({
+      open,
+      title,
+      description,
+      confirmLabel,
+      cancelLabel,
+      onConfirm,
+      onCancel,
+    }: any) =>
+      open ? (
+        <div role="alertdialog">
+          <span>{title}</span>
+          <span>{description}</span>
+          <button onClick={onCancel}>{cancelLabel || 'Cancel'}</button>
+          <button onClick={onConfirm}>{confirmLabel || 'Confirm'}</button>
+        </div>
+      ) : null,
   };
 }

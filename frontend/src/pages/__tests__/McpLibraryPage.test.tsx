@@ -1,9 +1,9 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
-import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { restoreMockedModules } from '@/test/restore-mocks';
+import { fireEvent, screen, cleanup } from '@testing-library/react';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 // --- Mock dialog / alert-dialog components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
@@ -124,15 +124,6 @@ mock.module('@/hooks/queries/useMcpGroupQueries', () => ({
   }),
 }));
 
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  ...realModuleExports('@tanstack/react-query'),
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
-}));
-
 // Mock mcpDiscoveryApi to prevent real API calls
 mock.module('@/services/mcpDiscoveryApi', () => ({
   mcpDiscoveryApi: {
@@ -230,17 +221,11 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
     mock().mockResolvedValue({ id: 'srv-1', enabled: true, name: 'Test' });
   mockQueryState.testConnection =
     overrides.testConnection ?? mock().mockResolvedValue({ success: true, message: 'OK' });
-  mockInvalidateQueries.mockClear();
 
   return mockQueryState;
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <McpLibraryPage />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<McpLibraryPage />);
 
 // --- Tests ---
 afterAll(() =>
@@ -250,7 +235,6 @@ afterAll(() =>
     '@/components/ui/sheet',
     '@/hooks/queries/useMcpServerQueries',
     '@/hooks/queries/useMcpGroupQueries',
-    '@tanstack/react-query',
     '@/services/mcpDiscoveryApi',
     '@/config/env',
   ]),

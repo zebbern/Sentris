@@ -10,21 +10,50 @@ const mockSetThemePreference = mock((pref: 'light' | 'dark' | 'system') => {
   mockThemePreference = pref;
 });
 
-mock.module('@/store/themeStore', () => ({
-  useThemeStore: (selector: (state: any) => any) => {
+mock.module('@/store/themeStore', () => {
+  const _state: Record<string, any> = {
+    theme: 'light',
+    themePreference: 'light' as const,
+    isTransitioning: false,
+    setTheme: (theme: string) => {
+      Object.assign(_state, { theme, themePreference: theme });
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    },
+    setThemePreference: mockSetThemePreference,
+    toggleTheme: () => {
+      const next = _state.theme === 'light' ? 'dark' : 'light';
+      _state.setTheme(next);
+    },
+    startTransition: () => {
+      _state.isTransitioning = true;
+    },
+    endTransition: () => {
+      _state.isTransitioning = false;
+    },
+  };
+  const useThemeStore = ((selector?: any) => {
+    // Read from mutable var on each call for test-controlled state
     const state = {
-      theme: mockThemePreference === 'system' ? 'light' : mockThemePreference,
+      ..._state,
       themePreference: mockThemePreference,
-      isTransitioning: false,
-      setTheme: mock(),
-      setThemePreference: mockSetThemePreference,
-      toggleTheme: mock(),
-      startTransition: mock(),
-      endTransition: mock(),
+      theme: mockThemePreference === 'system' ? 'light' : mockThemePreference,
     };
-    return selector(state);
-  },
-}));
+    return selector ? selector(state) : state;
+  }) as any;
+  useThemeStore.setState = (partial: any) => {
+    const next = typeof partial === 'function' ? partial(_state) : partial;
+    Object.assign(_state, next);
+    if (next && 'themePreference' in next) mockThemePreference = next.themePreference;
+  };
+  useThemeStore.getState = () => ({
+    ..._state,
+    themePreference: mockThemePreference,
+    theme: mockThemePreference === 'system' ? 'light' : mockThemePreference,
+  });
+  useThemeStore.subscribe = () => () => {};
+  useThemeStore.destroy = () => {};
+  return { useThemeStore };
+});
 
 // Dynamic import to ensure mock.module takes effect before the component loads
 let AppearanceSettings: React.ComponentType;

@@ -14,3 +14,5 @@ export {
   DEFAULT_AUTH_ORG_ID,
   type AuthStoreMockOverrides,
 } from './auth-store';
+
+export { createSelectMock } from './radix-select';

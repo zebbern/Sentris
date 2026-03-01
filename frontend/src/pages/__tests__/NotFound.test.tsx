@@ -1,35 +1,32 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-
-// --- Mock useNavigate ---
-const mockNavigate = mock();
-
-mock.module('react-router-dom', () => ({
-  useNavigate: () => mockNavigate,
-  MemoryRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+import { fireEvent, screen, cleanup } from '@testing-library/react';
+import { useLocation } from 'react-router-dom';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 // --- Mock useDocumentTitle (no-op) ---
 mock.module('@/hooks/useDocumentTitle', () => ({
   useDocumentTitle: () => {},
 }));
 
-import { MemoryRouter } from 'react-router-dom';
 import { NotFound } from '../NotFound';
 
-const renderNotFound = () =>
-  render(
-    <MemoryRouter>
+/** Renders current pathname so tests can assert on real navigation. */
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location-display">{location.pathname}</div>;
+}
+
+const renderNotFound = (initialEntries: string[] = ['/not-found']) =>
+  renderWithProviders(
+    <>
       <NotFound />
-    </MemoryRouter>,
+      <LocationDisplay />
+    </>,
+    { initialEntries },
   );
 
 describe('NotFound', () => {
-  beforeEach(() => {
-    cleanup();
-    mockNavigate.mockClear();
-  });
-
+  beforeEach(cleanup);
   afterEach(cleanup);
 
   it('renders without crashing', () => {
@@ -62,7 +59,7 @@ describe('NotFound', () => {
   it('navigates to "/" when "Go to Homepage" is clicked', () => {
     renderNotFound();
     fireEvent.click(screen.getByText('Go to Homepage'));
-    expect(mockNavigate).toHaveBeenCalledWith('/');
+    expect(screen.getByTestId('location-display').textContent).toBe('/');
   });
 
   it('renders "Go Back" button', () => {
@@ -71,8 +68,8 @@ describe('NotFound', () => {
   });
 
   it('calls navigate(-1) when "Go Back" is clicked', () => {
-    renderNotFound();
+    renderNotFound(['/previous', '/not-found']);
     fireEvent.click(screen.getByText('Go Back'));
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(screen.getByTestId('location-display').textContent).toBe('/previous');
   });
 });

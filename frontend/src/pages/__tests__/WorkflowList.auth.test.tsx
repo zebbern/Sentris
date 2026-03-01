@@ -9,6 +9,7 @@ import {
   createUseSortableListMock,
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { createSelectMock } from '@/test/mocks/radix-select';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -29,13 +30,7 @@ mock.module('@/components/ui/tooltip', () => ({
 }));
 
 // --- Select: passthrough ---
-mock.module('@/components/ui/select', () => ({
-  Select: ({ children }: any) => <div>{children}</div>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
-  SelectTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
-}));
+mock.module('@/components/ui/select', createSelectMock);
 
 // --- AlertDialog: passthrough for ConfirmDialog ---
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);

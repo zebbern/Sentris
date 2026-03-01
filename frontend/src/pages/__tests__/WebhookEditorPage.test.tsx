@@ -1,21 +1,15 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { fireEvent, screen, cleanup } from '@testing-library/react';
 import type { WebhookFormState } from '../webhook-editor/webhookEditorTypes';
 import {
   createDialogMock,
   createAlertDialogMock,
   createConfirmDialogMock,
 } from '@/test/mocks/dialog';
+import { renderWithProviders } from '@/test/render-with-providers';
 
-// --- Mock navigate ---
+// --- Mock navigate (used via hookState.navigate, not react-router-dom) ---
 const mockNavigate = mock();
-
-mock.module('react-router-dom', () => ({
-  useNavigate: () => mockNavigate,
-  useParams: () => ({ id: 'wh-123' }),
-  useLocation: () => ({ pathname: '/webhooks/wh-123', state: null }),
-  MemoryRouter: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
 
 // --- Mock dialog / alert-dialog (passthrough) ---
 mock.module('@/components/ui/dialog', createDialogMock);
@@ -196,7 +190,10 @@ mock.module('../webhook-editor', () => ({
 
 import { WebhookEditorPage } from '../WebhookEditorPage';
 
-const renderEditor = () => render(<WebhookEditorPage />);
+const renderEditor = () =>
+  renderWithProviders(<WebhookEditorPage />, {
+    initialEntries: ['/webhooks/wh-123'],
+  });
 
 describe('WebhookEditorPage', () => {
   beforeEach(() => {

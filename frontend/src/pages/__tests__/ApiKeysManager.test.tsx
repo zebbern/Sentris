@@ -1,10 +1,10 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
-import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { restoreMockedModules } from '@/test/restore-mocks';
+import { fireEvent, screen, within, cleanup, waitFor } from '@testing-library/react';
 import type { components } from '@sentris/backend-client';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 type ApiKeyResponseDto = components['schemas']['ApiKeyResponseDto'];
 
@@ -61,15 +61,6 @@ mock.module('@/hooks/queries/useApiKeyQueries', () => ({
     };
     return selector(state);
   },
-}));
-
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  ...realModuleExports('@tanstack/react-query'),
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
 }));
 
 // --- Auth store ---
@@ -142,7 +133,6 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.deleteApiKey = overrides.deleteApiKey ?? mock().mockResolvedValue(undefined);
   mockQueryState.lastCreatedKey = overrides.lastCreatedKey ?? null;
   mockQueryState.clearLastCreatedKey = overrides.clearLastCreatedKey ?? mock();
-  mockInvalidateQueries.mockClear();
 
   return mockQueryState;
 };
@@ -155,12 +145,7 @@ Object.defineProperty(navigator, 'clipboard', {
   configurable: true,
 });
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <ApiKeysManager />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<ApiKeysManager />);
 
 // --- Tests ---
 afterAll(() =>
@@ -168,7 +153,6 @@ afterAll(() =>
     '@/components/ui/dialog',
     '@/components/ui/alert-dialog',
     '@/hooks/queries/useApiKeyQueries',
-    '@tanstack/react-query',
   ]),
 );
 

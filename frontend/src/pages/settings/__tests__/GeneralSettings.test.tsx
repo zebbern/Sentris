@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { createSelectMock } from '@/test/mocks/radix-select';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -14,17 +15,44 @@ const mockSetSidebarDensity = mock((density: 'compact' | 'comfortable') => {
   mockSidebarDensity = density;
 });
 
-mock.module('@/store/userPreferencesStore', () => ({
-  useUserPreferencesStore: (selector: (state: any) => any) => {
+mock.module('@/components/ui/select', createSelectMock);
+
+mock.module('@/store/userPreferencesStore', () => {
+  const _state: Record<string, any> = {
+    defaultLandingPage: '/',
+    sidebarDensity: 'comfortable' as const,
+    notifyOnRunComplete: false,
+    notifyOnRunFailed: false,
+    notifyOnScheduleTriggered: false,
+    setDefaultLandingPage: mockSetDefaultLandingPage,
+    setSidebarDensity: mockSetSidebarDensity,
+    setNotifyOnRunComplete: mock(),
+    setNotifyOnRunFailed: mock(),
+    setNotifyOnScheduleTriggered: mock(),
+  };
+  const useUserPreferencesStore = ((selector?: any) => {
     const state = {
+      ..._state,
       defaultLandingPage: mockDefaultLandingPage,
       sidebarDensity: mockSidebarDensity,
-      setDefaultLandingPage: mockSetDefaultLandingPage,
-      setSidebarDensity: mockSetSidebarDensity,
     };
-    return selector(state);
-  },
-}));
+    return selector ? selector(state) : state;
+  }) as any;
+  useUserPreferencesStore.setState = (partial: any) => {
+    const next = typeof partial === 'function' ? partial(_state) : partial;
+    Object.assign(_state, next);
+    if (next && 'defaultLandingPage' in next) mockDefaultLandingPage = next.defaultLandingPage;
+    if (next && 'sidebarDensity' in next) mockSidebarDensity = next.sidebarDensity;
+  };
+  useUserPreferencesStore.getState = () => ({
+    ..._state,
+    defaultLandingPage: mockDefaultLandingPage,
+    sidebarDensity: mockSidebarDensity,
+  });
+  useUserPreferencesStore.subscribe = () => () => {};
+  useUserPreferencesStore.destroy = () => {};
+  return { useUserPreferencesStore };
+});
 
 import { GeneralSettings } from '../GeneralSettings';
 

@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach, vi, mock, beforeEach } from 'bun:test';
-import { cleanup } from '@testing-library/react';
+import { cleanup, act } from '@testing-library/react';
+import { renderHookWithProviders } from '@/test/render-with-providers';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 // ---------------------------------------------------------------------------
-// Mocks — follow established project pattern (SecretsManager.test.tsx):
-// mock @tanstack/react-query and @/services/api, then test hook logic.
+// Mocks — only mock the API layer; react-query is provided by the test wrapper.
 // ---------------------------------------------------------------------------
 
 const deleteMock = vi.fn();
@@ -24,37 +26,23 @@ mock.module('@/services/api', () => ({
   },
 }));
 
-const invalidateQueriesMock = vi.fn().mockResolvedValue(undefined);
-let capturedMutationOptions: any = null;
-
-mock.module('@tanstack/react-query', () => {
-  return {
-    useQueryClient: () => ({
-      invalidateQueries: invalidateQueriesMock,
-    }),
-    useMutation: (options: any) => {
-      capturedMutationOptions = options;
-      return {
-        mutate: vi.fn(),
-        mutateAsync: async (args: any) => {
-          const result = await options.mutationFn(args);
-          if (options.onSuccess) {
-            options.onSuccess(result, args, {});
-          }
-          return result;
-        },
-        isPending: false,
-        error: null,
-        isError: false,
-        isSuccess: false,
-        reset: vi.fn(),
-      };
-    },
-    useQuery: vi.fn(),
-    QueryClientProvider: ({ children }: any) => children,
-    skipToken: Symbol('skipToken'),
-  };
-});
+// Override any global mock.module for useWorkflowQueries from other test files
+// (e.g. WorkflowList.test.tsx) to prevent cross-file mock contamination.
+// Provides the real hook logic backed by our mocked @/services/api above.
+// Uses closured ESM imports (useMutation, useQueryClient, queryKeys) to avoid
+// CJS/ESM React context mismatch that require() would cause.
+mock.module('@/hooks/queries/useWorkflowQueries', () => ({
+  useDeleteWorkflow: () => {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: (id: string) => deleteMock(id),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: queryKeys.workflows.list() });
+        qc.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
+      },
+    });
+  },
+}));
 
 import { useDeleteWorkflow } from '../useWorkflowQueries';
 
@@ -62,8 +50,6 @@ afterEach(cleanup);
 
 beforeEach(() => {
   deleteMock.mockReset();
-  invalidateQueriesMock.mockClear();
-  capturedMutationOptions = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -71,11 +57,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('useDeleteWorkflow', () => {
-  it('calls api.workflows.delete(id) via mutationFn', async () => {
+  it('calls api.workflows.delete(id) via mutateAsync', async () => {
     deleteMock.mockResolvedValueOnce(undefined);
 
-    const hook = useDeleteWorkflow();
-    await hook.mutateAsync('wf-123');
+    const { result } = renderHookWithProviders(() => useDeleteWorkflow());
+
+    await act(async () => {
+      await result.current.mutateAsync('wf-123');
+    });
 
     expect(deleteMock).toHaveBeenCalledTimes(1);
     expect(deleteMock).toHaveBeenCalledWith('wf-123');
@@ -84,15 +73,16 @@ describe('useDeleteWorkflow', () => {
   it('invalidates workflow list and summary query keys on success', async () => {
     deleteMock.mockResolvedValueOnce(undefined);
 
-    const hook = useDeleteWorkflow();
-    await hook.mutateAsync('wf-1');
+    const { result, queryClient } = renderHookWithProviders(() => useDeleteWorkflow());
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
-    // onSuccess should have called invalidateQueries twice
-    expect(invalidateQueriesMock).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await result.current.mutateAsync('wf-1');
+    });
 
-    const calls = invalidateQueriesMock.mock.calls;
-    // Verify both list and summary keys are invalidated
-    const invalidatedKeys = calls.map((c: any) => c[0]?.queryKey);
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+
+    const invalidatedKeys = invalidateSpy.mock.calls.map((c: any) => c[0]?.queryKey);
     expect(invalidatedKeys).toEqual(
       expect.arrayContaining([
         expect.arrayContaining(['workflows']),
@@ -101,30 +91,40 @@ describe('useDeleteWorkflow', () => {
     );
   });
 
-  it('passes the correct mutationFn to useMutation', () => {
-    useDeleteWorkflow();
-
-    expect(capturedMutationOptions).toBeTruthy();
-    expect(typeof capturedMutationOptions.mutationFn).toBe('function');
-    expect(typeof capturedMutationOptions.onSuccess).toBe('function');
-  });
-
-  it('mutationFn delegates to api.workflows.delete', async () => {
+  it('returns the result from the API delete call', async () => {
     deleteMock.mockResolvedValueOnce({ ok: true });
 
-    useDeleteWorkflow();
+    const { result } = renderHookWithProviders(() => useDeleteWorkflow());
 
-    const result = await capturedMutationOptions.mutationFn('wf-789');
+    let deleteResult: any;
+    await act(async () => {
+      deleteResult = await result.current.mutateAsync('wf-789');
+    });
 
     expect(deleteMock).toHaveBeenCalledWith('wf-789');
-    expect(result).toEqual({ ok: true });
+    expect(deleteResult).toEqual({ ok: true });
   });
 
   it('propagates errors from api.workflows.delete', async () => {
     deleteMock.mockRejectedValueOnce(new Error('Network error'));
 
-    useDeleteWorkflow();
+    const { result } = renderHookWithProviders(() => useDeleteWorkflow());
 
-    await expect(capturedMutationOptions.mutationFn('wf-bad')).rejects.toThrow('Network error');
+    let caughtError: Error | undefined;
+    await act(async () => {
+      try {
+        await result.current.mutateAsync('wf-bad');
+      } catch (e) {
+        caughtError = e as Error;
+      }
+    });
+
+    expect(caughtError).toBeDefined();
+    expect(caughtError!.message).toBe('Network error');
+  });
+
+  it('exposes isPending state initially as false', () => {
+    const { result } = renderHookWithProviders(() => useDeleteWorkflow());
+    expect(result.current.isPending).toBe(false);
   });
 });

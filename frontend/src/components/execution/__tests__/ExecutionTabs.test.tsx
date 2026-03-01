@@ -12,18 +12,55 @@ const mockSwitchToRun = mock((_runId: string) => {});
 const mockRemoveTrackedRun = mock((_runId: string) => {});
 const mockDisconnectStream = mock(() => {});
 
-mock.module('@/store/executionStore', () => ({
-  useExecutionStore: (selector: (state: any) => any) => {
-    const state = {
-      trackedRuns: mockTrackedRuns,
-      runId: mockActiveRunId,
-      switchToRun: mockSwitchToRun,
-      removeTrackedRun: mockRemoveTrackedRun,
-      disconnectStream: mockDisconnectStream,
-    };
-    return selector(state);
-  },
-}));
+mock.module('@/store/executionStore', () => {
+  const _state: Record<string, any> = {
+    trackedRuns: [] as TrackedRun[],
+    runId: null as string | null,
+    workflowId: null as string | null,
+    status: null as string | null,
+    runStatus: null as any,
+    traceEvents: [] as any[],
+    isStreaming: false,
+    streamError: null as any,
+    switchToRun: mockSwitchToRun,
+    removeTrackedRun: mockRemoveTrackedRun,
+    disconnectStream: mockDisconnectStream,
+    connectStream: mock(() => {}),
+    monitorRun: mock(() => {}),
+    addTrackedRun: mock(() => {}),
+    reset: () => {
+      Object.assign(_state, {
+        runId: null,
+        workflowId: null,
+        status: null,
+        runStatus: null,
+        traceEvents: [],
+        isStreaming: false,
+        streamError: null,
+      });
+    },
+    getTerminalSession: (_nodeId: string, _stream = 'pty') => null,
+  };
+  const useExecutionStore = ((selector?: any) => {
+    // Sync with mutable test vars on each call
+    const state = { ..._state, trackedRuns: mockTrackedRuns, runId: mockActiveRunId };
+    return selector ? selector(state) : state;
+  }) as any;
+  useExecutionStore.setState = (partial: any) => {
+    const next = typeof partial === 'function' ? partial(_state) : partial;
+    Object.assign(_state, next);
+    if (next && 'trackedRuns' in next) mockTrackedRuns = next.trackedRuns;
+    if (next && 'runId' in next) mockActiveRunId = next.runId;
+  };
+  useExecutionStore.getState = () => ({
+    ..._state,
+    trackedRuns: mockTrackedRuns,
+    runId: mockActiveRunId,
+  });
+  useExecutionStore.subscribe = () => () => {};
+  useExecutionStore.destroy = () => {};
+  return { useExecutionStore };
+});
 
 // Tooltip components need to render children in jsdom
 mock.module('@/components/ui/tooltip', () => ({

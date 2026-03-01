@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, cleanup } from '@testing-library/react';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 // --- Mock dialog components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
@@ -68,14 +68,6 @@ mock.module('@/hooks/queries/useIntegrationQueries', () => ({
   }),
   useDisconnectIntegration: () => ({
     mutateAsync: mockQueryState.disconnectIntegration,
-  }),
-}));
-
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
   }),
 }));
 
@@ -188,17 +180,11 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
     overrides.refreshConnection ?? mock().mockResolvedValue(undefined);
   mockQueryState.disconnectIntegration =
     overrides.disconnectIntegration ?? mock().mockResolvedValue(undefined);
-  mockInvalidateQueries.mockClear();
 
   return mockQueryState;
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <IntegrationsManager />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<IntegrationsManager />);
 
 // --- Tests ---
 describe('IntegrationsManager', () => {

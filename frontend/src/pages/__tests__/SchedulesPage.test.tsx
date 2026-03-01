@@ -1,13 +1,33 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, screen, cleanup } from '@testing-library/react';
 import type { WorkflowSchedule } from '@sentris/shared';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
+import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { renderWithProviders } from '@/test/render-with-providers';
 
-// --- Mock dialog components (passthrough for test rendering) ---
+// --- Mock dialog / select components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
+mock.module('@/components/ui/select', createSelectMock);
+
+// --- Mock useConfirmDialog (prevents cross-file contamination from other test files) ---
+const mockConfirm = mock().mockResolvedValue(false);
+mock.module('@/hooks/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: mockConfirm,
+    dialogProps: {
+      open: false,
+      title: '',
+      description: '',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      destructive: false,
+      onConfirm: () => {},
+      onCancel: () => {},
+    },
+  }),
+}));
 
 // --- Mutable mock state for schedule queries ---
 const mockQueryState: {
@@ -58,14 +78,6 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
   useWorkflowsSummary: () => ({
     data: mockWorkflows,
     isLoading: false,
-  }),
-}));
-
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
   }),
 }));
 
@@ -135,23 +147,19 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.resumeSchedule = overrides.resumeSchedule ?? mock().mockResolvedValue(undefined);
   mockQueryState.runSchedule = overrides.runSchedule ?? mock().mockResolvedValue(undefined);
   mockQueryState.deleteSchedule = overrides.deleteSchedule ?? mock().mockResolvedValue(undefined);
-  mockInvalidateQueries.mockClear();
 
   return mockQueryState;
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <SchedulesPage />
-    </MemoryRouter>,
-  );
+const renderPage = () => renderWithProviders(<SchedulesPage />);
 
 // --- Tests ---
 describe('SchedulesPage', () => {
   beforeEach(() => {
     cleanup();
     setupStore();
+    mockConfirm.mockClear();
+    mockConfirm.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -182,9 +190,9 @@ describe('SchedulesPage', () => {
     expect(screen.getByText('Nightly Scan')).toBeInTheDocument();
     expect(screen.getByText('Weekly Deploy')).toBeInTheDocument();
 
-    // Status badges
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Paused')).toBeInTheDocument();
+    // Status badges — use getAllByText since filter dropdown options also contain status text
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Paused').length).toBeGreaterThanOrEqual(1);
 
     // Action buttons (Run buttons for both schedules)
     const runButtons = screen.getAllByRole('button', { name: /Run/i });
@@ -238,6 +246,7 @@ describe('SchedulesPage', () => {
   });
 
   it('clicking Delete button shows confirm dialog, confirming calls deleteScheduleMutation.mutateAsync', async () => {
+    mockConfirm.mockResolvedValue(true);
     const deleteSchedule = mock().mockResolvedValue(undefined);
     setupStore({ schedules: [baseSchedule], deleteSchedule });
     renderPage();
@@ -246,18 +255,12 @@ describe('SchedulesPage', () => {
     const deleteButton = screen.getByRole('button', { name: /Delete schedule/i });
     fireEvent.click(deleteButton);
 
-    // Wait for the confirm dialog to appear
-    await screen.findByRole('alertdialog');
+    // confirm() was called with delete-related options
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
 
-    // The confirm dialog renders "Delete" as the confirmLabel inside alertdialog
-    const actionButtons = screen.getAllByRole('button', { name: /Delete/i });
-    const confirmActionBtn = actionButtons.find(
-      (btn) => btn.closest('[role="alertdialog"]') !== null,
-    );
-    expect(confirmActionBtn).toBeTruthy();
-    fireEvent.click(confirmActionBtn!);
     // Give the async handler time to resolve
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 20));
+
     expect(deleteSchedule).toHaveBeenCalledTimes(1);
     expect(deleteSchedule).toHaveBeenCalledWith(baseSchedule.id);
   });

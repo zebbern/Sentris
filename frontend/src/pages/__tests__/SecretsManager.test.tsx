@@ -1,10 +1,10 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, screen, within, cleanup, waitFor } from '@testing-library/react';
 import type { SecretSummary } from '@/schemas/secret';
 import { createDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { ToastContext } from '@/components/ui/toast-context';
+import { renderWithProviders } from '@/test/render-with-providers';
 
 mock.module('@/components/ui/dialog', createDialogMock);
 
@@ -50,17 +50,15 @@ mock.module('@/hooks/queries/useSecretQueries', () => ({
   }),
 }));
 
-const mockInvalidateQueries = mock().mockResolvedValue(undefined);
-
-mock.module('@tanstack/react-query', () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
-}));
-
 // --- Toast mock ---
 const mockToast = mock(() => ({ id: 'test-toast' }));
 const mockDismiss = mock();
+
+// Protect against process-global mock.module contamination from other files
+// that mock @/components/ui/use-toast with their own toast functions.
+mock.module('@/components/ui/use-toast', () => ({
+  useToast: () => ({ toast: mockToast, dismiss: mockDismiss }),
+}));
 
 // --- Auth store ---
 mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
@@ -95,11 +93,9 @@ const baseSecret: SecretSummary = {
 };
 
 const renderSecretsManager = () =>
-  render(
+  renderWithProviders(
     <ToastContext.Provider value={{ toast: mockToast as any, dismiss: mockDismiss }}>
-      <MemoryRouter>
-        <SecretsManager />
-      </MemoryRouter>
+      <SecretsManager />
     </ToastContext.Provider>,
   );
 
@@ -111,7 +107,6 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.updateSecret = overrides.updateSecret ?? mock().mockResolvedValue(baseSecret);
   mockQueryState.rotateSecret = overrides.rotateSecret ?? mock().mockResolvedValue(baseSecret);
   mockQueryState.deleteSecret = overrides.deleteSecret ?? mock().mockResolvedValue(undefined);
-  mockInvalidateQueries.mockClear();
 
   return mockQueryState;
 };
