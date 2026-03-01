@@ -1,83 +1,152 @@
 import { describe, it, beforeEach, afterEach, afterAll, expect, vi, mock } from 'bun:test';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import type { WorkflowSummary } from '@/services/api';
 
-import { AuthProvider } from '@/auth/auth-context';
-import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
+// ---------------------------------------------------------------------------
+// Mutable mock state
+// ---------------------------------------------------------------------------
 
-mock.module('@/components/ui/dialog', () => {
-  const Dialog = ({ open, children }: { open: boolean; children: ReactNode }) =>
+let mockWorkflows: WorkflowSummary[] = [];
+const deleteMutateAsync = mock(async (_id: string) => {});
+let mockDeleteIsPending = false;
+const cloneMutateAsync = mock(async (_id: string) => ({ id: 'new-id', name: 'Copy' }));
+let mockCloneIsPending = false;
+const mockToast = mock((_opts: any) => {});
+
+// ---------------------------------------------------------------------------
+// Module mocks (BEFORE component import)
+// ---------------------------------------------------------------------------
+
+// --- AlertDialog: passthrough for ConfirmDialog rendering ---
+mock.module('@/components/ui/alert-dialog', () => {
+  const AlertDialog = ({ open, children }: { open: boolean; children: ReactNode }) =>
     open ? <>{children}</> : null;
-  const DialogContent = ({ children, ...props }: any) => (
-    <div role="dialog" {...props}>
+  const AlertDialogContent = ({ children, ...props }: any) => (
+    <div role="alertdialog" {...props}>
       {children}
     </div>
   );
   const passthrough = ({ children, ...props }: any) => <div {...props}>{children}</div>;
-  const passthroughInline = ({ children, ...props }: any) => <span {...props}>{children}</span>;
-  const FragmentWrapper = ({ children }: any) => <>{children}</>;
+  const AlertDialogAction = ({ children, onClick, ...props }: any) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  );
+  const AlertDialogCancel = ({ children, onClick, ...props }: any) => (
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
+  );
 
   return {
-    Dialog,
-    DialogContent,
-    DialogHeader: passthrough,
-    DialogFooter: passthrough,
-    DialogTitle: passthroughInline,
-    DialogDescription: passthroughInline,
-    DialogPortal: FragmentWrapper,
-    DialogOverlay: FragmentWrapper,
-    DialogTrigger: FragmentWrapper,
-    DialogClose: FragmentWrapper,
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader: passthrough,
+    AlertDialogFooter: passthrough,
+    AlertDialogTitle: passthrough,
+    AlertDialogDescription: passthrough,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogPortal: ({ children }: any) => <>{children}</>,
+    AlertDialogOverlay: ({ children }: any) => <>{children}</>,
+    AlertDialogTrigger: ({ children }: any) => <>{children}</>,
   };
 });
 
-const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+// --- DropdownMenu: render items directly for testability ---
+mock.module('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: any) => <>{children}</>,
+  DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
+  DropdownMenuItem: ({ children, onClick, disabled, ...props }: any) => (
+    <button onClick={onClick} disabled={disabled} role="menuitem" {...props}>
+      {children}
+    </button>
+  ),
+  DropdownMenuSeparator: () => <hr />,
+}));
 
-const listMock = vi.fn();
-const deleteMock = vi.fn();
-const noop = vi.fn();
+// --- Tooltip: passthrough ---
+mock.module('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: any) => <>{children}</>,
+  TooltipContent: ({ children }: any) => <span>{children}</span>,
+  TooltipProvider: ({ children }: any) => <>{children}</>,
+  TooltipTrigger: ({ children }: any) => <>{children}</>,
+}));
 
-mock.module('@/services/api', () => {
-  return {
-    api: {
-      workflows: {
-        list: listMock,
-        delete: deleteMock,
-        get: noop,
-        create: noop,
-        update: noop,
-        commit: noop,
-        run: noop,
-      },
-    },
-  };
-});
+// --- Select: passthrough ---
+mock.module('@/components/ui/select', () => ({
+  Select: ({ children }: any) => <div>{children}</div>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
+}));
 
-import { WorkflowList } from '@/pages/WorkflowList';
-import {
-  DEFAULT_WORKFLOW_VIEWPORT,
-  WorkflowMetadataSchema,
-  type WorkflowMetadataNormalized,
-} from '@/schemas/workflow';
+// --- DnD-kit: passthrough ---
+mock.module('@dnd-kit/core', () => ({
+  DndContext: ({ children }: any) => <>{children}</>,
+  useSensor: () => ({}),
+  useSensors: () => [],
+  PointerSensor: class {},
+  KeyboardSensor: class {},
+  closestCenter: () => null,
+}));
 
-// Mock the auth store to provide admin roles for testing
+mock.module('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: any) => <>{children}</>,
+  verticalListSortingStrategy: {},
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: () => {},
+    transform: null,
+    transition: null,
+    isDragging: false,
+  }),
+}));
+
+mock.module('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => undefined } },
+}));
+
+mock.module('@/hooks/useSortableList', () => ({
+  useSortableList: ({ items }: any) => ({
+    orderedItems: items,
+    sensors: [],
+    collisionDetection: () => null,
+    handleDragEnd: () => {},
+    isDragDisabled: false,
+  }),
+}));
+
+// --- Workflow query hooks (replaces direct @/services/api mock) ---
+mock.module('@/hooks/queries/useWorkflowQueries', () => ({
+  useWorkflowsSummary: () => ({
+    data: mockWorkflows,
+    isLoading: false,
+    error: null,
+    refetch: mock(() => {}),
+  }),
+  useDeleteWorkflow: () => ({
+    mutateAsync: deleteMutateAsync,
+    isPending: mockDeleteIsPending,
+  }),
+  useCloneWorkflow: () => ({
+    mutateAsync: cloneMutateAsync,
+    isPending: mockCloneIsPending,
+  }),
+}));
+
+// --- Auth store ---
 const mockAuthStore: any = {
   roles: ['ADMIN'],
-  token: null,
-  userId: null,
+  token: 'test-token',
+  userId: 'user-1',
   organizationId: 'local-dev',
   provider: 'local' as const,
-  adminUsername: null,
-  adminPassword: null,
-  setRoles: vi.fn(),
-  clear: vi.fn(),
-  setToken: vi.fn(),
-  setUserId: vi.fn(),
-  setOrganizationId: vi.fn(),
-  setProvider: vi.fn(),
-  setAdminCredentials: vi.fn(),
-  setAuthContext: vi.fn(),
 };
 
 mock.module('@/store/authStore', () => {
@@ -91,142 +160,160 @@ mock.module('@/store/authStore', () => {
   };
   useAuthStoreMock.getState = () => mockAuthStore;
   useAuthStoreMock.persist = { clearStorage: async () => {} };
-
-  return { useAuthStore: useAuthStoreMock };
+  return { useAuthStore: useAuthStoreMock, DEFAULT_ORG_ID: 'local-dev' };
 });
+
+// --- Auth utility ---
+mock.module('@/utils/auth', () => ({
+  hasAdminRole: (roles: string[]) => roles.includes('ADMIN'),
+}));
+
+// --- Toast ---
+mock.module('@/components/ui/use-toast', () => ({
+  useToast: () => ({ toast: mockToast }),
+}));
+
+// --- Analytics ---
+mock.module('@/features/analytics/events', () => ({
+  track: mock(() => {}),
+  Events: {
+    WorkflowListViewed: 'wf_list_viewed',
+    WorkflowCreateClicked: 'wf_create_clicked',
+    WorkflowDuplicated: 'wf_duplicated',
+  },
+}));
+
+// --- Document title ---
+mock.module('@/hooks/useDocumentTitle', () => ({
+  useDocumentTitle: () => {},
+}));
+
+// --- Logger ---
+mock.module('@/lib/logger', () => ({
+  logger: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} },
+}));
+
+const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+// Import component AFTER all mock.module() calls
+import { WorkflowList } from '@/pages/WorkflowList';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const ISO = '2024-01-01T00:00:00.000Z';
 
-const makeWorkflow = (id: string, name: string): WorkflowMetadataNormalized =>
-  WorkflowMetadataSchema.parse({
-    id,
-    name,
-    description: null,
-    graph: {
-      nodes: [],
-      edges: [],
-      viewport: DEFAULT_WORKFLOW_VIEWPORT,
-    },
-    nodes: [],
-    edges: [],
-    viewport: DEFAULT_WORKFLOW_VIEWPORT,
-    compiledDefinition: null,
-    lastRun: null,
-    runCount: 0,
-    createdAt: ISO,
-    updatedAt: ISO,
-    currentVersionId: null,
-    currentVersion: null,
-  });
+const makeWorkflow = (id: string, name: string): WorkflowSummary => ({
+  id,
+  name,
+  description: null,
+  organizationId: 'local-dev',
+  isSystem: false,
+  templateId: null,
+  lastRun: null,
+  latestRunStatus: null,
+  runCount: 0,
+  nodeCount: 2,
+  createdAt: ISO,
+  updatedAt: ISO,
+});
 
 const renderWorkflowList = () =>
   render(
     <MemoryRouter>
-      <AuthProvider>
-        <WorkflowList />
-      </AuthProvider>
+      <WorkflowList />
     </MemoryRouter>,
   );
 
-// TODO: Fix React infinite update loop issues in dialog component
-describe.skip('WorkflowList delete workflow flow', () => {
-  async function resetAuthStore() {
-    const persist = (
-      useAuthStore as typeof useAuthStore & { persist?: { clearStorage?: () => Promise<void> } }
-    ).persist;
-    if (persist?.clearStorage) {
-      await persist.clearStorage();
-    }
-    useAuthStore.setState({
-      token: null,
-      userId: null,
-      organizationId: DEFAULT_ORG_ID,
-      roles: ['ADMIN'],
-      provider: 'local',
-    });
-  }
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-  beforeEach(async () => {
-    listMock.mockReset();
-    deleteMock.mockReset();
-    // Ensure auth preconditions are satisfied for data loading in tests
-    await resetAuthStore();
-    useAuthStore.setState({ token: ' bearer-token ' });
-    // Clean up any existing dialogs
-    document.body.innerHTML = '';
+describe('WorkflowList delete workflow flow', () => {
+  beforeEach(() => {
+    cleanup();
+    mockWorkflows = [];
+    deleteMutateAsync.mockReset();
+    deleteMutateAsync.mockResolvedValue(undefined);
+    cloneMutateAsync.mockReset();
+    mockDeleteIsPending = false;
+    mockCloneIsPending = false;
+    mockToast.mockReset();
+    mockAuthStore.roles = ['ADMIN'];
   });
 
   afterEach(() => {
-    // Clean up after each test
-    document.body.innerHTML = '';
+    cleanup();
   });
-  async function findDialogFor(workflowName: string) {
-    const dialogs = await screen.findAllByRole('dialog');
-    for (const dialog of dialogs) {
-      if (within(dialog).queryByText(workflowName)) {
-        return dialog;
-      }
-    }
-    return dialogs[dialogs.length - 1];
-  }
 
   it('opens confirmation dialog with workflow details when delete is clicked', async () => {
     const workflow = makeWorkflow('11111111-1111-4111-8111-111111111111', 'Alpha Workflow');
-    listMock.mockResolvedValue([workflow]);
-    deleteMock.mockResolvedValue(undefined);
+    mockWorkflows = [workflow];
 
     renderWorkflowList();
 
-    await screen.findByText('Alpha Workflow');
-    const deleteButton = screen.getByRole('button', { name: 'Delete workflow Alpha Workflow' });
-    fireEvent.click(deleteButton);
+    await screen.findAllByText('Alpha Workflow');
 
-    const dialog = await findDialogFor('Alpha Workflow');
-    expect(within(dialog).getByText('Alpha Workflow')).toBeInTheDocument();
-    expect(within(dialog).getByText(workflow.id)).toBeInTheDocument();
+    // Find the delete menu item in the dropdown (rendered inline due to mock)
+    const deleteItems = screen.getAllByRole('menuitem');
+    const deleteItem = deleteItems.find((el) => el.textContent?.includes('Delete'));
+    expect(deleteItem).toBeDefined();
+    fireEvent.click(deleteItem!);
+
+    // ConfirmDialog renders as an AlertDialog with the workflow name
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/Alpha Workflow/)).toBeInTheDocument();
+    // "Delete workflow" appears as both title and confirm button
+    expect(within(dialog).getAllByText('Delete workflow').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('calls API and removes workflow from list on successful delete', async () => {
+  it('calls mutation on confirmed delete', async () => {
     const workflow = makeWorkflow('22222222-2222-4222-8222-222222222222', 'Beta Workflow');
-    listMock.mockResolvedValue([workflow]);
-    deleteMock.mockResolvedValue(undefined);
+    mockWorkflows = [workflow];
 
     renderWorkflowList();
 
-    await screen.findByText('Beta Workflow');
-    fireEvent.click(screen.getByRole('button', { name: 'Delete workflow Beta Workflow' }));
+    await screen.findAllByText('Beta Workflow');
 
-    const dialog = await findDialogFor('Beta Workflow');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete workflow' }));
+    const deleteItems = screen.getAllByRole('menuitem');
+    const deleteItem = deleteItems.find((el) => el.textContent?.includes('Delete'));
+    fireEvent.click(deleteItem!);
+
+    const dialog = await screen.findByRole('alertdialog');
+    const confirmButton = within(dialog).getByRole('button', { name: 'Delete workflow' });
+    fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(deleteMock).toHaveBeenCalledWith(workflow.id);
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText('Beta Workflow')).not.toBeInTheDocument();
+      expect(deleteMutateAsync).toHaveBeenCalledWith(workflow.id);
     });
   });
 
-  it('shows error in dialog when delete fails', async () => {
+  it('shows toast error when delete fails', async () => {
     const workflow = makeWorkflow('33333333-3333-4333-8333-333333333333', 'Gamma Workflow');
-    listMock.mockResolvedValue([workflow]);
-    deleteMock.mockRejectedValue(new Error('Delete failed'));
+    mockWorkflows = [workflow];
+    deleteMutateAsync.mockRejectedValue(new Error('Delete failed'));
 
     renderWorkflowList();
 
-    await screen.findByText('Gamma Workflow');
-    fireEvent.click(screen.getByRole('button', { name: 'Delete workflow Gamma Workflow' }));
+    await screen.findAllByText('Gamma Workflow');
 
-    const dialog = await findDialogFor('Gamma Workflow');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete workflow' }));
+    const deleteItems = screen.getAllByRole('menuitem');
+    const deleteItem = deleteItems.find((el) => el.textContent?.includes('Delete'));
+    fireEvent.click(deleteItem!);
+
+    const dialog = await screen.findByRole('alertdialog');
+    const confirmButton = within(dialog).getByRole('button', { name: 'Delete workflow' });
+    fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(deleteMock).toHaveBeenCalledWith(workflow.id);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Delete failed',
+          variant: 'destructive',
+        }),
+      );
     });
-
-    expect(await within(dialog).findByText('Delete failed')).toBeInTheDocument();
-    expect(dialog).toBeInTheDocument();
   });
 });
 
