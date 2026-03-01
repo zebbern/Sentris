@@ -403,6 +403,7 @@ export function WebhooksPage() {
             onViewHistory={handleViewHistory}
             onRegeneratePath={handleRegeneratePath}
             onDelete={handleDelete}
+            onCreateNew={() => navigate('/webhooks/new')}
           />
         </div>
       </div>

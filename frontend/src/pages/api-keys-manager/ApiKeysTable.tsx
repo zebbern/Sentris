@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Key, RefreshCw } from 'lucide-react';
+import { Key, Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -142,8 +142,9 @@ export function ApiKeysTable({
             <Button
               onClick={onCreateOpen}
               disabled={isReadOnly}
-              className="self-start sm:self-auto"
+              className="self-start sm:self-auto gap-2"
             >
+              <Plus className="h-4 w-4" />
               Create new key
             </Button>
             <Button variant="outline" onClick={onRefresh} disabled={loading} className="gap-2">
@@ -185,25 +186,29 @@ export function ApiKeysTable({
             onDragEnd={onDragEnd}
           >
             <Table className="table-fixed w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={isAllSelected || (isIndeterminate && 'indeterminate')}
-                      onCheckedChange={toggleAll}
-                      aria-label="Select all API keys"
-                    />
-                  </TableHead>
-                  <TableHead className="w-10" />
-                  <TableHead className="min-w-[120px]">Name</TableHead>
-                  <TableHead className="min-w-[80px]">Key Hint</TableHead>
-                  <TableHead className="min-w-[120px] hidden md:table-cell">Permissions</TableHead>
-                  <TableHead className="min-w-[80px]">Status</TableHead>
-                  <TableHead className="min-w-[100px] hidden sm:table-cell">Created</TableHead>
-                  <TableHead className="min-w-[100px] hidden lg:table-cell">Last Used</TableHead>
-                  <TableHead className="text-right min-w-[80px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+              {(apiKeys.length > 0 || loading) && (
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all API keys"
+                      />
+                    </TableHead>
+                    <TableHead className="w-10" />
+                    <TableHead className="min-w-[120px]">Name</TableHead>
+                    <TableHead className="min-w-[80px]">Key Hint</TableHead>
+                    <TableHead className="min-w-[120px] hidden md:table-cell">
+                      Permissions
+                    </TableHead>
+                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <TableHead className="min-w-[100px] hidden sm:table-cell">Created</TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">Last Used</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+              )}
               <TableBody>
                 {loading && apiKeys.length === 0 ? (
                   <TableSkeleton />
@@ -215,6 +220,14 @@ export function ApiKeysTable({
                         title="No API keys"
                         description="Create your first API key to enable programmatic access."
                         className="py-10"
+                        action={
+                          !isReadOnly ? (
+                            <Button onClick={onCreateOpen} className="gap-2">
+                              <Plus className="h-4 w-4" />
+                              Create new key
+                            </Button>
+                          ) : undefined
+                        }
                       />
                     </TableCell>
                   </TableRow>

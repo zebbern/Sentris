@@ -8,9 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Plus } from 'lucide-react';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
@@ -50,6 +51,9 @@ export interface SchedulesTableProps {
   onPauseResume: (schedule: WorkflowSchedule) => void;
   onEdit: (schedule: WorkflowSchedule) => void;
   onDelete: (schedule: WorkflowSchedule) => void;
+
+  // Empty state
+  onCreateNew?: () => void;
 }
 
 function TableSkeleton() {
@@ -90,6 +94,7 @@ export function SchedulesTable({
   onPauseResume,
   onEdit,
   onDelete,
+  onCreateNew,
 }: SchedulesTableProps) {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -97,25 +102,27 @@ export function SchedulesTable({
         <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <Table className="table-fixed w-full min-w-[480px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={isAllSelected || (isIndeterminate && 'indeterminate')}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all schedules"
-                  />
-                </TableHead>
-                <TableHead className="w-10" />
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                <TableHead className="hidden lg:table-cell">Cadence</TableHead>
-                <TableHead className="hidden sm:table-cell">Next run</TableHead>
-                <TableHead className="hidden lg:table-cell">Last run</TableHead>
-                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                <TableHead className="text-right w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            {(hasData || isLoading) && (
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all schedules"
+                    />
+                  </TableHead>
+                  <TableHead className="w-10" />
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                  <TableHead className="hidden lg:table-cell">Cadence</TableHead>
+                  <TableHead className="hidden sm:table-cell">Next run</TableHead>
+                  <TableHead className="hidden lg:table-cell">Last run</TableHead>
+                  <TableHead className="hidden sm:table-cell">Status</TableHead>
+                  <TableHead className="text-right w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+            )}
             <TableBody>
               {isLoading && !hasData ? <TableSkeleton /> : null}
               {!isLoading && hasData ? (
@@ -161,6 +168,14 @@ export function SchedulesTable({
           title="No schedules found"
           description='Create your first cadence with the "New schedule" button or adjust the filters above.'
           className="py-10"
+          action={
+            onCreateNew ? (
+              <Button onClick={onCreateNew} className="gap-2">
+                <Plus className="h-4 w-4" />
+                New schedule
+              </Button>
+            ) : undefined
+          }
         />
       )}
     </div>

@@ -103,7 +103,7 @@ export function AppTopBar({
     if (location.pathname === '/action-center') {
       return {
         title: 'Action Center',
-        shortTitle: 'Actions',
+        shortTitle: 'Action Center',
         subtitle: 'Review and respond to pending items',
       };
     }
@@ -119,7 +119,7 @@ export function AppTopBar({
     if (location.pathname === '/analytics-settings') {
       return {
         title: 'Analytics Settings',
-        shortTitle: 'Analytics',
+        shortTitle: 'Analytics Settings',
         subtitle: 'Configure data retention and storage settings',
       };
     }

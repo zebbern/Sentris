@@ -497,6 +497,7 @@ export function SchedulesPage() {
             onPauseResume={handlePauseResume}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onCreateNew={openCreateDrawer}
           />
         </div>
       </div>

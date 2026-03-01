@@ -1,4 +1,5 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { components } from '@sentris/backend-client';
@@ -126,6 +127,7 @@ mock.module('@/hooks/queries/useApiKeyQueries', () => ({
 const mockInvalidateQueries = mock().mockResolvedValue(undefined);
 
 mock.module('@tanstack/react-query', () => ({
+  ...realModuleExports('@tanstack/react-query'),
   useQueryClient: () => ({
     invalidateQueries: mockInvalidateQueries,
   }),
@@ -234,6 +236,15 @@ const renderPage = () =>
   );
 
 // --- Tests ---
+afterAll(() =>
+  restoreMockedModules([
+    '@/components/ui/dialog',
+    '@/components/ui/alert-dialog',
+    '@/hooks/queries/useApiKeyQueries',
+    '@tanstack/react-query',
+  ]),
+);
+
 describe('ApiKeysManager', () => {
   beforeEach(async () => {
     cleanup();
@@ -293,7 +304,7 @@ describe('ApiKeysManager', () => {
     setupStore({ apiKeys: [] });
     renderPage();
 
-    const createButton = screen.getByRole('button', { name: /Create new key/i });
+    const createButton = screen.getAllByRole('button', { name: /Create new key/i })[0];
     fireEvent.click(createButton);
 
     // Dialog should be open with form fields
@@ -310,7 +321,7 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     // Open dialog
-    const createButton = screen.getByRole('button', { name: /Create new key/i });
+    const createButton = screen.getAllByRole('button', { name: /Create new key/i })[0];
     fireEvent.click(createButton);
 
     const dialog = await screen.findByRole('dialog');

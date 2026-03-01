@@ -263,6 +263,13 @@ export function AuditLogSettings() {
                       icon={ClipboardList}
                       title="No events found"
                       description="Try adjusting your filters to see more results."
+                      action={
+                        hasActiveFilters ? (
+                          <Button variant="outline" onClick={clearFilters}>
+                            Clear filters
+                          </Button>
+                        ) : undefined
+                      }
                     />
                   </TableCell>
                 </TableRow>

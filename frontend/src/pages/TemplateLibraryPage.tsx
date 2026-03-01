@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Layers } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { Button } from '@/components/ui/button';
 import {
   useTemplates,
   useTemplateCategories,
@@ -176,6 +177,17 @@ export function TemplateLibraryPage() {
               hasFilters
                 ? "Try adjusting your filters or search query to find what you're looking for."
                 : 'No templates available yet. Sync from GitHub to load templates.'
+            }
+            action={
+              hasFilters ? (
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : canManageWorkflows ? (
+                <Button onClick={handleSync} disabled={isSyncing}>
+                  {isSyncing ? 'Syncing…' : 'Sync templates'}
+                </Button>
+              ) : undefined
             }
           />
         ) : (

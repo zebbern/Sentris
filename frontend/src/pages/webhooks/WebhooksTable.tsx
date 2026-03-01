@@ -9,8 +9,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@/components/ui/button';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-import { Link2 } from 'lucide-react';
+import { Link2, Plus } from 'lucide-react';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
@@ -50,6 +51,9 @@ export interface WebhooksTableProps {
   onViewHistory: (webhook: WebhookConfiguration) => void;
   onRegeneratePath: (webhook: WebhookConfiguration) => void;
   onDelete: (webhook: WebhookConfiguration) => void;
+
+  // Empty state
+  onCreateNew?: () => void;
 }
 
 function TableSkeleton() {
@@ -93,6 +97,7 @@ export function WebhooksTable({
   onViewHistory,
   onRegeneratePath,
   onDelete,
+  onCreateNew,
 }: WebhooksTableProps) {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -100,24 +105,26 @@ export function WebhooksTable({
         <BulkActionBar selectedCount={selectedCount} actions={bulkActions} />
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <Table className="table-fixed w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={isAllSelected || (isIndeterminate && 'indeterminate')}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all webhooks"
-                  />
-                </TableHead>
-                <TableHead className="w-10" />
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                <TableHead className="hidden sm:table-cell">Webhook URL</TableHead>
-                <TableHead className="hidden lg:table-cell whitespace-nowrap">Created</TableHead>
-                <TableHead className="hidden sm:table-cell whitespace-nowrap">Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            {(hasData || isLoading) && (
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={isAllSelected || (isIndeterminate && 'indeterminate')}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all webhooks"
+                    />
+                  </TableHead>
+                  <TableHead className="w-10" />
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden md:table-cell">Workflow</TableHead>
+                  <TableHead className="hidden sm:table-cell">Webhook URL</TableHead>
+                  <TableHead className="hidden lg:table-cell whitespace-nowrap">Created</TableHead>
+                  <TableHead className="hidden sm:table-cell whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+            )}
             <TableBody>
               {isLoading && !hasData ? <TableSkeleton /> : null}
               {!isLoading && hasData ? (
@@ -162,6 +169,14 @@ export function WebhooksTable({
                       title="No webhooks found"
                       description='Create your first webhook with the "New webhook" button or tweak the filters above.'
                       className="py-10"
+                      action={
+                        onCreateNew ? (
+                          <Button onClick={onCreateNew} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            New webhook
+                          </Button>
+                        ) : undefined
+                      }
                     />
                   </TableCell>
                 </TableRow>

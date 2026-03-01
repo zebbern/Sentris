@@ -234,24 +234,26 @@ export function ActionCenterPage() {
                 onDragEnd={handleDragEnd}
               >
                 <Table className="table-fixed w-full">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10" />
-                      <TableHead>Title</TableHead>
-                      <TableHead className="hidden md:table-cell">Node</TableHead>
-                      <TableHead className="hidden lg:table-cell">Run ID</TableHead>
-                      <TableHead className="hidden sm:table-cell whitespace-nowrap">
-                        Created
-                      </TableHead>
-                      <TableHead className="hidden lg:table-cell whitespace-nowrap">
-                        Timeout
-                      </TableHead>
-                      <TableHead className="hidden sm:table-cell whitespace-nowrap">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  {(hasData || isLoading) && (
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10" />
+                        <TableHead>Title</TableHead>
+                        <TableHead className="hidden md:table-cell">Node</TableHead>
+                        <TableHead className="hidden lg:table-cell">Run ID</TableHead>
+                        <TableHead className="hidden sm:table-cell whitespace-nowrap">
+                          Created
+                        </TableHead>
+                        <TableHead className="hidden lg:table-cell whitespace-nowrap">
+                          Timeout
+                        </TableHead>
+                        <TableHead className="hidden sm:table-cell whitespace-nowrap">
+                          Status
+                        </TableHead>
+                        <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                  )}
                   <TableBody>
                     {isLoading && !hasData
                       ? Array.from({ length: 4 }).map((_, index) => (
@@ -410,6 +412,23 @@ export function ActionCenterPage() {
                                 : 'No requests match your filters. Try adjusting the search or status filter.'
                             }
                             className="py-10"
+                            action={
+                              search.trim().length > 0 ? (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSearch('');
+                                    setStatusFilter('all');
+                                  }}
+                                >
+                                  Clear filters
+                                </Button>
+                              ) : statusFilter !== 'all' ? (
+                                <Button variant="outline" onClick={() => setStatusFilter('all')}>
+                                  View all statuses
+                                </Button>
+                              ) : undefined
+                            }
                           />
                         </TableCell>
                       </TableRow>
