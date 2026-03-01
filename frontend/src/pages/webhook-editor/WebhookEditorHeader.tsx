@@ -79,6 +79,7 @@ export function WebhookEditorHeader({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Delete webhook"
             onClick={onDelete}
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
           >

@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { History, RotateCcw, Check, Loader2, Eye } from 'lucide-react';
+import { EmptyState as SharedEmptyState } from '@/components/ui/EmptyState';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -153,7 +154,7 @@ export function VersionHistoryPanel({ workflowId, onLoadVersion }: VersionHistor
             {isLoading ? (
               <VersionListSkeleton />
             ) : sortedVersions.length === 0 ? (
-              <EmptyState />
+              <VersionEmptyState />
             ) : (
               <div className="space-y-1">
                 {sortedVersions.map((version) => {
@@ -300,14 +301,13 @@ function VersionListSkeleton() {
   );
 }
 
-function EmptyState() {
+function VersionEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <History className="h-10 w-10 text-muted-foreground/40 mb-3" />
-      <p className="text-sm font-medium text-muted-foreground">No versions yet</p>
-      <p className="text-xs text-muted-foreground/70 mt-1 max-w-[200px]">
-        Versions are created when the workflow is saved and committed.
-      </p>
-    </div>
+    <SharedEmptyState
+      icon={History}
+      title="No versions yet"
+      description="Versions are created when the workflow is saved and committed."
+      className="py-12"
+    />
   );
 }
