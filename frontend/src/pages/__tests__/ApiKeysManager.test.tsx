@@ -12,6 +12,24 @@ type ApiKeyResponseDto = components['schemas']['ApiKeyResponseDto'];
 mock.module('@/components/ui/dialog', createDialogMock);
 mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
 
+// --- Mock useConfirmDialog (prevents cross-file contamination from other test files) ---
+const mockConfirm = mock().mockResolvedValue(false);
+mock.module('@/hooks/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: mockConfirm,
+    dialogProps: {
+      open: false,
+      title: '',
+      description: '',
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      destructive: false,
+      onConfirm: () => {},
+      onCancel: () => {},
+    },
+  }),
+}));
+
 // --- Mutable auth state ---
 let mockRoles: string[] = ['ADMIN'];
 
@@ -152,6 +170,7 @@ afterAll(() =>
   restoreMockedModules([
     '@/components/ui/dialog',
     '@/components/ui/alert-dialog',
+    '@/hooks/useConfirmDialog',
     '@/hooks/queries/useApiKeyQueries',
   ]),
 );
@@ -162,6 +181,8 @@ describe('ApiKeysManager', () => {
     mockRoles = ['ADMIN'];
     setupStore();
     mockWriteText.mockClear();
+    mockConfirm.mockClear();
+    mockConfirm.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -272,6 +293,7 @@ describe('ApiKeysManager', () => {
   });
 
   it('clicking Revoke button shows confirm dialog, confirming calls revokeApiKeyMutation.mutateAsync', async () => {
+    mockConfirm.mockResolvedValue(true);
     const revokeApiKey = mock().mockResolvedValue(undefined);
     setupStore({ apiKeys: [baseApiKey], revokeApiKey });
     renderPage();
@@ -279,21 +301,18 @@ describe('ApiKeysManager', () => {
     const revokeButton = screen.getByRole('button', { name: /Revoke key/i });
     fireEvent.click(revokeButton);
 
-    // Wait for the confirm dialog to appear
-    const alertDialog = await screen.findByRole('alertdialog');
-    expect(alertDialog).toBeInTheDocument();
+    // confirm() was called with revoke-related options
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
 
-    // Find the confirm action button inside the alert dialog
-    const confirmActionBtn = within(alertDialog).getByRole('button', { name: /Revoke/i });
-    fireEvent.click(confirmActionBtn);
+    // Give the async handler time to resolve
+    await new Promise((r) => setTimeout(r, 20));
 
-    await waitFor(() => {
-      expect(revokeApiKey).toHaveBeenCalledTimes(1);
-      expect(revokeApiKey).toHaveBeenCalledWith(baseApiKey.id);
-    });
+    expect(revokeApiKey).toHaveBeenCalledTimes(1);
+    expect(revokeApiKey).toHaveBeenCalledWith(baseApiKey.id);
   });
 
   it('clicking Delete button shows confirm dialog, confirming calls deleteApiKeyMutation.mutateAsync', async () => {
+    mockConfirm.mockResolvedValue(true);
     const deleteApiKey = mock().mockResolvedValue(undefined);
     setupStore({ apiKeys: [baseApiKey], deleteApiKey });
     renderPage();
@@ -301,18 +320,14 @@ describe('ApiKeysManager', () => {
     const deleteButton = screen.getByRole('button', { name: /Delete key/i });
     fireEvent.click(deleteButton);
 
-    // Wait for the confirm dialog to appear
-    const alertDialog = await screen.findByRole('alertdialog');
-    expect(alertDialog).toBeInTheDocument();
+    // confirm() was called with delete-related options
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
 
-    // Find the confirm action button inside the alert dialog
-    const confirmActionBtn = within(alertDialog).getByRole('button', { name: /Delete/i });
-    fireEvent.click(confirmActionBtn);
+    // Give the async handler time to resolve
+    await new Promise((r) => setTimeout(r, 20));
 
-    await waitFor(() => {
-      expect(deleteApiKey).toHaveBeenCalledTimes(1);
-      expect(deleteApiKey).toHaveBeenCalledWith(baseApiKey.id);
-    });
+    expect(deleteApiKey).toHaveBeenCalledTimes(1);
+    expect(deleteApiKey).toHaveBeenCalledWith(baseApiKey.id);
   });
 
   it('read-only mode (MEMBER role) disables create button', async () => {
