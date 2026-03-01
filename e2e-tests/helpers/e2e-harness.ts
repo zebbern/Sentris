@@ -136,6 +136,74 @@ export async function createWorkflow(workflow: any): Promise<string> {
   return id;
 }
 
+/** Create a workflow, returns the full response body. */
+export async function createWorkflowFull(workflow: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/workflows`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(workflow),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Workflow creation failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** List all workflows. */
+export async function listWorkflows(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/workflows`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list workflows: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get a workflow by ID. */
+export async function getWorkflow(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/workflows/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get workflow ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Fetch a workflow, returning the raw Response (for asserting 404s etc.). */
+export async function getWorkflowRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/workflows/${id}`, { headers: HEADERS });
+}
+
+/** Rename a workflow via PATCH /workflows/:id/metadata. */
+export async function renameWorkflow(
+  id: string,
+  newName: string,
+  description?: string | null,
+): Promise<any> {
+  const body: Record<string, unknown> = { name: newName };
+  if (description !== undefined) body.description = description;
+  const res = await fetch(`${API_BASE}/workflows/${id}/metadata`, {
+    method: 'PATCH',
+    headers: HEADERS,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to rename workflow ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Delete a workflow. Returns the response status code. */
+export async function deleteWorkflowById(id: string): Promise<number> {
+  const res = await fetch(`${API_BASE}/workflows/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  return res.status;
+}
+
 /** Run a workflow, returns the runId. */
 export async function runWorkflow(
   workflowId: string,
