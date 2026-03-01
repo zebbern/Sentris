@@ -100,8 +100,8 @@ export const ExecutionErrorView: React.FC<ExecutionErrorViewProps> = ({ error, c
               <span className="font-semibold text-foreground/70 uppercase text-[9px]">{field}</span>
               <ul className="list-none pl-1 space-y-0.5">
                 {errors.map((err, i) => (
-                  <li key={i} className="text-red-500 flex items-start gap-1">
-                    <span className="mt-1 block h-1 w-1 rounded-full bg-red-400 flex-shrink-0" />
+                  <li key={i} className="text-destructive flex items-start gap-1">
+                    <span className="mt-1 block h-1 w-1 rounded-full bg-destructive/60 flex-shrink-0" />
                     {err}
                   </li>
                 ))}

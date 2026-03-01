@@ -177,7 +177,7 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <div className="flex gap-2 items-center">
               <Input
@@ -190,12 +190,12 @@ export function RunWorkflowDialog({
                   }
                 }}
                 disabled={isUploading}
-                className={hasError ? 'border-red-500' : ''}
+                className={hasError ? 'border-destructive' : ''}
               />
               {isUploading && <Loader2 className="h-4 w-4 animate-spin" />}
             </div>
             {inputs[input.id] != null && (
-              <p className="text-xs text-green-600">
+              <p className="text-xs text-green-600 dark:text-green-400">
                 ✓ File uploaded:{' '}
                 {
                   (typeof inputs[input.id] === 'string'
@@ -207,7 +207,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
 
@@ -216,13 +216,13 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Textarea
               id={input.id}
               placeholder='{"key": "value"}'
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
-              className={cn('max-h-[120px] overflow-y-auto', hasError && 'border-red-500')}
+              className={cn('max-h-[120px] overflow-y-auto', hasError && 'border-destructive')}
               rows={2}
               defaultValue={
                 typeof inputs[input.id] === 'string'
@@ -235,7 +235,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
 
@@ -244,7 +244,7 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Textarea
               id={input.id}
@@ -252,7 +252,7 @@ export function RunWorkflowDialog({
               onChange={(e) => handleInputChange(input.id, e.target.value, input.type)}
               className={cn(
                 'font-mono max-h-[120px] overflow-y-auto',
-                hasError && 'border-red-500',
+                hasError && 'border-destructive',
               )}
               rows={2}
               defaultValue={
@@ -269,7 +269,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
 
@@ -278,14 +278,14 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Input
               id={input.id}
               type="number"
               placeholder="Enter a number"
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
-              className={hasError ? 'border-red-500' : ''}
+              className={hasError ? 'border-destructive' : ''}
               defaultValue={
                 typeof inputs[input.id] === 'number' || typeof inputs[input.id] === 'string'
                   ? (inputs[input.id] as string | number)
@@ -295,7 +295,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
 
@@ -304,14 +304,14 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Input
               id={input.id}
               type="password"
               placeholder="Enter secret value"
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
-              className={hasError ? 'border-red-500' : ''}
+              className={hasError ? 'border-destructive' : ''}
               defaultValue={
                 inputs[input.id] !== undefined && inputs[input.id] !== null
                   ? String(inputs[input.id])
@@ -321,7 +321,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
 
@@ -331,7 +331,7 @@ export function RunWorkflowDialog({
           <div className="space-y-2">
             <Label htmlFor={input.id}>
               {input.label}
-              {input.required && <span className="text-red-500 ml-1">*</span>}
+              {input.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Textarea
               id={input.id}
@@ -339,7 +339,7 @@ export function RunWorkflowDialog({
               onChange={(e) => handleInputChange(input.id, e.target.value, inputType)}
               className={cn(
                 'font-mono max-h-[120px] overflow-y-auto',
-                hasError && 'border-red-500',
+                hasError && 'border-destructive',
               )}
               rows={2}
               defaultValue={
@@ -351,7 +351,7 @@ export function RunWorkflowDialog({
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}
-            {hasError && <p className="text-xs text-red-500">{errors[input.id]}</p>}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
           </div>
         );
     }

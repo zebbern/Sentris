@@ -213,8 +213,8 @@ export function WebhookDetails({
                       >
                         {copiedText !== null ? (
                           <>
-                            <Check className="h-3 w-3 text-green-500" />
-                            <span className="text-green-600">Copied</span>
+                            <Check className="h-3 w-3 text-green-500 dark:text-green-400" />
+                            <span className="text-green-600 dark:text-green-400">Copied</span>
                           </>
                         ) : (
                           <>

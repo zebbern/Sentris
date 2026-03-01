@@ -42,7 +42,7 @@ function RuntimeInputField({
         <div className="space-y-2">
           <Label htmlFor={input.id} className="text-sm font-medium">
             {input.label}
-            {input.required ? <span className="text-red-500 ml-1">*</span> : null}
+            {input.required ? <span className="text-destructive ml-1">*</span> : null}
           </Label>
           <Input
             id={input.id}
@@ -69,7 +69,7 @@ function RuntimeInputField({
           {input.description ? (
             <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}
-          {error ? <p className="text-xs text-red-500">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     case 'json':
@@ -77,12 +77,12 @@ function RuntimeInputField({
         <div className="space-y-2">
           <Label htmlFor={input.id} className="text-sm font-medium">
             {input.label}
-            {input.required ? <span className="text-red-500 ml-1">*</span> : null}
+            {input.required ? <span className="text-destructive ml-1">*</span> : null}
           </Label>
           <Textarea
             id={input.id}
             rows={4}
-            className={cn('font-mono', error && 'border-red-500')}
+            className={cn('font-mono', error && 'border-destructive')}
             defaultValue={
               typeof currentValue === 'string'
                 ? currentValue
@@ -95,7 +95,7 @@ function RuntimeInputField({
           {input.description ? (
             <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}
-          {error ? <p className="text-xs text-red-500">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     case 'array':
@@ -103,12 +103,12 @@ function RuntimeInputField({
         <div className="space-y-2">
           <Label htmlFor={input.id} className="text-sm font-medium">
             {input.label}
-            {input.required ? <span className="text-red-500 ml-1">*</span> : null}
+            {input.required ? <span className="text-destructive ml-1">*</span> : null}
           </Label>
           <Textarea
             id={input.id}
             rows={3}
-            className={cn('font-mono', error && 'border-red-500')}
+            className={cn('font-mono', error && 'border-destructive')}
             placeholder='["value-1", "value-2"] or comma-separated text'
             defaultValue={
               typeof currentValue === 'string'
@@ -122,7 +122,7 @@ function RuntimeInputField({
           {input.description ? (
             <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}
-          {error ? <p className="text-xs text-red-500">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     default:
@@ -130,7 +130,7 @@ function RuntimeInputField({
         <div className="space-y-2">
           <Label htmlFor={input.id} className="text-sm font-medium">
             {input.label}
-            {input.required ? <span className="text-red-500 ml-1">*</span> : null}
+            {input.required ? <span className="text-destructive ml-1">*</span> : null}
           </Label>
           <Input
             id={input.id}
@@ -140,14 +140,14 @@ function RuntimeInputField({
                 ? String(currentValue)
                 : ''
             }
-            className={error ? 'border-red-500' : ''}
+            className={error ? 'border-destructive' : ''}
             placeholder={type === 'number' ? '0' : undefined}
             onBlur={(event) => onRuntimeInputChange(input, event.target.value)}
           />
           {input.description ? (
             <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}
-          {error ? <p className="text-xs text-red-500">{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
   }

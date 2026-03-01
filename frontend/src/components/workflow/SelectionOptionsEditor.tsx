@@ -94,7 +94,7 @@ function SortableRow({ item, onUpdate, onRemove }: SortableRowProps) {
         aria-label="Remove option"
         onClick={() => onRemove(item._uid)}
       >
-        <Trash2 className="h-3 w-3 text-red-500" />
+        <Trash2 className="h-3 w-3 text-destructive" />
       </Button>
     </div>
   );

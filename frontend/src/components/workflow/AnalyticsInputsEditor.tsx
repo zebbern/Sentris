@@ -111,14 +111,14 @@ export function AnalyticsInputsEditor({ value, onChange }: AnalyticsInputsEditor
                   aria-label={`Remove input ${index + 1}`}
                   onClick={() => removeInput(index)}
                 >
-                  <Trash2 className="h-3 w-3 text-red-500" />
+                  <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
               </div>
 
               {/* ID Field */}
               <div className="space-y-1">
                 <Label htmlFor={`input-${index}-id`} className="text-xs">
-                  ID <span className="text-red-500">*</span>
+                  ID <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id={`input-${index}-id`}
@@ -135,7 +135,7 @@ export function AnalyticsInputsEditor({ value, onChange }: AnalyticsInputsEditor
               {/* Label Field */}
               <div className="space-y-1">
                 <Label htmlFor={`input-${index}-label`} className="text-xs">
-                  Label <span className="text-red-500">*</span>
+                  Label <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id={`input-${index}-label`}

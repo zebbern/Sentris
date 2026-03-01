@@ -102,17 +102,17 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             'bg-background/95 backdrop-blur-sm border',
             'transition-all duration-200 active:scale-95',
             hasIssues
-              ? 'border-red-500/50 hover:border-red-500'
-              : 'border-green-500/50 hover:border-green-500',
+              ? 'border-destructive/50 hover:border-destructive'
+              : 'border-green-500/50 hover:border-green-500 dark:border-green-400/50 dark:hover:border-green-400',
           )}
         >
           {hasIssues ? (
             <>
-              <AlertCircle className="h-4 w-4 text-red-500" />
+              <AlertCircle className="h-4 w-4 text-destructive" />
               <span className="text-xs font-medium">{totalIssues}</span>
             </>
           ) : (
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
           )}
         </button>
 
@@ -144,9 +144,9 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
           <div className="flex items-center justify-between px-4 pb-3 border-b">
             <div className="flex items-center gap-2">
               {hasIssues ? (
-                <AlertCircle className="h-4 w-4 text-red-500" />
+                <AlertCircle className="h-4 w-4 text-destructive" />
               ) : (
-                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
               )}
               <span className="text-sm font-medium">
                 {hasIssues
@@ -178,7 +178,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
                       'transition-colors cursor-pointer active:bg-muted',
                     )}
                   >
-                    <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-foreground">{issue.nodeLabel}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">{issue.message}</div>
@@ -189,7 +189,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             ) : (
               <div className="flex items-center justify-center py-8">
                 <div className="text-center">
-                  <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <CheckCircle2 className="h-8 w-8 text-green-500 dark:text-green-400 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">No validation issues found</p>
                 </div>
               </div>
@@ -226,7 +226,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             )}
           >
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />
+              <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
               <span className="text-[11px] font-medium">
                 {totalIssues} {totalIssues === 1 ? 'issue' : 'issues'}
               </span>
@@ -262,7 +262,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
                   'group',
                 )}
               >
-                <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />
+                <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
                 <span className="font-medium text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 truncate">
                   {issue.nodeLabel}
                 </span>
@@ -273,7 +273,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
         </>
       ) : (
         <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+          <CheckCircle2 className="h-3 w-3 text-green-500 dark:text-green-400 shrink-0" />
           <span className="text-[11px] text-muted-foreground">All validated</span>
         </div>
       )}

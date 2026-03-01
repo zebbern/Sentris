@@ -122,14 +122,14 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
                   aria-label={`Remove input ${index + 1}`}
                   onClick={() => removeInput(index)}
                 >
-                  <Trash2 className="h-3 w-3 text-red-500" />
+                  <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
               </div>
 
               {/* ID Field */}
               <div className="space-y-1">
                 <Label htmlFor={`input-${index}-id`} className="text-xs">
-                  ID <span className="text-red-500">*</span>
+                  ID <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id={`input-${index}-id`}
@@ -146,7 +146,7 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
               {/* Label Field */}
               <div className="space-y-1">
                 <Label htmlFor={`input-${index}-label`} className="text-xs">
-                  Label <span className="text-red-500">*</span>
+                  Label <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id={`input-${index}-label`}
@@ -161,7 +161,7 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
               {/* Type Dropdown */}
               <div className="space-y-1">
                 <Label htmlFor={`input-${index}-type`} className="text-xs">
-                  Type <span className="text-red-500">*</span>
+                  Type <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={input.type}
@@ -276,7 +276,8 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
                 <div className="flex items-center gap-2 text-xs">
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   <span className="text-muted-foreground">
-                    Output port: <span className="font-mono text-green-600">{input.id}</span>
+                    Output port:{' '}
+                    <span className="font-mono text-green-600 dark:text-green-400">{input.id}</span>
                   </span>
                 </div>
               </div>

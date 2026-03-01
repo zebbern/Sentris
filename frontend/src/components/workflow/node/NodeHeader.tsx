@@ -186,7 +186,7 @@ export function NodeHeader({
                 )}
               {entryPointHeaderSlot}
               {hasUnfilledRequired && !nodeStatus && (
-                <span className="text-red-500 text-xs" title="Required fields missing">
+                <span className="text-destructive text-xs" title="Required fields missing">
                   !
                 </span>
               )}

@@ -87,7 +87,7 @@ export function JsonField({ parameter, value, onChange }: JsonFieldProps) {
         rows={Math.min(parameter.rows || 4, 4)}
         placeholder={parameter.placeholder || '{\n  "key": "value"\n}'}
       />
-      {jsonError && <p className="text-sm text-red-500">{jsonError}</p>}
+      {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
     </div>
   );
 }

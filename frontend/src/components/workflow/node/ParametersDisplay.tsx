@@ -80,7 +80,7 @@ export function ParametersDisplay({
                     {String(displayValue)}
                   </span>
                 ) : param.required ? (
-                  <span className="text-red-500 text-[10px]">*required</span>
+                  <span className="text-destructive text-[10px]">*required</span>
                 ) : null}
               </div>
             </div>

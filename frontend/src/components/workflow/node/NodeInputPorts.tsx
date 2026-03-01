@@ -160,7 +160,7 @@ function InputPortRow({
       <div className="flex-1">
         <div className="text-muted-foreground font-medium">{input.label}</div>
         {input.required && !sourceInfo && !manualValueProvided && (
-          <span className="text-red-500 text-[10px]">*required</span>
+          <span className="text-destructive text-[10px]">*required</span>
         )}
         {manualValueProvided && manualDisplay && (
           <div className="mt-0.5">

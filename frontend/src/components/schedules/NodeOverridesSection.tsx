@@ -73,17 +73,17 @@ export function NodeOverridesSection({
                     aria-label="Remove override"
                     onClick={() => onRemoveOverrideNode(nodeId)}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500" />
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
                 <Textarea
                   rows={4}
-                  className={cn('font-mono', error && 'border-red-500')}
+                  className={cn('font-mono', error && 'border-destructive')}
                   value={draftValue}
                   onChange={(event) => onOverrideChange(nodeId, event.target.value)}
                   placeholder='{"parameter": "value"}'
                 />
-                {error ? <p className="text-xs text-red-500">{error}</p> : null}
+                {error ? <p className="text-xs text-destructive">{error}</p> : null}
               </div>
             );
           })

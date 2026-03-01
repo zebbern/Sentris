@@ -290,8 +290,12 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
 
                     {/* Health status text */}
                     <div className="flex items-center gap-1">
-                      {status === 'healthy' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                      {status === 'unhealthy' && <AlertCircle className="h-3 w-3 text-red-500" />}
+                      {status === 'healthy' && (
+                        <CheckCircle2 className="h-3 w-3 text-green-500 dark:text-green-400" />
+                      )}
+                      {status === 'unhealthy' && (
+                        <AlertCircle className="h-3 w-3 text-destructive" />
+                      )}
                       {status === 'unknown' && (
                         <HelpCircle className="h-3 w-3 text-muted-foreground" />
                       )}

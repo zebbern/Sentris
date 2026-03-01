@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -111,19 +112,23 @@ export function CustomServersTable({
                 ))
               ) : servers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
-                    <Plug className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      {searchQuery
-                        ? 'No servers match your search'
-                        : 'No custom servers configured'}
-                    </p>
-                    {!searchQuery && (
-                      <Button variant="outline" className="mt-4" onClick={onCreateNew}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add your first custom server
-                      </Button>
-                    )}
+                  <TableCell colSpan={8}>
+                    <EmptyState
+                      icon={Plug}
+                      title={
+                        searchQuery
+                          ? 'No servers match your search'
+                          : 'No custom servers configured'
+                      }
+                      action={
+                        !searchQuery ? (
+                          <Button variant="outline" onClick={onCreateNew}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add your first custom server
+                          </Button>
+                        ) : undefined
+                      }
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

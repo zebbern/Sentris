@@ -73,9 +73,9 @@ export function McpServersDisplay({
                   : HelpCircle;
             const statusColor =
               status === 'healthy'
-                ? 'text-green-500'
+                ? 'text-green-500 dark:text-green-400'
                 : status === 'unhealthy'
-                  ? 'text-red-500'
+                  ? 'text-destructive'
                   : 'text-muted-foreground';
 
             return (

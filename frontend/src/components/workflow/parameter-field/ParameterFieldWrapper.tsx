@@ -169,7 +169,7 @@ export function ParameterFieldWrapper({
           >
             {parameter.label}
           </label>
-          {parameter.required && <span className="text-xs text-red-500">*required</span>}
+          {parameter.required && <span className="text-xs text-destructive">*required</span>}
         </div>
       )}
 
