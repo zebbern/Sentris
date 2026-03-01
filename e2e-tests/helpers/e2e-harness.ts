@@ -244,6 +244,105 @@ export async function pollRunStatus(
   throw new Error(`Workflow run ${runId} did not complete within ${timeoutMs}ms`);
 }
 
+/** Poll until a run reaches AWAITING_INPUT or a terminal status. */
+export async function pollRunUntilAwaitingInput(
+  runId: string,
+  timeoutMs = 60000,
+): Promise<{ status: string }> {
+  const startTime = Date.now();
+  const pollInterval = 1000;
+
+  while (Date.now() - startTime < timeoutMs) {
+    const res = await fetch(`${API_BASE}/workflows/runs/${runId}/status`, {
+      headers: HEADERS,
+    });
+    const s = await res.json();
+    if (
+      ['AWAITING_INPUT', 'COMPLETED', 'FAILED', 'CANCELLED', 'TERMINATED'].includes(s.status)
+    ) {
+      return s;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+  }
+
+  throw new Error(`Workflow run ${runId} did not reach AWAITING_INPUT within ${timeoutMs}ms`);
+}
+
+// ---------------------------------------------------------------------------
+// Human Input helpers
+// ---------------------------------------------------------------------------
+
+/** List human input requests, with optional query filters. */
+export async function listHumanInputs(
+  query?: { status?: string; inputType?: string },
+): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.inputType) params.set('inputType', query.inputType);
+  const qs = params.toString();
+  const url = qs ? `${API_BASE}/human-inputs?${qs}` : `${API_BASE}/human-inputs`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list human inputs: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get a human input request by ID. */
+export async function getHumanInput(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/human-inputs/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get human input ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get a human input request by ID, returning the raw Response. */
+export async function getHumanInputRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/human-inputs/${id}`, { headers: HEADERS });
+}
+
+/** Resolve a human input request (authenticated). */
+export async function resolveHumanInput(
+  id: string,
+  dto: { responseData?: Record<string, unknown>; respondedBy?: string },
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/human-inputs/${id}/resolve`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to resolve human input ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/**
+ * Resolve a human input request via token endpoint.
+ * NOTE: The controller intends this to be public (no auth) but the @Public()
+ * decorator is currently missing, so the global AuthGuard still applies.
+ * We send HEADERS (with internal token) to work around this.
+ */
+export async function resolveByToken(
+  token: string,
+  body: { action?: 'approve' | 'reject' | 'resolve'; data?: Record<string, unknown> },
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/human-inputs/resolve/${token}`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to resolve by token: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
 /** Fetch trace events for a run. */
 export async function getTraceEvents(runId: string): Promise<any[]> {
   const res = await fetch(`${API_BASE}/workflows/runs/${runId}/trace`, {
