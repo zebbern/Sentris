@@ -297,9 +297,7 @@ async function fetchConnectionAccessToken(
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
   const baseUrl =
-    process.env.SENTRIS_API_BASE_URL ??
-    process.env.API_BASE_URL ??
-    'http://localhost:3211';
+    process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
 
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 

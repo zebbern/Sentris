@@ -6,9 +6,7 @@ import type { PrepareRunPayloadActivityInput } from '../types';
 type FetchResponse = Awaited<ReturnType<typeof fetch>>;
 
 const DEFAULT_API_BASE_URL =
-  process.env.SENTRIS_API_BASE_URL ??
-  process.env.API_BASE_URL ??
-  'http://localhost:3211';
+  process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
 
 function normalizeBaseUrl(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
