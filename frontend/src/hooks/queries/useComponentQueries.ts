@@ -10,12 +10,19 @@ interface ComponentIndex {
 }
 
 /** Normalizes raw API component data into indexed ComponentMetadata records. */
-function buildIndexes(components: any[]): ComponentIndex {
+function buildIndexes(components: Record<string, unknown>[]): ComponentIndex {
   const byId: Record<string, ComponentMetadata> = {};
   const slugIndex: Record<string, string> = {};
 
-  components.forEach((component) => {
-    if (!component?.id || !component?.slug || !component?.name) return;
+  components.forEach((raw) => {
+    if (!raw?.id || !raw?.slug || !raw?.name) return;
+
+    // After validation, cast to a partial metadata shape for safe property access
+    const component = raw as Partial<ComponentMetadata> & {
+      id: string;
+      slug: string;
+      name: string;
+    };
 
     const metadata: ComponentMetadata = {
       id: component.id,
@@ -25,7 +32,7 @@ function buildIndexes(components: any[]): ComponentIndex {
       type: component.type || 'process',
       category: component.category || 'transform',
       categoryConfig: component.categoryConfig || {
-        label: component.category || 'Other',
+        label: (component.category as string) || 'Other',
         color: '#666',
         description: '',
         emoji: '\u{1F4E6}',

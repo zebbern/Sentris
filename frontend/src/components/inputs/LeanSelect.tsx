@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils';
 
 export interface SelectOption {
   label: string;
-  value: any;
+  value: string | number;
   description?: string;
   icon?: ReactNode;
 }
 
 interface LeanSelectProps {
-  value?: any;
-  onChange: (value: any) => void;
+  value?: string | number;
+  onChange: (value: string | number | undefined) => void;
   options: SelectOption[];
   placeholder?: string;
   disabled?: boolean;
@@ -59,7 +59,7 @@ export function LeanSelect({
 
   const selectedOption = options.find((o) => o.value === value);
 
-  const handleSelect = (val: any) => {
+  const handleSelect = (val: string | number | undefined) => {
     onChange(val);
     setIsOpen(false);
   };

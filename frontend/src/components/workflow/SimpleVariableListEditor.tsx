@@ -123,8 +123,8 @@ function generateId(): string {
   return `var_${Date.now()}_${++idCounter}`;
 }
 
-function toInternal(value: any): InternalVariable[] {
-  let list: any[] = [];
+function toInternal(value: SimpleVariable[] | string): InternalVariable[] {
+  let list: Partial<SimpleVariable>[] = [];
   if (Array.isArray(value)) {
     list = value;
   } else if (typeof value === 'string' && value.trim()) {
@@ -137,7 +137,11 @@ function toInternal(value: any): InternalVariable[] {
       logger.warn('Failed to parse legacy variables', e);
     }
   }
-  return list.map((v) => ({ ...v, _id: generateId() }));
+  return list.map((v) => ({
+    name: v.name || '',
+    type: v.type || 'string',
+    _id: generateId(),
+  }));
 }
 
 function toExternal(items: InternalVariable[]): SimpleVariable[] {

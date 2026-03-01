@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Building2 } from 'lucide-react';
 
 interface OrganizationSwitcherProps {
-  appearance?: any;
+  appearance?: Record<string, unknown>;
   className?: string;
 }
 

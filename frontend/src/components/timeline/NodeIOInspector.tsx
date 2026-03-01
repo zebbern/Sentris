@@ -16,8 +16,8 @@ interface NodeIO {
   startedAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
-  inputs: any | null;
-  outputs: any | null;
+  inputs: Record<string, unknown> | null;
+  outputs: Record<string, unknown> | null;
   inputsSize: number;
   outputsSize: number;
   inputsSpilled: boolean;
@@ -84,19 +84,28 @@ export function NodeIOInspector() {
         // Might need a direct fetch if not in the list for some reason
         const fetchDetail = async () => {
           try {
-            const detail: any = await api.executions.getNodeIO(selectedRunId, selectedNodeId);
-            setSelectedNodeIO({
-              ...detail,
-              nodeRef: detail.nodeRef || selectedNodeId,
-              componentId: detail.componentId || 'unknown',
-              status: detail.status || 'running',
-              startedAt: detail.startedAt || null,
-              completedAt: detail.completedAt || null,
-              durationMs: detail.durationMs ?? null,
-              inputs: detail.inputs || null,
-              outputs: detail.outputs || null,
-              errorMessage: detail.errorMessage || null,
-            } as NodeIO);
+            const detail = (await api.executions.getNodeIO(selectedRunId, selectedNodeId)) as
+              | Record<string, unknown>
+              | undefined;
+            if (detail) {
+              setSelectedNodeIO({
+                nodeRef: (detail.nodeRef as string) || selectedNodeId,
+                componentId: (detail.componentId as string) || 'unknown',
+                status: (detail.status as NodeIO['status']) || 'running',
+                startedAt: (detail.startedAt as string) || null,
+                completedAt: (detail.completedAt as string) || null,
+                durationMs: (detail.durationMs as number) ?? null,
+                inputs: (detail.inputs as Record<string, unknown>) || null,
+                outputs: (detail.outputs as Record<string, unknown>) || null,
+                inputsSize: (detail.inputsSize as number) ?? 0,
+                outputsSize: (detail.outputsSize as number) ?? 0,
+                inputsSpilled: (detail.inputsSpilled as boolean) ?? false,
+                outputsSpilled: (detail.outputsSpilled as boolean) ?? false,
+                inputsTruncated: !!detail.inputsTruncated,
+                outputsTruncated: !!detail.outputsTruncated,
+                errorMessage: (detail.errorMessage as string) || null,
+              });
+            }
           } catch (_err: unknown) {
             setSelectedNodeIO(null);
           }
@@ -133,7 +142,7 @@ export function NodeIOInspector() {
     );
   }
 
-  const renderJson = (data: any) => {
+  const renderJson = (data: Record<string, unknown> | string | null | undefined) => {
     if (data === null || data === undefined) {
       return <span className="text-muted-foreground italic text-[11px]">Empty</span>;
     }
@@ -158,8 +167,10 @@ export function NodeIOInspector() {
     if (!selectedRunId || !selectedNodeId) return;
     setLoadingDetail(true);
     try {
-      const detail: any = await api.executions.getNodeIO(selectedRunId, selectedNodeId, true);
-      const data = type === 'inputs' ? detail.inputs : detail.outputs;
+      const detail = (await api.executions.getNodeIO(selectedRunId, selectedNodeId, true)) as
+        | Record<string, unknown>
+        | undefined;
+      const data = type === 'inputs' ? detail?.inputs : detail?.outputs;
       const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
 
       setFullViewModal({
@@ -167,7 +178,7 @@ export function NodeIOInspector() {
         title: `Full ${type === 'inputs' ? 'Inputs' : 'Outputs'} - ${selectedNodeId}`,
         content,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error('Failed to fetch full node I/O', err);
     } finally {
       setLoadingDetail(false);

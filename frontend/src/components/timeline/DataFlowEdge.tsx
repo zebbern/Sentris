@@ -35,7 +35,7 @@ const DataPacketComponent = memo(
   ({ packet, onHover }: { packet: DataPacket; onHover: (packet: DataPacket | null) => void }) => {
     const IconComponent = PACKET_ICONS[packet.type] || Package;
 
-    const formatPayload = (payload: any): string => {
+    const formatPayload = (payload: unknown): string => {
       if (typeof payload === 'string') return payload;
       if (typeof payload === 'object' && payload !== null) {
         return (

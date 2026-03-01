@@ -105,8 +105,8 @@ function generateUid(): string {
   return `opt_${Date.now()}_${++idCounter}`;
 }
 
-function toInternal(value: any): InternalOption[] {
-  let list: any[] = [];
+function toInternal(value: SelectionOption[] | string[] | string): InternalOption[] {
+  let list: (string | Partial<SelectionOption>)[] = [];
   if (Array.isArray(value)) {
     list = value;
   } else if (typeof value === 'string' && value.trim()) {
@@ -128,7 +128,7 @@ function toInternal(value: any): InternalOption[] {
     if (typeof v === 'string') {
       return { label: v, value: v, _uid: generateUid() };
     }
-    return { ...v, _uid: generateUid() };
+    return { label: v.label || '', value: v.value || '', _uid: generateUid() };
   });
 }
 

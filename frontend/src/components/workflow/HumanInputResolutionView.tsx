@@ -29,7 +29,7 @@ export interface HumanInputRequest {
   inputType: string;
   title: string;
   description: string | null;
-  inputSchema: any | null;
+  inputSchema: Record<string, unknown> | string | null;
   context: Record<string, unknown> | null;
   resolveToken: string;
   timeoutAt: string | null;
@@ -47,7 +47,19 @@ interface HumanInputResolutionViewProps {
   initialAction?: 'approve' | 'reject' | 'view';
 }
 
-const STATUS_ICONS: Record<string, any> = {
+/** Shape of a single property in a JSON Schema 'properties' object. */
+interface SchemaProperty {
+  title?: string;
+  type?: string;
+  description?: string;
+  enum?: string[];
+}
+
+type SelectionOptionEntry = string | { value: string; label: string };
+
+import type { LucideIcon } from 'lucide-react';
+
+const STATUS_ICONS: Record<string, LucideIcon> = {
   pending: Clock,
   approved: CheckCircle,
   rejected: XCircle,
@@ -75,7 +87,7 @@ export function HumanInputResolutionView({
     request.status === 'pending' ? initialAction : 'view',
   );
   const [responseNote, setResponseNote] = useState('');
-  const [formValues, setFormValues] = useState<Record<string, any>>({});
+  const [formValues, setFormValues] = useState<Record<string, string | number | boolean>>({});
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
 
   const parsedInputSchema = useMemo(() => {
@@ -96,7 +108,7 @@ export function HumanInputResolutionView({
 
     try {
       const isApprovalType = request.inputType === 'approval' || request.inputType === 'review';
-      const data: any = {
+      const data: Record<string, unknown> = {
         comment: responseNote || undefined,
         approved: resolveAction === 'approve',
       };
@@ -259,7 +271,7 @@ export function HumanInputResolutionView({
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Please select an option</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(parsedInputSchema?.options || []).map((option: any) => {
+                {(parsedInputSchema?.options || []).map((option: SelectionOptionEntry) => {
                   const value = typeof option === 'string' ? option : option.value;
                   const label = typeof option === 'string' ? option : option.label;
                   const isSelected = selectedOptions.includes(value);
@@ -308,77 +320,82 @@ export function HumanInputResolutionView({
             <div className="space-y-4">
               <Label className="text-sm font-semibold">Complete the form</Label>
               <div className="grid grid-cols-1 gap-4 bg-muted/20 p-4 rounded-lg border">
-                {Object.entries(parsedInputSchema.properties).map(([key, prop]: [string, any]) => (
-                  <div key={key} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor={`form-${key}`} className="text-sm font-medium">
-                        {prop.title || key}
-                        {parsedInputSchema.required?.includes(key) && (
-                          <span className="text-destructive ml-1">*</span>
-                        )}
-                      </Label>
-                    </div>
-                    {prop.type === 'string' && prop.enum ? (
-                      <Select
-                        value={formValues[key] || ''}
-                        onValueChange={(v) => setFormValues((prev) => ({ ...prev, [key]: v }))}
-                      >
-                        <SelectTrigger id={`form-${key}`}>
-                          <SelectValue placeholder={`Select ${key}...`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {prop.enum.map((v: string) => (
-                            <SelectItem key={v} value={v}>
-                              {v}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : prop.type === 'string' ? (
-                      <Input
-                        id={`form-${key}`}
-                        value={formValues[key] || ''}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        placeholder={prop.description || ''}
-                      />
-                    ) : prop.type === 'number' || prop.type === 'integer' ? (
-                      <Input
-                        id={`form-${key}`}
-                        type="number"
-                        value={formValues[key] || ''}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, [key]: parseFloat(e.target.value) }))
-                        }
-                      />
-                    ) : prop.type === 'boolean' ? (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Input
-                          type="checkbox"
-                          id={`form-${key}`}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                          checked={formValues[key] || false}
-                          onChange={(e: any) =>
-                            setFormValues((prev) => ({ ...prev, [key]: e.target.checked }))
-                          }
-                        />
-                        <Label htmlFor={`form-${key}`} className="text-sm">
-                          {prop.description || key}
+                {(Object.entries(parsedInputSchema.properties) as [string, SchemaProperty][]).map(
+                  ([key, prop]) => (
+                    <div key={key} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor={`form-${key}`} className="text-sm font-medium">
+                          {prop.title || key}
+                          {parsedInputSchema.required?.includes(key) && (
+                            <span className="text-destructive ml-1">*</span>
+                          )}
                         </Label>
                       </div>
-                    ) : (
-                      <Textarea
-                        id={`form-${key}`}
-                        value={formValues[key] || ''}
-                        onChange={(e) =>
-                          setFormValues((prev) => ({ ...prev, [key]: e.target.value }))
-                        }
-                        placeholder="JSON or text block"
-                      />
-                    )}
-                  </div>
-                ))}
+                      {prop.type === 'string' && prop.enum ? (
+                        <Select
+                          value={String(formValues[key] ?? '')}
+                          onValueChange={(v) => setFormValues((prev) => ({ ...prev, [key]: v }))}
+                        >
+                          <SelectTrigger id={`form-${key}`}>
+                            <SelectValue placeholder={`Select ${key}...`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {prop.enum.map((v: string) => (
+                              <SelectItem key={v} value={v}>
+                                {v}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : prop.type === 'string' ? (
+                        <Input
+                          id={`form-${key}`}
+                          value={String(formValues[key] ?? '')}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          placeholder={prop.description || ''}
+                        />
+                      ) : prop.type === 'number' || prop.type === 'integer' ? (
+                        <Input
+                          id={`form-${key}`}
+                          type="number"
+                          value={String(formValues[key] ?? '')}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({
+                              ...prev,
+                              [key]: parseFloat(e.target.value),
+                            }))
+                          }
+                        />
+                      ) : prop.type === 'boolean' ? (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Input
+                            type="checkbox"
+                            id={`form-${key}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={Boolean(formValues[key])}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setFormValues((prev) => ({ ...prev, [key]: e.target.checked }))
+                            }
+                          />
+                          <Label htmlFor={`form-${key}`} className="text-sm">
+                            {prop.description || key}
+                          </Label>
+                        </div>
+                      ) : (
+                        <Textarea
+                          id={`form-${key}`}
+                          value={String(formValues[key] ?? '')}
+                          onChange={(e) =>
+                            setFormValues((prev) => ({ ...prev, [key]: e.target.value }))
+                          }
+                          placeholder="JSON or text block"
+                        />
+                      )}
+                    </div>
+                  ),
+                )}
               </div>
             </div>
           )}

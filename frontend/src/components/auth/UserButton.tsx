@@ -14,9 +14,15 @@ import { Shield, User, LogOut, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
+/** Structural type for Clerk-compatible appearance prop. */
+interface ClerkAppearanceConfig {
+  elements?: Record<string, string>;
+  [key: string]: unknown;
+}
+
 interface UserButtonProps {
   afterSignOutUrl?: string;
-  appearance?: any;
+  appearance?: ClerkAppearanceConfig;
   showUserInfo?: boolean;
   className?: string;
   sidebarCollapsed?: boolean;

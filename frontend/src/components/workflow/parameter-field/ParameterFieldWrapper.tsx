@@ -12,12 +12,12 @@ import { ParameterField } from '../ParameterField';
 
 interface ParameterFieldWrapperProps {
   parameter: Parameter;
-  value: any;
-  onChange: (value: any) => void;
+  value: unknown;
+  onChange: (value: unknown) => void;
   connectedInput?: InputMapping;
   componentId?: string;
   parameters?: Record<string, unknown> | undefined;
-  onUpdateParameter?: (paramId: string, value: any) => void;
+  onUpdateParameter?: (paramId: string, value: unknown) => void;
   allComponentParameters?: Parameter[];
 }
 

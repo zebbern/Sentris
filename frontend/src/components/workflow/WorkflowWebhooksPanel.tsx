@@ -68,10 +68,13 @@ export function WorkflowWebhooksSidebar({
 
       if (!Array.isArray(inputs)) return {};
 
-      return inputs.reduce((acc: any, input: any) => {
-        acc[input.id] = input.type === 'number' ? 0 : input.type === 'boolean' ? false : 'value';
-        return acc;
-      }, {});
+      return inputs.reduce(
+        (acc: Record<string, string | number | boolean>, input: { id: string; type?: string }) => {
+          acc[input.id] = input.type === 'number' ? 0 : input.type === 'boolean' ? false : 'value';
+          return acc;
+        },
+        {} as Record<string, string | number | boolean>,
+      );
     } catch {
       return {};
     }

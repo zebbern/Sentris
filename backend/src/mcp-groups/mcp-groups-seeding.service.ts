@@ -9,6 +9,7 @@ import { McpGroupsRepository } from './mcp-groups.repository';
 import {
   MCP_GROUP_TEMPLATES,
   computeTemplateHash,
+  type GroupTemplateServer,
   type McpGroupTemplate,
 } from './mcp-group-templates';
 import { SyncTemplatesResponse, GroupTemplateDto } from './dto/mcp-groups.dto';
@@ -338,7 +339,7 @@ export class McpGroupsSeedingService {
   private async createServer(
     tx: NodePgDatabase,
     groupId: string,
-    serverTemplate: any,
+    serverTemplate: GroupTemplateServer,
     organizationId: string | null,
   ): Promise<{ id: string }> {
     const [server] = await tx
@@ -366,7 +367,7 @@ export class McpGroupsSeedingService {
     tx: NodePgDatabase,
     groupId: string,
     serverId: string,
-    serverTemplate: any,
+    serverTemplate: GroupTemplateServer,
   ): Promise<void> {
     await tx.insert(mcpGroupServers).values({
       groupId,

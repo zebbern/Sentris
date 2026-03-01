@@ -16,7 +16,7 @@ import { codeSnippets } from './code-snippets';
 
 interface WebhookDetailsProps {
   url: string;
-  payload: any;
+  payload: Record<string, unknown>;
   triggerLabel?: string;
   className?: string;
   apiKey?: string | null;

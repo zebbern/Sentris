@@ -190,8 +190,15 @@ function generateUid(): string {
   return `field_${Date.now()}_${++idCounter}`;
 }
 
-function toInternal(value: any): InternalFormField[] {
-  let list: any[] = [];
+/** Shape of a property entry in a legacy JSON Schema 'properties' object. */
+interface LegacySchemaProperty {
+  title?: string;
+  type?: string;
+  description?: string;
+}
+
+function toInternal(value: FormField[] | string): InternalFormField[] {
+  let list: Partial<FormField>[] = [];
   if (Array.isArray(value)) {
     list = value;
   } else if (typeof value === 'string' && value.trim()) {
@@ -201,19 +208,30 @@ function toInternal(value: any): InternalFormField[] {
         list = parsed;
       } else if (parsed && typeof parsed === 'object' && parsed.properties) {
         // Handle legacy JSON Schema format
-        list = Object.entries(parsed.properties).map(([id, prop]: [string, any]) => ({
-          id,
-          label: prop.title || id,
-          type: prop.type || 'string',
-          required: Array.isArray(parsed.required) ? parsed.required.includes(id) : false,
-          placeholder: prop.description || '',
-        }));
+        list = (Object.entries(parsed.properties) as [string, LegacySchemaProperty][]).map(
+          ([id, prop]) => ({
+            id,
+            label: prop.title || id,
+            type: prop.type || 'string',
+            required: Array.isArray(parsed.required) ? parsed.required.includes(id) : false,
+            placeholder: prop.description || '',
+          }),
+        );
       }
     } catch (e: unknown) {
       logger.warn('Failed to parse legacy form fields', e);
     }
   }
-  return list.map((v: any) => ({ ...v, _uid: generateUid() }));
+  return list.map((v: Partial<FormField>) => ({
+    id: v.id || '',
+    label: v.label || '',
+    type: v.type || 'string',
+    required: v.required ?? false,
+    placeholder: v.placeholder,
+    description: v.description,
+    options: v.options,
+    _uid: generateUid(),
+  }));
 }
 
 function toExternal(items: InternalFormField[]): FormField[] {
