@@ -27,6 +27,7 @@ interface DataFlowEdgeProps extends EdgeProps {
   data?: {
     packets?: DataPacket[];
     isHighlighted?: boolean;
+    isPathHighlighted?: boolean;
     sourcePortColor?: string;
     isBranching?: boolean;
     portType?: string;
@@ -277,15 +278,31 @@ export const DataFlowEdge = memo(
       return { x, y };
     };
 
+    const isPathHighlighted = data?.isPathHighlighted ?? false;
+
     if (mode !== 'execution' || !selectedRunId) {
       return (
         <>
+          {/* Path highlight glow — rendered behind the main edge */}
+          {isPathHighlighted && (
+            <path
+              d={edgePath}
+              fill="none"
+              stroke="hsl(var(--primary))"
+              strokeWidth={8}
+              strokeLinecap="round"
+              opacity={0.3}
+              filter="blur(3px)"
+              pointerEvents="none"
+            />
+          )}
           <BaseEdge
             id={id}
             path={edgePath}
             markerEnd={markerEnd}
             style={{
-              stroke: edgeStrokeColor,
+              stroke: isPathHighlighted ? 'hsl(var(--primary))' : edgeStrokeColor,
+              strokeWidth: isPathHighlighted ? 3 : undefined,
               ...(edgeDasharray ? { strokeDasharray: edgeDasharray } : {}),
             }}
           />
@@ -293,10 +310,10 @@ export const DataFlowEdge = memo(
           <path
             d={edgePath}
             fill="none"
-            stroke={edgeStrokeColor}
+            stroke={isPathHighlighted ? 'hsl(var(--primary))' : edgeStrokeColor}
             strokeWidth={2}
             strokeDasharray={edgeDasharray ?? '8 16'}
-            strokeOpacity={0.25}
+            strokeOpacity={isPathHighlighted ? 0.5 : 0.25}
             className="edge-flow-pulse"
             style={
               {

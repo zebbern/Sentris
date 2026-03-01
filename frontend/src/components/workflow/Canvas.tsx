@@ -52,6 +52,13 @@ import { useResolvedScheduleContext, type ScheduleContextProps } from './canvas-
 import { getNodeStatusColor } from './canvas-minimap-colors';
 import { CanvasConfigPanel } from './canvas-config-panel';
 import { useNodeStatusSync } from './canvas-status-sync';
+import { EdgeContextMenu } from './EdgeContextMenu';
+import {
+  deleteEdge,
+  insertNodeAtEdge,
+  highlightFullPath,
+  clearPathHighlights,
+} from './edge-context-actions';
 
 const nodeTypes = { workflow: WorkflowNode, terminal: TerminalNode };
 const edgeTypes = { dataFlow: DataFlowEdge, default: DataFlowEdge };
@@ -105,6 +112,12 @@ export function Canvas({
   const selectNode = useExecutionTimelineStore((s) => s.selectNode);
   const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
+
+  // --- Edge context menu state ---
+  const [edgeContextMenu, setEdgeContextMenu] = useState<{
+    position: { x: number; y: number };
+    edgeId: string;
+  } | null>(null);
 
   // --- Connection preview state (drag-to-connect) ---
   const [connectingFromHandle, setConnectingFromHandle] = useState<ConnectingFromHandle | null>(
@@ -331,6 +344,40 @@ export function Canvas({
     toast,
   });
 
+  // --- Edge context menu handlers ---
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    setEdgeContextMenu({
+      position: { x: event.clientX, y: event.clientY },
+      edgeId: edge.id,
+    });
+  }, []);
+
+  const closeEdgeContextMenu = useCallback(() => {
+    setEdgeContextMenu(null);
+  }, []);
+
+  const handleDeleteEdge = useCallback(
+    (edgeId: string) => {
+      deleteEdge(edgeId, edges, setEdges, setNodes, markDirty, onSnapshot);
+    },
+    [edges, setEdges, setNodes, markDirty, onSnapshot],
+  );
+
+  const handleInsertNodeAtEdge = useCallback(
+    (edgeId: string) => {
+      insertNodeAtEdge(edgeId, edges, setPlacement, clearPlacement, workflowId ?? null, toast);
+    },
+    [edges, setPlacement, clearPlacement, workflowId, toast],
+  );
+
+  const handleHighlightPath = useCallback(
+    (edgeId: string) => {
+      highlightFullPath(edgeId, edges, setEdges);
+    },
+    [edges, setEdges],
+  );
+
   const entryPointActionsValue = useMemo(
     () => ({
       onOpenScheduleSidebar: schedule.resolvedOnOpenScheduleSidebar ?? (() => {}),
@@ -407,7 +454,12 @@ export function Canvas({
                 onDragOver={onDragOver}
                 onNodeClick={onNodeClick}
                 onNodeDoubleClick={onNodeDoubleClick}
-                onPaneClick={onPaneClick}
+                onPaneClick={(event) => {
+                  onPaneClick(event);
+                  closeEdgeContextMenu();
+                  clearPathHighlights(setEdges);
+                }}
+                onEdgeContextMenu={onEdgeContextMenu}
                 onMoveStart={() => {
                   hasUserInteractedRef.current = true;
                 }}
@@ -438,6 +490,18 @@ export function Canvas({
                 />
               </ReactFlow>
             </ConnectionPreviewContext.Provider>
+
+            {edgeContextMenu && (
+              <EdgeContextMenu
+                position={edgeContextMenu.position}
+                edgeId={edgeContextMenu.edgeId}
+                isDesignMode={mode === 'design'}
+                onClose={closeEdgeContextMenu}
+                onDelete={handleDeleteEdge}
+                onInsertNode={handleInsertNodeAtEdge}
+                onHighlightPath={handleHighlightPath}
+              />
+            )}
           </div>
 
           {mode === 'design' && selectedNode && (
