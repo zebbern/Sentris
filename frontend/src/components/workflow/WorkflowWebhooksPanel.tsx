@@ -4,7 +4,7 @@ import { Loader2, Plus, X, Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useWebhooks } from '@/hooks/queries/useWebhookQueries';
-import type { WebhookConfiguration } from '@sentris/shared';
+import type { WebhookConfiguration, WebhookInputDefinition } from '@sentris/shared';
 import { WebhookDetails } from './WebhookDetails';
 import { useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { Node as ReactFlowNode } from 'reactflow';
@@ -226,13 +226,13 @@ export function WorkflowWebhooksSidebar({
 
             // Generate a sample payload that combines expectedInputs with generic fields
             // to show it can accept "whatever payload"
-            const samplePayload: any = {
+            const samplePayload: Record<string, unknown> = {
               event_type: 'webhook_event',
               timestamp: new Date().toISOString(),
             };
 
             if (Array.isArray(webhook.expectedInputs)) {
-              webhook.expectedInputs.forEach((input: any) => {
+              webhook.expectedInputs.forEach((input: WebhookInputDefinition) => {
                 samplePayload[input.id] =
                   input.type === 'number' ? 0 : input.type === 'boolean' ? false : 'value';
               });
