@@ -231,6 +231,89 @@ export async function createOrRotateSecret(
   return existing.id;
 }
 
+/** Create a secret, returning the full response body. */
+export async function createSecret(
+  name: string,
+  value: string,
+  opts?: { description?: string; tags?: string[] },
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/secrets`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify({ name, value, ...opts }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to create secret: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get a secret by ID (metadata only). */
+export async function getSecret(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/secrets/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get secret: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Get the decrypted value of a secret. */
+export async function getSecretValue(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/secrets/${id}/value`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get secret value: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Update secret metadata (name, description, tags). */
+export async function updateSecret(
+  id: string,
+  patch: { name?: string; description?: string | null; tags?: string[] | null },
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/secrets/${id}`, {
+    method: 'PATCH',
+    headers: HEADERS,
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update secret: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Rotate a secret's value. */
+export async function rotateSecret(id: string, newValue: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/secrets/${id}/rotate`, {
+    method: 'PUT',
+    headers: HEADERS,
+    body: JSON.stringify({ value: newValue }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to rotate secret: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Delete a secret. Returns the response status code. */
+export async function deleteSecret(id: string): Promise<number> {
+  const res = await fetch(`${API_BASE}/secrets/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  return res.status;
+}
+
+/** Attempt to fetch a secret, returning the raw Response (for asserting 404s etc.). */
+export async function fetchSecretRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/secrets/${id}`, { headers: HEADERS });
+}
+
 // ---------------------------------------------------------------------------
 // Webhook helpers
 // ---------------------------------------------------------------------------
@@ -243,6 +326,226 @@ export async function createWebhook(config: any): Promise<any> {
   });
   if (!res.ok) {
     throw new Error(`Webhook creation failed: ${await res.text()}`);
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// API Key helpers
+// ---------------------------------------------------------------------------
+
+export interface CreateApiKeyConfig {
+  name: string;
+  description?: string;
+  permissions: {
+    workflows: { run: boolean; list: boolean; read: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    runs: { read: boolean; cancel: boolean };
+    audit: { read: boolean };
+    artifacts?: { read?: boolean; delete?: boolean };
+    schedules?: { list?: boolean; read?: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    secrets?: { list?: boolean; read?: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    'human-inputs'?: { read?: boolean; resolve?: boolean };
+  };
+  expiresAt?: string;
+  rateLimit?: number;
+}
+
+export async function createApiKey(config: CreateApiKeyConfig): Promise<any> {
+  const res = await fetch(`${API_BASE}/api-keys`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API key creation failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function listApiKeys(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/api-keys`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list API keys: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function getApiKey(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api-keys/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get API key: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function updateApiKey(id: string, patch: Record<string, unknown>): Promise<any> {
+  const res = await fetch(`${API_BASE}/api-keys/${id}`, {
+    method: 'PATCH',
+    headers: HEADERS,
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update API key: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function revokeApiKey(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api-keys/${id}/revoke`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to revoke API key: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function deleteApiKey(id: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE}/api-keys/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to delete API key: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+export async function deleteApiKeyRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/api-keys/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+}
+
+export async function getApiKeyRaw(id: string): Promise<Response> {
+  return fetch(`${API_BASE}/api-keys/${id}`, { headers: HEADERS });
+}
+
+// ---------------------------------------------------------------------------
+// Schedule helpers
+// ---------------------------------------------------------------------------
+
+/** Create a schedule, returns the full schedule object. */
+export async function createSchedule(config: {
+  workflowId: string;
+  name: string;
+  cronExpression: string;
+  timezone: string;
+  description?: string | null;
+  overlapPolicy?: 'skip' | 'buffer' | 'allow';
+  catchupWindowSeconds?: number;
+  inputPayload?: { runtimeInputs?: Record<string, unknown>; nodeOverrides?: Record<string, unknown> };
+}): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules`, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Schedule creation failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** List all schedules, optionally filtered by workflowId or status. */
+export async function listSchedules(query?: {
+  workflowId?: string;
+  status?: string;
+}): Promise<any[]> {
+  const params = new URLSearchParams();
+  if (query?.workflowId) params.set('workflowId', query.workflowId);
+  if (query?.status) params.set('status', query.status);
+  const qs = params.toString();
+  const url = qs ? `${API_BASE}/schedules?${qs}` : `${API_BASE}/schedules`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to list schedules: ${res.status} ${text}`);
+  }
+  const body = await res.json();
+  return body.schedules ?? body;
+}
+
+/** Get a single schedule by ID. */
+export async function getSchedule(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, { headers: HEADERS });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to get schedule ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Update (PATCH) a schedule, returns the updated schedule. */
+export async function updateSchedule(
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+    method: 'PATCH',
+    headers: HEADERS,
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to update schedule ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Delete a schedule. */
+export async function deleteSchedule(id: string): Promise<Response> {
+  const res = await fetch(`${API_BASE}/schedules/${id}`, {
+    method: 'DELETE',
+    headers: HEADERS,
+  });
+  return res;
+}
+
+/** Pause a schedule; returns the updated schedule. */
+export async function pauseSchedule(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules/${id}/pause`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to pause schedule ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Resume a schedule; returns the updated schedule. */
+export async function resumeSchedule(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules/${id}/resume`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to resume schedule ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Trigger a schedule manually; returns { success: true }. */
+export async function triggerSchedule(id: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/schedules/${id}/trigger`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to trigger schedule ${id}: ${res.status} ${text}`);
   }
   return res.json();
 }
