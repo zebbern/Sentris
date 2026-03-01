@@ -19,7 +19,7 @@ import {
   Package,
   X,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { env } from '@/config/env';
@@ -103,6 +103,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     closeMobileSidebar,
   } = useSidebarState({ isMobile, isTablet, settingsHrefs: SETTINGS_HREFS });
 
+  const [faviconError, setFaviconError] = useState(false);
   const gitSha = env.VITE_GIT_SHA;
   const displayVersion =
     gitSha && gitSha !== '' && gitSha !== 'unknown'
@@ -196,18 +197,18 @@ export function AppLayout({ children }: AppLayoutProps) {
               onClick={() => isMobile && setSidebarOpen(false)}
             >
               <div className="flex-shrink-0">
-                <img
-                  src="/favicon.ico"
-                  alt="Sentris Flow"
-                  width={24}
-                  height={24}
-                  className="w-6 h-6"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-                <span className="hidden text-sm font-bold">SS</span>
+                {!faviconError ? (
+                  <img
+                    src="/favicon.ico"
+                    alt="Sentris Flow"
+                    width={24}
+                    height={24}
+                    className="w-6 h-6"
+                    onError={() => setFaviconError(true)}
+                  />
+                ) : (
+                  <span className="text-sm font-bold">SS</span>
+                )}
               </div>
               <span
                 className={cn(

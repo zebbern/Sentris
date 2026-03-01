@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ export function ProviderCard({
   onConfigure,
 }: ProviderCardProps) {
   const logoUrl = getLogoUrl(provider.id);
+  const [logoError, setLogoError] = useState(false);
   const configuredBadge = provider.isConfigured ? (
     <Badge variant="secondary">Configured</Badge>
   ) : (
@@ -55,7 +57,7 @@ export function ProviderCard({
     <div className="border rounded-lg p-5 bg-card flex flex-col gap-4 relative">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          {logoUrl && (
+          {logoUrl && !logoError && (
             <div className="h-10 w-10 flex-shrink-0 rounded-full bg-white dark:bg-muted flex items-center justify-center p-1.5 mt-0.5 border border-border/50 shadow-sm">
               <img
                 src={logoUrl}
@@ -63,10 +65,13 @@ export function ProviderCard({
                 width={40}
                 height={40}
                 className="h-full w-full object-contain rounded-full"
-                onError={(e) => {
-                  e.currentTarget.parentElement!.style.display = 'none';
-                }}
+                onError={() => setLogoError(true)}
               />
+            </div>
+          )}
+          {logoUrl && logoError && (
+            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-0.5 border border-border/50 shadow-sm">
+              <span className="text-lg font-bold">{provider.name.charAt(0)}</span>
             </div>
           )}
           <div>

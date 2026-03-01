@@ -1,20 +1,12 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { RefreshCw, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
-import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -30,21 +22,13 @@ import {
 } from '@/hooks/queries/useScheduleQueries';
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
 import { ScheduleEditorDrawer } from '@/components/schedules/ScheduleEditorDrawer';
 import type { WorkflowSchedule } from '@sentris/shared';
 import { useSortableList } from '@/hooks/useSortableList';
 import { useAuthStore } from '@/store/authStore';
 import { getWorkflowName, getStatusBadgeProps } from '@/utils/tableHelpers';
 import type { WorkflowOption, BadgeVariant } from '@/utils/tableHelpers';
-import { SchedulesTable } from './schedules/SchedulesTable';
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'error', label: 'Error' },
-];
+import { SchedulesTable, ScheduleFilters, useScheduleActions, useScheduleEditorDrawer } from './schedules';
 
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   active: 'default',
@@ -58,11 +42,7 @@ export function SchedulesPage() {
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [actionState, setActionState] = useState<Record<string, 'run' | 'toggle'>>({});
   const organizationId = useAuthStore((state) => state.organizationId);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-  const [activeSchedule, setActiveSchedule] = useState<WorkflowSchedule | null>(null);
 
   // Local filter state (search is client-side, workflowId & status go to the query)
   const initialWorkflowId = searchParams.get('workflowId') || null;
@@ -92,6 +72,29 @@ export function SchedulesPage() {
   const resumeScheduleMutation = useResumeSchedule();
   const runScheduleMutation = useRunSchedule();
   const deleteScheduleMutation = useDeleteSchedule();
+
+  // --- Per-item action handlers ---
+  const { handlePauseResume, handleRunNow, handleRefresh, handleDelete, isActionBusy } =
+    useScheduleActions({
+      pauseMutation: pauseScheduleMutation,
+      resumeMutation: resumeScheduleMutation,
+      runMutation: runScheduleMutation,
+      deleteMutation: deleteScheduleMutation,
+      toast,
+      confirm,
+      queryClient,
+    });
+
+  // --- Editor drawer state ---
+  const {
+    editorOpen,
+    editorMode,
+    activeSchedule,
+    openCreateDrawer,
+    openEditDrawer,
+    closeDrawer,
+    handleScheduleSaved,
+  } = useScheduleEditorDrawer({ queryClient, toast });
 
   const filteredSchedules = useMemo(() => {
     const query = filters.search.trim().toLowerCase();
@@ -221,17 +224,6 @@ export function SchedulesPage() {
     return actions;
   }, [selectedIds, orderedSchedules]);
 
-  const markAction = (id: string, action: 'run' | 'toggle') => {
-    setActionState((state) => ({ ...state, [id]: action }));
-  };
-
-  const clearAction = (id: string) => {
-    setActionState((state) => {
-      const { [id]: _removed, ...rest } = state;
-      return rest;
-    });
-  };
-
   const handleWorkflowFilterChange = (value: string) => {
     const workflowId = value === 'all' ? null : value;
     setFilters((prev) => ({ ...prev, workflowId }));
@@ -248,109 +240,9 @@ export function SchedulesPage() {
     setFilters((prev) => ({ ...prev, status: value as typeof filters.status }));
   };
 
-  const openCreateDrawer = () => {
-    setEditorMode('create');
-    setActiveSchedule(null);
-    setEditorOpen(true);
-  };
-
-  const openEditDrawer = (schedule: WorkflowSchedule) => {
-    setEditorMode('edit');
-    setActiveSchedule(schedule);
-    setEditorOpen(true);
-  };
-
-  const handleScheduleSaved = (savedSchedule: WorkflowSchedule, mode: 'create' | 'edit') => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
-    toast({
-      title: mode === 'create' ? 'Schedule created' : 'Schedule updated',
-      description:
-        mode === 'create'
-          ? `"${savedSchedule.name}" is now active.`
-          : `"${savedSchedule.name}" has been updated.`,
-    });
-  };
-
-  const handlePauseResume = async (schedule: WorkflowSchedule) => {
-    markAction(schedule.id, 'toggle');
-    try {
-      if (schedule.status === 'active') {
-        await pauseScheduleMutation.mutateAsync(schedule.id);
-        toast({
-          title: 'Schedule paused',
-          description: `"${schedule.name}" has been paused.`,
-        });
-      } else {
-        await resumeScheduleMutation.mutateAsync(schedule.id);
-        toast({
-          title: 'Schedule resumed',
-          description: `"${schedule.name}" is active again.`,
-        });
-      }
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      clearAction(schedule.id);
-    }
-  };
-
-  const handleRunNow = async (schedule: WorkflowSchedule) => {
-    markAction(schedule.id, 'run');
-    try {
-      await runScheduleMutation.mutateAsync(schedule.id);
-      toast({
-        title: 'Run requested',
-        description: `Scheduled cadence "${schedule.name}" is executing now.`,
-      });
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      clearAction(schedule.id);
-    }
-  };
-
-  const handleRefresh = async () => {
-    try {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
-      toast({
-        title: 'Schedules refreshed',
-        description: 'Latest schedule statuses have been loaded.',
-      });
-    } catch (err: unknown) {
-      toast({
-        title: 'Refresh failed',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleEdit = (schedule: WorkflowSchedule) => {
     openEditDrawer(schedule);
   };
-
-  const handleDelete = async (schedule: WorkflowSchedule) => {
-    const ok = await confirm({
-      title: 'Delete schedule',
-      description: `Are you sure you want to delete "${schedule.name}"? This action cannot be undone.`,
-      confirmLabel: 'Delete',
-    });
-    if (!ok) return;
-    markAction(schedule.id, 'run');
-    try {
-      await deleteScheduleMutation.mutateAsync(schedule.id);
-      toast({
-        title: 'Schedule deleted',
-        description: `"${schedule.name}" has been deleted.`,
-      });
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      clearAction(schedule.id);
-    }
-  };
-
-  const isActionBusy = useCallback((id: string) => Boolean(actionState[id]), [actionState]);
 
   const hasData = orderedSchedules.length > 0;
 
@@ -401,43 +293,14 @@ export function SchedulesPage() {
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <label className="text-xs uppercase text-muted-foreground">Status</label>
-              <Select value={filters.status} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase text-muted-foreground">Workflow</label>
-              <Select
-                value={filters.workflowId ?? 'all'}
-                onValueChange={handleWorkflowFilterChange}
-                disabled={workflowsLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All workflows" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All workflows</SelectItem>
-                  {workflowOptions.map((workflow) => (
-                    <SelectItem key={workflow.id} value={workflow.id}>
-                      {workflow.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <ScheduleFilters
+            status={filters.status}
+            workflowId={filters.workflowId}
+            workflowOptions={workflowOptions}
+            workflowsLoading={workflowsLoading}
+            onStatusChange={handleStatusFilterChange}
+            onWorkflowChange={handleWorkflowFilterChange}
+          />
 
           <SchedulesTable
             orderedSchedules={orderedSchedules}
@@ -474,7 +337,7 @@ export function SchedulesPage() {
           editorMode === 'create' ? filters.workflowId : activeSchedule?.workflowId
         }
         workflowOptions={workflowOptions}
-        onClose={() => setEditorOpen(false)}
+        onClose={closeDrawer}
         onSaved={handleScheduleSaved}
       />
       <ConfirmDialog {...dialogProps} />
