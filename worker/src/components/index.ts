@@ -25,6 +25,8 @@ import './core/credentials-aws';
 import './core/destination-artifact';
 import './core/destination-s3';
 import './core/text-block';
+import './core/conditional-router';
+import './core/deduplicator';
 import './core/workflow-call';
 import './core/mcp-library';
 import './core/analytics-sink';
@@ -56,6 +58,19 @@ import './security/terminal-demo';
 import './security/virustotal';
 import './security/abuseipdb';
 import './security/aws-mcp-group';
+
+// Security components — Batch 2
+import './security/testssl';
+import './security/checkov';
+import './security/theharvester';
+import './security/wafw00f';
+
+// Security components — Batch 1
+import './security/katana';
+import './security/ffuf';
+import './security/trivy';
+import './security/semgrep';
+import './security/yara';
 
 // GitHub components
 import './github/connection-provider';
