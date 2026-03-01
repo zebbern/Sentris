@@ -1,0 +1,133 @@
+{
+  "_metadata": {
+    "name": "Cloud Security Posture Audit",
+    "description": "Comprehensive cloud security audit that checks IAM policies, reviews S3 bucket configurations, scans for secret leaks with TruffleHog, and aggregates all findings into a unified security posture report. Use for periodic security reviews or pre-deployment checks.",
+    "category": "security",
+    "tags": ["cloud", "aws", "iam", "trufflehog", "secrets", "audit"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Cloud Security Posture Audit",
+    "description": "Audit IAM policies, S3 buckets, and leaked secrets, then generate a unified posture report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "security",
+    "tags": ["cloud", "aws", "iam", "trufflehog", "secrets", "audit"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 7
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "componentId": "entry-point",
+        "componentType": "trigger",
+        "label": "Start Posture Audit",
+        "position": { "x": 100, "y": 300 },
+        "data": { "description": "Trigger the cloud security posture audit" }
+      },
+      {
+        "id": "aws_creds",
+        "componentId": "credentials-aws",
+        "componentType": "action",
+        "label": "Load AWS Credentials",
+        "position": { "x": 350, "y": 300 },
+        "data": { "description": "Load AWS credentials for API access" }
+      },
+      {
+        "id": "http_iam",
+        "componentId": "http-request",
+        "componentType": "action",
+        "label": "Audit IAM Policies",
+        "position": { "x": 600, "y": 150 },
+        "data": {
+          "description": "Query AWS IAM to review user policies, roles, and identify overly permissive access",
+          "config": {
+            "method": "GET",
+            "url": "https://iam.amazonaws.com/?Action=GetAccountAuthorizationDetails&Version=2010-05-08"
+          }
+        }
+      },
+      {
+        "id": "http_s3",
+        "componentId": "http-request",
+        "componentType": "action",
+        "label": "Check S3 Buckets",
+        "position": { "x": 600, "y": 300 },
+        "data": {
+          "description": "List S3 buckets and check for public access, encryption, and logging",
+          "config": {
+            "method": "GET",
+            "url": "https://s3.amazonaws.com/"
+          }
+        }
+      },
+      {
+        "id": "trufflehog_1",
+        "componentId": "trufflehog",
+        "componentType": "action",
+        "label": "Scan for Secret Leaks",
+        "position": { "x": 600, "y": 450 },
+        "data": {
+          "description": "Run TruffleHog to detect leaked secrets, API keys, and credentials in repositories",
+          "config": { "target": "{{input.repository_url}}", "onlyVerified": true }
+        }
+      },
+      {
+        "id": "script_aggregate",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Aggregate Findings",
+        "position": { "x": 900, "y": 300 },
+        "data": {
+          "description": "Combine all audit findings into a unified security posture score",
+          "config": {
+            "script": "const iam = input.iamAudit || {}; const s3 = input.s3Audit || {}; const secrets = input.secretScan || {}; const iamIssues = iam.overpermissive || 0; const s3Issues = (s3.publicBuckets || 0) + (s3.unencrypted || 0); const secretLeaks = secrets.verified || 0; const totalIssues = iamIssues + s3Issues + secretLeaks; const postureScore = Math.max(0, 100 - totalIssues * 5); return { postureScore, summary: { iam: { issues: iamIssues }, s3: { issues: s3Issues }, secrets: { leaks: secretLeaks } }, totalIssues, grade: postureScore >= 90 ? 'A' : postureScore >= 75 ? 'B' : postureScore >= 60 ? 'C' : postureScore >= 40 ? 'D' : 'F' };"
+          }
+        }
+      },
+      {
+        "id": "notify_report",
+        "componentId": "slack",
+        "componentType": "action",
+        "label": "Send Posture Report",
+        "position": { "x": 1200, "y": 300 },
+        "data": {
+          "description": "Deliver the security posture report to the security team",
+          "config": {
+            "channel": "#security-posture",
+            "message": "Cloud Security Posture: Grade {{script_aggregate.output.grade}} ({{script_aggregate.output.postureScore}}%) — {{script_aggregate.output.totalIssues}} issues found"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "source": "trigger_1", "target": "aws_creds" },
+      { "source": "aws_creds", "target": "http_iam" },
+      { "source": "aws_creds", "target": "http_s3" },
+      { "source": "aws_creds", "target": "trufflehog_1" },
+      { "source": "http_iam", "target": "script_aggregate" },
+      { "source": "http_s3", "target": "script_aggregate" },
+      { "source": "trufflehog_1", "target": "script_aggregate" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "aws_access_key_id",
+      "type": "string",
+      "description": "AWS access key ID for the target account"
+    },
+    {
+      "name": "aws_secret_access_key",
+      "type": "string",
+      "description": "AWS secret access key for the target account"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack webhook URL for posture report delivery"
+    }
+  ]
+}

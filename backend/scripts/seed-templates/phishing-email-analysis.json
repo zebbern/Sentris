@@ -1,0 +1,117 @@
+{
+  "_metadata": {
+    "name": "Phishing Email Analysis",
+    "description": "Analyze suspicious emails by extracting URLs and attachments, checking them against VirusTotal for malware and phishing indicators, assessing risk, and delivering a verdict. Designed for SOC teams handling phishing reports.",
+    "category": "security",
+    "tags": ["phishing", "email", "analysis", "virustotal", "soar"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Phishing Email Analysis",
+    "description": "Extract, scan, and classify suspicious emails with automated threat intelligence.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "security",
+    "tags": ["phishing", "email", "analysis", "virustotal", "soar"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "componentId": "entry-point",
+        "componentType": "trigger",
+        "label": "Email Submitted",
+        "position": { "x": 100, "y": 250 },
+        "data": { "description": "Triggered when a user reports a suspicious email for analysis" }
+      },
+      {
+        "id": "script_extract",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Extract Indicators",
+        "position": { "x": 350, "y": 250 },
+        "data": {
+          "description": "Parse email headers, extract URLs, sender info, and attachment hashes",
+          "config": {
+            "script": "const email = input; const urlRegex = /https?:\\/\\/[^\\s\"<>]+/g; const urls = (email.body || '').match(urlRegex) || []; const senderDomain = (email.from || '').split('@')[1] || 'unknown'; return { urls, senderDomain, from: email.from, subject: email.subject, attachments: email.attachments || [], hasAttachments: (email.attachments || []).length > 0, headerAnalysis: { spf: email.headers?.spf, dkim: email.headers?.dkim, dmarc: email.headers?.dmarc } };"
+          }
+        }
+      },
+      {
+        "id": "vt_urls",
+        "componentId": "virustotal",
+        "componentType": "action",
+        "label": "Scan URLs",
+        "position": { "x": 600, "y": 150 },
+        "data": {
+          "description": "Check all extracted URLs against VirusTotal for malicious indicators",
+          "config": { "urls": "{{script_extract.output.urls}}" }
+        }
+      },
+      {
+        "id": "http_domain",
+        "componentId": "http-request",
+        "componentType": "action",
+        "label": "Check Sender Domain",
+        "position": { "x": 600, "y": 350 },
+        "data": {
+          "description": "Query domain reputation API for the sender domain",
+          "config": {
+            "method": "GET",
+            "url": "https://domain-reputation-api.example.com/check?domain={{script_extract.output.senderDomain}}"
+          }
+        }
+      },
+      {
+        "id": "script_verdict",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Generate Verdict",
+        "position": { "x": 900, "y": 250 },
+        "data": {
+          "description": "Analyze all intelligence data and produce a phishing confidence score",
+          "config": {
+            "script": "const urlResults = input.urlScan || {}; const domainRep = input.domainCheck || {}; const indicators = input.extracted || {}; let score = 0; if (urlResults.malicious > 0) score += 40; if (domainRep.reputation === 'malicious') score += 30; if (!indicators.headerAnalysis?.dkim) score += 10; if (!indicators.headerAnalysis?.spf) score += 10; if (!indicators.headerAnalysis?.dmarc) score += 10; const verdict = score >= 60 ? 'phishing' : score >= 30 ? 'suspicious' : 'clean'; return { verdict, confidenceScore: score, details: { urlThreats: urlResults.malicious || 0, domainReputation: domainRep.reputation || 'unknown', authFailures: { spf: !indicators.headerAnalysis?.spf, dkim: !indicators.headerAnalysis?.dkim, dmarc: !indicators.headerAnalysis?.dmarc } } };"
+          }
+        }
+      },
+      {
+        "id": "notify_verdict",
+        "componentId": "slack",
+        "componentType": "action",
+        "label": "Report Verdict",
+        "position": { "x": 1200, "y": 250 },
+        "data": {
+          "description": "Send the phishing analysis verdict to the SOC team",
+          "config": {
+            "channel": "#phishing-reports",
+            "message": "Phishing Analysis: {{script_verdict.output.verdict}} (score: {{script_verdict.output.confidenceScore}})"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "source": "trigger_1", "target": "script_extract" },
+      { "source": "script_extract", "target": "vt_urls" },
+      { "source": "script_extract", "target": "http_domain" },
+      { "source": "vt_urls", "target": "script_verdict" },
+      { "source": "http_domain", "target": "script_verdict" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "virustotal_api_key",
+      "type": "string",
+      "description": "VirusTotal API key for URL and file scanning"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack webhook URL for phishing analysis results"
+    }
+  ]
+}

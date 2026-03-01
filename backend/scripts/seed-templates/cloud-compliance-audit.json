@@ -1,0 +1,114 @@
+{
+  "_metadata": {
+    "name": "Cloud Security Compliance Audit",
+    "description": "Automated compliance checking workflow that runs Prowler against your AWS infrastructure, compares findings against CIS benchmarks, generates a compliance report, and stores results as an artifact. Perfect for continuous compliance monitoring.",
+    "category": "compliance",
+    "tags": ["compliance", "aws", "prowler", "cis", "audit", "cloud"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Cloud Security Compliance Audit",
+    "description": "Run Prowler compliance checks, analyze against CIS benchmarks, and generate reports.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "compliance",
+    "tags": ["compliance", "aws", "prowler", "cis", "audit", "cloud"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "componentId": "entry-point",
+        "componentType": "trigger",
+        "label": "Start Audit",
+        "position": { "x": 100, "y": 250 },
+        "data": { "description": "Trigger weekly compliance audit (schedule or manual)" }
+      },
+      {
+        "id": "aws_creds",
+        "componentId": "credentials-aws",
+        "componentType": "action",
+        "label": "Load AWS Credentials",
+        "position": { "x": 350, "y": 250 },
+        "data": { "description": "Retrieve AWS credentials for the target account" }
+      },
+      {
+        "id": "prowler_1",
+        "componentId": "prowler-scan",
+        "componentType": "action",
+        "label": "Run Prowler Scan",
+        "position": { "x": 600, "y": 250 },
+        "data": {
+          "description": "Execute Prowler CIS Benchmark checks against the AWS account",
+          "config": { "checks": "cis_level1", "services": "iam,s3,ec2,rds,cloudtrail,kms" }
+        }
+      },
+      {
+        "id": "script_analyze",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Analyze Compliance",
+        "position": { "x": 850, "y": 250 },
+        "data": {
+          "description": "Process Prowler findings and calculate compliance score per service",
+          "config": {
+            "script": "const findings = input.results || []; const passed = findings.filter(f => f.status === 'PASS').length; const failed = findings.filter(f => f.status === 'FAIL').length; const total = passed + failed; const score = total > 0 ? Math.round((passed / total) * 100) : 0; const byService = {}; findings.forEach(f => { if (!byService[f.service]) byService[f.service] = { passed: 0, failed: 0 }; byService[f.service][f.status === 'PASS' ? 'passed' : 'failed']++; }); return { score, passed, failed, total, byService, criticalFindings: findings.filter(f => f.status === 'FAIL' && f.severity === 'critical') };"
+          }
+        }
+      },
+      {
+        "id": "artifact_1",
+        "componentId": "artifact-writer",
+        "componentType": "action",
+        "label": "Save Report Artifact",
+        "position": { "x": 1100, "y": 250 },
+        "data": {
+          "description": "Store the full compliance report as a downloadable artifact",
+          "config": { "filename": "compliance-report.json", "content": "{{script_analyze.output}}" }
+        }
+      },
+      {
+        "id": "notify_1",
+        "componentId": "slack",
+        "componentType": "action",
+        "label": "Send Compliance Summary",
+        "position": { "x": 1350, "y": 250 },
+        "data": {
+          "description": "Notify the security team with compliance score and critical findings",
+          "config": {
+            "channel": "#compliance",
+            "message": "AWS Compliance Score: {{script_analyze.output.score}}% — {{script_analyze.output.failed}} failures detected"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "source": "trigger_1", "target": "aws_creds" },
+      { "source": "aws_creds", "target": "prowler_1" },
+      { "source": "prowler_1", "target": "script_analyze" },
+      { "source": "script_analyze", "target": "artifact_1" },
+      { "source": "artifact_1", "target": "notify_1" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "aws_access_key_id",
+      "type": "string",
+      "description": "AWS access key ID for the target account"
+    },
+    {
+      "name": "aws_secret_access_key",
+      "type": "string",
+      "description": "AWS secret access key for the target account"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack webhook URL for compliance notifications"
+    }
+  ]
+}

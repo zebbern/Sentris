@@ -1,0 +1,138 @@
+{
+  "_metadata": {
+    "name": "Incident Response Triage",
+    "description": "Automated incident response workflow that collects alert data, enriches indicators of compromise (IOCs) via VirusTotal and AbuseIPDB, generates a severity assessment, and creates a ticket with findings. Accelerates SOC analyst response time.",
+    "category": "incident response",
+    "tags": ["incident-response", "triage", "ioc", "soar", "virustotal"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Incident Response Triage",
+    "description": "Enrich IOCs, assess severity, and create tickets automatically on security alerts.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "incident response",
+    "tags": ["incident-response", "triage", "ioc", "soar", "virustotal"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 7
+  },
+  "graph": {
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "componentId": "entry-point",
+        "componentType": "trigger",
+        "label": "Alert Received",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "description": "Triggered when a security alert is received (webhook, SIEM, etc.)"
+        }
+      },
+      {
+        "id": "script_extract",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Extract IOCs",
+        "position": { "x": 350, "y": 300 },
+        "data": {
+          "description": "Parse alert payload and extract IP addresses, domains, and file hashes",
+          "config": {
+            "script": "const alert = input; const ips = alert.indicators?.filter(i => i.type === 'ip') || []; const domains = alert.indicators?.filter(i => i.type === 'domain') || []; const hashes = alert.indicators?.filter(i => i.type === 'hash') || []; return { ips, domains, hashes, alertId: alert.id, severity: alert.severity };"
+          }
+        }
+      },
+      {
+        "id": "vt_check",
+        "componentId": "virustotal",
+        "componentType": "action",
+        "label": "VirusTotal Lookup",
+        "position": { "x": 600, "y": 200 },
+        "data": {
+          "description": "Query VirusTotal for reputation data on extracted IOCs",
+          "config": { "indicators": "{{script_extract.output}}" }
+        }
+      },
+      {
+        "id": "abuse_check",
+        "componentId": "abuseipdb",
+        "componentType": "action",
+        "label": "AbuseIPDB Check",
+        "position": { "x": 600, "y": 400 },
+        "data": {
+          "description": "Check IP addresses against AbuseIPDB for known malicious activity",
+          "config": { "ips": "{{script_extract.output.ips}}" }
+        }
+      },
+      {
+        "id": "script_assess",
+        "componentId": "logic-script",
+        "componentType": "action",
+        "label": "Assess Severity",
+        "position": { "x": 900, "y": 300 },
+        "data": {
+          "description": "Combine enrichment data and calculate a risk score for the incident",
+          "config": {
+            "script": "const vt = input.virustotal; const abuse = input.abuseipdb; const riskScore = (vt?.malicious || 0) * 10 + (abuse?.confidenceScore || 0); const severity = riskScore > 80 ? 'critical' : riskScore > 50 ? 'high' : riskScore > 20 ? 'medium' : 'low'; return { riskScore, severity, enrichment: { virustotal: vt, abuseipdb: abuse } };"
+          }
+        }
+      },
+      {
+        "id": "http_ticket",
+        "componentId": "http-request",
+        "componentType": "action",
+        "label": "Create Incident Ticket",
+        "position": { "x": 1150, "y": 300 },
+        "data": {
+          "description": "Create a ticket in the incident management system with enriched findings",
+          "config": {
+            "method": "POST",
+            "url": "{{REPLACE_WITH_TICKETING_URL}}/api/incidents",
+            "body": "{{script_assess.output}}"
+          }
+        }
+      },
+      {
+        "id": "notify_soc",
+        "componentId": "slack",
+        "componentType": "action",
+        "label": "Notify SOC Team",
+        "position": { "x": 1400, "y": 300 },
+        "data": {
+          "description": "Alert the SOC team in Slack with incident summary and ticket link",
+          "config": {
+            "channel": "#soc-incidents",
+            "message": "New incident: {{script_assess.output.severity}} severity — Ticket created"
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "source": "trigger_1", "target": "script_extract" },
+      { "source": "script_extract", "target": "vt_check" },
+      { "source": "script_extract", "target": "abuse_check" },
+      { "source": "vt_check", "target": "script_assess" },
+      { "source": "abuse_check", "target": "script_assess" },
+      { "source": "script_assess", "target": "http_ticket" },
+      { "source": "http_ticket", "target": "notify_soc" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "virustotal_api_key",
+      "type": "string",
+      "description": "VirusTotal API key for threat intelligence lookups"
+    },
+    {
+      "name": "abuseipdb_api_key",
+      "type": "string",
+      "description": "AbuseIPDB API key for IP reputation checks"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for SOC notifications"
+    }
+  ]
+}
