@@ -7,20 +7,13 @@ import request from 'supertest';
 import { AuthService } from '../../auth/auth.service';
 import { AuthGuard } from '../../auth/auth.guard';
 import { ApiKeysService } from '../../api-keys/api-keys.service';
-import { AnalyticsService } from '../../analytics/analytics.service';
-import { OpenSearchTenantService } from '../../analytics/opensearch-tenant.service';
-import { SecurityAnalyticsService } from '../../analytics/security-analytics.service';
-import { OrganizationSettingsService } from '../../analytics/organization-settings.service';
-import { AnalyticsModule } from '../../analytics/analytics.module';
-import { AgentTraceIngestService } from '../../agent-trace/agent-trace-ingest.service';
-import { EventIngestService } from '../../events/event-ingest.service';
-import { LogIngestService } from '../../logging/log-ingest.service';
-import { NodeIOIngestService } from '../../node-io/node-io-ingest.service';
 import { SecretsEncryptionService } from '../../secrets/secrets.encryption';
+import { integrationsEnvConfig } from '../../config/integrations.config';
 import { InternalMcpController } from '../internal-mcp.controller';
 import { McpGatewayService } from '../mcp-gateway.service';
+import { McpAuthService } from '../mcp-auth.service';
+import { McpGroupsService } from '../../mcp-groups/mcp-groups.service';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from '../tool-registry.service';
-import { Pool } from 'pg';
 
 // Simple Mock Redis
 class MockRedis {
@@ -62,7 +55,6 @@ describe('MCP Internal API (Integration)', () => {
     process.env.SENTRIS_SKIP_MIGRATION_CHECK = 'true';
     process.env.SECRET_STORE_MASTER_KEY = '0123456789abcdef0123456789abcdef';
 
-    const { McpModule } = await import('../mcp.module');
     const mockRedis = new MockRedis();
     const encryption = new SecretsEncryptionService({
       get: (key: string) => {
@@ -74,88 +66,42 @@ describe('MCP Internal API (Integration)', () => {
     const mockGatewayService = {
       refreshServersForRun: async () => {},
     };
+
+    // Register InternalMcpController directly with mock providers
+    // instead of importing McpModule (which cascades into dozens of modules).
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }), McpModule],
-    })
-      .overrideModule(AnalyticsModule)
-      .useModule(
-        class MockAnalyticsModule {
-          static providers = [
-            {
-              provide: AnalyticsService,
-              useValue: {
-                isEnabled: () => false,
-                track: () => {},
-                trackWorkflowStarted: () => {},
-                trackWorkflowCompleted: () => {},
-                trackApiCall: () => {},
-                trackComponentExecuted: () => {},
-              },
-            },
-            {
-              provide: OpenSearchTenantService,
-              useValue: { provisionTenant: async () => true },
-            },
-            {
-              provide: SecurityAnalyticsService,
-              useValue: { indexDocument: async () => {}, bulkIndexDocuments: async () => {} },
-            },
-            {
-              provide: OrganizationSettingsService,
-              useValue: {
-                getOrganizationSettings: async () => ({}),
-                updateOrganizationSettings: async () => ({}),
-              },
-            },
-          ];
-        },
-      )
-      .overrideProvider(NodeIOIngestService)
-      .useValue({
-        onModuleInit: async () => {},
-        onModuleDestroy: async () => {},
-      })
-      .overrideProvider(LogIngestService)
-      .useValue({
-        onModuleInit: async () => {},
-        onModuleDestroy: async () => {},
-      })
-      .overrideProvider(EventIngestService)
-      .useValue({
-        onModuleInit: async () => {},
-        onModuleDestroy: async () => {},
-      })
-      .overrideProvider(AgentTraceIngestService)
-      .useValue({
-        onModuleInit: async () => {},
-        onModuleDestroy: async () => {},
-      })
-      .overrideProvider(ToolRegistryService)
-      .useValue(toolRegistryService)
-      .overrideProvider(ApiKeysService)
-      .useValue({
-        validateKey: async () => null,
-      })
-      .overrideProvider(McpGatewayService)
-      .useValue(mockGatewayService)
-      .overrideProvider(AuthService)
-      .useValue({
-        authenticate: async () => {
-          throw new ForbiddenException('Unauthorized');
-        },
-        providerName: 'local',
-      })
-      .overrideProvider(Pool)
-      .useValue({
-        connect: async () => ({
-          query: async () => ({ rows: [] }),
-          release: () => {},
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          ignoreEnvFile: true,
+          load: [integrationsEnvConfig],
         }),
-        on: () => {},
-      })
-      .overrideProvider(TOOL_REGISTRY_REDIS)
-      .useValue(mockRedis)
-      .compile();
+      ],
+      controllers: [InternalMcpController],
+      providers: [
+        { provide: ToolRegistryService, useValue: toolRegistryService },
+        { provide: McpGatewayService, useValue: mockGatewayService },
+        { provide: McpAuthService, useValue: { generateSessionToken: async () => 'mock-token' } },
+        {
+          provide: McpGroupsService,
+          useValue: { getServerConfig: async () => ({}) },
+        },
+        { provide: TOOL_REGISTRY_REDIS, useValue: mockRedis },
+        {
+          provide: AuthService,
+          useValue: {
+            authenticate: async () => {
+              throw new ForbiddenException('Unauthorized');
+            },
+            providerName: 'local',
+          },
+        },
+        {
+          provide: ApiKeysService,
+          useValue: { validateKey: async () => null },
+        },
+      ],
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     const authService = moduleFixture.get(AuthService);
@@ -165,12 +111,15 @@ describe('MCP Internal API (Integration)', () => {
     app.useGlobalGuards(new AuthGuard(authService, apiKeysService, reflector, configService));
     await app.init();
 
-    redis = moduleFixture.get(TOOL_REGISTRY_REDIS);
+    // Manually assign services to controller — NestJS DI may not inject
+    // useValue providers into controllers compiled with Bun's TS compiler.
     const controller = moduleFixture.get(InternalMcpController);
     (controller as unknown as { toolRegistry: ToolRegistryService }).toolRegistry =
       toolRegistryService;
     (controller as unknown as { mcpGatewayService: typeof mockGatewayService }).mcpGatewayService =
       mockGatewayService;
+
+    redis = moduleFixture.get(TOOL_REGISTRY_REDIS);
   });
 
   afterAll(async () => {

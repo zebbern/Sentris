@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, mock } from 'bun:test';
 import { Context } from '@temporalio/activity';
 import { runComponentActivity } from '../../../temporal/activities/run-component.activity';
+import { resetComponentActivityServices } from '../../../temporal/activities/run-component.activity';
 import { createMockTrace, createMockLogCollector } from '../../../testing/test-utils';
 
 // Mock the Okta SDK
@@ -37,11 +38,13 @@ describe('Okta User Offboard - Temporal Activity Integration', () => {
         activityId: 'activity-1',
         attempt: 1,
       },
+      heartbeat: vi.fn(),
     } as any);
   });
 
   afterEach(() => {
     contextSpy.mockReset();
+    resetComponentActivityServices();
   });
 
   const baseParams = {

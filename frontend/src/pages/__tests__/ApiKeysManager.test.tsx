@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, screen, within, cleanup, waitFor } from '@testing-library/react';
+import { fireEvent, screen, within, cleanup, waitFor, act } from '@testing-library/react';
 import type { components } from '@sentris/backend-client';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
@@ -277,7 +277,9 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     const revokeButton = screen.getByRole('button', { name: /Revoke key/i });
-    fireEvent.click(revokeButton);
+    await act(async () => {
+      fireEvent.click(revokeButton);
+    });
 
     // Wait for the confirm dialog to appear
     await screen.findByRole('alertdialog');
@@ -300,7 +302,9 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     const deleteButton = screen.getByRole('button', { name: /Delete key/i });
-    fireEvent.click(deleteButton);
+    await act(async () => {
+      fireEvent.click(deleteButton);
+    });
 
     // Confirm dialog should appear
     const actionButtons = await screen.findAllByRole('button', { name: /Delete/i });

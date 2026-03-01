@@ -76,6 +76,11 @@ function getComponentServices(): ComponentActivityServices {
   return componentServices;
 }
 
+/** Reset the singleton so tests can re-initialize between runs. */
+export function resetComponentActivityServices(): void {
+  componentServices = null;
+}
+
 export async function setRunMetadataActivity(input: {
   runId: string;
   workflowId: string;
