@@ -77,7 +77,8 @@ export function PreviewSection({
       <div
         className="absolute inset-0 hidden dark:block pointer-events-none"
         style={{
-          background: 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08), transparent 60%)',
+          background:
+            'radial-gradient(circle at 50% 0%, hsl(var(--primary) / 0.08), transparent 60%)',
         }}
       />
 

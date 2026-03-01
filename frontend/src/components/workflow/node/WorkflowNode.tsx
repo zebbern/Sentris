@@ -234,8 +234,9 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
         !isEntryPoint &&
           (effectiveStatus !== 'idle' || isTimelineActive) && [nodeStyle.bg, nodeStyle.border],
         (!nodeData.status || nodeData.status === 'idle') && !isTimelineActive && ['border-border'],
-        selected && 'shadow-[0_0_15px_rgba(59,130,246,0.4),0_0_30px_rgba(59,130,246,0.3)]',
-        selected && 'hover:shadow-[0_0_25px_rgba(59,130,246,0.6),0_0_45px_rgba(59,130,246,0.4)]',
+        selected && 'shadow-[0_0_15px_hsl(var(--primary)/0.4),0_0_30px_hsl(var(--primary)/0.3)]',
+        selected &&
+          'hover:shadow-[0_0_25px_hsl(var(--primary)/0.6),0_0_45px_hsl(var(--primary)/0.4)]',
         !selected && 'hover:shadow-xl',
         'hover:scale-[1.02]',
         selectedRunId && 'cursor-pointer',
