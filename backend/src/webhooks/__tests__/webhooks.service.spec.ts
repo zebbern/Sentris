@@ -324,7 +324,7 @@ describe('WebhooksService', () => {
       temporalService,
       auditLogService as any,
       {
-        get: (key: string, defaultValue?: string) => defaultValue ?? 'https://api.sentris.ai',
+        get: (key: string, defaultValue?: string) => defaultValue ?? 'http://localhost:3211',
       } as any,
     );
     ensureWorkflowAdminAccessCalls.length = 0;

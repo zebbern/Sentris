@@ -242,4 +242,4 @@ curl http://localhost:3000/mcp/gateway/health
 - [MCP Architecture Documentation](/docs/architecture.mdx)
 - [AI Agent Component Documentation](/docs/ai-agent.md)
 - [Component Development Guide](/docs/components.md)
-- [Sentris Flow Architecture](https://docs.sentris.ai)
+- [Sentris Flow Architecture](https://github.com/zebbern/Sentris/tree/main/docs)

@@ -1154,7 +1154,7 @@ printf "${BLUE}│${NC}                                                         
 printf "${BLUE}└─────────────────────────────────────────────────────────────────┘${NC}\n"
 printf "\n"
 info "Platform: ${BOLD}$PLATFORM_NAME${NC}"
-info "Documentation: https://docs.sentris.ai"
+info "Documentation: https://github.com/zebbern/Sentris"
 printf "\n"
 
 # ---------- Early Check: Truly non-interactive mode without sudo ----------
@@ -1521,7 +1521,7 @@ printf "    just prod logs     - View logs\n"
 printf "    just prod stop     - Stop all services\n"
 printf "    just prod clean    - Remove all data\n"
 printf "\n"
-info "Documentation: https://docs.sentris.ai"
+info "Documentation: https://github.com/zebbern/Sentris"
 info "Need help? https://github.com/zebbern/Sentris/issues"
 printf "\n"
 

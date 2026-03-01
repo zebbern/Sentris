@@ -229,7 +229,7 @@ jobs:
 
       - name: Update version check service
         env:
-          VERSION_CHECK_URL: ${{ secrets.VERSION_CHECK_URL || 'https://version.sentris.ai' }}
+          VERSION_CHECK_URL: ${{ secrets.VERSION_CHECK_URL }}
           VERSION_CHECK_ADMIN_SECRET: ${{ secrets.VERSION_CHECK_ADMIN_SECRET }}
         run: |
           echo "🚀 Updating version check service..."
@@ -257,7 +257,7 @@ jobs:
 
       - name: Verify version update
         env:
-          VERSION_CHECK_URL: ${{ secrets.VERSION_CHECK_URL || 'https://version.sentris.ai' }}
+          VERSION_CHECK_URL: ${{ secrets.VERSION_CHECK_URL }}
         run: |
           echo "🔍 Verifying version update..."
 

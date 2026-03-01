@@ -24,12 +24,11 @@ Parameters:
 
   SentrisWebhookDomain:
     Type: String
-    Default: 'api.sentris.ai'
+    Default: 'localhost:3211'
     Description: 'Sentris API domain'
     AllowedValues:
-      - 'api.sentris.ai'
       - 'localhost:3211'
-    ConstraintDescription: 'Use api.sentris.ai for cloud or localhost:3211 for local testing'
+    ConstraintDescription: 'Configure with your Sentris API domain'
 
   GuardDutySeverityThreshold:
     Type: Number
@@ -220,7 +219,7 @@ Outputs:
       3. 🧪 Test the connection:
          - Wait for a GuardDuty finding, OR
          - Manually POST to webhook:
-           curl -X POST "https://api.sentris.ai/webhooks/inbound/wh_YOUR_PATH" \
+           curl -X POST "https://${SentrisWebhookDomain}/webhooks/inbound/wh_YOUR_PATH" \
              -H 'Content-Type: application/json' \
              -d '{"Message":"..."}'
       4. 📊 Monitor in Sentris dashboard

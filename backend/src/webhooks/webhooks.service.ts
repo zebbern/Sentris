@@ -40,7 +40,7 @@ export class WebhooksService {
   ) {
     this.webhookBaseUrl = this.configService.get<string>(
       'app.webhookBaseUrl',
-      'https://api.sentris.ai',
+      'http://localhost:3211',
     );
   }
 

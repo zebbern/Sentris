@@ -37,7 +37,7 @@ Triggerable from Anywhere
 Invoke security workflows from your CI/CD pipeline or incident response tools. Integrate via simple HTTP APIs. Use Python, Node.js, or any language to trigger automation. Security automation becomes part of your infrastructure, not a separate tool.
 
 Enterprise Deployment Options
-Use cloud-hosted Sentris Flow at studio.sentris.ai or self-host on your own infrastructure with Docker. Both options deliver the same powerful features. No vendor lock-in. Your data stays under your control.
+Use cloud-hosted Sentris Flow or self-host on your own infrastructure with Docker. Both options deliver the same powerful features. No vendor lock-in. Your data stays under your control.
 
 Security by Default Architecture
 Role-based access control, encrypted secrets storage, comprehensive audit logs, multi-tenancy support, and compliance-ready architecture for SOC2, ISO27001, and other industry-specific requirements.
@@ -86,7 +86,7 @@ Sentris Flow is open source under the Apache 2.0 license. The entire codebase is
 Getting Started
 
 Cloud Platform
-Visit studio.sentris.ai, sign up, and start building security workflows immediately. Free tier available. Your first security automation workflow can run within minutes.
+Clone the repository from GitHub, and start building security workflows immediately. Your first security automation workflow can run within minutes.
 
 Self-Hosted Deployment
 Clone the repository and run a single command to deploy the complete stack on your infrastructure. The setup handles all dependencies and infrastructure automatically.
@@ -104,9 +104,8 @@ Use Cases
 
 Resources
 
-- Website: https://sentris.ai
-- Studio Platform: https://studio.sentris.ai
-- Documentation: https://docs.sentris.ai
+- Website: https://github.com/zebbern/Sentris
+- Documentation: https://github.com/zebbern/Sentris/tree/main/docs
 - Source Code: https://github.com/zebbern/Sentris
 - Community Discord: https://discord.gg/fmMA4BtNXC
 - Updates: https://twitter.com/sentris

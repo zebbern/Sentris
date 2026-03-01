@@ -213,7 +213,7 @@ const definition = defineComponent({
       'Audit a Supabase project for security posture (RLS, policies, roles, storage buckets, risky extensions).',
     documentation:
       'Provide your Supabase URL, Postgres connection string, and Service Role key. The scanner runs read-only checks.',
-    documentationUrl: 'https://github.com/sentris/supabase-scanner',
+    documentationUrl: 'https://github.com/zebbern/Sentris',
     icon: 'ShieldCheck',
     author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,

@@ -457,4 +457,4 @@ steps:
 - [AWS IAM Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/)
 - [AWS Security Best Practices](https://docs.aws.amazon.com/security-guide/latest/)
 - [Sentris Flow MCP Documentation](./mcp-library.md)
-- [Sentris Flow Architecture](https://docs.sentris.ai)
+- [Sentris Flow Architecture](https://github.com/zebbern/Sentris/tree/main/docs)

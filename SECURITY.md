@@ -5,7 +5,7 @@ We take security and user trust seriously. Please use the private channels below
 ## Reporting a Vulnerability
 
 - Preferred: Open a private advisory via GitHub’s “Report a vulnerability” link for this repository.
-- Alternative: Email `security@sentris.ai` with a clear subject (e.g., `Vulnerability report: <area>`).
+- Alternative: Email `z_r@tuta.com` with a clear subject (e.g., `Vulnerability report: <area>`).
 
 Please include:
 

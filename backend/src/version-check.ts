@@ -9,7 +9,7 @@ const rootPackage = (() => {
   }
 })();
 
-const FALLBACK_BASE_URL = 'https://version.sentris.ai';
+const FALLBACK_BASE_URL = ''; // Configure SENTRIS_VERSION_CHECK_URL env var for version checking
 const DEFAULT_VERSION = typeof rootPackage?.version === 'string' ? rootPackage.version : '0.1.1';
 const FALLBACK_TIMEOUT_MS = 5000;
 

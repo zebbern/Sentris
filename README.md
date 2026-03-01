@@ -16,13 +16,6 @@
 
 Sentris Flow provides a visual DSL and runtime for building, executing, and monitoring automated security workflows. It decouples security logic from infrastructure management, providing a durable and isolated environment for running security tooling at scale.
 
-<div align="center">
-  <a href="https://youtu.be/7uyv43VforM">
-    <img src="https://img.youtube.com/vi/7uyv43VforM/maxresdefault.jpg" alt="Sentris Flow Demo" width="600">
-  </a>
-  <p><em>Watch the platform in action on YouTube.</em></p>
-</div>
-
 ---
 
 ### 🏗️ Core Pillars
@@ -40,29 +33,7 @@ Sentris Flow provides a visual DSL and runtime for building, executing, and moni
 
 The easiest way to run Sentris Flow on your own infrastructure:
 
-#### One-Line Install
-
-```bash
-curl -fsSL https://get.sentris.ai | bash
-```
-
-This installer will:
-
-- Check and install missing dependencies (docker, just, curl, jq, git)
-- Start Docker if not running
-- Clone the repository and start all services
-- Guide you through any required setup steps
-
-Once complete, visit **http://localhost** to access Sentris Flow.
-
-### 2. Sentris Cloud (Preview)
-
-The fastest way to test Sentris Flow without managing infrastructure.
-
-- **Try it out:** [studio.sentris.ai](https://studio.sentris.ai)
-- **Note:** Sentris Flow is under active development. The cloud environment is a technical preview for evaluation and sandbox testing.
-
-### 3. Self-Host (Docker)
+#### Clone & Start
 
 For teams requiring data residency and air-gapped security orchestrations. This setup runs the full stack (Frontend, Backend, Worker, and Infrastructure).
 
@@ -75,7 +46,7 @@ For teams requiring data residency and air-gapped security orchestrations. This 
 ```bash
 # Clone and start the latest stable release
 git clone https://github.com/zebbern/Sentris.git
-cd studio
+cd Sentris
 just prod start-latest
 ```
 
@@ -91,7 +62,7 @@ Get the dev environment running in 3 steps:
 
 ```bash
 git clone https://github.com/zebbern/Sentris.git
-cd studio
+cd Sentris
 bun run setup   # Install deps + create .env files
 bun run dev     # Start Docker infra + all apps
 ```
@@ -157,7 +128,7 @@ Learn more about our design decisions and system components in the **[Architectu
 
 - 💬 **[Discord](https://discord.gg/fmMA4BtNXC)** — Real-time support and community discussion.
 - 🗣️ **[GitHub Discussions](https://github.com/zebbern/Sentris/discussions)** — Technical RFCs and feature requests.
-- 📚 **[Documentation](https://docs.sentris.ai)** — Full guides on component development and deployment.
+- 📚 **[Documentation](https://github.com/zebbern/Sentris/tree/main/docs)** — Full guides on component development and deployment.
 
 ---
 
@@ -193,5 +164,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guidelines and setup in
 Sentris Flow is licensed under the **Apache License 2.0**.
 
 <div align="center">
-  <p>Engineered for security teams by the Sentris AI team.</p>
+  <p>Engineered for security teams by the Sentris Flow team.</p>
 </div>

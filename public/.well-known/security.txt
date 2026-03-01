@@ -1,5 +1,5 @@
-Contact: contact@sentris.ai
+Contact: z_r@tuta.com
 Preferred-Languages: en
 
 # Sentris Flow Security Policy
-# Report security vulnerabilities responsibly to contact@sentris.ai | VDP 
+# Report security vulnerabilities responsibly to z_r@tuta.com | VDP 

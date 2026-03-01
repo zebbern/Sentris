@@ -65,12 +65,12 @@
       "anchors": [
         {
           "anchor": "Website",
-          "href": "https://studio.sentris.ai",
+          "href": "https://github.com/zebbern/Sentris",
           "icon": "globe"
         },
         {
           "anchor": "GitHub",
-          "href": "https://github.com/sentris/studio",
+          "href": "https://github.com/zebbern/Sentris",
           "icon": "github"
         }
       ]
@@ -84,19 +84,19 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@sentris.ai"
+        "href": "mailto:z_r@tuta.com"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://studio.sentris.ai"
+      "href": "https://github.com/zebbern/Sentris"
     }
   },
   "footer": {
     "socials": {
       "x": "https://x.com/sentrisflow",
-      "github": "https://github.com/sentris",
+      "github": "https://github.com/zebbern/Sentris",
       "linkedin": "https://linkedin.com/company/sentris"
     }
   }

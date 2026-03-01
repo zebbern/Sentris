@@ -53,7 +53,7 @@ async function bootstrap() {
       'http://localhost',
       'http://localhost:80',
       'http://localhost:8090',
-      'https://studio.sentris.ai',
+      // Add production domain to CORS when deployed
       ...instanceOrigins,
     ],
     credentials: true,

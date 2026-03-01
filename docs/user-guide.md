@@ -331,7 +331,7 @@ curl http://localhost:3000/api/v1/mcp-servers
 
 ## Resources
 
-- **Documentation**: [Full Documentation](https://docs.sentris.ai)
+- **Documentation**: [Full Documentation](https://github.com/zebbern/Sentris/tree/main/docs)
 - **Community**: [Discord Server](https://discord.gg/fmMA4BtNXC)
 - **GitHub**: [Repository](https://github.com/zebbern/Sentris)
 - **Examples**: [Workflow Examples](./workflows/)

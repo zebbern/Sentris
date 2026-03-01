@@ -28,7 +28,7 @@ export default defineConfig({
     port: frontendPort,
     strictPort: true,
     open: false,
-    allowedHosts: ['studio.sentris.ai', 'frontend'],
+    allowedHosts: ['frontend'],
     proxy: {
       '/api/': {
         target: `http://localhost:${backendPort}`,
@@ -43,7 +43,7 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ['studio.sentris.ai', 'frontend'],
+    allowedHosts: ['frontend'],
   },
   build: {
     rollupOptions: {

@@ -1,6 +1,6 @@
 # Version Check Client
 
-Sentris Flow performs a version compatibility check whenever the backend boots. The backend calls `https://version.sentris.ai/api/version/check` and reacts according to the server response.
+Sentris Flow performs a version compatibility check whenever the backend boots. The backend calls the configured version check endpoint and reacts according to the server response.
 
 ## When it runs
 
@@ -11,20 +11,20 @@ If the endpoint reports `is_supported=false`, the backend logs an error and cont
 
 ## Configuration
 
-| Variable | Purpose |
-| --- | --- |
-| `SENTRIS_VERSION_CHECK_DISABLED` | Set to `1` or `true` to skip the check. |
-| `SENTRIS_VERSION_CHECK_URL` | Override the base URL (default: `https://version.sentris.ai`). |
-| `SENTRIS_VERSION_CHECK_TIMEOUT_MS` | HTTP timeout in milliseconds (default: `5000`). |
+| Variable                           | Purpose                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| `SENTRIS_VERSION_CHECK_DISABLED`   | Set to `1` or `true` to skip the check.                                       |
+| `SENTRIS_VERSION_CHECK_URL`        | Override the base URL (no default — must be configured for version checking). |
+| `SENTRIS_VERSION_CHECK_TIMEOUT_MS` | HTTP timeout in milliseconds (default: `5000`).                               |
 
 ## CLI output semantics
 
-| Outcome | Behaviour | CLI Display |
-| --- | --- | --- |
-| Supported | Backend logs confirmation and continues startup. | Green box with ✅ UP TO DATE |
-| Upgrade available | Backend logs a warning mentioning the latest version and upgrade URL. | Yellow box with ⚠️ UPDATE AVAILABLE |
-| Unsupported | Backend logs an error and continues in fail-open mode (still urging upgrade). | Red box with ❌ UNSUPPORTED VERSION |
-| Error / offline | Backend logs a warning but continues (fail-open). | Gray box with ⚠️ VERSION CHECK SKIPPED |
+| Outcome           | Behaviour                                                                     | CLI Display                            |
+| ----------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
+| Supported         | Backend logs confirmation and continues startup.                              | Green box with ✅ UP TO DATE           |
+| Upgrade available | Backend logs a warning mentioning the latest version and upgrade URL.         | Yellow box with ⚠️ UPDATE AVAILABLE    |
+| Unsupported       | Backend logs an error and continues in fail-open mode (still urging upgrade). | Red box with ❌ UNSUPPORTED VERSION    |
+| Error / offline   | Backend logs a warning but continues (fail-open).                             | Gray box with ⚠️ VERSION CHECK SKIPPED |
 
 Watch backend logs for `[version-check]` entries to see the exact decision path.
 

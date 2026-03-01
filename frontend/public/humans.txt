@@ -3,9 +3,9 @@
 
 /* TEAM */
 Team: Sentris
-Contact: contact@sentris.ai
+Contact: z_r@tuta.com
 Location: United States
-Website: https://sentris.ai
+Website: https://github.com/zebbern/Sentris
 GitHub: https://github.com/SentrisAI
 Twitter: @sentris
 Discord: discord.gg/fmMA4BtNXC
@@ -17,7 +17,7 @@ Purpose: Build the operating system for modern security teams
 
 /* PROJECT */
 Project Name: Sentris Flow
-Project URL: https://studio.sentris.ai
+Project URL: https://github.com/zebbern/Sentris
 Project Description: The leading security automation platform purpose-built for security engineers and product security teams. Design, deploy, and monitor security workflows without writing code.
 
 Project Status: Active Development
@@ -43,10 +43,10 @@ Issues: https://github.com/zebbern/Sentris/issues
 Discord: https://discord.gg/fmMA4BtNXC
 
 /* SECURITY */
-Security Contact: contact@sentris.ai
+Security Contact: z_r@tuta.com
 
 /* SUPPORT */
-Support Email: contact@sentris.ai
+Support Email: z_r@tuta.com
 
 /* SOCIAL */
 LinkedIn: https://linkedin.com/company/sentris

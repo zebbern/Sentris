@@ -39,5 +39,5 @@ User-agent: Bingbot
 
 
 # Sitemaps - primary and documentation
-Sitemap: https://studio.sentris.ai/sitemap.xml
-Github: https://github.com/sentris/studio
+Sitemap: https://github.com/zebbern/Sentris
+Github: https://github.com/zebbern/Sentris

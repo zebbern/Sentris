@@ -87,7 +87,7 @@ export const backendEnvSchema = z
     GITHUB_TEMPLATE_TOKEN: z.string().optional(),
 
     // --- Version Check ---
-    SENTRIS_VERSION_CHECK_URL: z.string().optional().default('https://version.sentris.ai'),
+    SENTRIS_VERSION_CHECK_URL: z.string().optional().default(''),
     SENTRIS_VERSION_CHECK_TIMEOUT_MS: z.coerce.number().optional().default(5000),
     SENTRIS_VERSION_CHECK_VERSION: z.string().optional(),
     SENTRIS_SKIP_MIGRATION_CHECK: stringToBoolean(false),

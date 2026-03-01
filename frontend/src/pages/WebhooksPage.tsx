@@ -52,7 +52,7 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   error: 'destructive',
 };
 
-const WEBHOOK_BASE_URL = env.VITE_API_URL || 'https://api.sentris.ai';
+const WEBHOOK_BASE_URL = env.VITE_API_URL || 'http://localhost:3211';
 
 export function WebhooksPage() {
   useDocumentTitle('Webhooks');
