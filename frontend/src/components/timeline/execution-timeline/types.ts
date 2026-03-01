@@ -23,11 +23,13 @@ export interface PlaybackControlsProps {
   playbackMode: 'live' | 'replay';
   playbackSpeed: number;
   isLiveFollowing: boolean;
+  showHeatMap: boolean;
   onPlayPause: () => void;
   onStepForward: () => void;
   onStepBackward: () => void;
   onSpeedChange: (speed: number) => void;
   onGoLive: () => void;
+  onToggleHeatMap: () => void;
 }
 
 export interface TimelineTrackProps {

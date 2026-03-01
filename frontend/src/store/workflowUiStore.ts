@@ -30,6 +30,8 @@ interface WorkflowUiState {
   terminalPanelHeight: number;
   /** Whether the dock panel is collapsed to tab bar only. */
   terminalPanelCollapsed: boolean;
+  /** Whether the edge heat map overlay is enabled (execution mode only). */
+  showHeatMap: boolean;
 }
 
 interface WorkflowUiActions {
@@ -56,6 +58,8 @@ interface WorkflowUiActions {
   toggleTerminalPanelCollapsed: () => void;
   /** Remove all terminal tabs and hide the dock panel. */
   clearDockedTerminals: () => void;
+  /** Toggle the edge heat map overlay on/off. */
+  toggleHeatMap: () => void;
 }
 
 export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
@@ -69,6 +73,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
       activeDockedTerminalId: null,
       terminalPanelHeight: 300,
       terminalPanelCollapsed: false,
+      showHeatMap: false,
       setMode: (mode) =>
         set((state) => ({
           mode,
@@ -147,6 +152,8 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         set((state) => ({ terminalPanelCollapsed: !state.terminalPanelCollapsed })),
 
       clearDockedTerminals: () => set({ dockedTerminals: [], activeDockedTerminalId: null }),
+
+      toggleHeatMap: () => set((state) => ({ showHeatMap: !state.showHeatMap })),
     }),
     {
       name: 'workflow-ui-preferences',
@@ -155,6 +162,7 @@ export const useWorkflowUiStore = create<WorkflowUiState & WorkflowUiActions>()(
         libraryOpen: state.libraryOpen,
         inspectorWidth: state.inspectorWidth,
         terminalPanelHeight: state.terminalPanelHeight,
+        showHeatMap: state.showHeatMap,
       }),
       // Merge function to ensure mode is never restored from localStorage
       merge: (persistedState, currentState) => ({

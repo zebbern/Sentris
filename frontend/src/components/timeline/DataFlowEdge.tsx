@@ -31,6 +31,10 @@ interface DataFlowEdgeProps extends EdgeProps {
     sourcePortColor?: string;
     isBranching?: boolean;
     portType?: string;
+    /** Heat-map override — hex color from the heat ramp. */
+    heatMapColor?: string;
+    /** Heat-map override — stroke width in px. */
+    heatMapStrokeWidth?: number;
   };
 }
 
@@ -100,6 +104,7 @@ export const DataFlowEdge = memo(
     const dataFlows = useExecutionTimelineStore((s) => s.dataFlows);
     const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
     const mode = useWorkflowUiStore((s) => s.mode);
+    const showHeatMap = useWorkflowUiStore((s) => s.showHeatMap);
     const isDark = useThemeStore((s) => s.theme === 'dark');
 
     const edgeStrokeColor = useMemo(
@@ -334,22 +339,30 @@ export const DataFlowEdge = memo(
 
     const isRunning = sourceNodeState?.status === 'running';
 
+    // Heat map active = showHeatMap is on AND we have heat-map data for this edge
+    const isHeatMapActive = showHeatMap && !!data?.heatMapColor;
+    const effectiveStrokeColor = isHeatMapActive ? data.heatMapColor! : edgeStrokeColor;
+    const effectiveStrokeWidth = isHeatMapActive ? (data.heatMapStrokeWidth ?? 2) : undefined;
+
     return (
       <>
         {/* Glow path — rendered before the main edge so it sits behind it */}
-        {glowColor && (
+        {/* When heat map is active, use heat color for the glow instead of status glow */}
+        {(glowColor || isHeatMapActive) && (
           <path
             d={edgePath}
             fill="none"
-            stroke={glowColor}
-            strokeWidth={6}
+            stroke={isHeatMapActive ? effectiveStrokeColor : glowColor!}
+            strokeWidth={isHeatMapActive ? (effectiveStrokeWidth ?? 2) + 4 : 6}
             strokeLinecap="round"
-            opacity={isRunning ? undefined : 0.6}
+            opacity={isRunning && !isHeatMapActive ? undefined : 0.6}
             filter="blur(3px)"
             pointerEvents="none"
-            className={isRunning ? 'edge-glow-pulse' : undefined}
+            className={isRunning && !isHeatMapActive ? 'edge-glow-pulse' : undefined}
             style={
-              isRunning ? { animation: 'edge-glow-pulse 1.5s ease-in-out infinite' } : undefined
+              isRunning && !isHeatMapActive
+                ? { animation: 'edge-glow-pulse 1.5s ease-in-out infinite' }
+                : undefined
             }
           />
         )}
@@ -367,8 +380,9 @@ export const DataFlowEdge = memo(
                   opacity: 0.5,
                 }
               : {
-                  stroke: edgeStrokeColor,
-                  ...(edgeDasharray ? { strokeDasharray: edgeDasharray } : {}),
+                  stroke: effectiveStrokeColor,
+                  strokeWidth: effectiveStrokeWidth,
+                  ...(edgeDasharray && !isHeatMapActive ? { strokeDasharray: edgeDasharray } : {}),
                 }
           }
         />

@@ -83,3 +83,70 @@ export function getEdgeDasharraySum(portType: string | undefined): number {
   if (!dasharray) return 24; // default sum for the base pulse (8 + 16)
   return dasharray.split(' ').reduce((sum, v) => sum + Number(v), 0);
 }
+
+// ---------------------------------------------------------------------------
+// Heat map color ramp — blue (low) → yellow (mid) → red (high)
+// ---------------------------------------------------------------------------
+
+/** Color stops for the heat-map ramp (light / dark theme variants). */
+const HEAT_MAP_STOPS = {
+  light: [
+    { at: 0, r: 59, g: 130, b: 246 }, // #3b82f6 — blue-500
+    { at: 0.5, r: 234, g: 179, b: 8 }, // #eab308 — yellow-500
+    { at: 1, r: 239, g: 68, b: 68 }, // #ef4444 — red-500
+  ],
+  dark: [
+    { at: 0, r: 96, g: 165, b: 250 }, // #60a5fa — blue-400
+    { at: 0.5, r: 250, g: 204, b: 21 }, // #facc15 — yellow-400
+    { at: 1, r: 248, g: 113, b: 113 }, // #f87171 — red-400
+  ],
+} as const;
+
+function lerpStops(
+  t: number,
+  stops: readonly { at: number; r: number; g: number; b: number }[],
+): string {
+  const clamped = Math.max(0, Math.min(1, t));
+
+  // Find the two surrounding stops
+  let lower = stops[0];
+  let upper = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped >= stops[i].at && clamped <= stops[i + 1].at) {
+      lower = stops[i];
+      upper = stops[i + 1];
+      break;
+    }
+  }
+
+  const range = upper.at - lower.at;
+  const ratio = range === 0 ? 0 : (clamped - lower.at) / range;
+
+  const r = Math.round(lower.r + (upper.r - lower.r) * ratio);
+  const g = Math.round(lower.g + (upper.g - lower.g) * ratio);
+  const b = Math.round(lower.b + (upper.b - lower.b) * ratio);
+
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Return a hex color on the blue→yellow→red ramp for a normalised intensity (0–1).
+ * Picks the correct palette for the current theme.
+ */
+export function getHeatMapColor(normalizedValue: number, isDark: boolean): string {
+  const stops = isDark ? HEAT_MAP_STOPS.dark : HEAT_MAP_STOPS.light;
+  return lerpStops(normalizedValue, stops);
+}
+
+/** Min / max stroke widths for heat-map edges. */
+const HEAT_STROKE_MIN = 2;
+const HEAT_STROKE_MAX = 8;
+
+/**
+ * Return a stroke width (px) linearly interpolated between 2 and 8 for a
+ * normalised intensity (0–1).
+ */
+export function getHeatMapStrokeWidth(normalizedValue: number): number {
+  const clamped = Math.max(0, Math.min(1, normalizedValue));
+  return HEAT_STROKE_MIN + (HEAT_STROKE_MAX - HEAT_STROKE_MIN) * clamped;
+}

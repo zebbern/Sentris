@@ -1,4 +1,4 @@
-import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,11 +18,13 @@ export function PlaybackControls({
   playbackMode,
   playbackSpeed,
   isLiveFollowing,
+  showHeatMap,
   onPlayPause,
   onStepForward,
   onStepBackward,
   onSpeedChange,
   onGoLive,
+  onToggleHeatMap,
 }: PlaybackControlsProps) {
   const isLiveMode = playbackMode === 'live';
 
@@ -91,6 +93,16 @@ export function PlaybackControls({
             'EXECUTION'
           )}
         </Badge>
+        <Button
+          variant={showHeatMap ? 'default' : 'outline'}
+          size="sm"
+          onClick={onToggleHeatMap}
+          aria-label={showHeatMap ? 'Disable heat map' : 'Enable heat map'}
+          className={cn('gap-1.5', showHeatMap && 'bg-orange-500 hover:bg-orange-600 text-white')}
+        >
+          <Flame className="h-4 w-4" />
+          Heat Map
+        </Button>
         {isLiveMode && !isLiveFollowing && (
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-red-500 border-red-400 bg-red-50">

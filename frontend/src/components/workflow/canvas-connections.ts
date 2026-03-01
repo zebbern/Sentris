@@ -12,10 +12,15 @@ import type { NodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import type { ToastVariant } from '@/components/ui/toast-context';
 import { validateConnection } from '@/utils/connectionValidation';
-import { getEdgeColor } from '@/components/workflow/edge-colors';
+import {
+  getEdgeColor,
+  getHeatMapColor,
+  getHeatMapStrokeWidth,
+} from '@/components/workflow/edge-colors';
 import { useThemeStore } from '@/store/themeStore';
 import { logger } from '@/lib/logger';
 import type { DataPacket } from '@/store/executionTimelineStore';
+import type { EdgeHeatMetrics } from '@/components/workflow/useEdgeHeatMap';
 
 export interface UseCanvasConnectionsDeps {
   nodes: Node<NodeData>[];
@@ -30,6 +35,7 @@ export interface UseCanvasConnectionsDeps {
   selectedNodeId: string | null;
   onSnapshot?: (nodes?: Node<NodeData>[], edges?: Edge[]) => void;
   dataFlows: DataPacket[];
+  heatMap: Map<string, EdgeHeatMetrics> | null;
 }
 
 /**
@@ -49,6 +55,7 @@ export function useCanvasConnections({
   selectedNodeId,
   onSnapshot,
   dataFlows,
+  heatMap,
 }: UseCanvasConnectionsDeps) {
   const isDark = useThemeStore((s) => s.theme === 'dark');
 
@@ -209,11 +216,16 @@ export function useCanvasConnections({
 
   // Update edges with data flow highlighting and packet data
   // Preserve sourcePortColor, isBranching, and portType from the original edge data
+  // When heatMap is provided, inject heatMapColor and heatMapStrokeWidth into edge data
   useEffect(() => {
     setEdges((eds) =>
       eds.map((edge) => {
         const portColor = edge.data?.sourcePortColor as string | undefined;
         const resolvedColor = getEdgeColor(portColor, isDark);
+
+        // Heat map overlay data (only present when heatMap is non-null)
+        const metrics = heatMap?.get(edge.id);
+
         return {
           ...edge,
           markerEnd: {
@@ -231,11 +243,16 @@ export function useCanvasConnections({
             sourcePortColor: portColor,
             isBranching: edge.data?.isBranching,
             portType: edge.data?.portType,
+            // Heat map props — undefined when heat map is off so edge renders normally
+            heatMapColor: metrics ? getHeatMapColor(metrics.normalizedCount, isDark) : undefined,
+            heatMapStrokeWidth: metrics
+              ? getHeatMapStrokeWidth(metrics.normalizedCount)
+              : undefined,
           },
         };
       }),
     );
-  }, [dataFlows, selectedNodeId, setEdges, isDark]);
+  }, [dataFlows, selectedNodeId, setEdges, isDark, heatMap]);
 
   return { handleEdgesChange, onConnect };
 }

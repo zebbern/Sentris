@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
+import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { clampValue } from './execution-timeline/utils';
 import { PlaybackControls } from './execution-timeline/PlaybackControls';
 import { TimelineTrack } from './execution-timeline/TimelineTrack';
@@ -36,6 +37,9 @@ export function ExecutionTimeline() {
   const timelineStartTime = useExecutionTimelineStore((state) => state.timelineStartTime);
   const agentMarkersRunId = useExecutionTimelineStore((state) => state.agentMarkersRunId);
   const agentMarkers = useExecutionTimelineStore((state) => state.agentMarkers);
+
+  const showHeatMap = useWorkflowUiStore((s) => s.showHeatMap);
+  const toggleHeatMap = useWorkflowUiStore((s) => s.toggleHeatMap);
 
   const isLiveMode = playbackMode === 'live';
   const overviewDuration = Math.max(eventDuration, totalDuration);
@@ -273,11 +277,13 @@ export function ExecutionTimeline() {
           playbackMode={playbackMode}
           playbackSpeed={playbackSpeed}
           isLiveFollowing={isLiveFollowing}
+          showHeatMap={showHeatMap}
           onPlayPause={handlePlayPause}
           onStepForward={stepForward}
           onStepBackward={stepBackward}
           onSpeedChange={handleSpeedChange}
           onGoLive={goLive}
+          onToggleHeatMap={toggleHeatMap}
         />
 
         <TimelineTrack

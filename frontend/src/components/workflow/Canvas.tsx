@@ -46,6 +46,8 @@ import {
 } from './canvas-node-factory';
 import { useNodeUpdater } from './canvas-node-updater';
 import { useCanvasConnections } from './canvas-connections';
+import { useEdgeHeatMap } from './useEdgeHeatMap';
+import { HeatMapLegend } from './HeatMapLegend';
 import { useCanvasViewport } from './canvas-viewport';
 import { useCanvasNodeInteractions } from './canvas-node-interactions';
 import { useResolvedScheduleContext, type ScheduleContextProps } from './canvas-schedule-context';
@@ -112,6 +114,7 @@ export function Canvas({
   const selectNode = useExecutionTimelineStore((s) => s.selectNode);
   const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
+  const showHeatMap = useWorkflowUiStore((state) => state.showHeatMap);
 
   // --- Edge context menu state ---
   const [edgeContextMenu, setEdgeContextMenu] = useState<{
@@ -190,6 +193,10 @@ export function Canvas({
   const schedule = useResolvedScheduleContext(scheduleProps);
   const applyEdgesChange = onEdgesChange;
 
+  // Compute edge heat map — only active when showHeatMap is on and in execution mode
+  const edgeHeatMap = useEdgeHeatMap(edges, dataFlows);
+  const activeHeatMap = showHeatMap && mode === 'execution' ? edgeHeatMap : null;
+
   const configPanelWidth = 432;
 
   useEffect(() => {
@@ -211,6 +218,7 @@ export function Canvas({
     selectedNodeId,
     onSnapshot,
     dataFlows,
+    heatMap: activeHeatMap,
   });
 
   const { canvasOpacity, hasUserInteractedRef } = useCanvasViewport({
@@ -430,6 +438,7 @@ export function Canvas({
               mode={mode}
               onNodeClick={handleValidationNodeClick}
             />
+            <HeatMapLegend />
             <ConnectionPreviewContext.Provider value={connectingFromHandle}>
               <ReactFlow
                 nodes={nodes}
