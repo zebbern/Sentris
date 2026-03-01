@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // Mutable auth state
@@ -23,12 +23,26 @@ mock.module('@/pages/settings/AuditLogSettings', () => ({
   AuditLogSettings: () => <div data-testid="audit-settings">Audit Log Settings Content</div>,
 }));
 
+mock.module('@/pages/settings/NotificationSettings', () => ({
+  NotificationSettings: () => (
+    <div data-testid="notification-settings">Notification Settings Content</div>
+  ),
+}));
+
+mock.module('@/pages/settings/KeyboardShortcutsSettings', () => ({
+  KeyboardShortcutsSettings: () => (
+    <div data-testid="shortcuts-settings">Keyboard Shortcuts Settings Content</div>
+  ),
+}));
+
 import { SettingsPage } from '../SettingsPage';
 
 const renderSettings = (initialRoute = '/settings/general') =>
   render(
     <MemoryRouter initialEntries={[initialRoute]}>
-      <SettingsPage />
+      <Routes>
+        <Route path="/settings/*" element={<SettingsPage />} />
+      </Routes>
     </MemoryRouter>,
   );
 
@@ -40,9 +54,9 @@ describe('SettingsPage', () => {
 
   afterEach(cleanup);
 
-  it('renders page heading', () => {
+  it('renders navigation tabs', () => {
     renderSettings();
-    expect(screen.getByText('Settings')).toBeTruthy();
+    expect(screen.getByText('General')).toBeTruthy();
   });
 
   it('shows General, Appearance, and Audit tabs for admin users', () => {

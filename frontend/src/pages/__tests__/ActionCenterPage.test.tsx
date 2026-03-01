@@ -221,7 +221,7 @@ describe('ActionCenterPage', () => {
     setupStore();
     renderPage();
 
-    const dragHandles = screen.getAllByLabelText('Drag handle');
+    const dragHandles = screen.getAllByLabelText('Drag to reorder');
     expect(dragHandles.length).toBeGreaterThanOrEqual(2);
   });
 

@@ -2,6 +2,7 @@ import { describe, it, afterEach, expect, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { ReactFlowProvider } from 'reactflow';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { FrontendNodeData } from '@/schemas/node';
 
 const textBlockMetadata = {
@@ -66,6 +67,10 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
 const { WorkflowNode } = await import('../WorkflowNode');
 
 describe('WorkflowNode – text block rendering', () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   afterEach(() => {
     cleanup();
   });
@@ -87,21 +92,23 @@ describe('WorkflowNode – text block rendering', () => {
     };
 
     render(
-      <MemoryRouter>
-        <ReactFlowProvider>
-          <WorkflowNode
-            id="node-1"
-            data={nodeData}
-            selected={false}
-            type="workflow"
-            xPos={0}
-            yPos={0}
-            zIndex={0}
-            isConnectable={true}
-            dragging={false}
-          />
-        </ReactFlowProvider>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ReactFlowProvider>
+            <WorkflowNode
+              id="node-1"
+              data={nodeData}
+              selected={false}
+              type="workflow"
+              xPos={0}
+              yPos={0}
+              zIndex={0}
+              isConnectable={true}
+              dragging={false}
+            />
+          </ReactFlowProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByText('Text')).toBeInTheDocument();
@@ -127,21 +134,23 @@ describe('WorkflowNode – text block rendering', () => {
     };
 
     render(
-      <MemoryRouter>
-        <ReactFlowProvider>
-          <WorkflowNode
-            id="node-2"
-            data={nodeData}
-            selected={false}
-            type="workflow"
-            xPos={0}
-            yPos={0}
-            zIndex={0}
-            isConnectable={true}
-            dragging={false}
-          />
-        </ReactFlowProvider>
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ReactFlowProvider>
+            <WorkflowNode
+              id="node-2"
+              data={nodeData}
+              selected={false}
+              type="workflow"
+              xPos={0}
+              yPos={0}
+              zIndex={0}
+              isConnectable={true}
+              dragging={false}
+            />
+          </ReactFlowProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByText('Text')).toBeInTheDocument();

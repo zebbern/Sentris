@@ -215,9 +215,9 @@ describe('WebhookEditorPage', () => {
   it('shows loading spinner when isLoading is true', () => {
     hookState.isLoading = true;
     renderEditor();
-    // Loader2 renders an SVG with animate-spin class
-    const spinner = document.querySelector('.animate-spin');
-    expect(spinner).toBeTruthy();
+    // Loading state renders Skeleton components with animate-pulse class
+    const skeletons = document.querySelectorAll('[class*="animate-pulse"]');
+    expect(skeletons.length).toBeGreaterThan(0);
   });
 
   it('does not render tabs or header while loading', () => {

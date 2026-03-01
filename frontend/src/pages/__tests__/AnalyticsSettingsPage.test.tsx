@@ -143,7 +143,8 @@ describe('AnalyticsSettingsPage', () => {
   it('shows tier badge', () => {
     renderPage();
 
-    expect(screen.getByText('Pro')).toBeTruthy();
+    const proElements = screen.getAllByText('Pro');
+    expect(proElements.length).toBeGreaterThan(0);
   });
 
   // --- Non-admin read-only view ---
@@ -153,7 +154,8 @@ describe('AnalyticsSettingsPage', () => {
 
     renderPage();
 
-    expect(screen.getByText('30 days')).toBeTruthy();
+    const retentionElements = screen.getAllByText(/30\s*days/);
+    expect(retentionElements.length).toBeGreaterThan(0);
     // No input should be present
     expect(screen.queryByLabelText('Retention Period (days)')).toBeNull();
   });
@@ -270,11 +272,12 @@ describe('AnalyticsSettingsPage', () => {
     renderPage();
 
     expect(screen.getByText('Free')).toBeTruthy();
-    expect(screen.getByText('Pro')).toBeTruthy();
+    expect(screen.getAllByText('Pro').length).toBeGreaterThan(0);
     expect(screen.getByText('Enterprise')).toBeTruthy();
-    expect(screen.getByText('30 days')).toBeTruthy();
-    expect(screen.getByText('90 days')).toBeTruthy();
-    expect(screen.getByText('365 days')).toBeTruthy();
+    // "30 days" appears in both retention display and tier table
+    expect(screen.getAllByText(/30\s*days/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/90\s*days/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/365\s*days/).length).toBeGreaterThan(0);
   });
 
   it('shows "Current" badge next to the active tier', () => {

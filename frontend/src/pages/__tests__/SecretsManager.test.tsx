@@ -1,9 +1,10 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, within, cleanup } from '@testing-library/react';
+import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { SecretSummary } from '@/schemas/secret';
 import { createDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { ToastContext } from '@/components/ui/toast-context';
 
 mock.module('@/components/ui/dialog', createDialogMock);
 
@@ -57,6 +58,10 @@ mock.module('@tanstack/react-query', () => ({
   }),
 }));
 
+// --- Toast mock ---
+const mockToast = mock(() => ({ id: 'test-toast' }));
+const mockDismiss = mock();
+
 // --- Auth store ---
 mock.module('@/store/authStore', () => createAuthStoreMock({ roles: () => mockRoles }));
 
@@ -76,7 +81,7 @@ const ISO = '2024-01-01T00:00:00.000Z';
 
 const baseSecret: SecretSummary = {
   id: '11111111-1111-1111-1111-111111111111',
-  name: 'Prod API Key',
+  name: 'prod-api-key',
   description: 'Original secret',
   tags: ['prod', 'api'],
   createdAt: ISO,
@@ -91,9 +96,11 @@ const baseSecret: SecretSummary = {
 
 const renderSecretsManager = () =>
   render(
-    <MemoryRouter>
-      <SecretsManager />
-    </MemoryRouter>,
+    <ToastContext.Provider value={{ toast: mockToast as any, dismiss: mockDismiss }}>
+      <MemoryRouter>
+        <SecretsManager />
+      </MemoryRouter>
+    </ToastContext.Provider>,
   );
 
 const setupStore = (overrides: MockQueryOverrides = {}) => {
@@ -125,6 +132,7 @@ describe('SecretsManager edit dialog', () => {
     cleanup();
     mockRoles = ['ADMIN'];
     setupStore();
+    mockToast.mockClear();
   });
 
   afterEach(() => {
@@ -134,7 +142,7 @@ describe('SecretsManager edit dialog', () => {
   it('updates metadata without rotating when only metadata changes', async () => {
     const updateSecret = mock().mockResolvedValue({
       ...baseSecret,
-      name: 'Updated Secret',
+      name: 'updated-secret',
     });
     const rotateSecret = mock().mockResolvedValue(baseSecret);
 
@@ -145,18 +153,24 @@ describe('SecretsManager edit dialog', () => {
     const dialog = await openEditDialog();
     const nameInput = within(dialog).getByLabelText('Secret name');
 
-    fireEvent.change(nameInput, { target: { value: 'Updated Secret' } });
+    fireEvent.change(nameInput, { target: { value: 'updated-secret' } });
 
     const saveButton = within(dialog).getByRole('button', { name: 'Save changes' });
     fireEvent.click(saveButton);
 
-    await screen.findByText('Secret "Updated Secret" updated successfully.');
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Secret "updated-secret" updated successfully.',
+        }),
+      );
+    });
 
     expect(updateSecret).toHaveBeenCalledTimes(1);
     expect(updateSecret).toHaveBeenCalledWith({
       id: baseSecret.id,
       input: {
-        name: 'Updated Secret',
+        name: 'updated-secret',
         description: 'Original secret',
         tags: ['prod', 'api'],
       },
@@ -180,7 +194,13 @@ describe('SecretsManager edit dialog', () => {
     const saveButton = within(dialog).getByRole('button', { name: 'Save changes' });
     fireEvent.click(saveButton);
 
-    await screen.findByText('Secret "Prod API Key" rotated successfully.');
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Secret "prod-api-key" rotated successfully.',
+        }),
+      );
+    });
 
     expect(rotateSecret).toHaveBeenCalledTimes(1);
     expect(rotateSecret).toHaveBeenCalledWith({
@@ -193,7 +213,7 @@ describe('SecretsManager edit dialog', () => {
   it('updates metadata and rotates secret value when both are provided', async () => {
     const updatedSecret = {
       ...baseSecret,
-      name: 'Prod API Key v2',
+      name: 'prod-api-key-v2',
       updatedAt: '2024-02-01T00:00:00.000Z',
     };
     const updateSecret = mock().mockResolvedValue(updatedSecret);
@@ -207,18 +227,24 @@ describe('SecretsManager edit dialog', () => {
     const nameInput = within(dialog).getByLabelText('Secret name');
     const valueInput = within(dialog).getByLabelText(/New secret value/);
 
-    fireEvent.change(nameInput, { target: { value: 'Prod API Key v2' } });
+    fireEvent.change(nameInput, { target: { value: 'prod-api-key-v2' } });
     fireEvent.change(valueInput, { target: { value: 'next-secret' } });
 
     const saveButton = within(dialog).getByRole('button', { name: 'Save changes' });
     fireEvent.click(saveButton);
 
-    await screen.findByText('Secret "Prod API Key v2" updated and rotated successfully.');
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Secret "prod-api-key-v2" updated and rotated successfully.',
+        }),
+      );
+    });
 
     expect(updateSecret).toHaveBeenCalledWith({
       id: baseSecret.id,
       input: {
-        name: 'Prod API Key v2',
+        name: 'prod-api-key-v2',
         description: 'Original secret',
         tags: ['prod', 'api'],
       },
@@ -242,7 +268,13 @@ describe('SecretsManager edit dialog', () => {
     const saveButton = within(dialog).getByRole('button', { name: 'Save changes' });
     fireEvent.click(saveButton);
 
-    await screen.findByText('Secret "Prod API Key" unchanged.');
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Secret "prod-api-key" unchanged.',
+        }),
+      );
+    });
 
     expect(updateSecret).not.toHaveBeenCalled();
     expect(rotateSecret).not.toHaveBeenCalled();

@@ -73,18 +73,42 @@ export function createDndUtilitiesMock() {
 
 export function createSortableUiMock() {
   const SortableTableRow = ({ children, id, className, onClick, ...rest }: any) => {
-    const handleProps = { role: 'button', 'aria-label': 'Drag handle' };
+    const handleProps = {
+      listeners: {},
+      attributes: {
+        role: 'button',
+        tabIndex: 0,
+        'aria-roledescription': 'sortable',
+        'aria-describedby': 'dndkit-instructions',
+        'aria-disabled': false,
+      },
+    };
     return (
       <tr data-id={id} className={className} onClick={onClick} {...rest}>
-        {typeof children === 'function' ? children({ handleProps }) : children}
+        {typeof children === 'function' ? children({ handleProps, isDragging: false }) : children}
       </tr>
     );
   };
-  const DragHandle = (props: any) => (
-    <td>
-      <span {...props}>⠿</span>
-    </td>
-  );
+  const DragHandle = ({ listeners, attributes, disabled }: any) => {
+    const mergedProps = disabled ? {} : { ...listeners, ...attributes };
+    const { 'aria-roledescription': ariaRoleDescription, ...handleProps } = mergedProps;
+    return (
+      <td className="w-10 px-2 align-middle">
+        <div
+          className={
+            disabled
+              ? 'touch-none text-muted-foreground opacity-30 cursor-not-allowed'
+              : 'touch-none text-muted-foreground cursor-grab'
+          }
+          {...handleProps}
+          aria-roledescription={ariaRoleDescription}
+          aria-label="Drag to reorder"
+        >
+          <svg className="h-4 w-4" />
+        </div>
+      </td>
+    );
+  };
   return { SortableTableRow, DragHandle };
 }
 
