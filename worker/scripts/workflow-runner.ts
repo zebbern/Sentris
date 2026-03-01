@@ -7,7 +7,7 @@ import { Pool } from 'pg';
 import { Connection, Client } from '@temporalio/client';
 
 import type { WorkflowDefinition } from '../src/temporal/types';
-import { shipsecWorkflowRun } from '../src/temporal/workflows';
+import { sentrisWorkflowRun } from '../src/temporal/workflows';
 
 interface ListEntry {
   workflowId: string;
@@ -91,7 +91,7 @@ async function listRuns(
   const runs: ListEntry[] = [];
   const maxMatches = Math.max(limit * 3, limit);
 
-  const query = 'WorkflowType = "shipsecWorkflowRun"';
+  const query = 'WorkflowType = "sentrisWorkflowRun"';
 
   for await (const info of client.workflow.list({ query, pageSize: 50 })) {
     if (runs.length >= maxMatches) {
@@ -154,10 +154,10 @@ async function runWorkflow(
   workflowRecordId: string,
   fileId: string,
 ): Promise<{ runId: string; result: unknown }> {
-  const temporalWorkflowId = `shipsec-run-${randomUUID()}`;
-  const taskQueue = process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-default';
+  const temporalWorkflowId = `sentris-run-${randomUUID()}`;
+  const taskQueue = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 
-  const handle = await client.workflow.start(shipsecWorkflowRun, {
+  const handle = await client.workflow.start(sentrisWorkflowRun, {
     workflowId: temporalWorkflowId,
     taskQueue,
     args: [
@@ -184,13 +184,13 @@ async function main() {
 
   const pool = new Pool({
     connectionString:
-      process.env.DATABASE_URL ?? 'postgresql://shipsec:shipsec@localhost:5433/shipsec',
+      process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris',
   });
 
   const definition = await loadDefinition(pool, workflowRecordId);
 
   const address = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-  const namespace = process.env.TEMPORAL_NAMESPACE ?? 'shipsec-dev';
+  const namespace = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
 
   const connection = await Connection.connect({ address });
   const client = new Client({ connection, namespace });

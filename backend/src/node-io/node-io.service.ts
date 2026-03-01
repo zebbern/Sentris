@@ -98,8 +98,8 @@ export class NodeIOService {
       if (!data || typeof data !== 'object') return false;
       const d = data as Record<string, unknown>;
       // New format: __spilled__ === true
-      // Legacy format: __shipsec_spilled__ === true
-      const hasSpillFlag = d['__spilled__'] === true || d['__shipsec_spilled__'] === true;
+      // Legacy format: __sentris_spilled__ === true
+      const hasSpillFlag = d['__spilled__'] === true || d['__sentris_spilled__'] === true;
       return hasSpillFlag && typeof d['storageRef'] === 'string';
     };
 

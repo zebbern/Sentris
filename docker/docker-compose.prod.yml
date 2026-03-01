@@ -37,12 +37,12 @@ services:
       - plugins.security.ssl.http.pemtrustedcas_filepath=certs/root-ca.pem
       - plugins.security.allow_unsafe_democertificates=false
       - plugins.security.allow_default_init_securityindex=true
-      - plugins.security.authcz.admin_dn=CN=admin,OU=ShipSec,O=ShipSecAI,L=SF,ST=CA,C=US
+      - plugins.security.authcz.admin_dn=CN=admin,OU=Sentris,O=SentrisAI,L=SF,ST=CA,C=US
       - plugins.security.audit.type=internal_opensearch
       - plugins.security.enable_snapshot_restore_privilege=true
       - plugins.security.check_snapshot_restore_write_privileges=true
       - plugins.security.restapi.roles_enabled=["all_access", "security_rest_api_access"]
-      - cluster.name=shipsec-prod
+      - cluster.name=sentris-prod
       - node.name=opensearch-node1
     volumes:
       - opensearch_data:/usr/share/opensearch/data
@@ -94,4 +94,4 @@ volumes:
 
 networks:
   default:
-    name: shipsec-network
+    name: sentris-network

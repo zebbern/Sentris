@@ -74,7 +74,7 @@ import { RunArtifactsResponseDto } from '../storage/dto/artifact.dto';
 import { RunArtifactIdParamDto, RunArtifactIdParamSchema } from '../storage/dto/artifacts.dto';
 import type { WorkflowTerminalRecord } from '../database/schema';
 import { NodeIOService } from '../node-io/node-io.service';
-import { TERMINAL_STATUSES } from '@shipsec/shared';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 import type { AppConfig } from '../config';
 
 const TERMINAL_COMPLETION_STATUSES = new Set(TERMINAL_STATUSES);

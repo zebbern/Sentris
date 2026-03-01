@@ -204,7 +204,7 @@ if (hasNamedServers) {
     process.exit(1);
   }
 
-  const client = new Client({ name: 'shipsec-mcp-stdio-proxy', version: '1.0.0' });
+  const client = new Client({ name: 'sentris-mcp-stdio-proxy', version: '1.0.0' });
   const clientTransport = new StdioClientTransport({
     command,
     args,

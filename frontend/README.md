@@ -1,4 +1,4 @@
-# ShipSec Studio Frontend
+# Sentris Flow Frontend
 
 React 19 + Vite UI for building and monitoring security workflows with real-time execution visibility.
 
@@ -69,7 +69,7 @@ bun test
 
 ### API Integration
 
-- **Generated Client**: `@shipsec/backend-client` - Auto-generated TypeScript API client
+- **Generated Client**: `@sentris/backend-client` - Auto-generated TypeScript API client
 - **Service Layer**: `src/services/` - Centralized API communication and error handling
 - **Authentication**: Clerk-based auth with organization scoping
 

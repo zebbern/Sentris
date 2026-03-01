@@ -8,7 +8,7 @@ import {
   componentRegistry,
   createExecutionContext,
   type ExecutionContext,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import type { AmassInput, AmassOutput } from '../amass';
 import '../amass';
 
@@ -23,7 +23,7 @@ const shouldRunIntegration =
     logs.length = 0;
     context = createExecutionContext({
       runId: 'test-run',
-      componentRef: 'shipsec.amass.enum',
+      componentRef: 'sentris.amass.enum',
       logCollector: (entry) => {
         logs.push(`${entry.stream.toUpperCase()}: ${entry.message}`);
       },
@@ -31,7 +31,7 @@ const shouldRunIntegration =
   });
 
   test('enumerates subdomains for a known domain', async () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     expect(component).toBeDefined();
 
     const result = await component!.execute(

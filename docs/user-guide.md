@@ -1,4 +1,4 @@
-# ShipSec Studio User Guide
+# Sentris Flow User Guide
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@
 **One-Line Install (Recommended)**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShipSecAI/studio/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zebbern/Sentris/main/install.sh | bash
 ```
 
 This installer will:
@@ -30,11 +30,11 @@ This installer will:
 - Clone the repository and start all services
 - Guide you through any required setup steps
 
-Once complete, visit **http://localhost** to access ShipSec Studio.
+Once complete, visit **http://localhost** to access Sentris Flow.
 
 ### Quick Start
 
-1. **Login** to ShipSec Studio
+1. **Login** to Sentris Flow
 2. **Create New Workflow** from the dashboard
 3. **Add Components** from the left sidebar
 4. **Connect Components** by dragging between ports
@@ -331,9 +331,9 @@ curl http://localhost:3000/api/v1/mcp-servers
 
 ## Resources
 
-- **Documentation**: [Full Documentation](https://docs.shipsec.ai)
+- **Documentation**: [Full Documentation](https://docs.sentris.ai)
 - **Community**: [Discord Server](https://discord.gg/fmMA4BtNXC)
-- **GitHub**: [Repository](https://github.com/ShipSecAI/studio)
+- **GitHub**: [Repository](https://github.com/zebbern/Sentris)
 - **Examples**: [Workflow Examples](./workflows/)
 
 ## Support

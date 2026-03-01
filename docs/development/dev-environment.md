@@ -1,6 +1,6 @@
 # Development Environment Setup
 
-Step-by-step guide for starting the ShipSec Studio development environment. Written for both human developers and AI agents.
+Step-by-step guide for starting the Sentris Flow development environment. Written for both human developers and AI agents.
 
 ## Prerequisites
 
@@ -19,24 +19,24 @@ Step-by-step guide for starting the ShipSec Studio development environment. Writ
 The development environment has two layers: Docker infrastructure and application processes.
 
 ```
-Docker Compose (infrastructure — project name: shipsec)
-├── shipsec-postgres          127.0.0.1:5433 → 5432   Postgres 16 database
-├── shipsec-temporal          127.0.0.1:7233           Temporal workflow engine
-├── shipsec-temporal-ui       127.0.0.1:8081 → 8080   Temporal dashboard
-├── shipsec-minio             127.0.0.1:9000, 9001     MinIO object storage
-├── shipsec-redis             127.0.0.1:6379           Redis cache & rate limiting
-├── shipsec-loki              127.0.0.1:3100           Loki log aggregation
-├── shipsec-redpanda          127.0.0.1:9092, 9644     Redpanda (Kafka) event streaming
-├── shipsec-redpanda-console  127.0.0.1:8082 → 8080   Redpanda Console UI
-├── shipsec-opensearch        127.0.0.1:9200, 9600     OpenSearch analytics
-├── shipsec-opensearch-dashboards  127.0.0.1:5601      OpenSearch Dashboards
-├── shipsec-opensearch-init   (one-shot)               Index pattern setup
-└── shipsec-nginx             0.0.0.0:80               Reverse proxy (auth gate)
+Docker Compose (infrastructure — project name: sentris)
+├── sentris-postgres          127.0.0.1:5433 → 5432   Postgres 16 database
+├── sentris-temporal          127.0.0.1:7233           Temporal workflow engine
+├── sentris-temporal-ui       127.0.0.1:8081 → 8080   Temporal dashboard
+├── sentris-minio             127.0.0.1:9000, 9001     MinIO object storage
+├── sentris-redis             127.0.0.1:6379           Redis cache & rate limiting
+├── sentris-loki              127.0.0.1:3100           Loki log aggregation
+├── sentris-redpanda          127.0.0.1:9092, 9644     Redpanda (Kafka) event streaming
+├── sentris-redpanda-console  127.0.0.1:8082 → 8080   Redpanda Console UI
+├── sentris-opensearch        127.0.0.1:9200, 9600     OpenSearch analytics
+├── sentris-opensearch-dashboards  127.0.0.1:5601      OpenSearch Dashboards
+├── sentris-opensearch-init   (one-shot)               Index pattern setup
+└── sentris-nginx             0.0.0.0:80               Reverse proxy (auth gate)
 
 Application (PM2-managed processes on the host)
-├── shipsec-frontend-0        localhost:5173            React + Vite dev server
-├── shipsec-backend-0         localhost:3211            NestJS API
-└── shipsec-worker-0          (no HTTP port)            Temporal worker
+├── sentris-frontend-0        localhost:5173            React + Vite dev server
+├── sentris-backend-0         localhost:3211            NestJS API
+└── sentris-worker-0          (no HTTP port)            Temporal worker
 ```
 
 > All Docker ports except nginx (port 80) bind to `127.0.0.1` only — they are not accessible from external networks.
@@ -101,14 +101,14 @@ cp worker/.env.example worker/.env
 cp frontend/.env.example frontend/.env
 
 # 3. Start Docker infrastructure
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
 
 # 4. Wait for Postgres to be healthy (required before starting backend)
-docker exec shipsec-postgres pg_isready -U shipsec
+docker exec sentris-postgres pg_isready -U sentris
 # Retry every 2 seconds until it returns "accepting connections"
 
 # 5. Start application via PM2
-pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 
 # 6. Check PM2 status
 pm2 status
@@ -119,8 +119,8 @@ pm2 status
 **Stopping manually:**
 
 ```bash
-pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down
 ```
 
 ## Port Reference
@@ -151,20 +151,20 @@ docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-p
 ### Docker Containers
 
 ```bash
-# List all ShipSec containers with status
-docker ps -a --filter name=shipsec --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+# List all Sentris containers with status
+docker ps -a --filter name=sentris --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
-**Expected:** All containers show `Up` and `(healthy)` status, except `shipsec-opensearch-init` which exits after completion.
+**Expected:** All containers show `Up` and `(healthy)` status, except `sentris-opensearch-init` which exits after completion.
 
 ### Individual Service Checks
 
 ```bash
 # Postgres
-docker exec shipsec-postgres pg_isready -U shipsec
+docker exec sentris-postgres pg_isready -U sentris
 
 # Redis
-docker exec shipsec-redis redis-cli ping
+docker exec sentris-redis redis-cli ping
 # Expected: PONG
 
 # OpenSearch
@@ -187,7 +187,7 @@ curl -sf http://localhost:9000/minio/health/live
 ```bash
 # PM2 process status
 pm2 status
-# Expected: shipsec-frontend-0, shipsec-backend-0, shipsec-worker-0 all "online"
+# Expected: sentris-frontend-0, sentris-backend-0, sentris-worker-0 all "online"
 
 # Frontend responds
 curl -sf http://localhost:5173 > /dev/null && echo "Frontend OK" || echo "Frontend DOWN"
@@ -231,7 +231,7 @@ Key variables:
 
 | Variable                  | Default                                               | Purpose                            |
 | ------------------------- | ----------------------------------------------------- | ---------------------------------- |
-| `DATABASE_URL`            | `postgresql://shipsec:shipsec@localhost:5433/shipsec` | Postgres connection                |
+| `DATABASE_URL`            | `postgresql://sentris:sentris@localhost:5433/sentris` | Postgres connection                |
 | `PORT`                    | `3211`                                                | Backend HTTP port                  |
 | `TEMPORAL_ADDRESS`        | `localhost:7233`                                      | Temporal gRPC endpoint             |
 | `AUTH_PROVIDER`           | `local`                                               | Auth mode (`local` or `clerk`)     |
@@ -245,7 +245,7 @@ Key variables:
 
 | Variable                  | Default                                               | Purpose                       |
 | ------------------------- | ----------------------------------------------------- | ----------------------------- |
-| `DATABASE_URL`            | `postgresql://shipsec:shipsec@localhost:5433/shipsec` | Postgres connection           |
+| `DATABASE_URL`            | `postgresql://sentris:sentris@localhost:5433/sentris` | Postgres connection           |
 | `TEMPORAL_ADDRESS`        | `localhost:7233`                                      | Temporal gRPC endpoint        |
 | `MINIO_ENDPOINT`          | `localhost`                                           | MinIO host                    |
 | `SECRET_STORE_MASTER_KEY` | `CHANGE_ME_32_CHAR_SECRET_KEY!!!!`                    | Must match backend            |
@@ -292,7 +292,7 @@ sed -i 's/\r$//' docker/init-db/01-create-instance-databases.sh
 # Global install
 bun add -g pm2
 # Or use npx
-npx pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+npx pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 ```
 
 ### Port conflicts
@@ -316,11 +316,11 @@ Common conflicts: `5173` (Vite), `3211` (NestJS), `80` (nginx/IIS/Apache), `5432
 docker info
 
 # Check for leftover containers from a previous session
-docker ps -a --filter name=shipsec
+docker ps -a --filter name=sentris
 
 # Force remove and restart
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down -v
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down -v
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
 ```
 
 ### Worker fails with SWC binding error
@@ -347,10 +347,10 @@ Run these checks **before** attempting to start anything:
 
 ```bash
 # Check Docker containers
-docker ps --filter name=shipsec --format "{{.Names}}: {{.Status}}" 2>/dev/null
+docker ps --filter name=sentris --format "{{.Names}}: {{.Status}}" 2>/dev/null
 
 # Check PM2 processes
-pm2 jlist 2>/dev/null | grep -o '"name":"shipsec-[^"]*","status":"[^"]*"' || echo "PM2 not running"
+pm2 jlist 2>/dev/null | grep -o '"name":"sentris-[^"]*","status":"[^"]*"' || echo "PM2 not running"
 ```
 
 If containers are up and PM2 shows `online`, the environment is already running. Skip to health checks.
@@ -382,14 +382,14 @@ Verify: All three files exist.
 **Step 3: Start Docker infrastructure**
 
 ```bash
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
 ```
 
 Verify: Wait for Postgres to accept connections:
 
 ```bash
 # Retry loop (max 30 attempts, 2-second intervals)
-docker exec shipsec-postgres pg_isready -U shipsec
+docker exec sentris-postgres pg_isready -U sentris
 ```
 
 Expected output: `localhost:5432 - accepting connections`
@@ -397,7 +397,7 @@ Expected output: `localhost:5432 - accepting connections`
 **Step 4: Start application processes**
 
 ```bash
-pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 ```
 
 Verify:
@@ -431,16 +431,16 @@ If only one component needs restarting:
 
 ```bash
 # Frontend only
-pm2 restart shipsec-frontend-0
+pm2 restart sentris-frontend-0
 
 # Backend only
-pm2 restart shipsec-backend-0
+pm2 restart sentris-backend-0
 
 # Worker only
-pm2 restart shipsec-worker-0
+pm2 restart sentris-worker-0
 
 # Docker infra only (if containers are down)
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
 ```
 
 ### Viewing Logs
@@ -450,11 +450,11 @@ docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-p
 pm2 logs
 
 # Specific process
-pm2 logs shipsec-backend-0 --lines 50
+pm2 logs sentris-backend-0 --lines 50
 
 # Docker container logs
-docker logs shipsec-postgres --tail 50
-docker logs shipsec-nginx --tail 50
+docker logs sentris-postgres --tail 50
+docker logs sentris-nginx --tail 50
 ```
 
 ### Failure Recovery
@@ -463,8 +463,8 @@ docker logs shipsec-nginx --tail 50
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | PM2 process shows `errored`         | Run `pm2 logs <name> --lines 100` to diagnose, then `pm2 restart <name>`                                                    |
 | Docker container shows `Restarting` | Run `docker logs <container>` to diagnose. May need `docker compose ... down -v` and restart                                |
-| Backend can't connect to Postgres   | Check `docker exec shipsec-postgres pg_isready -U shipsec`. If failing, restart Postgres: `docker restart shipsec-postgres` |
-| Frontend shows blank page           | Check `pm2 logs shipsec-frontend-0`. Common cause: missing `frontend/.env`                                                  |
+| Backend can't connect to Postgres   | Check `docker exec sentris-postgres pg_isready -U sentris`. If failing, restart Postgres: `docker restart sentris-postgres` |
+| Frontend shows blank page           | Check `pm2 logs sentris-frontend-0`. Common cause: missing `frontend/.env`                                                  |
 | Nginx returns 502                   | Backend is not responding. Check backend health first                                                                       |
 | Port already in use                 | Kill the conflicting process, then restart the PM2 app                                                                      |
 
@@ -472,17 +472,17 @@ docker logs shipsec-nginx --tail 50
 
 ```bash
 # Stop PM2 apps
-pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0
+pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0
 
 # Stop Docker containers
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down
 ```
 
 ### Full Clean (Reset Everything)
 
 ```bash
-pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0 2>/dev/null || true
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down -v
+pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 2>/dev/null || true
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down -v
 ```
 
 This removes all Docker volumes (database data, MinIO files, OpenSearch indexes).

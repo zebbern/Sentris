@@ -12,8 +12,8 @@ set -euo pipefail
 APPS=(backend worker frontend)
 BASE_BACKEND_PORT=3211
 BASE_FRONTEND_PORT=5173
-BASE_DB_NAME="shipsec"
-BASE_TEMPORAL_NS="shipsec-dev"
+BASE_DB_NAME="sentris"
+BASE_TEMPORAL_NS="sentris-dev"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -64,7 +64,7 @@ get_temporal_ns() {
 }
 
 get_db_url() {
-  echo "postgresql://shipsec:shipsec@localhost:5433/$(get_db_name "$1")"
+  echo "postgresql://sentris:sentris@localhost:5433/$(get_db_name "$1")"
 }
 
 get_studio_api_url() {

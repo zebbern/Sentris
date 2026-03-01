@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { formatEnvErrors } from '@shipsec/shared';
+import { formatEnvErrors } from '@sentris/shared';
 import { backendEnvSchema, type BackendEnvConfig } from './env.schema';
 
 export function validateBackendEnv(config: Record<string, unknown>): BackendEnvConfig {

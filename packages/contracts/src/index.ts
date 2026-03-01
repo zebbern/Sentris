@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { withPortMeta } from '@shipsec/component-sdk';
-import { DestinationConfigSchema } from '@shipsec/shared';
+import { withPortMeta } from '@sentris/component-sdk';
+import { DestinationConfigSchema } from '@sentris/shared';
 
 export const awsCredentialContractName = 'core.credential.aws';
 export const awsCredentialSchema = () =>
@@ -110,7 +110,7 @@ export const secretMetadataSchema = () =>
 
 export type SecretMetadata = z.infer<ReturnType<typeof secretMetadataSchema>>;
 
-export const fileContractName = 'shipsec.file.v1';
+export const fileContractName = 'sentris.file.v1';
 export const fileContractSchema = () =>
   withPortMeta(
     z.object({

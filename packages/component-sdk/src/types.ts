@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ComponentCategory } from '@shipsec/shared';
+import type { ComponentCategory } from '@sentris/shared';
 
 import type {
   IArtifactService,
@@ -357,7 +357,7 @@ export interface ComponentParameterMetadata {
   visibleWhen?: Record<string, unknown>;
 }
 
-export type ComponentAuthorType = 'shipsecai' | 'community';
+export type ComponentAuthorType = 'sentris' | 'community';
 
 export interface ComponentAuthorMetadata {
   name: string;

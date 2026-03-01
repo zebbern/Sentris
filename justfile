@@ -1,6 +1,6 @@
 #!/usr/bin/env just
 
-# ShipSec Studio - Development Environment
+# Sentris Flow - Development Environment
 # Run `just` or `just help` to see available commands
 
 default:
@@ -16,7 +16,7 @@ export OPENSEARCH_DASHBOARDS_PASSWORD := env_var_or_default("OPENSEARCH_DASHBOAR
 init:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "🔧  Setting up ShipSec Studio..."
+    echo "🔧  Setting up Sentris Flow..."
 
     # Install dependencies if needed
     if [ ! -d "node_modules" ]; then
@@ -40,24 +40,24 @@ init:
 # Start development environment with hot-reload
 # Auto-detects auth mode: if CLERK_SECRET_KEY is set in backend/.env → secure mode (Clerk + OpenSearch Security)
 # Otherwise → local auth mode (faster startup, no multi-tenant isolation)
-# Supports multi-instance: set SHIPSEC_INSTANCE=N (or .shipsec-instance file) to run on offset ports
+# Supports multi-instance: set SENTRIS_INSTANCE=N (or .sentris-instance file) to run on offset ports
 dev action="start":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Resolve active instance: env var → .shipsec-instance file → default 0
-    if [ -n "${SHIPSEC_INSTANCE:-}" ]; then
-        INST="${SHIPSEC_INSTANCE}"
-    elif [ -f ".shipsec-instance" ]; then
-        INST="$(tr -d '[:space:]' < .shipsec-instance || true)"
+    # Resolve active instance: env var → .sentris-instance file → default 0
+    if [ -n "${SENTRIS_INSTANCE:-}" ]; then
+        INST="${SENTRIS_INSTANCE}"
+    elif [ -f ".sentris-instance" ]; then
+        INST="$(tr -d '[:space:]' < .sentris-instance || true)"
         INST="${INST:-0}"
     else
         INST="0"
     fi
-    export SHIPSEC_INSTANCE="$INST"
+    export SENTRIS_INSTANCE="$INST"
 
     # Instance-aware PM2 app names and ports
-    PM2_APPS="shipsec-frontend-${INST},shipsec-backend-${INST},shipsec-worker-${INST}"
+    PM2_APPS="sentris-frontend-${INST},sentris-backend-${INST},sentris-worker-${INST}"
     FRONTEND_PORT=$(( 5173 + INST * 100 ))
     BACKEND_PORT=$(( 3211 + INST * 100 ))
 
@@ -108,15 +108,15 @@ dev action="start":
 
                 # Wait for Postgres
                 echo "⏳  Waiting for infrastructure..."
-                timeout 30s bash -c 'until docker exec shipsec-postgres pg_isready -U shipsec >/dev/null 2>&1; do sleep 1; done' || true
+                timeout 30s bash -c 'until docker exec sentris-postgres pg_isready -U sentris >/dev/null 2>&1; do sleep 1; done' || true
 
                 # Wait for OpenSearch to be healthy (security init takes longer)
                 echo "⏳  Waiting for OpenSearch security initialization..."
-                timeout 120s bash -c 'until docker exec shipsec-opensearch curl -sf -u admin:${OPENSEARCH_ADMIN_PASSWORD:-admin} --cacert /usr/share/opensearch/config/certs/root-ca.pem https://localhost:9200/_cluster/health >/dev/null 2>&1; do sleep 2; done' || true
+                timeout 120s bash -c 'until docker exec sentris-opensearch curl -sf -u admin:${OPENSEARCH_ADMIN_PASSWORD:-admin} --cacert /usr/share/opensearch/config/certs/root-ca.pem https://localhost:9200/_cluster/health >/dev/null 2>&1; do sleep 2; done' || true
 
                 # Update git SHA and start PM2 with security enabled
                 ./scripts/set-git-sha.sh || true
-                SHIPSEC_INSTANCE="$INST" SHIPSEC_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=true NODE_TLS_REJECT_UNAUTHORIZED=0 \
+                SENTRIS_INSTANCE="$INST" SENTRIS_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=true NODE_TLS_REJECT_UNAUTHORIZED=0 \
                     pm2 startOrReload pm2.config.cjs --only "$PM2_APPS" --update-env
 
                 echo ""
@@ -140,11 +140,11 @@ dev action="start":
 
                 # Wait for Postgres
                 echo "⏳  Waiting for infrastructure..."
-                timeout 30s bash -c 'until docker exec shipsec-postgres pg_isready -U shipsec >/dev/null 2>&1; do sleep 1; done' || true
+                timeout 30s bash -c 'until docker exec sentris-postgres pg_isready -U sentris >/dev/null 2>&1; do sleep 1; done' || true
 
                 # Update git SHA and start PM2
                 ./scripts/set-git-sha.sh || true
-                SHIPSEC_INSTANCE="$INST" SHIPSEC_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=false \
+                SENTRIS_INSTANCE="$INST" SENTRIS_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=false \
                     OPENSEARCH_URL=http://localhost:9200 \
                     pm2 startOrReload pm2.config.cjs --only "$PM2_APPS" --update-env
 
@@ -178,7 +178,7 @@ dev action="start":
             ;;
         stop)
             echo "🛑  Stopping development environment (instance ${INST})..."
-            pm2 delete shipsec-frontend-${INST} shipsec-backend-${INST} shipsec-worker-${INST} 2>/dev/null || true
+            pm2 delete sentris-frontend-${INST} sentris-backend-${INST} sentris-worker-${INST} 2>/dev/null || true
             # Only stop infra if instance 0 (shared infra serves all instances)
             if [ "$INST" = "0" ]; then
                 if [ "$SECURE_MODE" = "true" ]; then
@@ -190,7 +190,7 @@ dev action="start":
             echo "✅  Stopped instance ${INST}"
             ;;
         logs)
-            pm2 logs shipsec-frontend-${INST} shipsec-backend-${INST} shipsec-worker-${INST}
+            pm2 logs sentris-frontend-${INST} sentris-backend-${INST} sentris-worker-${INST}
             ;;
         status)
             pm2 status
@@ -202,7 +202,7 @@ dev action="start":
             ;;
         clean)
             echo "🧹  Cleaning development environment (instance ${INST})..."
-            pm2 delete shipsec-frontend-${INST} shipsec-backend-${INST} shipsec-worker-${INST} 2>/dev/null || true
+            pm2 delete sentris-frontend-${INST} sentris-backend-${INST} sentris-worker-${INST} 2>/dev/null || true
             # Only tear down infra if instance 0
             if [ "$INST" = "0" ]; then
                 if [ "$SECURE_MODE" = "true" ]; then
@@ -324,29 +324,29 @@ prod action="start":
                 exit 1
             fi
 
-            LATEST_TAG=$(curl -s https://api.github.com/repos/ShipSecAI/studio/releases | jq -r '.[0].tag_name')
+            LATEST_TAG=$(curl -s https://api.github.com/repos/zebbern/Sentris/releases | jq -r '.[0].tag_name')
 
             # Strip leading 'v' if present (v0.1-rc2 -> 0.1-rc2)
             LATEST_TAG="${LATEST_TAG#v}"
 
             if [ "$LATEST_TAG" == "null" ] || [ -z "$LATEST_TAG" ]; then
-                echo "❌  Could not find any releases. Please check the repository at https://github.com/ShipSecAI/studio/releases"
+                echo "❌  Could not find any releases. Please check the repository at https://github.com/zebbern/Sentris/releases"
                 exit 1
             fi
 
             echo "📦  Found latest release: $LATEST_TAG"
 
             echo "📥 Pulling matching images from GHCR..."
-            docker pull ghcr.io/shipsecai/studio-backend:$LATEST_TAG
-            docker pull ghcr.io/shipsecai/studio-frontend:$LATEST_TAG
-            docker pull ghcr.io/shipsecai/studio-worker:$LATEST_TAG
+            docker pull ghcr.io/zebbern/studio-backend:$LATEST_TAG
+            docker pull ghcr.io/zebbern/studio-frontend:$LATEST_TAG
+            docker pull ghcr.io/zebbern/studio-worker:$LATEST_TAG
 
             echo "🚀  Starting production environment with version $LATEST_TAG..."
-            export SHIPSEC_TAG=$LATEST_TAG
+            export SENTRIS_TAG=$LATEST_TAG
             $COMPOSE_CMD up -d
 
             echo ""
-            echo "✅  ShipSec Studio $LATEST_TAG ready"
+            echo "✅  Sentris Flow $LATEST_TAG ready"
             echo "   App:         http://localhost"
             echo "   API:         http://localhost/api"
             echo "   Analytics:   http://localhost/analytics"
@@ -371,19 +371,19 @@ prod-images action="start":
 
             # Check if images exist locally, pull if needed
             echo "🔍 Checking for local images..."
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/shipsecai/studio-frontend"; then
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-frontend"; then
                 echo "📥 Pulling GHCR images..."
-                docker pull ghcr.io/shipsecai/studio-frontend:latest || echo "⚠️  Frontend image not found, will build locally"
+                docker pull ghcr.io/zebbern/studio-frontend:latest || echo "⚠️  Frontend image not found, will build locally"
             else
                 echo "✅  Frontend image found locally"
             fi
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/shipsecai/studio-backend"; then
-                docker pull ghcr.io/shipsecai/studio-backend:latest || echo "⚠️  Backend image not found, will build locally"
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-backend"; then
+                docker pull ghcr.io/zebbern/studio-backend:latest || echo "⚠️  Backend image not found, will build locally"
             else
                 echo "✅  Backend image found locally"
             fi
-            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/shipsecai/studio-worker"; then
-                docker pull ghcr.io/shipsecai/studio-worker:latest || echo "⚠️  Worker image not found, will build locally"
+            if ! docker images --format "{{{{.Repository}}}}:{{{{.Tag}}}}" | grep -q "ghcr.io/zebbern/studio-worker"; then
+                docker pull ghcr.io/zebbern/studio-worker:latest || echo "⚠️  Worker image not found, will build locally"
             else
                 echo "✅  Worker image found locally"
             fi
@@ -414,21 +414,21 @@ prod-images action="start":
                 --target frontend-debug \
                 --build-arg VITE_PUBLIC_POSTHOG_KEY=$POSTHOG_API_KEY \
                 --build-arg VITE_PUBLIC_POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/shipsecai/studio-frontend:latest \
+                -t ghcr.io/zebbern/studio-frontend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target backend \
                 --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
                 --build-arg POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/shipsecai/studio-backend:latest \
+                -t ghcr.io/zebbern/studio-backend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target worker \
                 --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
                 --build-arg POSTHOG_HOST=$POSTHOG_HOST \
-                -t ghcr.io/shipsecai/studio-worker:latest \
+                -t ghcr.io/zebbern/studio-worker:latest \
                 .
 
             echo "✅  Test images built with PostHog analytics"
@@ -518,7 +518,7 @@ infra action="up":
 status:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "📊 ShipSec Studio Status"
+    echo "📊 Sentris Flow Status"
     echo ""
     echo "=== PM2 Services ==="
     pm2 status 2>/dev/null || echo "  (PM2 not running)"
@@ -533,11 +533,11 @@ status:
 db-reset:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! docker ps --filter "name=shipsec-postgres" --format "{{{{.Names}}}}" | grep -q "shipsec-postgres"; then
+    if ! docker ps --filter "name=sentris-postgres" --format "{{{{.Names}}}}" | grep -q "sentris-postgres"; then
         echo "❌  PostgreSQL not running. Run: just dev" && exit 1
     fi
-    docker exec shipsec-postgres psql -U shipsec -d postgres -c "DROP DATABASE IF EXISTS shipsec;"
-    docker exec shipsec-postgres psql -U shipsec -d postgres -c "CREATE DATABASE shipsec;"
+    docker exec sentris-postgres psql -U sentris -d postgres -c "DROP DATABASE IF EXISTS sentris;"
+    docker exec sentris-postgres psql -U sentris -d postgres -c "CREATE DATABASE sentris;"
     bun --cwd=backend run migration:push
     echo "✅  Database reset"
 
@@ -589,7 +589,7 @@ instance-env +args:
 # === Help ===
 
 help:
-    @echo "ShipSec Studio"
+    @echo "Sentris Flow"
     @echo ""
     @echo "Getting Started:"
     @echo "  just init       Set up dependencies and environment files"
@@ -623,7 +623,7 @@ help:
     @echo ""
     @echo "Multi-Instance:"
     @echo "  just instance show                  Show active instance"
-    @echo "  just instance use N                 Persist active instance in .shipsec-instance"
+    @echo "  just instance use N                 Persist active instance in .sentris-instance"
     @echo "  just instance-init [N]               Init env files for instance N"
     @echo "  just instance-env init [N] [--force]  Generate env files"
     @echo "  just instance-env update [N]          Patch instance-specific vars"

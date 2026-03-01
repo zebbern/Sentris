@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TERMINAL_STATUSES } from '@shipsec/shared';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 import { api } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
 import { logger } from '@/lib/logger';

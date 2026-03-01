@@ -54,7 +54,7 @@ export function SecretsManager() {
   } = useSortableList({
     items: secrets,
     getId: getSecretId,
-    storageKey: `shipsec:sort:secrets:${organizationId}`,
+    storageKey: `sentris:sort:secrets:${organizationId}`,
   });
   const createSecretMutation = useCreateSecret();
   const updateSecretMutation = useUpdateSecret();

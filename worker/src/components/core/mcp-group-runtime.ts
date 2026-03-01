@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ExecutionContext } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
@@ -308,7 +308,7 @@ async function discoverToolsWithRetry(
       });
 
       client = new Client(
-        { name: 'shipsec-worker-tool-discovery', version: '1.0.0' },
+        { name: 'sentris-worker-tool-discovery', version: '1.0.0' },
         { capabilities: {} },
       );
 

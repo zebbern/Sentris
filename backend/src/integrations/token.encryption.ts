@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SecretEncryption, SecretEncryptionMaterial, parseMasterKey } from '@shipsec/shared';
+import { SecretEncryption, SecretEncryptionMaterial, parseMasterKey } from '@sentris/shared';
 import type { IntegrationsEnvConfig, SecretsConfig } from '../config';
 
 const DEFAULT_DEV_KEY = 'fedcba9876543210fedcba9876543210';

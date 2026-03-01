@@ -65,13 +65,13 @@ bun test --exclude src/__tests__/worker-integration.test.ts
 Tests use the following environment (from `worker/.env`):
 
 ```env
-DATABASE_URL=postgresql://shipsec:shipsec@localhost:5433/shipsec
+DATABASE_URL=postgresql://sentris:sentris@localhost:5433/sentris
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 TEMPORAL_ADDRESS=localhost:7233
-TEMPORAL_NAMESPACE=shipsec-dev
+TEMPORAL_NAMESPACE=sentris-dev
 ```
 
 ## Test Isolation
@@ -110,7 +110,7 @@ This accounts for:
 - Verify MinIO credentials
 
 ### Worker Not Polling Tasks
-- Check Temporal namespace exists: `shipsec-dev`
+- Check Temporal namespace exists: `sentris-dev`
 - Verify task queue name matches
 - Check worker logs for initialization errors
 

@@ -21,7 +21,7 @@ import { API_V1_URL, api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { logger } from '@/lib/logger';
 import { useApiKeys, useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { ENTRY_COMPONENT_ID } from '@/utils/entryPointUtils';

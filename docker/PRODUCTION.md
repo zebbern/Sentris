@@ -165,7 +165,7 @@ curl -u user@customer.com:password \
 After modifying security files, apply changes:
 
 ```bash
-docker exec -it shipsec-opensearch \
+docker exec -it sentris-opensearch \
   /usr/share/opensearch/plugins/opensearch-security/tools/securityadmin.sh \
   -cd /usr/share/opensearch/config/opensearch-security \
   -icl -nhnv \
@@ -180,8 +180,8 @@ docker exec -it shipsec-opensearch \
 
 Check logs:
 ```bash
-docker logs shipsec-opensearch
-docker logs shipsec-opensearch-dashboards
+docker logs sentris-opensearch
+docker logs sentris-opensearch-dashboards
 ```
 
 Common issues:

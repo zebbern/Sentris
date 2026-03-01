@@ -8,7 +8,7 @@ import {
 } from '@/hooks/queries/useMcpServerQueries';
 import { queryKeys } from '@/lib/queryKeys';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
-import type { CreateMcpServer } from '@shipsec/shared';
+import type { CreateMcpServer } from '@sentris/shared';
 import type { ServerFormData, DiscoveryPreviewItem, DiscoveryCacheEntry } from './types';
 import { INITIAL_FORM_DATA } from './types';
 import { parseClaudeCodeConfig } from './utils';

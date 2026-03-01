@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi, mock } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import type { DnsxInput, DnsxOutput } from '../dnsx';
 
 mock.module('../../utils/isolated-volume', () => ({
@@ -16,7 +16,7 @@ mock.module('../../utils/isolated-volume', () => ({
   },
 }));
 
-let componentRegistry: typeof import('@shipsec/component-sdk').componentRegistry;
+let componentRegistry: typeof import('@sentris/component-sdk').componentRegistry;
 
 // TODO: Fix flaky Docker timeout issues
 describe.skip('dnsx component', () => {
@@ -29,7 +29,7 @@ describe.skip('dnsx component', () => {
   });
 
   it('should be registered with metadata', () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     expect(component).toBeDefined();
     expect(component!.label).toBe('DNSX Resolver');
     expect(component!.category).toBe('security');
@@ -37,7 +37,7 @@ describe.skip('dnsx component', () => {
   });
 
   it('should normalise structured JSON output from dnsx', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -94,7 +94,7 @@ describe.skip('dnsx component', () => {
   });
 
   it('should pass advanced options and custom flags into the runner', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -131,7 +131,7 @@ describe.skip('dnsx component', () => {
   });
 
   it('should gracefully fallback when dnsx returns non-JSON output', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -161,7 +161,7 @@ describe.skip('dnsx component', () => {
   });
 
   it('should skip execution when no domains are provided', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -192,12 +192,12 @@ describe.skip('dnsx component', () => {
   });
 
   it('should use docker runner config for dnsx image', () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/dnsx:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/dnsx:latest');
       expect(component.runner.entrypoint).toBe('sh');
     }
   });

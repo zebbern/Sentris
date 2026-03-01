@@ -10,7 +10,7 @@ import {
   getActionInputIds,
   getExposedParameterIds,
   getToolInputShape,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -89,7 +89,7 @@ export class McpGatewayService {
 
     this.logger.debug(`[getServerForRun] Creating NEW server for cacheKey=${cacheKey}`);
     const server = new McpServer({
-      name: 'shipsec-studio-gateway',
+      name: 'sentris-flow-gateway',
       version: '1.0.0',
     });
 
@@ -488,7 +488,7 @@ export class McpGatewayService {
     });
 
     const client = new Client(
-      { name: 'shipsec-gateway-client', version: '1.0.0' },
+      { name: 'sentris-gateway-client', version: '1.0.0' },
       { capabilities: {} },
     );
 

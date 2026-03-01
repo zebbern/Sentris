@@ -3,7 +3,7 @@
  * Used to verify Docker runner implementation
  */
 import { z } from 'zod';
-import { ContainerError, defineComponent, inputs, outputs, port } from '@shipsec/component-sdk';
+import { ContainerError, defineComponent, inputs, outputs, port } from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   message: port(z.string(), {

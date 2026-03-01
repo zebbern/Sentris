@@ -409,7 +409,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="flex-shrink-0">
                 <img
                   src="/favicon.ico"
-                  alt="ShipSec Studio"
+                  alt="Sentris Flow"
                   width={24}
                   height={24}
                   className="w-6 h-6"
@@ -430,7 +430,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                   transitionProperty: 'opacity, max-width',
                 }}
               >
-                ShipSec Studio
+                Sentris Flow
               </span>
             </Link>
             {isMobile && sidebarOpen && (

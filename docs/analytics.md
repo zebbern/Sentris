@@ -1,6 +1,6 @@
 # Analytics Pipeline
 
-This document describes the analytics infrastructure for ShipSec Studio, including OpenSearch for data storage, OpenSearch Dashboards for visualization, and the routing architecture.
+This document describes the analytics infrastructure for Sentris Flow, including OpenSearch for data storage, OpenSearch Dashboards for visualization, and the routing architecture.
 
 ## Architecture Overview
 
@@ -79,9 +79,9 @@ OPENSEARCH_URL=http://opensearch:9200
   "title": "Finding title",
   "severity": "high",
   "description": "...",
-  "shipsec": {
+  "sentris": {
     "organization_id": "local-dev",
-    "run_id": "shipsec-run-xxx",
+    "run_id": "sentris-run-xxx",
     "workflow_id": "workflow-xxx",
     "workflow_name": "My Workflow",
     "component_id": "core.analytics.sink",
@@ -125,7 +125,7 @@ The frontend links to OpenSearch Dashboards Discover app with pre-filtered queri
 ```typescript
 const baseUrl = '/analytics';
 // Use .keyword fields for exact match filtering
-const filterQuery = `shipsec.run_id.keyword:"${runId}"`;
+const filterQuery = `sentris.run_id.keyword:"${runId}"`;
 
 // Build Discover URL with proper state format
 const gParam = encodeURIComponent('(time:(from:now-7d,to:now))');
@@ -140,7 +140,7 @@ window.open(url, '_blank', 'noopener,noreferrer');
 
 **Key points:**
 
-- Use `.keyword` fields (e.g., `shipsec.run_id.keyword`) for exact match filtering
+- Use `.keyword` fields (e.g., `sentris.run_id.keyword`) for exact match filtering
 - Use Discover app (`/app/discover`) for viewing raw data without saved views
 - Include `index`, `columns`, `interval`, and `sort` in the `_a` param
 
@@ -153,7 +153,7 @@ VITE_OPENSEARCH_DASHBOARDS_URL=/analytics
 ## Data Flow
 
 1. **Workflow Execution**: Worker runs workflow with Analytics Sink component
-2. **Data Enrichment**: Analytics Sink adds `shipsec.*` metadata fields
+2. **Data Enrichment**: Analytics Sink adds `sentris.*` metadata fields
 3. **Indexing**: Documents bulk-indexed to OpenSearch via `OPENSEARCH_URL`
 4. **Visualization**: Users explore data in OpenSearch Dashboards at `/analytics`
 
@@ -252,7 +252,7 @@ This can happen when:
 
 ```bash
 # Check backend logs for the auth resolution path
-docker logs shipsec-backend 2>&1 | grep -E "\[AUTH\].*Resolving org|No org found|Using org"
+docker logs sentris-backend 2>&1 | grep -E "\[AUTH\].*Resolving org|No org found|Using org"
 
 # Example log when org is missing from JWT:
 # [AUTH] Resolving org - Header: not present, JWT org: none, User: user_39ey3oxc0...
@@ -326,10 +326,10 @@ ssh -L 5601:<container-ip>:5601 user@your-production-server
 
 ```bash
 # Verify worker has OPENSEARCH_URL set
-docker exec shipsec-worker env | grep OPENSEARCH
+docker exec sentris-worker env | grep OPENSEARCH
 
 # Check worker logs for indexing errors
-docker logs shipsec-worker 2>&1 | grep -i "analytics\|indexing"
+docker logs sentris-worker 2>&1 | grep -i "analytics\|indexing"
 ```
 
 **Solution:** Ensure `OPENSEARCH_URL=http://opensearch:9200` is set in worker environment.
@@ -360,7 +360,7 @@ curl -s "http://localhost:9200/security-findings-*/_count" | jq '.count'
 # List run_ids with data
 curl -s "http://localhost:9200/security-findings-*/_search" \
   -H "Content-Type: application/json" \
-  -d '{"size":0,"aggs":{"run_ids":{"terms":{"field":"shipsec.run_id.keyword"}}}}' \
+  -d '{"size":0,"aggs":{"run_ids":{"terms":{"field":"sentris.run_id.keyword"}}}}' \
   | jq '.aggregations.run_ids.buckets'
 ```
 

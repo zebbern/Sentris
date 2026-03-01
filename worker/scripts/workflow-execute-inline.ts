@@ -32,11 +32,11 @@ async function main() {
   config({ path: join(__dirname, '..', '.env') });
 
   const connectionString =
-    process.env.DATABASE_URL ?? 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+    process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris';
   const pool = new Pool({ connectionString });
   const db = drizzle(pool, { schema });
 
-  const minioBucket = process.env.MINIO_BUCKET_NAME ?? 'shipsec-files';
+  const minioBucket = process.env.MINIO_BUCKET_NAME ?? 'sentris-files';
   const minioEndpoint = process.env.MINIO_ENDPOINT ?? 'localhost';
   const minioPort = parseInt(process.env.MINIO_PORT ?? '9000', 10);
   const minioAccessKey = process.env.MINIO_ACCESS_KEY ?? 'minioadmin';

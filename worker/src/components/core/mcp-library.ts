@@ -7,7 +7,7 @@ import {
   parameters,
   param,
   port,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { fetchEnabledServers, registerServerTools } from './mcp-library-utils';
 
 const inputSchema = inputs({});
@@ -58,8 +58,8 @@ const definition = defineComponent({
     description: 'Select multiple custom MCP servers to expose their tools to AI agents.',
     icon: 'Library',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
   },

@@ -20,14 +20,14 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Create user
-RUN groupadd -g 1001 shipsec && useradd -u 1001 -g shipsec -m shipsec
+RUN groupadd -g 1001 sentris && useradd -u 1001 -g sentris -m sentris
 
 # Copy all files
-COPY --chown=shipsec:shipsec bun.lock package.json bunfig.toml ./
-COPY --chown=shipsec:shipsec packages/ packages/
-COPY --chown=shipsec:shipsec backend/ backend/
-COPY --chown=shipsec:shipsec frontend/ frontend/
-COPY --chown=shipsec:shipsec worker/ worker/
+COPY --chown=sentris:sentris bun.lock package.json bunfig.toml ./
+COPY --chown=sentris:sentris packages/ packages/
+COPY --chown=sentris:sentris backend/ backend/
+COPY --chown=sentris:sentris frontend/ frontend/
+COPY --chown=sentris:sentris worker/ worker/
 
 # Install ALL dependencies (no filtering)
 RUN bun install --frozen-lockfile
@@ -38,7 +38,7 @@ RUN bun install --frozen-lockfile
 FROM base AS backend
 
 # Switch to user
-USER shipsec
+USER sentris
 
 # PostHog analytics (optional)
 ARG POSTHOG_API_KEY=""
@@ -61,7 +61,7 @@ CMD ["sh", "-c", "bun run migration:push && bun src/main.ts"]
 FROM base AS worker
 
 # Switch to user
-USER shipsec
+USER sentris
 
 # PostHog analytics (optional)
 ARG POSTHOG_API_KEY=""
@@ -102,7 +102,7 @@ ENV VITE_PUBLIC_POSTHOG_HOST=${VITE_PUBLIC_POSTHOG_HOST}
 ENV VITE_OPENSEARCH_DASHBOARDS_URL=${VITE_OPENSEARCH_DASHBOARDS_URL}
 
 # Set working directory for frontend
-USER shipsec
+USER sentris
 WORKDIR /app/frontend
 
 # Build TypeScript declarations for workspace packages first (project references require this)
@@ -144,13 +144,13 @@ ENV VITE_PUBLIC_POSTHOG_HOST=${VITE_PUBLIC_POSTHOG_HOST}
 ENV VITE_OPENSEARCH_DASHBOARDS_URL=${VITE_OPENSEARCH_DASHBOARDS_URL}
 
 # Set working directory for frontend
-USER shipsec
+USER sentris
 WORKDIR /app/frontend
 
-# Ensure shipsec user can write to node_modules for Vite cache
+# Ensure sentris user can write to node_modules for Vite cache
 USER root
-RUN chown -R shipsec:shipsec /app/frontend/node_modules
-USER shipsec
+RUN chown -R sentris:sentris /app/frontend/node_modules
+USER sentris
 
 # Expose port
 EXPOSE 5173

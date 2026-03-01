@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import type { NucleiInput, NucleiOutput } from '../nuclei';
 // Import to trigger registration
 import '../nuclei';
@@ -10,7 +10,7 @@ describe('Nuclei Component', () => {
 
   beforeEach(() => {
     // Get the registered component
-    nucleiComponent = componentRegistry.get<NucleiInput, NucleiOutput>('shipsec.nuclei.scan');
+    nucleiComponent = componentRegistry.get<NucleiInput, NucleiOutput>('sentris.nuclei.scan');
 
     // Mock execution context
     mockContext = {
@@ -403,32 +403,32 @@ describe('Nuclei Security Validations', () => {
 
 describe('Nuclei Integration', () => {
   test('should be registered in component registry', () => {
-    const component = componentRegistry.get<NucleiInput, NucleiOutput>('shipsec.nuclei.scan')!;
+    const component = componentRegistry.get<NucleiInput, NucleiOutput>('sentris.nuclei.scan')!;
     expect(component).toBeDefined();
-    expect(component.id).toBe('shipsec.nuclei.scan');
+    expect(component.id).toBe('sentris.nuclei.scan');
     expect(component.label).toBe('Nuclei Vulnerability Scanner');
     expect(component.category).toBe('security');
   });
 
   test('should have correct metadata', () => {
-    const component = componentRegistry.get<NucleiInput, NucleiOutput>('shipsec.nuclei.scan')!;
+    const component = componentRegistry.get<NucleiInput, NucleiOutput>('sentris.nuclei.scan')!;
     expect(component.ui!.slug).toBe('nuclei');
     expect(component.ui!.version).toBe('1.0.0');
     expect(component.ui!.type).toBe('scan');
-    expect(component.ui!.author!.name).toBe('ShipSecAI');
+    expect(component.ui!.author!.name).toBe('SentrisAI');
   });
 
   test('should have Docker runner configuration', () => {
-    const component = componentRegistry.get('shipsec.nuclei.scan')!;
+    const component = componentRegistry.get('sentris.nuclei.scan')!;
     expect(component!.runner.kind).toBe('docker');
     if (component!.runner.kind === 'docker') {
-      expect(component!.runner.image).toBe('ghcr.io/shipsecai/nuclei:latest');
+      expect(component!.runner.image).toBe('ghcr.io/zebbern/nuclei:latest');
       expect(component!.runner.entrypoint).toBe('nuclei');
     }
   });
 
   test('should have documented inputs', () => {
-    const entry = componentRegistry.getMetadata('shipsec.nuclei.scan');
+    const entry = componentRegistry.getMetadata('sentris.nuclei.scan');
     const inputs = entry?.inputs || [];
 
     const targetInput = inputs.find((i) => i.id === 'targets');
@@ -443,7 +443,7 @@ describe('Nuclei Integration', () => {
   });
 
   test('should have documented outputs', () => {
-    const entry = componentRegistry.getMetadata('shipsec.nuclei.scan');
+    const entry = componentRegistry.getMetadata('sentris.nuclei.scan');
     const outputs = entry?.outputs || [];
 
     const findingsOutput = outputs.find((o) => o.id === 'findings');
@@ -457,7 +457,7 @@ describe('Nuclei Integration', () => {
   });
 
   test('should have configuration parameters', () => {
-    const metadata = componentRegistry.getMetadata('shipsec.nuclei.scan');
+    const metadata = componentRegistry.getMetadata('sentris.nuclei.scan');
     const params = metadata?.parameters || [];
 
     const rateLimitParam = params.find((p) => p.id === 'rateLimit');
@@ -475,7 +475,7 @@ describe('Nuclei Integration', () => {
   });
 
   test('should have usage examples', () => {
-    const component = componentRegistry.get('shipsec.nuclei.scan');
+    const component = componentRegistry.get('sentris.nuclei.scan');
     const examples = component!.ui!.examples || [];
 
     expect(examples.length).toBeGreaterThan(0);

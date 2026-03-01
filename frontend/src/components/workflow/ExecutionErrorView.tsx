@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle, AlertTriangle, Search, Settings, ShieldAlert, WifiOff } from 'lucide-react';
-import type { TraceError } from '@shipsec/shared';
+import type { TraceError } from '@sentris/shared';
 import { cn } from '@/lib/utils';
 
 interface ExecutionErrorViewProps {

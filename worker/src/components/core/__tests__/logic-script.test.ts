@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'bun:test';
 import { definition } from '../logic-script';
-import { extractPorts, type ExecutionContext } from '@shipsec/component-sdk';
-import * as sdk from '@shipsec/component-sdk';
+import { extractPorts, type ExecutionContext } from '@sentris/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 
 // Mock context
 const mockContext: ExecutionContext = {

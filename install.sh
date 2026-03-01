@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# install.sh - One-liner installer for ShipSec Studio (Production/Docker mode)
+# install.sh - One-liner installer for Sentris Flow (Production/Docker mode)
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/ShipSecAI/studio/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/zebbern/Sentris/main/install.sh | bash
 #
-# This script installs ShipSec Studio using pre-built Docker images from GHCR.
-# For development setup, see: https://github.com/ShipSecAI/studio#option-3-development-setup
+# This script installs Sentris Flow using pre-built Docker images from GHCR.
+# For development setup, see: https://github.com/zebbern/Sentris#option-3-development-setup
 #
 # Supported platforms: macOS, Linux, Windows (Git Bash/MSYS2/WSL)
 
@@ -14,7 +14,7 @@ set -u -o pipefail
 # because we use space-separated lists for MISSING_DEPS and INSTALL_FAILED
 
 # ---------- Config ----------
-REPO_URL="https://github.com/ShipSecAI/studio"
+REPO_URL="https://github.com/zebbern/Sentris"
 REPO_DIR="studio"
 WAIT_DOCKER_SEC=60
 
@@ -52,7 +52,7 @@ on_err() {
   local rc=$?
   printf "\n"
   err "Installation failed (exit code: $rc)"
-  err "If you need help, please visit: https://github.com/ShipSecAI/studio/issues"
+  err "If you need help, please visit: https://github.com/zebbern/Sentris/issues"
   exit $rc
 }
 on_int() {
@@ -296,7 +296,7 @@ install_docker() {
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}  ${BOLD}➡️  Please log out, log back in, then run:${NC}                     ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
-          printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/ShipSecAI/   ${GREEN}│${NC}\n"
+          printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/SentrisAI/   ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}      studio/main/install.sh | bash                              ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}└─────────────────────────────────────────────────────────────────┘${NC}\n"
@@ -350,7 +350,7 @@ install_docker() {
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}  ${BOLD}➡️  Please log out, log back in, then run:${NC}                     ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
-          printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/ShipSecAI/   ${GREEN}│${NC}\n"
+          printf "${GREEN}│${NC}      curl -fsSL https://raw.githubusercontent.com/SentrisAI/   ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}      studio/main/install.sh | bash                              ${GREEN}│${NC}\n"
           printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
           printf "${GREEN}└─────────────────────────────────────────────────────────────────┘${NC}\n"
@@ -460,7 +460,7 @@ install_just() {
         # Add to shell profile if not already there
         if [ -n "$shell_profile" ] && [ -f "$shell_profile" ]; then
           if ! grep -q '\.local/bin' "$shell_profile" 2>/dev/null; then
-            printf '\n# Added by ShipSec Studio installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$shell_profile"
+            printf '\n# Added by Sentris Flow installer\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$shell_profile"
             info "Added ~/.local/bin to PATH in $shell_profile"
           fi
         else
@@ -1148,13 +1148,13 @@ detect_platform
 printf "\n"
 printf "${BLUE}┌─────────────────────────────────────────────────────────────────┐${NC}\n"
 printf "${BLUE}│${NC}                                                                 ${BLUE}│${NC}\n"
-printf "${BLUE}│${NC}   ${BOLD}ShipSec Studio Installer${NC}                                      ${BLUE}│${NC}\n"
+printf "${BLUE}│${NC}   ${BOLD}Sentris Flow Installer${NC}                                      ${BLUE}│${NC}\n"
 printf "${BLUE}│${NC}   Self-Hosted Production Deployment                             ${BLUE}│${NC}\n"
 printf "${BLUE}│${NC}                                                                 ${BLUE}│${NC}\n"
 printf "${BLUE}└─────────────────────────────────────────────────────────────────┘${NC}\n"
 printf "\n"
 info "Platform: ${BOLD}$PLATFORM_NAME${NC}"
-info "Documentation: https://docs.shipsec.ai"
+info "Documentation: https://docs.sentris.ai"
 printf "\n"
 
 # ---------- Early Check: Truly non-interactive mode without sudo ----------
@@ -1177,7 +1177,7 @@ fi
 # ---------- Check Prerequisites ----------
 log "Checking prerequisites"
 printf "\n"
-info "ShipSec Studio requires the following tools:"
+info "Sentris Flow requires the following tools:"
 info "  - docker    (container runtime)"
 info "  - just      (command runner)"
 info "  - curl      (HTTP client)"
@@ -1250,7 +1250,7 @@ if [ "$ALL_OK" = false ]; then
         printf "\n"
         info "After installing, run this script again:"
         printf "\n"
-        printf "    curl -fsSL https://raw.githubusercontent.com/ShipSecAI/studio/main/install.sh | bash\n"
+        printf "    curl -fsSL https://raw.githubusercontent.com/zebbern/Sentris/main/install.sh | bash\n"
         printf "\n"
         exit 1
       fi
@@ -1269,7 +1269,7 @@ if [ "$ALL_OK" = false ]; then
       printf "\n"
       info "After installing the missing dependencies, run this script again:"
       printf "\n"
-      printf "    curl -fsSL https://raw.githubusercontent.com/ShipSecAI/studio/main/install.sh | bash\n"
+      printf "    curl -fsSL https://raw.githubusercontent.com/zebbern/Sentris/main/install.sh | bash\n"
       printf "\n"
       exit 1
     fi
@@ -1284,7 +1284,7 @@ if [ "$ALL_OK" = false ]; then
     printf "\n"
     info "After installing the missing dependencies, run this script again:"
     printf "\n"
-    printf "    curl -fsSL https://raw.githubusercontent.com/ShipSecAI/studio/main/install.sh | bash\n"
+    printf "    curl -fsSL https://raw.githubusercontent.com/zebbern/Sentris/main/install.sh | bash\n"
     printf "\n"
     exit 1
   fi
@@ -1426,7 +1426,7 @@ IN_REPO=false
 # Check if already in the repo
 if [ -d .git ] && [ -f justfile ]; then
   IN_REPO=true
-  info "Already in ShipSec Studio repository."
+  info "Already in Sentris Flow repository."
 # Check if repo exists in current directory
 elif [ -d "$REPO_DIR" ] && [ -d "$REPO_DIR/.git" ] && [ -f "$REPO_DIR/justfile" ]; then
   info "Found existing repository in ./$REPO_DIR"
@@ -1490,7 +1490,7 @@ if ! ask_yes_no "Do you want to proceed with the installation?" "y"; then
 fi
 
 # ---------- Start Installation ----------
-log "Installing ShipSec Studio"
+log "Installing Sentris Flow"
 
 printf "\n"
 if ! just prod start-latest; then
@@ -1498,7 +1498,7 @@ if ! just prod start-latest; then
   err "Installation failed."
   err "Please check the error messages above."
   printf "\n"
-  info "For troubleshooting, visit: https://github.com/ShipSecAI/studio/issues"
+  info "For troubleshooting, visit: https://github.com/zebbern/Sentris/issues"
   exit 1
 fi
 
@@ -1508,7 +1508,7 @@ printf "${GREEN}┌────────────────────�
 printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
 printf "${GREEN}│${NC}   ${BOLD}Installation Complete!${NC}                                        ${GREEN}│${NC}\n"
 printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
-printf "${GREEN}│${NC}   Open ShipSec Studio in your browser:                          ${GREEN}│${NC}\n"
+printf "${GREEN}│${NC}   Open Sentris Flow in your browser:                          ${GREEN}│${NC}\n"
 printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
 printf "${GREEN}│${NC}       ${BOLD}http://localhost:8090${NC}                                     ${GREEN}│${NC}\n"
 printf "${GREEN}│${NC}                                                                 ${GREEN}│${NC}\n"
@@ -1521,8 +1521,8 @@ printf "    just prod logs     - View logs\n"
 printf "    just prod stop     - Stop all services\n"
 printf "    just prod clean    - Remove all data\n"
 printf "\n"
-info "Documentation: https://docs.shipsec.ai"
-info "Need help? https://github.com/ShipSecAI/studio/issues"
+info "Documentation: https://docs.sentris.ai"
+info "Need help? https://github.com/zebbern/Sentris/issues"
 printf "\n"
 
 exit 0

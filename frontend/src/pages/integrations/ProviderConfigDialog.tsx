@@ -180,7 +180,7 @@ export function ProviderConfigDialog({
           {configuredBy === 'environment' && (
             <p className="text-xs text-muted-foreground">
               This provider currently uses credentials from the server environment. Saving values
-              here will override them for ShipSec Studio.
+              here will override them for Sentris Flow.
             </p>
           )}
 

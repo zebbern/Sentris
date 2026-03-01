@@ -11,7 +11,7 @@
 
 import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { type ToolInputSchema } from '@shipsec/component-sdk';
+import { type ToolInputSchema } from '@sentris/component-sdk';
 import { SecretsEncryptionService } from '../secrets/secrets.encryption';
 import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
 
@@ -108,7 +108,7 @@ export class ToolRegistryService implements OnModuleDestroy {
   }
 
   /**
-   * Register a ShipSec component as an agent-callable tool
+   * Register a Sentris component as an agent-callable tool
    */
   async registerComponentTool(input: RegisterComponentToolInput): Promise<void> {
     if (!this.redis) {

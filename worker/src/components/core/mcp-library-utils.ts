@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ExecutionContext } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
@@ -128,7 +128,7 @@ async function discoverToolsFromEndpoint(
       });
 
       client = new Client(
-        { name: 'shipsec-worker-tool-discovery', version: '1.0.0' },
+        { name: 'sentris-worker-tool-discovery', version: '1.0.0' },
         { capabilities: {} },
       );
 
@@ -168,7 +168,7 @@ export async function registerServerTools(
   // For stdio servers, we need to spawn a Docker container
   if (server.transportType === 'stdio') {
     const { endpoint, containerId } = await startMcpDockerServer({
-      image: 'shipsec/mcp-stdio-proxy:latest',
+      image: 'zebbern/mcp-stdio-proxy:latest',
       command: [],
       env: {
         MCP_COMMAND: server.command || '',

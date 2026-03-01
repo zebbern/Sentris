@@ -8,7 +8,7 @@ import {
   TraceEventMetadataSchema,
   TraceEventPayload,
   TraceEventType,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import type { AuthContext } from '../auth/types';
 
 @Injectable()

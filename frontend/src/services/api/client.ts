@@ -1,4 +1,4 @@
-import { createShipSecClient } from '@shipsec/backend-client';
+import { createSentrisClient } from '@sentris/backend-client';
 import { useAuthStore } from '@/store/authStore';
 import { getFreshClerkToken } from '@/utils/clerk-token';
 
@@ -87,7 +87,7 @@ export async function getApiAuthHeaders(): Promise<Record<string, string>> {
 }
 
 // Create type-safe API client
-export const apiClient = createShipSecClient({
+export const apiClient = createSentrisClient({
   baseUrl: API_BASE_URL,
   middleware: {
     async onRequest({ request }) {

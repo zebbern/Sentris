@@ -1,5 +1,5 @@
-import type { components } from '@shipsec/backend-client';
-import type { WorkflowSchedule, ScheduleStatus } from '@shipsec/shared';
+import type { components } from '@sentris/backend-client';
+import type { WorkflowSchedule, ScheduleStatus } from '@sentris/shared';
 import { apiClient } from './client';
 
 type CreateScheduleRequestDto = components['schemas']['CreateScheduleRequestDto'];

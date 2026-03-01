@@ -5,7 +5,7 @@ import {
   setHandler,
   workflowInfo,
 } from '@temporalio/workflow';
-import type { McpTool } from '@shipsec/shared';
+import type { McpTool } from '@sentris/shared';
 
 // Input DTO for MCP discovery workflow
 export interface DiscoveryInput {

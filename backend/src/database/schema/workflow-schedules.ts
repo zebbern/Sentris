@@ -1,6 +1,6 @@
 import { integer, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-import type { ScheduleInputPayload } from '@shipsec/shared';
+import type { ScheduleInputPayload } from '@sentris/shared';
 
 export const workflowSchedulesTable = pgTable('workflow_schedules', {
   id: uuid('id').primaryKey().defaultRandom(),

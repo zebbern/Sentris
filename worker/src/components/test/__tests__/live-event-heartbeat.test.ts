@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { componentRegistry, createExecutionContext } from '@shipsec/component-sdk';
+import { componentRegistry, createExecutionContext } from '@sentris/component-sdk';
 
 import { LiveEventHeartbeatInput, LiveEventHeartbeatOutput } from '../live-event-heartbeat';
 import '../live-event-heartbeat';

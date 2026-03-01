@@ -29,10 +29,10 @@ workerDescribe('Worker Integration Tests', () => {
   let fileStorageAdapter: FileStorageAdapter;
   let db: NodePgDatabase<typeof schema>;
 
-  // Use the test task queue - tests submit workflows to the test worker (pm2: shipsec-test-worker)
-  // Main worker uses 'shipsec-default', test worker uses 'test-worker-integration'
+  // Use the test task queue - tests submit workflows to the test worker (pm2: sentris-test-worker)
+  // Main worker uses 'sentris-default', test worker uses 'test-worker-integration'
   const taskQueue = 'test-worker-integration';
-  const testNamespace = process.env.TEMPORAL_NAMESPACE || 'shipsec-dev';
+  const testNamespace = process.env.TEMPORAL_NAMESPACE || 'sentris-dev';
 
   beforeAll(async () => {
     console.log('🚀 Starting worker integration test setup...');
@@ -58,12 +58,12 @@ workerDescribe('Worker Integration Tests', () => {
 
     // Initialize PostgreSQL
     const connectionString =
-      process.env.DATABASE_URL || 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
     pool = new Pool({ connectionString });
     db = drizzle(pool, { schema });
 
     // Initialize adapters
-    const bucketName = process.env.MINIO_BUCKET_NAME || 'shipsec-files';
+    const bucketName = process.env.MINIO_BUCKET_NAME || 'sentris-files';
     fileStorageAdapter = new FileStorageAdapter(minioClient, db, bucketName);
 
     // Ensure bucket exists
@@ -86,7 +86,7 @@ workerDescribe('Worker Integration Tests', () => {
   describe('Workflow Execution', () => {
     it('should execute a simple workflow with trigger component', async () => {
       // Import workflow function dynamically
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       // Create a minimal workflow DSL
       const workflowDSL = {
@@ -128,7 +128,7 @@ workerDescribe('Worker Integration Tests', () => {
       const runId = `test-run-${randomUUID()}`;
 
       // Start workflow
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -152,7 +152,7 @@ workerDescribe('Worker Integration Tests', () => {
     });
 
     it('should inject services into components during execution', async () => {
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       // Upload a test file first
       const fileId = randomUUID();
@@ -216,7 +216,7 @@ workerDescribe('Worker Integration Tests', () => {
       const runId = `test-file-run-${randomUUID()}`;
 
       // Start workflow
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -248,11 +248,11 @@ workerDescribe('Worker Integration Tests', () => {
       expect(loader.textContent).toBe(content);
 
       // Cleanup
-      await minioClient.removeObject(process.env.MINIO_BUCKET_NAME || 'shipsec-files', fileId);
+      await minioClient.removeObject(process.env.MINIO_BUCKET_NAME || 'sentris-files', fileId);
     }, 60000);
 
     it('should handle workflow failures gracefully', async () => {
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       // Create workflow with non-existent file (valid UUID format)
       const nonExistentFileId = randomUUID();
@@ -293,7 +293,7 @@ workerDescribe('Worker Integration Tests', () => {
       const runId = `test-fail-run-${randomUUID()}`;
 
       // Start workflow
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -321,7 +321,7 @@ workerDescribe('Worker Integration Tests', () => {
     }, 60000);
 
     it('should execute multi-step workflow with dependencies', async () => {
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       // Create workflow with multiple steps
       const workflowDSL = {
@@ -397,7 +397,7 @@ workerDescribe('Worker Integration Tests', () => {
       const runId = `test-multi-run-${randomUUID()}`;
 
       // Start workflow
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -422,7 +422,7 @@ workerDescribe('Worker Integration Tests', () => {
     }, 60000);
 
     it('should route error edges when an activity fails', async () => {
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       const missingFileId = randomUUID();
 
@@ -492,7 +492,7 @@ workerDescribe('Worker Integration Tests', () => {
       const workflowId = `error-edge-workflow-${randomUUID()}`;
       const runId = `error-edge-run-${randomUUID()}`;
 
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -526,7 +526,7 @@ workerDescribe('Worker Integration Tests', () => {
     }, 60000);
 
     it('should persist ordered traces for parallel branches', async () => {
-      const { shipsecWorkflowRun } = await import('../temporal/workflows');
+      const { sentrisWorkflowRun } = await import('../temporal/workflows');
 
       const workflowDSL = {
         version: 1,
@@ -594,7 +594,7 @@ workerDescribe('Worker Integration Tests', () => {
       const workflowId = `trace-order-workflow-${randomUUID()}`;
       const runId = `trace-order-run-${randomUUID()}`;
 
-      const handle = await temporalClient.workflow.start(shipsecWorkflowRun, {
+      const handle = await temporalClient.workflow.start(sentrisWorkflowRun, {
         taskQueue,
         workflowId,
         args: [
@@ -661,7 +661,7 @@ workerDescribe('Worker Integration Tests', () => {
     });
 
     it('should verify MinIO connection is working', async () => {
-      const bucketName = process.env.MINIO_BUCKET_NAME || 'shipsec-files';
+      const bucketName = process.env.MINIO_BUCKET_NAME || 'sentris-files';
       const exists = await minioClient.bucketExists(bucketName);
 
       // Either bucket exists or we can create it

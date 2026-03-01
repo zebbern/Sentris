@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Ensure all worker components are registered before accessing the registry
-import '@shipsec/studio-worker/components';
+import '@sentris/studio-worker/components';
 import {
   componentRegistry,
   extractPorts,
   isAgentCallable,
   getToolSchema,
   type CachedComponentMetadata,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { categorizeComponent } from '../../components/utils/categorization';
 import { errorResult } from './types';
 

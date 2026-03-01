@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { exec as execCallback } from 'child_process';
-import { ValidationError, ConfigurationError, ContainerError } from '@shipsec/component-sdk';
+import { ValidationError, ConfigurationError, ContainerError } from '@sentris/component-sdk';
 
 const exec = promisify(execCallback);
 

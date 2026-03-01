@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { NodeSchema } from './node';
 import { EdgeSchema } from './edge';
 

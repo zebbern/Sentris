@@ -1,9 +1,9 @@
 {
-  "name": "@shipsec/component-sdk",
+  "name": "@sentris/component-sdk",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Component SDK for ShipSec workflow orchestration",
+  "description": "Component SDK for Sentris workflow orchestration",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -19,7 +19,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@shipsec/shared": "workspace:*",
+    "@sentris/shared": "workspace:*",
     "zod": "^4.3.6"
   },
   "optionalDependencies": {

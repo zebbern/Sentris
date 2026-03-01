@@ -21,7 +21,7 @@ const AWS_SERVERS = [
   { name: 'aws-api', command: 'awslabs.aws-api-mcp-server' },
 ];
 
-const DOCKER_IMAGE = 'shipsec/mcp-aws-suite:latest';
+const DOCKER_IMAGE = 'zebbern/mcp-aws-suite:latest';
 const GROUP_ID = 'd5adb1c5-6e7f-47d3-b864-66dfe4755679';
 
 async function discoverToolsForServer(serverName: string, command: string) {

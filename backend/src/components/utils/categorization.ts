@@ -1,9 +1,9 @@
-import type { ComponentDefinition } from '@shipsec/component-sdk';
+import type { ComponentDefinition } from '@sentris/component-sdk';
 import {
   type ComponentCategory,
   getComponentCategoryDescriptor,
   normalizeComponentCategory,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 export interface ComponentCategoryConfig {
   label: string;

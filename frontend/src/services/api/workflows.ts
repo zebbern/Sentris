@@ -1,4 +1,4 @@
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { apiClient, getAuthHeaders, API_V1_URL, type ApiResponse } from './client';
 
 type WorkflowResponseDto = components['schemas']['WorkflowResponseDto'];

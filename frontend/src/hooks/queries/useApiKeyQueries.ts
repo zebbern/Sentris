@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { create } from 'zustand';
 
 type ApiKeyResponseDto = components['schemas']['ApiKeyResponseDto'];

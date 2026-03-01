@@ -2,12 +2,12 @@ import {
   componentRegistry,
   createExecutionContext,
   runComponentWithRunner,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 import '../src/components/security/subfinder';
 
 async function main() {
-  const component = componentRegistry.get('shipsec.subfinder.run');
+  const component = componentRegistry.get('sentris.subfinder.run');
   if (!component) {
     throw new Error('Subfinder component not registered');
   }

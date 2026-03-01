@@ -6,12 +6,12 @@
 #   ./scripts/active-instance.sh set 5
 #
 # Behavior:
-# - Uses .shipsec-instance in repo root
+# - Uses .sentris-instance in repo root
 # - Instance must be an integer 0-9
 
 set -euo pipefail
 
-FILE=".shipsec-instance"
+FILE=".sentris-instance"
 CMD="${1:-get}"
 
 die() {
@@ -25,8 +25,8 @@ is_digit() {
 
 case "$CMD" in
   get)
-    if [ -n "${SHIPSEC_INSTANCE:-}" ]; then
-      echo "${SHIPSEC_INSTANCE}"
+    if [ -n "${SENTRIS_INSTANCE:-}" ]; then
+      echo "${SENTRIS_INSTANCE}"
       exit 0
     fi
     if [ -f "$FILE" ]; then

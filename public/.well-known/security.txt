@@ -1,5 +1,5 @@
-Contact: contact@shipsec.ai
+Contact: contact@sentris.ai
 Preferred-Languages: en
 
-# ShipSec Studio Security Policy
-# Report security vulnerabilities responsibly to contact@shipsec.ai | VDP 
+# Sentris Flow Security Policy
+# Report security vulnerabilities responsibly to contact@sentris.ai | VDP 

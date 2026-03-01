@@ -132,7 +132,7 @@ export function TemplateLibraryPage() {
   } = useSortableList({
     items: templates,
     getId: getTemplateId,
-    storageKey: `shipsec:sort:templates:${organizationId}`,
+    storageKey: `sentris:sort:templates:${organizationId}`,
     disabled: hasFilters,
   });
 

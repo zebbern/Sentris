@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state

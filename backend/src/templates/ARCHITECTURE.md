@@ -409,7 +409,7 @@ curl -X POST -H "Authorization: Bearer {admin_token}" \
 
 | Variable               | Description                                   | Example                        |
 | ---------------------- | --------------------------------------------- | ------------------------------ |
-| `GITHUB_TEMPLATE_REPO` | Public GitHub repository containing templates | `shipsecai/workflow-templates` |
+| `GITHUB_TEMPLATE_REPO` | Public GitHub repository containing templates | `zebbern/sentris-templates` |
 
 ### Optional Variables
 
@@ -423,7 +423,7 @@ curl -X POST -H "Authorization: Bearer {admin_token}" \
 # .env or .env.docker
 
 # GitHub template repository (must be public)
-GITHUB_TEMPLATE_REPO=shipsecai/workflow-templates
+GITHUB_TEMPLATE_REPO=zebbern/sentris-templates
 GITHUB_TEMPLATE_BRANCH=main
 ```
 
@@ -707,7 +707,7 @@ Common validation failures:
 
 ### Templates Not Showing
 
-1. **Check `GITHUB_TEMPLATE_REPO`** in `.env` -- must match your actual public repo (e.g., `shipsecai/workflow-templates`)
+1. **Check `GITHUB_TEMPLATE_REPO`** in `.env` -- must match your actual public repo (e.g., `zebbern/sentris-templates`)
 2. **Ensure the repo is public** -- the sync uses unauthenticated GitHub API calls
 3. Check branch name in `GITHUB_TEMPLATE_BRANCH`
 4. Review backend logs for sync errors (look for `GitHubSyncService` messages)

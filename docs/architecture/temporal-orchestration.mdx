@@ -1,11 +1,11 @@
 ---
 title: "Temporal Orchestration"
-description: "How ShipSec Studio uses Temporal for workflow and activity management"
+description: "How Sentris Flow uses Temporal for workflow and activity management"
 ---
 
 # Temporal Orchestration
 
-ShipSec Studio uses [Temporal.io](https://temporal.io) as its core orchestration engine. Temporal ensures that workflows are durable, retriable, and scalable.
+Sentris Flow uses [Temporal.io](https://temporal.io) as its core orchestration engine. Temporal ensures that workflows are durable, retriable, and scalable.
 
 ## Workflows vs. Activities
 
@@ -14,10 +14,10 @@ ShipSec Studio uses [Temporal.io](https://temporal.io) as its core orchestration
 
 ## Worker Architecture
 
-ShipSec uses a specialized worker architecture to handle different types of workloads.
+Sentris uses a specialized worker architecture to handle different types of workloads.
 
 ### Default Worker
-- **Task Queue**: `shipsec-default`
+- **Task Queue**: `sentris-default`
 - **Responsibilities**: 
   - Executing workflow logic (orchestration).
   - Running lightweight "inline" activities (logic, simple transforms).
@@ -34,7 +34,7 @@ For high-volume or heavy workloads, we can deploy specialized workers:
 ## Execution Flow
 
 1.  **Backend** starts a workflow via the Temporal Client.
-2.  **Temporal Server** places a "Workflow Task" on the `shipsec-default` queue.
+2.  **Temporal Server** places a "Workflow Task" on the `sentris-default` queue.
 3.  **Default Worker** picks up the task and starts the workflow.
 4.  When the workflow reaches a node, it schedules an **Activity Task**.
 5.  The **Activity worker** (could be the same worker or a specialized one) executes the activity and returns the result.
@@ -55,4 +55,4 @@ const results = await heavyActivities.runScanner({ target: 'example.com' });
 ```
 
 ## Scaling
-ShipSec workers are horizontally scalable. Multiple workers can poll the same task queue, and Temporal will automatically load-balance tasks between them. Workers can be deployed as separate Docker containers or Kubernetes pods.
+Sentris workers are horizontally scalable. Multiple workers can poll the same task queue, and Temporal will automatically load-balance tasks between them. Workers can be deployed as separate Docker containers or Kubernetes pods.

@@ -1,7 +1,7 @@
-import type { DestinationAdapterDefinition, DestinationConfig } from '@shipsec/shared';
-import type { ArtifactDestination, ArtifactRemoteUpload } from '@shipsec/shared';
-import type { ExecutionContext } from '@shipsec/component-sdk';
-import { ConfigurationError, NotFoundError } from '@shipsec/component-sdk';
+import type { DestinationAdapterDefinition, DestinationConfig } from '@sentris/shared';
+import type { ArtifactDestination, ArtifactRemoteUpload } from '@sentris/shared';
+import type { ExecutionContext } from '@sentris/component-sdk';
+import { ConfigurationError, NotFoundError } from '@sentris/component-sdk';
 
 export interface DestinationSaveInput {
   fileName: string;

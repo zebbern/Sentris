@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { definition } from '../http-request';
-import type { ExecutionContext } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
 
 // Helper to create a dummy context
 const mockContext: ExecutionContext = {

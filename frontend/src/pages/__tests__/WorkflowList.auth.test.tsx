@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 
 import { WorkflowList } from '@/pages/WorkflowList';
 import { AuthProvider } from '@/auth/auth-context';

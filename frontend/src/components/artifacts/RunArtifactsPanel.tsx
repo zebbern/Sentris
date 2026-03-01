@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { Download, RefreshCw, Copy, ExternalLink } from 'lucide-react';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRunArtifacts, useDownloadArtifact } from '@/hooks/queries/useArtifactQueries';
 import { queryKeys } from '@/lib/queryKeys';

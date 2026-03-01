@@ -1,10 +1,10 @@
-# ShipSec Backend Client
+# Sentris Backend Client
 
-Type-safe TypeScript client for the ShipSec API, auto-generated from OpenAPI specification.
+Type-safe TypeScript client for the Sentris API, auto-generated from OpenAPI specification.
 
 ## Installation
 
-This package is part of the ShipSec monorepo. Install dependencies from the root:
+This package is part of the Sentris monorepo. Install dependencies from the root:
 
 ```bash
 bun install
@@ -13,10 +13,10 @@ bun install
 ## Usage
 
 ```typescript
-import { createShipSecClient } from '@shipsec/backend-client';
+import { createSentrisClient } from '@sentris/backend-client';
 
 // Create client instance
-const client = createShipSecClient({
+const client = createSentrisClient({
   baseUrl: 'http://localhost:3001',
   middleware: {
     async onRequest({ request }) {

@@ -15,7 +15,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const DEFAULT_RESOLVERS = ['1.1.1.1', '8.8.8.8'] as const;
@@ -173,12 +173,12 @@ const outputSchema = outputs({
 });
 
 const definition = defineComponent({
-  id: 'shipsec.shuffledns.massdns',
+  id: 'sentris.shuffledns.massdns',
   label: 'Shuffledns + MassDNS',
   category: 'security',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/shuffledns-massdns:latest',
+    image: 'ghcr.io/zebbern/shuffledns-massdns:latest',
     // Do not depend on a shell in the image; we'll run the binary directly
     network: 'bridge',
     timeoutSeconds: 300,
@@ -208,8 +208,8 @@ const definition = defineComponent({
       'ProjectDiscovery shuffledns with MassDNS backend. See https://github.com/projectdiscovery/shuffledns',
     icon: 'Shuffle',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

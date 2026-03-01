@@ -3,14 +3,14 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 // Ensure all worker components are registered before accessing the registry
-import '@shipsec/studio-worker/components';
+import '@sentris/studio-worker/components';
 import {
   componentRegistry,
   extractPorts,
   isAgentCallable,
   getToolSchema,
   type CachedComponentMetadata,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { categorizeComponent, getCategoryConfig } from './utils/categorization';
 import { ResolvePortsDto, ResolvePortsSchema } from './dto/components.dto';
 
@@ -100,7 +100,7 @@ export class ComponentsController {
             nullable: true,
             properties: {
               name: { type: 'string' },
-              type: { type: 'string', enum: ['shipsecai', 'community'] },
+              type: { type: 'string', enum: ['sentris', 'community'] },
               url: { type: 'string', nullable: true },
             },
           },

@@ -4,7 +4,7 @@ import {
   temporalConfigSchema,
   secretStoreKeySchema,
   stringToBoolean,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 /**
  * AUTH_PROVIDER: trims, lowercases, and defaults unknown values to 'local'.
@@ -79,7 +79,7 @@ export const backendEnvSchema = z
     GITHUB_TEMPLATE_REPO: z
       .string()
       .optional()
-      .default('shipsecai/workflow-templates')
+      .default('zebbern/sentris-templates')
       .refine((v) => v.includes('/'), {
         message: 'GITHUB_TEMPLATE_REPO must be in owner/repo format',
       }),
@@ -87,11 +87,11 @@ export const backendEnvSchema = z
     GITHUB_TEMPLATE_TOKEN: z.string().optional(),
 
     // --- Version Check ---
-    SHIPSEC_VERSION_CHECK_URL: z.string().optional().default('https://version.shipsec.ai'),
-    SHIPSEC_VERSION_CHECK_TIMEOUT_MS: z.coerce.number().optional().default(5000),
-    SHIPSEC_VERSION_CHECK_VERSION: z.string().optional(),
-    SHIPSEC_SKIP_MIGRATION_CHECK: stringToBoolean(false),
-    SHIPSEC_VERSION_CHECK_DISABLED: stringToBoolean(false),
+    SENTRIS_VERSION_CHECK_URL: z.string().optional().default('https://version.sentris.ai'),
+    SENTRIS_VERSION_CHECK_TIMEOUT_MS: z.coerce.number().optional().default(5000),
+    SENTRIS_VERSION_CHECK_VERSION: z.string().optional(),
+    SENTRIS_SKIP_MIGRATION_CHECK: stringToBoolean(false),
+    SENTRIS_VERSION_CHECK_DISABLED: stringToBoolean(false),
 
     // --- Runtime ---
     NODE_ENV: z.string().optional().default('development'),

@@ -124,7 +124,7 @@ export function ActionCenterPage() {
   } = useSortableList({
     items: filteredApprovals,
     getId: getApprovalId,
-    storageKey: `shipsec:sort:actioncenter:${organizationId}`,
+    storageKey: `sentris:sort:actioncenter:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

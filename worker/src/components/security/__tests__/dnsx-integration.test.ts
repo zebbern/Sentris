@@ -3,8 +3,8 @@
  * Requires Docker daemon to be running
  */
 import { describe, test, expect, beforeEach } from 'bun:test';
-import type { ExecutionContext } from '@shipsec/component-sdk';
-import { componentRegistry, createExecutionContext } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
+import { componentRegistry, createExecutionContext } from '@sentris/component-sdk';
 import type { DnsxInput, DnsxOutput } from '../dnsx';
 import '../dnsx';
 
@@ -19,7 +19,7 @@ dockerDescribe('DNSX Integration (Docker)', () => {
     logs.length = 0;
     context = createExecutionContext({
       runId: 'test-run',
-      componentRef: 'shipsec.dnsx.run',
+      componentRef: 'sentris.dnsx.run',
       logCollector: (entry) => {
         logs.push(`${entry.stream.toUpperCase()}: ${entry.message}`);
       },
@@ -27,7 +27,7 @@ dockerDescribe('DNSX Integration (Docker)', () => {
   });
 
   test('should resolve DNS records for a known domain using real dnsx', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     expect(component).toBeDefined();
 
     const typedComponent = component!;
@@ -51,7 +51,7 @@ dockerDescribe('DNSX Integration (Docker)', () => {
   }, 180_000);
 
   test('should handle non-existent domains gracefully', async () => {
-    const component = componentRegistry.get<DnsxInput, DnsxOutput>('shipsec.dnsx.run');
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
     expect(component).toBeDefined();
 
     const typedComponent = component!;

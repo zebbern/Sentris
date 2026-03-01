@@ -1,14 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'ShipSec AWS Integration - Forward GuardDuty findings to ShipSec for automated triage'
+Description: 'Sentris AWS Integration - Forward GuardDuty findings to Sentris for automated triage'
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: 'ShipSec Configuration'
+          default: 'Sentris Configuration'
         Parameters:
-          - ShipSecWebhookPath
-          - ShipSecWebhookDomain
+          - SentrisWebhookPath
+          - SentrisWebhookDomain
       - Label:
           default: 'GuardDuty Settings'
         Parameters:
@@ -16,20 +16,20 @@ Metadata:
           - EnableTestFinding
 
 Parameters:
-  ShipSecWebhookPath:
+  SentrisWebhookPath:
     Type: String
-    Description: 'Webhook path from ShipSec (e.g., wh_abc123xyz...)'
+    Description: 'Webhook path from Sentris (e.g., wh_abc123xyz...)'
     MinLength: 10
     ConstraintDescription: 'Must be a valid webhook path'
 
-  ShipSecWebhookDomain:
+  SentrisWebhookDomain:
     Type: String
-    Default: 'api.shipsec.ai'
-    Description: 'ShipSec API domain'
+    Default: 'api.sentris.ai'
+    Description: 'Sentris API domain'
     AllowedValues:
-      - 'api.shipsec.ai'
+      - 'api.sentris.ai'
       - 'localhost:3211'
-    ConstraintDescription: 'Use api.shipsec.ai for cloud or localhost:3211 for local testing'
+    ConstraintDescription: 'Use api.sentris.ai for cloud or localhost:3211 for local testing'
 
   GuardDutySeverityThreshold:
     Type: Number
@@ -54,7 +54,7 @@ Resources:
   EventBridgeRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: ShipSecGuardDutyRole
+      RoleName: SentrisGuardDutyRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -69,22 +69,22 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: 'sns:Publish'
-                Resource: !GetAtt ShipSecTopic.TopicArn
+                Resource: !GetAtt SentrisTopic.TopicArn
 
   # SNS Topic to receive GuardDuty findings
-  ShipSecTopic:
+  SentrisTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: shipsec-guardduty-findings
-      DisplayName: 'ShipSec GuardDuty Findings'
+      TopicName: sentris-guardduty-findings
+      DisplayName: 'Sentris GuardDuty Findings'
 
-  # HTTP subscription to ShipSec webhook endpoint
-  ShipSecWebhookSubscription:
+  # HTTP subscription to Sentris webhook endpoint
+  SentrisWebhookSubscription:
     Type: AWS::SNS::Subscription
     Properties:
       Protocol: https
-      TopicArn: !GetAtt ShipSecTopic.TopicArn
-      Endpoint: !Sub 'https://${ShipSecWebhookDomain}/webhooks/inbound/${ShipSecWebhookPath}'
+      TopicArn: !GetAtt SentrisTopic.TopicArn
+      Endpoint: !Sub 'https://${SentrisWebhookDomain}/webhooks/inbound/${SentrisWebhookPath}'
       Attributes:
         # For local testing only - auto-confirm without email
         - Name: RawMessageDelivery
@@ -94,8 +94,8 @@ Resources:
   GuardDutyRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: guardduty-to-shipsec
-      Description: 'Forward GuardDuty findings to ShipSec'
+      Name: guardduty-to-sentris
+      Description: 'Forward GuardDuty findings to Sentris'
       State: ENABLED
       EventPattern:
         source:
@@ -108,9 +108,9 @@ Resources:
                 - '>'
                 - !Ref GuardDutySeverityThreshold
       Targets:
-        - Arn: !GetAtt ShipSecTopic.TopicArn
+        - Arn: !GetAtt SentrisTopic.TopicArn
           RoleArn: !GetAtt EventBridgeRole.Arn
-          Id: ShipSecTarget
+          Id: SentrisTarget
 
   # Lambda to generate test finding (optional)
   TestFindingLambdaRole:
@@ -141,7 +141,7 @@ Resources:
     Type: AWS::Lambda::Function
     Condition: ShouldCreateTestFinding
     Properties:
-      FunctionName: shipsec-test-finding-generator
+      FunctionName: sentris-test-finding-generator
       Runtime: python3.11
       Handler: index.lambda_handler
       Role: !GetAtt TestFindingLambdaRole.Arn
@@ -189,7 +189,7 @@ Resources:
 Outputs:
   SNSTopicArn:
     Description: 'SNS Topic ARN for GuardDuty findings'
-    Value: !GetAtt ShipSecTopic.TopicArn
+    Value: !GetAtt SentrisTopic.TopicArn
 
   EventBridgeRuleArn:
     Description: 'EventBridge Rule ARN'
@@ -197,7 +197,7 @@ Outputs:
 
   WebhookUrl:
     Description: 'Full webhook URL receiving findings'
-    Value: !Sub 'https://${ShipSecWebhookDomain}/webhooks/inbound/${ShipSecWebhookPath}'
+    Value: !Sub 'https://${SentrisWebhookDomain}/webhooks/inbound/${SentrisWebhookPath}'
 
   StackName:
     Description: 'CloudFormation stack name'
@@ -207,7 +207,7 @@ Outputs:
     Description: 'Integration status'
     Value: !If
       - ShouldCreateTestFinding
-      - 'Ready - Test finding created, check ShipSec dashboard'
+      - 'Ready - Test finding created, check Sentris dashboard'
       - 'Ready - Waiting for GuardDuty findings'
 
   SetupInstructions:
@@ -220,7 +220,7 @@ Outputs:
       3. 🧪 Test the connection:
          - Wait for a GuardDuty finding, OR
          - Manually POST to webhook:
-           curl -X POST "https://api.shipsec.ai/webhooks/inbound/wh_YOUR_PATH" \
+           curl -X POST "https://api.sentris.ai/webhooks/inbound/wh_YOUR_PATH" \
              -H 'Content-Type: application/json' \
              -d '{"Message":"..."}'
-      4. 📊 Monitor in ShipSec dashboard
+      4. 📊 Monitor in Sentris dashboard

@@ -279,32 +279,32 @@ function loadWorkerEnv() {
 
 const workerEnv = loadWorkerEnv();
 
-// Determine environment from NODE_ENV or SHIPSEC_ENV
-const environment = process.env.SHIPSEC_ENV || process.env.NODE_ENV || 'development';
+// Determine environment from NODE_ENV or SENTRIS_ENV
+const environment = process.env.SENTRIS_ENV || process.env.NODE_ENV || 'development';
 const isProduction = environment === 'production';
 
 // Get instance number (0-9) for multi-instance support
-const instanceNum = process.env.SHIPSEC_INSTANCE || '0';
-const instanceDatabaseUrl = `postgresql://shipsec:shipsec@localhost:5433/shipsec_instance_${instanceNum}`;
+const instanceNum = process.env.SENTRIS_INSTANCE || '0';
+const instanceDatabaseUrl = `postgresql://sentris:sentris@localhost:5433/sentris_instance_${instanceNum}`;
 // Only set these defaults for local development. In production, credentials must
 // come from the environment / deployment config.
 const devInstanceEnv = isProduction
   ? {}
   : {
       DATABASE_URL: instanceDatabaseUrl,
-      SECRET_STORE_MASTER_KEY: process.env.SECRET_STORE_MASTER_KEY || 'ShipSecLocalDevKey32Bytes!!!!!!!',
+      SECRET_STORE_MASTER_KEY: process.env.SECRET_STORE_MASTER_KEY || 'SentrisLocalDevKey32Bytes!!!!!!!',
     };
 
 // Environment-specific configuration
 const envConfig = {
   development: {
-    TEMPORAL_TASK_QUEUE: 'shipsec-dev',
-    TEMPORAL_NAMESPACE: 'shipsec-dev',
+    TEMPORAL_TASK_QUEUE: 'sentris-dev',
+    TEMPORAL_NAMESPACE: 'sentris-dev',
     NODE_ENV: 'development',
   },
   production: {
-    TEMPORAL_TASK_QUEUE: 'shipsec-prod',
-    TEMPORAL_NAMESPACE: 'shipsec-prod',
+    TEMPORAL_TASK_QUEUE: 'sentris-prod',
+    TEMPORAL_NAMESPACE: 'sentris-prod',
     NODE_ENV: 'production',
   },
 };
@@ -335,7 +335,7 @@ function resolveEnvFile(appName, instance) {
 module.exports = {
   apps: [
     {
-      name: `shipsec-backend-${instanceNum}`,
+      name: `sentris-backend-${instanceNum}`,
       cwd: __dirname + '/backend',
       script: BUN,
       args: isProduction ? 'src/main.ts' : 'run dev',
@@ -349,33 +349,33 @@ module.exports = {
         TERMINAL_REDIS_URL: process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379',
         LOG_KAFKA_BROKERS: process.env.LOG_KAFKA_BROKERS || 'localhost:9092',
         LOG_KAFKA_TOPIC: process.env.LOG_KAFKA_TOPIC || 'telemetry.logs',
-        LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `shipsec-backend-${instanceNum}`,
-        LOG_KAFKA_GROUP_ID: process.env.LOG_KAFKA_GROUP_ID || `shipsec-backend-log-consumer-${instanceNum}`,
+        LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `sentris-backend-${instanceNum}`,
+        LOG_KAFKA_GROUP_ID: process.env.LOG_KAFKA_GROUP_ID || `sentris-backend-log-consumer-${instanceNum}`,
         EVENT_KAFKA_TOPIC: process.env.EVENT_KAFKA_TOPIC || 'telemetry.events',
-        EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `shipsec-backend-events-${instanceNum}`,
-        EVENT_KAFKA_GROUP_ID: process.env.EVENT_KAFKA_GROUP_ID || `shipsec-event-ingestor-${instanceNum}`,
+        EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `sentris-backend-events-${instanceNum}`,
+        EVENT_KAFKA_GROUP_ID: process.env.EVENT_KAFKA_GROUP_ID || `sentris-event-ingestor-${instanceNum}`,
         NODE_IO_KAFKA_TOPIC: process.env.NODE_IO_KAFKA_TOPIC || 'telemetry.node-io',
         NODE_IO_KAFKA_CLIENT_ID:
-          process.env.NODE_IO_KAFKA_CLIENT_ID || `shipsec-backend-node-io-${instanceNum}`,
+          process.env.NODE_IO_KAFKA_CLIENT_ID || `sentris-backend-node-io-${instanceNum}`,
         NODE_IO_KAFKA_GROUP_ID:
-          process.env.NODE_IO_KAFKA_GROUP_ID || `shipsec-node-io-ingestor-${instanceNum}`,
+          process.env.NODE_IO_KAFKA_GROUP_ID || `sentris-node-io-ingestor-${instanceNum}`,
         AGENT_TRACE_KAFKA_TOPIC: process.env.AGENT_TRACE_KAFKA_TOPIC || 'telemetry.agent-trace',
         AGENT_TRACE_KAFKA_CLIENT_ID:
-          process.env.AGENT_TRACE_KAFKA_CLIENT_ID || `shipsec-backend-agent-trace-${instanceNum}`,
+          process.env.AGENT_TRACE_KAFKA_CLIENT_ID || `sentris-backend-agent-trace-${instanceNum}`,
         AGENT_TRACE_KAFKA_GROUP_ID:
-          process.env.AGENT_TRACE_KAFKA_GROUP_ID || `shipsec-agent-trace-ingestor-${instanceNum}`,
+          process.env.AGENT_TRACE_KAFKA_GROUP_ID || `sentris-agent-trace-ingestor-${instanceNum}`,
         ENABLE_INGEST_SERVICES: process.env.ENABLE_INGEST_SERVICES || 'true',
         INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN || 'local-internal-token',
         TEMPORAL_ADDRESS: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
-        TEMPORAL_NAMESPACE: `shipsec-dev-${instanceNum}`,
-        TEMPORAL_TASK_QUEUE: `shipsec-dev-${instanceNum}`,
+        TEMPORAL_NAMESPACE: `sentris-dev-${instanceNum}`,
+        TEMPORAL_TASK_QUEUE: `sentris-dev-${instanceNum}`,
       },
       watch: !isProduction ? ['src'] : false,
       ignore_watch: ['node_modules', 'dist', '*.log'],
       max_memory_restart: '500M',
     },
     {
-      name: `shipsec-frontend-${instanceNum}`,
+      name: `sentris-frontend-${instanceNum}`,
       cwd: __dirname + '/frontend',
       script: BUN,
       args: 'run dev',
@@ -384,13 +384,13 @@ module.exports = {
       env: {
         ...loadFrontendEnv(resolveEnvFile('frontend', instanceNum)),
         ...currentEnvConfig,
-        SHIPSEC_INSTANCE: instanceNum,
+        SENTRIS_INSTANCE: instanceNum,
       },
       watch: !isProduction ? ['src'] : false,
       ignore_watch: ['node_modules', 'dist', '*.log'],
     },
     {
-      name: `shipsec-worker-${instanceNum}`,
+      name: `sentris-worker-${instanceNum}`,
       cwd: __dirname + '/worker',
       // Run the worker with Node + tsx to avoid Bun's SWC binding issues
       script: tsxBinary,
@@ -407,12 +407,12 @@ module.exports = {
           TERMINAL_REDIS_URL: process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379',
           LOG_KAFKA_BROKERS: process.env.LOG_KAFKA_BROKERS || 'localhost:9092',
           LOG_KAFKA_TOPIC: process.env.LOG_KAFKA_TOPIC || 'telemetry.logs',
-          LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `shipsec-worker-${instanceNum}`,
+          LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `sentris-worker-${instanceNum}`,
           EVENT_KAFKA_TOPIC: process.env.EVENT_KAFKA_TOPIC || 'telemetry.events',
-          EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `shipsec-worker-events-${instanceNum}`,
+          EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `sentris-worker-events-${instanceNum}`,
           TEMPORAL_ADDRESS: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
-          TEMPORAL_NAMESPACE: `shipsec-dev-${instanceNum}`,
-          TEMPORAL_TASK_QUEUE: `shipsec-dev-${instanceNum}`,
+          TEMPORAL_NAMESPACE: `sentris-dev-${instanceNum}`,
+          TEMPORAL_TASK_QUEUE: `sentris-dev-${instanceNum}`,
           SKIP_CONTAINER_CLEANUP: process.env.SKIP_CONTAINER_CLEANUP || 'false',
         },
         swcBinaryPath ? { SWC_BINARY_PATH: swcBinaryPath } : {},
@@ -422,7 +422,7 @@ module.exports = {
       max_memory_restart: '1G',
     },
     {
-      name: 'shipsec-test-worker',
+      name: 'sentris-test-worker',
       cwd: __dirname + '/worker',
       // Use Node + tsx here as well
       script: tsxBinary,
@@ -432,7 +432,7 @@ module.exports = {
         {
           ...workerEnv, // Load worker .env file (includes OPENSEARCH_URL, etc.)
           TEMPORAL_TASK_QUEUE: 'test-worker-integration',
-          TEMPORAL_NAMESPACE: 'shipsec-dev',
+          TEMPORAL_NAMESPACE: 'sentris-dev',
           NODE_ENV: 'development',
           NAPI_RS_FORCE_WASI: '1',
         },

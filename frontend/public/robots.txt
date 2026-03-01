@@ -1,4 +1,4 @@
-# robots.txt - ShipSec Studio
+# robots.txt - Sentris Flow
 # Security automation platform robots configuration
 
 # Default rules for all bots
@@ -39,5 +39,5 @@ User-agent: Bingbot
 
 
 # Sitemaps - primary and documentation
-Sitemap: https://studio.shipsec.ai/sitemap.xml
-Github: https://github.com/shipsecai/studio
+Sitemap: https://studio.sentris.ai/sitemap.xml
+Github: https://github.com/sentris/studio

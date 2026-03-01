@@ -19,7 +19,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableTableRow } from '@/components/ui/sortable';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import { cn } from '@/lib/utils';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { ApiKeyRow } from './ApiKeyRow';
 

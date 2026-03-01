@@ -11,7 +11,7 @@ export function getBadgeTypeFromComponent(component: ComponentMetadata): BadgeTy
   if (component.deprecated) return 'deprecated';
   if (!isLatest) return 'outdated';
   if (isLatest) return 'latest';
-  return component.author?.type === 'shipsecai' ? 'official' : 'community';
+  return component.author?.type === 'sentris' ? 'official' : 'community';
 }
 
 /**
@@ -22,7 +22,7 @@ export function useComponentBadges(component: ComponentMetadata) {
     const badges: { type: BadgeType; version?: string }[] = [];
     const isLatest = component.isLatest ?? true;
 
-    if (component.author?.type === 'shipsecai') {
+    if (component.author?.type === 'sentris') {
       badges.push({ type: 'official' });
     } else if (component.author?.type === 'community') {
       badges.push({ type: 'community' });

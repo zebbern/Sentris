@@ -1,5 +1,5 @@
 import { vi } from 'bun:test';
-import { ExecutionContext, ISecretsService } from '@shipsec/component-sdk';
+import { ExecutionContext, ISecretsService } from '@sentris/component-sdk';
 
 export function createMockExecutionContext(
   overrides: Partial<ExecutionContext> = {},

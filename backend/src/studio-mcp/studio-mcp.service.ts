@@ -45,7 +45,7 @@ export class StudioMcpService {
   createServer(auth: AuthContext): McpServer {
     const server = new McpServer(
       {
-        name: 'shipsec-studio',
+        name: 'sentris-flow',
         version: '1.0.0',
       },
       {

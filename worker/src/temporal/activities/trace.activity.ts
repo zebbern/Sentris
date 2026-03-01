@@ -1,4 +1,4 @@
-import type { ITraceService, TraceEvent } from '@shipsec/component-sdk';
+import type { ITraceService, TraceEvent } from '@sentris/component-sdk';
 
 // Trace service instance will be injected at runtime
 let trace: ITraceService | undefined;

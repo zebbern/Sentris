@@ -1,24 +1,24 @@
 <div align="center">
-  <img src="docs/media/splash.png" alt="ShipSec AI" width="800">
+  <img src="docs/media/splash.png" alt="Sentris AI" width="800">
 </div>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/ShipSecAI/studio?color=blue&label=version" alt="Version">
-  <a href="https://github.com/ShipSecAI/studio/tree/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License"></a>
+  <img src="https://img.shields.io/github/v/release/zebbern/Sentris?color=blue&label=version" alt="Version">
+  <a href="https://github.com/zebbern/Sentris/tree/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License"></a>
   <a href="https://discord.gg/fmMA4BtNXC"><img src="https://img.shields.io/discord/1175402031123447818?color=5865F2&label=discord&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-# ShipSec Studio
+# Sentris Flow
 
 **Open-Source Security Workflow Orchestration Platform.**
 
-> ShipSec is currently in active development. We are optimizing the platform for stable production use and high-performance security operations.
+> Sentris is currently in active development. We are optimizing the platform for stable production use and high-performance security operations.
 
-ShipSec Studio provides a visual DSL and runtime for building, executing, and monitoring automated security workflows. It decouples security logic from infrastructure management, providing a durable and isolated environment for running security tooling at scale.
+Sentris Flow provides a visual DSL and runtime for building, executing, and monitoring automated security workflows. It decouples security logic from infrastructure management, providing a durable and isolated environment for running security tooling at scale.
 
 <div align="center">
   <a href="https://youtu.be/7uyv43VforM">
-    <img src="https://img.youtube.com/vi/7uyv43VforM/maxresdefault.jpg" alt="ShipSec Studio Demo" width="600">
+    <img src="https://img.youtube.com/vi/7uyv43VforM/maxresdefault.jpg" alt="Sentris Flow Demo" width="600">
   </a>
   <p><em>Watch the platform in action on YouTube.</em></p>
 </div>
@@ -36,14 +36,14 @@ ShipSec Studio provides a visual DSL and runtime for building, executing, and mo
 
 ## 🚀 Deployment Options
 
-### 1. Shipsec Self-Host with Docker (Recommended)
+### 1. Sentris Self-Host with Docker (Recommended)
 
-The easiest way to run ShipSec Studio on your own infrastructure:
+The easiest way to run Sentris Flow on your own infrastructure:
 
 #### One-Line Install
 
 ```bash
-curl -fsSL https://get.shipsec.ai | bash
+curl -fsSL https://get.sentris.ai | bash
 ```
 
 This installer will:
@@ -53,14 +53,14 @@ This installer will:
 - Clone the repository and start all services
 - Guide you through any required setup steps
 
-Once complete, visit **http://localhost** to access ShipSec Studio.
+Once complete, visit **http://localhost** to access Sentris Flow.
 
-### 2. ShipSec Cloud (Preview)
+### 2. Sentris Cloud (Preview)
 
-The fastest way to test ShipSec Studio without managing infrastructure.
+The fastest way to test Sentris Flow without managing infrastructure.
 
-- **Try it out:** [studio.shipsec.ai](https://studio.shipsec.ai)
-- **Note:** ShipSec Studio is under active development. The cloud environment is a technical preview for evaluation and sandbox testing.
+- **Try it out:** [studio.sentris.ai](https://studio.sentris.ai)
+- **Note:** Sentris Flow is under active development. The cloud environment is a technical preview for evaluation and sandbox testing.
 
 ### 3. Self-Host (Docker)
 
@@ -74,7 +74,7 @@ For teams requiring data residency and air-gapped security orchestrations. This 
 
 ```bash
 # Clone and start the latest stable release
-git clone https://github.com/ShipSecAI/studio.git
+git clone https://github.com/zebbern/Sentris.git
 cd studio
 just prod start-latest
 ```
@@ -90,7 +90,7 @@ Get the dev environment running in 3 steps:
 **Prerequisites:** [Docker Desktop](https://www.docker.com/), [Bun](https://bun.sh/), [Node.js](https://nodejs.org/) (v20+)
 
 ```bash
-git clone https://github.com/ShipSecAI/studio.git
+git clone https://github.com/zebbern/Sentris.git
 cd studio
 bun run setup   # Install deps + create .env files
 bun run dev     # Start Docker infra + all apps
@@ -142,7 +142,7 @@ Native support for industry-standard security tools including:
 
 ## 🏛️ Architecture Overview
 
-ShipSec Studio is designed for enterprise-grade durability and horizontal scalability.
+Sentris Flow is designed for enterprise-grade durability and horizontal scalability.
 
 - **Management Plane (Backend)**: NestJS service handling DSL compilation, secret management (AES-256-GCM), and identity.
 - **Orchestration Plane (Temporal)**: Manages workflow state, concurrency, and persistent wait states.
@@ -156,8 +156,8 @@ Learn more about our design decisions and system components in the **[Architectu
 ## 🤝 Community & Support
 
 - 💬 **[Discord](https://discord.gg/fmMA4BtNXC)** — Real-time support and community discussion.
-- 🗣️ **[GitHub Discussions](https://github.com/ShipSecAI/studio/discussions)** — Technical RFCs and feature requests.
-- 📚 **[Documentation](https://docs.shipsec.ai)** — Full guides on component development and deployment.
+- 🗣️ **[GitHub Discussions](https://github.com/zebbern/Sentris/discussions)** — Technical RFCs and feature requests.
+- 📚 **[Documentation](https://docs.sentris.ai)** — Full guides on component development and deployment.
 
 ---
 
@@ -190,8 +190,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architectural guidelines and setup in
 
 ## License
 
-ShipSec Studio is licensed under the **Apache License 2.0**.
+Sentris Flow is licensed under the **Apache License 2.0**.
 
 <div align="center">
-  <p>Engineered for security teams by the ShipSec AI team.</p>
+  <p>Engineered for security teams by the Sentris AI team.</p>
 </div>

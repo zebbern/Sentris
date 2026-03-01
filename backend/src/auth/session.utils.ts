@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 
 // Session cookie configuration
-export const SESSION_COOKIE_NAME = 'shipsec_session';
+export const SESSION_COOKIE_NAME = 'sentris_session';
 export const SESSION_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface SessionSecretConfig {

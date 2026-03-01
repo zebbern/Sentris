@@ -20,8 +20,8 @@ DAYS_VALID=365
 COUNTRY="US"
 STATE="CA"
 LOCALITY="SF"
-ORGANIZATION="ShipSecAI"
-ORG_UNIT="ShipSec"
+ORGANIZATION="SentrisAI"
+ORG_UNIT="Sentris"
 
 echo "=== OpenSearch Certificate Generator ==="
 echo "Output directory: $OUTPUT_DIR"

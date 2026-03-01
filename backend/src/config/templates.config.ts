@@ -11,7 +11,7 @@ export interface TemplatesConfig {
 export const templatesConfig = registerAs<TemplatesConfig>('templates', () => ({
   github: {
     token: process.env.GITHUB_TEMPLATE_TOKEN,
-    repo: process.env.GITHUB_TEMPLATE_REPO ?? 'shipsecai/workflow-templates',
+    repo: process.env.GITHUB_TEMPLATE_REPO ?? 'zebbern/sentris-templates',
     branch: process.env.GITHUB_TEMPLATE_BRANCH ?? 'main',
   },
 }));

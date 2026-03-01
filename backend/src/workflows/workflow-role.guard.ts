@@ -19,7 +19,7 @@ export interface WorkflowRoleRequirement {
   allowOrgAdmins?: boolean;
 }
 
-const WORKFLOW_ROLE_KEY = 'shipsec:workflow:role';
+const WORKFLOW_ROLE_KEY = 'sentris:workflow:role';
 
 export const RequireWorkflowRole = (
   role: AuthRole,

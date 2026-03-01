@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import type { TerminalChunkInput } from '@shipsec/component-sdk';
+import type { TerminalChunkInput } from '@sentris/component-sdk';
 
 export interface TerminalStreamAdapterOptions {
   maxEntries?: number;

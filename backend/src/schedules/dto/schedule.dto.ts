@@ -3,7 +3,7 @@ import {
   ScheduleOverlapPolicySchema,
   ScheduleStatusSchema,
   WorkflowScheduleSchema,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 

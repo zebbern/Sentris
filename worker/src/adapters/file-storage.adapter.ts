@@ -1,7 +1,7 @@
 import { Client } from 'minio';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
-import { IFileStorageService, NotFoundError } from '@shipsec/component-sdk';
+import { IFileStorageService, NotFoundError } from '@sentris/component-sdk';
 import * as schema from './schema';
 
 /**

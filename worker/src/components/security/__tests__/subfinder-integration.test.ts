@@ -3,8 +3,8 @@
  * Requires Docker daemon to be running
  */
 import { describe, test, expect, beforeEach } from 'bun:test';
-import { componentRegistry, createExecutionContext } from '@shipsec/component-sdk';
-import type { ExecutionContext } from '@shipsec/component-sdk';
+import { componentRegistry, createExecutionContext } from '@sentris/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
 import '../subfinder'; // Register the component
 
@@ -35,7 +35,7 @@ dockerDescribe('Subfinder Integration (Docker)', () => {
     logs.length = 0;
     context = createExecutionContext({
       runId: 'test-run',
-      componentRef: 'shipsec.subfinder.run',
+      componentRef: 'sentris.subfinder.run',
       logCollector: (entry) => {
         logs.push(`${entry.stream.toUpperCase()}: ${entry.message}`);
       },
@@ -44,7 +44,7 @@ dockerDescribe('Subfinder Integration (Docker)', () => {
 
   test('should discover subdomains for a known domain using real subfinder', async () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     )!;
     expect(component).toBeDefined();
 
@@ -78,7 +78,7 @@ dockerDescribe('Subfinder Integration (Docker)', () => {
 
   test('should handle invalid domain gracefully', async () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     )!;
     const result = await component.execute(
       {

@@ -62,7 +62,7 @@ export class ComponentRegistry {
       });
     }
 
-    // Validate component schemas against ShipSec typing rules
+    // Validate component schemas against Sentris typing rules
     const inputValidation = validateComponentSchema(definition.inputs);
     if (!inputValidation.valid) {
       throw new ConfigurationError(

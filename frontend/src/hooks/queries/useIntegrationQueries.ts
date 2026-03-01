@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 
 type IntegrationProvider = components['schemas']['IntegrationProviderResponse'];
 type IntegrationConnection = components['schemas']['IntegrationConnectionResponse'];

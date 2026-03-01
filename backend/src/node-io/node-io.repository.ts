@@ -19,7 +19,7 @@ export interface NodeIOData {
   errorMessage?: string;
 }
 
-import { KAFKA_SPILL_THRESHOLD_BYTES, createSpilledMarker } from '@shipsec/component-sdk';
+import { KAFKA_SPILL_THRESHOLD_BYTES, createSpilledMarker } from '@sentris/component-sdk';
 
 @Injectable()
 export class NodeIORepository {

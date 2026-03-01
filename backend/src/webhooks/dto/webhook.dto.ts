@@ -10,7 +10,7 @@ import {
   type CreateWebhook,
   type UpdateWebhook,
   type TestWebhookScript,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 // Existing DTO for backward compatibility
 export const WebhookRunWorkflowSchema = z.object({

@@ -12,10 +12,10 @@ import {
   port,
   param,
   type DockerRunnerConfig,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const NOTIFY_IMAGE = 'ghcr.io/shipsecai/notify:latest';
+const NOTIFY_IMAGE = 'ghcr.io/zebbern/notify:latest';
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;
 const MESSAGES_FILE_NAME = 'messages.txt';
@@ -294,7 +294,7 @@ const buildNotifyArgs = (options: BuildNotifyArgsOptions): string[] => {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.notify.dispatch',
+  id: 'sentris.notify.dispatch',
   label: 'ProjectDiscovery Notify',
   category: 'security',
   runner: {
@@ -335,8 +335,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/projectdiscovery/notify',
     icon: 'Bell',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "shipsec-studio",
+      "name": "sentris-flow",
       "dependencies": {
         "@googleapis/admin": "^30.2.0",
         "@grpc/grpc-js": "^1.14.3",
@@ -30,7 +30,7 @@
       },
     },
     "backend": {
-      "name": "@shipsec/studio-backend",
+      "name": "@sentris/flow-backend",
       "version": "0.1.0",
       "dependencies": {
         "@clerk/backend": "^2.29.5",
@@ -45,10 +45,10 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/throttler": "^6.5.0",
         "@opensearch-project/opensearch": "^3.5.1",
-        "@shipsec/backend-client": "workspace:*",
-        "@shipsec/component-sdk": "workspace:*",
-        "@shipsec/shared": "workspace:*",
-        "@shipsec/studio-worker": "workspace:*",
+        "@sentris/backend-client": "workspace:*",
+        "@sentris/component-sdk": "workspace:*",
+        "@sentris/shared": "workspace:*",
+        "@sentris/flow-worker": "workspace:*",
         "@temporalio/client": "^1.14.1",
         "@temporalio/worker": "^1.14.1",
         "@temporalio/workflow": "^1.14.1",
@@ -104,7 +104,7 @@
       },
     },
     "frontend": {
-      "name": "@shipsec/studio-frontend",
+      "name": "@sentris/flow-frontend",
       "version": "1.0.0",
       "dependencies": {
         "@ai-sdk/react": "^2.0.105",
@@ -127,8 +127,8 @@
         "@radix-ui/react-switch": "^1.2.6",
         "@radix-ui/react-tabs": "^1.1.13",
         "@radix-ui/react-tooltip": "^1.2.8",
-        "@shipsec/backend-client": "workspace:*",
-        "@shipsec/shared": "workspace:*",
+        "@sentris/backend-client": "workspace:*",
+        "@sentris/shared": "workspace:*",
         "@tanstack/react-query": "^5.90.21",
         "@tanstack/react-query-devtools": "^5.91.3",
         "@uiw/react-markdown-preview": "^5.1.5",
@@ -193,7 +193,7 @@
       },
     },
     "packages/backend-client": {
-      "name": "@shipsec/backend-client",
+      "name": "@sentris/backend-client",
       "version": "0.1.0",
       "dependencies": {
         "openapi-fetch": "^0.12.2",
@@ -207,10 +207,10 @@
       },
     },
     "packages/component-sdk": {
-      "name": "@shipsec/component-sdk",
+      "name": "@sentris/component-sdk",
       "version": "0.1.0",
       "dependencies": {
-        "@shipsec/shared": "workspace:*",
+        "@sentris/shared": "workspace:*",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -228,11 +228,11 @@
       },
     },
     "packages/contracts": {
-      "name": "@shipsec/contracts",
+      "name": "@sentris/contracts",
       "version": "0.1.0",
       "dependencies": {
-        "@shipsec/component-sdk": "workspace:*",
-        "@shipsec/shared": "workspace:*",
+        "@sentris/component-sdk": "workspace:*",
+        "@sentris/shared": "workspace:*",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -245,7 +245,7 @@
       },
     },
     "packages/shared": {
-      "name": "@shipsec/shared",
+      "name": "@sentris/shared",
       "version": "0.1.0",
       "dependencies": {
         "zod": "^4.3.6",
@@ -259,7 +259,7 @@
       },
     },
     "worker": {
-      "name": "@shipsec/studio-worker",
+      "name": "@sentris/flow-worker",
       "version": "0.1.0",
       "dependencies": {
         "@ai-sdk/google": "^3.0.13",
@@ -271,9 +271,9 @@
         "@modelcontextprotocol/sdk": "^1.25.1",
         "@okta/okta-sdk-nodejs": "^7.3.0",
         "@opensearch-project/opensearch": "^3.5.1",
-        "@shipsec/component-sdk": "*",
-        "@shipsec/contracts": "*",
-        "@shipsec/shared": "*",
+        "@sentris/component-sdk": "*",
+        "@sentris/contracts": "*",
+        "@sentris/shared": "*",
         "@temporalio/activity": "^1.14.1",
         "@temporalio/client": "^1.14.1",
         "@temporalio/common": "^1.14.1",
@@ -914,19 +914,19 @@
 
     "@scarf/scarf": ["@scarf/scarf@1.4.0", "", {}, "sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ=="],
 
-    "@shipsec/backend-client": ["@shipsec/backend-client@workspace:packages/backend-client"],
+    "@sentris/backend-client": ["@sentris/backend-client@workspace:packages/backend-client"],
 
-    "@shipsec/component-sdk": ["@shipsec/component-sdk@workspace:packages/component-sdk"],
+    "@sentris/component-sdk": ["@sentris/component-sdk@workspace:packages/component-sdk"],
 
-    "@shipsec/contracts": ["@shipsec/contracts@workspace:packages/contracts"],
+    "@sentris/contracts": ["@sentris/contracts@workspace:packages/contracts"],
 
-    "@shipsec/shared": ["@shipsec/shared@workspace:packages/shared"],
+    "@sentris/shared": ["@sentris/shared@workspace:packages/shared"],
 
-    "@shipsec/studio-backend": ["@shipsec/studio-backend@workspace:backend"],
+    "@sentris/flow-backend": ["@sentris/flow-backend@workspace:backend"],
 
-    "@shipsec/studio-frontend": ["@shipsec/studio-frontend@workspace:frontend"],
+    "@sentris/flow-frontend": ["@sentris/flow-frontend@workspace:frontend"],
 
-    "@shipsec/studio-worker": ["@shipsec/studio-worker@workspace:worker"],
+    "@sentris/flow-worker": ["@sentris/flow-worker@workspace:worker"],
 
     "@smithy/abort-controller": ["@smithy/abort-controller@4.2.8", "", { "dependencies": { "@smithy/types": "^4.12.0", "tslib": "^2.6.2" } }, "sha512-peuVfkYHAmS5ybKxWcfraK7WBBP0J+rkfUcbHJJKQ4ir3UAUNQI+Y4Vt/PqSzGqgloJ5O1dk7+WzNL8wcCSXbw=="],
 
@@ -3278,15 +3278,15 @@
 
     "@redocly/openapi-core/minimatch": ["minimatch@5.1.6", "", { "dependencies": { "brace-expansion": "^2.0.1" } }, "sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g=="],
 
-    "@shipsec/component-sdk/@types/node": ["@types/node@20.19.30", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-WJtwWJu7UdlvzEAUm484QNg5eAoq5QR08KDNx7g45Usrs2NtOPiX8ugDqmKdXkyL03rBqU5dYNYVQetEpBHq2g=="],
+    "@sentris/component-sdk/@types/node": ["@types/node@20.19.30", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-WJtwWJu7UdlvzEAUm484QNg5eAoq5QR08KDNx7g45Usrs2NtOPiX8ugDqmKdXkyL03rBqU5dYNYVQetEpBHq2g=="],
 
-    "@shipsec/studio-backend/@types/node": ["@types/node@20.19.30", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-WJtwWJu7UdlvzEAUm484QNg5eAoq5QR08KDNx7g45Usrs2NtOPiX8ugDqmKdXkyL03rBqU5dYNYVQetEpBHq2g=="],
+    "@sentris/flow-backend/@types/node": ["@types/node@20.19.30", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-WJtwWJu7UdlvzEAUm484QNg5eAoq5QR08KDNx7g45Usrs2NtOPiX8ugDqmKdXkyL03rBqU5dYNYVQetEpBHq2g=="],
 
-    "@shipsec/studio-frontend/ai": ["ai@5.0.124", "", { "dependencies": { "@ai-sdk/gateway": "2.0.30", "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.20", "@opentelemetry/api": "1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-Li6Jw9F9qsvFJXZPBfxj38ddP2iURCnMs96f9Q3OeQzrDVcl1hvtwSEAuxA/qmfh6SDV2ERqFUOFzigvr0697g=="],
+    "@sentris/flow-frontend/ai": ["ai@5.0.124", "", { "dependencies": { "@ai-sdk/gateway": "2.0.30", "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.20", "@opentelemetry/api": "1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-Li6Jw9F9qsvFJXZPBfxj38ddP2iURCnMs96f9Q3OeQzrDVcl1hvtwSEAuxA/qmfh6SDV2ERqFUOFzigvr0697g=="],
 
-    "@shipsec/studio-worker/@googleapis/admin": ["@googleapis/admin@29.0.0", "", { "dependencies": { "googleapis-common": "^8.0.0" } }, "sha512-lujnbfmDn1aetoJBDeExH4IDKniMZs7Ga8hGagN/lecO8hd0fy9hu+osROp0HFk6u2wCAiA89oXi5qHVXupbOQ=="],
+    "@sentris/flow-worker/@googleapis/admin": ["@googleapis/admin@29.0.0", "", { "dependencies": { "googleapis-common": "^8.0.0" } }, "sha512-lujnbfmDn1aetoJBDeExH4IDKniMZs7Ga8hGagN/lecO8hd0fy9hu+osROp0HFk6u2wCAiA89oXi5qHVXupbOQ=="],
 
-    "@shipsec/studio-worker/@types/node": ["@types/node@25.2.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w=="],
+    "@sentris/flow-worker/@types/node": ["@types/node@25.2.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w=="],
 
     "@temporalio/common/ms": ["ms@3.0.0-canary.1", "", {}, "sha512-kh8ARjh8rMN7Du2igDRO9QJnqCb2xYTJxyQYK7vJJS4TvLLmsbyhiKpSW+t+y26gyOyMd0riphX0GeWKU3ky5g=="],
 
@@ -3654,15 +3654,15 @@
 
     "@redocly/openapi-core/minimatch/brace-expansion": ["brace-expansion@2.0.2", "", { "dependencies": { "balanced-match": "^1.0.0" } }, "sha512-Jt0vHyM+jmUBqojB7E1NIYadt0vI0Qxjxd2TErW94wDz+E2LAm5vKMXXwg6ZZBTHPuUlDgQHKXvjGBdfcF1ZDQ=="],
 
-    "@shipsec/component-sdk/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+    "@sentris/component-sdk/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
-    "@shipsec/studio-backend/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
+    "@sentris/flow-backend/@types/node/undici-types": ["undici-types@6.21.0", "", {}, "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ=="],
 
-    "@shipsec/studio-frontend/ai/@ai-sdk/gateway": ["@ai-sdk/gateway@2.0.30", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.20", "@vercel/oidc": "3.1.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-5Nrkj8B4MzkkOfjjA+Cs5pamkbkK4lI11bx80QV7TFcen/hWA8wEC+UVzwuM5H2zpekoNMjvl6GonHnR62XIZw=="],
+    "@sentris/flow-frontend/ai/@ai-sdk/gateway": ["@ai-sdk/gateway@2.0.30", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.20", "@vercel/oidc": "3.1.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-5Nrkj8B4MzkkOfjjA+Cs5pamkbkK4lI11bx80QV7TFcen/hWA8wEC+UVzwuM5H2zpekoNMjvl6GonHnR62XIZw=="],
 
-    "@shipsec/studio-frontend/ai/@ai-sdk/provider": ["@ai-sdk/provider@2.0.1", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-KCUwswvsC5VsW2PWFqF8eJgSCu5Ysj7m1TxiHTVA6g7k360bk0RNQENT8KTMAYEs+8fWPD3Uu4dEmzGHc+jGng=="],
+    "@sentris/flow-frontend/ai/@ai-sdk/provider": ["@ai-sdk/provider@2.0.1", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-KCUwswvsC5VsW2PWFqF8eJgSCu5Ysj7m1TxiHTVA6g7k360bk0RNQENT8KTMAYEs+8fWPD3Uu4dEmzGHc+jGng=="],
 
-    "@shipsec/studio-frontend/ai/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@3.0.20", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-iXHVe0apM2zUEzauqJwqmpC37A5rihrStAih5Ks+JE32iTe4LZ58y17UGBjpQQTCRw9YxMeo2UFLxLpBluyvLQ=="],
+    "@sentris/flow-frontend/ai/@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@3.0.20", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@standard-schema/spec": "^1.0.0", "eventsource-parser": "^3.0.6" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-iXHVe0apM2zUEzauqJwqmpC37A5rihrStAih5Ks+JE32iTe4LZ58y17UGBjpQQTCRw9YxMeo2UFLxLpBluyvLQ=="],
 
     "@types/express/@types/express-serve-static-core/@types/node": ["@types/node@25.2.0", "", { "dependencies": { "undici-types": "~7.16.0" } }, "sha512-DZ8VwRFUNzuqJ5khrvwMXHmvPe+zGayJhr2CDNiKB1WBE1ST8Djl00D0IC4vvNmHMdj6DlbYRIaFE7WHjlDl5w=="],
 

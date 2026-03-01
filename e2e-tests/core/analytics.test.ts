@@ -32,7 +32,7 @@ async function pollOpenSearch(runId: string, timeoutMs = 60000): Promise<number>
     size: 1,
     query: {
       term: {
-        'shipsec.run_id': runId,
+        'sentris.run_id': runId,
       },
     },
   };
@@ -156,7 +156,7 @@ e2eDescribe('Workflow Analytics E2E Tests', () => {
       body: JSON.stringify({
         query: {
           term: {
-            'shipsec.run_id': runId,
+            'sentris.run_id': runId,
           },
         },
         size: 5,

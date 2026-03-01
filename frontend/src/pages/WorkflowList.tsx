@@ -107,7 +107,7 @@ export function WorkflowList() {
   } = useSortableList({
     items: filteredWorkflows,
     getId: getWorkflowId,
-    storageKey: `shipsec:sort:workflows:${organizationId}`,
+    storageKey: `sentris:sort:workflows:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

@@ -9,7 +9,7 @@ import {
   type WorkflowRunInsert,
   type WorkflowRunRecord,
 } from '../../database/schema';
-import type { ExecutionInputPreview, ExecutionTriggerType } from '@shipsec/shared';
+import type { ExecutionInputPreview, ExecutionTriggerType } from '@sentris/shared';
 
 interface CreateWorkflowRunInput {
   runId: string;

@@ -5,7 +5,7 @@ import type {
   RunWorkflowActivityOutput,
   WorkflowLogSink,
 } from '../types';
-import type { IFileStorageService, ITraceService, ISecretsService } from '@shipsec/component-sdk';
+import type { IFileStorageService, ITraceService, ISecretsService } from '@sentris/component-sdk';
 import type { ArtifactServiceFactory } from '../artifact-factory';
 import { isTraceMetadataAware } from '../utils/trace-metadata';
 

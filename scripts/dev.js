@@ -19,9 +19,9 @@ const COMPOSE_FILES = [
   'docker/docker-compose.infra.yml',
   'docker/docker-compose.dev-ports.yml',
 ];
-const COMPOSE_PROJECT = 'shipsec';
+const COMPOSE_PROJECT = 'sentris';
 const PM2_CONFIG = 'pm2.config.cjs';
-const PM2_APPS = 'shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0';
+const PM2_APPS = 'sentris-frontend-0,sentris-backend-0,sentris-worker-0';
 
 function log(icon, message) {
   console.log(`${icon}  ${message}`);
@@ -98,8 +98,8 @@ function startPm2Apps() {
       stdio: 'inherit',
       env: {
         ...process.env,
-        SHIPSEC_INSTANCE: '0',
-        SHIPSEC_ENV: 'development',
+        SENTRIS_INSTANCE: '0',
+        SENTRIS_ENV: 'development',
         NODE_ENV: 'development',
         OPENSEARCH_SECURITY_ENABLED: 'false',
         OPENSEARCH_URL: 'http://localhost:9200',
@@ -132,7 +132,7 @@ function printSummary() {
 
 function main() {
   console.log('');
-  log('🔧', 'Starting ShipSec Studio (full stack)...');
+  log('🔧', 'Starting Sentris Flow (full stack)...');
   console.log('');
 
   checkEnvFiles();

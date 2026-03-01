@@ -11,7 +11,7 @@ interface TestItem {
 // which triggers the hook's useEffect infinitely.
 const getId = (item: TestItem): string => item.id;
 
-const STORAGE_KEY = 'shipsec:sort:test-page:org-1';
+const STORAGE_KEY = 'sentris:sort:test-page:org-1';
 
 const makeItems = (...ids: string[]): TestItem[] => ids.map((id) => ({ id, name: `Item ${id}` }));
 

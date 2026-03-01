@@ -13,7 +13,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const inputSchema = inputs({
@@ -205,12 +205,12 @@ const dockerTimeoutSeconds = (() => {
 })();
 
 const definition = defineComponent({
-  id: 'shipsec.httpx.scan',
+  id: 'sentris.httpx.scan',
   label: 'httpx Web Probe',
   category: 'security',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/httpx:latest',
+    image: 'ghcr.io/zebbern/httpx:latest',
     entrypoint: 'httpx',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
@@ -242,8 +242,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/projectdiscovery/httpx',
     icon: 'Globe',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

@@ -21,7 +21,7 @@ mock.module('@okta/okta-sdk-nodejs', () => ({
 
 // Import the component definition
 import '../okta-user-offboard';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import { OktaUserOffboardInput, OktaUserOffboardOutput } from '../okta-user-offboard';
 
 const definition = componentRegistry.get<OktaUserOffboardInput, OktaUserOffboardOutput>(

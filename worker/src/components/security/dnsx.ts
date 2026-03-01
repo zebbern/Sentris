@@ -14,7 +14,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const recordTypeEnum = z.enum([
@@ -35,7 +35,7 @@ const recordTypeEnum = z.enum([
 
 const outputModeEnum = z.enum(['silent', 'json']);
 
-const DNSX_IMAGE = 'ghcr.io/shipsecai/dnsx:latest';
+const DNSX_IMAGE = 'ghcr.io/zebbern/dnsx:latest';
 const DNSX_TIMEOUT_SECONDS = 180;
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;
@@ -476,7 +476,7 @@ const dnsxRetryPolicy: ComponentRetryPolicy = {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.dnsx.run',
+  id: 'sentris.dnsx.run',
   label: 'DNSX Resolver',
   category: 'security',
   retryPolicy: dnsxRetryPolicy,
@@ -513,8 +513,8 @@ const definition = defineComponent({
     documentation: 'https://github.com/projectdiscovery/dnsx',
     icon: 'Globe',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

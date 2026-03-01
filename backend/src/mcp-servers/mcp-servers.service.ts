@@ -630,7 +630,7 @@ export class McpServersService {
           params: {
             protocolVersion: '2024-11-05',
             capabilities: {},
-            clientInfo: { name: 'shipsec-studio', version: '1.0.0' },
+            clientInfo: { name: 'sentris-flow', version: '1.0.0' },
           },
         }),
         signal: AbortSignal.timeout(10000),

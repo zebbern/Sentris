@@ -6,7 +6,7 @@ import { TableCell } from '@/components/ui/table';
 import { DragHandle } from '@/components/ui/sortable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { PauseCircle, PlayCircle, Edit3, Trash2 } from 'lucide-react';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import type { StatusBadgeProps } from '@/utils/tableHelpers';
 import { formatDateTime } from '@/utils/timeFormat';
 

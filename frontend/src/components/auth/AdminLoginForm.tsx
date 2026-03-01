@@ -89,7 +89,7 @@ export function AdminLoginForm() {
         <div className="flex flex-col items-center gap-3 mb-8">
           <img
             src="/favicon.ico"
-            alt="ShipSec Studio"
+            alt="Sentris Flow"
             width={48}
             height={48}
             className="h-12 w-12"
@@ -98,7 +98,7 @@ export function AdminLoginForm() {
             }}
           />
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">ShipSec Studio</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Sentris Flow</h1>
             <p className="text-sm text-muted-foreground">Security Workflow Platform</p>
           </div>
         </div>

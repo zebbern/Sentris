@@ -9,7 +9,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -20,7 +20,7 @@ const parameterSchema = parameters({
       .trim()
       .min(1)
       .max(120)
-      .default('Hello from ShipSec Terminal!')
+      .default('Hello from Sentris Terminal!')
       .describe('Message to display in the terminal.'),
     {
       label: 'Message',
@@ -70,7 +70,7 @@ process.stdin.setRawMode && process.stdin.setRawMode(false);
 process.stdin.resume();
 process.stdin.on('data', () => {}); // Consume any stdin data silently
 
-const message = process.env.MESSAGE || 'Hello from ShipSec Terminal!';
+const message = process.env.MESSAGE || 'Hello from Sentris Terminal!';
 const durationSeconds = parseInt(process.env.DURATION_SECONDS || '20', 10);
 
 // ANSI colors
@@ -82,7 +82,7 @@ const bright = '\x1b[1m';
 
 console.log('');
 console.log(bright + cyan + '╔════════════════════════════════════════╗' + reset);
-console.log(bright + cyan + '║' + reset + '     ShipSec Terminal Demo     ' + bright + cyan + '║' + reset);
+console.log(bright + cyan + '║' + reset + '     Sentris Terminal Demo     ' + bright + cyan + '║' + reset);
 console.log(bright + cyan + '╚════════════════════════════════════════╝' + reset);
 console.log('');
 console.log('Message: ' + yellow + message + reset);
@@ -142,7 +142,7 @@ const runner: DockerRunnerConfig = {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.security.terminal-demo',
+  id: 'sentris.security.terminal-demo',
   label: 'Terminal Stream Demo',
   category: 'security',
   runner,
@@ -159,8 +159,8 @@ const definition = defineComponent({
     documentationUrl: 'https://asciinema.org/',
     icon: 'Terminal',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

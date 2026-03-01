@@ -1,4 +1,4 @@
-import type { IArtifactService } from '@shipsec/component-sdk';
+import type { IArtifactService } from '@sentris/component-sdk';
 
 export interface ArtifactScope {
   runId: string;

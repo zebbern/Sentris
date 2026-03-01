@@ -1,4 +1,4 @@
-import type { ExecutionContext, AgentTraceEvent } from '@shipsec/component-sdk';
+import type { ExecutionContext, AgentTraceEvent } from '@sentris/component-sdk';
 
 export type AgentStreamPart =
   | {

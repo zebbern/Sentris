@@ -6,8 +6,8 @@ import {
   componentRegistry,
   getCredentialInputIds,
   type ComponentPortMetadata,
-} from '@shipsec/component-sdk';
-import { extractPorts } from '@shipsec/component-sdk/zod-ports';
+} from '@sentris/component-sdk';
+import { extractPorts } from '@sentris/component-sdk/zod-ports';
 import {
   WorkflowAction,
   WorkflowDefinition,

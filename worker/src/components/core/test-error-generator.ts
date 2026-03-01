@@ -15,7 +15,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -191,8 +191,8 @@ const definition = defineComponent({
       'Generates programmed errors for E2E testing of the retry and error reporting system.',
     icon: 'AlertTriangle',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

@@ -10,7 +10,7 @@ import {
   withPortMeta,
   inputs,
   outputs,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 import { executeWorkflow } from '../workflow-runner';
 import type { WorkflowDefinition, WorkflowLogEntry, WorkflowLogSink } from '../types';

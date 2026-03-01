@@ -34,10 +34,10 @@ illegal_argument_exception: Limit of total fields [1000] has been exceeded
    - All findings from one component execution share the same `@timestamp`
    - Captured once at the start of indexing, applied to all documents
 
-4. **Nested `shipsec` context**
-   - Workflow context stored under `shipsec.*` namespace
+4. **Nested `sentris` context**
+   - Workflow context stored under `sentris.*` namespace
    - Prevents field name collision with component data
-   - Clear separation: component fields at root, system fields under `shipsec`
+   - Clear separation: component fields at root, system fields under `sentris`
 
 5. **Nested objects serialized before indexing**
    - Any nested object or array within a finding is JSON-stringified
@@ -80,9 +80,9 @@ illegal_argument_exception: Limit of total fields [1000] has been exceeded
   "asset_key": "abcdefghij1234567890",
   "finding_hash": "a1b2c3d4e5f67890",
 
-  "shipsec": {
+  "sentris": {
     "organization_id": "org_123",
-    "run_id": "shipsec-run-xxx",
+    "run_id": "sentris-run-xxx",
     "workflow_id": "d1d33161-929f-4af4-9a64-xxx",
     "workflow_name": "Supabase Security Audit",
     "component_id": "core.analytics.sink",
@@ -135,9 +135,9 @@ function generateFindingHash(...fields: (string | undefined | null)[]): string {
 - **Resolution tracking**: Findings that stop appearing may be resolved
 - **Deduplication**: Remove duplicates in dashboards across runs
 
-### `shipsec` Context Fields
+### `sentris` Context Fields
 
-The indexer automatically adds these fields under `shipsec`:
+The indexer automatically adds these fields under `sentris`:
 
 | Field | Description |
 |-------|-------------|
@@ -152,9 +152,9 @@ The indexer automatically adds these fields under `shipsec`:
 ### Querying in OpenSearch
 
 With this structure, users can:
-- Filter by organization: `shipsec.organization_id: "org_123"`
-- Filter by workflow: `shipsec.workflow_id: "xxx"`
-- Filter by run: `shipsec.run_id: "xxx"`
+- Filter by organization: `sentris.organization_id: "org_123"`
+- Filter by workflow: `sentris.workflow_id: "xxx"`
+- Filter by run: `sentris.run_id: "xxx"`
 - Filter by asset: `asset_key: "api.example.com"`
 - Filter by scanner: `scanner: "nuclei"`
 - Filter by component-specific fields: `severity: "CRITICAL"`
@@ -167,13 +167,13 @@ With this structure, users can:
 | Decision | Pro | Con |
 |----------|-----|-----|
 | Serialize nested objects | Prevents field explosion | Can't query inside serialized fields |
-| `shipsec` namespace | No field collision | Slightly more verbose queries |
+| `sentris` namespace | No field collision | Slightly more verbose queries |
 | No generic schema | Better fit per component | Less consistency across components |
 | Same timestamp per batch | Accurate (same scan time) | Can't distinguish individual finding times |
 
 ### Implementation Files
 
-1. `/worker/src/utils/opensearch-indexer.ts` - Add `shipsec` context, serialize nested objects
+1. `/worker/src/utils/opensearch-indexer.ts` - Add `sentris` context, serialize nested objects
 2. `/worker/src/components/core/analytics-sink.ts` - Accept `list<json>`, consistent timestamp
 3. Component files - Ensure structured output, add `results` port where missing
 
@@ -185,6 +185,6 @@ With this structure, users can:
 
 ### Future Considerations
 
-1. **Index templates**: Create OpenSearch index template with explicit mappings for `shipsec.*` fields
+1. **Index templates**: Create OpenSearch index template with explicit mappings for `sentris.*` fields
 2. **Field discovery**: Build UI to show available fields from indexed data
 3. **Schema validation**: Optional strict mode to validate findings against expected schema

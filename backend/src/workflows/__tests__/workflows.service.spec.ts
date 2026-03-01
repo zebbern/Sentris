@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import '@shipsec/studio-worker/components'; // Register components
+import '@sentris/studio-worker/components'; // Register components
 import { WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { compileWorkflowGraph } from '../../dsl/compiler';
 import { WorkflowDefinition } from '../../dsl/types';
@@ -12,7 +12,7 @@ import type {
 import { WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
 import type { AuthContext } from '../../auth/types';
-import type { ExecutionInputPreview, ExecutionTriggerType } from '@shipsec/shared';
+import type { ExecutionInputPreview, ExecutionTriggerType } from '@sentris/shared';
 
 const TEST_ORG = 'test-org';
 const authContext: AuthContext = {
@@ -355,9 +355,9 @@ describe('WorkflowsService', () => {
       async startWorkflow(options) {
         startCalls.push(options);
         return {
-          workflowId: options.workflowId ?? 'shipsec-run-mock',
+          workflowId: options.workflowId ?? 'sentris-run-mock',
           runId: 'temporal-run-mock',
-          taskQueue: options.taskQueue ?? 'shipsec-default',
+          taskQueue: options.taskQueue ?? 'sentris-default',
         };
       },
       async describeWorkflow(ref) {
@@ -369,7 +369,7 @@ describe('WorkflowsService', () => {
           startTime: now,
           closeTime: undefined,
           historyLength: 0,
-          taskQueue: 'shipsec-default',
+          taskQueue: 'sentris-default',
           failure: undefined,
         };
         return { ...base, ...overrides };
@@ -381,7 +381,7 @@ describe('WorkflowsService', () => {
         lastCancelRef = ref;
       },
       getDefaultTaskQueue() {
-        return 'shipsec-default';
+        return 'sentris-default';
       },
     };
 
@@ -448,12 +448,12 @@ describe('WorkflowsService', () => {
 
     const run = await service.run('workflow-id', { inputs: { message: 'hi' } }, authContext);
 
-    expect(run.runId).toMatch(/^shipsec-run-/);
+    expect(run.runId).toMatch(/^sentris-run-/);
     expect(run.workflowId).toBe('workflow-id');
     expect(run.status).toBe('RUNNING');
-    expect(run.taskQueue).toBe('shipsec-default');
+    expect(run.taskQueue).toBe('sentris-default');
     expect(startCalls).toHaveLength(1);
-    expect(startCalls[0].workflowType).toBe('shipsecWorkflowRun');
+    expect(startCalls[0].workflowType).toBe('sentrisWorkflowRun');
     expect(startCalls[0].args?.[0]).toMatchObject({
       runId: run.runId,
       workflowId: 'workflow-id',
@@ -569,7 +569,7 @@ describe('WorkflowsService', () => {
     expect(status.runId).toBe(run.runId);
     expect(status.workflowId).toBe('workflow-id');
     expect(status.status).toBe('RUNNING');
-    expect(status.taskQueue).toBe('shipsec-default');
+    expect(status.taskQueue).toBe('sentris-default');
     expect(status.progress).toEqual({ completedActions: 1, totalActions: 2 });
     expect(status.failure).toBeUndefined();
     expect(result).toMatchObject({ workflowId: run.runId, completed: true });
@@ -625,7 +625,7 @@ describe('WorkflowsService', () => {
     const versionRecord = createWorkflowVersionRecord('workflow-id');
 
     storedRunMeta = {
-      runId: 'shipsec-run-fail',
+      runId: 'sentris-run-fail',
       workflowId: 'workflow-id',
       workflowVersionId: versionRecord.id,
       workflowVersion: versionRecord.version,
@@ -636,7 +636,7 @@ describe('WorkflowsService', () => {
       organizationId: TEST_ORG,
     };
 
-    const status = await service.getRunStatus('shipsec-run-fail', undefined, authContext);
+    const status = await service.getRunStatus('sentris-run-fail', undefined, authContext);
     expect(status.status).toBe('FAILED');
     expect(status.failure).toEqual({
       reason: 'Component crashed',

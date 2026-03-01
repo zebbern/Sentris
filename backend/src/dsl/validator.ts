@@ -5,13 +5,13 @@ import {
   type ComponentDefinition,
   type ComponentPortMetadata,
   type ConnectionType,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import {
   extractPorts,
   canConnect,
   describeConnectionType,
   createPlaceholderForConnectionType,
-} from '@shipsec/component-sdk/zod-ports';
+} from '@sentris/component-sdk/zod-ports';
 
 import type { WorkflowGraphDto } from '../workflows/dto/workflow-graph.dto';
 import type { WorkflowAction, WorkflowDefinition } from './types';

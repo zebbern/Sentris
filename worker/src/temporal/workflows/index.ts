@@ -27,7 +27,7 @@ import {
   type ToolCallRequest,
   type ToolCallResult,
 } from '../signals.js';
-import type { ExecutionTriggerMetadata, PreparedRunPayload } from '@shipsec/shared';
+import type { ExecutionTriggerMetadata, PreparedRunPayload } from '@sentris/shared';
 import type {
   RunComponentActivityInput,
   RunComponentActivityOutput,
@@ -109,7 +109,7 @@ const { recordTraceEventActivity } = proxyActivities<{
   startToCloseTimeout: '1 minute',
 });
 
-export async function shipsecWorkflowRun(
+export async function sentrisWorkflowRun(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
   const results = new Map<string, unknown>();
@@ -231,7 +231,7 @@ export async function shipsecWorkflowRun(
     },
   );
 
-  console.log(`[Workflow] Starting shipsec workflow run: ${input.runId}`);
+  console.log(`[Workflow] Starting sentris workflow run: ${input.runId}`);
   console.log(
     `[Workflow] Definition actions:`,
     input.definition.actions.map((a) => a.ref),
@@ -415,7 +415,7 @@ export async function shipsecWorkflowRun(
             childInputs[id] = mergedInputs[id];
           }
 
-          const childRunId = `shipsec-run-${uuid4()}`;
+          const childRunId = `sentris-run-${uuid4()}`;
 
           await recordTraceEventActivity({
             type: 'NODE_STARTED',
@@ -467,7 +467,7 @@ export async function shipsecWorkflowRun(
             throw error;
           }
 
-          const child = await startChild(shipsecWorkflowRun, {
+          const child = await startChild(sentrisWorkflowRun, {
             args: [
               {
                 runId: prepared.runId,
@@ -496,7 +496,7 @@ export async function shipsecWorkflowRun(
               sleep(timeoutMs).then(() => ({ kind: 'timeout' as const })),
             ]);
           } catch (childError: unknown) {
-            // child.result() rejects when the child workflow throws (shipsecWorkflowRun
+            // child.result() rejects when the child workflow throws (sentrisWorkflowRun
             // always throws on failure rather than returning { success: false }).
             // Record NODE_FAILED so the UI shows the node as failed instead of stuck running.
             const message = childError instanceof Error ? childError.message : String(childError);
@@ -1044,7 +1044,7 @@ export async function minimalWorkflow(): Promise<string> {
 export async function testMinimalWorkflow(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
-  return shipsecWorkflowRun(input);
+  return sentrisWorkflowRun(input);
 }
 
 export interface ScheduleTriggerWorkflowInput {
@@ -1073,7 +1073,7 @@ export async function scheduleTriggerWorkflow(
       label: input.scheduleName ?? 'Scheduled run',
     } satisfies ExecutionTriggerMetadata);
 
-  const runId = `shipsec-run-${uuid4()}`;
+  const runId = `sentris-run-${uuid4()}`;
 
   const prepared = await prepareRunPayloadActivity({
     workflowId: input.workflowId,
@@ -1086,7 +1086,7 @@ export async function scheduleTriggerWorkflow(
     runId,
   });
 
-  const child = await startChild(shipsecWorkflowRun, {
+  const child = await startChild(sentrisWorkflowRun, {
     args: [
       {
         runId: prepared.runId,

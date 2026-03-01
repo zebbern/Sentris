@@ -47,7 +47,7 @@ import { createBundlerOptions } from './worker-config';
 // Load environment variables from instance-specific env if set, otherwise fall back
 // to the worker's default `.env`.
 const workerRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const instanceNum = process.env.SHIPSEC_INSTANCE;
+const instanceNum = process.env.SENTRIS_INSTANCE;
 const instanceEnvPath = instanceNum
   ? join(workerRoot, '..', '.instances', `instance-${instanceNum}`, 'worker.env')
   : undefined;
@@ -66,8 +66,8 @@ if (typeof globalThis.crypto === 'undefined') {
 
 async function main() {
   const address = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-  const taskQueue = process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-default';
-  const namespace = process.env.TEMPORAL_NAMESPACE ?? 'shipsec-dev';
+  const taskQueue = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
+  const namespace = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
   const workflowsPath = join(dirname(fileURLToPath(import.meta.url)), '../workflows');
 
   console.log(`🔌 Connecting to Temporal at ${address}...`);

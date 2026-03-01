@@ -1,4 +1,4 @@
-import type { ScheduleOverlapPolicy } from '@shipsec/shared';
+import type { ScheduleOverlapPolicy } from '@sentris/shared';
 
 export type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string';
 export type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;

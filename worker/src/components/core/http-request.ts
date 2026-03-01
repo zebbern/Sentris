@@ -13,7 +13,7 @@ import {
   port,
   param,
   withPortMeta,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   url: port(z.string().url().describe('Target URL'), {
@@ -149,8 +149,8 @@ const definition = defineComponent({
     description: 'Make generic HTTP requests to external APIs.',
     icon: 'Globe',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

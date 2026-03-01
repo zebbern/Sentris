@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ShipSec E2E Local Testing Script
+# Sentris E2E Local Testing Script
 # Usage: ./scripts/e2e-local-test.sh [test-name]
 # Example: ./scripts/e2e-local-test.sh alert-investigation
 
@@ -11,13 +11,13 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_ROOT/.env.e2e"
 TEST_NAME="${1:-alert-investigation}"
 
-echo "🧪 ShipSec E2E Local Testing"
+echo "🧪 Sentris E2E Local Testing"
 echo "================================"
 echo ""
 
 # Check if running in correct directory
 if [ ! -f "$PROJECT_ROOT/package.json" ]; then
-    echo "❌ Error: Not in ShipSec project root"
+    echo "❌ Error: Not in Sentris project root"
     exit 1
 fi
 
@@ -62,7 +62,7 @@ fi
 echo ""
 
 # Check if services are running
-echo "🔍 Checking if ShipSec backend is running..."
+echo "🔍 Checking if Sentris backend is running..."
 
 INSTANCE=$(just instance show 2>/dev/null || echo "0")
 BACKEND_PORT=$((3211 + INSTANCE * 100))

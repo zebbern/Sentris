@@ -38,7 +38,7 @@ import {
   type BadgeVariant,
 } from '@/utils/tableHelpers';
 import { WebhooksTable } from './webhooks/WebhooksTable';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -52,7 +52,7 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   error: 'destructive',
 };
 
-const WEBHOOK_BASE_URL = env.VITE_API_URL || 'https://api.shipsec.ai';
+const WEBHOOK_BASE_URL = env.VITE_API_URL || 'https://api.sentris.ai';
 
 export function WebhooksPage() {
   useDocumentTitle('Webhooks');
@@ -117,7 +117,7 @@ export function WebhooksPage() {
   } = useSortableList({
     items: filteredWebhooks,
     getId: getWebhookId,
-    storageKey: `shipsec:sort:webhooks:${organizationId}`,
+    storageKey: `sentris:sort:webhooks:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

@@ -11,7 +11,7 @@ import {
   type ITraceService,
   type INodeIOService,
   type AgentTracePublisher,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 import {
   maskSecretInputs,

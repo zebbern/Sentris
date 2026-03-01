@@ -12,12 +12,12 @@ import {
   outputs,
   port,
   DEFAULT_SENSITIVE_HEADERS,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   organization: port(z.string().trim().min(1, 'Organization is required.'), {
     label: 'Organization',
-    description: 'GitHub organization login (e.g. shipsecai).',
+    description: 'GitHub organization login (e.g. sentris).',
   }),
   teamSlug: port(z.string().trim().min(1, 'Team slug cannot be empty.').optional(), {
     label: 'Team Slug',
@@ -125,8 +125,8 @@ const definition = defineComponent({
       'Automates GitHub organization seat recovery by running a device OAuth flow (client ID + secret) and removing the user from the organization and optionally a team.',
     icon: 'UserMinus',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,
@@ -167,7 +167,7 @@ const definition = defineComponent({
       // Use token obtained via selected authentication mode
       Authorization: `${authorizationScheme} ${accessToken}`,
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'shipsecai-worker/1.0',
+      'User-Agent': 'sentris-worker/1.0',
       'X-GitHub-Api-Version': '2022-11-28',
     };
 
@@ -298,7 +298,7 @@ async function fetchConnectionAccessToken(
 
   const baseUrl =
     process.env.STUDIO_API_BASE_URL ??
-    process.env.SHIPSEC_API_BASE_URL ??
+    process.env.SENTRIS_API_BASE_URL ??
     process.env.API_BASE_URL ??
     'http://localhost:3211';
 

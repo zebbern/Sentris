@@ -414,8 +414,8 @@ export function TopBar({
                               );
                               // Filter by run_id if a specific run is selected, otherwise by workflow_id
                               const filterQuery = selectedRunId
-                                ? `shipsec.run_id.keyword:"${selectedRunId}"`
-                                : `shipsec.workflow_id.keyword:"${workflowId}"`;
+                                ? `sentris.run_id.keyword:"${selectedRunId}"`
+                                : `sentris.workflow_id.keyword:"${workflowId}"`;
                               // Use the run's backend-resolved org ID when available (matches indexed data),
                               // fall back to auth store org ID for workflow-level queries
                               const effectiveOrgId = (

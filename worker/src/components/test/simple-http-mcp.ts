@@ -11,7 +11,7 @@ import {
   port,
   param,
   runComponentWithRunner,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { z } from 'zod';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
@@ -63,8 +63,8 @@ const definition = defineComponent({
     description: 'Simple HTTP MCP server with get_weather tool',
     icon: 'Cloud',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs: _inputs, params }, context) {

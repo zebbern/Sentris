@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import * as fs from 'fs';
 
-const DEBUG_LOG_FILE = '/tmp/shipsec-debug/worker.log';
+const DEBUG_LOG_FILE = '/tmp/sentris-debug/worker.log';
 
 const args = process.argv.slice(2);
 const filter = args[0];

@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 
 // --- Mock dialog / alert-dialog components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', () => {

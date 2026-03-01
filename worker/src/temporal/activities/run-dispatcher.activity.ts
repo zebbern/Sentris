@@ -1,5 +1,5 @@
-import type { PreparedRunPayload } from '@shipsec/shared';
-import { ConfigurationError, ServiceError } from '@shipsec/component-sdk';
+import type { PreparedRunPayload } from '@sentris/shared';
+import { ConfigurationError, ServiceError } from '@sentris/component-sdk';
 
 import type { PrepareRunPayloadActivityInput } from '../types';
 
@@ -7,7 +7,7 @@ type FetchResponse = Awaited<ReturnType<typeof fetch>>;
 
 const DEFAULT_API_BASE_URL =
   process.env.STUDIO_API_BASE_URL ??
-  process.env.SHIPSEC_API_BASE_URL ??
+  process.env.SENTRIS_API_BASE_URL ??
   process.env.API_BASE_URL ??
   'http://localhost:3211';
 

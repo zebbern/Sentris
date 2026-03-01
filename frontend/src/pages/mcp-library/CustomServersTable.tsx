@@ -11,7 +11,7 @@ import { HealthIndicator } from './HealthIndicator';
 import { TransportBadge } from './TransportBadge';
 import { ConnectionCell } from './ConnectionCell';
 import { ServerTableHeader } from './ServerTableHeader';
-import type { McpHealthStatus } from '@shipsec/shared';
+import type { McpHealthStatus } from '@sentris/shared';
 import { DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow, DragHandle } from '@/components/ui/sortable';

@@ -7,7 +7,7 @@ import type { MinioEnvConfig } from '../config';
 export class MinioConfig {
   private readonly logger = new Logger(MinioConfig.name);
   private client: Client;
-  private readonly bucketName = 'shipsec-files';
+  private readonly bucketName = 'sentris-files';
 
   constructor(private readonly configService: ConfigService) {
     const minioCfg = this.configService.get<MinioEnvConfig>('minio')!;

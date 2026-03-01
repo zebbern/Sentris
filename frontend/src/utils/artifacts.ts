@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { ArtifactMetadata, ArtifactRemoteUpload } from '@shipsec/shared';
-import { ArtifactRemoteUploadSchema } from '@shipsec/shared';
+import type { ArtifactMetadata, ArtifactRemoteUpload } from '@sentris/shared';
+import { ArtifactRemoteUploadSchema } from '@sentris/shared';
 
 const RemoteUploadListSchema = z.array(ArtifactRemoteUploadSchema);
 

@@ -19,7 +19,7 @@ export interface KafkaConfig {
 
 export const kafkaConfig = registerAs<KafkaConfig>('kafka', () => ({
   brokers: process.env.LOG_KAFKA_BROKERS ?? '',
-  instanceId: process.env.SHIPSEC_INSTANCE,
+  instanceId: process.env.SENTRIS_INSTANCE,
   nodeIoGroupId: process.env.NODE_IO_KAFKA_GROUP_ID,
   nodeIoClientId: process.env.NODE_IO_KAFKA_CLIENT_ID,
   eventGroupId: process.env.EVENT_KAFKA_GROUP_ID,

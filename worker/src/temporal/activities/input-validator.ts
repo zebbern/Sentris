@@ -11,7 +11,7 @@ import {
   type ComponentDefinition,
   type ComponentPortMetadata,
   type IScopedTraceService,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import type { InputWarning } from './spill-resolver';
 
 /**

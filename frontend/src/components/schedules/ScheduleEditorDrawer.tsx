@@ -1,4 +1,4 @@
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

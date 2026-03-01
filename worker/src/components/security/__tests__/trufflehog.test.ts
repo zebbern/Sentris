@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { TruffleHogInput, TruffleHogOutput } from '../trufflehog';
 
@@ -14,7 +14,7 @@ describe('trufflehog component', () => {
 
   it('should be registered', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     expect(component).toBeDefined();
     expect(component!.label).toBe('TruffleHog');
@@ -23,19 +23,19 @@ describe('trufflehog component', () => {
 
   it('should use docker runner config', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/trufflehog:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/trufflehog:latest');
     }
   });
 
   it('should parse input with default values', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -57,7 +57,7 @@ describe('trufflehog component', () => {
 
   it('should handle JSON output with secrets', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -126,7 +126,7 @@ describe('trufflehog component', () => {
 
   it('should handle no secrets found', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -166,7 +166,7 @@ describe('trufflehog component', () => {
 
   it('should support different scan types', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -185,7 +185,7 @@ describe('trufflehog component', () => {
 
   it('should accept optional git parameters', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -201,7 +201,7 @@ describe('trufflehog component', () => {
 
   it('should accept custom flags', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -215,7 +215,7 @@ describe('trufflehog component', () => {
 
   it('should handle unverified secrets when onlyVerified is false', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -285,7 +285,7 @@ describe('trufflehog component', () => {
 
   it('should handle parse errors gracefully', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -315,7 +315,7 @@ describe('trufflehog component', () => {
 
   it('should accept filesystemContent parameter', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -334,7 +334,7 @@ describe('trufflehog component', () => {
 
   it('should reject filesystemContent with non-filesystem scanType', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -362,7 +362,7 @@ describe('trufflehog component', () => {
 
   it('should propagate exit code 183 when secrets found with --fail flag', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -391,7 +391,7 @@ describe('trufflehog component', () => {
 
   it('should propagate other error exit codes', async () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
-      'shipsec.trufflehog.scan',
+      'sentris.trufflehog.scan',
     );
     if (!component) throw new Error('Component not registered');
 

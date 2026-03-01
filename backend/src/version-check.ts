@@ -9,7 +9,7 @@ const rootPackage = (() => {
   }
 })();
 
-const FALLBACK_BASE_URL = 'https://version.shipsec.ai';
+const FALLBACK_BASE_URL = 'https://version.sentris.ai';
 const DEFAULT_VERSION = typeof rootPackage?.version === 'string' ? rootPackage.version : '0.1.1';
 const FALLBACK_TIMEOUT_MS = 5000;
 
@@ -36,7 +36,7 @@ export interface VersionCheckResult {
 }
 
 export function isVersionCheckDisabled(env: NodeJS.ProcessEnv = process.env) {
-  const value = env.SHIPSEC_VERSION_CHECK_DISABLED;
+  const value = env.SENTRIS_VERSION_CHECK_DISABLED;
   if (!value) return false;
   return ['1', 'true', 'yes'].includes(value.toLowerCase());
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
 
@@ -15,7 +15,7 @@ describe.skip('subfinder component', () => {
 
   it('should be registered', () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     expect(component).toBeDefined();
     expect(component!.label).toBe('Subfinder');
@@ -24,7 +24,7 @@ describe.skip('subfinder component', () => {
 
   it('should normalise raw output returned as plain text', async () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -52,7 +52,7 @@ describe.skip('subfinder component', () => {
 
   it('should return structured output when docker emits JSON', async () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -90,7 +90,7 @@ describe.skip('subfinder component', () => {
 
   it('should accept a single domain string and normalise to array', () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -100,7 +100,7 @@ describe.skip('subfinder component', () => {
 
   it('should accept legacy "domain" key from older workflows', () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -110,7 +110,7 @@ describe.skip('subfinder component', () => {
 
   it('should pass provider config via -pc flag when configured', async () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -160,13 +160,13 @@ describe.skip('subfinder component', () => {
 
   it('should use docker runner config', () => {
     const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
-      'shipsec.subfinder.run',
+      'sentris.subfinder.run',
     );
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/subfinder:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/subfinder:latest');
     }
   });
 });

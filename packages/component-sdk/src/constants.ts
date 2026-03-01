@@ -1,5 +1,5 @@
 /**
- * Shared constants for telemetry and data handling across the ShipSec platform.
+ * Shared constants for telemetry and data handling across the Sentris platform.
  */
 
 /**

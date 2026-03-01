@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'bun:test';
-import { createExecutionContext } from '@shipsec/component-sdk';
+import { createExecutionContext } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type {
   GitHubRemoveOrgMembershipInput,
@@ -65,7 +65,7 @@ describe('github.org.membership.remove component', () => {
 
     const executePayload = {
       inputs: {
-        organization: 'shipsecai',
+        organization: 'sentris',
         userIdentifier: 'octocat',
         connectionId: 'connection-123',
       },
@@ -89,7 +89,7 @@ describe('github.org.membership.remove component', () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'https://api.github.com/orgs/shipsecai/members/octocat',
+      'https://api.github.com/orgs/sentris/members/octocat',
       expect.objectContaining({
         method: 'DELETE',
         headers: expect.objectContaining({
@@ -142,7 +142,7 @@ describe('github.org.membership.remove component', () => {
 
     const executePayload = {
       inputs: {
-        organization: 'shipsecai',
+        organization: 'sentris',
         userIdentifier: 'octocat@example.com',
         connectionId: 'connection-999',
       },
@@ -200,7 +200,7 @@ describe('github.org.membership.remove component', () => {
 
     const executePayload = {
       inputs: {
-        organization: 'shipsecai',
+        organization: 'sentris',
         userIdentifier: 'octocat',
         connectionId: 'connection-321',
       },
@@ -264,7 +264,7 @@ describe('github.org.membership.remove component', () => {
 
     const executePayload = {
       inputs: {
-        organization: 'shipsecai',
+        organization: 'sentris',
         teamSlug: 'infra',
         userIdentifier: 'octocat',
         connectionId: 'connection-456',
@@ -291,7 +291,7 @@ describe('github.org.membership.remove component', () => {
     if (!component) throw new Error('Component not registered');
 
     const result = component.inputs.safeParse({
-      organization: 'shipsecai',
+      organization: 'sentris',
       userIdentifier: 'octocat',
       connectionId: '   ',
     });

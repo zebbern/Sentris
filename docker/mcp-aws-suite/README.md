@@ -14,7 +14,7 @@ This Docker image contains multiple AWS-related MCP (Model Context Protocol) ser
 ### Building the Image
 
 ```bash
-docker build -t shipsec/mcp-aws-suite:latest .
+docker build -t zebbern/mcp-aws-suite:latest .
 ```
 
 ### Running the Container
@@ -22,19 +22,19 @@ docker build -t shipsec/mcp-aws-suite:latest .
 With default settings (CloudTrail):
 
 ```bash
-docker run -p 8080:8080 shipsec/mcp-aws-suite:latest
+docker run -p 8080:8080 zebbern/mcp-aws-suite:latest
 ```
 
 With different MCP server:
 
 ```bash
-docker run -e MCP_COMMAND=awslabs.cloudwatch-mcp-server -p 8080:8080 shipsec/mcp-aws-suite:latest
+docker run -e MCP_COMMAND=awslabs.cloudwatch-mcp-server -p 8080:8080 zebbern/mcp-aws-suite:latest
 ```
 
 With custom arguments:
 
 ```bash
-docker run -e MCP_COMMAND=awslabs.cloudtrail-mcp-server -e MCP_ARGS='["--region", "us-west-2"]' -p 8080:8080 shipsec/mcp-aws-suite:latest
+docker run -e MCP_COMMAND=awslabs.cloudtrail-mcp-server -e MCP_ARGS='["--region", "us-west-2"]' -p 8080:8080 zebbern/mcp-aws-suite:latest
 ```
 
 ### Environment Variables
@@ -56,11 +56,11 @@ curl http://localhost:8080/health
 To use the AWS MCP servers, you'll need to provide AWS credentials. You can mount them:
 
 ```bash
-docker run -v ~/.aws/credentials:/root/.aws/credentials:ro -e AWS_PROFILE=default -p 8080:8080 shipsec/mcp-aws-suite:latest
+docker run -v ~/.aws/credentials:/root/.aws/credentials:ro -e AWS_PROFILE=default -p 8080:8080 zebbern/mcp-aws-suite:latest
 ```
 
 or set environment variables:
 
 ```bash
-docker run -e AWS_ACCESS_KEY_ID=your_access_key -e AWS_SECRET_ACCESS_KEY=your_secret_key -p 8080:8080 shipsec/mcp-aws-suite:latest
+docker run -e AWS_ACCESS_KEY_ID=your_access_key -e AWS_SECRET_ACCESS_KEY=your_secret_key -p 8080:8080 zebbern/mcp-aws-suite:latest
 ```

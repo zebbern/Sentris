@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { ShufflednsMassdnsInput, ShufflednsMassdnsOutput } from '../shuffledns-massdns';
 
@@ -15,7 +15,7 @@ describe.skip('shuffledns-massdns component', () => {
 
   it('registers with expected metadata', () => {
     const component = componentRegistry.get<ShufflednsMassdnsInput, ShufflednsMassdnsOutput>(
-      'shipsec.shuffledns.massdns',
+      'sentris.shuffledns.massdns',
     );
     expect(component).toBeDefined();
     expect(component!.label).toBe('Shuffledns + MassDNS');
@@ -25,7 +25,7 @@ describe.skip('shuffledns-massdns component', () => {
 
   it('normalises plain text output into subdomains array', async () => {
     const component = componentRegistry.get<ShufflednsMassdnsInput, ShufflednsMassdnsOutput>(
-      'shipsec.shuffledns.massdns',
+      'sentris.shuffledns.massdns',
     );
     if (!component) throw new Error('Component not registered');
 
@@ -60,12 +60,12 @@ describe.skip('shuffledns-massdns component', () => {
 
   it('uses docker runner with correct image', () => {
     const component = componentRegistry.get<ShufflednsMassdnsInput, ShufflednsMassdnsOutput>(
-      'shipsec.shuffledns.massdns',
+      'sentris.shuffledns.massdns',
     );
     if (!component) throw new Error('Component not registered');
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/shuffledns-massdns:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/shuffledns-massdns:latest');
       // We no longer depend on a shell entrypoint; the execute path sets
       // the entrypoint to the tool binary and passes flags directly.
       // The static runner definition just provides image/network defaults.

@@ -6,9 +6,9 @@ API service layer that abstracts all backend communication and provides centrali
 
 ### API Service (`api.ts`)
 Centralized API communication layer that:
-- Wraps the generated `@shipsec/backend-client` for type-safe API calls
+- Wraps the generated `@sentris/backend-client` for type-safe API calls
 - Centralizes backend URL configuration and authentication headers
-- Validates responses using Zod schemas from `@shipsec/shared`
+- Validates responses using Zod schemas from `@sentris/shared`
 - Provides consistent error handling and retry logic
 - Implements request/response interceptors for authentication and logging
 

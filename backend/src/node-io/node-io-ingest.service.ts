@@ -57,11 +57,11 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
     this.kafkaTopic = topicResolver.getNodeIOTopic();
     const instanceId = kafka.instanceId;
     const defaultGroupId = instanceId
-      ? `shipsec-node-io-ingestor-${instanceId}`
-      : 'shipsec-node-io-ingestor';
+      ? `sentris-node-io-ingestor-${instanceId}`
+      : 'sentris-node-io-ingestor';
     const defaultClientId = instanceId
-      ? `shipsec-backend-node-io-${instanceId}`
-      : 'shipsec-backend-node-io';
+      ? `sentris-backend-node-io-${instanceId}`
+      : 'sentris-backend-node-io';
 
     this.kafkaGroupId = kafka.nodeIoGroupId ?? defaultGroupId;
     this.kafkaClientId = kafka.nodeIoClientId ?? defaultClientId;

@@ -4,7 +4,7 @@ import { Loader2, Plus, X, Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useWebhooks } from '@/hooks/queries/useWebhookQueries';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 import { WebhookDetails } from './WebhookDetails';
 import { useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import type { Node as ReactFlowNode } from 'reactflow';

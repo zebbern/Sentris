@@ -1,9 +1,9 @@
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import type {
   WebhookConfiguration,
   WebhookDelivery,
   TestWebhookScriptResponse,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import { apiClient, type ApiResponse } from './client';
 
 export const webhooksApi = {

@@ -8,9 +8,9 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { destinationWriterSchema } from '@shipsec/contracts';
-import { type DestinationConfig, ArtifactRemoteUploadSchema } from '@shipsec/shared';
+} from '@sentris/component-sdk';
+import { destinationWriterSchema } from '@sentris/contracts';
+import { type DestinationConfig, ArtifactRemoteUploadSchema } from '@sentris/shared';
 import { createDestinationAdapter, type DestinationSaveInput } from '../../destinations';
 
 const contentFormatSchema = z.enum(['text', 'json', 'base64']);
@@ -166,8 +166,8 @@ const definition = defineComponent({
     description: 'Write component output to run artifacts, the Artifact Library, or S3 buckets.',
     icon: 'FolderArchive',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

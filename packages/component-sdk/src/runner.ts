@@ -8,7 +8,7 @@ import { createTerminalChunkEmitter } from './terminal';
 import { ContainerError, TimeoutError, ValidationError, ConfigurationError } from './errors';
 
 // Standard output file path inside the container
-const CONTAINER_OUTPUT_PATH = '/shipsec-output';
+const CONTAINER_OUTPUT_PATH = '/sentris-output';
 const OUTPUT_FILENAME = 'result.json';
 
 type PtySpawn = typeof import('node-pty')['spawn'];
@@ -103,8 +103,8 @@ export async function runComponentInline<I, O>(
 /**
  * Execute a component in a Docker container
  * - Starts container with specified image and command
- * - Mounts a temp directory for structured output at /shipsec-output
- * - Components should write results to /shipsec-output/result.json
+ * - Mounts a temp directory for structured output at /sentris-output
+ * - Components should write results to /sentris-output/result.json
  * - Stdout/stderr are used purely for logging/progress
  * - Automatically cleans up container and temp directory on exit
  */
@@ -119,7 +119,7 @@ async function runComponentInDocker<I, O>(
   context.emitProgress(`Starting Docker container: ${image}`);
 
   // Create temp directory for output and input
-  const outputDir = await mkdtemp(join(tmpdir(), 'shipsec-run-'));
+  const outputDir = await mkdtemp(join(tmpdir(), 'sentris-run-'));
   const hostOutputPath = join(outputDir, OUTPUT_FILENAME);
   const hostInputPath = join(outputDir, 'input.json');
 
@@ -132,8 +132,8 @@ async function runComponentInDocker<I, O>(
       '--rm',
       '-i',
       '--network', network,
-      '--label', `shipsec.runId=${context.runId}`,
-      '--label', `shipsec.nodeRef=${context.componentRef}`,
+      '--label', `sentris.runId=${context.runId}`,
+      '--label', `sentris.nodeRef=${context.componentRef}`,
       // Mount the directory containing both input and output
       '-v', `${outputDir}:${CONTAINER_OUTPUT_PATH}`,
     ];
@@ -165,8 +165,8 @@ async function runComponentInDocker<I, O>(
     }
 
     // Tell the container where to read input and write output
-    dockerArgs.push('-e', `SHIPSEC_INPUT_PATH=${CONTAINER_OUTPUT_PATH}/input.json`);
-    dockerArgs.push('-e', `SHIPSEC_OUTPUT_PATH=${CONTAINER_OUTPUT_PATH}/${OUTPUT_FILENAME}`);
+    dockerArgs.push('-e', `SENTRIS_INPUT_PATH=${CONTAINER_OUTPUT_PATH}/input.json`);
+    dockerArgs.push('-e', `SENTRIS_OUTPUT_PATH=${CONTAINER_OUTPUT_PATH}/${OUTPUT_FILENAME}`);
 
     if (entrypoint) {
       dockerArgs.push('--entrypoint', entrypoint);
@@ -327,7 +327,7 @@ async function runDockerWithStandardIO<I, O>(
       context.logCollector?.(logEntry);
 
       // NOTE: We intentionally do NOT emit stdout as trace progress events.
-      // Output data is written to /shipsec-output/result.json by the container.
+      // Output data is written to /sentris-output/result.json by the container.
       // Stdout should only contain logs and progress messages from the component.
     });
 

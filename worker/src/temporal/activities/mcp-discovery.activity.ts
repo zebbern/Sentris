@@ -1,6 +1,6 @@
 import { startMcpDockerServer } from '../../components/core/mcp-runtime';
 import { Context } from '@temporalio/activity';
-import { createExecutionContext } from '@shipsec/component-sdk';
+import { createExecutionContext } from '@sentris/component-sdk';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -233,7 +233,7 @@ async function spawnStdioContainer(input: {
   const { awsEnv, volumes } = getAwsConfig();
 
   const result = await startMcpDockerServer({
-    image: input.image || 'shipsec/mcp-stdio-proxy:latest',
+    image: input.image || 'zebbern/mcp-stdio-proxy:latest',
     command: [],
     env: {
       MCP_COMMAND: input.command,
@@ -295,7 +295,7 @@ async function spawnNamedServersContainer(input: {
   }
 
   const result = await startMcpDockerServer({
-    image: input.image || 'shipsec/mcp-stdio-proxy:latest',
+    image: input.image || 'zebbern/mcp-stdio-proxy:latest',
     command: [],
     env: {
       MCP_NAMED_SERVERS: JSON.stringify({ mcpServers: namedServers }),
@@ -372,7 +372,7 @@ async function testMcpConnection(
       params: {
         protocolVersion: '2024-11-05',
         capabilities: {},
-        clientInfo: { name: 'shipsec-studio', version: '1.0.0' },
+        clientInfo: { name: 'sentris-flow', version: '1.0.0' },
       },
     }),
   });

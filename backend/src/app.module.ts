@@ -79,7 +79,7 @@ function getEnvFilePaths(): string[] {
   // In multi-instance dev, each instance has its own env file under:
   //   .instances/instance-N/backend.env
   // Backends run with cwd=backend/, so repo root is `..`.
-  const instance = process.env.SHIPSEC_INSTANCE;
+  const instance = process.env.SENTRIS_INSTANCE;
   if (instance) {
     // Use only the instance env file. In multi-instance dev the workspace `.env` contains
     // a default DATABASE_URL, and dotenv does not override already-set env vars; mixing

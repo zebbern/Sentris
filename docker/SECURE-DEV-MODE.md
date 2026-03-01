@@ -91,8 +91,8 @@ When a new customer is onboarded, the backend creates:
 
 ```bash
 just dev status
-docker logs shipsec-opensearch
-docker logs shipsec-opensearch-dashboards
+docker logs sentris-opensearch
+docker logs sentris-opensearch-dashboards
 ```
 
 ### Reset Security Configuration
@@ -102,7 +102,7 @@ docker logs shipsec-opensearch-dashboards
 just dev clean && just dev
 
 # Or manually run securityadmin
-docker exec shipsec-opensearch /usr/share/opensearch/plugins/opensearch-security/tools/securityadmin.sh \
+docker exec sentris-opensearch /usr/share/opensearch/plugins/opensearch-security/tools/securityadmin.sh \
   -cd /usr/share/opensearch/config/opensearch-security \
   -icl -nhnv \
   -cacert /usr/share/opensearch/config/certs/root-ca.pem \

@@ -41,8 +41,8 @@ export class LogIngestService implements OnModuleInit, OnModuleDestroy {
     });
     this.kafkaTopic = topicResolver.getLogsTopic();
 
-    this.kafkaGroupId = kafka.logGroupId ?? 'shipsec-log-ingestor';
-    this.kafkaClientId = kafka.logClientId ?? 'shipsec-backend';
+    this.kafkaGroupId = kafka.logGroupId ?? 'sentris-log-ingestor';
+    this.kafkaClientId = kafka.logClientId ?? 'sentris-backend';
 
     const lokiUrl = loki.url;
     if (!lokiUrl) {

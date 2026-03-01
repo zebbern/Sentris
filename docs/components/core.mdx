@@ -98,7 +98,7 @@ Joins array elements into a single string.
 
 ### Secret Loader
 
-Fetches secrets from the ShipSec-managed secret store.
+Fetches secrets from the Sentris-managed secret store.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -159,7 +159,7 @@ Outputs data to workflow logs for debugging.
 
 ### Artifact Writer
 
-Writes workflow artifacts to ShipSec storage.
+Writes workflow artifacts to Sentris storage.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -234,7 +234,7 @@ Indexes workflow output data into OpenSearch for analytics dashboards, queries, 
 **How it works:**
 
 1. Each item in the input array becomes a separate document
-2. Workflow context is added under `shipsec.*` namespace
+2. Workflow context is added under `sentris.*` namespace
 3. Nested objects are serialized to JSON strings (prevents field explosion)
 4. All documents get the same `@timestamp`
 

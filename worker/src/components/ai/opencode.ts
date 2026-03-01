@@ -9,8 +9,8 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { LLMProviderSchema, llmProviderContractName } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from './utils';
 
@@ -99,7 +99,7 @@ const definition = defineComponent({
   category: 'ai',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/opencode:latest',
+    image: 'ghcr.io/zebbern/opencode:latest',
     entrypoint: 'opencode', // We will override this in execution
     network: 'host' as const, // Required to access localhost gateway
     command: ['help'],
@@ -123,8 +123,8 @@ const definition = defineComponent({
     description: 'Autonomous coding and investigation agent.',
     icon: 'Bot',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {
@@ -166,7 +166,7 @@ const definition = defineComponent({
     // Always add MCP config (even if token is empty, so OpenCode can attempt connection)
     const mcpConfig = {
       mcp: {
-        'shipsec-gateway': {
+        'sentris-gateway': {
           type: 'remote' as const,
           url: DEFAULT_GATEWAY_URL,
           oauth: false,

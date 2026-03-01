@@ -2,11 +2,11 @@ services:
   # Infrastructure
   postgres:
     image: postgres:16-alpine
-    container_name: shipsec-postgres
+    container_name: sentris-postgres
     environment:
-      POSTGRES_USER: shipsec
-      POSTGRES_PASSWORD: shipsec
-      POSTGRES_DB: shipsec
+      POSTGRES_USER: sentris
+      POSTGRES_PASSWORD: sentris
+      POSTGRES_DB: sentris
       POSTGRES_MULTIPLE_DATABASES: temporal
     # Internal only - no direct port access in production
     expose:
@@ -15,7 +15,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U shipsec']
+      test: ['CMD-SHELL', 'pg_isready -U sentris']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -23,7 +23,7 @@ services:
 
   temporal:
     image: temporalio/auto-setup:latest
-    container_name: shipsec-temporal
+    container_name: sentris-temporal
     depends_on:
       postgres:
         condition: service_healthy
@@ -31,8 +31,8 @@ services:
       - DB=postgres12
       - DB_PORT=5432
       - DB_NAME=temporal
-      - POSTGRES_USER=shipsec
-      - POSTGRES_PWD=shipsec
+      - POSTGRES_USER=sentris
+      - POSTGRES_PWD=sentris
       - POSTGRES_SEEDS=postgres
       - AUTO_SETUP=true
     expose:
@@ -48,7 +48,7 @@ services:
 
   temporal-ui:
     image: temporalio/ui:latest
-    container_name: shipsec-temporal-ui
+    container_name: sentris-temporal-ui
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_NAMESPACE=default
@@ -65,7 +65,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2024-10-02T17-50-41Z
-    container_name: shipsec-minio
+    container_name: sentris-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -84,7 +84,7 @@ services:
 
   loki:
     image: grafana/loki:3.2.1
-    container_name: shipsec-loki
+    container_name: sentris-loki
     command: -config.file=/etc/loki/local-config.yaml
     expose:
       - '3100'
@@ -100,7 +100,7 @@ services:
 
   redis:
     image: redis:latest
-    container_name: shipsec-redis
+    container_name: sentris-redis
     expose:
       - '6379'
     volumes:
@@ -114,7 +114,7 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v24.2.5
-    container_name: shipsec-redpanda
+    container_name: sentris-redpanda
     command:
       - redpanda
       - start
@@ -139,7 +139,7 @@ services:
 
   redpanda-console:
     image: redpandadata/console:v2.7.2
-    container_name: shipsec-redpanda-console
+    container_name: sentris-redpanda-console
     depends_on:
       - redpanda
     environment:
@@ -152,7 +152,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.11.1
-    container_name: shipsec-opensearch
+    container_name: sentris-opensearch
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
@@ -182,8 +182,8 @@ services:
     build:
       context: .
       dockerfile: opensearch-dashboards.Dockerfile
-    image: shipsec-opensearch-dashboards:2.11.1
-    container_name: shipsec-opensearch-dashboards
+    image: sentris-opensearch-dashboards:2.11.1
+    container_name: sentris-opensearch-dashboards
     depends_on:
       opensearch:
         condition: service_healthy
@@ -203,7 +203,7 @@ services:
 
   opensearch-init:
     image: curlimages/curl:8.5.0
-    container_name: shipsec-opensearch-init
+    container_name: sentris-opensearch-init
     depends_on:
       opensearch-dashboards:
         condition: service_healthy
@@ -215,7 +215,7 @@ services:
   # Applications
   dind:
     image: docker:27-dind
-    container_name: shipsec-dind
+    container_name: sentris-dind
     privileged: true
     command: ['--host=tcp://0.0.0.0:2375', '--storage-driver=overlay2']
     environment:
@@ -230,21 +230,21 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/shipsecai/studio-backend:${SHIPSEC_TAG:-latest}
+    image: ghcr.io/zebbern/studio-backend:${SENTRIS_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
       target: backend
-    container_name: shipsec-backend
+    container_name: sentris-backend
     environment:
       - NODE_ENV=production
-      - SHIPSEC_ENV=production
+      - SENTRIS_ENV=production
       - PORT=3211
-      - DATABASE_URL=postgresql://shipsec:shipsec@postgres:5432/shipsec
+      - DATABASE_URL=postgresql://sentris:sentris@postgres:5432/sentris
       - ENABLE_INGEST_SERVICES=true
       - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_NAMESPACE=shipsec-prod
-      - TEMPORAL_TASK_QUEUE=shipsec-prod
+      - TEMPORAL_NAMESPACE=sentris-prod
+      - TEMPORAL_TASK_QUEUE=sentris-prod
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
       - MINIO_ENDPOINT=minio
@@ -253,11 +253,11 @@ services:
       - TERMINAL_REDIS_URL=redis://redis:6379
       - LOG_KAFKA_BROKERS=redpanda:9092
       - LOG_KAFKA_TOPIC=telemetry.logs
-      - LOG_KAFKA_CLIENT_ID=shipsec-backend
-      - LOG_KAFKA_GROUP_ID=shipsec-backend-log-consumer
+      - LOG_KAFKA_CLIENT_ID=sentris-backend
+      - LOG_KAFKA_GROUP_ID=sentris-backend-log-consumer
       - EVENT_KAFKA_TOPIC=telemetry.events
-      - EVENT_KAFKA_CLIENT_ID=shipsec-backend-events
-      - EVENT_KAFKA_GROUP_ID=shipsec-event-ingestor
+      - EVENT_KAFKA_CLIENT_ID=sentris-backend-events
+      - EVENT_KAFKA_GROUP_ID=sentris-event-ingestor
       - AUTH_PROVIDER=${AUTH_PROVIDER:-local}
       - CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
@@ -288,7 +288,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/shipsecai/studio-frontend:${SHIPSEC_TAG:-latest}
+    image: ghcr.io/zebbern/studio-frontend:${SENTRIS_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -303,7 +303,7 @@ services:
         VITE_PUBLIC_POSTHOG_KEY: ${VITE_PUBLIC_POSTHOG_KEY:-}
         VITE_PUBLIC_POSTHOG_HOST: ${VITE_PUBLIC_POSTHOG_HOST:-}
         VITE_OPENSEARCH_DASHBOARDS_URL: ${VITE_OPENSEARCH_DASHBOARDS_URL:-/analytics}
-    container_name: shipsec-frontend
+    container_name: sentris-frontend
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost}
       - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://localhost}
@@ -324,20 +324,20 @@ services:
       retries: 5
 
   worker:
-    image: ghcr.io/shipsecai/studio-worker:${SHIPSEC_TAG:-latest}
+    image: ghcr.io/zebbern/studio-worker:${SENTRIS_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
       target: worker
-    container_name: shipsec-worker
+    container_name: sentris-worker
     environment:
       - NODE_ENV=production
-      - SHIPSEC_ENV=production
-      - DATABASE_URL=postgresql://shipsec:shipsec@postgres:5432/shipsec
+      - SENTRIS_ENV=production
+      - DATABASE_URL=postgresql://sentris:sentris@postgres:5432/sentris
       - ENABLE_INGEST_SERVICES=true
       - TEMPORAL_ADDRESS=temporal:7233
-      - TEMPORAL_NAMESPACE=shipsec-prod
-      - TEMPORAL_TASK_QUEUE=shipsec-prod
+      - TEMPORAL_NAMESPACE=sentris-prod
+      - TEMPORAL_TASK_QUEUE=sentris-prod
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
       - MINIO_ENDPOINT=minio
@@ -347,9 +347,9 @@ services:
       - DOCKER_HOST=tcp://dind:2375
       - LOG_KAFKA_BROKERS=redpanda:9092
       - LOG_KAFKA_TOPIC=telemetry.logs
-      - LOG_KAFKA_CLIENT_ID=shipsec-worker
+      - LOG_KAFKA_CLIENT_ID=sentris-worker
       - EVENT_KAFKA_TOPIC=telemetry.events
-      - EVENT_KAFKA_CLIENT_ID=shipsec-worker-events
+      - EVENT_KAFKA_CLIENT_ID=sentris-worker-events
       # OpenSearch for Analytics Sink
       - OPENSEARCH_URL=http://opensearch:9200
       - OPENSEARCH_DASHBOARDS_URL=http://opensearch-dashboards:5601/analytics
@@ -382,7 +382,7 @@ services:
   # Nginx reverse proxy - unified entry point
   nginx:
     image: nginx:1.25-alpine
-    container_name: shipsec-nginx
+    container_name: sentris-nginx
     depends_on:
       frontend:
         condition: service_healthy
@@ -413,4 +413,4 @@ volumes:
 
 networks:
   default:
-    name: shipsec-network
+    name: sentris-network

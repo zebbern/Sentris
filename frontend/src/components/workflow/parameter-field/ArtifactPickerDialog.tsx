@@ -10,7 +10,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Search } from 'lucide-react';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 
 interface ArtifactPickerDialogProps {
   open: boolean;

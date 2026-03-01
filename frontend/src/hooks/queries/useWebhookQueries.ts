@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 

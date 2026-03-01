@@ -201,7 +201,7 @@ The TemplatesModule is already imported in `backend/src/app.module.ts`.
 
 ### Official Templates
 
-- Created and maintained by ShipSec team
+- Created and maintained by Sentris team
 - Verified and tested
 - Marked with "Official" badge
 

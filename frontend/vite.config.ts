@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
-const instance = parseInt(process.env.SHIPSEC_INSTANCE || '0', 10);
+const instance = parseInt(process.env.SENTRIS_INSTANCE || '0', 10);
 const frontendPort = 5173 + instance * 100;
 const backendPort = 3211 + instance * 100;
 
@@ -28,7 +28,7 @@ export default defineConfig({
     port: frontendPort,
     strictPort: true,
     open: false,
-    allowedHosts: ['studio.shipsec.ai', 'frontend'],
+    allowedHosts: ['studio.sentris.ai', 'frontend'],
     proxy: {
       '/api/': {
         target: `http://localhost:${backendPort}`,
@@ -43,7 +43,7 @@ export default defineConfig({
     },
   },
   preview: {
-    allowedHosts: ['studio.shipsec.ai', 'frontend'],
+    allowedHosts: ['studio.sentris.ai', 'frontend'],
   },
   build: {
     rollupOptions: {

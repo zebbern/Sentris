@@ -105,13 +105,13 @@ e2eDescribe('Smart Webhooks E2E Tests', () => {
         headers: HEADERS,
         body: JSON.stringify({
             parsingScript: it.parsingScript,
-            testPayload: { repository: { full_name: 'ShipSecAI/studio' } },
+            testPayload: { repository: { full_name: 'zebbern/Sentris' } },
             testHeaders: { 'x-github-event': 'push' }
         })
     });
     const testData = await testRes.json();
     expect(testData.success).toBe(true);
-    expect(testData.parsedData.repo_name).toBe('ShipSecAI/studio');
+    expect(testData.parsedData.repo_name).toBe('zebbern/Sentris');
     expect(testData.parsedData.is_push).toBe('true');
     console.log('    Script test successful');
 
@@ -123,7 +123,7 @@ e2eDescribe('Smart Webhooks E2E Tests', () => {
             'x-github-event': 'push'
         },
         body: JSON.stringify({
-            repository: { full_name: 'ShipSecAI/studio' }
+            repository: { full_name: 'zebbern/Sentris' }
         })
     });
 

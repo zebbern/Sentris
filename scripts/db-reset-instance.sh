@@ -5,8 +5,8 @@
 set -euo pipefail
 
 INSTANCE=${1:-0}
-COMPOSE_PROJECT_NAME="shipsec-infra"
-DB_NAME="shipsec_instance_$INSTANCE"
+COMPOSE_PROJECT_NAME="sentris-infra"
+DB_NAME="sentris_instance_$INSTANCE"
 
 # Colors
 RED='\033[0;31m'
@@ -46,22 +46,22 @@ log_info "Found PostgreSQL container: $POSTGRES_CONTAINER"
 # Drop and recreate database
 log_info "Dropping database $DB_NAME..."
 docker exec "$POSTGRES_CONTAINER" \
-  psql -v ON_ERROR_STOP=1 -U shipsec -d postgres \
+  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
   -c "DROP DATABASE IF EXISTS \"$DB_NAME\";" || true
 
 log_info "Creating database $DB_NAME..."
 docker exec "$POSTGRES_CONTAINER" \
-  psql -v ON_ERROR_STOP=1 -U shipsec -d postgres \
-  -c "CREATE DATABASE \"$DB_NAME\" OWNER shipsec;"
+  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
+  -c "CREATE DATABASE \"$DB_NAME\" OWNER sentris;"
 
 docker exec "$POSTGRES_CONTAINER" \
-  psql -v ON_ERROR_STOP=1 -U shipsec -d postgres \
-  -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO shipsec;"
+  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
+  -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO sentris;"
 
 # Run migrations
 log_info "Running migrations for instance $INSTANCE..."
-export SHIPSEC_INSTANCE="$INSTANCE"
-export DATABASE_URL="postgresql://shipsec:shipsec@localhost:5433/$DB_NAME"
+export SENTRIS_INSTANCE="$INSTANCE"
+export DATABASE_URL="postgresql://sentris:sentris@localhost:5433/$DB_NAME"
 
 if bun --cwd backend run migration:push > /dev/null 2>&1; then
   log_success "Migrations completed"
@@ -74,4 +74,4 @@ fi
 echo ""
 log_success "Database reset for instance $INSTANCE"
 log_info "Database: $DB_NAME"
-log_info "Connection: postgresql://shipsec:shipsec@localhost:5433/$DB_NAME"
+log_info "Connection: postgresql://sentris:sentris@localhost:5433/$DB_NAME"

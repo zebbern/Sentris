@@ -62,7 +62,7 @@ export function NotificationSettings() {
     if (permission === 'granted') {
       try {
         new Notification('Test Notification', {
-          body: 'ShipSec Studio notifications are working!',
+          body: 'Sentris Flow notifications are working!',
           icon: '/favicon.ico',
         });
         browserNotificationSent = true;
@@ -73,7 +73,7 @@ export function NotificationSettings() {
     if (!browserNotificationSent) {
       toast({
         title: 'Test Notification',
-        description: 'ShipSec Studio notifications are working!',
+        description: 'Sentris Flow notifications are working!',
         variant: 'success',
       });
     }

@@ -8,7 +8,7 @@ import {
   port,
   param,
   type PortMeta,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 /**
  * Manual Approval Component
@@ -144,8 +144,8 @@ const definition = defineComponent({
       'Pause and wait for manual approval. Supports dynamic templates for providing context to the reviewer.',
     icon: 'ShieldCheck',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

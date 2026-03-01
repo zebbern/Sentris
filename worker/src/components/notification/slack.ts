@@ -12,7 +12,7 @@ import {
   port,
   param,
   type PortMeta,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   // Dynamic values will be injected here by resolvePorts
@@ -121,7 +121,7 @@ const definition = defineComponent({
     category: 'notification',
     description: 'Send plain text or rich Block Kit messages with dynamic template support.',
     icon: 'Slack',
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
   },

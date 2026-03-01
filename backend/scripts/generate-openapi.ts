@@ -10,13 +10,13 @@ import { cleanupOpenApiDoc } from 'nestjs-zod';
 async function generateOpenApi() {
   // Skip ingest services that require external connections during OpenAPI generation
   process.env.SKIP_INGEST_SERVICES = 'true';
-  process.env.SHIPSEC_SKIP_MIGRATION_CHECK = 'true';
+  process.env.SENTRIS_SKIP_MIGRATION_CHECK = 'true';
   // Ensure encryption services can bootstrap during schema generation.
   // This key is only used to construct the Nest application for OpenAPI output.
   process.env.SECRET_STORE_MASTER_KEY =
-    process.env.SECRET_STORE_MASTER_KEY ?? 'shipsec-openapi-master-key-32bxx';
+    process.env.SECRET_STORE_MASTER_KEY ?? 'sentris-openapi-master-key-32bxx';
   process.env.INTEGRATION_STORE_MASTER_KEY =
-    process.env.INTEGRATION_STORE_MASTER_KEY ?? 'shipsec-openapi-master-key-32bxx';
+    process.env.INTEGRATION_STORE_MASTER_KEY ?? 'sentris-openapi-master-key-32bxx';
 
   const { AppModule } = await import('../src/app.module');
 
@@ -28,8 +28,8 @@ async function generateOpenApi() {
   app.setGlobalPrefix('api/v1');
 
   const config = new DocumentBuilder()
-    .setTitle('ShipSec Studio API')
-    .setDescription('ShipSec backend API specification')
+    .setTitle('Sentris Flow API')
+    .setDescription('Sentris backend API specification')
     .setVersion('0.1.0')
     .addServer('/api/v1', 'API v1')
     .build();

@@ -1,18 +1,18 @@
 #!/usr/bin/env bun
 /**
- * Quick test script for the ShipSec API Client
+ * Quick test script for the Sentris API Client
  * 
  * Prerequisites: Backend must be running on http://localhost:3211
  * 
  * Usage: bun run test-client.ts
  */
 
-import { createShipSecClient } from './src/index';
+import { createSentrisClient } from './src/index';
 
 async function main() {
-  console.log('🧪 Testing ShipSec API Client\n');
+  console.log('🧪 Testing Sentris API Client\n');
 
-  const client = createShipSecClient({
+  const client = createSentrisClient({
     baseUrl: 'http://localhost:3211',
   });
 

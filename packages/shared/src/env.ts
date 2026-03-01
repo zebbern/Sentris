@@ -46,8 +46,8 @@ export const databaseUrlSchema = z
 /** Temporal connection configuration */
 export const temporalConfigSchema = z.object({
   TEMPORAL_ADDRESS: z.string().optional().default('localhost:7233'),
-  TEMPORAL_NAMESPACE: z.string().optional().default('shipsec-dev'),
-  TEMPORAL_TASK_QUEUE: z.string().optional().default('shipsec-dev'),
+  TEMPORAL_NAMESPACE: z.string().optional().default('sentris-dev'),
+  TEMPORAL_TASK_QUEUE: z.string().optional().default('sentris-dev'),
 });
 
 /** MinIO / S3-compatible storage configuration */
@@ -57,7 +57,7 @@ export const minioConfigSchema = z.object({
   MINIO_ACCESS_KEY: z.string().optional().default('minioadmin'),
   MINIO_SECRET_KEY: z.string().optional().default('minioadmin'),
   MINIO_USE_SSL: stringToBoolean(false),
-  MINIO_BUCKET_NAME: z.string().optional().default('shipsec-files'),
+  MINIO_BUCKET_NAME: z.string().optional().default('sentris-files'),
 });
 
 /** SECRET_STORE_MASTER_KEY — exactly 32 characters */

@@ -15,7 +15,7 @@ import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 import type { StatusBadgeProps } from '@/utils/tableHelpers';
 import { WebhookRow } from './WebhookRow';
 

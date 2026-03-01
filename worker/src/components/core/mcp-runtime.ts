@@ -1,5 +1,5 @@
 import { createServer } from 'node:net';
-import { runComponentWithRunner, ValidationError } from '@shipsec/component-sdk';
+import { runComponentWithRunner, ValidationError } from '@sentris/component-sdk';
 
 interface StartMcpServerInput {
   image: string;

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=shipsec/mcp-stdio-proxy:latest
+ARG BASE_IMAGE=zebbern/mcp-stdio-proxy:latest
 FROM ${BASE_IMAGE}
 
 # Install Python and uv for AWS MCP servers

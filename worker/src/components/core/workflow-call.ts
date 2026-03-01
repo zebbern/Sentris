@@ -10,8 +10,8 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import type { PortMeta } from '@shipsec/component-sdk/port-meta';
+} from '@sentris/component-sdk';
+import type { PortMeta } from '@sentris/component-sdk/port-meta';
 
 const runtimeInputDefinitionSchema = z
   .object({
@@ -87,7 +87,7 @@ const definition = defineComponent({
     category: 'transform',
     description: 'Execute another workflow synchronously and use its outputs.',
     icon: 'GitBranch',
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
     examples: ['Use a reusable enrichment workflow inside a larger pipeline.'],
@@ -130,7 +130,7 @@ const definition = defineComponent({
   },
   async execute() {
     throw new Error(
-      'core.workflow.call must be executed by the Temporal workflow orchestrator (shipsecWorkflowRun)',
+      'core.workflow.call must be executed by the Temporal workflow orchestrator (sentrisWorkflowRun)',
     );
   },
 });

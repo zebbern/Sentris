@@ -1,4 +1,4 @@
-import type { WebhookInputDefinition } from '@shipsec/shared';
+import type { WebhookInputDefinition } from '@sentris/shared';
 
 /** Runtime input definition returned by the workflow runtime-inputs endpoint. */
 export interface RuntimeInput {

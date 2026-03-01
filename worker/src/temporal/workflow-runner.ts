@@ -12,7 +12,7 @@ import {
   type INodeIOService,
   type ComponentPortMetadata,
   type LogEventInput,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import type {
   WorkflowDefinition,
   WorkflowRunRequest,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import { TERMINAL_STATUSES } from '@shipsec/shared';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 import { WorkflowsService } from '../workflows.service';
 import type { WorkflowRunRepository } from '../repository/workflow-run.repository';
 import type { TemporalService } from '../../temporal/temporal.service';

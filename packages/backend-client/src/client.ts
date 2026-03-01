@@ -5323,7 +5323,7 @@ export interface operations {
                         author?: {
                             name?: string;
                             /** @enum {string} */
-                            type?: "shipsecai" | "community";
+                            type?: "sentris" | "community";
                             url?: string | null;
                         } | null;
                         runner?: {
@@ -6204,7 +6204,7 @@ export interface operations {
                     "application/json": {
                         /** @example delivered */
                         status?: string;
-                        /** @example shipsec-run-123 */
+                        /** @example sentris-run-123 */
                         runId?: string;
                     };
                 };

@@ -7,7 +7,7 @@ import {
   TERMINAL_STATUSES,
   type ExecutionTriggerType,
   type ExecutionInputPreview,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 export interface ExecutionRun {
   id: string;

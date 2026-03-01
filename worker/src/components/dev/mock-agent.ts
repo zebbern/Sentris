@@ -7,7 +7,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from '../ai/utils';
@@ -127,8 +127,8 @@ const definition = defineComponent({
     description: 'Debug component: discovers and calls MCP tools.',
     icon: 'Bug',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ params }, context) {
@@ -169,7 +169,7 @@ const definition = defineComponent({
     });
 
     const client = new ClientImpl(
-      { name: 'shipsec-mock-agent', version: '1.0.0' },
+      { name: 'sentris-mock-agent', version: '1.0.0' },
       { capabilities: {} },
     );
 

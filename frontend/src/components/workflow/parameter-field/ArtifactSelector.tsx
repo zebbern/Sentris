@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArtifactLibrary } from '@/hooks/queries/useArtifactQueries';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 import { ArtifactPickerDialog } from './ArtifactPickerDialog';
 
 interface ArtifactSelectorProps {

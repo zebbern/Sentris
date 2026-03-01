@@ -1,4 +1,4 @@
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { getAuthHeaders, API_V1_URL } from './client';
 
 type ListAuditLogsResponseDto = components['schemas']['ListAuditLogsResponseDto'];

@@ -149,7 +149,7 @@ When running in Docker, assign IAM roles to the containers:
 services:
   worker:
     environment:
-      - AWS_ROLE_ARN=arn:aws:iam::123456789012:role/ShipSecWorkerRole
+      - AWS_ROLE_ARN=arn:aws:iam::123456789012:role/SentrisWorkerRole
       - AWS_WEB_IDENTITY_TOKEN_FILE=/var/run/secrets/eks.amazonaws.com/serviceaccount/token
     volumes:
       - /var/run/secrets/eks.amazonaws.com/serviceaccount:/var/run/secrets/eks.amazonaws.com/serviceaccount
@@ -200,7 +200,7 @@ The filesystem server provides access to:
 **Container Spawning Failed**
 
 - Check Docker is running and accessible
-- Verify image exists: `shipsec/mcp-stdio-proxy:latest`
+- Verify image exists: `zebbern/mcp-stdio-proxy:latest`
 - Check container resource limits
 
 ### Debug Commands
@@ -242,4 +242,4 @@ curl http://localhost:3000/mcp/gateway/health
 - [MCP Architecture Documentation](/docs/architecture.mdx)
 - [AI Agent Component Documentation](/docs/ai-agent.md)
 - [Component Development Guide](/docs/components.md)
-- [ShipSec Studio Architecture](https://docs.shipsec.ai)
+- [Sentris Flow Architecture](https://docs.sentris.ai)

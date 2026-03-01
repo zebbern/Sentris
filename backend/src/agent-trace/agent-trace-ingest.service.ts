@@ -37,11 +37,11 @@ export class AgentTraceIngestService implements OnModuleInit, OnModuleDestroy {
     this.kafkaTopic = topicResolver.getAgentTraceTopic();
     const instanceId = kafka.instanceId;
     const defaultGroupId = instanceId
-      ? `shipsec-agent-trace-ingestor-${instanceId}`
-      : 'shipsec-agent-trace-ingestor';
+      ? `sentris-agent-trace-ingestor-${instanceId}`
+      : 'sentris-agent-trace-ingestor';
     const defaultClientId = instanceId
-      ? `shipsec-backend-agent-trace-${instanceId}`
-      : 'shipsec-backend-agent-trace';
+      ? `sentris-backend-agent-trace-${instanceId}`
+      : 'sentris-backend-agent-trace';
 
     this.kafkaGroupId = kafka.agentTraceGroupId ?? defaultGroupId;
     this.kafkaClientId = kafka.agentTraceClientId ?? defaultClientId;

@@ -105,7 +105,7 @@ export function TemplateFilters({
           variant="outline"
           size="sm"
           onClick={() =>
-            window.open('https://github.com/shipsec/templates', '_blank', 'noopener,noreferrer')
+            window.open('https://github.com/sentris/templates', '_blank', 'noopener,noreferrer')
           }
           className="gap-2 h-9"
         >

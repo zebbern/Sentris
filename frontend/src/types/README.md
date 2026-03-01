@@ -4,12 +4,12 @@ TypeScript utility types and type helpers for frontend-specific functionality.
 
 ## Type Sources
 
-### Shared Types (`@shipsec/shared`)
+### Shared Types (`@sentris/shared`)
 - Main data structures are defined as Zod schemas in the shared package
 - Types are derived using `z.infer<SchemaType>` for type safety
 - Includes workflow, component, and execution contract types
 
-### Backend Client Types (`@shipsec/backend-client`)
+### Backend Client Types (`@sentris/backend-client`)
 - Auto-generated TypeScript types from OpenAPI specification
 - Provides request/response type definitions for all API endpoints
 - Ensures type safety across frontend-backend communication

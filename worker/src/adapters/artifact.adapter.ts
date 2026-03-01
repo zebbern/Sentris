@@ -10,8 +10,8 @@ import type {
   ArtifactUploadRequest,
   ArtifactUploadResult,
   IArtifactService,
-} from '@shipsec/component-sdk';
-import { NotFoundError } from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
+import { NotFoundError } from '@sentris/component-sdk';
 import * as schema from './schema';
 
 export class ArtifactAdapter {

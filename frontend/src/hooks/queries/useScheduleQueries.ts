@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ScheduleStatus, WorkflowSchedule } from '@shipsec/shared';
+import type { ScheduleStatus, WorkflowSchedule } from '@sentris/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 

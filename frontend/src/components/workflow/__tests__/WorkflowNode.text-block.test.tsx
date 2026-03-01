@@ -51,8 +51,8 @@ const textBlockMetadata = {
   icon: 'Type',
   logo: null,
   author: {
-    name: 'ShipSecAI',
-    type: 'shipsecai' as const,
+    name: 'SentrisAI',
+    type: 'sentris' as const,
   },
   isLatest: true,
   deprecated: false,

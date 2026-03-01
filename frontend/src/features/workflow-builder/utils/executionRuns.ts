@@ -1,4 +1,4 @@
-import { TERMINAL_STATUSES } from '@shipsec/shared';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 import type { ExecutionStatus } from '@/schemas/execution';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { AmassInput, AmassOutput } from '../amass';
 
@@ -14,14 +14,14 @@ describe.skip('amass component', () => {
   });
 
   it('should be registered with correct metadata', () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     expect(component).toBeDefined();
     expect(component!.label).toBe('Amass Enumeration');
     expect(component!.category).toBe('security');
   });
 
   it('should provide default options when omitted', () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     if (!component) throw new Error('Component not registered');
 
     const paramValues = {};
@@ -46,7 +46,7 @@ describe.skip('amass component', () => {
   });
 
   it('should parse raw text output from docker container', async () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -75,7 +75,7 @@ describe.skip('amass component', () => {
   });
 
   it('should handle structured object output from docker', async () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -107,13 +107,13 @@ describe.skip('amass component', () => {
     expect(result.rawOutput).toBe(rawOutput);
   });
 
-  it('should configure docker runner for ghcr.io/shipsecai/amass image', () => {
-    const component = componentRegistry.get<AmassInput, AmassOutput>('shipsec.amass.enum');
+  it('should configure docker runner for ghcr.io/zebbern/amass image', () => {
+    const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/amass:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/amass:latest');
       expect(component.runner.entrypoint).toBe('sh');
       expect(component.runner.command).toBeInstanceOf(Array);
     }

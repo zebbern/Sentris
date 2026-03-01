@@ -3,7 +3,7 @@ import {
   componentRegistry,
   createExecutionContext,
   type IArtifactService,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import type { FileWriterInput, FileWriterOutput } from '../file-writer';
 
 const s3SendMock = vi.fn();
@@ -148,7 +148,7 @@ describe('core.file.writer component', () => {
         destination: {
           adapterId: 's3',
           config: {
-            bucket: 'shipsec-artifacts',
+            bucket: 'sentris-artifacts',
             credentials: {
               accessKeyId: 'AKIA123',
               secretAccessKey: 'secret',
@@ -169,18 +169,18 @@ describe('core.file.writer component', () => {
 
     expect(s3SendMock).toHaveBeenCalledTimes(1);
     const commandInput = (s3SendMock.mock.calls[0][0] as { input: Record<string, unknown> }).input;
-    expect(commandInput.Bucket).toBe('shipsec-artifacts');
+    expect(commandInput.Bucket).toBe('sentris-artifacts');
     expect(commandInput.Key).toBe('runs/demo/report.json');
 
     expect(result.remoteUploads).toHaveLength(1);
     expect(result.remoteUploads![0]).toMatchObject({
-      bucket: 'shipsec-artifacts',
+      bucket: 'sentris-artifacts',
       key: 'runs/demo/report.json',
       url: 'https://cdn.example.com/artifacts/runs/demo/report.json',
       etag: 'abc123',
     });
 
-    expect(result.remoteUploads?.[0].uri).toBe('s3://shipsec-artifacts/runs/demo/report.json');
+    expect(result.remoteUploads?.[0].uri).toBe('s3://sentris-artifacts/runs/demo/report.json');
     expect(result.artifactId).toBeUndefined();
   });
 });

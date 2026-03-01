@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, mock } from 'bun:test';
 import '../../index';
-import { ExecutionContext } from '@shipsec/component-sdk';
+import { ExecutionContext } from '@sentris/component-sdk';
 import { createMockExecutionContext } from '../../../testing/test-utils';
 
 // Mock the dependencies
@@ -25,7 +25,7 @@ mock.module('googleapis', () => ({
 
 // Import the component definition
 import '../google-workspace-license-unassign';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import { GoogleWorkspaceUserDeleteOutput } from '../google-workspace-license-unassign';
 
 const definition = componentRegistry.get('it-automation.google-workspace.user-delete');

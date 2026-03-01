@@ -8,7 +8,7 @@ import type { KafkaConfig } from '../../config';
 function createMockConfigService(): ConfigService {
   const kafkaConfig: KafkaConfig = {
     brokers: process.env.LOG_KAFKA_BROKERS ?? '',
-    instanceId: process.env.SHIPSEC_INSTANCE,
+    instanceId: process.env.SENTRIS_INSTANCE,
     nodeIoGroupId: process.env.NODE_IO_KAFKA_GROUP_ID,
     nodeIoClientId: process.env.NODE_IO_KAFKA_CLIENT_ID,
     eventGroupId: undefined,
@@ -40,7 +40,7 @@ describe('NodeIOIngestService', () => {
   beforeEach(() => {
     restoreEnv();
     process.env.LOG_KAFKA_BROKERS = 'localhost:19092';
-    delete process.env.SHIPSEC_INSTANCE;
+    delete process.env.SENTRIS_INSTANCE;
     delete process.env.NODE_IO_KAFKA_GROUP_ID;
     delete process.env.NODE_IO_KAFKA_CLIENT_ID;
   });
@@ -49,7 +49,7 @@ describe('NodeIOIngestService', () => {
     restoreEnv();
   });
 
-  test('uses legacy defaults when SHIPSEC_INSTANCE is unset', () => {
+  test('uses legacy defaults when SENTRIS_INSTANCE is unset', () => {
     const repository = {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
@@ -59,12 +59,12 @@ describe('NodeIOIngestService', () => {
       kafkaClientId: string;
     };
 
-    expect(service.kafkaGroupId).toBe('shipsec-node-io-ingestor');
-    expect(service.kafkaClientId).toBe('shipsec-backend-node-io');
+    expect(service.kafkaGroupId).toBe('sentris-node-io-ingestor');
+    expect(service.kafkaClientId).toBe('sentris-backend-node-io');
   });
 
-  test('uses instance-scoped defaults when SHIPSEC_INSTANCE is set', () => {
-    process.env.SHIPSEC_INSTANCE = '4';
+  test('uses instance-scoped defaults when SENTRIS_INSTANCE is set', () => {
+    process.env.SENTRIS_INSTANCE = '4';
     const repository = {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
@@ -74,12 +74,12 @@ describe('NodeIOIngestService', () => {
       kafkaClientId: string;
     };
 
-    expect(service.kafkaGroupId).toBe('shipsec-node-io-ingestor-4');
-    expect(service.kafkaClientId).toBe('shipsec-backend-node-io-4');
+    expect(service.kafkaGroupId).toBe('sentris-node-io-ingestor-4');
+    expect(service.kafkaClientId).toBe('sentris-backend-node-io-4');
   });
 
   test('prefers explicit env vars over defaults', () => {
-    process.env.SHIPSEC_INSTANCE = '9';
+    process.env.SENTRIS_INSTANCE = '9';
     process.env.NODE_IO_KAFKA_GROUP_ID = 'custom-node-io-group';
     process.env.NODE_IO_KAFKA_CLIENT_ID = 'custom-node-io-client';
     const repository = {

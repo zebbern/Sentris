@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, mock } from 'bun:test';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import { createMockExecutionContext } from '../../../testing/test-utils';
 import { OktaUserOffboardInput, OktaUserOffboardOutput } from '../okta-user-offboard';
 

@@ -5,7 +5,7 @@
  *   AWS GuardDuty (sample finding)
  *     -> EventBridge (rule: source=aws.guardduty)
  *       -> API Destination (ngrok public URL + webhook path)
- *         -> ShipSec webhook /webhooks/inbound/:path
+ *         -> Sentris webhook /webhooks/inbound/:path
  *           -> Parsing script (extracts finding from EventBridge envelope)
  *             -> Investigation workflow
  *               -> OpenCode agent + AbuseIPDB + VirusTotal + AWS MCP tools
@@ -228,14 +228,14 @@ e2eDescribe('GuardDuty -> EventBridge -> Webhook -> Investigation E2E', () => {
       // ---------------------------------------------------------------
       console.log('\n  Phase 1: AWS IAM Setup');
 
-      const userName = 'shipsec-e2e-investigator';
+      const userName = 'sentris-e2e-investigator';
       cleanupState.userName = userName;
       await ensureInvestigatorUser(userName);
       await attachPolicy(userName, 'arn:aws:iam::aws:policy/ReadOnlyAccess');
       const keys = await createAccessKeys(userName);
       console.log(`    Access key created: ${keys.accessKeyId}`);
 
-      const roleName = `shipsec-e2e-eventbridge-role`;
+      const roleName = `sentris-e2e-eventbridge-role`;
       cleanupState.roleName = roleName;
       const roleArn = await createEventBridgeTargetRole(roleName);
       console.log(`    EventBridge role ARN: ${roleArn}`);
@@ -427,12 +427,12 @@ e2eDescribe('GuardDuty -> EventBridge -> Webhook -> Investigation E2E', () => {
       // ---------------------------------------------------------------
       console.log('\n  Phase 4: EventBridge Setup');
 
-      const connName = `shipsec-e2e-gd-conn-${ts}`;
+      const connName = `sentris-e2e-gd-conn-${ts}`;
       cleanupState.connectionName = connName;
       const connectionArn = await createConnection(connName, AWS_REGION);
       await waitForConnection(connName, AWS_REGION);
 
-      const apiDestName = `shipsec-e2e-gd-apidest-${ts}`;
+      const apiDestName = `sentris-e2e-gd-apidest-${ts}`;
       cleanupState.apiDestinationName = apiDestName;
       const apiDestArn = await createApiDestination(
         apiDestName,
@@ -441,14 +441,14 @@ e2eDescribe('GuardDuty -> EventBridge -> Webhook -> Investigation E2E', () => {
         AWS_REGION,
       );
 
-      const ruleNameStr = `shipsec-e2e-gd-rule-${ts}`;
+      const ruleNameStr = `sentris-e2e-gd-rule-${ts}`;
       cleanupState.ruleName = ruleNameStr;
       await createRule(ruleNameStr, AWS_REGION, {
         source: ['aws.guardduty'],
         'detail-type': ['GuardDuty Finding'],
       });
 
-      const targetId = `shipsec-e2e-target-${ts}`;
+      const targetId = `sentris-e2e-target-${ts}`;
       cleanupState.targetId = targetId;
       await putTarget(ruleNameStr, targetId, apiDestArn, roleArn, AWS_REGION);
 

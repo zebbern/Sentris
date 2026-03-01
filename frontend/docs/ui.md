@@ -1,6 +1,6 @@
 # Frontend UI Conventions
 
-ShipSec Studio’s UI is composed of three primary layers: layout scaffolding, workflow canvas primitives, and a shadcn-based component library. Use this guide when adding new surfaces or extending the canvas.
+Sentris Flow’s UI is composed of three primary layers: layout scaffolding, workflow canvas primitives, and a shadcn-based component library. Use this guide when adding new surfaces or extending the canvas.
 
 ## Layout Skeleton
 

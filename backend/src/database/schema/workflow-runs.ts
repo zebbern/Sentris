@@ -1,6 +1,6 @@
 import { integer, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-import type { ExecutionInputPreview } from '@shipsec/shared';
+import type { ExecutionInputPreview } from '@sentris/shared';
 
 export const workflowRunsTable = pgTable('workflow_runs', {
   runId: text('run_id').primaryKey(),

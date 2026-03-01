@@ -4,7 +4,7 @@ import {
   type ScheduleInputPayload,
   type WorkflowSchedule,
   ScheduleOverlapPolicy,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import type { WorkflowDefinition } from '../dsl/types';
 import type { AuthContext } from '../auth/types';
 import { WorkflowsService } from '../workflows/workflows.service';

@@ -1,7 +1,7 @@
 import { CheckCircle2, AlertCircle, HelpCircle, RefreshCw } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import type { McpHealthStatus } from '@shipsec/shared';
+import type { McpHealthStatus } from '@sentris/shared';
 
 interface HealthIndicatorProps {
   status: McpHealthStatus | null;

@@ -10,7 +10,7 @@ import {
   port,
   param,
   type PortMeta,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 /**
  * Manual Selection Component
@@ -168,8 +168,8 @@ const definition = defineComponent({
       'Ask the user to select from a list of options. Supports dynamic context templates.',
     icon: 'ListChecks',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

@@ -1,5 +1,5 @@
 /**
- * ShipSec Component SDK
+ * Sentris Component SDK
  *
  * This SDK provides the core primitives for building workflow components:
  * - Type definitions and interfaces

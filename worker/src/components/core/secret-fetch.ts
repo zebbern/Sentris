@@ -10,8 +10,8 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { secretMetadataSchema } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { secretMetadataSchema } from '@sentris/contracts';
 
 const inputSchema = inputs({});
 
@@ -20,7 +20,7 @@ const parameterSchema = parameters({
     z
       .string()
       .min(1, 'Secret identifier is required')
-      .describe('Name or UUID of the secret in the ShipSec store'),
+      .describe('Name or UUID of the secret in the Sentris store'),
     {
       label: 'Secret Name',
       editor: 'secret',
@@ -69,7 +69,7 @@ const definition = defineComponent({
   inputs: inputSchema,
   outputs: outputSchema,
   parameters: parameterSchema,
-  docs: 'Fetch a secret from the ShipSec-managed secret store and expose it to downstream nodes.',
+  docs: 'Fetch a secret from the Sentris-managed secret store and expose it to downstream nodes.',
   requiresSecrets: true,
   ui: {
     slug: 'secret-fetch',

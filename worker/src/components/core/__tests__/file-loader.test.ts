@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import { createExecutionContext } from '@shipsec/component-sdk';
-import type { IFileStorageService } from '@shipsec/component-sdk';
+import { createExecutionContext } from '@sentris/component-sdk';
+import type { IFileStorageService } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { FileLoaderInput, FileLoaderOutput } from '../file-loader';
 

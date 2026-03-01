@@ -3117,7 +3117,7 @@
                           "type": {
                             "type": "string",
                             "enum": [
-                              "shipsecai",
+                              "sentris",
                               "community"
                             ]
                           },
@@ -4687,7 +4687,7 @@
                     },
                     "runId": {
                       "type": "string",
-                      "example": "shipsec-run-123"
+                      "example": "sentris-run-123"
                     }
                   }
                 }
@@ -6628,8 +6628,8 @@
     }
   },
   "info": {
-    "title": "ShipSec Studio API",
-    "description": "ShipSec backend API specification",
+    "title": "Sentris Flow API",
+    "description": "Sentris backend API specification",
     "version": "0.1.0",
     "contact": {}
   },

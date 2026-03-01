@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COMPONENT_CATEGORIES } from '@shipsec/shared';
+import { COMPONENT_CATEGORIES } from '@sentris/shared';
 
 export const ComponentRunnerSchema = z
   .object({
@@ -139,7 +139,7 @@ export type Parameter = z.infer<typeof ParameterSchema>;
  */
 export const ComponentAuthorSchema = z.object({
   name: z.string(),
-  type: z.enum(['shipsecai', 'community']),
+  type: z.enum(['sentris', 'community']),
   url: z.string().url().optional(),
 });
 

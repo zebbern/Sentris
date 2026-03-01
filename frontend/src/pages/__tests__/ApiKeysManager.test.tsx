@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, within, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 
 // Polyfill ResizeObserver for Radix UI components (Checkbox uses it)
 if (typeof globalThis.ResizeObserver === 'undefined') {

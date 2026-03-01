@@ -3,7 +3,7 @@ import {
   extractPorts,
   type ComponentPortMetadata,
   type ComponentParameterMetadata,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 type RegisteredComponent = NonNullable<ReturnType<typeof componentRegistry.get>>;
 
@@ -88,7 +88,7 @@ export function maskSecretParameters(component: RegisteredComponent, params: unk
     const parameters = component.parameters as any;
     if (parameters && typeof parameters.shape === 'object') {
       for (const [key, field] of Object.entries(parameters.shape)) {
-        const metadata = (field as any)._def?.shipsecMetadata;
+        const metadata = (field as any)._def?.sentrisMetadata;
         if (metadata?.editor === 'secret') {
           paramMetadata.push({ id: key, type: 'secret', label: key });
         }

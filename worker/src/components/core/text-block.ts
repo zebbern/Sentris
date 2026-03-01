@@ -6,7 +6,7 @@ import {
   outputs,
   parameters,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -40,8 +40,8 @@ const definition = defineComponent({
     description: 'Add markdown notes and documentation to your workflow',
     icon: 'FileText',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     // UI-only component - should not be included in workflow execution
     uiOnly: true,

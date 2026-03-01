@@ -8,7 +8,7 @@ import {
   analyticsResultSchema,
   generateFindingHash,
   type ExecutionContext,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   trigger: port(z.any().optional(), {
@@ -41,8 +41,8 @@ const definition = (defineComponent as any)({
     category: 'transform',
     description: 'Test-only component that emits deterministic analytics results.',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute(_payload: z.infer<typeof inputSchema>, _context: ExecutionContext) {

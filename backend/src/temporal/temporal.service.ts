@@ -18,14 +18,14 @@ import {
 // Import workflow functions (for type safety during client.start())
 // Note: Actual implementation runs in the worker
 import {
-  shipsecWorkflowRun,
+  sentrisWorkflowRun,
   testMinimalWorkflow,
   scheduleTriggerWorkflow,
   mcpDiscoveryWorkflow,
   mcpGroupDiscoveryWorkflow,
   webhookParsingWorkflow,
-} from '@shipsec/studio-worker/workflows';
-import type { ExecutionTriggerMetadata, ScheduleOverlapPolicy } from '@shipsec/shared';
+} from '@sentris/studio-worker/workflows';
+import type { ExecutionTriggerMetadata, ScheduleOverlapPolicy } from '@sentris/shared';
 
 export interface StartWorkflowOptions {
   workflowType: string;
@@ -113,7 +113,7 @@ export class TemporalService implements OnModuleDestroy {
 
   async startWorkflow(options: StartWorkflowOptions): Promise<WorkflowStartResult> {
     const client = await this.getClient();
-    const workflowId = options.workflowId ?? `shipsec-workflow-${randomUUID()}`;
+    const workflowId = options.workflowId ?? `sentris-workflow-${randomUUID()}`;
     const taskQueue = options.taskQueue ?? this.defaultTaskQueue;
 
     const argsSummary = this.formatArgsSummary(options.args);
@@ -148,8 +148,8 @@ export class TemporalService implements OnModuleDestroy {
 
   private getWorkflowFunction(workflowType: string) {
     switch (workflowType) {
-      case 'shipsecWorkflowRun':
-        return shipsecWorkflowRun;
+      case 'sentrisWorkflowRun':
+        return sentrisWorkflowRun;
       case 'testMinimalWorkflow':
         return testMinimalWorkflow;
       case 'scheduleTriggerWorkflow':

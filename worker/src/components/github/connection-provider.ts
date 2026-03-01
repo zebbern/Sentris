@@ -7,7 +7,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -58,8 +58,8 @@ const definition = defineComponent({
       'Surface a GitHub integration connection to downstream automation steps without re-entering OAuth credentials.',
     icon: 'Plug',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

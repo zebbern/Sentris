@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'bun:test';
-import type { ExecutionContext } from '@shipsec/component-sdk';
-import { componentRegistry, runComponentWithRunner } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
+import { componentRegistry, runComponentWithRunner } from '@sentris/component-sdk';
 
 function createTestContext(overrides?: Partial<ExecutionContext>): ExecutionContext {
   return {

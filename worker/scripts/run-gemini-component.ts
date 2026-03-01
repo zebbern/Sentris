@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { componentRegistry, createExecutionContext } from '@shipsec/component-sdk';
+import { componentRegistry, createExecutionContext } from '@sentris/component-sdk';
 
 async function main() {
   await import('../src/components/index');

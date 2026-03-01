@@ -1,6 +1,6 @@
-# Contributing to ShipSec Studio
+# Contributing to Sentris Flow
 
-Thank you for improving ShipSec Studio. This guide keeps contributions consistent, reviewable, and compliant with our legal and security expectations.
+Thank you for improving Sentris Flow. This guide keeps contributions consistent, reviewable, and compliant with our legal and security expectations.
 
 ## Quick Start
 - Fork or branch from `main`.
@@ -29,7 +29,7 @@ The repository enforces a DCO status check on pull requests; unsignoffed commits
 - Tests, lint, and type checks pass (or documented exceptions).
 - New or changed behaviour is covered with tests near the code (`__tests__`, `*.spec.ts`/`*.test.ts`).
 - Docs/runbooks updated when contracts, workflows, or operational steps change.
-- Keep workflow/run identifiers in the `shipsec-run-*` shape and reuse shared Zod schemas from `@shipsec/shared` instead of ad-hoc types.
+- Keep workflow/run identifiers in the `sentris-run-*` shape and reuse shared Zod schemas from `@sentris/shared` instead of ad-hoc types.
 - Screenshots or trace snippets included for UI/observability changes when helpful.
 
 ## Code Review Expectations

@@ -8,7 +8,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   artifactName: port(
@@ -153,8 +153,8 @@ const definition = defineComponent({
       'Save any content (text, JSON, arrays, objects) as an artifact for the current run and/or the shared library.',
     icon: 'Archive',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

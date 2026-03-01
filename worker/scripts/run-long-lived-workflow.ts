@@ -8,17 +8,17 @@ import { Pool } from 'pg';
 import { Connection, Client } from '@temporalio/client';
 
 import type { WorkflowDefinition } from '../src/temporal/types';
-import { shipsecWorkflowRun } from '../src/temporal/workflows';
+import { sentrisWorkflowRun } from '../src/temporal/workflows';
 import '../src/components';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '..', '.env') });
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+  process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris';
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'shipsec-dev';
-const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-default';
+const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
+const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 
 const OUTPUT_DIR = join(__dirname, '..', 'benchmarks');
 
@@ -125,7 +125,7 @@ async function main() {
     console.log(`Starting long-lived workflow ${runId}`);
     const start = Date.now();
 
-    const handle = await client.workflow.start(shipsecWorkflowRun, {
+    const handle = await client.workflow.start(sentrisWorkflowRun, {
       workflowId: runId,
       taskQueue: TEMPORAL_TASK_QUEUE,
       args: [

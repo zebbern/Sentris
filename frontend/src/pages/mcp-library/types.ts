@@ -1,4 +1,4 @@
-import type { McpHealthStatus } from '@shipsec/shared';
+import type { McpHealthStatus } from '@sentris/shared';
 
 export const TRANSPORT_TYPES = [
   { value: 'http', label: 'HTTP' },

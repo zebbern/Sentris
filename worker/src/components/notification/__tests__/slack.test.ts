@@ -1,5 +1,5 @@
 import { describe, it, expect, mock, beforeEach } from 'bun:test';
-import { extractPorts } from '@shipsec/component-sdk';
+import { extractPorts } from '@sentris/component-sdk';
 import { definition } from '../slack';
 
 describe('Slack Component Template Support', () => {

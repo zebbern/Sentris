@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DEBUG_LOG_DIR = '/tmp/shipsec-debug';
+const DEBUG_LOG_DIR = '/tmp/sentris-debug';
 const DEBUG_LOG_FILE = path.join(DEBUG_LOG_DIR, 'worker.log');
 const HEARTBEAT_LOG_FILE = path.join(DEBUG_LOG_DIR, 'heartbeat.log');
 

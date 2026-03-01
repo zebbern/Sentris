@@ -7,7 +7,7 @@
  */
 
 import { ApplicationFailure } from '@temporalio/common';
-import { isSpilledDataMarker, type IFileStorageService } from '@shipsec/component-sdk';
+import { isSpilledDataMarker, type IFileStorageService } from '@sentris/component-sdk';
 
 export interface InputWarning {
   target: string;

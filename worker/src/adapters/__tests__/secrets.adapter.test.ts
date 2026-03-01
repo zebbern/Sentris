@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { SecretEncryption, parseMasterKey } from '@shipsec/shared';
+import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 import { SecretsAdapter } from '../secrets.adapter';
 import * as schema from '../schema';
 

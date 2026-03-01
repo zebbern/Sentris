@@ -72,4 +72,4 @@ volumes:
 
 networks:
   default:
-    name: shipsec-network
+    name: sentris-network

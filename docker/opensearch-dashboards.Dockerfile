@@ -1,5 +1,5 @@
 # Custom OpenSearch Dashboards image for SaaS tenant lockdown
-# Source: https://github.com/ShipSecAI/tools/tree/main/misc/opensearch-dashboards-saas
+# Source: https://github.com/zebbern/tools/tree/main/misc/opensearch-dashboards-saas
 #
 # Removes unwanted plugins from sidebar. Config-level disabling is NOT possible
 # because OSD 2.x plugins don't register an "enabled" config key (fatal error).

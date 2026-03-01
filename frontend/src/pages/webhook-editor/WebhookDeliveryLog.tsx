@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { NavigateFunction } from 'react-router-dom';
-import type { WebhookDelivery } from '@shipsec/shared';
+import type { WebhookDelivery } from '@sentris/shared';
 
 interface WebhookDeliveryLogProps {
   deliveries: WebhookDelivery[];

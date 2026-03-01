@@ -18,7 +18,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
-import type { McpHealthStatus } from '@shipsec/shared';
+import type { McpHealthStatus } from '@sentris/shared';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -145,7 +145,7 @@ export function McpLibraryPage() {
   } = useSortableList({
     items: filteredCustomServers,
     getId: getServerId,
-    storageKey: `shipsec:sort:mcp-custom:${organizationId}`,
+    storageKey: `sentris:sort:mcp-custom:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

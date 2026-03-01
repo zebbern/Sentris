@@ -1,4 +1,4 @@
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 
 export const formatScheduleTimestamp = (value?: string | null) => {
   if (!value) return 'Not scheduled';

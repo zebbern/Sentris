@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/accordion';
 import { Cloud, HelpCircle, Package, Trash2, Wrench, RefreshCw, Loader } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { McpHealthStatus } from '@shipsec/shared';
+import type { McpHealthStatus } from '@sentris/shared';
 import type { ToolCounts } from './types';
 import { getGroupTheme } from './utils';
 import { GroupLogo } from './GroupLogo';

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'bun:test';
-import { componentRegistry, createExecutionContext } from '@shipsec/component-sdk';
+import { componentRegistry, createExecutionContext } from '@sentris/component-sdk';
 import type { AnalyticsFixtureInput, AnalyticsFixtureOutput } from '../analytics-fixture';
 
 describe('test.analytics.fixture component', () => {

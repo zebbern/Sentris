@@ -1,4 +1,4 @@
-import type { ArtifactDestination } from '@shipsec/shared';
+import type { ArtifactDestination } from '@sentris/shared';
 import { apiClient, getAuthHeaders, API_BASE_URL, API_V1_URL, type ApiResponse } from './client';
 
 export interface ArtifactListFilters {

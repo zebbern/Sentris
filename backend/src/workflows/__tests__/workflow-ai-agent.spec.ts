@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'bun:test';
 
-import '@shipsec/studio-worker/components';
+import '@sentris/studio-worker/components';
 
 import { WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { compileWorkflowGraph } from '../../dsl/compiler';

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 import { api, type ArtifactListFilters } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { terminalStaleTime } from '@/hooks/queries/useRunQueries';

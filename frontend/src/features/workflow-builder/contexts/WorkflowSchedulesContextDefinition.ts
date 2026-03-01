@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 
 type ScheduleAction = 'pause' | 'resume' | 'run';
 

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { ITraceService } from '@shipsec/component-sdk';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import type { ITraceService } from '@sentris/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 import * as schema from '../../adapters/schema';
 import type { HumanInputType } from '../../adapters/schema';
 

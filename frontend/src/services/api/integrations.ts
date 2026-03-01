@@ -1,4 +1,4 @@
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { apiClient } from './client';
 
 type IntegrationProviderResponse = components['schemas']['IntegrationProviderResponse'];

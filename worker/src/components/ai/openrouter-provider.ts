@@ -9,13 +9,13 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { LLMProviderSchema, type LlmProviderConfig } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
 
 const DEFAULT_MODEL = 'openrouter/auto';
 const DEFAULT_BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
 const DEFAULT_HTTP_REFERER = process.env.OPENROUTER_HTTP_REFERER ?? '';
-const DEFAULT_APP_TITLE = process.env.OPENROUTER_APP_TITLE ?? 'ShipSec Studio';
+const DEFAULT_APP_TITLE = process.env.OPENROUTER_APP_TITLE ?? 'Sentris Flow';
 
 const inputSchema = inputs({
   apiKey: port(
@@ -115,8 +115,8 @@ const definition = defineComponent({
       'Normalize OpenRouter credentials, headers, and model selection into a reusable provider config.',
     icon: 'Settings',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

@@ -7,7 +7,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -56,8 +56,8 @@ const definition = defineComponent({
     category: 'transform',
     description: 'Utility component that sleeps for a fixed delay and records timestamps.',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ params }, context) {

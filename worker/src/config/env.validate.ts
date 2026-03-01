@@ -1,4 +1,4 @@
-import { formatEnvErrors } from '@shipsec/shared';
+import { formatEnvErrors } from '@sentris/shared';
 import { workerEnvSchema, type WorkerEnvConfig } from './env.schema';
 
 export function validateWorkerEnv(env: Record<string, unknown>): WorkerEnvConfig {

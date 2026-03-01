@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SaveButton } from '@/components/ui/save-button';
 import { cn } from '@/lib/utils';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 import type { WebhookFormState } from './webhookEditorTypes';
 
 interface WebhookEditorHeaderProps {

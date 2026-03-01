@@ -1,4 +1,4 @@
-# ShipSec Studio Backend
+# Sentris Flow Backend
 
 NestJS REST API server for workflow management, orchestration, and real-time execution monitoring.
 
@@ -79,7 +79,7 @@ bun run test
 
 ```bash
 # Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/shipsec
+DATABASE_URL=postgresql://user:pass@localhost:5432/sentris
 
 # Authentication
 CLERK_PUBLISHABLE_KEY=pk_test_...
@@ -88,8 +88,8 @@ CLERK_WEBHOOK_SECRET=whsec_...
 
 # Temporal
 TEMPORAL_ADDRESS=localhost:7233
-TEMPORAL_NAMESPACE=shipsec-studio
-TEMPORAL_TASK_QUEUE=shipsec-workflows
+TEMPORAL_NAMESPACE=sentris-flow
+TEMPORAL_TASK_QUEUE=sentris-workflows
 
 # Object Storage
 MINIO_ENDPOINT=localhost:9000

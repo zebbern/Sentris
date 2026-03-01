@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { componentRegistry, defineComponent, inputs, outputs, port } from '@shipsec/component-sdk';
-import { awsCredentialSchema } from '@shipsec/contracts';
+import { componentRegistry, defineComponent, inputs, outputs, port } from '@sentris/component-sdk';
+import { awsCredentialSchema } from '@sentris/contracts';
 
 const inputSchema = inputs({
   accessKeyId: port(z.string().min(1, 'Access key ID is required'), {

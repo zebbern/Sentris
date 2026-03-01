@@ -25,8 +25,8 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { LLMProviderSchema, llmProviderContractName } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { AgentStreamRecorder } from './agent-stream-recorder';
 
 type ModelProvider = 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan';
@@ -535,8 +535,8 @@ Loop the Conversation State output back into the next agent invocation to keep m
     description: 'AI SDK agent with conversation memory and MCP tool calling via gateway.',
     icon: 'Bot',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

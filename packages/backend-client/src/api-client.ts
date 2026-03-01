@@ -27,11 +27,11 @@ type CreateApiKeyPayload = components['schemas']['CreateApiKeyDto'];
 type UpdateApiKeyPayload = components['schemas']['UpdateApiKeyDto'];
 
 /**
- * ShipSec API Client
+ * Sentris API Client
  * 
- * Type-safe client for the ShipSec backend API
+ * Type-safe client for the Sentris backend API
  */
-export class ShipSecApiClient {
+export class SentrisApiClient {
   private client: ReturnType<typeof createClient<paths>>;
   private baseUrl: string;
 
@@ -666,10 +666,10 @@ export class ShipSecApiClient {
 }
 
 /**
- * Create a new ShipSec API client instance
+ * Create a new Sentris API client instance
  */
-export function createShipSecClient(config?: ClientConfig) {
-  return new ShipSecApiClient(config);
+export function createSentrisClient(config?: ClientConfig) {
+  return new SentrisApiClient(config);
 }
 
 // Export types for consumers

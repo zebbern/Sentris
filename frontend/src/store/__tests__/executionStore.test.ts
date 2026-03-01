@@ -134,7 +134,7 @@ const baseStatus = (overrides: Partial<ExecutionStatusResponse> = {}): Execution
   status: 'RUNNING',
   startedAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  taskQueue: 'shipsec-default',
+  taskQueue: 'sentris-default',
   historyLength: 0,
   ...overrides,
 });

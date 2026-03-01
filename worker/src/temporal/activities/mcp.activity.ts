@@ -4,7 +4,7 @@ import {
   isAgentCallable,
   getToolMetadata,
   ServiceError,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { ApplicationFailure } from '@temporalio/activity';
 import {
   CleanupRunResourcesActivityInput,
@@ -17,7 +17,7 @@ import {
 
 const DEFAULT_API_BASE_URL =
   process.env.STUDIO_API_BASE_URL ??
-  process.env.SHIPSEC_API_BASE_URL ??
+  process.env.SENTRIS_API_BASE_URL ??
   process.env.API_BASE_URL ??
   'http://localhost:3211';
 

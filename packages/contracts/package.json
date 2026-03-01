@@ -1,9 +1,9 @@
 {
-  "name": "@shipsec/contracts",
+  "name": "@sentris/contracts",
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Explicit Zod contracts for ShipSec component ports",
+  "description": "Explicit Zod contracts for Sentris component ports",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@shipsec/component-sdk": "workspace:*",
-    "@shipsec/shared": "workspace:*",
+    "@sentris/component-sdk": "workspace:*",
+    "@sentris/shared": "workspace:*",
     "zod": "^4.3.6"
   },
   "devDependencies": {

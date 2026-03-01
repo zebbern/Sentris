@@ -1,5 +1,5 @@
 /**
- * ShipSec Component SDK - Error Types
+ * Sentris Component SDK - Error Types
  *
  * Standardized error taxonomy for component execution.
  * All errors extend ComponentError and provide semantic information

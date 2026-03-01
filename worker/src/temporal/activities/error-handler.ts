@@ -7,8 +7,8 @@
  */
 
 import { ApplicationFailure } from '@temporalio/common';
-import { ValidationError } from '@shipsec/component-sdk';
-import type { INodeIOService, IScopedTraceService } from '@shipsec/component-sdk';
+import { ValidationError } from '@sentris/component-sdk';
+import type { INodeIOService, IScopedTraceService } from '@sentris/component-sdk';
 import {
   truncateText,
   getErrorMessage,

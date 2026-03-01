@@ -17,7 +17,7 @@ import {
   port,
   param,
   createExecutionContext,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 describe('Dynamic Port Resolution', () => {
   it('resolves dynamic input schemas before executing component', async () => {

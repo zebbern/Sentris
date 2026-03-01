@@ -204,8 +204,8 @@ const templateA: Template = {
   description: 'Run a full network reconnaissance scan across target hosts.',
   category: 'security',
   tags: ['network', 'recon', 'nmap'],
-  author: 'shipsec',
-  repository: 'shipsec/templates',
+  author: 'sentris',
+  repository: 'sentris/templates',
   path: 'templates/network-recon.yaml',
   branch: 'main',
   version: '1.0.0',
@@ -227,7 +227,7 @@ const templateB: Template = {
   category: 'compliance',
   tags: ['cis', 'audit', 'benchmark'],
   author: 'contrib-user',
-  repository: 'shipsec/templates',
+  repository: 'sentris/templates',
   path: 'templates/compliance-audit.yaml',
   branch: 'main',
   manifest: {},
@@ -411,7 +411,7 @@ describe('TemplateLibraryPage', () => {
     setupStore();
     renderPage();
 
-    // templateA author "shipsec" -> "S", templateB author "contrib-user" -> "C"
+    // templateA author "sentris" -> "S", templateB author "contrib-user" -> "C"
     expect(screen.getByText('S')).toBeInTheDocument();
     expect(screen.getByText('C')).toBeInTheDocument();
   });

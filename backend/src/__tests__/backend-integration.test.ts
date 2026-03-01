@@ -75,7 +75,7 @@ interface Component {
   logo: string | null;
   author: {
     name: string;
-    type: 'shipsecai' | 'community';
+    type: 'sentris' | 'community';
     url: string | null;
   } | null;
   isLatest: boolean;
@@ -135,7 +135,7 @@ interface Component {
   let pool: Pool;
   let db: ReturnType<typeof drizzle>;
   let minioClient: MinioClient;
-  const testBucket = process.env.MINIO_BUCKET_NAME || 'shipsec-files';
+  const testBucket = process.env.MINIO_BUCKET_NAME || 'sentris-files';
 
   beforeAll(async () => {
     // eslint-disable-next-line no-console
@@ -151,7 +151,7 @@ interface Component {
 
     // Initialize database connection for cleanup
     const connectionString =
-      process.env.DATABASE_URL || 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
     pool = new Pool({ connectionString });
     db = drizzle(pool);
 

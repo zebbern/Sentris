@@ -7,8 +7,8 @@ import {
   inputs,
   outputs,
   port,
-} from '@shipsec/component-sdk';
-import { fileContractSchema } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { fileContractSchema } from '@sentris/contracts';
 
 const inputSchema = inputs({
   fileId: port(z.string().uuid().describe('File ID from uploaded files'), {
@@ -52,11 +52,11 @@ const definition = defineComponent({
     version: '1.0.0',
     type: 'input',
     category: 'input',
-    description: 'Load file contents from ShipSec storage for use in workflows.',
+    description: 'Load file contents from Sentris storage for use in workflows.',
     icon: 'FileUp',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

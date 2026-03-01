@@ -15,7 +15,7 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
   let pool: Pool;
   let db: NodePgDatabase<typeof schema>;
   let adapter: FileStorageAdapter;
-  const bucketName = 'test-shipsec-files';
+  const bucketName = 'test-sentris-files';
 
   beforeAll(async () => {
     // Initialize MinIO client
@@ -29,7 +29,7 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
 
     // Initialize PostgreSQL connection
     const connectionString =
-      process.env.DATABASE_URL || 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
     pool = new Pool({ connectionString });
     db = drizzle(pool, { schema });
 

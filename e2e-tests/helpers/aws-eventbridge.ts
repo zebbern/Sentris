@@ -3,7 +3,7 @@
  *
  * Encapsulates all AWS CLI interactions for the GuardDuty → EventBridge → Webhook E2E test.
  * Uses Bun.spawn for async subprocess execution with JSON output parsing.
- * All resource names are prefixed with `shipsec-e2e-` + timestamp for idempotency.
+ * All resource names are prefixed with `sentris-e2e-` + timestamp for idempotency.
  */
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ export async function createConnection(
       '--auth-parameters',
       JSON.stringify({
         ApiKeyAuthParameters: {
-          ApiKeyName: 'x-shipsec-e2e',
+          ApiKeyName: 'x-sentris-e2e',
           ApiKeyValue: 'e2e-dummy-key',
         },
       }),

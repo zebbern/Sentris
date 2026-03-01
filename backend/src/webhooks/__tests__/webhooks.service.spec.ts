@@ -267,7 +267,7 @@ describe('WebhooksService', () => {
   const prepareRunPayload = async (...args: unknown[]) => {
     prepareRunPayloadCalls.push(args);
     return {
-      runId: 'shipsec-run-123',
+      runId: 'sentris-run-123',
       workflowId: 'workflow-1',
       definition: workflowDefinition,
       inputs: { prTitle: 'Test PR', prNumber: 42 },
@@ -282,7 +282,7 @@ describe('WebhooksService', () => {
   const startPreparedRunCalls: unknown[][] = [];
   const startPreparedRun = async (...args: unknown[]) => {
     startPreparedRunCalls.push(args);
-    return { runId: 'shipsec-run-123', status: 'RUNNING' };
+    return { runId: 'sentris-run-123', status: 'RUNNING' };
   };
 
   const workflowsService = {
@@ -295,7 +295,7 @@ describe('WebhooksService', () => {
   const temporalStartCalls: unknown[][] = [];
   const temporalStartWorkflow = async (...args: unknown[]) => {
     temporalStartCalls.push(args);
-    return { workflowId: 'webhook-parse-1', runId: 'run-1', taskQueue: 'shipsec-default' };
+    return { workflowId: 'webhook-parse-1', runId: 'run-1', taskQueue: 'sentris-default' };
   };
 
   const temporalResultCalls: unknown[][] = [];
@@ -307,7 +307,7 @@ describe('WebhooksService', () => {
   const temporalService = {
     startWorkflow: temporalStartWorkflow,
     getWorkflowResult: temporalGetWorkflowResult,
-    getDefaultTaskQueue: () => 'shipsec-default',
+    getDefaultTaskQueue: () => 'sentris-default',
   } as unknown as TemporalService;
 
   const auditLogService = {
@@ -324,7 +324,7 @@ describe('WebhooksService', () => {
       temporalService,
       auditLogService as any,
       {
-        get: (key: string, defaultValue?: string) => defaultValue ?? 'https://api.shipsec.ai',
+        get: (key: string, defaultValue?: string) => defaultValue ?? 'https://api.sentris.ai',
       } as any,
     );
     ensureWorkflowAdminAccessCalls.length = 0;

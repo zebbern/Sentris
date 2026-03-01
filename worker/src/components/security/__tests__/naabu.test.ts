@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi, mock } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import type { NaabuInput, NaabuOutput } from '../naabu';
 
 // Mock IsolatedContainerVolume BEFORE any component imports.
@@ -18,7 +18,7 @@ mock.module('../../../utils/isolated-volume', () => ({
   },
 }));
 
-let componentRegistry: typeof import('@shipsec/component-sdk').componentRegistry;
+let componentRegistry: typeof import('@sentris/component-sdk').componentRegistry;
 
 describe('naabu component', () => {
   beforeAll(async () => {
@@ -30,14 +30,14 @@ describe('naabu component', () => {
   });
 
   it('should be registered with correct metadata', () => {
-    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('sentris.naabu.scan');
     expect(component).toBeDefined();
     expect(component!.label).toBe('Naabu Port Scan');
     expect(component!.category).toBe('security');
   });
 
   it('should provide sensible defaults', () => {
-    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('sentris.naabu.scan');
     if (!component) throw new Error('Component not registered');
 
     const paramValues = {};
@@ -49,7 +49,7 @@ describe('naabu component', () => {
   });
 
   it('should parse JSONL output into findings', async () => {
-    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('sentris.naabu.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -87,7 +87,7 @@ describe('naabu component', () => {
   });
 
   it('should handle plain host:port output', async () => {
-    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('sentris.naabu.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -117,12 +117,12 @@ describe('naabu component', () => {
   });
 
   it('should configure docker runner for naabu image', () => {
-    const component = componentRegistry.get<NaabuInput, NaabuOutput>('shipsec.naabu.scan');
+    const component = componentRegistry.get<NaabuInput, NaabuOutput>('sentris.naabu.scan');
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/shipsecai/naabu:latest');
+      expect(component.runner.image).toBe('ghcr.io/zebbern/naabu:latest');
       // Distroless image — no entrypoint override, uses image default
       expect(component.runner.entrypoint).toBeUndefined();
       expect(component.runner.command).toEqual([]);

@@ -175,13 +175,13 @@ export function AppTopBar({
 
       {/* Logo and Page title section */}
       <div className="flex items-center min-w-0 flex-1 gap-3">
-        {/* Mobile: ShipSec Studio stacked | Page Title (except on workflows page) */}
+        {/* Mobile: Sentris Flow stacked | Page Title (except on workflows page) */}
         {isMobile ? (
           <div className="flex items-center gap-2 min-w-0">
             <Link to="/" className="flex items-center gap-1.5 flex-shrink-0">
               <img
                 src="/favicon.ico"
-                alt="ShipSec"
+                alt="Sentris"
                 width={24}
                 height={24}
                 className="w-6 h-6"
@@ -190,7 +190,7 @@ export function AppTopBar({
                 }}
               />
               <div className="flex flex-col leading-none">
-                <span className="font-bold text-base">ShipSec</span>
+                <span className="font-bold text-base">Sentris</span>
                 <span className="text-xs text-muted-foreground font-medium -mt-1.5">Studio</span>
               </div>
             </Link>

@@ -1,6 +1,6 @@
 import { Kafka, logLevel as KafkaLogLevel, type Producer } from 'kafkajs';
-import type { ITraceService, TraceEvent } from '@shipsec/component-sdk';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import type { ITraceService, TraceEvent } from '@sentris/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 
 interface KafkaTraceAdapterConfig {
   brokers: string[];
@@ -47,7 +47,7 @@ export class KafkaTraceAdapter implements ITraceService {
     }
 
     const kafka = new Kafka({
-      clientId: config.clientId ?? 'shipsec-worker-events',
+      clientId: config.clientId ?? 'sentris-worker-events',
       brokers: config.brokers,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });

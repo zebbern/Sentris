@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { componentRegistry, defineComponent, inputs, outputs, port } from '@shipsec/component-sdk';
+import { componentRegistry, defineComponent, inputs, outputs, port } from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   a: port(z.string().optional().describe('First value to include'), {
@@ -51,8 +51,8 @@ const definition = defineComponent({
     description: 'Combine multiple string inputs into an array.',
     icon: 'ListCollapse',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
   },

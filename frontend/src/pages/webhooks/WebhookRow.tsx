@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ExternalLink, RotateCw, Trash2, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDateTime } from '@/utils/timeFormat';
-import type { WebhookConfiguration } from '@shipsec/shared';
+import type { WebhookConfiguration } from '@sentris/shared';
 import type { StatusBadgeProps } from '@/utils/tableHelpers';
 
 export interface WebhookRowHandleProps {

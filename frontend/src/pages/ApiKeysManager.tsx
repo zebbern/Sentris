@@ -12,7 +12,7 @@ import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { useSortableList } from '@/hooks/useSortableList';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { ApiKeysTable } from './api-keys-manager/ApiKeysTable';
 import { CreateApiKeyDialog } from './api-keys-manager/CreateApiKeyDialog';
 
@@ -39,7 +39,7 @@ export function ApiKeysManager() {
   } = useSortableList({
     items: apiKeys,
     getId: getApiKeyId,
-    storageKey: `shipsec:sort:apikeys:${organizationId}`,
+    storageKey: `sentris:sort:apikeys:${organizationId}`,
   });
   const revokeApiKeyMutation = useRevokeApiKey();
   const deleteApiKeyMutation = useDeleteApiKey();

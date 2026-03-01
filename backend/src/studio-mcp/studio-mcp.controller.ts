@@ -9,7 +9,7 @@ import type { AuthContext } from '../auth/types';
 import { StudioMcpService } from './studio-mcp.service';
 
 /**
- * Exposes ShipSec Studio as an MCP server for external agents.
+ * Exposes Sentris Flow as an MCP server for external agents.
  *
  * Auth: Uses global AuthGuard which validates Bearer sk_live_* API keys.
  * Protocol: MCP Streamable HTTP only (POST for messages, GET for server-push, DELETE for session end).

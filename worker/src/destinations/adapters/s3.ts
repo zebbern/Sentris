@@ -4,8 +4,8 @@ import type {
   DestinationSaveInput,
   DestinationSaveResult,
 } from '../registry';
-import type { ExecutionContext } from '@shipsec/component-sdk';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 
 interface AwsCredentialPayload {
   accessKeyId: string;
@@ -77,8 +77,8 @@ export const s3DestinationAdapter: DestinationAdapterRegistration = {
           Body: input.buffer,
           ContentType: input.mimeType,
           Metadata: {
-            'shipsec-run-id': context.runId,
-            'shipsec-component-ref': context.componentRef,
+            'sentris-run-id': context.runId,
+            'sentris-component-ref': context.componentRef,
           },
         });
 

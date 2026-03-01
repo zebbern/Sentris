@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import type { ScheduleInputPayload } from '@shipsec/shared';
+import type { ScheduleInputPayload } from '@sentris/shared';
 import type { AuthContext } from '../../auth/types';
 import type { WorkflowDefinition } from '../../dsl/types';
 import type { WorkflowScheduleRecord } from '../../database/schema';
@@ -184,7 +184,7 @@ describe('SchedulesService', () => {
   const prepareRunPayloadCalls: unknown[][] = [];
   const prepareRunPayload = async (...args: unknown[]) => {
     prepareRunPayloadCalls.push(args);
-    return { runId: 'shipsec-run-123' };
+    return { runId: 'sentris-run-123' };
   };
 
   const startPreparedRunCalls: unknown[][] = [];

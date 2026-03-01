@@ -25,7 +25,7 @@ export class MigrationGuard implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     const appCfg = this.configService.get<AppConfig>('app')!;
     if (appCfg.skipMigrationCheck) {
-      this.logger.warn('Skipping migration check because SHIPSEC_SKIP_MIGRATION_CHECK=true.');
+      this.logger.warn('Skipping migration check because SENTRIS_SKIP_MIGRATION_CHECK=true.');
       return;
     }
 

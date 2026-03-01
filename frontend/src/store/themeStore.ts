@@ -48,7 +48,7 @@ export const useThemeStore = create<ThemeState>()(
       endTransition: () => set({ isTransitioning: false }),
     }),
     {
-      name: 'shipsec-theme',
+      name: 'sentris-theme',
       partialize: (state) => ({
         theme: state.theme,
         themePreference: state.themePreference,
@@ -104,7 +104,7 @@ function applyTheme(theme: Theme) {
 
 // Initialize theme on module load (handles initial page load)
 export function initializeTheme() {
-  const stored = localStorage.getItem('shipsec-theme');
+  const stored = localStorage.getItem('sentris-theme');
   if (stored) {
     try {
       const parsed = JSON.parse(stored);

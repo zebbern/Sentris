@@ -1,6 +1,6 @@
 # Frontend State & Data Flow
 
-ShipSec Studio's UI separates **server state** (data from the backend) from **client state** (UI-only concerns). Server state is managed exclusively through **TanStack Query** (`@tanstack/react-query`). Client-only state uses **Zustand** stores or local React state.
+Sentris Flow's UI separates **server state** (data from the backend) from **client state** (UI-only concerns). Server state is managed exclusively through **TanStack Query** (`@tanstack/react-query`). Client-only state uses **Zustand** stores or local React state.
 
 ## Golden Rule
 
@@ -8,7 +8,7 @@ ShipSec Studio's UI separates **server state** (data from the backend) from **cl
 
 ## Shared Types
 
-- All schemas originate in `@shipsec/shared`. Import directly rather than re-declaring shapes.
+- All schemas originate in `@sentris/shared`. Import directly rather than re-declaring shapes.
 - `src/schemas/*` re-exports shared schemas or wraps them with UI-specific helpers. Any contract change starts with `docs/execution-contract.md` → shared package → frontend schema update.
 
 ---
@@ -225,7 +225,7 @@ queryClient.invalidateQueries({ queryKey: ['items'] });
 When the backend contract expands (new trace fields, statuses), update:
 
 - `docs/execution-contract.md`
-- `@shipsec/shared` schemas
+- `@sentris/shared` schemas
 - Store merge helpers/tests under `src/store/__tests__`
 
 ## API Layer Expectations

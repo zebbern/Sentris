@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import { TraceAdapter } from '../trace.adapter';
-import type { TraceEvent } from '@shipsec/component-sdk';
+import type { TraceEvent } from '@sentris/component-sdk';
 import { workflowTraces } from '../schema';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../schema';

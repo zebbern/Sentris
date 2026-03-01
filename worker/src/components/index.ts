@@ -75,4 +75,4 @@ import './test/simple-http-mcp';
 import './test/analytics-fixture';
 
 // Export registry for external use
-export { componentRegistry } from '@shipsec/component-sdk';
+export { componentRegistry } from '@sentris/component-sdk';

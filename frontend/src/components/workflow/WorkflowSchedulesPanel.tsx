@@ -3,7 +3,7 @@ import { Loader2, Plus, ExternalLink, X, Pause, Play, Zap, Pencil, Trash2 } from
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { formatScheduleTimestamp, scheduleStatusVariant } from './schedules-utils';
 
 export interface WorkflowSchedulesSummaryBarProps {

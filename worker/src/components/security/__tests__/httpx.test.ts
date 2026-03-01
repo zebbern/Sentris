@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import { parseHttpxOutput } from '../httpx';
 import type { HttpxOutput, InputShape, OutputShape } from '../httpx';
@@ -65,14 +65,14 @@ describeHttpx('httpx component', () => {
   });
 
   test('registers the httpx component', () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('shipsec.httpx.scan');
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
     expect(component).toBeDefined();
     expect(component!.label).toBe('httpx Web Probe');
     expect(component!.category).toBe('security');
   });
 
   test('normalises docker runner JSON output', async () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('shipsec.httpx.scan');
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -135,7 +135,7 @@ describeHttpx('httpx component', () => {
   });
 
   test('falls back to parsing raw string output when provided', async () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('shipsec.httpx.scan');
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -163,7 +163,7 @@ describeHttpx('httpx component', () => {
   });
 
   test('skips execution when no targets are provided', async () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('shipsec.httpx.scan');
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({
@@ -186,7 +186,7 @@ describeHttpx('httpx component', () => {
   });
 
   test('throws when httpx exits with a non-zero status', async () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('shipsec.httpx.scan');
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
     if (!component) throw new Error('Component not registered');
 
     const context = sdk.createExecutionContext({

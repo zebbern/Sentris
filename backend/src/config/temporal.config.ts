@@ -9,7 +9,7 @@ export interface TemporalTaskConfig {
 
 export const temporalTaskConfig = registerAs<TemporalTaskConfig>('temporalTask', () => ({
   address: process.env.TEMPORAL_ADDRESS ?? 'localhost:7233',
-  namespace: process.env.TEMPORAL_NAMESPACE ?? 'shipsec-dev',
-  taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-default',
+  namespace: process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev',
+  taskQueue: process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default',
   bootstrapDemo: process.env.TEMPORAL_BOOTSTRAP_DEMO?.toLowerCase() === 'true',
 }));

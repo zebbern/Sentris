@@ -8,7 +8,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 // Support both direct text and file objects from previous components
 const manualTriggerFileSchema = z.object({
@@ -98,8 +98,8 @@ const definition = defineComponent({
     description: 'Join array of strings into formatted text for AI prompts.',
     icon: 'Merge',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

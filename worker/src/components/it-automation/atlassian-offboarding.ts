@@ -12,7 +12,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const emailUsernameArraySchema = z
   .array(z.string().min(1, 'Email username cannot be empty'))
@@ -221,7 +221,7 @@ function getSearchResults(payload: unknown): Record<string, unknown>[] {
 }
 
 const definition = defineComponent({
-  id: 'shipsec.atlassian.offboarding',
+  id: 'sentris.atlassian.offboarding',
   label: 'Atlassian Offboarding',
   category: 'it_ops',
   runner: { kind: 'inline' },
@@ -246,8 +246,8 @@ const definition = defineComponent({
     documentation: 'docs/atlassian-offboarding.md',
     icon: 'UserMinus',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

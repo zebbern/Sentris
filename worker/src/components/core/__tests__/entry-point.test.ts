@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import { createExecutionContext, extractPorts } from '@shipsec/component-sdk';
+import { createExecutionContext, extractPorts } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { EntryPointInput, EntryPointOutput } from '../entry-point';
 

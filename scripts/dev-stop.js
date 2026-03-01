@@ -18,11 +18,11 @@ const COMPOSE_FILES = [
   'docker/docker-compose.infra.yml',
   'docker/docker-compose.dev-ports.yml',
 ];
-const COMPOSE_PROJECT = 'shipsec';
+const COMPOSE_PROJECT = 'sentris';
 const PM2_APPS = [
-  'shipsec-frontend-0',
-  'shipsec-backend-0',
-  'shipsec-worker-0',
+  'sentris-frontend-0',
+  'sentris-backend-0',
+  'sentris-worker-0',
 ];
 
 function log(icon, message) {
@@ -57,7 +57,7 @@ function stopDockerInfra() {
 
 function main() {
   console.log('');
-  log('🔧', 'Stopping ShipSec Studio...');
+  log('🔧', 'Stopping Sentris Flow...');
   console.log('');
 
   stopPm2Apps();

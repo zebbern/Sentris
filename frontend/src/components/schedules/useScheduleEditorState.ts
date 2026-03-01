@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { api } from '@/services/api';
 import { useWorkflow } from '@/hooks/queries/useWorkflowQueries';
 import { ENTRY_COMPONENT_ID } from '@/utils/entryPointUtils';

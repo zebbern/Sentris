@@ -110,7 +110,7 @@ export class McpGatewayController {
           `MCP SSE connection closed for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
         );
         // We don't necessarily want to delete the transport here if POSTs are still allowed,
-        // but for ShipSec run-bounded sessions, closing SSE usually means the agent is done.
+        // but for Sentris run-bounded sessions, closing SSE usually means the agent is done.
         this.transports.delete(cacheKey);
         await this.mcpGateway.cleanupRun(runId);
       });

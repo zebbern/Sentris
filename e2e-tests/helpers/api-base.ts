@@ -2,7 +2,7 @@ const DEFAULT_INSTANCE = 0;
 const BACKEND_BASE_PORT = 3211;
 
 function readInstance(): number {
-  const raw = process.env.E2E_INSTANCE ?? process.env.SHIPSEC_INSTANCE ?? String(DEFAULT_INSTANCE);
+  const raw = process.env.E2E_INSTANCE ?? process.env.SENTRIS_INSTANCE ?? String(DEFAULT_INSTANCE);
   const parsed = Number.parseInt(raw, 10);
   if (Number.isNaN(parsed) || parsed < 0) {
     return DEFAULT_INSTANCE;

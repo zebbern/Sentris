@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import '@shipsec/studio-worker/components'; // Register components
+import '@sentris/studio-worker/components'; // Register components
 import { WorkflowGraphDto } from '../../workflows/dto/workflow-graph.dto';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import { compileWorkflowGraph } from '../compiler';
 
 describe('compileWorkflowGraph', () => {

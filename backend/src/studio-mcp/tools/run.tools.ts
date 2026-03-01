@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { ExecutionStatus } from '@shipsec/shared';
+import type { ExecutionStatus } from '@sentris/shared';
 import type { AuthContext } from '../../auth/types';
 import type { WorkflowRunSummary } from '../../workflows/workflows.service';
 import { checkPermission, errorResult, jsonResult, type StudioMcpDeps } from './types';

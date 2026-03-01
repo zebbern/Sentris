@@ -5,7 +5,7 @@ This image wraps a stdio-based MCP server and exposes it over Streamable HTTP.
 ## Build
 
 ```bash
-docker build -t shipsec/mcp-stdio-proxy:latest docker/mcp-stdio-proxy
+docker build -t zebbern/mcp-stdio-proxy:latest docker/mcp-stdio-proxy
 ```
 
 ## Run
@@ -14,7 +14,7 @@ docker build -t shipsec/mcp-stdio-proxy:latest docker/mcp-stdio-proxy
 docker run --rm -p 8080:8080 \
   -e MCP_COMMAND=uvx \
   -e MCP_ARGS='["awslabs-cloudwatch-mcp-server"]' \
-  shipsec/mcp-stdio-proxy:latest
+  zebbern/mcp-stdio-proxy:latest
 ```
 
 The proxy will expose MCP on `http://localhost:8080/mcp` and a basic health endpoint at `/health`.

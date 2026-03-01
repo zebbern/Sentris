@@ -14,7 +14,7 @@ import {
   analyticsResultSchema,
   type AnalyticsResult,
   type DockerRunnerConfig,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 // Extract Supabase project ref from a standard URL like https://<project-ref>.supabase.co
@@ -185,14 +185,14 @@ const supabaseScannerRetryPolicy: ComponentRetryPolicy = {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.supabase.scanner',
+  id: 'sentris.supabase.scanner',
   label: 'Supabase Security Scanner',
   category: 'security',
   retryPolicy: supabaseScannerRetryPolicy,
   // Base runner; volumes and command are finalised dynamically in execute()
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/supabase-scanner:latest',
+    image: 'ghcr.io/zebbern/supabase-scanner:latest',
     network: 'bridge',
     // Distroless image (no shell) - use image's ENTRYPOINT directly
     // ENTRYPOINT: ["/usr/bin/python3", "/app/supabase_scanner.py"]
@@ -213,9 +213,9 @@ const definition = defineComponent({
       'Audit a Supabase project for security posture (RLS, policies, roles, storage buckets, risky extensions).',
     documentation:
       'Provide your Supabase URL, Postgres connection string, and Service Role key. The scanner runs read-only checks.',
-    documentationUrl: 'https://github.com/shipsecai/supabase-scanner',
+    documentationUrl: 'https://github.com/sentris/supabase-scanner',
     icon: 'ShieldCheck',
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
     example:

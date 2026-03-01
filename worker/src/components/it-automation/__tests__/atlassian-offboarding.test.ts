@@ -1,5 +1,5 @@
 import { beforeAll, afterEach, describe, expect, it, vi } from 'bun:test';
-import { createExecutionContext } from '@shipsec/component-sdk';
+import { createExecutionContext } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import { AtlassianOffboardingInput, AtlassianOffboardingOutput } from '../atlassian-offboarding';
 
@@ -18,7 +18,7 @@ describe('atlassian offboarding component', () => {
 
   const getComponent = () => {
     const component = componentRegistry.get<AtlassianOffboardingInput, AtlassianOffboardingOutput>(
-      'shipsec.atlassian.offboarding',
+      'sentris.atlassian.offboarding',
     );
     if (!component) {
       throw new Error('Component not registered');
@@ -34,7 +34,7 @@ describe('atlassian offboarding component', () => {
     });
 
   it('should be registered in the component registry', () => {
-    const component = componentRegistry.get('shipsec.atlassian.offboarding');
+    const component = componentRegistry.get('sentris.atlassian.offboarding');
     expect(component).toBeDefined();
     expect(component?.label).toBe('Atlassian Offboarding');
     expect(component?.category).toBe('it_ops');

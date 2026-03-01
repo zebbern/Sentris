@@ -20,7 +20,7 @@ interface UseSortableListOptions<T> {
   getId: (item: T) => string;
   /**
    * localStorage key used to persist the manual order.
-   * Convention: `shipsec:sort:{page}:{orgId}`
+   * Convention: `sentris:sort:{page}:{orgId}`
    */
   storageKey: string;
   /**

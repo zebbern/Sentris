@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { api } from '@/services/api';
 import { getCurrentUserId } from '@/lib/currentUser';
 import { env } from '@/config/env';

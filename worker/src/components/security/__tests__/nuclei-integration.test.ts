@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
-import { componentRegistry } from '@shipsec/component-sdk';
+import { componentRegistry } from '@sentris/component-sdk';
 import type { NucleiInput, NucleiOutput } from '../nuclei';
 // Import to trigger registration
 import '../nuclei';
@@ -20,7 +20,7 @@ describe('Nuclei Integration Tests', () => {
   let nucleiComponent: ReturnType<typeof componentRegistry.get<NucleiInput, NucleiOutput>>;
 
   beforeEach(() => {
-    nucleiComponent = componentRegistry.get<NucleiInput, NucleiOutput>('shipsec.nuclei.scan');
+    nucleiComponent = componentRegistry.get<NucleiInput, NucleiOutput>('sentris.nuclei.scan');
 
     // Reset mocks
     mockRunComponentWithRunner.mockClear();

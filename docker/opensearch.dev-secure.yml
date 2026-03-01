@@ -1,7 +1,7 @@
 # OpenSearch Development Configuration with Security
 # Mount to: /usr/share/opensearch/config/opensearch.yml
 
-cluster.name: shipsec-dev-secure
+cluster.name: sentris-dev-secure
 node.name: opensearch-node1
 network.host: 0.0.0.0
 
@@ -25,7 +25,7 @@ plugins.security.allow_default_init_securityindex: true
 
 # Admin DN - Required for securityadmin.sh and REST API access
 plugins.security.authcz.admin_dn:
-  - "CN=admin,OU=ShipSec,O=ShipSecAI,L=SF,ST=CA,C=US"
+  - "CN=admin,OU=Sentris,O=SentrisAI,L=SF,ST=CA,C=US"
 
 plugins.security.audit.type: internal_opensearch
 plugins.security.enable_snapshot_restore_privilege: true

@@ -9,8 +9,8 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { LLMProviderSchema, type LlmProviderConfig } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = process.env.GEMINI_BASE_URL ?? '';
@@ -99,8 +99,8 @@ const definition = defineComponent({
       'Normalize Gemini credentials and model selection into a reusable provider config.',
     icon: 'Settings',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ inputs, params }, context) {

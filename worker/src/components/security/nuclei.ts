@@ -15,7 +15,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import * as yaml from 'js-yaml';
 
@@ -263,20 +263,20 @@ const nucleiRetryPolicy: ComponentRetryPolicy = {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.nuclei.scan',
+  id: 'sentris.nuclei.scan',
   label: 'Nuclei Vulnerability Scanner',
   category: 'security',
   retryPolicy: nucleiRetryPolicy,
   runner: {
     kind: 'docker',
-    // Using custom ShipSecAI image instead of projectdiscovery/nuclei:latest because:
+    // Using custom SentrisAI image instead of projectdiscovery/nuclei:latest because:
     // 1. Pre-installed templates: Avoids 100MB+ download on every scan (templates cached in image)
     // 2. Distroless base: Smaller attack surface, no shell (security hardening)
     // 3. Non-root user: Runs as 'nonroot' user with minimal permissions (UID 65532)
     // 4. ARM64 support: Built for multi-architecture (amd64 + arm64) for M1/M2 Macs
     // 5. Verified -stream flag: Tested and confirmed working for PTY real-time output
-    // Image source: github.com/ShipSecAI/docker-images/nuclei
-    image: 'ghcr.io/shipsecai/nuclei:latest',
+    // Image source: github.com/SentrisAI/docker-images/nuclei
+    image: 'ghcr.io/zebbern/nuclei:latest',
     entrypoint: 'nuclei',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
@@ -309,8 +309,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/projectdiscovery/nuclei',
     icon: 'Shield',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,
@@ -508,7 +508,7 @@ const definition = defineComponent({
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [
           volume.getVolumeConfig('/inputs', true),
-          // ✅ Templates are pre-installed in ghcr.io/shipsecai/nuclei:latest
+          // ✅ Templates are pre-installed in ghcr.io/zebbern/nuclei:latest
           // No need for persistent volume since templates are baked into the image
         ],
       };

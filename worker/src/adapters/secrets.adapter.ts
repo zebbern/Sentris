@@ -1,7 +1,7 @@
 import { and, eq, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { ISecretsService, ServiceError } from '@shipsec/component-sdk';
-import { SecretEncryption, parseMasterKey } from '@shipsec/shared';
+import { ISecretsService, ServiceError } from '@sentris/component-sdk';
+import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 
 import * as schema from './schema';
 

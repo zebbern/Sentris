@@ -1,10 +1,10 @@
 #!/bin/bash
-# Create additional PostgreSQL databases required by ShipSec
+# Create additional PostgreSQL databases required by Sentris
 # This script is run automatically by PostgreSQL init-entrypoint
 #
 # Creates:
 #   - temporal: Required by Temporal workflow engine
-#   - shipsec_instance_0..9: Multi-instance dev databases
+#   - sentris_instance_0..9: Multi-instance dev databases
 
 set -e
 
@@ -23,7 +23,7 @@ fi
 # --- Instance-specific databases (for multi-instance dev) ---
 echo "🗄️  Creating instance-specific databases..."
 for i in {0..9}; do
-  DB_NAME="shipsec_instance_$i"
+  DB_NAME="sentris_instance_$i"
 
   if psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
     echo "  Database $DB_NAME already exists, skipping..."

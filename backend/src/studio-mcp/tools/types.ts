@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { TraceEventPayload, WorkflowSchedule } from '@shipsec/shared';
+import type { TraceEventPayload, WorkflowSchedule } from '@sentris/shared';
 import type { AuthContext, ApiKeyPermissions } from '../../auth/types';
 import type {
   HumanInputResponseDto,

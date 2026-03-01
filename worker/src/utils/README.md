@@ -1,6 +1,6 @@
 # Worker Utilities
 
-Shared utilities for ShipSec Studio worker components.
+Shared utilities for Sentris Flow worker components.
 
 ## IsolatedContainerVolume
 

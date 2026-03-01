@@ -1,4 +1,4 @@
-import { ExecutionStatusSchema, ExecutionTriggerMetadataSchema } from '@shipsec/shared';
+import { ExecutionStatusSchema, ExecutionTriggerMetadataSchema } from '@sentris/shared';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 

@@ -1,5 +1,5 @@
-import { isSpilledDataMarker } from '@shipsec/component-sdk';
-import type { ConnectionType } from '@shipsec/component-sdk/types';
+import { isSpilledDataMarker } from '@sentris/component-sdk';
+import type { ConnectionType } from '@sentris/component-sdk/types';
 import type { WorkflowAction } from './types';
 
 export interface InputWarning {

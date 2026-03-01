@@ -31,7 +31,7 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
       setNotifyOnScheduleTriggered: (value) => set({ notifyOnScheduleTriggered: value }),
     }),
     {
-      name: 'shipsec:user-preferences',
+      name: 'sentris:user-preferences',
       partialize: (state) => ({
         defaultLandingPage: state.defaultLandingPage,
         sidebarDensity: state.sidebarDensity,

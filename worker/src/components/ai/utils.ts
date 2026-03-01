@@ -1,4 +1,4 @@
-import { ConfigurationError } from '@shipsec/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 
 // Detect if running inside Docker and use host.docker.internal instead of localhost
 const isInDocker = () => {
@@ -11,7 +11,7 @@ const isInDocker = () => {
 
 export const DEFAULT_API_BASE_URL =
   process.env.STUDIO_API_BASE_URL ??
-  process.env.SHIPSEC_API_BASE_URL ??
+  process.env.SENTRIS_API_BASE_URL ??
   process.env.API_BASE_URL ??
   (isInDocker() ? 'http://host.docker.internal:3211/api/v1' : 'http://localhost:3211/api/v1');
 

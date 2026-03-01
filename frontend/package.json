@@ -1,5 +1,5 @@
 {
-  "name": "@shipsec/studio-frontend",
+  "name": "@sentris/flow-frontend",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
@@ -67,8 +67,8 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@shipsec/backend-client": "workspace:*",
-    "@shipsec/shared": "workspace:*",
+    "@sentris/backend-client": "workspace:*",
+    "@sentris/shared": "workspace:*",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@uiw/react-markdown-preview": "^5.1.5",

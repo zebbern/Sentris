@@ -5,49 +5,49 @@
 
   <!-- Studio Platform - Core Pages -->
   <url>
-    <loc>https://studio.shipsec.ai/</loc>
+    <loc>https://studio.sentris.ai/</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/login</loc>
+    <loc>https://studio.sentris.ai/login</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/signup</loc>
+    <loc>https://studio.sentris.ai/signup</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/workflows</loc>
+    <loc>https://studio.sentris.ai/workflows</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/components</loc>
+    <loc>https://studio.sentris.ai/components</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/executions</loc>
+    <loc>https://studio.sentris.ai/executions</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://studio.shipsec.ai/settings</loc>
+    <loc>https://studio.sentris.ai/settings</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -55,70 +55,70 @@
 
   <!-- Documentation Hub -->
   <url>
-    <loc>https://docs.shipsec.ai/</loc>
+    <loc>https://docs.sentris.ai/</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/quickstart</loc>
+    <loc>https://docs.sentris.ai/quickstart</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.95</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/installation</loc>
+    <loc>https://docs.sentris.ai/installation</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/architecture</loc>
+    <loc>https://docs.sentris.ai/architecture</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/workflows</loc>
+    <loc>https://docs.sentris.ai/workflows</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>bi-weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/components</loc>
+    <loc>https://docs.sentris.ai/components</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/api-reference</loc>
+    <loc>https://docs.sentris.ai/api-reference</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/deployment</loc>
+    <loc>https://docs.sentris.ai/deployment</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/security</loc>
+    <loc>https://docs.sentris.ai/security</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://docs.shipsec.ai/faq</loc>
+    <loc>https://docs.sentris.ai/faq</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -126,84 +126,84 @@
 
   <!-- Marketing & Company Site -->
   <url>
-    <loc>https://shipsec.ai/</loc>
+    <loc>https://sentris.ai/</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/about</loc>
+    <loc>https://sentris.ai/about</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/features</loc>
+    <loc>https://sentris.ai/features</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/pricing</loc>
+    <loc>https://sentris.ai/pricing</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/use-cases</loc>
+    <loc>https://sentris.ai/use-cases</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/use-cases/vulnerability-detection</loc>
+    <loc>https://sentris.ai/use-cases/vulnerability-detection</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/use-cases/threat-hunting</loc>
+    <loc>https://sentris.ai/use-cases/threat-hunting</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/use-cases/penetration-testing</loc>
+    <loc>https://sentris.ai/use-cases/penetration-testing</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/use-cases/compliance-auditing</loc>
+    <loc>https://sentris.ai/use-cases/compliance-auditing</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/enterprise</loc>
+    <loc>https://sentris.ai/enterprise</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/blog</loc>
+    <loc>https://sentris.ai/blog</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/changelog</loc>
+    <loc>https://sentris.ai/changelog</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -211,35 +211,35 @@
 
   <!-- Legal & Support -->
   <url>
-    <loc>https://shipsec.ai/privacy</loc>
+    <loc>https://sentris.ai/privacy</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/terms</loc>
+    <loc>https://sentris.ai/terms</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/security</loc>
+    <loc>https://sentris.ai/security</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/contact</loc>
+    <loc>https://sentris.ai/contact</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://shipsec.ai/support</loc>
+    <loc>https://sentris.ai/support</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -247,21 +247,21 @@
 
   <!-- Community & Resources -->
   <url>
-    <loc>https://github.com/ShipSecAI/studio</loc>
+    <loc>https://github.com/zebbern/Sentris</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://github.com/ShipSecAI/studio/discussions</loc>
+    <loc>https://github.com/zebbern/Sentris/discussions</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://github.com/ShipSecAI/studio/issues</loc>
+    <loc>https://github.com/zebbern/Sentris/issues</loc>
     <lastmod>2025-12-22</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>

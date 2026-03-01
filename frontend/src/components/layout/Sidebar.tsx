@@ -15,7 +15,7 @@ import type { ComponentMetadata } from '@/schemas/component';
 import { cn } from '@/lib/utils';
 import { env } from '@/config/env';
 import { Skeleton } from '@/components/ui/skeleton';
-import { COMPONENT_CATEGORY_ORDER, isComponentCategory } from '@shipsec/shared';
+import { COMPONENT_CATEGORY_ORDER, isComponentCategory } from '@sentris/shared';
 import { getCategorySeparatorColor, getCategoryTextColorClass } from '@/utils/categoryColors';
 import { useThemeStore } from '@/store/themeStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';

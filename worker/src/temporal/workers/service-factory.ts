@@ -10,7 +10,7 @@ import { Pool } from 'pg';
 import Redis from 'ioredis';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'minio';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 import { getTopicResolver } from '../../common/kafka-topic-resolver';
 import * as schema from '../../adapters/schema';
 import {
@@ -57,7 +57,7 @@ export function createMinioClient(): MinioServices {
   const accessKey = process.env.MINIO_ACCESS_KEY ?? 'minioadmin';
   const secretKey = process.env.MINIO_SECRET_KEY ?? 'minioadmin';
   const useSSL = process.env.MINIO_USE_SSL === 'true';
-  const bucketName = process.env.MINIO_BUCKET_NAME ?? 'shipsec-files';
+  const bucketName = process.env.MINIO_BUCKET_NAME ?? 'sentris-files';
 
   const client = new Client({ endPoint, port, useSSL, accessKey, secretKey });
   console.log(`✅ Connected to MinIO at ${endPoint}:${port}`);
@@ -116,20 +116,20 @@ export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters 
   const trace = new KafkaTraceAdapter({
     brokers: kafkaBrokers,
     topic: topicResolver.getEventsTopic(),
-    clientId: process.env.EVENT_KAFKA_CLIENT_ID ?? 'shipsec-worker-events',
+    clientId: process.env.EVENT_KAFKA_CLIENT_ID ?? 'sentris-worker-events',
   });
 
   const agentTrace = new KafkaAgentTracePublisher({
     brokers: kafkaBrokers,
     topic: topicResolver.getAgentTraceTopic(),
-    clientId: process.env.AGENT_TRACE_KAFKA_CLIENT_ID ?? 'shipsec-worker-agent-trace',
+    clientId: process.env.AGENT_TRACE_KAFKA_CLIENT_ID ?? 'sentris-worker-agent-trace',
   });
 
   const nodeIO = new KafkaNodeIOAdapter(
     {
       brokers: kafkaBrokers,
       topic: topicResolver.getNodeIOTopic(),
-      clientId: process.env.NODE_IO_KAFKA_CLIENT_ID ?? 'shipsec-worker-node-io',
+      clientId: process.env.NODE_IO_KAFKA_CLIENT_ID ?? 'sentris-worker-node-io',
     },
     storage,
   );
@@ -139,7 +139,7 @@ export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters 
     logs = new KafkaLogAdapter({
       brokers: kafkaBrokers,
       topic: topicResolver.getLogsTopic(),
-      clientId: process.env.LOG_KAFKA_CLIENT_ID ?? 'shipsec-worker',
+      clientId: process.env.LOG_KAFKA_CLIENT_ID ?? 'sentris-worker',
     });
     console.log(`✅ Kafka logging enabled (${kafkaBrokers.join(', ')})${instanceMsg}`);
   } catch (error: unknown) {

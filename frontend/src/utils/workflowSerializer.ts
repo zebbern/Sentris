@@ -2,7 +2,7 @@ import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
 import { MarkerType } from 'reactflow';
 import type { NodeData, NodeConfig } from '@/schemas/node';
 import type { InputPort } from '@/schemas/component';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 
 // Backend types
 type BackendNode = components['schemas']['WorkflowResponseDto']['graph']['nodes'][number];

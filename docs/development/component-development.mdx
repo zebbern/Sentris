@@ -1,9 +1,9 @@
 ---
 title: "Component Development"
-description: "Build custom security components for ShipSec Studio"
+description: "Build custom security components for Sentris Flow"
 ---
 
-This guide covers everything you need to build components for ShipSec Studio.
+This guide covers everything you need to build components for Sentris Flow.
 
 ---
 
@@ -37,7 +37,7 @@ When adding or renaming a category, update this shared file so backend and front
 <namespace>.<tool>.<action>
 
 Examples:
-  shipsec.dnsx.run       # Security tool
+  sentris.dnsx.run       # Security tool
   core.http.request      # Core utility  
   ai.llm.generate        # AI component
   notification.slack     # Notification
@@ -63,7 +63,7 @@ import {
   inputs,
   outputs,
   port,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const definition = defineComponent({
   id: 'core.http.request',
@@ -108,10 +108,10 @@ import {
   port,
   runComponentWithRunner,
   DockerRunnerConfig
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const definition = defineComponent({
-  id: 'shipsec.tool.scan',
+  id: 'sentris.tool.scan',
   label: 'Tool Scanner',
   category: 'security',
   runner: {
@@ -327,7 +327,7 @@ When a workflow with secret inputs is triggered:
 Components can dynamically generate input/output ports based on parameter values:
 
 ```typescript
-import { inputs, port } from '@shipsec/component-sdk';
+import { inputs, port } from '@sentris/component-sdk';
 
 export default defineComponent({
   // ...
@@ -361,7 +361,7 @@ Components can specify custom retry behavior (maps to Temporal activity retry):
 
 ```typescript
 const definition: ComponentDefinition<Input, Output> = {
-  id: 'shipsec.api.call',
+  id: 'sentris.api.call',
   // ... other fields ...
   
   retryPolicy: {
@@ -395,7 +395,7 @@ import {
   NotFoundError,       // Non-retryable - resource missing
   fromHttpResponse,    // Convert HTTP response to error
   wrapError,           // Wrap unknown errors
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 async execute({ inputs }, context) {
   try {
@@ -462,7 +462,7 @@ The `finding_hash` is a stable identifier that enables deduplication across work
 Import from the component SDK:
 
 ```typescript
-import { generateFindingHash } from '@shipsec/component-sdk';
+import { generateFindingHash } from '@sentris/component-sdk';
 
 // Usage
 const hash = generateFindingHash(finding.templateId, finding.host, finding.matchedAt);
@@ -481,7 +481,7 @@ Choose fields that uniquely identify a finding but remain stable across runs (av
 ### Example Implementation
 
 ```typescript
-import { generateFindingHash } from '@shipsec/component-sdk';
+import { generateFindingHash } from '@sentris/component-sdk';
 
 async execute({ inputs, params }, context) {
   // ... run scanner and get findings ...
@@ -512,7 +512,7 @@ async execute({ inputs, params }, context) {
 2. **Connect to Analytics Sink**: In the workflow canvas, connect the `results` port to Analytics Sink's `data` input
 3. **Indexed to OpenSearch**: Each item in the array becomes a separate document with:
    - Finding data at root level (nested objects serialized to JSON strings)
-   - Workflow context under `shipsec.*` namespace
+   - Workflow context under `sentris.*` namespace
    - Consistent `@timestamp` for all findings in the batch
 
 ### Document Structure in OpenSearch
@@ -526,7 +526,7 @@ async execute({ inputs, params }, context) {
   "scanner": "supabase-scanner",
   "asset_key": "abc123xyz",
   "finding_hash": "a1b2c3d4e5f67890",
-  "shipsec": {
+  "sentris": {
     "organization_id": "org_123",
     "run_id": "run_abc123",
     "workflow_id": "wf_xyz789",
@@ -538,9 +538,9 @@ async execute({ inputs, params }, context) {
 }
 ```
 
-### `shipsec` Context Fields
+### `sentris` Context Fields
 
-The Analytics Sink automatically adds workflow context under the `shipsec` namespace:
+The Analytics Sink automatically adds workflow context under the `sentris` namespace:
 
 | Field | Description |
 |-------|-------------|
@@ -562,7 +562,7 @@ asset_key: "api.example.com"
 finding_hash: X AND @timestamp: [now-1d TO now] AND NOT (finding_hash: X AND @timestamp: [* TO now-1d])
 
 # All findings from a specific workflow run
-shipsec.run_id: "run_abc123"
+sentris.run_id: "run_abc123"
 
 # Aggregate findings by scanner
 scanner: * | stats count() by scanner
@@ -637,7 +637,7 @@ Many ProjectDiscovery images (subfinder, dnsx, naabu, amass, notify) are **distr
 // ✅ CORRECT - Distroless image (no shell available)
 runner: {
   kind: 'docker',
-  image: 'ghcr.io/shipsecai/subfinder:latest',
+  image: 'ghcr.io/zebbern/subfinder:latest',
   // No entrypoint — uses image default (/usr/local/bin/subfinder)
   command: [],
   network: 'bridge',
@@ -648,7 +648,7 @@ runner: {
 // ❌ WRONG - Distroless image with shell wrapper (exit code 127)
 runner: {
   kind: 'docker',
-  image: 'ghcr.io/shipsecai/subfinder:latest',
+  image: 'ghcr.io/zebbern/subfinder:latest',
   entrypoint: 'sh',  // sh does not exist in distroless images!
   command: ['-c', 'subfinder "$@"', '--'],
 }
@@ -737,7 +737,7 @@ Located alongside component: `worker/src/components/<category>/__tests__/<compon
 
 ```typescript
 import { describe, it, expect, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 
 describe('my-component', () => {
@@ -911,7 +911,7 @@ import {
   DockerRunnerConfig,
   runComponentWithRunner,
   port,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const inputSchema = z.object({
@@ -931,12 +931,12 @@ type Input = z.infer<typeof inputSchema>;
 type Output = z.infer<typeof outputSchema>;
 
 export default defineComponent({
-  id: 'shipsec.dnsx.scan',
+  id: 'sentris.dnsx.scan',
   label: 'DNSX Scanner',
   category: 'security',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/dnsx:latest',
+    image: 'ghcr.io/zebbern/dnsx:latest',
     entrypoint: 'sh',
     command: ['-c', 'dnsx "$@"', '--'],
     network: 'bridge',

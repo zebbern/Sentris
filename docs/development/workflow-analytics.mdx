@@ -3,7 +3,7 @@ title: "Workflow Analytics"
 description: "Index security findings into OpenSearch for dashboards, queries, and alerting"
 ---
 
-ShipSec Studio includes a workflow analytics system that indexes security findings into OpenSearch. This enables real-time dashboards, historical trend analysis, and alerting on security data.
+Sentris Flow includes a workflow analytics system that indexes security findings into OpenSearch. This enables real-time dashboards, historical trend analysis, and alerting on security data.
 
 ---
 
@@ -62,9 +62,9 @@ Indexed documents follow this structure:
   "scanner": "supabase-scanner",
   "asset_key": "abcdefghij1234567890",
   "finding_hash": "a1b2c3d4e5f67890",
-  "shipsec": {
+  "sentris": {
     "organization_id": "org_123",
-    "run_id": "shipsec-run-xxx",
+    "run_id": "sentris-run-xxx",
     "workflow_id": "d1d33161-929f-4af4-9a64-xxx",
     "workflow_name": "Supabase Security Audit",
     "component_id": "core.analytics.sink",
@@ -80,7 +80,7 @@ Indexed documents follow this structure:
 |----------|--------|-------------|
 | Finding data | `check_id`, `severity`, `title`, etc. | Scanner-specific fields at root level |
 | Asset tracking | `scanner`, `asset_key`, `finding_hash` | Required fields for analytics |
-| Workflow context | `shipsec.*` | Automatic metadata from the workflow |
+| Workflow context | `sentris.*` | Automatic metadata from the workflow |
 | Timestamp | `@timestamp` | Indexing timestamp |
 
 <Note>
@@ -89,9 +89,9 @@ Indexed documents follow this structure:
 
 ---
 
-## `shipsec` context fields
+## `sentris` context fields
 
-The Analytics Sink automatically adds workflow context under the `shipsec` namespace:
+The Analytics Sink automatically adds workflow context under the `sentris` namespace:
 
 | Field | Description |
 |-------|-------------|
@@ -145,13 +145,13 @@ severity: "CRITICAL" OR severity: "HIGH"
 scanner: "nuclei"
 
 # All findings from a specific workflow run
-shipsec.run_id: "shipsec-run-abc123"
+sentris.run_id: "sentris-run-abc123"
 
 # Filter by organization
-shipsec.organization_id: "org_123"
+sentris.organization_id: "org_123"
 
 # Filter by workflow
-shipsec.workflow_id: "d1d33161-929f-4af4-9a64-xxx"
+sentris.workflow_id: "d1d33161-929f-4af4-9a64-xxx"
 ```
 
 ### Tracking Findings Over Time
@@ -212,7 +212,7 @@ After indexing data, create an index pattern in OpenSearch Dashboards:
 4. Click **Create index pattern**
 
 <Warning>
-  If you don't see `shipsec.*` fields in Available Fields after indexing, refresh the index pattern field list in Dashboards Management.
+  If you don't see `sentris.*` fields in Available Fields after indexing, refresh the index pattern field list in Dashboards Management.
 </Warning>
 
 ---
@@ -268,8 +268,8 @@ By default, Analytics Sink operates in fire-and-forget mode:
 
 The workflow builder includes a "View Analytics" button that opens OpenSearch Dashboards with pre-filtered data:
 
-- **When a run is selected**: Filters by `shipsec.run_id`
-- **When no run is selected**: Filters by `shipsec.workflow_id`
+- **When a run is selected**: Filters by `sentris.run_id`
+- **When no run is selected**: Filters by `sentris.workflow_id`
 - **Time range**: Last 7 days
 
 The button only appears when `VITE_OPENSEARCH_DASHBOARDS_URL` is configured.
@@ -326,10 +326,10 @@ If you see "Limit of total fields [1000] has been exceeded":
 1. Delete the problematic index: `curl -X DELETE "http://localhost:9200/security-findings-*"`
 2. Re-run the workflow (new index will use correct schema)
 
-### shipsec fields not visible
+### sentris fields not visible
 
 1. Fields starting with `_` are hidden in OpenSearch UI
-2. Ensure you're using `shipsec.*` (no underscore prefix)
+2. Ensure you're using `sentris.*` (no underscore prefix)
 3. Refresh the index pattern in Dashboards Management
 
 ### pm2 not loading environment variables
@@ -337,8 +337,8 @@ If you see "Limit of total fields [1000] has been exceeded":
 pm2's `env_file` doesn't auto-inject variables. The worker uses a custom `loadWorkerEnv()` function in `pm2.config.cjs`. After changing `worker/.env`:
 
 ```bash
-pm2 delete shipsec-worker
-pm2 start pm2.config.cjs --only shipsec-worker
+pm2 delete sentris-worker
+pm2 start pm2.config.cjs --only sentris-worker
 ```
 
 ---

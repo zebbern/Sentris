@@ -1,4 +1,4 @@
-# ShipSec Studio Worker
+# Sentris Flow Worker
 
 Node.js component execution engine with Temporal.io integration for running security workflows in isolated environments.
 
@@ -116,7 +116,7 @@ const definition: ComponentDefinition = {
   id: 'security.subfinder',
   label: 'Subfinder',
   category: 'discovery',
-  runner: { kind: 'docker', image: 'ghcr.io/shipsecai/subfinder' },
+  runner: { kind: 'docker', image: 'ghcr.io/zebbern/subfinder' },
   inputSchema: z.object({
     domain: z.string(),
     timeout: z.number().default(30),
@@ -156,8 +156,8 @@ The dev worker registers `SIGTERM` and `SIGINT` handlers in `dev.worker.ts`. On 
 ```typescript
 const worker = await Worker.create({
   connection,
-  namespace: 'shipsec-studio',
-  taskQueue: 'shipsec-workflows',
+  namespace: 'sentris-flow',
+  taskQueue: 'sentris-workflows',
   workflowsPath: require.resolve('./temporal/workflows'),
   activities: {
     runComponentActivity,

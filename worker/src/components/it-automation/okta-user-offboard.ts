@@ -11,7 +11,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import * as Okta from '@okta/okta-sdk-nodejs';
 
 const inputSchema = inputs({
@@ -244,8 +244,8 @@ const definition = defineComponent({
       'Offboard users from Okta by deactivating or deleting their accounts to revoke all access.',
     icon: 'Shield',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

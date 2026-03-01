@@ -52,8 +52,8 @@ export class EventIngestService implements OnModuleInit, OnModuleDestroy {
     });
     this.kafkaTopic = topicResolver.getEventsTopic();
 
-    this.kafkaGroupId = kafka.eventGroupId ?? 'shipsec-event-ingestor';
-    this.kafkaClientId = kafka.eventClientId ?? 'shipsec-backend-events';
+    this.kafkaGroupId = kafka.eventGroupId ?? 'sentris-event-ingestor';
+    this.kafkaClientId = kafka.eventClientId ?? 'sentris-backend-events';
   }
 
   async onModuleInit(): Promise<void> {

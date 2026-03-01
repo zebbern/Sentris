@@ -53,7 +53,7 @@ async function bootstrap() {
       'http://localhost',
       'http://localhost:80',
       'http://localhost:8090',
-      'https://studio.shipsec.ai',
+      'https://studio.sentris.ai',
       ...instanceOrigins,
     ],
     credentials: true,
@@ -73,8 +73,8 @@ async function bootstrap() {
   const host = appCfg.host;
 
   const config = new DocumentBuilder()
-    .setTitle('ShipSec Studio API')
-    .setDescription('ShipSec backend API')
+    .setTitle('Sentris Flow API')
+    .setDescription('Sentris backend API')
     .setVersion('0.1.0')
     .addServer('/api/v1', 'API v1')
     .build();
@@ -83,7 +83,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/v1/docs', app, cleaned);
 
   await app.listen(port, host);
-  Logger.log(`🚀 ShipSec backend listening on http://${host}:${port}`, 'Bootstrap');
+  Logger.log(`🚀 Sentris backend listening on http://${host}:${port}`, 'Bootstrap');
 }
 
 const versionLogger = new Logger('VersionCheck');
@@ -132,6 +132,6 @@ async function enforceVersionCheck(configService: ConfigService) {
 
 bootstrap().catch((error) => {
   // eslint-disable-next-line no-console
-  console.error('Failed to bootstrap ShipSec backend', error);
+  console.error('Failed to bootstrap Sentris backend', error);
   process.exit(1);
 });

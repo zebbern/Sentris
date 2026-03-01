@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { ServiceError } from '@shipsec/component-sdk';
+import { ServiceError } from '@sentris/component-sdk';
 
 import { workflowLogStreams } from './schema';
 import type * as schema from './schema';

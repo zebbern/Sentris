@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, mock } from 'bun:test';
 import { executeWorkflow } from '../../../temporal/workflow-runner';
 import type { WorkflowDefinition } from '../../../temporal/types';
-import type { TraceEvent } from '@shipsec/component-sdk';
+import type { TraceEvent } from '@sentris/component-sdk';
 
 // Mock the Okta SDK at the global level
 const mockUserApi = {

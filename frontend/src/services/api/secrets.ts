@@ -1,4 +1,4 @@
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { apiClient, type ApiResponse } from './client';
 
 type SecretSummaryResponse = components['schemas']['SecretSummaryResponse'];

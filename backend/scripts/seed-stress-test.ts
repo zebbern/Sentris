@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
-import { SecretEncryption, parseMasterKey } from '@shipsec/shared';
+import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 import * as bcrypt from 'bcryptjs';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -2072,7 +2072,7 @@ async function main() {
   const config = TIERS[tier];
 
   const connectionString =
-    process.env.DATABASE_URL || 'postgresql://shipsec:shipsec@localhost:5433/shipsec';
+    process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
 
   const pool = new Pool({ connectionString });
   const client = await pool.connect();

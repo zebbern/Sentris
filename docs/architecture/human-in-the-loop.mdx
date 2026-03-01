@@ -1,6 +1,6 @@
 ---
 title: "Human-in-the-Loop (HITL)"
-description: "How ShipSec Studio handles manual approvals, forms, and workflow pauses"
+description: "How Sentris Flow handles manual approvals, forms, and workflow pauses"
 ---
 
 # Human-in-the-Loop (HITL)
@@ -20,7 +20,7 @@ When a workflow hits a manual action node (e.g., `manual-action.approval`):
 ### 2. Notification & Access
 - The system generates a unique, cryptographically secure **Resolve Token**.
 - A notification (Slack, Email) is sent with a link containing this token.
-- Alternatively, the request appears in the "Pending Actions" section of the ShipSec Studio UI.
+- Alternatively, the request appears in the "Pending Actions" section of the Sentris Flow UI.
 
 ### 3. The Resume Scenario (Signal)
 When a human interacts with the request (approves/rejects/submits form):

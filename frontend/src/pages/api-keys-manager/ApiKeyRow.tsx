@@ -6,7 +6,7 @@ import { TableCell } from '@/components/ui/table';
 import { DragHandle } from '@/components/ui/sortable';
 import { ShieldOff, Trash2 } from 'lucide-react';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
-import type { components } from '@shipsec/backend-client';
+import type { components } from '@sentris/backend-client';
 import { formatDate, truncateKey } from './helpers';
 
 type ApiKeyResponseDto = components['schemas']['ApiKeyResponseDto'];

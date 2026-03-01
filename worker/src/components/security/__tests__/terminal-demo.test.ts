@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
-import * as sdk from '@shipsec/component-sdk';
+import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { TerminalDemoInputZod, TerminalDemoOutputZod } from '../terminal-demo';
 
@@ -14,7 +14,7 @@ describe('terminal demo component', () => {
 
   it('registers in the component registry', () => {
     const component = componentRegistry.get<TerminalDemoInputZod, TerminalDemoOutputZod>(
-      'shipsec.security.terminal-demo',
+      'sentris.security.terminal-demo',
     );
     expect(component).toBeDefined();
     expect(component?.label).toBe('Terminal Stream Demo');
@@ -22,7 +22,7 @@ describe('terminal demo component', () => {
 
   it('invokes the docker runner to emit PTY-friendly output', async () => {
     const component = componentRegistry.get<TerminalDemoInputZod, TerminalDemoOutputZod>(
-      'shipsec.security.terminal-demo',
+      'sentris.security.terminal-demo',
     );
     if (!component) throw new Error('Component not registered');
 

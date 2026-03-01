@@ -14,7 +14,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   indicator: port(z.string().describe('The IP, Domain, File Hash, or URL to inspect.'), {
@@ -105,7 +105,7 @@ const definition = defineComponent({
     category: 'security',
     description: 'Get threat intelligence reports for IOCs from VirusTotal.',
     icon: 'Shield', // We can update this if there's a better one, or generic Shield
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
   },

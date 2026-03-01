@@ -1,27 +1,27 @@
 import 'reflect-metadata';
 
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
-import { WorkflowRunStatusSchema, TraceStreamEnvelopeSchema } from '@shipsec/shared';
+import { WorkflowRunStatusSchema, TraceStreamEnvelopeSchema } from '@sentris/shared';
 
 import { WorkflowsController } from '../workflows.controller';
 import { WorkflowLogsQuerySchema } from '../dto/workflow-graph.dto';
 
 const sampleStatus = WorkflowRunStatusSchema.parse({
-  runId: 'shipsec-run-123',
+  runId: 'sentris-run-123',
   workflowId: 'workflow-id-123',
   status: 'RUNNING',
   startedAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  taskQueue: 'shipsec-default',
+  taskQueue: 'sentris-default',
   historyLength: 42,
 });
 
 const sampleTrace = TraceStreamEnvelopeSchema.parse({
-  runId: 'shipsec-run-123',
+  runId: 'sentris-run-123',
   events: [
     {
       id: '1',
-      runId: 'shipsec-run-123',
+      runId: 'sentris-run-123',
       nodeId: 'node-1',
       type: 'STARTED',
       level: 'info',
@@ -32,11 +32,11 @@ const sampleTrace = TraceStreamEnvelopeSchema.parse({
 });
 
 const sampleLogs = {
-  runId: 'shipsec-run-123',
+  runId: 'sentris-run-123',
   logs: [
     {
       id: 'log-1',
-      runId: 'shipsec-run-123',
+      runId: 'sentris-run-123',
       nodeId: 'node-1',
       level: 'info',
       message: 'line one',
@@ -104,7 +104,7 @@ describe('WorkflowsController contract coverage', () => {
 
   it('returns status payload matching the shared contract', async () => {
     const result = await controller.status(
-      'shipsec-run-123',
+      'sentris-run-123',
       { temporalRunId: undefined },
       authContext as any,
     );
@@ -112,24 +112,24 @@ describe('WorkflowsController contract coverage', () => {
     expect(parsed.runId).toBe(sampleStatus.runId);
     expect(parsed.workflowId).toBe(sampleStatus.workflowId);
     expect(workflowService.getRunStatus).toHaveBeenCalledWith(
-      'shipsec-run-123',
+      'sentris-run-123',
       undefined,
       authContext,
     );
   });
 
   it('returns trace payload matching the shared contract', async () => {
-    const result = await controller.trace('shipsec-run-123', authContext as any);
+    const result = await controller.trace('sentris-run-123', authContext as any);
     const parsed = TraceStreamEnvelopeSchema.parse(result);
     expect(parsed.events).toHaveLength(1);
-    expect(traceService.list).toHaveBeenCalledWith('shipsec-run-123', authContext);
+    expect(traceService.list).toHaveBeenCalledWith('sentris-run-123', authContext);
   });
 
   it('retrieves logs with validated query parameters', async () => {
     const query = WorkflowLogsQuerySchema.parse({ nodeRef: 'node-1', stream: 'stdout', limit: 10 });
-    const result = await controller.logs('shipsec-run-123', query, authContext as any);
+    const result = await controller.logs('sentris-run-123', query, authContext as any);
     expect(result).toEqual(sampleLogs);
-    expect(logStreamService.fetch).toHaveBeenCalledWith('shipsec-run-123', authContext, {
+    expect(logStreamService.fetch).toHaveBeenCalledWith('sentris-run-123', authContext, {
       nodeRef: 'node-1',
       stream: 'stdout',
       level: undefined,

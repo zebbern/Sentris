@@ -22,7 +22,7 @@ docker/.env
 .env.test.local
 .env.production.local
 .env.e2e
-.shipsec-instance
+.sentris-instance
 
 # Logs
 logs/

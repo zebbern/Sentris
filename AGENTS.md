@@ -1,4 +1,4 @@
-# ShipSec Studio
+# Sentris Flow
 
 Security workflow orchestration platform. Visual builder + Temporal for reliability.
 
@@ -24,21 +24,21 @@ just dev                           # Recommended (Linux/macOS/WSL)
 # OR:
 bun run dev:stack                  # Cross-platform (requires bash)
 # OR (manual):
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec up -d
-pm2 startOrReload pm2.config.cjs --only shipsec-frontend-0,shipsec-backend-0,shipsec-worker-0
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
+pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 
 # Status & logs
 just dev status                    # PM2 + Docker status
 just dev logs                      # Tail app logs
 pm2 status                         # PM2 only
-docker ps --filter name=shipsec    # Docker only
+docker ps --filter name=sentris    # Docker only
 
 # Stop
 just dev stop                      # Stop PM2 + Docker
 # OR:
 bun run dev:stack:stop
 # OR (manual):
-pm2 delete shipsec-frontend-0 shipsec-backend-0 shipsec-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p shipsec down
+pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down
 
 # Health checks
 curl -sf http://localhost:3211/api  # Backend API
@@ -77,10 +77,10 @@ Full details: `docs/MULTI-INSTANCE-DEV.md`
 
 Local development runs as **multiple app instances** (PM2) on top of **one shared Docker infra stack**.
 
-- Shared infra (Docker Compose project `shipsec-infra`): Postgres/Temporal/Redpanda/Redis/MinIO/Loki on fixed ports.
-- Per-instance apps: `shipsec-{frontend,backend,worker}-N`.
+- Shared infra (Docker Compose project `sentris-infra`): Postgres/Temporal/Redpanda/Redis/MinIO/Loki on fixed ports.
+- Per-instance apps: `sentris-{frontend,backend,worker}-N`.
 - Isolation is via per-instance DB + Temporal namespace/task queue + Kafka topic suffixing + instance-scoped Kafka consumer groups/client IDs (not per-instance infra containers).
-- The workspace can have an **active instance** (stored in `.shipsec-instance`, gitignored).
+- The workspace can have an **active instance** (stored in `.sentris-instance`, gitignored).
 - Instance env files are stored at `.instances/instance-N/{backend,worker,frontend}.env` and can be managed with `just instance-env ...`.
 
 **Agent rule:** before running any dev commands, ensure you’re targeting the intended instance.
@@ -89,7 +89,7 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
 - If the task is ambiguous (logs, curl, E2E, “run locally”, etc.), ask the user which instance to use.
 - If the user says “use instance N”, prefer either:
   - `just instance use N` then run `just dev` / `bun run test:e2e`, or
-  - explicit env override (`SHIPSEC_INSTANCE=N just dev ...`) for one-off commands.
+  - explicit env override (`SENTRIS_INSTANCE=N just dev ...`) for one-off commands.
 
 **Ports / URLs**
 
@@ -99,8 +99,8 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
 
 **E2E tests**
 
-- E2E targets the backend for `SHIPSEC_INSTANCE` (or the active instance).
-- When asked to run E2E, confirm the instance and ensure that instance is running: `SHIPSEC_INSTANCE=N just dev start` (or `just instance use N` then `just dev start`).
+- E2E targets the backend for `SENTRIS_INSTANCE` (or the active instance).
+- When asked to run E2E, confirm the instance and ensure that instance is running: `SENTRIS_INSTANCE=N just dev start` (or `just instance use N` then `just dev start`).
 
 **Keep docs in sync**
 

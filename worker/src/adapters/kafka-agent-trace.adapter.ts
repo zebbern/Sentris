@@ -1,6 +1,6 @@
 import { Kafka, logLevel as KafkaLogLevel, type Producer } from 'kafkajs';
-import type { AgentTraceEvent, AgentTracePublisher } from '@shipsec/component-sdk';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import type { AgentTraceEvent, AgentTracePublisher } from '@sentris/component-sdk';
+import { ConfigurationError } from '@sentris/component-sdk';
 
 export interface KafkaAgentTracePublisherConfig {
   brokers: string[];
@@ -25,7 +25,7 @@ export class KafkaAgentTracePublisher implements AgentTracePublisher {
     }
 
     const kafka = new Kafka({
-      clientId: config.clientId ?? 'shipsec-agent-trace',
+      clientId: config.clientId ?? 'sentris-agent-trace',
       brokers: config.brokers,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });

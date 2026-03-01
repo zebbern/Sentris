@@ -119,7 +119,7 @@ export function CreateApiKeyDialog({
         <DialogHeader>
           <DialogTitle>Create new API Key</DialogTitle>
           <DialogDescription>
-            Create a new API key to access ShipSec programmatically.
+            Create a new API key to access Sentris programmatically.
           </DialogDescription>
         </DialogHeader>
 

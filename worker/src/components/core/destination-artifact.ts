@@ -7,9 +7,9 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
-import { destinationWriterSchema } from '@shipsec/contracts';
-import { type DestinationConfig } from '@shipsec/shared';
+} from '@sentris/component-sdk';
+import { destinationWriterSchema } from '@sentris/contracts';
+import { type DestinationConfig } from '@sentris/shared';
 
 const inputSchema = inputs({});
 

@@ -1,6 +1,6 @@
 # Version Check Client
 
-ShipSec Studio performs a version compatibility check whenever the backend boots. The backend calls `https://version.shipsec.ai/api/version/check` and reacts according to the server response.
+Sentris Flow performs a version compatibility check whenever the backend boots. The backend calls `https://version.sentris.ai/api/version/check` and reacts according to the server response.
 
 ## When it runs
 
@@ -13,9 +13,9 @@ If the endpoint reports `is_supported=false`, the backend logs an error and cont
 
 | Variable | Purpose |
 | --- | --- |
-| `SHIPSEC_VERSION_CHECK_DISABLED` | Set to `1` or `true` to skip the check. |
-| `SHIPSEC_VERSION_CHECK_URL` | Override the base URL (default: `https://version.shipsec.ai`). |
-| `SHIPSEC_VERSION_CHECK_TIMEOUT_MS` | HTTP timeout in milliseconds (default: `5000`). |
+| `SENTRIS_VERSION_CHECK_DISABLED` | Set to `1` or `true` to skip the check. |
+| `SENTRIS_VERSION_CHECK_URL` | Override the base URL (default: `https://version.sentris.ai`). |
+| `SENTRIS_VERSION_CHECK_TIMEOUT_MS` | HTTP timeout in milliseconds (default: `5000`). |
 
 ## CLI output semantics
 

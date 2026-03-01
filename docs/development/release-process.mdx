@@ -3,7 +3,7 @@ title: "Release Process"
 description: "Docker image releases and npm package versioning"
 ---
 
-This document describes the release process for ShipSec Studio, including Docker image releases and npm package versioning.
+This document describes the release process for Sentris Flow, including Docker image releases and npm package versioning.
 
 ---
 
@@ -15,8 +15,8 @@ When you push a git tag matching the pattern `v*.*.*` (e.g., `v1.0.0`, `v1.2.3`)
 
 1. **Builds** all three Docker images (backend, worker, frontend)
 2. **Tags** images with:
-   - Version tag: `ghcr.io/shipsecai/studio-{service}:{version}`
-   - Latest tag: `ghcr.io/shipsecai/studio-{service}:latest`
+   - Version tag: `ghcr.io/zebbern/studio-{service}:{version}`
+   - Latest tag: `ghcr.io/zebbern/studio-{service}:latest`
 3. **Pushes** images to GitHub Container Registry (GHCR)
 4. **Creates** a GitHub release with changelog
 
@@ -50,9 +50,9 @@ Images are tagged as:
 
 | Service | Image |
 |---------|-------|
-| Backend | `ghcr.io/shipsecai/studio-backend:{version}` |
-| Worker | `ghcr.io/shipsecai/studio-worker:{version}` |
-| Frontend | `ghcr.io/shipsecai/studio-frontend:{version}` |
+| Backend | `ghcr.io/zebbern/studio-backend:{version}` |
+| Worker | `ghcr.io/zebbern/studio-worker:{version}` |
+| Frontend | `ghcr.io/zebbern/studio-frontend:{version}` |
 
 All images also have a `:latest` tag.
 
@@ -60,10 +60,10 @@ All images also have a `:latest` tag.
 
 ```bash
 # Pull a specific version
-docker pull ghcr.io/shipsecai/studio-backend:1.0.0
+docker pull ghcr.io/zebbern/studio-backend:1.0.0
 
 # Pull latest
-docker pull ghcr.io/shipsecai/studio-backend:latest
+docker pull ghcr.io/zebbern/studio-backend:latest
 ```
 
 ---
@@ -76,12 +76,12 @@ This is a **monorepo** with workspace packages:
 
 | Package | Version | Published |
 |---------|---------|-----------|
-| `@shipsec/shared` | v0.1.0 | No |
-| `@shipsec/component-sdk` | v0.1.0 | No (private) |
-| `@shipsec/backend-client` | v0.1.0 | No |
-| `@shipsec/studio-backend` | v0.1.0 | No |
-| `@shipsec/studio-worker` | v0.1.0 | No (private) |
-| `@shipsec/studio-frontend` | v1.0.0 | No |
+| `@sentris/shared` | v0.1.0 | No |
+| `@sentris/component-sdk` | v0.1.0 | No (private) |
+| `@sentris/backend-client` | v0.1.0 | No |
+| `@sentris/flow-backend` | v0.1.0 | No |
+| `@sentris/studio-worker` | v0.1.0 | No (private) |
+| `@sentris/flow-frontend` | v1.0.0 | No |
 
 <Note>
   These packages are **workspace dependencies** and are **not published to npm**. They're consumed internally within the monorepo.

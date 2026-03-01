@@ -7,8 +7,8 @@ import {
   parameters,
   param,
   port,
-} from '@shipsec/component-sdk';
-import { awsCredentialSchema } from '@shipsec/contracts';
+} from '@sentris/component-sdk';
+import { awsCredentialSchema } from '@sentris/contracts';
 import { executeMcpGroupNode, McpGroupTemplateSchema } from '../core/mcp-group-runtime';
 
 /**
@@ -33,7 +33,7 @@ const AwsGroupTemplate = McpGroupTemplateSchema.parse({
   name: 'AWS MCPs',
   description: 'Curated AWS MCP servers (CloudTrail, CloudWatch, IAM, S3, Lambda, DynamoDB, ...)',
   credentialContractName: 'core.credential.aws',
-  defaultDockerImage: 'shipsec/mcp-aws-suite:latest',
+  defaultDockerImage: 'zebbern/mcp-aws-suite:latest',
   credentialMapping: {
     env: {
       AWS_ACCESS_KEY_ID: 'accessKeyId',
@@ -170,7 +170,7 @@ const definition = defineComponent({
     name: 'aws',
     description: 'Curated AWS MCP servers (CloudTrail, CloudWatch, IAM, S3, Lambda, DynamoDB, ...)',
     mcp: {
-      image: 'shipsec/mcp-aws-suite:latest',
+      image: 'zebbern/mcp-aws-suite:latest',
       credentialMapping: {
         AWS_ACCESS_KEY_ID: 'accessKeyId',
         AWS_SECRET_ACCESS_KEY: 'secretAccessKey',
@@ -189,8 +189,8 @@ const definition = defineComponent({
       'Expose AWS MCP tools from curated AWS services (CloudTrail, IAM, S3 Tables, CloudWatch, Network, Lambda, DynamoDB, Documentation, Well-Architected Security, API) using AWS credentials.',
     icon: 'Cloud',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
   },

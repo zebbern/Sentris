@@ -128,7 +128,7 @@ export const useAuthStore = create<AuthState>()(
         }),
     }),
     {
-      name: 'shipsec-auth',
+      name: 'sentris-auth',
       version: 3,
       migrate: (persistedState, version) => {
         if (!persistedState) {

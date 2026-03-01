@@ -1,4 +1,4 @@
-import { ITraceService, TraceEvent } from '@shipsec/component-sdk';
+import { ITraceService, TraceEvent } from '@sentris/component-sdk';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { workflowTraces } from './schema';

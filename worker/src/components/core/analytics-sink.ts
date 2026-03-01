@@ -10,7 +10,7 @@ import {
   analyticsResultSchema,
   withPortMeta,
   ValidationError,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 // Schema for defining a data input port
 const dataInputDefinitionSchema = z.object({
@@ -162,8 +162,8 @@ const definition = defineComponent({
       'Index security findings from multiple scanners into OpenSearch for analytics, dashboards, and alerting.',
     icon: 'BarChart3',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

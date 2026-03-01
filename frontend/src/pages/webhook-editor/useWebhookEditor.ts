@@ -18,7 +18,7 @@ import type {
   WebhookConfiguration,
   WebhookInputDefinition,
   WebhookDelivery,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import { loader } from '@monaco-editor/react';
 import type {
   WebhookFormState,

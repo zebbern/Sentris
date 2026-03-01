@@ -8,7 +8,7 @@ import {
   port,
   param,
   type PortMeta,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 /**
  * Manual Form Component
@@ -142,8 +142,8 @@ const definition = defineComponent({
     description: 'Collect structured data via a manual form. Supports dynamic context templates.',
     icon: 'FormInput',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

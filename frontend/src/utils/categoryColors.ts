@@ -3,7 +3,7 @@ import {
   DEFAULT_COMPONENT_CATEGORY,
   getComponentCategoryDescriptor,
   normalizeComponentCategory,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 function resolveCategory(category: string): ComponentCategory {
   return normalizeComponentCategory(category) ?? DEFAULT_COMPONENT_CATEGORY;

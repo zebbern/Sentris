@@ -30,7 +30,7 @@ import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { ScheduleEditorDrawer } from '@/components/schedules/ScheduleEditorDrawer';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { useSortableList } from '@/hooks/useSortableList';
 import { useAuthStore } from '@/store/authStore';
 import { getWorkflowName, getStatusBadgeProps } from '@/utils/tableHelpers';
@@ -119,7 +119,7 @@ export function SchedulesPage() {
   } = useSortableList({
     items: filteredSchedules,
     getId: getScheduleId,
-    storageKey: `shipsec:sort:schedules:${organizationId}`,
+    storageKey: `sentris:sort:schedules:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

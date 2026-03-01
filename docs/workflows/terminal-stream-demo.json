@@ -15,7 +15,7 @@
               "label": "Terminal Message",
               "type": "text",
               "required": false,
-              "defaultValue": "Hello from ShipSec Terminal!"
+              "defaultValue": "Hello from Sentris Terminal!"
             },
             {
               "id": "durationSeconds",
@@ -30,7 +30,7 @@
     },
     {
       "id": "terminal-stream-demo",
-      "type": "shipsec.security.terminal-demo",
+      "type": "sentris.security.terminal-demo",
       "position": { "x": 360, "y": 40 },
       "data": {
         "label": "Terminal Stream Demo",

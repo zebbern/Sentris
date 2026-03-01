@@ -1,4 +1,4 @@
-import type { ITraceService } from '@shipsec/component-sdk';
+import type { ITraceService } from '@sentris/component-sdk';
 
 export interface TraceMetadataAware extends ITraceService {
   setRunMetadata(

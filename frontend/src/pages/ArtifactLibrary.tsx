@@ -23,7 +23,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PageToolbar } from '@/components/shared/PageToolbar';
-import type { ArtifactMetadata } from '@shipsec/shared';
+import type { ArtifactMetadata } from '@sentris/shared';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -96,7 +96,7 @@ export function ArtifactLibrary() {
   } = useSortableList({
     items: library,
     getId: getArtifactId,
-    storageKey: `shipsec:sort:artifacts:${organizationId}`,
+    storageKey: `sentris:sort:artifacts:${organizationId}`,
     disabled: hasActiveFilters,
   });
 

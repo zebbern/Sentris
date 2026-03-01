@@ -1,7 +1,7 @@
 /**
  * Schema Validation Pipeline
  *
- * Validates Zod schemas according to ShipSec's typing rules:
+ * Validates Zod schemas according to Sentris's typing rules:
  * - Requires labels (or defaults to field name)
  * - Blocks z.any()/z.unknown() without explicit allowAny
  * - Requires schemaName for named contracts
@@ -53,7 +53,7 @@ export interface SchemaValidationResult {
 const DEFAULT_MAX_DEPTH = 1;
 
 /**
- * Validate a Zod schema against ShipSec typing rules
+ * Validate a Zod schema against Sentris typing rules
  *
  * @param schema - Zod schema to validate
  * @param options - Validation options

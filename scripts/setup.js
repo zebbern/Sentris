@@ -71,7 +71,7 @@ function copyEnvFiles() {
 
 function main() {
   console.log('');
-  log('🔧', 'Setting up ShipSec Studio...');
+  log('🔧', 'Setting up Sentris Flow...');
   console.log('');
 
   installDependencies();

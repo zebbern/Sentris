@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterEach, describe, expect, test, vi } from 'bun:test';
-import { createExecutionContext, componentRegistry } from '@shipsec/component-sdk';
+import { createExecutionContext, componentRegistry } from '@sentris/component-sdk';
 import type { McpLibraryInput, McpLibraryOutput } from '../mcp-library';
 
 // Mock the docker runtime utils to avoid actual Docker calls

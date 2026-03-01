@@ -49,7 +49,7 @@ interface PublishTemplateModalProps {
 }
 
 const DEFAULT_GITHUB_TEMPLATE_REPO =
-  import.meta.env.VITE_GITHUB_TEMPLATE_REPO || 'shipsecai/workflow-templates';
+  import.meta.env.VITE_GITHUB_TEMPLATE_REPO || 'zebbern/sentris-templates';
 const DEFAULT_GITHUB_BRANCH = import.meta.env.VITE_GITHUB_TEMPLATE_BRANCH || 'main';
 
 const TEMPLATE_CATEGORIES = [

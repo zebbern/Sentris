@@ -7,7 +7,7 @@ import { config } from 'dotenv';
 import { Connection, Client } from '@temporalio/client';
 
 import type { WorkflowDefinition } from '../src/temporal/types';
-import { shipsecWorkflowRun } from '../src/temporal/workflows';
+import { sentrisWorkflowRun } from '../src/temporal/workflows';
 import { executeWorkflow } from '../src/temporal/workflow-runner';
 import '../src/components';
 
@@ -15,8 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '..', '.env') });
 
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'shipsec-dev';
-const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'shipsec-default';
+const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
+const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 const OUTPUT_DIR = join(__dirname, '..', 'benchmarks');
 
 type BenchmarkMode = 'serial' | 'parallel';
@@ -167,7 +167,7 @@ async function runTemporalBenchmark(
     const runId = `${label}-${randomUUID()}`;
     const start = Date.now();
 
-    const handle = await client.workflow.start(shipsecWorkflowRun, {
+    const handle = await client.workflow.start(sentrisWorkflowRun, {
       workflowId: runId,
       taskQueue: TEMPORAL_TASK_QUEUE,
       args: [

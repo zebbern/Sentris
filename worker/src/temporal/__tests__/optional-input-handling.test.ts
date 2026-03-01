@@ -20,7 +20,7 @@ import {
   createExecutionContext,
   extractPorts,
   type ComponentPortMetadata,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 describe('Optional Input Handling', () => {
   beforeAll(() => {

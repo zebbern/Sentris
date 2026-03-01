@@ -1,4 +1,4 @@
-import type { ExecutionTriggerType } from '@shipsec/shared';
+import type { ExecutionTriggerType } from '@sentris/shared';
 
 interface TriggerMeta {
   icon: string;

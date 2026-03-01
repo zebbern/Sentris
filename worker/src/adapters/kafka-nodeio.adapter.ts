@@ -4,14 +4,14 @@ import type {
   NodeIOStartEvent,
   NodeIOCompletionEvent,
   IFileStorageService,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import {
   ConfigurationError,
   KAFKA_SPILL_THRESHOLD_BYTES,
   MAX_KAFKA_MESSAGE_BYTES,
   createSpilledMarker,
   isSpilledDataMarker,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { randomUUID } from 'node:crypto';
 
 interface KafkaNodeIOAdapterConfig {
@@ -62,7 +62,7 @@ export class KafkaNodeIOAdapter implements INodeIOService {
     }
 
     const kafka = new Kafka({
-      clientId: config.clientId ?? 'shipsec-worker-nodeio',
+      clientId: config.clientId ?? 'sentris-worker-nodeio',
       brokers: config.brokers,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });
@@ -136,7 +136,7 @@ export class KafkaNodeIOAdapter implements INodeIOService {
         // Detect if already spilled by activity (uses legacy marker format for backward compat)
         const isPreSpilled =
           isSpilledDataMarker(payload.outputs) ||
-          (payload.outputs.__shipsec_spilled__ === true &&
+          (payload.outputs.__sentris_spilled__ === true &&
             typeof payload.outputs.storageRef === 'string');
 
         if (isPreSpilled) {

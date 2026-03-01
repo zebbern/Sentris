@@ -1,6 +1,6 @@
 # Multi-Instance Development (Shared Infra)
 
-ShipSec Studio supports running multiple isolated dev instances (0-9) on one machine.
+Sentris Flow supports running multiple isolated dev instances (0-9) on one machine.
 
 ## Quick Start
 
@@ -22,23 +22,23 @@ just dev stop
 ## How It Works
 
 - **One shared Docker infra stack**: Postgres, Temporal, Redpanda, Redis, MinIO, etc.
-- **Many app instances** via PM2: `shipsec-{backend,worker,frontend}-N`
+- **Many app instances** via PM2: `sentris-{backend,worker,frontend}-N`
 - **Isolation via namespacing**, not per-instance containers:
-  - Postgres database: `shipsec_instance_N`
-  - Temporal namespace + task queue: `shipsec-dev-N`
-  - Kafka client/group IDs: `shipsec-*-N`
+  - Postgres database: `sentris_instance_N`
+  - Temporal namespace + task queue: `sentris-dev-N`
+  - Kafka client/group IDs: `sentris-*-N`
 
 ## Selecting an Instance
 
 The instance is resolved in this order:
 
-1. `SHIPSEC_INSTANCE` environment variable (highest priority)
-2. `.shipsec-instance` file in repo root (gitignored)
+1. `SENTRIS_INSTANCE` environment variable (highest priority)
+2. `.sentris-instance` file in repo root (gitignored)
 3. Defaults to `0`
 
 ```bash
 # Per-command
-SHIPSEC_INSTANCE=2 just dev
+SENTRIS_INSTANCE=2 just dev
 
 # Per-workspace (persistent)
 just instance use 2
@@ -105,11 +105,11 @@ http://localhost:5273        # frontend
 http://localhost:3311/api    # backend API
 ```
 
-The Vite dev server proxies `/api` calls to the correct backend port automatically (computed from `SHIPSEC_INSTANCE` in `vite.config.ts`).
+The Vite dev server proxies `/api` calls to the correct backend port automatically (computed from `SENTRIS_INSTANCE` in `vite.config.ts`).
 
 ## Commands
 
-All commands respect `SHIPSEC_INSTANCE` (or the active instance selected by `just instance use N`):
+All commands respect `SENTRIS_INSTANCE` (or the active instance selected by `just instance use N`):
 
 ```bash
 # Select instance once per workspace
@@ -131,7 +131,7 @@ just dev status
 just dev clean
 
 # One-off override without changing active workspace instance
-SHIPSEC_INSTANCE=3 just dev
+SENTRIS_INSTANCE=3 just dev
 ```
 
 When stopping/cleaning instance 0, Docker infra is also torn down. For non-zero instances, only the PM2 apps are stopped (since other instances may still need the shared infra).
@@ -145,7 +145,7 @@ E2E tests use the same instance resolution to pick the right backend port:
 bun run test:e2e
 
 # Against a specific instance
-SHIPSEC_INSTANCE=2 bun run test:e2e
+SENTRIS_INSTANCE=2 bun run test:e2e
 ```
 
 ## Troubleshooting

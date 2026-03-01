@@ -8,7 +8,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 // Support both direct text and file objects from entry point
 const manualTriggerFileSchema = z.object({
@@ -81,8 +81,8 @@ const definition = defineComponent({
     description: 'Split text into array of strings by separator (newline, comma, etc.)',
     icon: 'SplitSquareHorizontal',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

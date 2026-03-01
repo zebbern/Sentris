@@ -1,13 +1,13 @@
 /* HUMANS.TXT */
-/* ShipSec Studio - Team & Project Information */
+/* Sentris Flow - Team & Project Information */
 
 /* TEAM */
-Team: ShipSec
-Contact: contact@shipsec.ai
+Team: Sentris
+Contact: contact@sentris.ai
 Location: United States
-Website: https://shipsec.ai
-GitHub: https://github.com/ShipSecAI
-Twitter: @shipsecai
+Website: https://sentris.ai
+GitHub: https://github.com/SentrisAI
+Twitter: @sentris
 Discord: discord.gg/fmMA4BtNXC
 
 /* ABOUT */
@@ -16,8 +16,8 @@ Founded: 2025
 Purpose: Build the operating system for modern security teams
 
 /* PROJECT */
-Project Name: ShipSec Studio
-Project URL: https://studio.shipsec.ai
+Project Name: Sentris Flow
+Project URL: https://studio.sentris.ai
 Project Description: The leading security automation platform purpose-built for security engineers and product security teams. Design, deploy, and monitor security workflows without writing code.
 
 Project Status: Active Development
@@ -34,24 +34,24 @@ Latest Update: December 2025
 - Open source (Apache 2.0)
 
 /* OPEN SOURCE */
-Repository: https://github.com/ShipSecAI/studio
+Repository: https://github.com/zebbern/Sentris
 License: Apache License 2.0
-Contributing: https://github.com/ShipSecAI/studio/blob/main/CONTRIBUTING.md
+Contributing: https://github.com/zebbern/Sentris/blob/main/CONTRIBUTING.md
 
 /* COMMUNITY */
-Issues: https://github.com/ShipSecAI/studio/issues
+Issues: https://github.com/zebbern/Sentris/issues
 Discord: https://discord.gg/fmMA4BtNXC
 
 /* SECURITY */
-Security Contact: contact@shipsec.ai
+Security Contact: contact@sentris.ai
 
 /* SUPPORT */
-Support Email: contact@shipsec.ai
+Support Email: contact@sentris.ai
 
 /* SOCIAL */
-LinkedIn: https://linkedin.com/company/shipsecai
-GitHub Discussions: https://github.com/ShipSecAI/studio/discussions
-Twitter: https://twitter.com/shipsecai
+LinkedIn: https://linkedin.com/company/sentris
+GitHub Discussions: https://github.com/zebbern/Sentris/discussions
+Twitter: https://twitter.com/sentris
 
 /* STANDARDS */
 HTML5: Yes
@@ -71,10 +71,10 @@ Infrastructure: Docker, Kubernetes ready
 Cache: Redis-compatible
 
 /* FEEDBACK & UPDATES */
-To stay updated on ShipSec Studio development:
-- Watch releases: https://github.com/ShipSecAI/studio/releases
+To stay updated on Sentris Flow development:
+- Watch releases: https://github.com/zebbern/Sentris/releases
 - Join Discord: https://discord.gg/fmMA4BtNXC
-- Follow updates: https://twitter.com/shipsecai
+- Follow updates: https://twitter.com/sentris
 
 /* CONTRIBUTING */
 We welcome contributions! Please see CONTRIBUTING.md for guidelines.

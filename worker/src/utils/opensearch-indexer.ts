@@ -1,5 +1,5 @@
 import { Client } from '@opensearch-project/opensearch';
-import type { IScopedTraceService } from '@shipsec/component-sdk';
+import type { IScopedTraceService } from '@sentris/component-sdk';
 
 interface IndexOptions {
   workflowId: string;
@@ -178,9 +178,9 @@ export class OpenSearchIndexer {
   }
 
   /**
-   * Build the enriched document structure with _shipsec context.
+   * Build the enriched document structure with _sentris context.
    * - Component data fields at root level (nested objects serialized)
-   * - Workflow context under _shipsec namespace (prevents field collision)
+   * - Workflow context under _sentris namespace (prevents field collision)
    */
   private buildEnrichedDocument(
     document: Record<string, any>,
@@ -196,8 +196,8 @@ export class OpenSearchIndexer {
       // Component data at root level (serialized)
       ...serializedDocument,
 
-      // Workflow context under shipsec namespace (no underscore prefix for UI visibility)
-      shipsec: {
+      // Workflow context under sentris namespace (no underscore prefix for UI visibility)
+      sentris: {
         organization_id: orgId,
         run_id: options.runId,
         workflow_id: options.workflowId,

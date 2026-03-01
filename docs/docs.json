@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "palm",
-  "name": "ShipSec Studio",
+  "name": "Sentris Flow",
   "colors": {
     "primary": "#1472D0",
     "light": "#1472D0",
@@ -65,12 +65,12 @@
       "anchors": [
         {
           "anchor": "Website",
-          "href": "https://studio.shipsec.ai",
+          "href": "https://studio.sentris.ai",
           "icon": "globe"
         },
         {
           "anchor": "GitHub",
-          "href": "https://github.com/shipsecai/studio",
+          "href": "https://github.com/sentris/studio",
           "icon": "github"
         }
       ]
@@ -84,20 +84,20 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@shipsec.ai"
+        "href": "mailto:support@sentris.ai"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://studio.shipsec.ai"
+      "href": "https://studio.sentris.ai"
     }
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/shipsecai",
-      "github": "https://github.com/shipsecai",
-      "linkedin": "https://linkedin.com/company/shipsecai"
+      "x": "https://x.com/sentrisflow",
+      "github": "https://github.com/sentris",
+      "linkedin": "https://linkedin.com/company/sentris"
     }
   }
 }

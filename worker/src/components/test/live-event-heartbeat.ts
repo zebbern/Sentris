@@ -7,7 +7,7 @@ import {
   parameters,
   port,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({});
 
@@ -104,8 +104,8 @@ const definition = defineComponent({
     description:
       'Diagnostic component that continuously emits progress events to exercise live trace streaming.',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
   },
   async execute({ params }, context) {

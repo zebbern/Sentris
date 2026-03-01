@@ -13,10 +13,10 @@ import {
   type AnalyticsResult,
   type DockerRunnerConfig,
   ContainerError,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const NAABU_IMAGE = 'ghcr.io/shipsecai/naabu:latest';
+const NAABU_IMAGE = 'ghcr.io/zebbern/naabu:latest';
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;
 const TARGETS_FILE_NAME = 'targets.txt';
@@ -252,7 +252,7 @@ const buildNaabuArgs = (options: BuildNaabuArgsOptions): string[] => {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.naabu.scan',
+  id: 'sentris.naabu.scan',
   label: 'Naabu Port Scan',
   category: 'security',
   runner: {
@@ -285,8 +285,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/projectdiscovery/naabu',
     icon: 'Radar',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

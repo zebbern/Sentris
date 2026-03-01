@@ -2,10 +2,10 @@
  * Kafka Topic Resolver
  *
  * Provides instance-aware topic naming for multi-instance deployments.
- * When SHIPSEC_INSTANCE is set, topics are namespaced with the instance number.
+ * When SENTRIS_INSTANCE is set, topics are namespaced with the instance number.
  *
  * Environment Variables:
- * - SHIPSEC_INSTANCE: Instance number (0-9) for multi-instance isolation
+ * - SENTRIS_INSTANCE: Instance number (0-9) for multi-instance isolation
  * - LOG_KAFKA_TOPIC: Base topic for logs (default: telemetry.logs)
  * - EVENT_KAFKA_TOPIC: Base topic for events (default: telemetry.events)
  * - AGENT_TRACE_KAFKA_TOPIC: Base topic for agent traces (default: telemetry.agent-trace)
@@ -22,8 +22,8 @@ export class KafkaTopicResolver {
   private enableInstanceSuffix: boolean;
 
   constructor(config: TopicResolverConfig = {}) {
-    this.instanceId = config.instanceId ?? process.env.SHIPSEC_INSTANCE;
-    // Enable instance suffix only if SHIPSEC_INSTANCE is set
+    this.instanceId = config.instanceId ?? process.env.SENTRIS_INSTANCE;
+    // Enable instance suffix only if SENTRIS_INSTANCE is set
     this.enableInstanceSuffix = config.enableInstanceSuffix ?? Boolean(this.instanceId);
   }
 

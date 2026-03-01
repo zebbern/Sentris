@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'bun:test';
 import type { GenerateTextResult, LanguageModelUsage, Output as AIOutput, ToolSet } from 'ai';
-import type { ExecutionContext } from '@shipsec/component-sdk';
-import { componentRegistry, runComponentWithRunner } from '@shipsec/component-sdk';
+import type { ExecutionContext } from '@sentris/component-sdk';
+import { componentRegistry, runComponentWithRunner } from '@sentris/component-sdk';
 import type { AiAgentInput, AiAgentOutput } from '../ai-agent';
 
 const stepCountIsMock = vi.fn((limit: number) => ({ type: 'step-count', limit }));

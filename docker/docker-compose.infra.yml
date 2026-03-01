@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: shipsec-postgres
+    container_name: sentris-postgres
     environment:
-      POSTGRES_USER: shipsec
-      POSTGRES_PASSWORD: shipsec
-      POSTGRES_DB: shipsec
+      POSTGRES_USER: sentris
+      POSTGRES_PASSWORD: sentris
+      POSTGRES_DB: sentris
       POSTGRES_MULTIPLE_DATABASES: temporal
     # Internal only - use docker-compose.dev-ports.yml overlay for local dev access
     expose:
@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shipsec"]
+      test: ["CMD-SHELL", "pg_isready -U sentris"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -22,7 +22,7 @@ services:
 
   temporal:
     image: temporalio/auto-setup:latest
-    container_name: shipsec-temporal
+    container_name: sentris-temporal
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,8 +30,8 @@ services:
       - DB=postgres12
       - DB_PORT=5432
       - DB_NAME=temporal
-      - POSTGRES_USER=shipsec
-      - POSTGRES_PWD=shipsec
+      - POSTGRES_USER=sentris
+      - POSTGRES_PWD=sentris
       - POSTGRES_SEEDS=postgres
       - AUTO_SETUP=true
     expose:
@@ -42,7 +42,7 @@ services:
 
   temporal-ui:
     image: temporalio/ui:latest
-    container_name: shipsec-temporal-ui
+    container_name: sentris-temporal-ui
     depends_on:
       - temporal
     environment:
@@ -54,7 +54,7 @@ services:
 
   minio:
     image: minio/minio:RELEASE.2024-10-02T17-50-41Z
-    container_name: shipsec-minio
+    container_name: sentris-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -73,7 +73,7 @@ services:
 
   redis:
     image: redis:latest
-    container_name: shipsec-redis
+    container_name: sentris-redis
     expose:
       - "6379"
     volumes:
@@ -87,7 +87,7 @@ services:
 
   loki:
     image: grafana/loki:3.2.1
-    container_name: shipsec-loki
+    container_name: sentris-loki
     command: -config.file=/etc/loki/local-config.yaml
     expose:
       - "3100"
@@ -103,7 +103,7 @@ services:
 
   redpanda:
     image: redpandadata/redpanda:v24.2.5
-    container_name: shipsec-redpanda
+    container_name: sentris-redpanda
     command:
       - redpanda
       - start
@@ -128,7 +128,7 @@ services:
 
   redpanda-console:
     image: redpandadata/console:v2.7.2
-    container_name: shipsec-redpanda-console
+    container_name: sentris-redpanda-console
     depends_on:
       - redpanda
     environment:
@@ -141,7 +141,7 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.11.1
-    container_name: shipsec-opensearch
+    container_name: sentris-opensearch
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
@@ -173,8 +173,8 @@ services:
     build:
       context: .
       dockerfile: opensearch-dashboards.Dockerfile
-    image: shipsec-opensearch-dashboards:2.11.1
-    container_name: shipsec-opensearch-dashboards
+    image: sentris-opensearch-dashboards:2.11.1
+    container_name: sentris-opensearch-dashboards
     depends_on:
       opensearch:
         condition: service_healthy
@@ -198,7 +198,7 @@ services:
   # Initialize OpenSearch Dashboards with default index patterns
   opensearch-init:
     image: curlimages/curl:8.5.0
-    container_name: shipsec-opensearch-init
+    container_name: sentris-opensearch-init
     depends_on:
       opensearch-dashboards:
         condition: service_healthy
@@ -211,7 +211,7 @@ services:
   # DEV MODE: Uses nginx.dev.conf which points to host.docker.internal for PM2 services
   nginx:
     image: nginx:1.25-alpine
-    container_name: shipsec-nginx
+    container_name: sentris-nginx
     depends_on:
       opensearch-dashboards:
         condition: service_healthy
@@ -239,4 +239,4 @@ volumes:
 
 networks:
   default:
-    name: shipsec-network
+    name: sentris-network

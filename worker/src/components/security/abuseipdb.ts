@@ -16,7 +16,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   ipAddress: port(z.string().describe('The IPv4 or IPv6 address you want to check.'), {
@@ -142,7 +142,7 @@ const definition = defineComponent({
     category: 'security',
     description: 'Get threat intelligence reports for an IP from AbuseIPDB.',
     icon: 'Shield',
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
   },

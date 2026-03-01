@@ -1,6 +1,6 @@
 # Frontend Performance Guidelines
 
-Authoritative reference for all performance patterns in the ShipSec Studio frontend. Every new feature, page, and query hook must follow these guidelines.
+Authoritative reference for all performance patterns in the Sentris Flow frontend. Every new feature, page, and query hook must follow these guidelines.
 
 **Enforcement:** Rules 11-15 in `AGENTS.md` are mandatory. This document provides the detail and rationale.
 

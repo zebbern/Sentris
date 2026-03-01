@@ -1,5 +1,5 @@
 import { Kafka, logLevel as KafkaLogLevel, type Producer } from 'kafkajs';
-import { ConfigurationError, LOG_CHUNK_SIZE_CHARS } from '@shipsec/component-sdk';
+import { ConfigurationError, LOG_CHUNK_SIZE_CHARS } from '@sentris/component-sdk';
 
 import type { WorkflowLogEntry, WorkflowLogSink } from '../temporal/types';
 
@@ -27,7 +27,7 @@ export class KafkaLogAdapter implements WorkflowLogSink {
     }
 
     const kafka = new Kafka({
-      clientId: config.clientId ?? 'shipsec-worker',
+      clientId: config.clientId ?? 'sentris-worker',
       brokers: config.brokers,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });

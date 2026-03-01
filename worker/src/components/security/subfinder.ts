@@ -14,10 +14,10 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const SUBFINDER_IMAGE = 'ghcr.io/shipsecai/subfinder:latest';
+const SUBFINDER_IMAGE = 'ghcr.io/zebbern/subfinder:latest';
 const SUBFINDER_TIMEOUT_SECONDS = 1800; // 30 minutes
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;
@@ -264,7 +264,7 @@ const subfinderRetryPolicy: ComponentRetryPolicy = {
 };
 
 const definition = defineComponent({
-  id: 'shipsec.subfinder.run',
+  id: 'sentris.subfinder.run',
   label: 'Subfinder',
   category: 'security',
   retryPolicy: subfinderRetryPolicy,
@@ -297,8 +297,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/projectdiscovery/subfinder',
     icon: 'Radar',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

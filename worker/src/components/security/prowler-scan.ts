@@ -17,10 +17,10 @@ import {
   analyticsResultSchema,
   generateFindingHash,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
-import type { DockerRunnerConfig } from '@shipsec/component-sdk';
-import { awsCredentialSchema } from '@shipsec/contracts';
+import type { DockerRunnerConfig } from '@sentris/component-sdk';
+import { awsCredentialSchema } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const recommendedFlagOptions = [
@@ -407,14 +407,14 @@ const definition = defineComponent({
   retryPolicy: prowlerRetryPolicy,
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/prowler:latest',
+    image: 'ghcr.io/zebbern/prowler:latest',
     platform: 'linux/amd64',
     command: [], // Placeholder - actual command built dynamically in execute()
   },
   inputs: inputSchema,
   outputs: outputSchema,
   parameters: parameterSchema,
-  docs: 'Execute Prowler inside Docker using `ghcr.io/shipsecai/prowler` (amd64 enforced on ARM hosts). Supports AWS account scans and the multi-cloud `prowler cloud` overview, with optional CLI flag customisation.',
+  docs: 'Execute Prowler inside Docker using `ghcr.io/zebbern/prowler` (amd64 enforced on ARM hosts). Supports AWS account scans and the multi-cloud `prowler cloud` overview, with optional CLI flag customisation.',
   toolProvider: {
     kind: 'component',
     name: 'prowler_scan',
@@ -430,8 +430,8 @@ const definition = defineComponent({
     documentation: 'https://github.com/prowler-cloud/prowler',
     icon: 'ShieldCheck',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,
@@ -571,14 +571,14 @@ const definition = defineComponent({
       '--output-directory',
       '/output',
       '--output-filename',
-      'shipsec',
+      'sentris',
     );
     context.logger.info(`[ProwlerScan] Command: ${cmd.join(' ')}`);
 
     // Prepare a one-off runner with dynamic command and volume
     const dockerRunner: DockerRunnerConfig = {
       kind: 'docker',
-      image: 'ghcr.io/shipsecai/prowler:latest',
+      image: 'ghcr.io/zebbern/prowler:latest',
       platform: 'linux/amd64',
       network: 'bridge',
       timeoutSeconds: 900,

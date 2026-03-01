@@ -9,7 +9,7 @@ import {
   type TraceEventPayload,
   type TraceStreamEnvelope,
   type WorkflowRunStatusPayload,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 export const ExecutionStatusEnum = SharedExecutionStatusSchema;
 export type ExecutionStatus = SharedExecutionStatus;

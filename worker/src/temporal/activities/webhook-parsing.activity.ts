@@ -2,7 +2,7 @@ import {
   createExecutionContext,
   runComponentWithRunner,
   type DockerRunnerConfig,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 export interface ExecuteWebhookParsingScriptActivityInput {
   parsingScript: string;
@@ -76,13 +76,13 @@ plugin({
 });
 `;
 
-  // Harness reads params from SHIPSEC_INPUT_PATH (mounted file) to avoid env/arg size limits.
+  // Harness reads params from SENTRIS_INPUT_PATH (mounted file) to avoid env/arg size limits.
   const harnessCode = `
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
 async function run() {
   try {
-    const inputPath = process.env.SHIPSEC_INPUT_PATH || "/shipsec-output/input.json";
+    const inputPath = process.env.SENTRIS_INPUT_PATH || "/sentris-output/input.json";
     const payload = JSON.parse(readFileSync(inputPath, "utf8"));
 
     if (!payload.code) {
@@ -102,7 +102,7 @@ async function run() {
 
     const result = await script(input);
 
-    const OUTPUT_PATH = process.env.SHIPSEC_OUTPUT_PATH || "/shipsec-output/result.json";
+    const OUTPUT_PATH = process.env.SENTRIS_OUTPUT_PATH || "/sentris-output/result.json";
     const OUTPUT_DIR = OUTPUT_PATH.substring(0, OUTPUT_PATH.lastIndexOf("/"));
     if (!existsSync(OUTPUT_DIR)) {
       mkdirSync(OUTPUT_DIR, { recursive: true });

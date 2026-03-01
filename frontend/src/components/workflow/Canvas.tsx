@@ -38,7 +38,7 @@ import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { cn } from '@/lib/utils';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
 import { usePlacementStore } from '@/components/layout/sidebar-state';

@@ -50,8 +50,8 @@ async function main() {
               severity: { type: 'keyword' },
               finding_hash: { type: 'keyword' },
               asset_key: { type: 'keyword' },
-              // Workflow context under shipsec namespace
-              shipsec: {
+              // Workflow context under sentris namespace
+              sentris: {
                 type: 'object',
                 dynamic: true,
                 properties: {
@@ -76,7 +76,7 @@ async function main() {
     console.log('  - Shards: 1, Replicas: 1');
     console.log('  - Mappings: @timestamp (date)');
     console.log('              root: scanner, severity, finding_hash, asset_key (keyword)');
-    console.log('              shipsec.*: organization_id, run_id, workflow_id, workflow_name,');
+    console.log('              sentris.*: organization_id, run_id, workflow_id, workflow_name,');
     console.log('                         component_id, node_ref, asset_key (keyword)');
     console.log('\n🎉 OpenSearch setup completed successfully!');
   } catch (error) {

@@ -41,7 +41,7 @@ e2e-tests/
 Local development environment must be running:
 
 ```bash
-docker compose -p shipsec up -d
+docker compose -p sentris up -d
 pm2 start pm2.config.cjs
 ```
 

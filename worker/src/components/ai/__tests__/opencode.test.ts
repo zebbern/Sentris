@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'bun:test';
-import { componentRegistry } from '@shipsec/component-sdk';
-import * as SDK from '@shipsec/component-sdk'; // Import for spying
+import { componentRegistry } from '@sentris/component-sdk';
+import * as SDK from '@sentris/component-sdk'; // Import for spying
 import { IsolatedContainerVolume } from '../../../utils/isolated-volume';
 import * as utils from '../utils';
 import '../opencode'; // Register the component
@@ -19,7 +19,7 @@ vi.mock('../../../utils/isolated-volume', () => {
   };
 });
 
-describe('shipsec.opencode.agent', () => {
+describe('sentris.opencode.agent', () => {
   let runSpy: any;
 
   beforeEach(() => {
@@ -89,11 +89,11 @@ describe('shipsec.opencode.agent', () => {
     const initCall = volumeInstance.initialize.mock.calls[0][0];
 
     expect(initCall['context.json']).toContain('"alertId": "123"');
-    expect(initCall['opencode.jsonc']).toContain('shipsec-gateway');
+    expect(initCall['opencode.jsonc']).toContain('sentris-gateway');
 
     expect(runSpy).toHaveBeenCalled();
     const runnerCall = runSpy.mock.calls[0][0];
-    expect(runnerCall.image).toBe('ghcr.io/shipsecai/opencode:latest');
+    expect(runnerCall.image).toBe('ghcr.io/zebbern/opencode:latest');
     expect(runnerCall.network).toBe('host');
     expect(runnerCall.env.OPENAI_API_KEY).toBe('sk-test');
   });

@@ -1,6 +1,6 @@
 # Docker Configuration
 
-This directory contains Docker Compose configurations for running ShipSec Studio in different environments.
+This directory contains Docker Compose configurations for running Sentris Flow in different environments.
 
 ## Docker Compose Files
 

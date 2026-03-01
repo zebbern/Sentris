@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { CreateMcpServer, UpdateMcpServer } from '@shipsec/shared';
+import type { CreateMcpServer, UpdateMcpServer } from '@sentris/shared';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
 import { queryKeys } from '@/lib/queryKeys';
@@ -18,7 +18,7 @@ export interface McpServerResponse {
   enabled: boolean;
   healthCheckUrl?: string | null;
   lastHealthCheck?: string | null;
-  lastHealthStatus?: import('@shipsec/shared').McpHealthStatus | null;
+  lastHealthStatus?: import('@sentris/shared').McpHealthStatus | null;
   createdAt: string;
   updatedAt: string;
   groupId?: string | null;

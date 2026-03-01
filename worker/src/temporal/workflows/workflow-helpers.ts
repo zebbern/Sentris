@@ -1,4 +1,4 @@
-import type { ComponentRetryPolicy } from '@shipsec/component-sdk';
+import type { ComponentRetryPolicy } from '@sentris/component-sdk';
 
 // ---------------------------------------------------------------------------
 // Constants

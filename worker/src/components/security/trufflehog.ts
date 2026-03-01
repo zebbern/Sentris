@@ -15,7 +15,7 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const scanTypeSchema = z.enum(['git', 'github', 'gitlab', 's3', 'gcs', 'filesystem', 'docker']);
@@ -308,12 +308,12 @@ function parseRawOutput(rawOutput: string): Output {
 }
 
 const definition = defineComponent({
-  id: 'shipsec.trufflehog.scan',
+  id: 'sentris.trufflehog.scan',
   label: 'TruffleHog',
   category: 'security',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/shipsecai/trufflehog:latest',
+    image: 'ghcr.io/zebbern/trufflehog:latest',
     entrypoint: 'trufflehog',
     network: 'bridge',
     command: [], // Will be built dynamically in execute
@@ -350,8 +350,8 @@ const definition = defineComponent({
     documentationUrl: 'https://github.com/trufflesecurity/trufflehog',
     icon: 'Key',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

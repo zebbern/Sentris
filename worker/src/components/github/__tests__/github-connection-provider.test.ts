@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'bun:test';
-import { createExecutionContext } from '@shipsec/component-sdk';
+import { createExecutionContext } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type {
   GitHubConnectionProviderInput,

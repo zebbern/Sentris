@@ -7,7 +7,7 @@ import {
   outputs,
   port,
   coerceNumberFromText,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const inputSchema = inputs({
   items: port(
@@ -64,8 +64,8 @@ const definition = defineComponent({
       'Pick a specific item from an array produced by Text Splitter or other components.',
     icon: 'MousePointerSquare',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
   },

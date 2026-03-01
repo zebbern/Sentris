@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 import { api } from '@/services/api';
 import { useSchedules } from '@/hooks/queries/useScheduleQueries';
 import { useQueryClient } from '@tanstack/react-query';

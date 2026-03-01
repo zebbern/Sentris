@@ -5,7 +5,7 @@ import {
   minioConfigSchema,
   secretStoreKeySchema,
   kafkaBrokersSchema,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 
 export const workerEnvSchema = z
   .object({
@@ -18,10 +18,10 @@ export const workerEnvSchema = z
     BACKEND_URL: z.string().optional().default('http://localhost:3211'),
 
     // --- Optional Kafka client IDs ---
-    EVENT_KAFKA_CLIENT_ID: z.string().optional().default('shipsec-worker-events'),
-    AGENT_TRACE_KAFKA_CLIENT_ID: z.string().optional().default('shipsec-worker-agent-trace'),
-    NODE_IO_KAFKA_CLIENT_ID: z.string().optional().default('shipsec-worker-node-io'),
-    LOG_KAFKA_CLIENT_ID: z.string().optional().default('shipsec-worker'),
+    EVENT_KAFKA_CLIENT_ID: z.string().optional().default('sentris-worker-events'),
+    AGENT_TRACE_KAFKA_CLIENT_ID: z.string().optional().default('sentris-worker-agent-trace'),
+    NODE_IO_KAFKA_CLIENT_ID: z.string().optional().default('sentris-worker-node-io'),
+    LOG_KAFKA_CLIENT_ID: z.string().optional().default('sentris-worker'),
 
     // --- Terminal Redis ---
     TERMINAL_REDIS_URL: z.string().optional(),

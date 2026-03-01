@@ -9,9 +9,9 @@
 set -euo pipefail
 
 INSTANCE="${1:-0}"
-INFRA_PROJECT_NAME="shipsec-infra"
-DB_NAME="shipsec_instance_${INSTANCE}"
-NAMESPACE="shipsec-dev-${INSTANCE}"
+INFRA_PROJECT_NAME="sentris-infra"
+DB_NAME="sentris_instance_${INSTANCE}"
+NAMESPACE="sentris-dev-${INSTANCE}"
 TEMPORAL_ADDRESS="127.0.0.1:7233"
 
 BLUE='\033[0;34m'

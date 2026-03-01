@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import '@shipsec/studio-worker/components'; // Register components
+import '@sentris/studio-worker/components'; // Register components
 import type { TemporalService, WorkflowRunStatus } from '../../temporal/temporal.service';
 import { WorkflowDefinition } from '../../dsl/types';
 import { TraceService } from '../../trace/trace.service';
@@ -349,9 +349,9 @@ describe('WorkflowsController', () => {
     > = {
       async startWorkflow(options) {
         return {
-          workflowId: options.workflowId ?? 'shipsec-run-controller',
+          workflowId: options.workflowId ?? 'sentris-run-controller',
           runId: 'temporal-run-controller',
-          taskQueue: options.taskQueue ?? 'shipsec-default',
+          taskQueue: options.taskQueue ?? 'sentris-default',
         };
       },
       async describeWorkflow(ref) {
@@ -362,7 +362,7 @@ describe('WorkflowsController', () => {
           startTime: now,
           closeTime: undefined,
           historyLength: 0,
-          taskQueue: 'shipsec-default',
+          taskQueue: 'sentris-default',
           failure: undefined,
         };
         return status;
@@ -374,7 +374,7 @@ describe('WorkflowsController', () => {
         lastCancelledRun = ref;
       },
       getDefaultTaskQueue() {
-        return 'shipsec-default';
+        return 'sentris-default';
       },
     };
 
@@ -392,12 +392,12 @@ describe('WorkflowsController', () => {
       listByRunId: async () => [],
     } as any);
     const logStreamService = {
-      fetch: async () => ({ runId: 'shipsec-run-controller', streams: [] }),
+      fetch: async () => ({ runId: 'sentris-run-controller', streams: [] }),
     };
     const artifactsService = {
       listRunArtifacts: vi
         .fn()
-        .mockResolvedValue({ runId: 'shipsec-run-controller', artifacts: [] }),
+        .mockResolvedValue({ runId: 'sentris-run-controller', artifacts: [] }),
     };
     const terminalStreamService = {
       fetchChunks: vi.fn().mockResolvedValue({ cursor: '{}', chunks: [] }),
@@ -405,7 +405,7 @@ describe('WorkflowsController', () => {
     const terminalArchiveService = {
       archive: vi.fn().mockResolvedValue({
         id: 1,
-        runId: 'shipsec-run-controller',
+        runId: 'sentris-run-controller',
         workflowId: 'workflow',
         workflowVersionId: 'version',
         nodeRef: 'node-1',
@@ -473,10 +473,10 @@ describe('WorkflowsController', () => {
     const run = await controller.run(authContext, created.id, {
       inputs: { payload: { note: 'hello' } },
     });
-    expect(run.runId).toMatch(/^shipsec-run-/);
+    expect(run.runId).toMatch(/^sentris-run-/);
     expect(run.temporalRunId).toBe('temporal-run-controller');
     expect(run.status).toBe('RUNNING');
-    expect(run.taskQueue).toBe('shipsec-default');
+    expect(run.taskQueue).toBe('sentris-default');
     expect(run.workflowVersion).toBeDefined();
     expect(run.workflowVersionId).toBeDefined();
 

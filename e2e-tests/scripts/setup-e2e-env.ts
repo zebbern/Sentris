@@ -53,13 +53,13 @@ const FIELDS: Field[] = [
   {
     key: 'AWS_CLOUDTRAIL_MCP_IMAGE',
     prompt: 'CloudTrail MCP image (optional)',
-    defaultValue: 'shipsec/mcp-aws-cloudtrail:latest',
+    defaultValue: 'sentris/mcp-aws-cloudtrail:latest',
     optional: true,
   },
   {
     key: 'AWS_CLOUDWATCH_MCP_IMAGE',
     prompt: 'CloudWatch MCP image (optional)',
-    defaultValue: 'shipsec/mcp-aws-cloudwatch:latest',
+    defaultValue: 'sentris/mcp-aws-cloudwatch:latest',
     optional: true,
   },
 ];

@@ -1,4 +1,4 @@
-import { TERMINAL_STATUSES } from '@shipsec/shared';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 import { logger } from '@/lib/logger';
 import {
   ExecutionStatusResponseSchema,

@@ -8,7 +8,7 @@ import {
   componentRegistry,
   createExecutionContext,
   type ExecutionContext,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 import '../../index'; // Ensure registry is populated
 import { AbuseIPDBInput, AbuseIPDBOutput } from '../abuseipdb';
 

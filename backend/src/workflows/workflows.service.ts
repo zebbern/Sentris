@@ -13,8 +13,8 @@ import { z } from 'zod';
 
 import { compileWorkflowGraph } from '../dsl/compiler';
 // Ensure all worker components are registered before accessing the registry
-import '@shipsec/studio-worker/components';
-import { componentRegistry, extractPorts } from '@shipsec/component-sdk';
+import '@sentris/studio-worker/components';
+import { componentRegistry, extractPorts } from '@sentris/component-sdk';
 import { WorkflowDefinition } from '../dsl/types';
 import {
   TemporalService,
@@ -45,7 +45,7 @@ import {
   ExecutionInputPreview,
   ExecutionTriggerMetadata,
   TERMINAL_STATUSES,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import type { WorkflowRunRecord, WorkflowVersionRecord, WorkflowGraph } from '../database/schema';
 import type { AuthContext } from '../auth/types';
 
@@ -100,7 +100,7 @@ export interface WorkflowRunSummary {
   parentNodeRef?: string | null;
 }
 
-const SHIPSEC_WORKFLOW_TYPE = 'shipsecWorkflowRun';
+const SENTRIS_WORKFLOW_TYPE = 'sentrisWorkflowRun';
 export interface PreparedRunPayload {
   runId: string;
   workflowId: string;
@@ -179,7 +179,7 @@ export class WorkflowsService {
 
   private runIdFromIdempotencyKey(key: string): string {
     const hash = createHash('sha256').update(key).digest('hex');
-    return `shipsec-run-${hash}`;
+    return `sentris-run-${hash}`;
   }
 
   async getCompiledWorkflowContext(
@@ -902,7 +902,7 @@ export class WorkflowsService {
     let temporalRunId: string | null = null;
     try {
       const temporalRun = await this.temporalService.startWorkflow({
-        workflowType: SHIPSEC_WORKFLOW_TYPE,
+        workflowType: SENTRIS_WORKFLOW_TYPE,
         workflowId: prepared.runId,
         args: [
           {
@@ -1051,7 +1051,7 @@ export class WorkflowsService {
     const normalizedKey = this.normalizeIdempotencyKey(options.idempotencyKey);
     const runId =
       options.runId ??
-      (normalizedKey ? this.runIdFromIdempotencyKey(normalizedKey) : `shipsec-run-${randomUUID()}`);
+      (normalizedKey ? this.runIdFromIdempotencyKey(normalizedKey) : `sentris-run-${randomUUID()}`);
     const triggerMetadata = options.trigger ?? this.buildEntryPointTriggerMetadata(auth);
     const inputs = request.inputs ?? {};
     const inputPreview = this.buildInputPreview(inputs, nodeOverrides);

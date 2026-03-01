@@ -37,7 +37,7 @@ graph TD
 
 ### 1. Create New Workflow
 
-1. Open ShipSec Studio
+1. Open Sentris Flow
 2. Click "Create New Workflow"
 3. Name the workflow "AWS Security Monitoring"
 

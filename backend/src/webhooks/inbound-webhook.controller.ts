@@ -35,7 +35,7 @@ export class InboundWebhookController {
       type: 'object',
       properties: {
         status: { type: 'string', example: 'delivered' },
-        runId: { type: 'string', example: 'shipsec-run-123' },
+        runId: { type: 'string', example: 'sentris-run-123' },
       },
     },
   })

@@ -1,4 +1,4 @@
-import { ToolInputSchema } from '@shipsec/component-sdk';
+import { ToolInputSchema } from '@sentris/component-sdk';
 
 /**
  * Tool discovered from an MCP server.

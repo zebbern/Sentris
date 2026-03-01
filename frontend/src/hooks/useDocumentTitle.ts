@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 
-const DEFAULT_TITLE = 'ShipSec Studio';
+const DEFAULT_TITLE = 'Sentris Flow';
 
 /**
- * Sets `document.title` to `"${title} | ShipSec Studio"` while the component
- * is mounted and resets to `"ShipSec Studio"` on unmount.
+ * Sets `document.title` to `"${title} | Sentris Flow"` while the component
+ * is mounted and resets to `"Sentris Flow"` on unmount.
  */
 export function useDocumentTitle(title: string): void {
   useEffect(() => {

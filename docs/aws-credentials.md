@@ -1,10 +1,10 @@
 # AWS Credential Management
 
-This document covers secure and effective ways to manage AWS credentials for ShipSec Studio MCP components, particularly AWS CloudTrail and AWS CloudWatch.
+This document covers secure and effective ways to manage AWS credentials for Sentris Flow MCP components, particularly AWS CloudTrail and AWS CloudWatch.
 
 ## Overview
 
-ShipSec Studio supports multiple methods for AWS credential management, ranging from simple environment variables to advanced IAM roles with EKS integration.
+Sentris Flow supports multiple methods for AWS credential management, ranging from simple environment variables to advanced IAM roles with EKS integration.
 
 ## Supported Credential Methods
 
@@ -35,7 +35,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-    image: shipsec/studio-backend:latest
+    image: sentris/studio-backend:latest
 
   worker:
     environment:
@@ -43,7 +43,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
-    image: shipsec/studio-worker:latest
+    image: sentris/studio-worker:latest
 ```
 
 ### 2. Backend Configuration File
@@ -88,18 +88,18 @@ The most secure method for production environments.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: shipsec-studio
+  name: sentris-flow
 spec:
   replicas: 1
   template:
     spec:
-      serviceAccountName: shipsec-studio-sa
+      serviceAccountName: sentris-flow-sa
       containers:
         - name: backend
-          image: shipsec/studio-backend:latest
+          image: sentris/studio-backend:latest
           env:
             - name: AWS_ROLE_ARN
-              value: arn:aws:iam::123456789012:role/ShipSecBackendRole
+              value: arn:aws:iam::123456789012:role/SentrisBackendRole
             - name: AWS_WEB_IDENTITY_TOKEN_FILE
               value: /var/run/secrets/eks.amazonaws.com/serviceaccount/token
           volumeMounts:
@@ -143,17 +143,17 @@ spec:
 
 ```json
 {
-  "family": "shipsec-studio",
-  "taskRoleArn": "arn:aws:iam::123456789012:role/ShipSecTaskRole",
-  "executionRoleArn": "arn:aws:iam::123456789012:role/ShipSecExecutionRole",
+  "family": "sentris-flow",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/SentrisTaskRole",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/SentrisExecutionRole",
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "shipsec/studio-backend:latest",
+      "image": "sentris/studio-backend:latest",
       "environment": [
         {
           "name": "AWS_ROLE_ARN",
-          "value": "arn:aws:iam::123456789012:role/ShipSecTaskRole"
+          "value": "arn:aws:iam::123456789012:role/SentrisTaskRole"
         }
       ]
     }
@@ -173,7 +173,7 @@ aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 aws_session_token = AQoEXAMPLEH4aoAH0gNCAPyJxz4BlCFFxWNE1OPTgk5TthT+FvwqnKwRcOIfrRh3c/LTo6UDdyJwOOvEVPvLXCrrrUtdnniCEXAMPLE/IvU1dYUg2RVAJBanLiHb4IgPzxj4XvrJOgQP0KM4T
 
-[shipsec-studio]
+[sentris-flow]
 aws_access_key_id = AKIAIOSFODNN7EXAMPLE
 aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 region = us-east-1
@@ -182,7 +182,7 @@ region = us-east-1
 #### ~/.aws/config
 
 ```ini
-[profile shipsec-studio]
+[profile sentris-flow]
 region = us-east-1
 output = json
 ```
@@ -195,13 +195,13 @@ Secure credential management for production.
 
 ```bash
 # Store access key
-aws ssm put-parameter --name "/shipsec/access-key" --value "AKIAIOSFODNN7EXAMPLE" --type "SecureString"
+aws ssm put-parameter --name "/sentris/access-key" --value "AKIAIOSFODNN7EXAMPLE" --type "SecureString"
 
 # Store secret key
-aws ssm put-parameter --name "/shipsec/secret-key" --value "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" --type "SecureString"
+aws ssm put-parameter --name "/sentris/secret-key" --value "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" --type "SecureString"
 
 # Store region
-aws ssm put-parameter --name "/shipsec/region" --value "us-east-1" --type "String"
+aws ssm put-parameter --name "/sentris/region" --value "us-east-1" --type "String"
 ```
 
 #### IAM Policy for SSM Access
@@ -213,7 +213,7 @@ aws ssm put-parameter --name "/shipsec/region" --value "us-east-1" --type "Strin
     {
       "Effect": "Allow",
       "Action": ["ssm:GetParameters", "ssm:GetParameter"],
-      "Resource": "arn:aws:ssm:us-east-1:123456789012:parameter/shipsec/*"
+      "Resource": "arn:aws:ssm:us-east-1:123456789012:parameter/sentris/*"
     }
   ]
 }
@@ -296,7 +296,7 @@ Implement automated credential rotation.
         "iam:CreateAccessKey",
         "iam:UpdateAccessKey"
       ],
-      "Resource": "arn:aws:iam::123456789012:user/ShipSecUser"
+      "Resource": "arn:aws:iam::123456789012:user/SentrisUser"
     }
   ]
 }
@@ -318,14 +318,14 @@ echo ".env" >> .gitignore
 
 ### 1. CloudTrail Logging
 
-Enable CloudTrail for all API calls made by ShipSec Studio.
+Enable CloudTrail for all API calls made by Sentris Flow.
 
 #### CloudTrail Configuration
 
 ```json
 {
-  "Name": "ShipSecStudioTrail",
-  "S3BucketName": "shipsec-cloudtrail-logs-123456789012",
+  "Name": "SentrisStudioTrail",
+  "S3BucketName": "sentris-cloudtrail-logs-123456789012",
   "IncludeServiceNames": ["cloudtrail", "cloudwatch", "logs"],
   "IsMultiRegionTrail": true,
   "IsLogging": true
@@ -340,7 +340,7 @@ Monitor credential usage and API calls.
 
 ```json
 {
-  "AlarmName": "ShipSecAPIErrorRate",
+  "AlarmName": "SentrisAPIErrorRate",
   "MetricName": "Sum",
   "Namespace": "AWS/CloudTrail",
   "Statistic": "Sum",
@@ -351,7 +351,7 @@ Monitor credential usage and API calls.
   "Dimensions": [
     {
       "Name": "TrailName",
-      "Value": "ShipSecStudioTrail"
+      "Value": "SentrisStudioTrail"
     }
   ]
 }
@@ -368,7 +368,7 @@ Monitor credential usage and API calls.
 aws sts get-caller-identity
 
 # Verify permissions
-aws iam get-user --user-name ShipSecUser
+aws iam get-user --user-name SentrisUser
 ```
 
 **Region Mismatch**
@@ -398,7 +398,7 @@ aws ec2 describe-vpcs
 curl -X GET "http://localhost:3000/api/v1/mcp-servers" -H "Content-Type: application/json"
 
 # Check worker health
-docker logs shipsec-studio-worker
+docker logs sentris-flow-worker
 
 # Verify backend configuration
 bun --cwd backend run config:validate
@@ -427,10 +427,10 @@ kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: shipsec-studio-sa
+  name: sentris-flow-sa
   namespace: production
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/ShipSecStudioRole
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/SentrisStudioRole
 EOF
 ```
 
@@ -456,5 +456,5 @@ steps:
 
 - [AWS IAM Documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/)
 - [AWS Security Best Practices](https://docs.aws.amazon.com/security-guide/latest/)
-- [ShipSec Studio MCP Documentation](./mcp-library.md)
-- [ShipSec Studio Architecture](https://docs.shipsec.ai)
+- [Sentris Flow MCP Documentation](./mcp-library.md)
+- [Sentris Flow Architecture](https://docs.sentris.ai)

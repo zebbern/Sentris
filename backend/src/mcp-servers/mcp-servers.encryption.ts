@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SecretEncryption, parseMasterKey, SecretEncryptionMaterial } from '@shipsec/shared';
+import { SecretEncryption, parseMasterKey, SecretEncryptionMaterial } from '@sentris/shared';
 import type { SecretsConfig } from '../config';
 
 const FALLBACK_DEV_KEY = '0123456789abcdef0123456789abcdef';

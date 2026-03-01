@@ -1,7 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
-import type { ExecutionTriggerMetadata } from '@shipsec/shared';
+import type { ExecutionTriggerMetadata } from '@sentris/shared';
 
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';

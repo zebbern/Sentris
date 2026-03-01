@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { SecretEncryptionMaterial } from '@shipsec/shared';
+import { SecretEncryptionMaterial } from '@sentris/shared';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import {

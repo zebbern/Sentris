@@ -12,7 +12,7 @@ import {
   outputs,
   parameters,
   param,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 const variableConfigSchema = z.object({
   name: z.string().min(1),
@@ -158,7 +158,7 @@ plugin({
 `;
 
 // Harness code that runs the user script
-// Output is written to the file at SHIPSEC_OUTPUT_PATH (mounted from host)
+// Output is written to the file at SENTRIS_OUTPUT_PATH (mounted from host)
 const harnessCode = `
 import { readFileSync, writeFileSync } from "node:fs";
 
@@ -167,7 +167,7 @@ async function run() {
     console.log('[Script] Starting execution...');
     
     // Read the combined payload from the mounted input file
-    const inputPath = process.env.SHIPSEC_INPUT_PATH || '/shipsec-output/input.json';
+    const inputPath = process.env.SENTRIS_INPUT_PATH || '/sentris-output/input.json';
     const payload = JSON.parse(readFileSync(inputPath, 'utf8'));
     
     // 1. Write user script to file so it can be imported
@@ -192,7 +192,7 @@ async function run() {
     const result = await script(inputValues);
     
     console.log('[Script] Execution completed, writing output...');
-    const OUTPUT_PATH = process.env.SHIPSEC_OUTPUT_PATH || '/shipsec-output/result.json';
+    const OUTPUT_PATH = process.env.SENTRIS_OUTPUT_PATH || '/sentris-output/result.json';
     const OUTPUT_DIR = OUTPUT_PATH.substring(0, OUTPUT_PATH.lastIndexOf('/'));
     
     try {
@@ -248,7 +248,7 @@ const definition = defineComponent({
     category: 'transform',
     description: 'Execute custom TypeScript in a secure Docker sandbox.',
     icon: 'Code',
-    author: { name: 'ShipSecAI', type: 'shipsecai' },
+    author: { name: 'SentrisAI', type: 'sentris' },
     isLatest: true,
     deprecated: false,
   },
@@ -306,7 +306,7 @@ const definition = defineComponent({
       ...baseRunner,
       command: ['-c', shellCommand],
       env: {
-        // No SHIPSEC_INPUTS here to avoid E2BIG
+        // No SENTRIS_INPUTS here to avoid E2BIG
       },
     };
 

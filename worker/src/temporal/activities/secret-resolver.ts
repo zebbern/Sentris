@@ -11,7 +11,7 @@ import {
   type ComponentDefinition,
   type ComponentPortMetadata,
   type ISecretsService,
-} from '@shipsec/component-sdk';
+} from '@sentris/component-sdk';
 
 /**
  * Resolve secret references found in `inputOverrides` and write the

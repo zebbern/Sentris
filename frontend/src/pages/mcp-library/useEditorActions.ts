@@ -9,7 +9,7 @@ import {
 } from '@/hooks/queries/useMcpServerQueries';
 import { queryKeys } from '@/lib/queryKeys';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
-import type { CreateMcpServer } from '@shipsec/shared';
+import type { CreateMcpServer } from '@sentris/shared';
 import type { ServerFormData, HeaderEntry, DiscoveryStatusState } from './types';
 import { INITIAL_FORM_DATA } from './types';
 import { formDataToJson as utilFormDataToJson, buildHeadersPayload } from './utils';

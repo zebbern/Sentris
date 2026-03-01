@@ -19,7 +19,7 @@ interface BadgeConfig {
 
 const BADGE_CONFIGS: Record<BadgeType, BadgeConfig> = {
   official: {
-    label: 'ShipSecAI',
+    label: 'SentrisAI',
     variant: 'default',
     icon: Shield,
   },

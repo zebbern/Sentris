@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SecretEncryptionMaterial } from '@shipsec/shared';
+import { SecretEncryptionMaterial } from '@sentris/shared';
 import { randomBytes, createHash } from 'crypto';
 
 import {

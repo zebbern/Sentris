@@ -6,7 +6,7 @@ const cleanup = globalJsdom('<!doctype html><html><body></body></html>', {
 });
 
 if (cleanup) {
-  (globalThis as any).__SHIPSEC_JS_DOM_CLEANUP__ = cleanup;
+  (globalThis as any).__SENTRIS_JS_DOM_CLEANUP__ = cleanup;
 }
 
 if (typeof window !== 'undefined' && window.HTMLElement) {

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'bun:test';
-import { createExecutionContext, type IArtifactService } from '@shipsec/component-sdk';
+import { createExecutionContext, type IArtifactService } from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { ArtifactWriterInput, ArtifactWriterOutput } from '../artifact-writer';
 

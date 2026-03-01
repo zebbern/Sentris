@@ -3,8 +3,8 @@ import type {
   DestinationSaveInput,
   DestinationSaveResult,
 } from '../registry';
-import type { ArtifactDestination } from '@shipsec/shared';
-import { ConfigurationError } from '@shipsec/component-sdk';
+import type { ArtifactDestination } from '@sentris/shared';
+import { ConfigurationError } from '@sentris/component-sdk';
 
 interface _ArtifactAdapterConfig {
   destinations?: ArtifactDestination[];

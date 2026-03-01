@@ -1,5 +1,5 @@
-import { createShipSecClient } from '@shipsec/backend-client';
-import type { RunArtifactsResponse } from '@shipsec/shared';
+import { createSentrisClient } from '@sentris/backend-client';
+import type { RunArtifactsResponse } from '@sentris/shared';
 import { useAuthStore } from '@/store/authStore';
 import { getFreshClerkToken } from '@/utils/clerk-token';
 import { apiClient, getAuthHeaders, API_BASE_URL, API_V1_URL, type ApiResponse } from './client';
@@ -248,7 +248,7 @@ export const executionsApi = {
       endTime?: string;
     },
   ) => {
-    const client = createShipSecClient({
+    const client = createSentrisClient({
       baseUrl: API_BASE_URL,
       middleware: {
         async onRequest({ request }) {

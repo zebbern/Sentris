@@ -9,8 +9,8 @@ import {
   port,
   param,
   withPortMeta,
-} from '@shipsec/component-sdk';
-import type { PortMeta } from '@shipsec/component-sdk/port-meta';
+} from '@sentris/component-sdk';
+import type { PortMeta } from '@sentris/component-sdk/port-meta';
 
 // Runtime input definition schema
 const runtimeInputDefinitionSchema = z.preprocess(
@@ -84,8 +84,8 @@ const definition = defineComponent({
       'Starts a workflow and captures runtime inputs from manual/API/scheduled invocations.',
     icon: 'Play',
     author: {
-      name: 'ShipSecAI',
-      type: 'shipsecai',
+      name: 'SentrisAI',
+      type: 'sentris',
     },
     isLatest: true,
     deprecated: false,

@@ -14,7 +14,7 @@ import {
   type WebhookInputDefinition,
   type TestWebhookScriptResponse,
   type WebhookUrlResponse,
-} from '@shipsec/shared';
+} from '@sentris/shared';
 import type { AuthContext } from '../auth/types';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { TemporalService } from '../temporal/temporal.service';
@@ -40,7 +40,7 @@ export class WebhooksService {
   ) {
     this.webhookBaseUrl = this.configService.get<string>(
       'app.webhookBaseUrl',
-      'https://api.shipsec.ai',
+      'https://api.sentris.ai',
     );
   }
 

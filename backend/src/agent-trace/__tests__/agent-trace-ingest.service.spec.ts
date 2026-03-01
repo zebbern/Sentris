@@ -8,7 +8,7 @@ import type { KafkaConfig } from '../../config';
 function createMockConfigService(overrides: Partial<KafkaConfig> = {}): ConfigService {
   const kafkaConfig: KafkaConfig = {
     brokers: process.env.LOG_KAFKA_BROKERS ?? '',
-    instanceId: process.env.SHIPSEC_INSTANCE,
+    instanceId: process.env.SENTRIS_INSTANCE,
     agentTraceGroupId: process.env.AGENT_TRACE_KAFKA_GROUP_ID,
     agentTraceClientId: process.env.AGENT_TRACE_KAFKA_CLIENT_ID,
     nodeIoGroupId: undefined,
@@ -41,7 +41,7 @@ describe('AgentTraceIngestService', () => {
   beforeEach(() => {
     restoreEnv();
     process.env.LOG_KAFKA_BROKERS = 'localhost:19092';
-    delete process.env.SHIPSEC_INSTANCE;
+    delete process.env.SENTRIS_INSTANCE;
     delete process.env.AGENT_TRACE_KAFKA_GROUP_ID;
     delete process.env.AGENT_TRACE_KAFKA_CLIENT_ID;
   });
@@ -50,7 +50,7 @@ describe('AgentTraceIngestService', () => {
     restoreEnv();
   });
 
-  test('uses legacy defaults when SHIPSEC_INSTANCE is unset', () => {
+  test('uses legacy defaults when SENTRIS_INSTANCE is unset', () => {
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;
     const service = new AgentTraceIngestService(
       repository,
@@ -60,12 +60,12 @@ describe('AgentTraceIngestService', () => {
       kafkaClientId: string;
     };
 
-    expect(service.kafkaGroupId).toBe('shipsec-agent-trace-ingestor');
-    expect(service.kafkaClientId).toBe('shipsec-backend-agent-trace');
+    expect(service.kafkaGroupId).toBe('sentris-agent-trace-ingestor');
+    expect(service.kafkaClientId).toBe('sentris-backend-agent-trace');
   });
 
-  test('uses instance-scoped defaults when SHIPSEC_INSTANCE is set', () => {
-    process.env.SHIPSEC_INSTANCE = '7';
+  test('uses instance-scoped defaults when SENTRIS_INSTANCE is set', () => {
+    process.env.SENTRIS_INSTANCE = '7';
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;
     const service = new AgentTraceIngestService(
       repository,
@@ -75,12 +75,12 @@ describe('AgentTraceIngestService', () => {
       kafkaClientId: string;
     };
 
-    expect(service.kafkaGroupId).toBe('shipsec-agent-trace-ingestor-7');
-    expect(service.kafkaClientId).toBe('shipsec-backend-agent-trace-7');
+    expect(service.kafkaGroupId).toBe('sentris-agent-trace-ingestor-7');
+    expect(service.kafkaClientId).toBe('sentris-backend-agent-trace-7');
   });
 
   test('prefers explicit env vars over defaults', () => {
-    process.env.SHIPSEC_INSTANCE = '3';
+    process.env.SENTRIS_INSTANCE = '3';
     process.env.AGENT_TRACE_KAFKA_GROUP_ID = 'custom-agent-trace-group';
     process.env.AGENT_TRACE_KAFKA_CLIENT_ID = 'custom-agent-trace-client';
     const repository = { append: async () => undefined } as unknown as AgentTraceRepository;

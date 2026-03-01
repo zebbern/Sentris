@@ -8,7 +8,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { WebhookDetails } from '../WebhookDetails';
 import { formatScheduleTimestamp, scheduleStatusVariant } from '../schedules-utils';
-import type { WorkflowSchedule } from '@shipsec/shared';
+import type { WorkflowSchedule } from '@sentris/shared';
 
 export interface ConfigPanelSchedulesProps {
   workflowId: string | null | undefined;
