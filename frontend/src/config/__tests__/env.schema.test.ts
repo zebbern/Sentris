@@ -34,11 +34,11 @@ describe('frontendEnvSchema', () => {
     }
   });
 
-  it('VITE_ENABLE_CONNECTIONS=undefined → false', () => {
+  it('VITE_ENABLE_CONNECTIONS=undefined → true (default)', () => {
     const result = frontendEnvSchema.safeParse({});
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.VITE_ENABLE_CONNECTIONS).toBe(false);
+      expect(result.data.VITE_ENABLE_CONNECTIONS).toBe(true);
     }
   });
 
