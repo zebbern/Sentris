@@ -48,7 +48,7 @@ export function GroupTemplatesSection({
   onClearDiscoveryPreview,
 }: GroupTemplatesSectionProps) {
   return (
-    <div className="mb-6">
+    <div id="group-templates-section" className="mb-6">
       <div className="flex items-center gap-3 mb-4">
         <Layers className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Group templates</h2>

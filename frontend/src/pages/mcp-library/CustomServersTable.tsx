@@ -78,7 +78,7 @@ export function CustomServersTable({
       <div className="border rounded-lg">
         <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
           <Table>
-            <ServerTableHeader showDragHandle />
+            {(servers.length > 0 || isLoading) && <ServerTableHeader showDragHandle />}
             <TableBody>
               {isLoading && servers.length === 0 ? (
                 Array.from({ length: 3 }).map((_, i) => (

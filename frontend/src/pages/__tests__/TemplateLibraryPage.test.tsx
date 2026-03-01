@@ -1,4 +1,5 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Template, TemplateCategory } from '@/types/templates';
@@ -32,6 +33,7 @@ let mockRoles: string[] = ['ADMIN'];
 
 // --- DnD-kit: passthrough mocks ---
 mock.module('@dnd-kit/core', () => ({
+  ...realModuleExports('@dnd-kit/core'),
   DndContext: ({ children }: any) => <>{children}</>,
   useSensor: () => ({}),
   useSensors: () => [],
@@ -41,6 +43,7 @@ mock.module('@dnd-kit/core', () => ({
 }));
 
 mock.module('@dnd-kit/sortable', () => ({
+  ...realModuleExports('@dnd-kit/sortable'),
   SortableContext: ({ children }: any) => <>{children}</>,
   rectSortingStrategy: {},
   verticalListSortingStrategy: {},
@@ -147,8 +150,9 @@ mock.module('@/hooks/queries/useTemplateQueries', () => ({
 }));
 
 // --- Auth store ---
-mock.module('@/store/authStore', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
+mock.module('@/store/authStore', () => {
+  const real = realModuleExports('@/store/authStore');
+  const useAuthStore: any = (selector?: (state: any) => any) => {
     const state = {
       token: 'test-token',
       userId: 'user-1',
@@ -157,37 +161,54 @@ mock.module('@/store/authStore', () => ({
       provider: 'local' as const,
     };
     return selector ? selector(state) : state;
-  },
-}));
+  };
+  useAuthStore.setState = (_partial: any) => {};
+  useAuthStore.getState = () => ({
+    token: 'test-token',
+    userId: 'user-1',
+    organizationId: 'org-001',
+    roles: mockRoles,
+    provider: 'local',
+  });
+  useAuthStore.subscribe = () => () => {};
+  useAuthStore.persist = { clearStorage: async () => {} };
+  return { ...real, useAuthStore, DEFAULT_ORG_ID: 'local-dev' };
+});
 
 // --- Auth utility ---
 mock.module('@/utils/auth', () => ({
+  ...realModuleExports('@/utils/auth'),
   hasAdminRole: (roles: string[]) => roles.includes('ADMIN'),
 }));
 
 // --- Toast ---
 const mockToast = mock((_opts: any) => {});
 mock.module('@/components/ui/use-toast', () => ({
+  ...realModuleExports('@/components/ui/use-toast'),
   useToast: () => ({ toast: mockToast }),
 }));
 
 // --- Analytics events ---
 mock.module('@/features/analytics/events', () => ({
+  ...realModuleExports('@/features/analytics/events'),
   track: mock(() => {}),
   Events: { TemplateUseClicked: 'template_use_clicked' },
 }));
 
 // --- UseTemplateModal / WorkflowPreview (stub) ---
 mock.module('@/features/templates/UseTemplateModal', () => ({
+  ...realModuleExports('@/features/templates/UseTemplateModal'),
   UseTemplateModal: () => null,
 }));
 
 mock.module('@/features/templates/WorkflowPreview', () => ({
+  ...realModuleExports('@/features/templates/WorkflowPreview'),
   WorkflowPreview: () => <div data-testid="workflow-preview">preview</div>,
 }));
 
 // --- humanizeApiError ---
 mock.module('@/lib/humanizeApiError', () => ({
+  ...realModuleExports('@/lib/humanizeApiError'),
   humanizeApiError: (err: any) => err?.message ?? 'Unknown error',
 }));
 
@@ -274,6 +295,26 @@ const renderPage = () =>
 // Tests
 // ---------------------------------------------------------------------------
 
+afterAll(() =>
+  restoreMockedModules([
+    '@dnd-kit/core',
+    '@dnd-kit/sortable',
+    '@/components/ui/sortable-card',
+    '@/hooks/useSortableList',
+    '@/components/ui/dialog',
+    '@/components/ui/tooltip',
+    '@/components/ui/select',
+    '@/hooks/queries/useTemplateQueries',
+    '@/store/authStore',
+    '@/utils/auth',
+    '@/components/ui/use-toast',
+    '@/features/analytics/events',
+    '@/features/templates/UseTemplateModal',
+    '@/features/templates/WorkflowPreview',
+    '@/lib/humanizeApiError',
+  ]),
+);
+
 describe('TemplateLibraryPage', () => {
   beforeEach(() => {
     cleanup();
@@ -286,7 +327,7 @@ describe('TemplateLibraryPage', () => {
 
   it('renders without crashing', () => {
     renderPage();
-    expect(screen.getByPlaceholderText('Search templates...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Filter by template name')).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {
@@ -377,7 +418,7 @@ describe('TemplateLibraryPage', () => {
     setupStore();
     renderPage();
 
-    const searchInput = screen.getByPlaceholderText('Search templates...');
+    const searchInput = screen.getByPlaceholderText('Filter by template name');
     fireEvent.change(searchInput, { target: { value: 'recon' } });
     expect((searchInput as HTMLInputElement).value).toBe('recon');
   });

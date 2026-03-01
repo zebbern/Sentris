@@ -338,7 +338,7 @@ export function McpLibraryPage() {
       <PageToolbar
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search servers..."
+        searchPlaceholder="Filter by server name"
         actions={
           <>
             <Button

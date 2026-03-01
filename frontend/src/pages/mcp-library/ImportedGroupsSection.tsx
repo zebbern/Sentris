@@ -125,6 +125,25 @@ export function ImportedGroupsSection({
             <p className="text-muted-foreground text-sm">
               {searchQuery ? 'No imported groups match your search.' : 'No groups imported yet.'}
             </p>
+            {!searchQuery && (
+              <>
+                <p className="text-muted-foreground text-xs mt-2 max-w-md text-center">
+                  Import curated MCP groups from the templates above to auto-register servers and
+                  discover tools.
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    document
+                      .getElementById('group-templates-section')
+                      ?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Browse group templates
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (

@@ -1,4 +1,5 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -190,6 +191,7 @@ mock.module('@/hooks/queries/useMcpGroupQueries', () => ({
 const mockInvalidateQueries = mock().mockResolvedValue(undefined);
 
 mock.module('@tanstack/react-query', () => ({
+  ...realModuleExports('@tanstack/react-query'),
   useQueryClient: () => ({
     invalidateQueries: mockInvalidateQueries,
   }),
@@ -317,6 +319,19 @@ const renderPage = () =>
   );
 
 // --- Tests ---
+afterAll(() =>
+  restoreMockedModules([
+    '@/components/ui/dialog',
+    '@/components/ui/alert-dialog',
+    '@/components/ui/sheet',
+    '@/hooks/queries/useMcpServerQueries',
+    '@/hooks/queries/useMcpGroupQueries',
+    '@tanstack/react-query',
+    '@/services/mcpDiscoveryApi',
+    '@/config/env',
+  ]),
+);
+
 describe('McpLibraryPage', () => {
   beforeEach(async () => {
     cleanup();
@@ -376,7 +391,7 @@ describe('McpLibraryPage', () => {
   it('renders the search input', () => {
     renderPage();
 
-    const searchInput = screen.getByPlaceholderText(/Search servers/i);
+    const searchInput = screen.getByPlaceholderText(/Filter by server name/i);
     expect(searchInput).toBeInTheDocument();
   });
 
@@ -389,7 +404,7 @@ describe('McpLibraryPage', () => {
     expect(screen.getByText('Filesystem MCP')).toBeInTheDocument();
 
     // Type in search
-    const searchInput = screen.getByPlaceholderText(/Search servers/i);
+    const searchInput = screen.getByPlaceholderText(/Filter by server name/i);
     fireEvent.change(searchInput, { target: { value: 'GitHub' } });
 
     // Only matching server remains
@@ -401,7 +416,7 @@ describe('McpLibraryPage', () => {
     setupStore();
     renderPage();
 
-    const searchInput = screen.getByPlaceholderText(/Search servers/i);
+    const searchInput = screen.getByPlaceholderText(/Filter by server name/i);
     fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
 
     expect(screen.getByText('No servers match your search')).toBeInTheDocument();

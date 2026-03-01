@@ -136,7 +136,7 @@ export function ApiKeysTable({
       <PageToolbar
         searchValue={searchQuery}
         onSearchChange={onSearchChange}
-        searchPlaceholder="Search API keys..."
+        searchPlaceholder="Filter by name or prefix"
         actions={
           <div className="flex items-center gap-2">
             <Button

@@ -235,15 +235,17 @@ export function AuditLogSettings() {
 
         <div className="overflow-x-auto">
           <Table className="table-fixed w-full">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[160px]">Time</TableHead>
-                <TableHead className="min-w-[120px]">Actor</TableHead>
-                <TableHead className="min-w-[200px]">Action</TableHead>
-                <TableHead className="min-w-[180px] hidden md:table-cell">Resource</TableHead>
-                <TableHead className="hidden sm:table-cell">Details</TableHead>
-              </TableRow>
-            </TableHeader>
+            {(items.length > 0 || isLoading) && (
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[160px]">Time</TableHead>
+                  <TableHead className="min-w-[120px]">Actor</TableHead>
+                  <TableHead className="min-w-[200px]">Action</TableHead>
+                  <TableHead className="min-w-[180px] hidden md:table-cell">Resource</TableHead>
+                  <TableHead className="hidden sm:table-cell">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+            )}
             <TableBody>
               {isLoading && !items.length
                 ? Array.from({ length: 5 }).map((_, index) => (
@@ -262,7 +264,11 @@ export function AuditLogSettings() {
                     <EmptyState
                       icon={ClipboardList}
                       title="No events found"
-                      description="Try adjusting your filters to see more results."
+                      description={
+                        hasActiveFilters
+                          ? 'Try adjusting your filters to see more results.'
+                          : 'Audit events will appear here as actions are performed across your organization.'
+                      }
                       action={
                         hasActiveFilters ? (
                           <Button variant="outline" onClick={clearFilters}>

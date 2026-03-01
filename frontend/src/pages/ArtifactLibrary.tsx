@@ -106,7 +106,7 @@ export function ArtifactLibrary() {
         <PageToolbar
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
-          searchPlaceholder="Search artifacts..."
+          searchPlaceholder="Filter by name or component"
           actions={
             <Button
               type="button"

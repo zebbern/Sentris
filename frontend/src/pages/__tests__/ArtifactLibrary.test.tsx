@@ -1,4 +1,5 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ArtifactMetadata } from '@sentris/shared';
@@ -29,6 +30,7 @@ let mockDownloadIsPending = false;
 
 // --- DnD-kit: passthrough mocks ---
 mock.module('@dnd-kit/core', () => ({
+  ...realModuleExports('@dnd-kit/core'),
   DndContext: ({ children }: any) => <>{children}</>,
   useSensor: () => ({}),
   useSensors: () => [],
@@ -38,6 +40,7 @@ mock.module('@dnd-kit/core', () => ({
 }));
 
 mock.module('@dnd-kit/sortable', () => ({
+  ...realModuleExports('@dnd-kit/sortable'),
   SortableContext: ({ children }: any) => <>{children}</>,
   verticalListSortingStrategy: {},
   useSortable: () => ({
@@ -100,6 +103,7 @@ const mockWorkflows = [
 ];
 
 mock.module('@/hooks/queries/useWorkflowQueries', () => ({
+  ...realModuleExports('@/hooks/queries/useWorkflowQueries'),
   useWorkflowsSummary: () => ({
     data: mockWorkflows,
     isLoading: false,
@@ -107,6 +111,7 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
 }));
 
 mock.module('@tanstack/react-query', () => ({
+  ...realModuleExports('@tanstack/react-query'),
   useQueryClient: () => ({
     invalidateQueries: mock(async () => {}),
   }),
@@ -129,12 +134,14 @@ mock.module('@/components/ui/confirm-dialog', () => ({
 // --- Toast ---
 const mockToast = mock((_opts: any) => {});
 mock.module('@/components/ui/use-toast', () => ({
+  ...realModuleExports('@/components/ui/use-toast'),
   useToast: () => ({ toast: mockToast }),
 }));
 
 // --- Auth store ---
-mock.module('@/store/authStore', () => ({
-  useAuthStore: (selector?: (state: any) => any) => {
+mock.module('@/store/authStore', () => {
+  const real = realModuleExports('@/store/authStore');
+  const useAuthStore: any = (selector?: (state: any) => any) => {
     const state = {
       token: 'test-token',
       userId: 'user-1',
@@ -143,17 +150,29 @@ mock.module('@/store/authStore', () => ({
       provider: 'local' as const,
     };
     return selector ? selector(state) : state;
-  },
-  DEFAULT_ORG_ID: 'default',
-}));
+  };
+  useAuthStore.setState = (_partial: any) => {};
+  useAuthStore.getState = () => ({
+    token: 'test-token',
+    userId: 'user-1',
+    organizationId: 'org-001',
+    roles: ['ADMIN'],
+    provider: 'local',
+  });
+  useAuthStore.subscribe = () => () => {};
+  useAuthStore.persist = { clearStorage: async () => {} };
+  return { ...real, useAuthStore, DEFAULT_ORG_ID: 'default' };
+});
 
 // --- Remote uploads utility ---
 mock.module('@/utils/artifacts', () => ({
+  ...realModuleExports('@/utils/artifacts'),
   getRemoteUploads: () => [],
 }));
 
 // --- Logger ---
 mock.module('@/lib/logger', () => ({
+  ...realModuleExports('@/lib/logger'),
   logger: { error: () => {}, warn: () => {}, info: () => {}, debug: () => {} },
 }));
 
@@ -226,6 +245,24 @@ const renderPage = () =>
 // Tests
 // ---------------------------------------------------------------------------
 
+afterAll(() =>
+  restoreMockedModules([
+    '@dnd-kit/core',
+    '@dnd-kit/sortable',
+    '@/components/ui/sortable',
+    '@/hooks/useSortableList',
+    '@/hooks/queries/useArtifactQueries',
+    '@/hooks/queries/useWorkflowQueries',
+    '@tanstack/react-query',
+    '@/hooks/useConfirmDialog',
+    '@/components/ui/confirm-dialog',
+    '@/components/ui/use-toast',
+    '@/store/authStore',
+    '@/utils/artifacts',
+    '@/lib/logger',
+  ]),
+);
+
 describe('ArtifactLibrary', () => {
   beforeEach(() => {
     cleanup();
@@ -239,7 +276,7 @@ describe('ArtifactLibrary', () => {
   it('renders without crashing', () => {
     renderPage();
     // The page should render the search input at minimum
-    expect(screen.getByPlaceholderText('Search artifacts...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Filter by name or component')).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {
@@ -313,7 +350,7 @@ describe('ArtifactLibrary', () => {
     setupStore();
     renderPage();
 
-    const searchInput = screen.getByPlaceholderText('Search artifacts...');
+    const searchInput = screen.getByPlaceholderText('Filter by name or component');
     expect(searchInput).toBeInTheDocument();
 
     // Typing in the search should update the input value
