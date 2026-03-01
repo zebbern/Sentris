@@ -31,26 +31,16 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
   }, [template.category, template.tags]);
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <article
       className={cn(
-        'group flex flex-col rounded-2xl cursor-pointer',
+        'group flex flex-col rounded-2xl',
         'bg-card dark:bg-zinc-900',
         'border border-border',
         'shadow-sm',
         'transition-all duration-300 ease-out',
         'hover:shadow-lg hover:-translate-y-1',
         'dark:hover:border-white/10',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       )}
-      onClick={() => onPreview(template)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onPreview(template);
-        }
-      }}
     >
       {/* Content wrapper with padding */}
       <div className="flex flex-col flex-1 p-5 md:p-6 gap-6">
@@ -88,7 +78,13 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
             className="text-xl font-semibold text-foreground leading-tight line-clamp-1"
             title={template.name}
           >
-            {toTitleCase(template.name)}
+            <button
+              type="button"
+              className="text-left hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              onClick={() => onPreview(template)}
+            >
+              {toTitleCase(template.name)}
+            </button>
           </h3>
 
           {template.description && (
@@ -210,7 +206,7 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 

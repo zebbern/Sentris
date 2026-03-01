@@ -14,6 +14,7 @@ interface SecretSelectProps {
   className?: string;
   onRefresh?: () => void;
   clearable?: boolean;
+  'aria-label'?: string;
 }
 
 /**
@@ -27,6 +28,7 @@ export function SecretSelect({
   className,
   onRefresh,
   clearable = true,
+  'aria-label': ariaLabel,
 }: SecretSelectProps) {
   const { data: secrets = [], isLoading: loading } = useSecrets();
   const queryClient = useQueryClient();
@@ -87,6 +89,7 @@ export function SecretSelect({
       emptyMessage="No secrets found in store"
       clearable={clearable}
       selectedLabel={selectedLabel}
+      aria-label={ariaLabel}
     />
   );
 }

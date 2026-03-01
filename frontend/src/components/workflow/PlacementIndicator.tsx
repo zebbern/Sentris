@@ -9,10 +9,11 @@ interface PlacementIndicatorProps {
  */
 export function PlacementIndicator({ componentName, onCancel }: PlacementIndicatorProps) {
   return (
-    <div className="absolute top-[52px] left-[10px] z-50">
+    <div className="absolute top-[52px] left-[10px] z-50" role="status" aria-live="polite">
       {/* Rotating border wrapper */}
       <div
         className="relative rounded-full p-[2px]"
+        data-placement-border
         style={{
           background:
             'conic-gradient(from var(--angle), hsl(var(--primary)) 0deg, transparent 60deg, transparent 300deg, hsl(var(--primary)) 360deg)',
@@ -58,6 +59,11 @@ export function PlacementIndicator({ componentName, onCancel }: PlacementIndicat
         @keyframes rotate-border {
           from { --angle: 0deg; }
           to { --angle: 360deg; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-placement-border] {
+            animation: none !important;
+          }
         }
       `}</style>
     </div>

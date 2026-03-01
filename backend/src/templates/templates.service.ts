@@ -182,23 +182,13 @@ export class TemplateService {
   private applySecretMappings(
     graph: Record<string, unknown>,
     secretMappings: Record<string, string>,
-    requiredSecrets: { name: string; type: string; description?: string; placeholder?: string }[],
+    _requiredSecrets: { name: string; type: string; description?: string; placeholder?: string }[],
   ): Record<string, unknown> {
     if (!secretMappings || Object.keys(secretMappings).length === 0) {
       return graph;
     }
 
-    const json = JSON.stringify(graph);
-
-    if (requiredSecrets.length === 1 && secretMappings[requiredSecrets[0].name]) {
-      const replaced = json.replace(
-        /\{\{SECRET_PLACEHOLDER\}\}/g,
-        secretMappings[requiredSecrets[0].name],
-      );
-      return JSON.parse(replaced);
-    }
-
-    const result = JSON.parse(json);
+    const result = structuredClone(graph);
     this.traverseAndApplySecrets(result, secretMappings);
     return result;
   }

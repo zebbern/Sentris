@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface UseSwipeGestureOptions {
   /** Whether to enable swipe gesture detection */
@@ -30,7 +30,7 @@ export function useSwipeGesture({
   edgeZone = 30,
   threshold = 50,
 }: UseSwipeGestureOptions): void {
-  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const touchStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,11 +39,11 @@ export function useSwipeGesture({
       const x = e.touches[0].clientX;
       // Start tracking if touching near the left edge to open
       if (!isOpen && x < edgeZone) {
-        setTouchStart(x);
+        touchStartRef.current = x;
       }
       // Or if panel is already open, track anywhere to detect closing swipe
       else if (isOpen) {
-        setTouchStart(x);
+        touchStartRef.current = x;
       }
     };
 
@@ -52,13 +52,13 @@ export function useSwipeGesture({
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
-      if (touchStart === null) return;
+      if (touchStartRef.current === null) return;
 
       const endX = e.changedTouches[0].clientX;
-      const diff = endX - touchStart;
+      const diff = endX - touchStartRef.current;
 
       // Swipe right to open
-      if (!isOpen && diff > threshold && touchStart < edgeZone) {
+      if (!isOpen && diff > threshold && touchStartRef.current < edgeZone) {
         onOpen();
       }
       // Swipe left to close
@@ -66,7 +66,7 @@ export function useSwipeGesture({
         onClose();
       }
 
-      setTouchStart(null);
+      touchStartRef.current = null;
     };
 
     window.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -78,5 +78,5 @@ export function useSwipeGesture({
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [enabled, isOpen, touchStart, edgeZone, threshold, onOpen, onClose]);
+  }, [enabled, isOpen, edgeZone, threshold, onOpen, onClose]);
 }

@@ -64,6 +64,7 @@ export function SecretField({
       {secretsError && <p className="text-sm text-destructive">{secretsError}</p>}
 
       <SecretSelect
+        aria-label="Select a secret"
         value={typeof value === 'string' ? value : ''}
         onChange={(nextValue) => {
           if (isReceivingInput) return;

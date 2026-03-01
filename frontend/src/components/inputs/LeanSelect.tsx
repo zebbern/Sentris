@@ -24,6 +24,7 @@ interface LeanSelectProps {
   emptyMessage?: string;
   clearable?: boolean;
   selectedLabel?: string;
+  'aria-label'?: string;
 }
 
 /**
@@ -43,6 +44,7 @@ export function LeanSelect({
   emptyMessage = 'No options found',
   clearable = false,
   selectedLabel,
+  'aria-label': ariaLabel,
 }: LeanSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,6 +96,7 @@ export function LeanSelect({
           role="combobox"
           aria-expanded={isOpen}
           aria-haspopup="listbox"
+          aria-label={ariaLabel}
           tabIndex={disabled ? -1 : 0}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           onKeyDown={(e) => {

@@ -109,6 +109,7 @@ export function ConnectionSelector({
         }}
         className="w-full px-3 py-2 text-sm border rounded-md bg-background"
         disabled={isDisabled}
+        aria-label="Select GitHub connection"
       >
         <option value="">Select a GitHub connection…</option>
         {githubConnections.map((connection) => (
