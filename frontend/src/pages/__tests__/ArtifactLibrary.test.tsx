@@ -276,7 +276,7 @@ describe('ArtifactLibrary', () => {
   it('renders without crashing', () => {
     renderPage();
     // The page should render the search input at minimum
-    expect(screen.getByPlaceholderText('Filter by name or component')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Filter by name...')).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {
@@ -350,7 +350,7 @@ describe('ArtifactLibrary', () => {
     setupStore();
     renderPage();
 
-    const searchInput = screen.getByPlaceholderText('Filter by name or component');
+    const searchInput = screen.getByPlaceholderText('Filter by name...');
     expect(searchInput).toBeInTheDocument();
 
     // Typing in the search should update the input value

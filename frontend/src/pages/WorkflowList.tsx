@@ -236,7 +236,7 @@ export function WorkflowList() {
                         </Tooltip>
                       </TooltipProvider>
                     </TableHead>
-                    <TableHead className="hidden lg:table-cell">
+                    <TableHead className="hidden lg:table-cell whitespace-nowrap">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -351,7 +351,7 @@ export function WorkflowList() {
                           </Tooltip>
                         </TooltipProvider>
                       </TableHead>
-                      <TableHead className="min-w-[140px] hidden lg:table-cell">
+                      <TableHead className="min-w-[140px] hidden lg:table-cell whitespace-nowrap">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
