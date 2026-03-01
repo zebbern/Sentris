@@ -120,62 +120,54 @@ describe('WorkflowsService', () => {
     return record;
   };
 
+  const makeWorkflowRecord = (overrides: Record<string, unknown> = {}) => ({
+    id: 'workflow-id',
+    createdAt: new Date(now),
+    updatedAt: new Date(now),
+    name: sampleGraph.name,
+    description: sampleGraph.description ?? null,
+    graph: sampleGraph,
+    compiledDefinition: null,
+    organizationId: TEST_ORG,
+    lastRun: null,
+    runCount: 0,
+    ...overrides,
+  });
+
+  const deleteCalls: string[] = [];
+  const updateMetadataCalls: {
+    id: string;
+    metadata: { name: string; description?: string | null };
+  }[] = [];
+
   const repositoryMock = {
     async create() {
       createCalls += 1;
-      return {
-        id: 'workflow-id',
-        createdAt: new Date(now),
-        updatedAt: new Date(now),
-        name: sampleGraph.name,
-        description: sampleGraph.description ?? null,
-        graph: sampleGraph,
-        compiledDefinition: null,
-        organizationId: TEST_ORG,
-      };
+      return makeWorkflowRecord();
     },
     async update() {
-      return {
-        id: 'workflow-id',
-        createdAt: new Date(now),
-        updatedAt: new Date(now),
-        name: sampleGraph.name,
-        description: sampleGraph.description ?? null,
-        graph: sampleGraph,
-        compiledDefinition: null,
-        organizationId: TEST_ORG,
-      };
+      return makeWorkflowRecord();
     },
     async findById() {
-      return {
-        id: 'workflow-id',
-        createdAt: new Date(now),
-        updatedAt: new Date(now),
-        name: sampleGraph.name,
-        description: sampleGraph.description ?? null,
-        graph: sampleGraph,
-        compiledDefinition: null,
-        organizationId: TEST_ORG,
-      };
+      return makeWorkflowRecord();
     },
-    async delete() {
+    async delete(id: string) {
+      deleteCalls.push(id);
       return;
     },
     async list() {
       return [];
     },
+    async listSummary() {
+      return [];
+    },
+    async updateMetadata(id: string, metadata: { name: string; description?: string | null }) {
+      updateMetadataCalls.push({ id, metadata });
+      return makeWorkflowRecord({ name: metadata.name, description: metadata.description ?? null });
+    },
     async saveCompiledDefinition(_: string, definition: WorkflowDefinition) {
       savedDefinition = definition;
-      return {
-        id: 'workflow-id',
-        createdAt: new Date(now),
-        updatedAt: new Date(now),
-        name: sampleGraph.name,
-        description: sampleGraph.description ?? null,
-        graph: sampleGraph,
-        compiledDefinition: definition,
-        organizationId: TEST_ORG,
-      };
+      return makeWorkflowRecord({ compiledDefinition: definition });
     },
     async incrementRunCount() {
       return;
@@ -222,6 +214,21 @@ describe('WorkflowsService', () => {
           record.version === input.version &&
           (!input.organizationId || record.organizationId === input.organizationId),
       );
+    },
+    async findAllByWorkflowId(
+      workflowId: string,
+      options: { organizationId?: string | null } = {},
+    ) {
+      const list = workflowVersionsByWorkflow.get(workflowId) ?? [];
+      const filtered = options.organizationId
+        ? list.filter((record) => record.organizationId === options.organizationId)
+        : list;
+      return filtered.map((v) => ({
+        id: v.id,
+        workflowId: v.workflowId,
+        version: v.version,
+        createdAt: v.createdAt,
+      }));
     },
     async setCompiledDefinition(
       id: string,
@@ -396,6 +403,8 @@ describe('WorkflowsService', () => {
     savedDefinition = null;
     storedRunMeta = null;
     completedCount = 0;
+    deleteCalls.length = 0;
+    updateMetadataCalls.length = 0;
     resetWorkflowVersions();
 
     const temporalService = buildTemporalStub();
@@ -646,5 +655,236 @@ describe('WorkflowsService', () => {
         applicationFailureDetails: { node: 'node-1' },
       },
     });
+  });
+
+  // ── findById ──────────────────────────────────────────────────────────────
+
+  it('returns a workflow by id with version info', async () => {
+    createWorkflowVersionRecord('workflow-id');
+    const result = await service.findById('workflow-id', authContext);
+    expect(result.id).toBe('workflow-id');
+    expect(result.name).toBe(sampleGraph.name);
+    expect(result.currentVersionId).toBeDefined();
+    expect(result.currentVersion).toBe(1);
+    expect(result.graph).toBeDefined();
+  });
+
+  it('throws NotFoundException when workflow does not exist', async () => {
+    repositoryMock.findById = async () => undefined;
+    await expect(service.findById('missing-id', authContext)).rejects.toThrow('not found');
+  });
+
+  it('scopes findById to the organization from auth context', async () => {
+    let capturedOrgId: string | null | undefined;
+    repositoryMock.findById = async (_id: string, options?: { organizationId?: string | null }) => {
+      capturedOrgId = options?.organizationId;
+      return makeWorkflowRecord();
+    };
+    createWorkflowVersionRecord('workflow-id');
+    await service.findById('workflow-id', authContext);
+    expect(capturedOrgId).toBe(TEST_ORG);
+  });
+
+  // ── list ───────────────────────────────────────────────────────────────────
+
+  it('returns an empty list when no workflows exist', async () => {
+    const result = await service.list(authContext);
+    expect(result).toEqual([]);
+  });
+
+  it('returns workflows with version information', async () => {
+    const records = [
+      makeWorkflowRecord({ id: 'wf-1', name: 'Workflow One' }),
+      makeWorkflowRecord({ id: 'wf-2', name: 'Workflow Two' }),
+    ];
+    repositoryMock.list = async () => records as any;
+    createWorkflowVersionRecord('wf-1');
+    createWorkflowVersionRecord('wf-2');
+
+    const result = await service.list(authContext);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('wf-1');
+    expect(result[0].currentVersionId).toBeDefined();
+    expect(result[1].id).toBe('wf-2');
+    expect(result[1].currentVersionId).toBeDefined();
+  });
+
+  it('scopes list to the organization from auth context', async () => {
+    let capturedOrgId: string | null | undefined;
+    repositoryMock.list = async (options?: { organizationId?: string | null }) => {
+      capturedOrgId = options?.organizationId;
+      return [];
+    };
+    await service.list(authContext);
+    expect(capturedOrgId).toBe(TEST_ORG);
+  });
+
+  // ── listSummary ────────────────────────────────────────────────────────────
+
+  it('returns workflow summaries with serialized dates', async () => {
+    const lastRunDate = new Date('2025-06-15T10:00:00Z');
+    const createdDate = new Date('2025-01-01T00:00:00Z');
+    const updatedDate = new Date('2025-06-15T10:00:00Z');
+    (repositoryMock as any).listSummary = async () => [
+      {
+        id: 'wf-1',
+        name: 'Summary Workflow',
+        description: 'desc',
+        organizationId: TEST_ORG,
+        lastRun: lastRunDate,
+        latestRunStatus: 'COMPLETED',
+        runCount: 5,
+        nodeCount: 3,
+        createdAt: createdDate,
+        updatedAt: updatedDate,
+      },
+    ];
+
+    const summaries = await service.listSummary(authContext);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].id).toBe('wf-1');
+    expect(summaries[0].name).toBe('Summary Workflow');
+    expect(summaries[0].lastRun).toBe(lastRunDate.toISOString());
+    expect(summaries[0].latestRunStatus).toBe('COMPLETED');
+    expect(summaries[0].runCount).toBe(5);
+    expect(summaries[0].nodeCount).toBe(3);
+    expect(summaries[0].createdAt).toBe(createdDate.toISOString());
+    expect(summaries[0].updatedAt).toBe(updatedDate.toISOString());
+  });
+
+  it('returns null lastRun when workflow has never been run', async () => {
+    (repositoryMock as any).listSummary = async () => [
+      {
+        id: 'wf-no-runs',
+        name: 'No Runs',
+        description: null,
+        organizationId: TEST_ORG,
+        lastRun: null,
+        latestRunStatus: null,
+        runCount: 0,
+        nodeCount: 2,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      },
+    ];
+
+    const summaries = await service.listSummary(authContext);
+    expect(summaries[0].lastRun).toBeNull();
+    expect(summaries[0].latestRunStatus).toBeNull();
+  });
+
+  // ── update ─────────────────────────────────────────────────────────────────
+
+  it('updates a workflow and creates a new version', async () => {
+    const updated = await service.update('workflow-id', sampleGraph, authContext);
+    expect(updated.id).toBe('workflow-id');
+    expect(updated.currentVersionId).toBeDefined();
+    expect(updated.currentVersion).toBe(1);
+  });
+
+  it('validates the graph on update and throws on invalid graph', async () => {
+    const invalidGraph = WorkflowGraphSchema.parse({
+      name: 'Bad workflow',
+      nodes: [
+        {
+          id: 'trigger',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: { label: 'Trigger', config: { params: {}, inputOverrides: {} } },
+        },
+      ],
+      edges: [
+        {
+          id: 'bad-edge',
+          source: 'trigger',
+          target: 'nonexistent',
+          sourceHandle: 'out',
+          targetHandle: 'in',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
+
+    await expect(service.update('workflow-id', invalidGraph, authContext)).rejects.toThrow();
+  });
+
+  // ── delete ─────────────────────────────────────────────────────────────────
+
+  it('deletes a workflow via the repository', async () => {
+    await service.delete('workflow-id', authContext);
+    expect(deleteCalls).toContain('workflow-id');
+  });
+
+  it('requires admin access to delete a workflow', async () => {
+    const nonAdminAuth: AuthContext = {
+      userId: 'regular-user',
+      organizationId: TEST_ORG,
+      roles: ['MEMBER'],
+      isAuthenticated: true,
+      provider: 'test',
+    };
+
+    await expect(service.delete('workflow-id', nonAdminAuth)).rejects.toThrow(
+      'Administrator role required',
+    );
+  });
+
+  // ── updateMetadata ─────────────────────────────────────────────────────────
+
+  it('updates workflow metadata without recompiling the graph', async () => {
+    createWorkflowVersionRecord('workflow-id');
+    const result = await service.updateMetadata(
+      'workflow-id',
+      { name: 'New Name', description: 'New description' },
+      authContext,
+    );
+    expect(result.id).toBe('workflow-id');
+    expect(result.name).toBe('New Name');
+    expect(updateMetadataCalls).toHaveLength(1);
+    expect(updateMetadataCalls[0].metadata.name).toBe('New Name');
+    expect(updateMetadataCalls[0].metadata.description).toBe('New description');
+    // compiledDefinition should remain null — no recompilation
+    expect(savedDefinition).toBeNull();
+  });
+
+  // ── listVersions ───────────────────────────────────────────────────────────
+
+  it('returns versions for a workflow', async () => {
+    createWorkflowVersionRecord('workflow-id');
+    createWorkflowVersionRecord('workflow-id');
+
+    const versions = await service.listVersions('workflow-id', authContext);
+    expect(versions).toHaveLength(2);
+    expect(versions[0].workflowId).toBe('workflow-id');
+    expect(versions[0].id).toBeDefined();
+    expect(versions[0].version).toBeDefined();
+    expect(typeof versions[0].createdAt).toBe('string');
+  });
+
+  it('throws NotFoundException when listing versions for non-existent workflow', async () => {
+    repositoryMock.findById = async () => undefined;
+    await expect(service.listVersions('missing-id', authContext)).rejects.toThrow('not found');
+  });
+
+  // ── listRuns ───────────────────────────────────────────────────────────────
+
+  it('returns run summaries for a workflow', async () => {
+    await service.create(sampleGraph, authContext);
+    const definition = compileWorkflowGraph(sampleGraph);
+    repositoryMock.findById = async () =>
+      makeWorkflowRecord({ compiledDefinition: definition }) as any;
+
+    const run = await service.run('workflow-id', { inputs: {} }, authContext);
+
+    const { runs } = await service.listRuns(authContext, { workflowId: 'workflow-id' });
+    expect(runs.length).toBeGreaterThanOrEqual(1);
+    expect(runs[0].id).toBe(run.runId);
+    expect(runs[0].workflowId).toBe('workflow-id');
+    expect(runs[0].workflowName).toBe(sampleGraph.name);
+  });
+
+  it('returns empty runs list when no runs exist', async () => {
+    const { runs } = await service.listRuns(authContext, { workflowId: 'workflow-id' });
+    expect(runs).toHaveLength(0);
   });
 });
