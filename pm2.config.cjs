@@ -1,5 +1,33 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
+
+/**
+ * Resolve the real bun binary path. On Windows, PM2 resolves 'bun' to
+ * bun.cmd (a batch-file shim) which it cannot execute. This helper
+ * locates the actual bun.exe so PM2 can run it directly.
+ */
+function resolveBun() {
+  if (process.platform !== 'win32') return 'bun';
+  try {
+    const result = execSync('where.exe bun.exe', { encoding: 'utf8', timeout: 5000 });
+    const paths = result.trim().split(/\r?\n/);
+    const realBun = paths.find(p => !p.toLowerCase().endsWith('.cmd'));
+    if (realBun) return realBun.trim();
+  } catch (_) {
+    // where.exe failed — try known fallback locations.
+  }
+  const fallback = path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe');
+  try {
+    fs.accessSync(fallback);
+    return fallback;
+  } catch (_) {
+    // Fallback path does not exist.
+  }
+  return 'bun';
+}
+
+const BUN = resolveBun();
 
 function isLinuxMusl() {
   if (process.platform !== 'linux') {
@@ -309,7 +337,7 @@ module.exports = {
     {
       name: `shipsec-backend-${instanceNum}`,
       cwd: __dirname + '/backend',
-      script: 'bun',
+      script: BUN,
       args: isProduction ? 'src/main.ts' : 'run dev',
       interpreter: 'none',
       env_file: resolveEnvFile('backend', instanceNum),
@@ -349,8 +377,9 @@ module.exports = {
     {
       name: `shipsec-frontend-${instanceNum}`,
       cwd: __dirname + '/frontend',
-      script: 'bun',
+      script: BUN,
       args: 'run dev',
+      interpreter: 'none',
       env_file: resolveEnvFile('frontend', instanceNum),
       env: {
         ...loadFrontendEnv(resolveEnvFile('frontend', instanceNum)),
