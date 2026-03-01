@@ -48,24 +48,28 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-radix': [
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-label',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-select',
-            '@radix-ui/react-slider',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-tooltip',
-          ],
-          'vendor-analytics': ['posthog-js'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+
+          // React core
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router-dom/')
+          )
+            return 'vendor-react';
+
+          // Radix UI
+          if (id.includes('@radix-ui/')) return 'vendor-radix';
+
+          // Analytics
+          if (id.includes('posthog-js')) return 'vendor-analytics';
+
+          // Heavy vendor chunks — split to enable parallel loading
+          if (id.includes('monaco-editor')) return 'vendor-monaco';
+          if (id.includes('@reactflow') || id.includes('reactflow')) return 'vendor-reactflow';
+          if (id.includes('xterm')) return 'vendor-xterm';
+          if (id.includes('@dnd-kit')) return 'vendor-dnd';
         },
       },
     },

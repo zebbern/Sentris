@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
+import type { Terminal } from 'xterm';
+import type { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { Copy, Download, Loader2, PlugZap, Radio, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,8 @@ export function NodeTerminalPanel({
   const [terminalKey, setTerminalKey] = useState(0);
   const terminalReadyRef = useRef<boolean>(false);
   const [isTerminalReady, setIsTerminalReady] = useState(false);
+  const [isXtermLoaded, setIsXtermLoaded] = useState(false);
+  const [xtermError, setXtermError] = useState<string | null>(null);
 
   const currentTime = useExecutionTimelineStore((state) => state.currentTime);
   const theme = useThemeStore((state) => state.theme);
@@ -112,90 +114,119 @@ export function NodeTerminalPanel({
       return;
     }
 
-    // Ensure container has dimensions before opening terminal
-    // This prevents xterm.js from trying to access undefined dimensions
-    const ensureContainerReady = (callback: () => void) => {
-      const container = containerRef.current;
-      if (!container) return;
+    let disposed = false;
 
-      // Check if container has dimensions
-      const rect = container.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        callback();
-        return;
-      }
-
-      // If no dimensions yet, wait for next frame and try again
-      requestAnimationFrame(() => {
-        ensureContainerReady(callback);
-      });
-    };
-
-    ensureContainerReady(() => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const term = new Terminal({
-        convertEol: false,
-        fontSize: 12,
-        disableStdin: true,
-        cursorBlink: false,
-        allowProposedApi: true,
-        allowTransparency: false,
-        macOptionIsMeta: false,
-        macOptionClickForcesSelection: false,
-        rightClickSelectsWord: false,
-        windowsMode: false,
-        theme: {
-          // Use dark terminal colors for both light and dark themes (easier to read)
-          background: '#1e1e1e', // Dark gray/black for both themes
-          foreground: '#d4d4d4', // Light gray text for both themes
-          cursor: '#aeafad', // Visible cursor color for both themes
-          cursorAccent: '#1e1e1e', // Cursor accent for both themes
-        },
-        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      });
-
-      term.options.macOptionIsMeta = false;
-      term.options.macOptionClickForcesSelection = false;
-      term.options.rightClickSelectsWord = false;
-
-      const fitAddon = new FitAddon();
-      term.loadAddon(fitAddon);
+    (async () => {
+      // Dynamically import xterm to reduce initial bundle size
+      let XtermTerminal: typeof Terminal;
+      let XtermFitAddon: typeof FitAddon;
 
       try {
-        term.open(container);
-      } catch (error: unknown) {
-        logger.warn('[NodeTerminalPanel] Failed to open terminal:', error);
-        // If opening fails, dispose and return early
-        term.dispose();
+        const [xtermModule, fitModule] = await Promise.all([
+          import('xterm'),
+          import('xterm-addon-fit'),
+        ]);
+        XtermTerminal = xtermModule.Terminal;
+        XtermFitAddon = fitModule.FitAddon;
+      } catch (err) {
+        if (!disposed) {
+          const message = err instanceof Error ? err.message : 'Failed to load terminal';
+          setXtermError(message);
+          logger.error('[NodeTerminalPanel] Failed to load xterm:', err);
+        }
         return;
       }
 
-      terminalRef.current = term;
-      fitAddonRef.current = fitAddon;
-      terminalReadyRef.current = false;
-      setIsTerminalReady(false);
+      if (disposed) return;
+      setIsXtermLoaded(true);
+      setXtermError(null);
 
-      // Wait for terminal to be fully initialized before fitting
-      // Use requestAnimationFrame to ensure DOM and terminal render service are ready
-      requestAnimationFrame(() => {
+      // Ensure container has dimensions before opening terminal
+      // This prevents xterm.js from trying to access undefined dimensions
+      const ensureContainerReady = (callback: () => void) => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        // Check if container has dimensions
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          callback();
+          return;
+        }
+
+        // If no dimensions yet, wait for next frame and try again
         requestAnimationFrame(() => {
-          if (fitAddonRef.current && containerRef.current && terminalRef.current === term) {
-            try {
-              fitAddonRef.current.fit();
-              terminalReadyRef.current = true;
-              setIsTerminalReady(true);
-            } catch (error: unknown) {
-              logger.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
-              // Mark as ready anyway to allow rendering
-              terminalReadyRef.current = true;
-              setIsTerminalReady(true);
+          ensureContainerReady(callback);
+        });
+      };
+
+      ensureContainerReady(() => {
+        if (disposed) return;
+        const container = containerRef.current;
+        if (!container) return;
+
+        const term = new XtermTerminal({
+          convertEol: false,
+          fontSize: 12,
+          disableStdin: true,
+          cursorBlink: false,
+          allowProposedApi: true,
+          allowTransparency: false,
+          macOptionIsMeta: false,
+          macOptionClickForcesSelection: false,
+          rightClickSelectsWord: false,
+          windowsMode: false,
+          theme: {
+            // Use dark terminal colors for both light and dark themes (easier to read)
+            background: '#1e1e1e', // Dark gray/black for both themes
+            foreground: '#d4d4d4', // Light gray text for both themes
+            cursor: '#aeafad', // Visible cursor color for both themes
+            cursorAccent: '#1e1e1e', // Cursor accent for both themes
+          },
+          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        });
+
+        term.options.macOptionIsMeta = false;
+        term.options.macOptionClickForcesSelection = false;
+        term.options.rightClickSelectsWord = false;
+
+        const fitAddon = new XtermFitAddon();
+        term.loadAddon(fitAddon);
+
+        try {
+          term.open(container);
+        } catch (error: unknown) {
+          logger.warn('[NodeTerminalPanel] Failed to open terminal:', error);
+          // If opening fails, dispose and return early
+          term.dispose();
+          return;
+        }
+
+        terminalRef.current = term;
+        fitAddonRef.current = fitAddon;
+        terminalReadyRef.current = false;
+        setIsTerminalReady(false);
+
+        // Wait for terminal to be fully initialized before fitting
+        // Use requestAnimationFrame to ensure DOM and terminal render service are ready
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (fitAddonRef.current && containerRef.current && terminalRef.current === term) {
+              try {
+                fitAddonRef.current.fit();
+                terminalReadyRef.current = true;
+                setIsTerminalReady(true);
+              } catch (error: unknown) {
+                logger.warn('[NodeTerminalPanel] Failed to fit terminal on mount', error);
+                // Mark as ready anyway to allow rendering
+                terminalReadyRef.current = true;
+                setIsTerminalReady(true);
+              }
             }
-          }
+          });
         });
       });
-    });
+    })();
 
     const handleResize = () => {
       if (fitAddonRef.current) {
@@ -209,6 +240,7 @@ export function NodeTerminalPanel({
     window.addEventListener('resize', handleResize);
 
     return () => {
+      disposed = true;
       window.removeEventListener('resize', handleResize);
       terminalReadyRef.current = false;
       setIsTerminalReady(false);
@@ -470,7 +502,23 @@ export function NodeTerminalPanel({
         style={{ backgroundColor: '#1e1e1e' }}
       >
         <div ref={containerRef} className={cn(embedded ? 'h-full w-full' : 'h-[360px] w-full')} />
-        {!hasData && !session?.chunks?.length && (
+        {!isXtermLoaded && !xtermError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading terminal…</span>
+            </div>
+          </div>
+        )}
+        {xtermError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-sm text-destructive text-center p-4">
+              <div>Failed to load terminal</div>
+              <div className="font-mono text-[10px] text-muted-foreground mt-1">{xtermError}</div>
+            </div>
+          </div>
+        )}
+        {!hasData && !session?.chunks?.length && isXtermLoaded && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-sm text-foreground space-y-2 text-center p-4">
               <div>
