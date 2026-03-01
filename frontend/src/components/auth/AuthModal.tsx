@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthProvider } from '../../auth/auth-context';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 
@@ -42,6 +42,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <DialogTitle className="text-center">
             {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Sign in to your account to continue
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { HumanInputResolutionView, type HumanInputRequest } from './HumanInputResolutionView';
@@ -34,6 +34,10 @@ export function HumanInputDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeHumanInputDialog()}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogTitle className="sr-only">Human Input Request</DialogTitle>
+        <DialogDescription className="sr-only">
+          Review and provide input for the workflow step
+        </DialogDescription>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

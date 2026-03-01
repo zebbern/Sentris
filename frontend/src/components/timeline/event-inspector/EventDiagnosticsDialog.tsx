@@ -1,4 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatDuration, formatData } from './utils';
 import type { EventDiagnosticsDialogProps } from './types';
 
@@ -17,6 +23,9 @@ export function EventDiagnosticsDialog({
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Diagnostics - {event.type}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Detailed diagnostics information for this event
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 rounded-md border border-dashed border-border/70 bg-muted/10 px-3 py-3 text-[11px] text-muted-foreground">
           <div className="grid grid-cols-2 gap-3">

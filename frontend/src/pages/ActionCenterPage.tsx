@@ -31,7 +31,7 @@ import { PageToolbar } from '@/components/shared/PageToolbar';
 import { getStatusBadgeClassFromStatus } from '@/utils/statusBadgeStyles';
 import { formatDateTime, formatRelativeTime } from '@/utils/timeFormat';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
@@ -444,6 +444,10 @@ export function ActionCenterPage() {
       {/* Resolve Dialog */}
       <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogTitle className="sr-only">Resolve Approval</DialogTitle>
+          <DialogDescription className="sr-only">
+            Review and respond to the approval request
+          </DialogDescription>
           <div className="overflow-y-auto px-1">
             {selectedApproval && (
               <HumanInputResolutionView
