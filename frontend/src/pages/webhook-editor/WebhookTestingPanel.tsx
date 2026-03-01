@@ -47,7 +47,11 @@ export function WebhookTestingPanel({
         <div className="grid gap-4">
           <div className="space-y-2">
             <Label>Test Payload (JSON)</Label>
-            <div className="h-[200px] border rounded-md overflow-hidden">
+            <div
+              className="h-[200px] border rounded-md overflow-hidden"
+              role="group"
+              aria-label="Test Payload (JSON)"
+            >
               <Editor
                 language="json"
                 value={testPayload}
@@ -59,7 +63,11 @@ export function WebhookTestingPanel({
           </div>
           <div className="space-y-2">
             <Label>Test Headers (JSON)</Label>
-            <div className="h-[100px] border rounded-md overflow-hidden">
+            <div
+              className="h-[100px] border rounded-md overflow-hidden"
+              role="group"
+              aria-label="Test Headers (JSON)"
+            >
               <Editor
                 language="json"
                 value={testHeaders}

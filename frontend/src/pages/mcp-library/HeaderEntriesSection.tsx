@@ -35,6 +35,7 @@ export function HeaderEntriesSection({
                 onChange={(e) => onUpdateHeader(index, 'key', e.target.value)}
                 placeholder="Header name"
                 className="flex-1 font-mono text-sm"
+                aria-label={`Header ${index + 1} name`}
               />
               <div className="relative flex-1">
                 <Input
@@ -43,6 +44,7 @@ export function HeaderEntriesSection({
                   onChange={(e) => onUpdateHeader(index, 'value', e.target.value)}
                   placeholder="Value"
                   className={cn('font-mono text-sm pr-20', entry.secretId && 'text-success')}
+                  aria-label={`Header ${index + 1} value`}
                 />
                 <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-0.5">
                   <Button

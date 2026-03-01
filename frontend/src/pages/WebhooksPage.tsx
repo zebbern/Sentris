@@ -289,8 +289,14 @@ export function WebhooksPage() {
             filters={
               <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-xs uppercase text-muted-foreground">Search</label>
+                  <label
+                    htmlFor="webhook-filter-search"
+                    className="text-xs uppercase text-muted-foreground"
+                  >
+                    Search
+                  </label>
                   <Input
+                    id="webhook-filter-search"
                     type="search"
                     placeholder="Filter by name, workflow, or URL"
                     value={filters.search}
@@ -298,9 +304,14 @@ export function WebhooksPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs uppercase text-muted-foreground">Status</label>
+                  <label
+                    htmlFor="webhook-filter-status"
+                    className="text-xs uppercase text-muted-foreground"
+                  >
+                    Status
+                  </label>
                   <Select value={filters.status} onValueChange={handleStatusFilterChange}>
-                    <SelectTrigger>
+                    <SelectTrigger id="webhook-filter-status">
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -313,13 +324,18 @@ export function WebhooksPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs uppercase text-muted-foreground">Workflow</label>
+                  <label
+                    htmlFor="webhook-filter-workflow"
+                    className="text-xs uppercase text-muted-foreground"
+                  >
+                    Workflow
+                  </label>
                   <Select
                     value={filters.workflowId ?? 'all'}
                     onValueChange={handleWorkflowFilterChange}
                     disabled={workflowsLoading}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="webhook-filter-workflow">
                       <SelectValue placeholder="All workflows" />
                     </SelectTrigger>
                     <SelectContent>
@@ -336,9 +352,7 @@ export function WebhooksPage() {
             }
             actions={
               <div className="flex flex-col shrink-0">
-                <label className="text-xs uppercase text-muted-foreground invisible hidden lg:block">
-                  &nbsp;
-                </label>
+                <div className="text-xs invisible hidden lg:block">&nbsp;</div>
                 <div className="flex gap-2 mt-2 lg:mt-0">
                   <Button
                     variant="outline"

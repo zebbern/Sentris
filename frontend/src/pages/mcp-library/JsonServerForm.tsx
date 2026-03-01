@@ -39,8 +39,11 @@ export function JsonServerForm({
   return (
     <>
       <div className="space-y-2">
-        <Label>{editingServer ? 'Server Configuration (JSON)' : 'Paste JSON Config'}</Label>
+        <Label htmlFor="json-server-config">
+          {editingServer ? 'Server Configuration (JSON)' : 'Paste JSON Config'}
+        </Label>
         <Textarea
+          id="json-server-config"
           value={jsonValue}
           onChange={(e) => {
             onJsonValueChange(e.target.value);

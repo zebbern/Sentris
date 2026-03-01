@@ -57,7 +57,11 @@ export function WebhookFormSection({
             TypeScript
           </Badge>
         </div>
-        <div className="flex-1 border rounded-md overflow-hidden min-h-[300px]">
+        <div
+          className="flex-1 border rounded-md overflow-hidden min-h-[300px]"
+          role="group"
+          aria-label="Parsing Script"
+        >
           <Editor
             language="typescript"
             value={form.parsingScript}

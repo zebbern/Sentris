@@ -25,8 +25,9 @@ export function WebhookSettingsTab({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label htmlFor="webhook-description">Description</Label>
             <Textarea
+              id="webhook-description"
               value={form.description}
               onChange={(e) => onDescriptionChange(e.target.value)}
             />

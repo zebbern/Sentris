@@ -67,6 +67,7 @@ export function PageToolbar({
                   placeholder={searchPlaceholder}
                   value={searchValue}
                   onChange={handleSearchChange}
+                  aria-label={searchPlaceholder || 'Search'}
                 />
               </>
             ) : (
@@ -79,6 +80,7 @@ export function PageToolbar({
                   onChange={handleSearchChange}
                   className="pl-8"
                   autoComplete="off"
+                  aria-label={searchPlaceholder || 'Search'}
                 />
               </div>
             )}
