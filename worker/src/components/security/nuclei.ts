@@ -269,14 +269,11 @@ const definition = defineComponent({
   retryPolicy: nucleiRetryPolicy,
   runner: {
     kind: 'docker',
-    // Using custom SentrisAI image instead of projectdiscovery/nuclei:latest because:
-    // 1. Pre-installed templates: Avoids 100MB+ download on every scan (templates cached in image)
-    // 2. Distroless base: Smaller attack surface, no shell (security hardening)
-    // 3. Non-root user: Runs as 'nonroot' user with minimal permissions (UID 65532)
-    // 4. ARM64 support: Built for multi-architecture (amd64 + arm64) for M1/M2 Macs
-    // 5. Verified -stream flag: Tested and confirmed working for PTY real-time output
-    // Image source: github.com/SentrisAI/docker-images/nuclei
-    image: 'projectdiscovery/nuclei:latest',
+    // Custom image with pre-installed nuclei-templates baked in at build time.
+    // The upstream projectdiscovery/nuclei:latest ships WITHOUT templates,
+    // so severity-filtered scans find 0 templates and produce no results.
+    // Build: docker build -t ghcr.io/zebbern/nuclei:latest docker/nuclei/
+    image: 'ghcr.io/zebbern/nuclei:latest',
     entrypoint: 'nuclei',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
@@ -508,7 +505,7 @@ const definition = defineComponent({
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [
           volume.getVolumeConfig('/inputs', true),
-          // ✅ Templates are pre-installed in projectdiscovery/nuclei:latest
+          // ✅ Templates are pre-installed in ghcr.io/zebbern/nuclei:latest
           // No need for persistent volume since templates are baked into the image
         ],
       };
