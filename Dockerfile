@@ -3,7 +3,7 @@
 # ============================================================================
 # BASE STAGE
 # ============================================================================
-FROM oven/bun:latest AS base
+FROM oven/bun:1.1.20 AS base
 # Install system deps
 RUN apt-get update && \
     apt-get install -y ca-certificates curl gnupg lsb-release procps python3 make g++ && \
