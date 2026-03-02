@@ -6,6 +6,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { status as grpcStatus, type ServiceError } from '@grpc/grpc-js';
 import { WorkflowNotFoundError } from '@temporalio/client';
@@ -144,10 +146,15 @@ interface FlowContext {
   >;
 }
 
+const FLOW_CONTEXT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const FLOW_CONTEXT_SWEEP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 @Injectable()
-export class WorkflowsService {
+export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WorkflowsService.name);
   private readonly flowContexts = new Map<string, FlowContext>();
+  private readonly flowContextTimestamps = new Map<string, number>();
+  private flowContextCleanupInterval: NodeJS.Timeout;
 
   constructor(
     private readonly repository: WorkflowRepository,
@@ -161,6 +168,23 @@ export class WorkflowsService {
     private readonly tagsRepository: WorkflowTagsRepository,
     private readonly workflowVersionService: WorkflowVersionService,
   ) {}
+
+  onModuleInit(): void {
+    this.flowContextCleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, timestamp] of this.flowContextTimestamps) {
+        if (now - timestamp > FLOW_CONTEXT_TTL_MS) {
+          this.flowContexts.delete(key);
+          this.flowContextTimestamps.delete(key);
+          this.logger.debug(`Evicted stale flow context for run ${key}`);
+        }
+      }
+    }, FLOW_CONTEXT_SWEEP_INTERVAL_MS);
+  }
+
+  onModuleDestroy(): void {
+    clearInterval(this.flowContextCleanupInterval);
+  }
 
   private resolveOrganizationId(auth?: AuthContext | null): string | null {
     return auth?.organizationId ?? null;
@@ -1530,6 +1554,7 @@ export class WorkflowsService {
 
   async releaseFlowContext(runId: string): Promise<void> {
     this.flowContexts.delete(runId);
+    this.flowContextTimestamps.delete(runId);
   }
 
   private async getFlowContext(runId: string): Promise<FlowContext> {
@@ -1577,6 +1602,7 @@ export class WorkflowsService {
     };
 
     this.flowContexts.set(runId, context);
+    this.flowContextTimestamps.set(runId, Date.now());
     return context;
   }
 
