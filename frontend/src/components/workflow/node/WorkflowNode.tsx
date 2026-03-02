@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { NodeResizer, type NodeProps, useReactFlow } from 'reactflow';
 import { ShieldAlert } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
@@ -68,10 +69,14 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
   };
   const { setNodes, deleteElements } = useReactFlow();
   const nodeState = useExecutionTimelineStore((s) => s.nodeStates[id]);
-  const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
-  const selectNode = useExecutionTimelineStore((s) => s.selectNode);
-  const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
-  const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
+  const { selectedRunId, selectNode, isPlaying, playbackMode } = useExecutionTimelineStore(
+    useShallow((s) => ({
+      selectedRunId: s.selectedRunId,
+      selectNode: s.selectNode,
+      isPlaying: s.isPlaying,
+      playbackMode: s.playbackMode,
+    })),
+  );
   const markDirty = useWorkflowStore((s) => s.markDirty);
   const mode = useWorkflowUiStore((s) => s.mode);
   const openHumanInputDialog = useWorkflowUiStore((s) => s.openHumanInputDialog);

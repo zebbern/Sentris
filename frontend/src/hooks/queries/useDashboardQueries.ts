@@ -43,6 +43,7 @@ export function useDashboardData(): DashboardData {
     queryFn: () => api.executions.listRuns({ limit: RECENT_RUNS_LIMIT }),
     staleTime: 30_000,
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const schedulesQuery = useQuery({

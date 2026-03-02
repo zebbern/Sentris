@@ -1,0 +1,99 @@
+{
+  "_metadata": {
+    "name": "OSINT Reconnaissance",
+    "description": "Automated OSINT reconnaissance workflow using theHarvester. Gathers emails, subdomains, and IP addresses from public data sources for a target domain. Results are compiled into a structured intelligence report and delivered via Slack. Ideal for pre-engagement reconnaissance and attack surface mapping.",
+    "category": "reconnaissance",
+    "tags": ["osint", "reconnaissance", "theharvester", "emails", "subdomains"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "OSINT Reconnaissance",
+    "description": "Gather emails, subdomains, and IPs from public sources, then deliver an intelligence report via Slack.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "reconnaissance",
+    "tags": ["osint", "reconnaissance", "theharvester", "emails", "subdomains"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 4
+  },
+  "graph": {
+    "name": "OSINT Reconnaissance",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": { "label": "Start OSINT Recon", "config": { "params": {}, "inputOverrides": {} } }
+      },
+      {
+        "id": "theharvester_1",
+        "type": "sentris.theharvester.run",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Harvest OSINT Data",
+          "config": {
+            "params": {
+              "sources": "baidu,bing,duckduckgo,yahoo",
+              "limit": 500
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "format_report",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Format Intelligence Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Save OSINT Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#threat-intel" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-theharvester_1", "source": "trigger_1", "target": "theharvester_1" },
+      {
+        "id": "theharvester_1-format_report",
+        "source": "theharvester_1",
+        "target": "format_report"
+      },
+      {
+        "id": "format_report-artifact_report",
+        "source": "format_report",
+        "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for OSINT reconnaissance alerts"
+    }
+  ]
+}
