@@ -193,7 +193,7 @@ export interface RegisterComponentToolActivityInput {
   exposedToAgent?: boolean;
   componentId: string;
   description: string;
-  inputSchema: any;
+  inputSchema: Record<string, unknown>;
   credentials: Record<string, unknown>;
 }
 
@@ -202,7 +202,7 @@ export interface RegisterRemoteMcpActivityInput {
   nodeId: string;
   toolName: string;
   description: string;
-  inputSchema: any;
+  inputSchema: Record<string, unknown>;
   endpoint: string;
   authToken?: string;
 }
@@ -212,7 +212,7 @@ export interface RegisterLocalMcpActivityInput {
   nodeId: string;
   toolName: string;
   description: string;
-  inputSchema: any;
+  inputSchema: Record<string, unknown>;
   image: string;
   command?: string;
   args?: string;
