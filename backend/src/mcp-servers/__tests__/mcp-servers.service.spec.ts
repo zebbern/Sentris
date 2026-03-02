@@ -34,6 +34,7 @@ function makeServerRecord(overrides: Partial<McpServerRecord> = {}): McpServerRe
     lastHealthCheck: null,
     lastHealthStatus: null,
     groupId: null,
+    registrySourceName: null,
     organizationId: DEFAULT_ORGANIZATION_ID,
     createdBy: 'tester',
     createdAt: now,

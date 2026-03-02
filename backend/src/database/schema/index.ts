@@ -18,6 +18,7 @@ export * from './audit-logs';
 export * from './terminal-records';
 export * from './agent-trace-events';
 export * from './mcp-servers';
+export * from './mcp-registry';
 
 export * from './node-io';
 export * from './organization-settings';
