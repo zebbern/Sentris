@@ -10,7 +10,10 @@ import { extractPorts } from './zod-ports';
 import { extractParameters } from './zod-parameters';
 import { getPortMeta } from './port-meta';
 import { validateComponentSchema, validateParameterSchema } from './schema-validation';
-import { type ZodDef, getDefType } from './zod-helpers';
+import {
+  unwrapToObject,
+  getObjectShape,
+} from './zod-helpers';
 
 type AnyComponentDefinition = ComponentDefinition<any, any, any, any, any, any>;
 
@@ -213,48 +216,5 @@ function validatePortMetadata(definition: AnyComponentDefinition) {
   }
 }
 
-function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
-  const shape = (schema as any).shape;
-  if (typeof shape === 'function') {
-    return shape();
-  }
-  return shape ?? {};
-}
-
-function unwrapToObject(
-  schema: z.ZodTypeAny
-): z.ZodObject<any, any> | null {
-  let current = schema;
-
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-    const typeName = getDefType(def);
-
-    if (!def) {
-      return null;
-    }
-
-    if (typeName === 'object') {
-      return current as z.ZodObject<any, any>;
-    }
-
-    if (typeName === 'optional' || typeName === 'nullable' || typeName === 'default') {
-      current = def.innerType;
-      continue;
-    }
-
-    if (typeName === 'effects') {
-      current = def.schema;
-      continue;
-    }
-
-    if (typeName === 'pipe') {
-      current = def.out ?? def.schema ?? def.innerType ?? def.in ?? current;
-      continue;
-    }
-
-    return null;
-  }
-}
 
 export const componentRegistry = new ComponentRegistry();

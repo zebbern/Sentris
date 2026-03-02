@@ -6,15 +6,7 @@
  */
 
 import { z } from 'zod';
-import { type ZodDef, getDefType } from './zod-helpers';
-
-function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
-  const shape = (schema as any).shape;
-  if (typeof shape === 'function') {
-    return shape();
-  }
-  return shape ?? {};
-}
+import { type ZodDef, getDefType, getObjectShape, isOptionalForJsonSchema } from './zod-helpers';
 
 /**
  * Generate JSON schema from Zod schema
@@ -46,7 +38,7 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
       properties[key] = zodToJsonSchema(fieldSchema);
 
       // Check if field is required
-      if (!isOptional(fieldSchema)) {
+      if (!isOptionalForJsonSchema(fieldSchema)) {
         required.push(key);
       }
     }
@@ -153,30 +145,4 @@ function zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   return {};
 }
 
-/**
- * Check if schema is optional
- */
-function isOptional(schema: z.ZodTypeAny): boolean {
-  let current = schema;
 
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-
-    if (!def) break;
-
-    const typeName = getDefType(def);
-
-    if (typeName === 'optional') {
-      return true;
-    }
-
-    if (typeName === 'default' || typeName === 'nullable') {
-      current = def.innerType;
-      continue;
-    }
-
-    break;
-  }
-
-  return false;
-}
