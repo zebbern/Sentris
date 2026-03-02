@@ -31,6 +31,6 @@ const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
       inject: [ConfigService],
     },
   ],
-  exports: [McpServersService],
+  exports: [McpServersService, McpServersRepository],
 })
 export class McpServersModule {}

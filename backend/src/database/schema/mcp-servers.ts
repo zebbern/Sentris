@@ -87,6 +87,9 @@ export const mcpServers = pgTable(
     // Group association (nullable - servers can exist independently)
     groupId: uuid('group_id').references(() => mcpGroups.id, { onDelete: 'set null' }),
 
+    // Registry tracking (set when imported from Docker MCP Registry)
+    registrySourceName: varchar('registry_source_name', { length: 191 }),
+
     // Multi-tenancy
     organizationId: varchar('organization_id', { length: 191 }),
     createdBy: varchar('created_by', { length: 191 }),
@@ -100,6 +103,7 @@ export const mcpServers = pgTable(
     enabledIdx: index('mcp_servers_enabled_idx').on(table.enabled),
     groupIdx: index('mcp_servers_group_idx').on(table.groupId),
     nameOrgUnique: uniqueIndex('mcp_servers_name_org_uidx').on(table.name, table.organizationId),
+    registrySourceIdx: index('mcp_servers_registry_source_idx').on(table.registrySourceName),
   }),
 );
 

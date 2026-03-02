@@ -387,4 +387,39 @@ export class McpServersRepository {
   async clearTools(serverId: string): Promise<void> {
     await this.db.delete(mcpServerTools).where(eq(mcpServerTools.serverId, serverId));
   }
+
+  /**
+   * Find a server by its registry source name within an organization.
+   * Used for duplicate detection during registry import.
+   */
+  async findByRegistrySource(
+    registrySourceName: string,
+    organizationId: string,
+  ): Promise<McpServerRecord | null> {
+    const rows = await this.db
+      .select()
+      .from(mcpServers)
+      .where(
+        and(
+          eq(mcpServers.registrySourceName, registrySourceName),
+          or(eq(mcpServers.organizationId, organizationId), isNull(mcpServers.organizationId)),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Set the registry source name on an existing server.
+   */
+  async setRegistrySourceName(serverId: string, registrySourceName: string): Promise<void> {
+    await this.db
+      .update(mcpServers)
+      .set({
+        registrySourceName,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(mcpServers.id, serverId));
+  }
 }
