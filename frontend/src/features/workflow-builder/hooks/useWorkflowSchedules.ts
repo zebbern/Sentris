@@ -3,6 +3,7 @@ import type { WorkflowSchedule } from '@sentris/shared';
 import { api } from '@/services/api';
 import { useSchedules } from '@/hooks/queries/useScheduleQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import type { ToastVariant } from '@/components/ui/toast-context';
 
@@ -62,7 +63,7 @@ export function useWorkflowSchedules({
   const [schedulePanelExpanded, setSchedulePanelExpanded] = useState(false);
 
   const refreshSchedules = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
   }, [queryClient]);
 
   const openScheduleDrawer = useCallback(

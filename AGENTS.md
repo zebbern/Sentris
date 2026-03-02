@@ -69,7 +69,7 @@ just instance-env show 6       # Show file status and computed values
 
 - Frontend: `http://localhost:${5173 + instance*100}`
 - Backend: `http://localhost:${3211 + instance*100}`
-- Temporal UI (shared): http://localhost:8081
+- Temporal UI (shared): <http://localhost:8081>
 
 Full details: `docs/MULTI-INSTANCE-DEV.md`
 
@@ -91,18 +91,18 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
   - `just instance use N` then run `just dev` / `bun run test:e2e`, or
   - explicit env override (`SENTRIS_INSTANCE=N just dev ...`) for one-off commands.
 
-**Ports / URLs**
+#### Ports / URLs
 
 - Frontend: `5173 + N*100`
 - Backend: `3211 + N*100`
-- Temporal UI (shared): http://localhost:8081
+- Temporal UI (shared): <http://localhost:8081>
 
-**E2E tests**
+#### E2E tests
 
 - E2E targets the backend for `SENTRIS_INSTANCE` (or the active instance).
 - When asked to run E2E, confirm the instance and ensure that instance is running: `SENTRIS_INSTANCE=N just dev start` (or `just instance use N` then `just dev start`).
 
-**Keep docs in sync**
+#### Keep docs in sync
 
 If you change instance/infra behavior (justfile/scripts/pm2 config), update `docs/MULTI-INSTANCE-DEV.md` and this section accordingly in the same PR.
 
@@ -148,14 +148,14 @@ Before writing ANY frontend code that fetches data or adds a page, you MUST read
 
 ### Frontend Data Fetching (Mandatory)
 
-6. **All API data must use TanStack Query hooks** in `frontend/src/hooks/queries/`. Never use `useState` + `useEffect` to fetch backend data — this is the single most important frontend rule.
-7. **Query keys** go in `frontend/src/lib/queryKeys.ts` (org-scoped, factory functions).
-8. **After mutations**, invalidate the relevant query cache via `queryClient.invalidateQueries()` — do not manually update local state.
-9. **Derive data** from query results using `useMemo`, not by copying into separate `useState`.
-10. **Zustand stores** are for client-only UI state (canvas, timeline, auth, notifications, command palette). Never store API data in Zustand.
-    - `notificationStore` — Notification history, unread count, persistent via localStorage (max 50, FIFO).
-    - `commandPaletteStore` — Global search command palette open/close state.
-11. **Per-route ErrorBoundary**: Every lazy-loaded route in `App.tsx` is wrapped in an `<ErrorBoundary>` so a crash in one page does not break the entire app.
+1. **All API data must use TanStack Query hooks** in `frontend/src/hooks/queries/`. Never use `useState` + `useEffect` to fetch backend data — this is the single most important frontend rule.
+2. **Query keys** go in `frontend/src/lib/queryKeys.ts` (org-scoped, factory functions).
+3. **After mutations**, invalidate the relevant query cache via `queryClient.invalidateQueries()` — do not manually update local state.
+4. **Derive data** from query results using `useMemo`, not by copying into separate `useState`.
+5. **Zustand stores** are for client-only UI state (canvas, timeline, auth, notifications, command palette). Never store API data in Zustand.
+   - `notificationStore` — Notification history, unread count, persistent via localStorage (max 50, FIFO).
+   - `commandPaletteStore` — Global search command palette open/close state.
+6. **Per-route ErrorBoundary**: Every lazy-loaded route in `App.tsx` is wrapped in an `<ErrorBoundary>` so a crash in one page does not break the entire app.
 
 See `frontend/docs/state.md` for patterns, anti-patterns, and the full decision guide.
 
@@ -163,11 +163,11 @@ See `frontend/docs/state.md` for patterns, anti-patterns, and the full decision 
 
 See `frontend/docs/performance.md` for the complete reference with code examples.
 
-11. **Every new page must use `React.lazy()`** in `App.tsx`. Add the route to `routePrefetchMap` in `src/lib/prefetch-routes.ts`.
-12. **Set `staleTime: Infinity` for static/reference data** (components, templates, providers). The 30s default is wrong for them.
-13. **Use `skipToken` for conditional queries** instead of `enabled: false` alone. See `useRunQueries.ts`.
-14. **Granular Zustand selectors**: `useStore((s) => s.field)`, never `const store = useStore()`.
-15. **No N+1 queries**: never call a query hook inside `.map()`. Use a batched endpoint (see `useMcpGroupsWithServers`).
+1. **Every new page must use `React.lazy()`** in `App.tsx`. Add the route to `routePrefetchMap` in `src/lib/prefetch-routes.ts`.
+2. **Set `staleTime: Infinity` for static/reference data** (components, templates, providers). The 30s default is wrong for them.
+3. **Use `skipToken` for conditional queries** instead of `enabled: false` alone. See `useRunQueries.ts`.
+4. **Granular Zustand selectors**: `useStore((s) => s.field)`, never `const store = useStore()`.
+5. **No N+1 queries**: never call a query hook inside `.map()`. Use a batched endpoint (see `useMcpGroupsWithServers`).
 
 ---
 
@@ -175,7 +175,7 @@ See `frontend/docs/performance.md` for the complete reference with code examples
 
 Full details: **`docs/architecture.mdx`**
 
-```
+```text
 Frontend ←→ Backend ←→ Temporal ←→ Worker
                                       ↓
                             Component Execution
@@ -198,6 +198,8 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 - Logs: Loki + PostgreSQL
 
 ---
+
+<!-- markdownlint-disable MD033 -->
 
 <skills_system priority="1">
 

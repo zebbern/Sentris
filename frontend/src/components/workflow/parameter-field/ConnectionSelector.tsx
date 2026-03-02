@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
 import { useIntegrationConnections } from '@/hooks/queries/useIntegrationQueries';
@@ -78,7 +79,7 @@ export function ConnectionSelector({
 
   const handleRefreshConnections = async () => {
     try {
-      await queryClient.invalidateQueries({ queryKey: ['integrationConnections'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.integrations.connectionsRoot() });
     } catch (error: unknown) {
       logger.error('Failed to refresh integration connections', error);
     }

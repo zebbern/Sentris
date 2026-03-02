@@ -202,7 +202,7 @@ export function getRunByIdFromCache(runId: string): ExecutionRun | undefined {
   if (detail) return detail;
 
   // Search through all run query caches
-  const queries = queryClient.getQueriesData<RunsPage>({ queryKey: ['runs'] });
+  const queries = queryClient.getQueriesData<RunsPage>({ queryKey: queryKeys.runs.root() });
   for (const [, data] of queries) {
     const found = data?.runs?.find((r) => r.id === runId);
     if (found) return found;

@@ -5,6 +5,7 @@ import { getSecretLabel, getSecretDescription } from '@/api/secrets';
 import { LeanSelect, type SelectOption } from './LeanSelect';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface SecretSelectProps {
   value?: string;
@@ -53,7 +54,7 @@ export function SecretSelect({
       : undefined;
 
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['secrets'] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.secrets.all() });
     onRefresh?.();
   };
 

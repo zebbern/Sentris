@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SecretSelect } from '@/components/inputs/SecretSelect';
+import { queryKeys } from '@/lib/queryKeys';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import type { InputMapping } from '@/schemas/node';
 
@@ -76,7 +77,7 @@ export function SecretField({
         }}
         disabled={isReceivingInput || isDisabledForConnection}
         onRefresh={() => {
-          void queryClient.invalidateQueries({ queryKey: ['secrets'] });
+          void queryClient.invalidateQueries({ queryKey: queryKeys.secrets.all() });
         }}
       />
 

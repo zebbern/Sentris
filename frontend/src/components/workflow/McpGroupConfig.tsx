@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useMcpGroups, useMcpGroupServers } from '@/hooks/queries/useMcpGroupQueries';
 import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface McpGroupConfigProps {
   /** Group slug to fetch servers for */
@@ -75,9 +76,9 @@ export function McpGroupConfig({
 
     setIsRefreshing(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['mcpGroups'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
       if (group?.id) {
-        await queryClient.invalidateQueries({ queryKey: ['mcpGroupServers'] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.serversRoot() });
       }
     } finally {
       setIsRefreshing(false);
