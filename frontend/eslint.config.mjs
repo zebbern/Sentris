@@ -14,6 +14,7 @@ export default tseslint.config(
       'build',
       'node_modules',
       'coverage',
+      '.storybook',
       '**/*.js',
       '**/*.mjs',
       '**/*.cjs',
