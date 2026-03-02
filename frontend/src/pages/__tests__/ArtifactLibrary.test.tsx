@@ -201,7 +201,7 @@ describe('ArtifactLibrary', () => {
   it('renders page heading', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Artifacts/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Artifacts/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {

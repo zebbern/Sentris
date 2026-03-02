@@ -133,7 +133,7 @@ export function TemplateLibraryPage() {
   return (
     <div className="flex-1 bg-background" aria-busy={isLoading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <h1 className="text-2xl font-bold tracking-tight mb-4">Templates</h1>
+        <h2 className="text-2xl font-bold tracking-tight mb-4">Templates</h2>
 
         {/* Filters */}
         <TemplateFilters
@@ -195,7 +195,11 @@ export function TemplateLibraryPage() {
               items={orderedTemplates.map((t) => t.id)}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                role="region"
+                aria-label="Template list"
+              >
                 {orderedTemplates.map((template) => (
                   <SortableCard
                     key={template.id}

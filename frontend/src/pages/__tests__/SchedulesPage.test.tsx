@@ -170,7 +170,7 @@ describe('SchedulesPage', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Schedules/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Schedules/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

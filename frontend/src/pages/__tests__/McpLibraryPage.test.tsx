@@ -258,7 +258,7 @@ describe('McpLibraryPage', () => {
   it('renders page heading', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /MCP Library/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /MCP Library/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no servers', () => {

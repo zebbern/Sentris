@@ -205,7 +205,7 @@ describe('IntegrationsManager', () => {
   it('renders page heading', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Connections/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Connections/i })).toBeInTheDocument();
   });
 
   it('renders section headings', () => {

@@ -1,0 +1,85 @@
+{
+  "_metadata": {
+    "name": "SSL/TLS Audit",
+    "description": "Automated SSL/TLS security audit workflow that first verifies target reachability with HTTPX, then performs a comprehensive TLS configuration assessment using testssl.sh. Checks certificate validity, cipher suites, protocol versions, and known vulnerabilities (BEAST, POODLE, Heartbleed, etc.). Results are compiled into an artifact report and delivered via Slack.",
+    "category": "network-security",
+    "tags": ["ssl", "tls", "certificate", "audit", "testssl"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "SSL/TLS Audit",
+    "description": "Verify target reachability, audit TLS configuration and certificates, and deliver a compliance report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "network-security",
+    "tags": ["ssl", "tls", "certificate", "audit", "testssl"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 4
+  },
+  "graph": {
+    "name": "SSL/TLS Audit",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": { "label": "Start TLS Audit", "config": { "params": {}, "inputOverrides": {} } }
+      },
+      {
+        "id": "httpx_1",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Verify Target Reachability",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "testssl_1",
+        "type": "sentris.testssl.run",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Audit TLS Configuration",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Generate Audit Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#tls-audit" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-httpx_1", "source": "trigger_1", "target": "httpx_1" },
+      { "id": "httpx_1-testssl_1", "source": "httpx_1", "target": "testssl_1" },
+      { "id": "testssl_1-artifact_report", "source": "testssl_1", "target": "artifact_report" },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for TLS audit notifications"
+    }
+  ]
+}

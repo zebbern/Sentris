@@ -182,7 +182,7 @@ describe('WebhooksPage', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Webhooks/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Webhooks/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

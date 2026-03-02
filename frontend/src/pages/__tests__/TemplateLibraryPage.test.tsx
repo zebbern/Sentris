@@ -249,7 +249,7 @@ describe('TemplateLibraryPage', () => {
   it('renders page heading', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Templates/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Templates/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {

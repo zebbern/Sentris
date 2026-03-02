@@ -52,6 +52,9 @@ export interface SchedulesTableProps {
   onEdit: (schedule: WorkflowSchedule) => void;
   onDelete: (schedule: WorkflowSchedule) => void;
 
+  // Error state — when true, empty-state is suppressed (ErrorBanner shown by parent)
+  error?: boolean;
+
   // Empty state
   onCreateNew?: () => void;
 }
@@ -94,6 +97,7 @@ export function SchedulesTable({
   onPauseResume,
   onEdit,
   onDelete,
+  error,
   onCreateNew,
 }: SchedulesTableProps) {
   return (
@@ -162,7 +166,7 @@ export function SchedulesTable({
           </Table>
         </DndContext>
       </div>
-      {!isLoading && !hasData && (
+      {!isLoading && !hasData && !error && (
         <EmptyState
           icon={CalendarClock}
           title="No schedules found"

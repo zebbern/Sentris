@@ -67,7 +67,7 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
     return null;
   };
   const { setNodes, deleteElements } = useReactFlow();
-  const nodeStates = useExecutionTimelineStore((s) => s.nodeStates);
+  const nodeState = useExecutionTimelineStore((s) => s.nodeStates[id]);
   const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
   const selectNode = useExecutionTimelineStore((s) => s.selectNode);
   const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
@@ -146,7 +146,7 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) 
   }, [id, isToolMode, isToolModeOnly, markDirty, setNodes]);
 
   // Visual state
-  const visualState: NodeVisualState = nodeStates[id] || DEFAULT_VISUAL_STATE;
+  const visualState: NodeVisualState = nodeState ?? DEFAULT_VISUAL_STATE;
 
   // Auto-collapse error details when status changes
   useEffect(() => {
