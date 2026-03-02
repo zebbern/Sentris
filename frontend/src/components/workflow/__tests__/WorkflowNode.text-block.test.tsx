@@ -1,9 +1,26 @@
 import { describe, it, afterEach, expect, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
-import { ReactFlowProvider } from 'reactflow';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { FrontendNodeData } from '@/schemas/node';
+
+// Inline provider avoids reactflow ESM resolution issues when running in test suite
+const ReactFlowProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+
+mock.module('reactflow', () => ({
+  ReactFlowProvider: ({ children }: any) => children,
+  NodeResizer: () => <div data-testid="node-resizer" />,
+  Handle: ({ id, ...rest }: any) => <div data-testid={`handle-${id}`} {...rest} />,
+  Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
+  useReactFlow: () => ({
+    getNodes: () => [],
+    getEdges: () => [],
+    setEdges: () => {},
+    setNodes: () => {},
+  }),
+  useNodeId: () => 'test-node-id',
+  useUpdateNodeInternals: () => () => {},
+}));
 
 const textBlockMetadata = {
   id: 'core.ui.text',

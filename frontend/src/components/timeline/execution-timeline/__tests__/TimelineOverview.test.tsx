@@ -25,7 +25,9 @@ mock.module('../utils', () => ({
   },
 }));
 
-import { TimelineOverview } from '../TimelineOverview';
+// Dynamic import with query param to bypass stale mock.module from ExecutionTimeline.test.tsx
+// @ts-expect-error — query parameter creates a separate module cache entry
+const { TimelineOverview } = await import('../TimelineOverview?unmocked');
 
 // ---------------------------------------------------------------------------
 // Helpers
