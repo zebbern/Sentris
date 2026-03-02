@@ -240,11 +240,11 @@ describe('PermissionError', () => {
 describe('ContainerError', () => {
   it('should NOT be retryable', () => {
     const error = new ContainerError('Image not found', {
-      image: 'projectdiscovery/nuclei:latest',
+      image: 'ghcr.io/zebbern/nuclei:latest',
     });
     expect(error.retryable).toBe(false);
     expect(error.type).toBe('ContainerError');
-    expect(error.image).toBe('projectdiscovery/nuclei:latest');
+    expect(error.image).toBe('ghcr.io/zebbern/nuclei:latest');
   });
 });
 
