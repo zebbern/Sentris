@@ -138,4 +138,4 @@ The following Claude Code skills are available for frontend work:
 - **[Component Development](../docs/development/component-development.mdx)** - Building custom security components
 - **[Quickstart](../docs/quickstart.mdx)** - Development setup and first workflow
 - **[Performance Guidelines](docs/performance.md)** - Query caching, bundle splitting, rendering, Zustand selectors
-- **[Analytics](../docs/analytics-pipeline.md)** - PostHog integration and privacy
+- **[Analytics](../docs/analytics-pipeline.mdx)** - PostHog integration and privacy
