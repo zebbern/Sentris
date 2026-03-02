@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # OpenSearch Dashboards initialization script
 # Creates default index patterns and saved objects
 #
