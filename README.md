@@ -86,7 +86,7 @@ pm2 status         # Check process status
 
 ### Integrated Tooling
 
-24 security components wrapping industry-standard open-source tools:
+25 security components wrapping industry-standard open-source tools:
 
 - **Discovery & Recon**: `Subfinder`, `Amass`, `DNSX`, `Naabu`, `HTTPx`, `Katana`, `theHarvester`, `ShuffleDNS`
 - **Vulnerability Scanning**: `Nuclei`, `Trivy`, `Semgrep`, `Checkov`, `TestSSL`

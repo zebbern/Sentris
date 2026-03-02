@@ -395,7 +395,7 @@ aws ec2 describe-vpcs
 
 ```bash
 # Test MCP server connectivity
-curl -X GET "http://localhost:3000/api/v1/mcp-servers" -H "Content-Type: application/json"
+curl -X GET "http://localhost:3211/api/v1/mcp-servers" -H "Content-Type: application/json"
 
 # Check worker health
 docker logs sentris-flow-worker

@@ -76,13 +76,13 @@ cp worker/.env.example worker/.env
 cp frontend/.env.example frontend/.env
 
 # Start everything (Docker + PM2), then tail frontend logs
-bun run dev:stack
+bun run dev
 ```
 
 Stop:
 
 ```bash
-bun run dev:stack:stop
+bun run dev:stop
 ```
 
 ### Method 3: Manual steps (most control — best for AI agents on Windows)

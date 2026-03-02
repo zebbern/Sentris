@@ -22,9 +22,9 @@ bun install && cp backend/.env.example backend/.env && cp worker/.env.example wo
 # Start dev environment (Docker infra + PM2 apps)
 just dev                           # Recommended (Linux/macOS/WSL)
 # OR:
-bun run dev:stack                  # Cross-platform (requires bash)
+bun run dev                        # Cross-platform (requires bash)
 # OR (manual):
-docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris up -d
+docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml up -d
 pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 
 # Status & logs
@@ -36,9 +36,9 @@ docker ps --filter name=sentris    # Docker only
 # Stop
 just dev stop                      # Stop PM2 + Docker
 # OR:
-bun run dev:stack:stop
+bun run dev:stop
 # OR (manual):
-pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml -p sentris down
+pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml down
 
 # Health checks
 curl -sf http://localhost:3211/api  # Backend API

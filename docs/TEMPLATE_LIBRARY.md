@@ -81,19 +81,19 @@ Sentris Flow ships with 35 ready-to-use workflow templates covering common secur
 
 ### Public Endpoints
 
-- `GET /templates` - List all templates with optional filters
+- `GET /api/v1/templates` - List all templates with optional filters
   - Query params: `category`, `search`, `tags`
-- `GET /templates/:id` - Get template details
-- `GET /templates/categories` - Get available categories
-- `GET /templates/tags` - Get available tags
+- `GET /api/v1/templates/:id` - Get template details
+- `GET /api/v1/templates/categories` - Get available categories
+- `GET /api/v1/templates/tags` - Get available tags
 
 ### Admin Endpoints
 
-- `POST /templates/publish` - Publish workflow as template (creates PR)
-- `POST /templates/:id/use` - Use template to create new workflow
-- `POST /templates/sync` - Sync templates from GitHub repository
-- `GET /templates/my` - Get user's submitted templates
-- `GET /templates/submissions` - Get template submissions
+- `POST /api/v1/templates/publish` - Publish workflow as template (creates PR)
+- `POST /api/v1/templates/:id/use` - Use template to create new workflow
+- `POST /api/v1/templates/sync` - Sync templates from GitHub repository
+- `GET /api/v1/templates/my` - Get user's submitted templates
+- `GET /api/v1/templates/submissions` - Get template submissions
 
 ## Environment Variables
 
@@ -257,7 +257,7 @@ The TemplatesModule is already imported in `backend/src/app.module.ts`.
 
 ### Templates not appearing after PR merge
 
-1. Run the sync endpoint: `POST /templates/sync`
+1. Run the sync endpoint: `POST /api/v1/templates/sync`
 2. Check the GitHub repository configuration
 3. Verify the backend has access to the repository
 

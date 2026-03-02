@@ -4,46 +4,51 @@ This document describes the secure development environment setup with OpenSearch
 
 ## Overview
 
-The `just dev` command now starts the development environment with full OpenSearch Security enabled, matching the production security model. This provides:
+The `just dev` command auto-detects the auth mode from your backend environment:
+
+- If `CLERK_SECRET_KEY` is set in `backend/.env` → **secure mode** (Clerk auth + OpenSearch Security)
+- Otherwise → **local auth mode** (faster startup, no multi-tenant isolation)
+
+Secure mode provides:
 
 - **TLS encryption** for all OpenSearch communication
-- **Multi-tenant isolation** - each organization's data is isolated
-- **Authentication required** - no anonymous access
-- **Same security model as production** - test security features locally
+- **Multi-tenant isolation** — each organization's data is isolated
+- **Authentication required** — no anonymous access
+- **Same security model as production** — test security features locally
 
 ## Quick Start
 
 ```bash
-# Start secure dev environment (recommended)
+# Auto-detects auth mode from backend/.env
 just dev
 
-# Start without security (faster, for quick iteration)
-just dev-insecure
+# To enable secure mode, set CLERK_SECRET_KEY in backend/.env, then restart:
+just dev stop && just dev
 ```
 
 ## Architecture
 
 ### Docker Compose Files
 
-| File | Purpose |
-|------|---------|
-| `docker-compose.infra.yml` | Base infrastructure (Postgres, Redis, Temporal, etc.) |
-| `docker-compose.dev-secure.yml` | Security overlay for development |
-| `docker-compose.prod.yml` | Production security configuration |
+| File                            | Purpose                                               |
+| ------------------------------- | ----------------------------------------------------- |
+| `docker-compose.infra.yml`      | Base infrastructure (Postgres, Redis, Temporal, etc.) |
+| `docker-compose.dev-secure.yml` | Security overlay for development                      |
+| `docker-compose.prod.yml`       | Production security configuration                     |
 
 ### Security Configuration Files
 
 Located in `docker/opensearch-security/`:
 
-| File | Purpose |
-|------|---------|
-| `config.yml` | Authentication/authorization backends (proxy auth) |
-| `internal_users.yml` | System users (admin, kibanaserver, worker) |
-| `roles.yml` | Role definitions with index permissions |
-| `roles_mapping.yml` | User-to-role mappings |
-| `action_groups.yml` | Permission groups for roles |
-| `tenants.yml` | Tenant definitions |
-| `audit.yml` | Audit logging configuration |
+| File                 | Purpose                                            |
+| -------------------- | -------------------------------------------------- |
+| `config.yml`         | Authentication/authorization backends (proxy auth) |
+| `internal_users.yml` | System users (admin, kibanaserver, worker)         |
+| `roles.yml`          | Role definitions with index permissions            |
+| `roles_mapping.yml`  | User-to-role mappings                              |
+| `action_groups.yml`  | Permission groups for roles                        |
+| `tenants.yml`        | Tenant definitions                                 |
+| `audit.yml`          | Audit logging configuration                        |
 
 ### TLS Certificates
 
@@ -57,13 +62,14 @@ Certificates are auto-generated on first run and stored in `docker/certs/`:
 
 For development convenience, default passwords are set:
 
-| User | Password | Purpose |
-|------|----------|---------|
-| `admin` | `admin` | Platform administrator |
-| `kibanaserver` | `admin` | Dashboards backend communication |
-| `worker` | `admin` | Worker service for indexing |
+| User           | Password | Purpose                          |
+| -------------- | -------- | -------------------------------- |
+| `admin`        | `admin`  | Platform administrator           |
+| `kibanaserver` | `admin`  | Dashboards backend communication |
+| `worker`       | `admin`  | Worker service for indexing      |
 
 **Important**: Change these in production via environment variables:
+
 - `OPENSEARCH_ADMIN_PASSWORD`
 - `OPENSEARCH_DASHBOARDS_PASSWORD`
 
@@ -81,6 +87,7 @@ For development convenience, default passwords are set:
 ### Dynamic Provisioning
 
 When a new customer is onboarded, the backend creates:
+
 1. A tenant for their organization
 2. A role with permissions scoped to their indices
 3. User-to-role mappings
@@ -120,7 +127,6 @@ just dev clean && just dev
 
 ## Changes from Previous Setup
 
-1. **`just dev`** now runs with security enabled (was insecure)
-2. **`just dev-insecure`** is the new command for fast, insecure development
-3. Certificates are auto-generated if missing
-4. Environment variable `OPENSEARCH_SECURITY_ENABLED=true` is set for backend/worker
+1. **`just dev`** auto-detects auth mode from `CLERK_SECRET_KEY` in `backend/.env`
+2. Certificates are auto-generated if missing when running in secure mode
+3. Environment variable `OPENSEARCH_SECURITY_ENABLED=true` is set for backend/worker in secure mode

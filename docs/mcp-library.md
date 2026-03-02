@@ -187,7 +187,7 @@ The filesystem server provides access to:
 
 **Servers Not Loading**
 
-- Check backend API: `curl http://localhost:3000/api/v1/mcp-servers`
+- Check backend API: `curl http://localhost:3211/api/v1/mcp-servers`
 - Verify backend service is running
 - Check network connectivity
 
@@ -207,7 +207,7 @@ The filesystem server provides access to:
 
 ```bash
 # Check backend API
-curl http://localhost:3000/api/v1/mcp-servers
+curl http://localhost:3211/api/v1/mcp-servers
 
 # Check Tool Registry (if Redis CLI is available)
 redis-cli GET tool:registry
@@ -216,7 +216,7 @@ redis-cli GET tool:registry
 docker ps | grep mcp
 
 # Check MCP Gateway health
-curl http://localhost:3000/mcp/gateway/health
+curl http://localhost:3211/mcp/gateway/health
 ```
 
 ## Best Practices

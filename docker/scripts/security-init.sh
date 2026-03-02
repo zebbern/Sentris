@@ -73,7 +73,7 @@ fi
 # Check if OpenSearch container is running
 if ! docker ps --filter "name=$CONTAINER_NAME" --format "{{.Names}}" | grep -q "$CONTAINER_NAME"; then
     echo "Error: OpenSearch container '$CONTAINER_NAME' is not running"
-    echo "Start it first with: just dev or just prod-secure"
+    echo "Start it first with: just dev or just prod"
     exit 1
 fi
 
