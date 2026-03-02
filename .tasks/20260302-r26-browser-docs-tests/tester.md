@@ -21,7 +21,7 @@ Load before starting: testing-patterns
 - [ ] Create `frontend/src/components/workflow/__tests__/ConnectionLine.test.tsx` — test connection line rendering between nodes
 - [ ] Create `frontend/src/components/workflow/__tests__/EdgeContextMenu.test.tsx` — test context menu appearance and action handlers
 - [ ] Create `frontend/src/components/workflow/__tests__/HeatMapLegend.test.tsx` — test legend rendering with different data ranges
-- [ ] Create `frontend/src/components/workflow/__tests__/WorkflowSchedulesPanel.test.tsx` — test schedule list rendering, create/edit/delete actions
+- [x] Create `frontend/src/components/workflow/__tests__/WorkflowSchedulesPanel.test.tsx` — test schedule list rendering, create/edit/delete actions
 - [ ] Create `frontend/src/components/workflow/__tests__/WorkflowWebhooksPanel.test.tsx` — test webhook list rendering, create/edit actions
 
 ### workflow/node/ subcomponents (`frontend/src/components/workflow/node/`)
@@ -30,7 +30,7 @@ Load before starting: testing-patterns
 - [ ] Create `frontend/src/components/workflow/node/__tests__/NodeInputPorts.test.tsx` — test input port rendering, connection indicators, port labels
 - [ ] Create `frontend/src/components/workflow/node/__tests__/NodeOutputPorts.test.tsx` — test output port rendering, connection indicators
 - [ ] Create `frontend/src/components/workflow/node/__tests__/NodeStatusSection.test.tsx` — test status display for running/completed/failed/pending states
-- [ ] Create `frontend/src/components/workflow/node/__tests__/NodeProgressBar.test.tsx` — test progress bar rendering with different percentages
+- [x] Create `frontend/src/components/workflow/node/__tests__/NodeProgressBar.test.tsx` — test progress bar rendering with different percentages
 - [ ] Create `frontend/src/components/workflow/node/__tests__/TextBlockContent.test.tsx` — test text block markdown rendering, edit mode
 
 ### timeline/ components (`frontend/src/components/timeline/`)
