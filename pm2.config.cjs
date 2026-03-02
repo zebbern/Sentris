@@ -343,6 +343,7 @@ module.exports = {
       env_file: resolveEnvFile('backend', instanceNum),
       env: {
         ...currentEnvConfig,
+        SENTRIS_INSTANCE: instanceNum,
         PORT: getInstancePort(3211, instanceNum),
         // Ensure instance DB isolation even if dotenv auto-loads a workspace/default `.env`.
         ...devInstanceEnv,
@@ -400,6 +401,7 @@ module.exports = {
         {
           ...workerEnv, // Load worker .env file (includes OPENSEARCH_URL, etc.)
           ...currentEnvConfig,
+          SENTRIS_INSTANCE: instanceNum,
           NAPI_RS_FORCE_WASI: '1',
           INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN || 'local-internal-token',
           SENTRIS_API_BASE_URL: process.env.SENTRIS_API_BASE_URL || `http://localhost:${getInstancePort(3211, instanceNum)}/api/v1`,

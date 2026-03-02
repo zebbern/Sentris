@@ -199,7 +199,10 @@ export class KafkaNodeIOAdapter implements INodeIOService {
 
       await this.sendRaw(payload.runId, message);
     } catch (error: unknown) {
-      this.logger.error('[KafkaNodeIOAdapter] Failed to process or send node I/O event', error);
+      this.logger.error(
+        '[KafkaNodeIOAdapter] CRITICAL: Failed to process or send node I/O event — messages may be lost. Check Kafka broker connectivity and topic configuration.',
+        error,
+      );
     }
   }
 

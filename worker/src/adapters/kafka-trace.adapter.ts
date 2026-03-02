@@ -102,7 +102,10 @@ export class KafkaTraceAdapter implements ITraceService {
         }),
       )
       .catch((error: unknown) => {
-        this.logger.error('[KafkaTraceAdapter] Failed to send trace event', error);
+        this.logger.error(
+          '[KafkaTraceAdapter] CRITICAL: Failed to send trace event — messages may be lost. Check Kafka broker connectivity and topic configuration.',
+          error,
+        );
       });
   }
 
