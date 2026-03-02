@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { FilesRepository } from './files.repository';
 import { StorageService, UploadedFile } from './storage.service';
@@ -16,21 +16,13 @@ export class FilesService {
     return auth?.organizationId ?? DEFAULT_ORGANIZATION_ID;
   }
 
-  private requireOrganizationId(auth: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) {
-      throw new BadRequestException('Organization context is required');
-    }
-    return organizationId;
-  }
-
   async uploadFile(
     auth: AuthContext | null,
     fileName: string,
     buffer: Buffer,
     mimeType: string,
   ): Promise<UploadedFile> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = this.resolveOrganizationId(auth);
     // Upload to MinIO
     const { storageKey, size } = await this.storageService.uploadFile(fileName, buffer, mimeType);
 
@@ -54,7 +46,7 @@ export class FilesService {
   }
 
   async getFileById(auth: AuthContext | null, id: string): Promise<UploadedFile> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = this.resolveOrganizationId(auth);
     const file = await this.filesRepository.findById(id, { organizationId });
     if (!file) {
       throw new NotFoundException(`File with id ${id} not found`);
@@ -81,7 +73,7 @@ export class FilesService {
   }
 
   async listFiles(auth: AuthContext | null, limit = 100): Promise<UploadedFile[]> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = this.resolveOrganizationId(auth);
     const files = await this.filesRepository.list(limit, { organizationId });
     return files.map((f) => ({
       id: f.id,
@@ -94,7 +86,7 @@ export class FilesService {
   }
 
   async deleteFile(auth: AuthContext | null, id: string): Promise<void> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = this.resolveOrganizationId(auth);
     const file = await this.getFileById(auth, id);
 
     // Delete from MinIO

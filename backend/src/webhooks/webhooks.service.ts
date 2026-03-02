@@ -1,12 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   type WebhookConfiguration,
@@ -16,6 +10,7 @@ import {
   type WebhookUrlResponse,
 } from '@sentris/shared';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { TemporalService } from '../temporal/temporal.service';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -47,13 +42,13 @@ export class WebhooksService {
   // Management methods (auth required)
 
   async list(auth: AuthContext | null): Promise<WebhookConfiguration[]> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const records = await this.repository.list({ organizationId });
     return records.map((r) => this.mapConfigurationRecord(r));
   }
 
   async get(auth: AuthContext | null, id: string): Promise<WebhookConfiguration> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const record = await this.repository.findById(id, { organizationId });
     if (!record) {
       throw new NotFoundException(`Webhook ${id} not found`);
@@ -82,7 +77,7 @@ export class WebhooksService {
     await this.workflowsService.ensureWorkflowAdminAccess(dto.workflowId, auth);
 
     // Get organization ID
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     // Generate unique webhook path
     const webhookPath = this.generateWebhookPath();
@@ -583,12 +578,5 @@ export class WebhooksService {
       createdAt: record.createdAt.toISOString(),
       completedAt: record.completedAt?.toISOString() ?? null,
     };
-  }
-
-  private requireOrganizationId(auth: AuthContext | null): string {
-    if (!auth?.organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return auth.organizationId;
   }
 }

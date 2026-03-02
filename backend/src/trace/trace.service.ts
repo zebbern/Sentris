@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { TraceRepository } from './trace.repository';
 import type { TraceEventType as PersistedTraceEventType } from './types';
@@ -10,6 +10,7 @@ import {
   TraceEventType,
 } from '@sentris/shared';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 
 @Injectable()
 export class TraceService {
@@ -19,7 +20,7 @@ export class TraceService {
     runId: string,
     auth?: AuthContext | null,
   ): Promise<{ events: TraceEventPayload[]; cursor?: string }> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const records = await this.repository.listByRunId(runId, organizationId);
     const events = records.map((record) => this.mapRecordToEvent(record));
     const cursor = events.length > 0 ? events[events.length - 1].id : undefined;
@@ -35,19 +36,11 @@ export class TraceService {
       return this.list(runId, auth);
     }
 
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const records = await this.repository.listAfterSequence(runId, afterSequence, organizationId);
     const events = records.map((record) => this.mapRecordToEvent(record));
     const cursor = events.length > 0 ? events[events.length - 1].id : undefined;
     return { events, cursor };
-  }
-
-  private requireOrganizationId(auth?: AuthContext | null): string {
-    const organizationId = auth?.organizationId;
-    if (!organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return organizationId;
   }
 
   private mapRecordToEvent(record: {

@@ -1,14 +1,10 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { LogStreamRepository } from './log-stream.repository';
 import type { WorkflowLogStreamRecord } from '../database/schema';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { redactSensitiveData } from '../logging/redact-sensitive';
 
 interface FetchLogsOptions {
@@ -53,7 +49,7 @@ export class LogStreamService {
       throw new ServiceUnavailableException('Loki integration is not configured');
     }
 
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 2000) : 500;
     const streams = await this.repository.listByRunId(
       runId,
@@ -432,13 +428,5 @@ export class LogStreamService {
 
   private sanitizeMessage(message: string): string {
     return redactSensitiveData(message);
-  }
-
-  private requireOrganizationId(auth: AuthContext | null): string {
-    const organizationId = auth?.organizationId;
-    if (!organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return organizationId;
   }
 }

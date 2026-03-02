@@ -18,6 +18,8 @@ export { ToolsDialog } from './ToolsDialog';
 export { useEditorActions } from './useEditorActions';
 export { useJsonImport } from './useJsonImport';
 export { useGroupActions } from './useGroupActions';
+export { useMcpLibraryActions } from './useMcpLibraryActions';
+export { useMcpLibraryData } from './useMcpLibraryData';
 
 // Types and utilities
 export type {

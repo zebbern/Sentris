@@ -13,6 +13,8 @@ import { status as grpcStatus, type ServiceError } from '@grpc/grpc-js';
 import { WorkflowNotFoundError } from '@temporalio/client';
 import { z } from 'zod';
 
+import { requireOrganizationId } from '../common/auth/require-organization-id';
+
 import { compileWorkflowGraph } from '../dsl/compiler';
 // Ensure all worker components are registered before accessing the registry
 import '@sentris/worker/components';
@@ -186,10 +188,6 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     clearInterval(this.flowContextCleanupInterval);
   }
 
-  private resolveOrganizationId(auth?: AuthContext | null): string | null {
-    return auth?.organizationId ?? null;
-  }
-
   async ensureWorkflowAdminAccess(workflowId: string, auth?: AuthContext | null): Promise<string> {
     return this.requireWorkflowAdmin(workflowId, auth);
   }
@@ -220,7 +218,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     definition: WorkflowDefinition;
     organizationId: string;
   }> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
@@ -243,14 +241,6 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private requireOrganizationId(auth?: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return organizationId;
-  }
-
   private ensureOrganizationAdmin(auth?: AuthContext | null): void {
     this.logger.debug(
       `[WORKFLOWS] Checking org admin - Auth: ${auth ? 'present' : 'null'}, Roles: ${auth?.roles ? JSON.stringify(auth.roles) : 'none'}, User: ${auth?.userId || 'none'}, Org: ${auth?.organizationId || 'none'}`,
@@ -268,7 +258,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     workflowId: string,
     auth?: AuthContext | null,
   ): Promise<string> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     if (auth?.roles?.includes('ADMIN')) {
       return organizationId;
     }
@@ -292,7 +282,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async requireRunAccess(runId: string, auth?: AuthContext | null) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const run = await this.runRepository.findByRunId(runId, { organizationId });
     if (!run) {
       throw new NotFoundException(`Workflow run ${runId} not found`);
@@ -340,7 +330,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.ensureOrganizationAdmin(auth);
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const record = await this.repository.create(input, { organizationId });
     let version: WorkflowVersionRecord;
     try {
@@ -448,7 +438,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async findById(id: string, auth?: AuthContext | null): Promise<ServiceWorkflowResponse> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const record = await this.repository.findById(id, { organizationId });
     if (!record) {
       throw new NotFoundException(`Workflow ${id} not found`);
@@ -627,7 +617,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     auth?: AuthContext | null,
     options?: { tags?: string[] },
   ): Promise<ServiceWorkflowResponse[]> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     let filteredIds: string[] | undefined;
     if (options?.tags && options.tags.length > 0) {
@@ -654,7 +644,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     auth?: AuthContext | null,
     options?: { tags?: string[] },
   ): Promise<(WorkflowSummaryResponse & { tags: string[] })[]> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     let filteredIds: string[] | undefined;
     if (options?.tags && options.tags.length > 0) {
@@ -958,7 +948,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
       offset?: number;
     } = {},
   ) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const runs = await this.runRepository.list({
       ...options,
       organizationId,
@@ -1007,7 +997,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getRun(runId: string, auth?: AuthContext | null): Promise<WorkflowRunSummary> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const run = await this.runRepository.findByRunId(runId, { organizationId });
     if (!run) {
       throw new NotFoundException(`Workflow run ${runId} not found`);
@@ -1193,7 +1183,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
       parentNodeRef?: string;
     } = {},
   ): Promise<PreparedRunPayload> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(id, { organizationId });
     if (!workflow) {
       throw new NotFoundException(`Workflow ${id} not found`);
