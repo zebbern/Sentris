@@ -11,6 +11,7 @@ The MCP Library component provides a centralized way to select and enable multip
 - **Seamless AI Agent Integration**: Works with existing AI Agent components without any modifications
 - **Dynamic Server Management**: Fetches server list from backend API with health status and tool counts
 - **Docker Container Management**: Automatically spawns and manages containers for stdio servers
+- **Docker Registry Catalog**: Browse, search, and import 300+ community MCP servers from Docker's official registry
 
 ## Component ID: `core.mcp.library`
 
@@ -227,11 +228,150 @@ curl http://localhost:3211/mcp/gateway/health
 4. **Resource Limits**: Monitor container resource usage
 5. **Network Isolation**: Keep MCP servers isolated from production networks
 
+---
+
+## Docker Registry Catalog
+
+The MCP Library includes a **Docker Registry** tab that gives you access to 300+ community Model Context Protocol (MCP) servers curated by Docker's official MCP Registry. You can browse, search, and import servers directly into your library — no manual configuration required.
+
+### Accessing the Docker Registry
+
+1. Navigate to the **MCP Library** page from the sidebar
+2. Click the **Docker Registry** tab (next to "My Library")
+3. Browse the full catalog of available community servers
+
+### Browsing and Searching
+
+The Docker Registry tab provides several ways to find servers:
+
+- **Search**: Type a name, description, or tag in the search bar to filter results in real time
+- **Category filter**: Select a category to narrow down servers — options include Databases, Cloud, Development, Security, AI/ML, Communication, and Monitoring
+- **Server type filter**: Toggle between **All**, **Docker**, or **Remote** to show only container-based or HTTP-based servers
+
+### Featured Servers
+
+Some servers are marked with a gold star badge, indicating they are **curated, security-relevant servers** recommended for common security workflows. Featured servers appear prominently in the catalog.
+
+### Server Types
+
+Each server in the registry has one of two types:
+
+| Type | Label | Description |
+|------|-------|-------------|
+| `server` | Docker | Container-based MCP server. Sentris automatically pulls and runs the Docker image in an isolated container. |
+| `remote` | Remote | HTTP-based MCP server. Sentris connects to a remote URL endpoint using streamable HTTP or SSE transport. |
+
+### Importing a Server
+
+To add a server from the Docker Registry to your library:
+
+1. **Click a server card** (or the "View Details" button) to open the server detail sheet
+2. **Review the server details**: description, server type, Docker image or remote URL, required secrets, and environment variables
+3. **Fill in required credentials**: Enter any required API keys or tokens. These are encrypted before storage.
+4. **Optionally configure environment variables**: Set any additional environment variables the server needs
+5. **Click "Import to Library"**: The server is created in your library with encrypted credentials
+
+After import, the server appears in your **My Library** tab. It is fully available for use in workflows and health checks, just like any manually configured server.
+
+### Already Imported Indicator
+
+Servers you have already imported display an **"Already imported"** badge on their catalog card. This prevents accidental duplicate imports and helps you quickly see which servers are already in your library.
+
+### Post-Import Behavior
+
+Once imported, a registry server behaves identically to a manually created MCP server:
+
+- It appears in the **My Library** tab with health status and tool count
+- You can enable or disable it for specific workflows
+- Docker-type servers have their containers automatically managed
+- Remote-type servers connect to their configured HTTP endpoint
+- Credentials and environment variables can be updated from the server settings
+
+---
+
+## Registry Sync and Administration
+
+The Docker Registry catalog is automatically synchronized from the upstream GitHub repository (`docker/mcp-registry`). Administrators can monitor and manage the sync process.
+
+### Automatic Sync
+
+The catalog syncs automatically once per day at **3:00 AM UTC**. During sync, new servers are added, removed servers are cleaned up, and existing server metadata is updated.
+
+No action is required — the catalog stays current automatically.
+
+### Manual Sync
+
+Administrators can trigger a sync manually:
+
+```bash
+curl -X POST http://localhost/api/v1/mcp-registry/sync \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+The response includes sync results:
+
+```json
+{
+  "status": "success",
+  "serversAdded": 5,
+  "serversUpdated": 12,
+  "serversRemoved": 1,
+  "totalServers": 312,
+  "durationMs": 2340,
+  "error": null
+}
+```
+
+### Sync Status
+
+Check the current sync state:
+
+```bash
+curl http://localhost/api/v1/mcp-registry/sync/status \
+  -H "Authorization: Bearer <admin-token>"
+```
+
+Response fields:
+
+| Field | Description |
+|-------|-------------|
+| `lastSyncAt` | Timestamp of the last completed sync |
+| `lastSyncStatus` | Result of the last sync (`success`, `partial`, `failed`) |
+| `serversSynced` | Total servers in the catalog after the last sync |
+| `serversAdded` | Number of servers added in the last sync |
+| `serversRemoved` | Number of servers removed in the last sync |
+| `serversUpdated` | Number of servers updated in the last sync |
+| `lastError` | Error message if the last sync failed (otherwise `null`) |
+
+### Registry Environment Variables
+
+Configure these optional environment variables in your backend `.env` file:
+
+```bash
+# Optional: GitHub personal access token for registry sync
+# Increases GitHub API rate limit from 60 to 5,000 requests/hour
+GITHUB_REGISTRY_TOKEN=""
+
+# Optional: Disable automatic daily catalog sync (default: true)
+MCP_REGISTRY_SYNC_ENABLED="true"
+
+# Optional: Override the registry GitHub repository (default: docker/mcp-registry)
+MCP_REGISTRY_REPO="docker/mcp-registry"
+```
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITHUB_REGISTRY_TOKEN` | No | — | GitHub personal access token. Increases API rate limit from 60 to 5,000 requests/hour for catalog sync. |
+| `MCP_REGISTRY_SYNC_ENABLED` | No | `true` | Set to `false` to disable the daily automatic sync at 3 AM UTC. |
+| `MCP_REGISTRY_REPO` | No | `docker/mcp-registry` | Override the GitHub repository used as the registry source. |
+
+<Note>
+  Without a `GITHUB_REGISTRY_TOKEN`, sync uses GitHub's unauthenticated rate limit of 60 requests per hour. This is sufficient for the daily sync schedule, but may be insufficient if you trigger manual syncs frequently.
+</Note>
+
 ## Future Enhancements
 
-- [ ] Database-backed server configuration (PostgreSQL)
 - [ ] Custom server registration (add your own MCP servers)
-- [ ] Per-server credential management
 - [ ] Health check polling and alerts
 - [ ] Tool exclusion filters
 - [ ] Server groups and templates
