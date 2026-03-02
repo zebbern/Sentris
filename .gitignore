@@ -71,7 +71,9 @@ vite.config.ts.timestamp-*
 
 # Playground testing directory
 .playground/
-.playground/
-.playground/
 .omc/
 MCP_FLOW_TRACE.md
+
+# Scratch / temporary test outputs
+test-output*.txt
+scratch/
