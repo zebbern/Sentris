@@ -7,6 +7,7 @@ import { TemplateService } from './templates.service';
 import { WorkflowSanitizationService } from './workflow-sanitization.service';
 import { TemplatesRepository } from './templates.repository';
 import { GitHubSyncService } from './github-sync.service';
+import { TemplateSeedService } from './template-seed.service';
 
 /**
  * Templates Module
@@ -14,11 +15,18 @@ import { GitHubSyncService } from './github-sync.service';
  *
  * Uses GitHub web flow for publishing and GitHub API for syncing templates.
  * Templates are synced on startup and via manual admin trigger.
+ * Auto-seeds from local JSON files when the templates table is empty.
  */
 @Module({
   imports: [DatabaseModule, ConfigModule, WorkflowsModule],
   controllers: [TemplatesController],
-  providers: [TemplateService, WorkflowSanitizationService, TemplatesRepository, GitHubSyncService],
+  providers: [
+    TemplateSeedService,
+    TemplateService,
+    WorkflowSanitizationService,
+    TemplatesRepository,
+    GitHubSyncService,
+  ],
   exports: [TemplateService, GitHubSyncService],
 })
 export class TemplatesModule {}

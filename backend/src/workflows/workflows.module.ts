@@ -31,11 +31,11 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     NodeIOModule,
   ],
   controllers: [
-    WorkflowsController,
-    WorkflowRunsController,
-    WorkflowRunObservabilityController,
-    WorkflowRunStreamController,
-    InternalRunsController,
+    WorkflowRunsController, // /runs (literal) — must come before wildcard
+    WorkflowRunObservabilityController, // /runs/:runId/trace etc.
+    WorkflowRunStreamController, // /runs/:runId/stream etc.
+    WorkflowsController, // :id (wildcard) — must come last
+    InternalRunsController, // different prefix, order doesn't matter
   ],
   providers: [
     WorkflowsService,
