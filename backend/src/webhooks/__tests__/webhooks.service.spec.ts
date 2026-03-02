@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'bun:test';
 import type { WebhookConfigurationRecord, WebhookDeliveryRecord } from '../../database/schema';
 import type { AuthContext } from '../../auth/types';
@@ -569,6 +569,264 @@ describe('WebhooksService', () => {
       const result = await service.getDelivery(authContext, delivery.id);
 
       expect(result?.id).toBe(delivery.id);
+    });
+  });
+
+  describe('negative auth paths', () => {
+    const nullOrgAuth: AuthContext = {
+      userId: 'tester',
+      organizationId: null,
+      roles: ['ADMIN'],
+      isAuthenticated: true,
+      provider: 'test',
+    };
+
+    const emptyOrgAuth: AuthContext = {
+      userId: 'tester',
+      organizationId: '' as unknown as string,
+      roles: ['ADMIN'],
+      isAuthenticated: true,
+      provider: 'test',
+    };
+
+    const createInput = {
+      workflowId: 'workflow-1',
+      name: 'Test Webhook',
+      parsingScript: 'export async function script(input) { return {}; }',
+      expectedInputs: [] as { id: string; label: string; type: string; required: boolean }[],
+    };
+
+    describe('null auth context', () => {
+      it('list throws ForbiddenException', async () => {
+        await expect(service.list(null)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('get throws ForbiddenException', async () => {
+        await expect(service.get(null, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('create throws ForbiddenException', async () => {
+        await expect(service.create(null, createInput)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('update throws ForbiddenException', async () => {
+        await expect(service.update(null, 'webhook-1', { name: 'Updated' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('delete throws ForbiddenException', async () => {
+        await expect(service.delete(null, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('regeneratePath throws ForbiddenException', async () => {
+        await expect(service.regeneratePath(null, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getUrl throws ForbiddenException', async () => {
+        await expect(service.getUrl(null, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('listDeliveries throws ForbiddenException', async () => {
+        await expect(service.listDeliveries(null, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getDelivery throws ForbiddenException when delivery exists', async () => {
+        const webhook = await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Auth Test Webhook',
+          webhookPath: 'wh_auth_test',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'org-1',
+          createdBy: 'user-1',
+        });
+        const delivery = await deliveryRepository.create({
+          webhookId: webhook.id,
+          status: 'delivered',
+          payload: {},
+        });
+
+        await expect(service.getDelivery(null, delivery.id)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('testParsingScript throws ForbiddenException', async () => {
+        await expect(
+          service.testParsingScript(null, {
+            parsingScript: 'export async function script(input) { return {}; }',
+            testPayload: {},
+          }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+    });
+
+    describe('auth with null organizationId', () => {
+      it('list throws ForbiddenException', async () => {
+        await expect(service.list(nullOrgAuth)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('get throws ForbiddenException', async () => {
+        await expect(service.get(nullOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('create throws ForbiddenException', async () => {
+        await expect(service.create(nullOrgAuth, createInput)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('update throws ForbiddenException', async () => {
+        await expect(service.update(nullOrgAuth, 'webhook-1', { name: 'Updated' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('delete throws ForbiddenException', async () => {
+        await expect(service.delete(nullOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('regeneratePath throws ForbiddenException', async () => {
+        await expect(service.regeneratePath(nullOrgAuth, 'webhook-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getUrl throws ForbiddenException', async () => {
+        await expect(service.getUrl(nullOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('listDeliveries throws ForbiddenException', async () => {
+        await expect(service.listDeliveries(nullOrgAuth, 'webhook-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getDelivery throws ForbiddenException', async () => {
+        const webhook = await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Null Org Test Webhook',
+          webhookPath: 'wh_null_org_test',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'org-1',
+          createdBy: 'user-1',
+        });
+        const delivery = await deliveryRepository.create({
+          webhookId: webhook.id,
+          status: 'delivered',
+          payload: {},
+        });
+
+        await expect(service.getDelivery(nullOrgAuth, delivery.id)).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+    });
+
+    describe('auth with empty string organizationId', () => {
+      it('list throws ForbiddenException', async () => {
+        await expect(service.list(emptyOrgAuth)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('get throws ForbiddenException', async () => {
+        await expect(service.get(emptyOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('create throws ForbiddenException', async () => {
+        await expect(service.create(emptyOrgAuth, createInput)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('delete throws ForbiddenException', async () => {
+        await expect(service.delete(emptyOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('update throws ForbiddenException', async () => {
+        await expect(
+          service.update(emptyOrgAuth, 'webhook-1', { name: 'Updated' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('regeneratePath throws ForbiddenException', async () => {
+        await expect(service.regeneratePath(emptyOrgAuth, 'webhook-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getUrl throws ForbiddenException', async () => {
+        await expect(service.getUrl(emptyOrgAuth, 'webhook-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('listDeliveries throws ForbiddenException', async () => {
+        await expect(service.listDeliveries(emptyOrgAuth, 'webhook-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getDelivery throws ForbiddenException', async () => {
+        const webhook = await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Empty Org Test Webhook',
+          webhookPath: 'wh_empty_org_test',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'org-1',
+          createdBy: 'user-1',
+        });
+        const delivery = await deliveryRepository.create({
+          webhookId: webhook.id,
+          status: 'delivered',
+          payload: {},
+        });
+
+        await expect(service.getDelivery(emptyOrgAuth, delivery.id)).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+    });
+
+    describe('cross-organization access', () => {
+      it('list returns empty when no webhooks belong to the org', async () => {
+        await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Other Org Webhook',
+          webhookPath: 'wh_other',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'other-org',
+          createdBy: 'user-1',
+        });
+
+        const results = await service.list(authContext);
+        expect(results.length).toBe(0);
+      });
+
+      it('update throws NotFoundException for webhook in different org', async () => {
+        const webhook = await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Other Org Webhook',
+          webhookPath: 'wh_cross',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'other-org',
+          createdBy: 'user-1',
+        });
+
+        await expect(service.update(authContext, webhook.id, { name: 'Hijacked' })).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('delete throws NotFoundException for webhook in different org', async () => {
+        const webhook = await repository.create({
+          workflowId: 'workflow-1',
+          name: 'Other Org Webhook',
+          webhookPath: 'wh_cross_del',
+          parsingScript: 'script',
+          expectedInputs: [],
+          organizationId: 'other-org',
+          createdBy: 'user-1',
+        });
+
+        await expect(service.delete(authContext, webhook.id)).rejects.toThrow(NotFoundException);
+      });
     });
   });
 });
