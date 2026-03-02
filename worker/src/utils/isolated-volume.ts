@@ -94,6 +94,11 @@ export class IsolatedContainerVolume {
       // Populate files if provided
       if (Object.keys(files).length > 0) {
         await this.writeFiles(files);
+      } else {
+        // writeFiles() calls setVolumePermissions() internally, but when no
+        // input files are provided we must still set permissions so nonroot
+        // containers (e.g. testssl.sh) can write output to the volume.
+        await this.setVolumePermissions();
       }
 
       this.isInitialized = true;
