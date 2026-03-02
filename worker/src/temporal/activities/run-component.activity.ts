@@ -253,7 +253,19 @@ export async function runComponentActivity(
     // normalisation/parsing inside `execute` runs.
     // Docker/remote execution should be invoked from within
     // the component via `runComponentWithRunner`.
-    let output = await component.execute({ inputs: parsedInputs, params: parsedParams }, context);
+    //
+    // Send periodic heartbeats during execution so long-running
+    // Docker containers (e.g. testssl.sh, trivy) don't exceed
+    // the Temporal heartbeat timeout.
+    const heartbeatInterval = setInterval(() => {
+      ctx.heartbeat('executing');
+    }, 15_000);
+    let output: Awaited<ReturnType<typeof component.execute>>;
+    try {
+      output = await component.execute({ inputs: parsedInputs, params: parsedParams }, context);
+    } finally {
+      clearInterval(heartbeatInterval);
+    }
     ctx.heartbeat('execution-complete');
 
     // Check if component requested suspension (e.g. approval gate)
