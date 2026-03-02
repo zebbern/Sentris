@@ -10,6 +10,7 @@ import { extractPorts } from './zod-ports';
 import { extractParameters } from './zod-parameters';
 import { getPortMeta } from './port-meta';
 import { validateComponentSchema, validateParameterSchema } from './schema-validation';
+import { type ZodDef, getDefType } from './zod-helpers';
 
 type AnyComponentDefinition = ComponentDefinition<any, any, any, any, any, any>;
 
@@ -24,22 +25,6 @@ type InferredFromSchema<T> = T extends { __inferred: infer I } ? I : unknown;
  * e.g., InputsSchema<{ targets: PortSchema<...> }> -> { targets: PortSchema<...> }
  */
 type ShapeFromSchema<T> = T extends z.ZodObject<infer S> ? S : Record<string, any>;
-
-type ZodDef = { type?: string; typeName?: string;[key: string]: any };
-
-const LEGACY_TYPE_MAP: Record<string, string> = {
-  ZodObject: 'object',
-  ZodOptional: 'optional',
-  ZodNullable: 'nullable',
-  ZodDefault: 'default',
-  ZodEffects: 'effects',
-  ZodPipeline: 'pipe',
-};
-
-function getDefType(def: ZodDef | undefined): string | undefined {
-  const raw = def?.type ?? def?.typeName;
-  return raw ? LEGACY_TYPE_MAP[raw] ?? raw : undefined;
-}
 
 export interface CachedComponentMetadata {
   definition: AnyComponentDefinition;

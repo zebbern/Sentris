@@ -7,22 +7,7 @@
 import { z } from 'zod';
 import type { ComponentParameterMetadata } from './types';
 import { getParamMeta } from './param-meta';
-
-type ZodDef = { type?: string; typeName?: string; [key: string]: any };
-
-const LEGACY_TYPE_MAP: Record<string, string> = {
-  ZodObject: 'object',
-  ZodOptional: 'optional',
-  ZodNullable: 'nullable',
-  ZodDefault: 'default',
-  ZodEffects: 'effects',
-  ZodPipeline: 'pipe',
-};
-
-function getDefType(def: ZodDef | undefined): string | undefined {
-  const raw = def?.type ?? def?.typeName;
-  return raw ? LEGACY_TYPE_MAP[raw] ?? raw : undefined;
-}
+import { type ZodDef, getDefType } from './zod-helpers';
 
 export function extractParameters(schema: z.ZodTypeAny): ComponentParameterMetadata[] {
   const parameters: ComponentParameterMetadata[] = [];
