@@ -132,7 +132,8 @@ export class WebhooksService {
       status?: 'active' | 'inactive';
     },
   ): Promise<WebhookConfiguration> {
-    const existing = await this.repository.findById(id, { organizationId: auth?.organizationId });
+    const organizationId = requireOrganizationId(auth);
+    const existing = await this.repository.findById(id, { organizationId });
     if (!existing) {
       throw new NotFoundException(`Webhook ${id} not found`);
     }
@@ -157,7 +158,7 @@ export class WebhooksService {
         expectedInputs: dto.expectedInputs as WebhookInputDefinition[] | undefined,
         status: dto.status,
       },
-      { organizationId: auth?.organizationId },
+      { organizationId },
     );
 
     if (!updated) {
@@ -179,14 +180,15 @@ export class WebhooksService {
   }
 
   async delete(auth: AuthContext | null, id: string): Promise<void> {
-    const existing = await this.repository.findById(id, { organizationId: auth?.organizationId });
+    const organizationId = requireOrganizationId(auth);
+    const existing = await this.repository.findById(id, { organizationId });
     if (!existing) {
       throw new NotFoundException(`Webhook ${id} not found`);
     }
 
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
 
-    await this.repository.delete(id, { organizationId: auth?.organizationId });
+    await this.repository.delete(id, { organizationId });
     this.logger.log(`Deleted webhook ${id}`);
     this.auditLogService.record(auth, {
       action: 'webhook.delete',
@@ -200,7 +202,8 @@ export class WebhooksService {
   }
 
   async regeneratePath(auth: AuthContext | null, id: string): Promise<WebhookUrlResponse> {
-    const existing = await this.repository.findById(id, { organizationId: auth?.organizationId });
+    const organizationId = requireOrganizationId(auth);
+    const existing = await this.repository.findById(id, { organizationId });
     if (!existing) {
       throw new NotFoundException(`Webhook ${id} not found`);
     }
@@ -208,11 +211,7 @@ export class WebhooksService {
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
 
     const newPath = this.generateWebhookPath();
-    const updated = await this.repository.update(
-      id,
-      { webhookPath: newPath },
-      { organizationId: auth?.organizationId },
-    );
+    const updated = await this.repository.update(id, { webhookPath: newPath }, { organizationId });
 
     if (!updated) {
       throw new NotFoundException(`Webhook ${id} not found`);
@@ -267,6 +266,7 @@ export class WebhooksService {
       webhookId?: string; // Optional: validate against existing webhook's expected inputs
     },
   ): Promise<TestWebhookScriptResponse> {
+    const organizationId = requireOrganizationId(auth);
     try {
       // Execute the parsing script
       const parsedData = await this.executeParsingScript(
@@ -279,7 +279,7 @@ export class WebhooksService {
       let validationErrors: { inputId: string; message: string }[] | undefined;
       if (dto.webhookId) {
         const webhook = await this.repository.findById(dto.webhookId, {
-          organizationId: auth?.organizationId,
+          organizationId,
         });
         if (webhook) {
           validationErrors = this.validateParsedData(webhook.expectedInputs, parsedData);
@@ -306,8 +306,9 @@ export class WebhooksService {
   // Delivery history
 
   async listDeliveries(auth: AuthContext | null, webhookId: string): Promise<WebhookDelivery[]> {
+    const organizationId = requireOrganizationId(auth);
     const webhook = await this.repository.findById(webhookId, {
-      organizationId: auth?.organizationId,
+      organizationId,
     });
     if (!webhook) {
       throw new NotFoundException(`Webhook ${webhookId} not found`);
@@ -324,8 +325,9 @@ export class WebhooksService {
     }
 
     // Verify access to the webhook
+    const organizationId = requireOrganizationId(auth);
     const webhook = await this.repository.findById(delivery.webhookId, {
-      organizationId: auth?.organizationId,
+      organizationId,
     });
     if (!webhook) {
       throw new NotFoundException(`Parent webhook not found`);
