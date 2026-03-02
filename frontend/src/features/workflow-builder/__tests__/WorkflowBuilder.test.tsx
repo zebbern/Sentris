@@ -2,6 +2,7 @@ import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun
 import { restoreMockedModules } from '@/test/restore-mocks';
 import { screen, cleanup } from '@testing-library/react';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 import * as reactRouterDom from 'react-router-dom';
 
 // --- Mutable mock state ---
@@ -127,17 +128,16 @@ mock.module('@/features/workflow-builder/workflowBuilderUtils', () => ({
 
 // --- Module mocks: stores ---
 mock.module('@/store/workflowStore', () => ({
-  useWorkflowStore: (s: (state: Record<string, unknown>) => unknown) => s(mockWorkflowStore),
+  useWorkflowStore: createStoreMock(() => mockWorkflowStore),
 }));
 mock.module('@/store/workflowUiStore', () => ({
-  useWorkflowUiStore: (s: (state: Record<string, unknown>) => unknown) => s(mockUiStore),
+  useWorkflowUiStore: createStoreMock(() => mockUiStore),
 }));
 mock.module('@/store/executionTimelineStore', () => ({
-  useExecutionTimelineStore: (s: (state: Record<string, unknown>) => unknown) =>
-    s(mockTimelineStore),
+  useExecutionTimelineStore: createStoreMock(() => mockTimelineStore),
 }));
 mock.module('@/store/authStore', () => ({
-  useAuthStore: (s: (state: Record<string, unknown>) => unknown) => s(mockAuthStore),
+  useAuthStore: createStoreMock(() => mockAuthStore),
 }));
 
 // --- Module mocks: hooks ---

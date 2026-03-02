@@ -1,16 +1,10 @@
 import { describe, it, expect, mock } from 'bun:test';
+import { createAuthStoreMock } from '@/test/mocks/auth-store';
 
 // ---------------------------------------------------------------------------
 // Mock authStore so queryKeys can resolve org/user scopes
 // ---------------------------------------------------------------------------
-mock.module('@/store/authStore', () => ({
-  useAuthStore: {
-    getState: () => ({
-      organizationId: 'test-org',
-      userId: 'test-user',
-    }),
-  },
-}));
+mock.module('@/store/authStore', () => createAuthStoreMock());
 
 // Mock the API module — we only care about the shape of returned objects,
 // not executing actual HTTP calls.

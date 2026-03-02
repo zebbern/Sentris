@@ -3,6 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { FrontendNodeData } from '@/schemas/node';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Inline provider avoids reactflow ESM resolution issues when running in test suite
 const ReactFlowProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
@@ -130,41 +131,37 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
 }));
 
 mock.module('@/store/executionTimelineStore', () => ({
-  useExecutionTimelineStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({
-      nodeStates: {},
-      selectedRunId: null,
-      selectNode: () => {},
-      isPlaying: false,
-      playbackMode: 'static',
-    }),
+  useExecutionTimelineStore: createStoreMock({
+    nodeStates: {},
+    selectedRunId: null,
+    selectNode: () => {},
+    isPlaying: false,
+    playbackMode: 'static',
+    getTerminalSession: () => null,
+  }),
 }));
 
 mock.module('@/store/workflowStore', () => ({
-  useWorkflowStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({
-      metadata: { id: 'wf-1' },
-      markDirty: () => {},
-    }),
+  useWorkflowStore: createStoreMock({
+    metadata: { id: 'wf-1' },
+    markDirty: () => {},
+  }),
 }));
 
 mock.module('@/store/workflowUiStore', () => ({
-  useWorkflowUiStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({
-      mode: 'design',
-      openHumanInputDialog: () => {},
-      dockedTerminals: [],
-    }),
+  useWorkflowUiStore: createStoreMock({
+    mode: 'design',
+    openHumanInputDialog: () => {},
+    dockedTerminals: [],
+  }),
 }));
 
 mock.module('@/store/themeStore', () => ({
-  useThemeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ theme: 'light' }),
+  useThemeStore: createStoreMock({ theme: 'light' }),
 }));
 
 mock.module('@/hooks/queries/useApiKeyQueries', () => ({
-  useApiKeyUiStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ lastCreatedKey: null }),
+  useApiKeyUiStore: createStoreMock({ lastCreatedKey: null }),
 }));
 
 mock.module('@/hooks/useIsMobile', () => ({

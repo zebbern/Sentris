@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
 
 // ---------------------------------------------------------------------------
 // Mocks for browser APIs
@@ -23,7 +23,10 @@ const mockSessionStorage = {
   key: mock((_index: number) => null as string | null),
 };
 
-// Mock window.location.reload
+// Save original window so we can restore it after each test.
+// Replacing globalThis.window with a spread copy loses prototype methods
+// (addEventListener, etc.) and corrupts the DOM environment for later tests.
+const originalWindow = globalThis.window;
 
 beforeEach(() => {
   mockSessionStorage.clear();
@@ -49,6 +52,16 @@ beforeEach(() => {
         },
       },
     },
+    writable: true,
+    configurable: true,
+  });
+});
+
+afterEach(() => {
+  // Restore the real window object so prototype methods (addEventListener,
+  // removeEventListener, etc.) are available for subsequent test files.
+  Object.defineProperty(globalThis, 'window', {
+    value: originalWindow,
     writable: true,
     configurable: true,
   });

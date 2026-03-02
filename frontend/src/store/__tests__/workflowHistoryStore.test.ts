@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real store
+mock.module('@/store/workflowHistoryStore', () =>
+  realModuleExports('@/store/workflowHistoryStore'),
+);
+
 import { useWorkflowHistoryStore, getTemporalState } from '../workflowHistoryStore';
 import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
 import type { FrontendNodeData } from '@/schemas/node';

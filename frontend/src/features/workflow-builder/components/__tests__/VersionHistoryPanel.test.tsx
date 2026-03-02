@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { createAlertDialogMock } from '@/test/mocks/dialog';
+import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 // ---------------------------------------------------------------------------
@@ -120,13 +121,11 @@ mock.module('@/services/api', () => ({
   },
 }));
 
-mock.module('@/lib/queryKeys', () => ({
-  queryKeys: {
-    workflows: {
-      versions: (id: string) => ['workflows', id, 'versions'],
-    },
-  },
-}));
+mock.module('@/lib/queryKeys', () =>
+  createQueryKeysMock({
+    workflows: { versions: (id: string) => ['workflows', id, 'versions'] },
+  }),
+);
 
 mock.module('@/components/ui/use-toast', () => ({
   useToast: () => ({ toast: mockToast, dismiss: mockDismiss }),

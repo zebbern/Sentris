@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real store
+mock.module('@/store/workflowUiStore', () => realModuleExports('@/store/workflowUiStore'));
+
 import { useWorkflowUiStore } from '../workflowUiStore';
 
 // Save original window.innerHeight

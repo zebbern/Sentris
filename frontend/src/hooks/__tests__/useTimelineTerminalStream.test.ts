@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Mock the terminal stream hook — use the alias path matching the source import
 const mockChunks = { value: [] as any[] };
@@ -31,12 +32,7 @@ const mockTimelineState = {
 };
 
 mock.module('@/store/executionTimelineStore', () => ({
-  useExecutionTimelineStore: Object.assign(
-    (selector: (s: typeof mockTimelineState) => any) => selector(mockTimelineState),
-    {
-      getState: () => mockTimelineState,
-    },
-  ),
+  useExecutionTimelineStore: createStoreMock(() => mockTimelineState),
 }));
 
 // Mock API and logger

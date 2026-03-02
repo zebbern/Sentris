@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
+import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
+import { realModuleExports } from '@/test/restore-mocks';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 
 // ---------------------------------------------------------------------------
@@ -79,23 +81,25 @@ mock.module('@/hooks/queries/useRunQueries', () => ({
 }));
 
 mock.module('@tanstack/react-query', () => ({
+  ...realModuleExports('@tanstack/react-query'),
   useQueryClient: () => ({
     invalidateQueries: mock(() => {}),
   }),
 }));
 
-mock.module('@/lib/queryKeys', () => ({
-  queryKeys: {
+mock.module('@/lib/queryKeys', () =>
+  createQueryKeysMock({
     runs: {
       byWorkflow: (id: string) => ['runs', 'workflow', id],
       global: () => ['runs', 'global'],
     },
-  },
-}));
+  }),
+);
 
 const mockNavigate = mock(() => {});
 
 mock.module('react-router-dom', () => ({
+  ...realModuleExports('react-router-dom'),
   useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: '/workflows/wf-1' }),
   useParams: () => ({ id: 'wf-1' }),
