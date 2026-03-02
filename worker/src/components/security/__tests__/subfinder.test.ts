@@ -168,7 +168,7 @@ dockerDescribe('subfinder component', () => {
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/zebbern/subfinder:latest');
+      expect(component.runner.image).toBe('projectdiscovery/subfinder:latest');
     }
   });
 });

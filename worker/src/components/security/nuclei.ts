@@ -276,7 +276,7 @@ const definition = defineComponent({
     // 4. ARM64 support: Built for multi-architecture (amd64 + arm64) for M1/M2 Macs
     // 5. Verified -stream flag: Tested and confirmed working for PTY real-time output
     // Image source: github.com/SentrisAI/docker-images/nuclei
-    image: 'ghcr.io/zebbern/nuclei:latest',
+    image: 'projectdiscovery/nuclei:latest',
     entrypoint: 'nuclei',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
@@ -508,7 +508,7 @@ const definition = defineComponent({
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [
           volume.getVolumeConfig('/inputs', true),
-          // ✅ Templates are pre-installed in ghcr.io/zebbern/nuclei:latest
+          // ✅ Templates are pre-installed in projectdiscovery/nuclei:latest
           // No need for persistent volume since templates are baked into the image
         ],
       };

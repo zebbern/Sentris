@@ -17,7 +17,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const SUBFINDER_IMAGE = 'ghcr.io/zebbern/subfinder:latest';
+const SUBFINDER_IMAGE = 'projectdiscovery/subfinder:latest';
 const SUBFINDER_TIMEOUT_SECONDS = 1800; // 30 minutes
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;

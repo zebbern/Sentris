@@ -199,7 +199,7 @@ dockerDescribe('dnsx component', () => {
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/zebbern/dnsx:latest');
+      expect(component.runner.image).toBe('projectdiscovery/dnsx:latest');
       expect(component.runner.entrypoint).toBe('sh');
     }
   });
