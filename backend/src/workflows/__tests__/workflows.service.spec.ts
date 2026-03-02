@@ -417,7 +417,13 @@ describe('WorkflowsService', () => {
       temporalService,
       analyticsServiceMock as any,
       { record: vi.fn() } as any,
-      {} as any,
+      {
+        getTagsByWorkflowIds: vi.fn().mockResolvedValue(new Map()),
+        getTagsByWorkflowId: vi.fn().mockResolvedValue([]),
+        findWorkflowIdsByTags: vi.fn().mockResolvedValue([]),
+        setTags: vi.fn().mockResolvedValue([]),
+        listAllTags: vi.fn().mockResolvedValue([]),
+      } as any,
     );
   });
 
