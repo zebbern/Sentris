@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { Lightbulb } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import type { Parameter } from '@/schemas/component';
 import type { InputMapping } from '@/schemas/node';
@@ -49,7 +50,10 @@ export function ParameterFieldWrapper({
         )}
         <RuntimeInputsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
-          <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
+          <p className="text-xs text-muted-foreground italic mt-2 flex items-start gap-1">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span>{parameter.helpText}</span>
+          </p>
         )}
       </div>
     );
@@ -72,7 +76,10 @@ export function ParameterFieldWrapper({
           type={isInput ? 'input' : 'output'}
         />
         {parameter.helpText && (
-          <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
+          <p className="text-xs text-muted-foreground italic mt-2 flex items-start gap-1">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span>{parameter.helpText}</span>
+          </p>
         )}
       </div>
     );
@@ -87,7 +94,10 @@ export function ParameterFieldWrapper({
         )}
         <FormFieldsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
-          <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
+          <p className="text-xs text-muted-foreground italic mt-2 flex items-start gap-1">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span>{parameter.helpText}</span>
+          </p>
         )}
       </div>
     );
@@ -102,7 +112,10 @@ export function ParameterFieldWrapper({
         )}
         <SelectionOptionsEditor value={Array.isArray(value) ? value : []} onChange={onChange} />
         {parameter.helpText && (
-          <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
+          <p className="text-xs text-muted-foreground italic mt-2 flex items-start gap-1">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span>{parameter.helpText}</span>
+          </p>
         )}
       </div>
     );
@@ -192,7 +205,10 @@ export function ParameterFieldWrapper({
       )}
 
       {parameter.helpText && (
-        <p className="text-xs text-muted-foreground italic mt-2">💡 {parameter.helpText}</p>
+        <p className="text-xs text-muted-foreground italic mt-2 flex items-start gap-1">
+          <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+          <span>{parameter.helpText}</span>
+        </p>
       )}
     </div>
   );

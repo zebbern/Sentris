@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
 import { useQueryClient } from '@tanstack/react-query';
+import { Lightbulb } from 'lucide-react';
 import { queryKeys } from '@/lib/queryKeys';
 
 type ToastFn = (params: {
@@ -415,15 +416,15 @@ function handleExecutionError(
     }
   }
 
-  let helpMessage = '💡 Open browser console (F12) to see complete error details';
+  let helpMessage = 'Open browser console (F12) to see complete error details';
   if (errorMessage.includes('validation failed') || errorMessage.includes('required')) {
     helpMessage =
-      '💡 Check the highlighted component configuration and ensure all required fields are filled';
+      'Check the highlighted component configuration and ensure all required fields are filled';
   } else if (errorMessage.includes('not registered')) {
-    helpMessage = '💡 This component may not be properly installed or registered';
+    helpMessage = 'This component may not be properly installed or registered';
   } else if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
     helpMessage =
-      '💡 The operation took too long. Try increasing timeout or check external service availability';
+      'The operation took too long. Try increasing timeout or check external service availability';
   }
 
   toast({
@@ -441,7 +442,10 @@ function handleExecutionError(
             </pre>
           </details>
         )}
-        <p className="text-xs opacity-70 mt-2 font-medium">{helpMessage}</p>
+        <p className="text-xs opacity-70 mt-2 font-medium flex items-start gap-1">
+          <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-px" />
+          <span>{helpMessage}</span>
+        </p>
       </div>
     ),
   });
