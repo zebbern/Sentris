@@ -16,6 +16,8 @@ import { GripVertical, MoreHorizontal, Copy, Trash2 } from 'lucide-react';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { type WorkflowSummary } from '@/services/api';
 import { cn } from '@/lib/utils';
+import { TagBadge } from '@/components/shared/TagBadge';
+import { TagEditor } from '@/components/shared/TagEditor';
 
 export interface WorkflowRowProps {
   workflow: WorkflowSummary;
@@ -27,6 +29,12 @@ export interface WorkflowRowProps {
   onRowClick: () => void;
   onDeleteClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
   onCloneClick: (event: MouseEvent, workflow: WorkflowSummary) => void;
+  /** All available tag names for suggestions in the editor. */
+  availableTags?: string[];
+  /** Called with (workflowId, newTags) to update tags. */
+  onTagsChange?: (workflowId: string, tags: string[]) => void;
+  /** Whether a tag mutation is pending for this workflow. */
+  isTagsPending?: boolean;
 }
 
 export function WorkflowRow({
@@ -39,6 +47,9 @@ export function WorkflowRow({
   onRowClick,
   onDeleteClick,
   onCloneClick,
+  availableTags = [],
+  onTagsChange,
+  isTagsPending = false,
 }: WorkflowRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: workflow.id,
@@ -109,6 +120,41 @@ export function WorkflowRow({
             <TooltipContent>{workflow.name}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        {/* Tag badges */}
+        {workflow.tags && workflow.tags.length > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-1 mt-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {workflow.tags.slice(0, 5).map((tag) => (
+              <TagBadge key={tag} tag={tag} isActive className="text-[10px] px-1.5 py-0" />
+            ))}
+            {workflow.tags.length > 5 && (
+              <span className="text-[10px] text-muted-foreground">
+                +{workflow.tags.length - 5} more
+              </span>
+            )}
+            {canManageWorkflows && onTagsChange && (
+              <TagEditor
+                currentTags={workflow.tags}
+                availableTags={availableTags}
+                onSave={(tags) => onTagsChange(workflow.id, tags)}
+                isPending={isTagsPending}
+              />
+            )}
+          </div>
+        )}
+        {/* Show add-tag button when no tags exist */}
+        {(!workflow.tags || workflow.tags.length === 0) && canManageWorkflows && onTagsChange && (
+          <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+            <TagEditor
+              currentTags={[]}
+              availableTags={availableTags}
+              onSave={(tags) => onTagsChange(workflow.id, tags)}
+              isPending={isTagsPending}
+            />
+          </div>
+        )}
       </TableCell>
       <TableCell className="hidden sm:table-cell">
         <Badge variant="secondary" className="text-xs">

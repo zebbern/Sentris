@@ -20,6 +20,7 @@ export interface WorkflowSummary {
   nodeCount: number;
   createdAt: string;
   updatedAt: string;
+  tags: string[];
 }
 
 export const workflowsApi = {
@@ -29,9 +30,15 @@ export const workflowsApi = {
     return response.data || [];
   },
 
-  listSummary: async (): Promise<WorkflowSummary[]> => {
+  listSummary: async (tags?: string[]): Promise<WorkflowSummary[]> => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/workflows/summary`, { headers });
+    const params = new URLSearchParams();
+    if (tags && tags.length > 0) {
+      params.set('tags', tags.join(','));
+    }
+    const qs = params.toString();
+    const url = `${API_V1_URL}/workflows/summary${qs ? `?${qs}` : ''}`;
+    const response = await fetch(url, { headers });
     if (!response.ok) throw new Error('Failed to fetch workflow summaries');
     return response.json();
   },

@@ -11,8 +11,10 @@ import { WorkflowRunRepository } from './repository/workflow-run.repository';
 import { WorkflowVersionRepository } from './repository/workflow-version.repository';
 import { WorkflowRoleRepository } from './repository/workflow-role.repository';
 import { TerminalRecordRepository } from './repository/terminal-record.repository';
+import { WorkflowTagsRepository } from './repository/workflow-tags.repository';
 import { TerminalArchiveService } from './terminal-archive.service';
 import { WorkflowsController } from './workflows.controller';
+import { WorkflowTagsController } from './workflow-tags.controller';
 import { WorkflowRunsController } from './workflow-runs.controller';
 import { WorkflowRunObservabilityController } from './workflow-run-observability.controller';
 import { WorkflowRunStreamController } from './workflow-run-stream.controller';
@@ -34,6 +36,7 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     WorkflowRunsController, // /runs (literal) — must come before wildcard
     WorkflowRunObservabilityController, // /runs/:runId/trace etc.
     WorkflowRunStreamController, // /runs/:runId/stream etc.
+    WorkflowTagsController, // /workflow-tags — different prefix, order doesn't matter
     WorkflowsController, // :id (wildcard) — must come last
     InternalRunsController, // different prefix, order doesn't matter
   ],
@@ -46,6 +49,7 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     TerminalRecordRepository,
     TerminalArchiveService,
     WorkflowRoleGuard,
+    WorkflowTagsRepository,
   ],
   exports: [WorkflowsService, WorkflowRepository, WorkflowRunRepository, WorkflowVersionRepository],
 })

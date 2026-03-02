@@ -2,10 +2,12 @@ import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/reac
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 
-export function useWorkflowsSummary() {
+export function useWorkflowsSummary(tags?: string[]) {
+  const filters =
+    tags && tags.length > 0 ? ({ tags: tags.join(',') } as Record<string, unknown>) : undefined;
   return useQuery({
-    queryKey: queryKeys.workflows.summary(),
-    queryFn: () => api.workflows.listSummary(),
+    queryKey: queryKeys.workflows.summary(filters),
+    queryFn: () => api.workflows.listSummary(tags),
     staleTime: 60_000,
   });
 }

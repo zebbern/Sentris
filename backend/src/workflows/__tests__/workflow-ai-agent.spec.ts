@@ -261,6 +261,7 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       {} as any,
       analyticsServiceMock as any,
       auditLogServiceMock as any,
+      {} as any,
     );
 
     const definition = await service.commit(workflowId, authContext);

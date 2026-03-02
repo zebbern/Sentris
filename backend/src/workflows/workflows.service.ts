@@ -32,6 +32,7 @@ import { WorkflowRecord, WorkflowRepository } from './repository/workflow.reposi
 import { WorkflowRoleRepository } from './repository/workflow-role.repository';
 import { WorkflowRunRepository } from './repository/workflow-run.repository';
 import { WorkflowVersionRepository } from './repository/workflow-version.repository';
+import { WorkflowTagsRepository } from './repository/workflow-tags.repository';
 import { TraceRepository } from '../trace/trace.repository';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -156,6 +157,7 @@ export class WorkflowsService {
     private readonly temporalService: TemporalService,
     private readonly analyticsService: AnalyticsService,
     private readonly auditLogService: AuditLogService,
+    private readonly tagsRepository: WorkflowTagsRepository,
   ) {}
 
   private resolveOrganizationId(auth?: AuthContext | null): string | null {
@@ -587,31 +589,109 @@ export class WorkflowsService {
     });
   }
 
-  async list(auth?: AuthContext | null): Promise<ServiceWorkflowResponse[]> {
+  async list(
+    auth?: AuthContext | null,
+    options?: { tags?: string[] },
+  ): Promise<ServiceWorkflowResponse[]> {
     const organizationId = this.requireOrganizationId(auth);
+
+    let filteredIds: string[] | undefined;
+    if (options?.tags && options.tags.length > 0) {
+      filteredIds = await this.tagsRepository.findWorkflowIdsByTags(options.tags, organizationId);
+      if (filteredIds.length === 0) return [];
+    }
+
     const records = await this.repository.list({ organizationId });
+    const filtered = filteredIds ? records.filter((r) => filteredIds!.includes(r.id)) : records;
+
     const versions = await Promise.all(
-      records.map((record) =>
+      filtered.map((record) =>
         this.versionRepository.findLatestByWorkflowId(record.id, { organizationId }),
       ),
     );
-    const responses = records.map((record, index) =>
+    const responses = filtered.map((record, index) =>
       this.buildWorkflowResponse(record, versions[index] ?? null),
     );
     this.logger.log(`Loaded ${responses.length} workflow(s) from repository`);
     return responses;
   }
 
-  async listSummary(auth?: AuthContext | null): Promise<WorkflowSummaryResponse[]> {
+  async listSummary(
+    auth?: AuthContext | null,
+    options?: { tags?: string[] },
+  ): Promise<(WorkflowSummaryResponse & { tags: string[] })[]> {
     const organizationId = this.requireOrganizationId(auth);
+
+    let filteredIds: string[] | undefined;
+    if (options?.tags && options.tags.length > 0) {
+      filteredIds = await this.tagsRepository.findWorkflowIdsByTags(options.tags, organizationId);
+      if (filteredIds.length === 0) return [];
+    }
+
     const records = await this.repository.listSummary({ organizationId });
-    return records.map((record) => ({
+    const filtered = filteredIds ? records.filter((r) => filteredIds!.includes(r.id)) : records;
+
+    const workflowIds = filtered.map((r) => r.id);
+    const tagsMap = await this.tagsRepository.getTagsByWorkflowIds(workflowIds);
+
+    return filtered.map((record) => ({
       ...record,
       lastRun: record.lastRun?.toISOString() ?? null,
       latestRunStatus: record.latestRunStatus ?? null,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
+      tags: tagsMap.get(record.id) ?? [],
     }));
+  }
+
+  // --- Tag operations ---
+
+  async setWorkflowTags(
+    auth: AuthContext | null,
+    workflowId: string,
+    tags: string[],
+  ): Promise<{ tags: string[] }> {
+    const organizationId = await this.requireWorkflowAdmin(workflowId, auth);
+
+    // Verify workflow exists
+    const workflow = await this.repository.findById(workflowId, { organizationId });
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
+
+    const oldTags = await this.tagsRepository.getTagsByWorkflowId(workflowId);
+    const newTags = await this.tagsRepository.setTags(workflowId, tags);
+
+    this.auditLogService.record(auth ?? null, {
+      action: 'workflow.tags.updated',
+      resourceType: 'workflow',
+      resourceId: workflowId,
+      resourceName: workflow.name,
+      metadata: { oldTags, newTags },
+    });
+
+    this.logger.log(`Updated tags for workflow ${workflowId}: [${newTags.join(', ')}]`);
+    return { tags: newTags };
+  }
+
+  async getWorkflowTags(auth: AuthContext | null, workflowId: string): Promise<{ tags: string[] }> {
+    const organizationId = this.requireOrganizationId(auth);
+
+    const workflow = await this.repository.findById(workflowId, { organizationId });
+    if (!workflow) {
+      throw new NotFoundException(`Workflow ${workflowId} not found`);
+    }
+
+    const tags = await this.tagsRepository.getTagsByWorkflowId(workflowId);
+    return { tags };
+  }
+
+  async listAllTags(
+    auth: AuthContext | null,
+  ): Promise<{ tags: { name: string; count: number }[] }> {
+    const organizationId = this.requireOrganizationId(auth);
+    const tags = await this.tagsRepository.listAllTags(organizationId);
+    return { tags };
   }
 
   private computeDuration(start: Date, end?: Date | null): number {

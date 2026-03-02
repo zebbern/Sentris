@@ -157,6 +157,7 @@ describe('Run status caching', () => {
       temporalServiceMock,
       analyticsServiceMock as any,
       { record: mock(() => {}) } as any,
+      {} as any,
     );
   });
 

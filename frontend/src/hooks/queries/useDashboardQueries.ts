@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type { ExecutionRun } from './useRunQueries';
+import type { WorkflowSummary } from '@/services/api/workflows';
 
 const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED', 'TERMINATED', 'TIMED_OUT'];
 const RECENT_RUNS_LIMIT = 10;
@@ -19,6 +20,7 @@ interface DashboardStats {
 interface DashboardData {
   stats: DashboardStats;
   recentRuns: ExecutionRun[];
+  workflows: WorkflowSummary[];
   isLoading: boolean;
   isError: boolean;
   errors: { workflows?: Error; runs?: Error; schedules?: Error; humanInputs?: Error };
@@ -113,5 +115,10 @@ export function useDashboardData(): DashboardData {
     void humanInputsQuery.refetch();
   };
 
-  return { stats, recentRuns, isLoading, isError, errors, refetch };
+  const workflows = useMemo(
+    () => (workflowsQuery.data ?? []) as WorkflowSummary[],
+    [workflowsQuery.data],
+  );
+
+  return { stats, recentRuns, workflows, isLoading, isError, errors, refetch };
 }

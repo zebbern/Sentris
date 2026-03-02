@@ -7,13 +7,21 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
   BadRequestException,
   HttpException,
   Headers,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -31,6 +39,11 @@ import {
   ENTRY_POINT_COMPONENT_IDS,
   type RuntimeInput,
 } from './dto/workflow-graph.dto';
+import {
+  SetWorkflowTagsDto,
+  SetWorkflowTagsSchema,
+  WorkflowTagsResponseDto,
+} from './dto/workflow-tags.dto';
 import { WorkflowsService } from './workflows.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
@@ -86,6 +99,13 @@ export class WorkflowsController {
 
   @Get('summary')
   @ApiOperation({ summary: 'List workflow summaries' })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated tag names to filter by (intersection — workflows must have ALL tags)',
+  })
   @ApiOkResponse({
     description: 'Lightweight workflow list without graph data',
     schema: {
@@ -103,12 +123,14 @@ export class WorkflowsController {
           nodeCount: { type: 'integer' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
+          tags: { type: 'array', items: { type: 'string' } },
         },
       },
     },
   })
-  async listSummary(@CurrentAuth() auth: AuthContext | null) {
-    return this.workflowsService.listSummary(auth);
+  async listSummary(@CurrentAuth() auth: AuthContext | null, @Query('tags') tagsParam?: string) {
+    const tags = this.parseTagsParam(tagsParam);
+    return this.workflowsService.listSummary(auth, { tags });
   }
 
   @Get(':id')
@@ -343,11 +365,46 @@ export class WorkflowsController {
     }
   }
 
+  @Get(':id/tags')
+  @ApiOperation({ summary: 'Get tags for a workflow' })
+  @ApiOkResponse({ type: WorkflowTagsResponseDto })
+  async getWorkflowTags(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('id') id: string,
+  ): Promise<WorkflowTagsResponseDto> {
+    return this.workflowsService.getWorkflowTags(auth, id);
+  }
+
+  @Patch(':id/tags')
+  @UseGuards(WorkflowRoleGuard)
+  @RequireWorkflowRole('ADMIN')
+  @ApiOperation({ summary: 'Set tags for a workflow (replaces all existing tags)' })
+  @ApiBody({ type: SetWorkflowTagsDto })
+  @ApiOkResponse({ type: WorkflowTagsResponseDto })
+  async setWorkflowTags(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(SetWorkflowTagsSchema)) body: SetWorkflowTagsDto,
+  ): Promise<WorkflowTagsResponseDto> {
+    return this.workflowsService.setWorkflowTags(auth, id, body.tags);
+  }
+
   @Get()
   @ApiOperation({ summary: 'List all workflows' })
+  @ApiQuery({
+    name: 'tags',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated tag names to filter by (intersection — workflows must have ALL tags)',
+  })
   @ApiOkResponse({ type: [WorkflowResponseDto] })
-  async findAll(@CurrentAuth() auth: AuthContext | null): Promise<WorkflowResponseDto[]> {
-    const serviceResponses = await this.workflowsService.list(auth);
+  async findAll(
+    @CurrentAuth() auth: AuthContext | null,
+    @Query('tags') tagsParam?: string,
+  ): Promise<WorkflowResponseDto[]> {
+    const tags = this.parseTagsParam(tagsParam);
+    const serviceResponses = await this.workflowsService.list(auth, { tags });
     return serviceResponses.map((response) => this.transformServiceResponseToApi(response));
   }
 
@@ -360,6 +417,15 @@ export class WorkflowsController {
       createdAt: serviceResponse.createdAt.toISOString(),
       updatedAt: serviceResponse.updatedAt.toISOString(),
     };
+  }
+
+  private parseTagsParam(tagsParam?: string): string[] | undefined {
+    if (!tagsParam) return undefined;
+    const tags = tagsParam
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0);
+    return tags.length > 0 ? tags : undefined;
   }
 
   private extractIdempotencyKey(

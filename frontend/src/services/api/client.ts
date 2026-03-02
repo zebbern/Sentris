@@ -155,6 +155,23 @@ export async function httpPut<T>(path: string, body?: unknown): Promise<T> {
   return response.json();
 }
 
+export async function httpPatch<T>(path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { ...(await getAuthHeaders()) };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const response = await fetch(`${API_V1_URL}${path}`, {
+    method: 'PATCH',
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: `PATCH ${path} failed` }));
+    throw new Error(error.message || `PATCH ${path} failed`);
+  }
+  return response.json();
+}
+
 export async function httpDel(path: string): Promise<void> {
   const headers = await getAuthHeaders();
   const response = await fetch(`${API_V1_URL}${path}`, {

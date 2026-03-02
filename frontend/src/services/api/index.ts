@@ -22,7 +22,7 @@ import { artifactsApi } from './artifacts';
 import { humanInputsApi } from './humanInputs';
 import { webhooksApi } from './webhooks';
 import { analyticsSettingsApi } from './analytics';
-import { httpGet, httpPost, httpPut, httpDel } from './client';
+import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
   templates: templatesApi,
@@ -44,6 +44,7 @@ export const api = {
   get: httpGet,
   post: httpPost,
   put: httpPut,
+  patch: httpPatch,
   del: httpDel,
 };
 
