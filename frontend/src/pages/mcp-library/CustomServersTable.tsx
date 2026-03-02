@@ -73,7 +73,9 @@ export function CustomServersTable({
         <Package className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Custom MCP Servers</h2>
         <Badge variant="secondary" className="text-xs">
-          {servers.length} {servers.length === 1 ? 'server' : 'servers'}
+          {isLoading && servers.length === 0
+            ? '…'
+            : `${servers.length} ${servers.length === 1 ? 'server' : 'servers'}`}
         </Badge>
       </div>
       <div className="border rounded-lg">

@@ -125,7 +125,7 @@ export function ArtifactLibrary() {
         />
 
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
-          {libraryLoading ? (
+          {libraryLoading && !libraryError ? (
             <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
               <TableHeader>
                 <TableRow className="text-xs uppercase text-muted-foreground">

@@ -232,7 +232,7 @@ export function ActionCenterPage() {
                     </TableHeader>
                   )}
                   <TableBody>
-                    {isLoading && !hasData
+                    {isLoading && !hasData && !error
                       ? Array.from({ length: 4 }).map((_, index) => (
                           <TableRow key={`skeleton-${index}`}>
                             <TableCell>
