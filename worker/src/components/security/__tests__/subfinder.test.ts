@@ -3,8 +3,10 @@ import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
 
-// TODO: Fix flaky Docker timeout issues
-describe.skip('subfinder component', () => {
+const shouldRunDockerTests = process.env.RUN_DOCKER_TESTS === 'true';
+const dockerDescribe = shouldRunDockerTests ? describe : describe.skip;
+
+dockerDescribe('subfinder component', () => {
   beforeAll(async () => {
     await import('../../index');
   });

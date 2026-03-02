@@ -3,8 +3,10 @@ import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { AmassInput, AmassOutput } from '../amass';
 
-// TODO: Fix flaky Docker timeout issues
-describe.skip('amass component', () => {
+const shouldRunDockerTests = process.env.RUN_DOCKER_TESTS === 'true';
+const dockerDescribe = shouldRunDockerTests ? describe : describe.skip;
+
+dockerDescribe('amass component', () => {
   beforeAll(async () => {
     await import('../../index');
   });
