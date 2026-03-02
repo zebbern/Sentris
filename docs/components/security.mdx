@@ -3,7 +3,7 @@ title: "Security Components"
 description: "Open source security tools for security automation workflows"
 ---
 
-Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, and secret detection.
+Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **24 security components**.
 
 ---
 
@@ -254,6 +254,211 @@ Scans Supabase instances for misconfigurations.
 |-------|------|-------------|
 | `projectUrl` | String | Supabase project URL |
 | `apiKey` | Secret | Supabase API key |
+
+---
+
+### Checkov
+
+<Info>
+[GitHub](https://github.com/bridgecrewio/checkov) · Docker: `bridgecrew/checkov`
+</Info>
+
+Static analysis for Infrastructure-as-Code (Terraform, CloudFormation, Kubernetes, Dockerfile, Helm).
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | IaC file content to scan |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `framework` | Select | IaC framework (terraform, cloudformation, kubernetes, dockerfile, helm, serverless) |
+
+---
+
+## Web Security
+
+### Ffuf
+
+<Info>
+[GitHub](https://github.com/ffuf/ffuf) · Docker: `ffuf/ffuf`
+</Info>
+
+Web fuzzer for directory, file, and parameter discovery.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | URL with FUZZ keyword for fuzzing |
+| `wordlist` | String | Newline-separated wordlist content |
+| `customFlags` | String | Additional CLI flags |
+
+---
+
+### Katana
+
+<Info>
+[GitHub](https://github.com/projectdiscovery/katana) · Docker: `projectdiscovery/katana`
+</Info>
+
+Web crawler for endpoint and URL discovery.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `targets` | Array | URLs or domains to crawl |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `depth` | Number | Maximum crawl depth (1–10, default: 3) |
+
+---
+
+### Wafw00f
+
+WAF (Web Application Firewall) detection across target URLs.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `targets` | Array | URLs to check for WAF |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `findAll` | Boolean | Detect all WAFs (not just the first match) |
+
+---
+
+## SAST & Code Analysis
+
+### Semgrep
+
+<Info>
+[GitHub](https://github.com/semgrep/semgrep) · Docker: `semgrep/semgrep`
+</Info>
+
+Static Application Security Testing (SAST) with configurable rulesets.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | Source code content to scan |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `config` | String | Semgrep rule config (e.g., `auto`, `p/owasp-top-ten`, or custom YAML rules) |
+
+---
+
+## SSL/TLS Auditing
+
+### TestSSL
+
+<Info>
+[GitHub](https://github.com/drwetter/testssl.sh) · Docker: `drwetter/testssl.sh`
+</Info>
+
+Comprehensive SSL/TLS configuration auditing.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | Hostname:port to audit (e.g., `example.com:443`) |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `protocols` | Boolean | Test SSL/TLS protocol support |
+| `ciphers` | Boolean | Test cipher suites |
+
+---
+
+## Container Security
+
+### Trivy
+
+<Info>
+[GitHub](https://github.com/aquasecurity/trivy) · Docker: `aquasec/trivy`
+</Info>
+
+Vulnerability scanner for container images, filesystems, and repositories.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | Container image name, filesystem path, or repo URL |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `scanType` | Select | `image`, `fs`, or `repo` |
+
+---
+
+## OSINT & Threat Intelligence
+
+### theHarvester
+
+<Info>
+[GitHub](https://github.com/laramies/theHarvester) · Docker: `ghcr.io/laramies/theharvester`
+</Info>
+
+OSINT gathering for domains — emails, subdomains, hosts, and IPs from public sources.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `domain` | String | Target domain to harvest |
+| `customFlags` | String | Additional CLI flags |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sources` | String | Comma-separated data sources (e.g., `baidu,bing,duckduckgo,yahoo`) |
+
+---
+
+### AbuseIPDB
+
+IP address reputation lookup via the AbuseIPDB API.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `ipAddress` | String | IPv4 or IPv6 address to check |
+| `apiKey` | Secret | AbuseIPDB API key |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `maxAgeInDays` | Number | Max age for reports (default: 90) |
+| `verbose` | Boolean | Include verbose information |
+
+---
+
+### VirusTotal
+
+Multi-engine threat analysis for IPs, domains, file hashes, and URLs.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `indicator` | String | IP, domain, file hash, or URL to inspect |
+| `apiKey` | Secret | VirusTotal API key |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | Select | `ip`, `domain`, `file`, or `url` |
+
+---
+
+## Malware Analysis
+
+### YARA
+
+<Info>
+[GitHub](https://github.com/VirusTotal/yara) · Docker: `blacktop/yara`
+</Info>
+
+Pattern matching engine for malware classification using YARA rules.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `target` | String | File content to scan |
+| `rules` | String | YARA rule definitions |
+| `customFlags` | String | Additional CLI flags |
 
 ---
 

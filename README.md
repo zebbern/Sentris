@@ -86,11 +86,21 @@ pm2 status         # Check process status
 
 ### Integrated Tooling
 
-Native support for industry-standard security tools including:
+24 security components wrapping industry-standard open-source tools:
 
-- **Discovery**: `Subfinder`, `DNSX`, `Naabu`, `HTTPx`
-- **Vulnerability**: `Nuclei`, `TruffleHog`
+- **Discovery & Recon**: `Subfinder`, `Amass`, `DNSX`, `Naabu`, `HTTPx`, `Katana`, `theHarvester`, `ShuffleDNS`
+- **Vulnerability Scanning**: `Nuclei`, `Trivy`, `Semgrep`, `Checkov`, `TestSSL`
+- **Secret Detection**: `TruffleHog`
+- **Threat Intelligence**: `AbuseIPDB`, `VirusTotal`, `YARA`
+- **Web Security**: `Ffuf`, `Wafw00f`, `Prowler`, `Supabase Scanner`
+- **Notifications**: `Notify` (Slack, Discord, Telegram, Email)
 - **Utility**: `JSON Transform`, `Logic Scripts`, `HTTP Requests`
+
+### Template Library
+
+- **24 ready-to-use workflow templates** covering vulnerability scanning, cloud compliance, incident response, OSINT, and more.
+- **One-click deployment**: Browse, preview, and create workflows from templates instantly.
+- **Community publishing**: Share your workflows as templates via GitHub PR with automatic secret sanitization.
 
 ### Advanced Orchestration
 

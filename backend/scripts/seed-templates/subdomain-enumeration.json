@@ -1,0 +1,111 @@
+{
+  "_metadata": {
+    "name": "Subdomain Enumeration",
+    "description": "Discover subdomains using Amass passive enumeration, then resolve DNS records with DNSX to validate findings. Results are formatted into a structured report and delivered via Slack. Ideal for mapping an organization's external attack surface before deeper testing.",
+    "category": "network-security",
+    "tags": ["subdomain", "dns", "recon", "amass", "dnsx"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Subdomain Enumeration",
+    "description": "Enumerate subdomains with Amass and resolve DNS records with DNSX, then report findings via Slack.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "network-security",
+    "tags": ["subdomain", "dns", "recon", "amass", "dnsx"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "Subdomain Enumeration",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": { "label": "Start Enumeration", "config": { "params": {}, "inputOverrides": {} } }
+      },
+      {
+        "id": "amass_1",
+        "type": "sentris.amass.enum",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Enumerate Subdomains",
+          "config": {
+            "params": {
+              "passive": true,
+              "active": false,
+              "bruteForce": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dnsx_1",
+        "type": "sentris.dnsx.run",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Resolve DNS Records",
+          "config": {
+            "params": {
+              "recordTypes": ["A", "AAAA", "CNAME"]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "format_results",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Format Enumeration Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Save Subdomain Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#recon-results" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-amass_1", "source": "trigger_1", "target": "amass_1" },
+      { "id": "amass_1-dnsx_1", "source": "amass_1", "target": "dnsx_1" },
+      { "id": "dnsx_1-format_results", "source": "dnsx_1", "target": "format_results" },
+      {
+        "id": "format_results-artifact_report",
+        "source": "format_results",
+        "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for subdomain enumeration results"
+    }
+  ]
+}
