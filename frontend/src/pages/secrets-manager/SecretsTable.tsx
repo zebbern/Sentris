@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { KeyRound, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
+import { DOCS_URLS } from '@/config/docs';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
@@ -119,6 +120,7 @@ export function SecretsTable({
     <div className="border rounded-lg bg-card p-4 md:p-6">
       <PageToolbar
         title="Secrets"
+        helpUrl={DOCS_URLS.secretsManagement}
         filters={
           <div>
             <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>

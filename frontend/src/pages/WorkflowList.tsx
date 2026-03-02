@@ -19,9 +19,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageToolbar } from '@/components/shared/PageToolbar';
+import { DOCS_URLS } from '@/config/docs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Workflow, Info } from 'lucide-react';
+import { Workflow, Info, Download } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { type WorkflowSummary } from '@/services/api';
@@ -33,8 +40,11 @@ import {
   useDeleteWorkflow,
   useCloneWorkflow,
 } from '@/hooks/queries/useWorkflowQueries';
+import { useWorkflowTags, useSetWorkflowTags } from '@/hooks/queries/useWorkflowTagQueries';
+import { TagFilter } from '@/components/shared/TagFilter';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { exportTableData, type ExportColumn } from '@/lib/exportTableData';
 import { logger } from '@/lib/logger';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -54,11 +64,29 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const WORKFLOW_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'name', header: 'Name' },
+  { key: 'description', header: 'Description' },
+  { key: 'runCount', header: 'Run Count' },
+  { key: 'latestRunStatus', header: 'Latest Run Status' },
+  { key: 'lastRun', header: 'Last Run' },
+  { key: 'nodeCount', header: 'Node Count' },
+  { key: 'createdAt', header: 'Created At' },
+  { key: 'updatedAt', header: 'Updated At' },
+  { key: 'id', header: 'Workflow ID' },
+];
+
 export function WorkflowList() {
   useDocumentTitle('Workflows');
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: rawWorkflows = EMPTY_WORKFLOWS, isLoading, error, refetch } = useWorkflowsSummary();
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const {
+    data: rawWorkflows = EMPTY_WORKFLOWS,
+    isLoading,
+    error,
+    refetch,
+  } = useWorkflowsSummary(selectedTags.length > 0 ? selectedTags : undefined);
   const trackedRef = useRef(false);
 
   const roles = useAuthStore((state) => state.roles);
@@ -72,6 +100,10 @@ export function WorkflowList() {
   // Search & filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Tag data
+  const { data: allTags = [], isLoading: isTagsLoading } = useWorkflowTags();
+  const setWorkflowTags = useSetWorkflowTags();
 
   // Track first view
   if (rawWorkflows.length > 0 && !trackedRef.current) {
@@ -93,7 +125,8 @@ export function WorkflowList() {
     });
   }, [rawWorkflows, searchQuery, statusFilter]);
 
-  const hasActiveFilters = searchQuery.trim().length > 0 || statusFilter !== 'all';
+  const hasActiveFilters =
+    searchQuery.trim().length > 0 || statusFilter !== 'all' || selectedTags.length > 0;
 
   // DnD via shared hook
   const getWorkflowId = useCallback((w: WorkflowSummary) => w.id, []);
@@ -184,23 +217,74 @@ export function WorkflowList() {
         {/* Filters */}
         <PageToolbar
           title="Workflows"
+          helpUrl={DOCS_URLS.userGuide}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchLabel="Search workflows"
           searchPlaceholder="Filter by name or description"
+          actions={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={filteredWorkflows.length === 0}
+                  aria-label="Export workflows"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportTableData<WorkflowSummary>({
+                      data: filteredWorkflows,
+                      columns: WORKFLOW_EXPORT_COLUMNS,
+                      filename: 'workflows',
+                      format: 'csv',
+                    })
+                  }
+                >
+                  Download CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportTableData<WorkflowSummary>({
+                      data: filteredWorkflows,
+                      columns: WORKFLOW_EXPORT_COLUMNS,
+                      filename: 'workflows',
+                      format: 'json',
+                    })
+                  }
+                >
+                  Download JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
           filters={
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <TagFilter
+                availableTags={allTags}
+                selectedTags={selectedTags}
+                onSelectedTagsChange={setSelectedTags}
+                isLoading={isTagsLoading}
+              />
+            </div>
           }
         />
 
@@ -302,6 +386,7 @@ export function WorkflowList() {
                     onClick={() => {
                       setSearchQuery('');
                       setStatusFilter('all');
+                      setSelectedTags([]);
                     }}
                   >
                     Clear filters
@@ -379,6 +464,11 @@ export function WorkflowList() {
                           onRowClick={() => navigate(`/workflows/${workflow.id}`)}
                           onDeleteClick={handleDeleteClick}
                           onCloneClick={handleCloneClick}
+                          availableTags={allTags.map((t) => t.name)}
+                          onTagsChange={(workflowId, tags) =>
+                            setWorkflowTags.mutate({ workflowId, tags })
+                          }
+                          isTagsPending={setWorkflowTags.isPending}
                         />
                       ))}
                     </SortableContext>

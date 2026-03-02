@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { ClipboardList, RefreshCw, X } from 'lucide-react';
+import { ClipboardList, Download, RefreshCw, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +22,7 @@ import { humanizeApiError } from '@/lib/humanizeApiError';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { hasAdminRole } from '@/utils/auth';
+import { api } from '@/services/api';
 import { MultiSelectFilter } from './MultiSelectFilter';
 import { DateTimeRangePicker } from './DateTimeRangePicker';
 
@@ -102,6 +103,7 @@ export function AuditLogSettings() {
 
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
   const [selectedResources, setSelectedResources] = useState<string[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Consolidated date range state
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
@@ -141,6 +143,30 @@ export function AuditLogSettings() {
     setSelectedActions([]);
     setSelectedResources([]);
     setDateRange({});
+  };
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await api.auditLogs.exportCsv({
+        action: filters.action,
+        resourceType: filters.resourceType,
+        from: filters.from,
+        to: filters.to,
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export audit logs', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const toggleAction = (val: string) => {
@@ -186,6 +212,24 @@ export function AuditLogSettings() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Refresh logs</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5"
+                  onClick={() => void handleExportCsv()}
+                  disabled={isExporting}
+                  aria-label="Download CSV"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Download CSV</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export filtered audit logs as CSV</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>

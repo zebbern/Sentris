@@ -1,11 +1,14 @@
 import type { ReactNode, ChangeEvent } from 'react';
-import { Search } from 'lucide-react';
+import { CircleHelp, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface PageToolbarProps {
   /** Page heading rendered as h1. Omit to skip the title row. */
   title?: string;
+  /** URL linking to the relevant documentation page. Renders a help icon next to the title. */
+  helpUrl?: string;
   /** Controlled search value. Provide along with onSearchChange to render the search row. */
   searchValue?: string;
   /** Callback fired when search input changes. */
@@ -26,6 +29,7 @@ interface PageToolbarProps {
 
 export function PageToolbar({
   title,
+  helpUrl,
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
@@ -44,10 +48,30 @@ export function PageToolbar({
 
   return (
     <div className={cn('flex flex-col', className)}>
-      {/* Title row — h1 + actions */}
+      {/* Title row — h1 + help icon + actions */}
       {hasTitle && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+            {helpUrl && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={helpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="View documentation"
+                    >
+                      <CircleHelp className="h-4 w-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>View documentation</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}

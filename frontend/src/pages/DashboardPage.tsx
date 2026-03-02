@@ -1,6 +1,15 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Workflow, Play, CalendarClock, Zap, Plus, Package, ArrowRight } from 'lucide-react';
+import {
+  Workflow,
+  Play,
+  CalendarClock,
+  Zap,
+  Plus,
+  Package,
+  ArrowRight,
+  Download,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,11 +23,32 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useDashboardData } from '@/hooks/queries/useDashboardQueries';
+import { OnboardingChecklist } from '@/components/shared/OnboardingChecklist';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { exportTableData, type ExportColumn } from '@/lib/exportTableData';
 import { formatDuration, formatStartTime } from '@/utils/timeFormat';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
+
+// ---------------------------------------------------------------------------
+// Export column definitions
+// ---------------------------------------------------------------------------
+
+const RECENT_RUNS_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'workflowName', header: 'Workflow' },
+  { key: 'status', header: 'Status' },
+  { key: 'startTime', header: 'Started' },
+  { key: 'duration', header: 'Duration (ms)' },
+  { key: 'triggerType', header: 'Trigger' },
+  { key: 'id', header: 'Run ID' },
+];
 
 // ---------------------------------------------------------------------------
 // Stat Card
@@ -215,7 +245,7 @@ function QuickActions() {
 
 export function DashboardPage() {
   useDocumentTitle('Dashboard');
-  const { stats, recentRuns, isLoading, errors, refetch } = useDashboardData();
+  const { stats, recentRuns, isLoading, errors, refetch, workflows } = useDashboardData();
 
   const runsSubtitle = useMemo(() => {
     if (stats.recentRunsCount === 0) return 'No runs in last 24h';
@@ -231,6 +261,14 @@ export function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
       </div>
+
+      {/* Onboarding checklist — shown for new users */}
+      <OnboardingChecklist
+        totalWorkflows={stats.totalWorkflows}
+        hasWorkflowWithNodes={workflows.some((w) => w.nodeCount > 0)}
+        totalRuns={recentRuns.length}
+        isLoading={isLoading}
+      />
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -273,12 +311,54 @@ export function DashboardPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold tracking-tight">Recent Runs</h2>
-          <Button asChild variant="ghost" size="sm" className="gap-1 text-muted-foreground">
-            <Link to="/workflows">
-              View all
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={recentRuns.length === 0}
+                  aria-label="Export recent runs"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportTableData<ExecutionRun>({
+                      data: recentRuns,
+                      columns: RECENT_RUNS_EXPORT_COLUMNS,
+                      filename: 'recent-runs',
+                      format: 'csv',
+                    })
+                  }
+                >
+                  Download CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() =>
+                    exportTableData<ExecutionRun>({
+                      data: recentRuns,
+                      columns: RECENT_RUNS_EXPORT_COLUMNS,
+                      filename: 'recent-runs',
+                      format: 'json',
+                    })
+                  }
+                >
+                  Download JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button asChild variant="ghost" size="sm" className="gap-1 text-muted-foreground">
+              <Link to="/workflows">
+                View all
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
         </div>
         <RecentRunsTable
           runs={recentRuns}

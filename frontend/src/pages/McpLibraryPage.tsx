@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
+import { DOCS_URLS } from '@/config/docs';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useMcpServers,
@@ -322,6 +323,7 @@ export function McpLibraryPage() {
     >
       <PageToolbar
         title="MCP Library"
+        helpUrl={DOCS_URLS.mcpLibrary}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Filter by server name"
