@@ -25,6 +25,7 @@ import {
 
 import { Throttle } from '@nestjs/throttler';
 
+import { Roles } from '../auth/roles.decorator';
 import { SecretsService } from './secrets.service';
 import {
   CreateSecretDto,
@@ -63,6 +64,7 @@ export class SecretsController {
   }
 
   @Get(':id/value')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get a secret value' })
   @ApiOkResponse({ type: SecretValueResponse })
   @ApiQuery({
@@ -94,6 +96,7 @@ export class SecretsController {
   }
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a new secret' })
   @ApiCreatedResponse({ type: SecretSummaryResponse })
   async createSecret(
@@ -104,6 +107,7 @@ export class SecretsController {
   }
 
   @Put(':id/rotate')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Rotate a secret value' })
   @ApiOkResponse({ type: SecretSummaryResponse })
   async rotateSecret(
@@ -115,6 +119,7 @@ export class SecretsController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update secret metadata' })
   @ApiOkResponse({ type: SecretSummaryResponse })
   async updateSecret(
@@ -126,6 +131,7 @@ export class SecretsController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a secret' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'Secret deleted' })

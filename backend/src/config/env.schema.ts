@@ -3,6 +3,7 @@ import {
   databaseUrlSchema,
   temporalConfigSchema,
   secretStoreKeySchema,
+  integrationStoreKeySchema,
   stringToBoolean,
 } from '@sentris/shared';
 
@@ -25,6 +26,7 @@ export const backendEnvSchema = z
 
     // --- Required ---
     SECRET_STORE_MASTER_KEY: secretStoreKeySchema,
+    INTEGRATION_STORE_MASTER_KEY: integrationStoreKeySchema,
 
     // --- With defaults ---
     PORT: z.coerce.number().optional().default(3211),

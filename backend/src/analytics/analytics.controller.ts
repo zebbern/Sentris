@@ -15,6 +15,8 @@ import { ApiOkResponse, ApiTags, ApiHeader, ApiOperation } from '@nestjs/swagger
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
 
+import { timingSafeCompare } from '../common/crypto-utils';
+
 import { SecurityAnalyticsService } from './security-analytics.service';
 import { OrganizationSettingsService } from './organization-settings.service';
 import { OpenSearchTenantService } from './opensearch-tenant.service';
@@ -255,9 +257,10 @@ export class AnalyticsController {
   ): Promise<{ success: boolean; securityEnabled: boolean; message: string }> {
     // Validate internal service token
     if (!this.internalServiceToken) {
-      // Token not configured - allow in dev mode but log warning
-      this.logger.warn('INTERNAL_SERVICE_TOKEN not configured');
-    } else if (internalToken !== this.internalServiceToken) {
+      throw new UnauthorizedException('INTERNAL_SERVICE_TOKEN is not configured');
+    }
+
+    if (!internalToken || !timingSafeCompare(internalToken, this.internalServiceToken)) {
       throw new UnauthorizedException('Invalid internal service token');
     }
 

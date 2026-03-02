@@ -21,6 +21,7 @@ import {
 
 import { ZodValidationPipe } from 'nestjs-zod';
 
+import { Roles } from '../auth/roles.decorator';
 import { McpServersService } from './mcp-servers.service';
 import {
   CreateMcpServerDto,
@@ -97,6 +98,7 @@ export class McpServersController {
   }
 
   @Post()
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a new MCP server configuration' })
   @ApiCreatedResponse({ type: McpServerResponse })
   async createServer(
@@ -107,6 +109,7 @@ export class McpServersController {
   }
 
   @Patch(':id')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update an MCP server configuration' })
   @ApiOkResponse({ type: McpServerResponse })
   async updateServer(
@@ -118,6 +121,7 @@ export class McpServersController {
   }
 
   @Post(':id/toggle')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Toggle MCP server enabled/disabled status' })
   @ApiOkResponse({ type: McpServerResponse })
   async toggleServer(
@@ -128,6 +132,7 @@ export class McpServersController {
   }
 
   @Post(':id/test')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Test connection to an MCP server' })
   @ApiOkResponse({ type: TestConnectionResponse })
   async testConnection(
@@ -138,6 +143,7 @@ export class McpServersController {
   }
 
   @Post(':serverId/tools/:toolId/toggle')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Toggle a tool enabled/disabled state' })
   @ApiOkResponse({ type: McpToolResponse })
   async toggleToolEnabled(
@@ -149,6 +155,7 @@ export class McpServersController {
   }
 
   @Delete(':id')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an MCP server configuration' })
   @ApiNoContentResponse()
@@ -160,6 +167,7 @@ export class McpServersController {
   }
 
   @Get(':id/resolve')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get resolved MCP server configuration (with secrets resolved)' })
   @ApiOkResponse({ type: Object })
   async getResolvedConfig(

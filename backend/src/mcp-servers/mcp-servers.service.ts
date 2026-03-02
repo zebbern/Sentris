@@ -607,8 +607,12 @@ export class McpServersService {
       // Decrypt headers
       let headers: Record<string, string> | null = null;
       if (server.headers) {
-        const decryptedJson = await this.encryption.decrypt(server.headers);
-        headers = JSON.parse(decryptedJson) as Record<string, string>;
+        headers = await this.encryption.decryptHeaders({
+          ciphertext: server.headers.ciphertext,
+          iv: server.headers.iv,
+          authTag: server.headers.authTag,
+          keyId: server.headers.keyId,
+        });
       }
 
       if (!server.endpoint) {
@@ -725,8 +729,12 @@ export class McpServersService {
     // Decrypt headers
     let headers: Record<string, string> | undefined;
     if (record.headers) {
-      const decryptedJson = await this.encryption.decrypt(record.headers);
-      headers = JSON.parse(decryptedJson) as Record<string, string>;
+      headers = await this.encryption.decryptHeaders({
+        ciphertext: record.headers.ciphertext,
+        iv: record.headers.iv,
+        authTag: record.headers.authTag,
+        keyId: record.headers.keyId,
+      });
     }
 
     // Get args
