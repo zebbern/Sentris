@@ -223,6 +223,7 @@ const definition = defineComponent({
       const runnerConfig: DockerRunnerConfig = {
         kind: 'docker',
         image: baseRunner.image,
+        entrypoint: 'theHarvester',
         network: baseRunner.network,
         timeoutSeconds: baseRunner.timeoutSeconds ?? THEHARVESTER_TIMEOUT_SECONDS,
         env: { ...(baseRunner.env ?? {}) },

@@ -17,7 +17,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const FFUF_IMAGE = 'ghcr.io/ffuf/ffuf:latest';
+const FFUF_IMAGE = 'ffuf/ffuf:latest';
 const FFUF_TIMEOUT_SECONDS = 600; // 10 minutes default
 
 const inputSchema = inputs({

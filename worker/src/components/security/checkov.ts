@@ -20,7 +20,6 @@ import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 const CHECKOV_IMAGE = 'bridgecrew/checkov:latest';
 const CHECKOV_TIMEOUT_SECONDS = 600;
 const INPUT_DIR = '/input';
-const CODE_DIR = `${INPUT_DIR}/code`;
 
 const inputSchema = inputs({
   target: port(z.string().min(1, 'Target cannot be empty').describe('IaC file content to scan'), {
@@ -271,10 +270,11 @@ const definition = defineComponent({
     let rawOutput = '';
     try {
       const filename = getFilenameForFramework(framework);
-      await volume.initialize({ [`code/${filename}`]: target });
+      // Write file at volume root — IsolatedContainerVolume does not create subdirectories
+      await volume.initialize({ [filename]: target });
       context.logger.info(`[Checkov] Created isolated volume: ${volume.getVolumeName()}`);
 
-      const args: string[] = ['-d', CODE_DIR, '--output', 'json', '--framework', framework];
+      const args: string[] = ['-d', INPUT_DIR, '--output', 'json', '--framework', framework];
       if (compact) args.push('--compact');
       if (severity && severity.length > 0) args.push('--check-severity', severity.join(','));
       for (const flag of customFlagArgs) {

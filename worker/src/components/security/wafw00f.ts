@@ -17,7 +17,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const WAFW00F_IMAGE = 'enablesecurity/wafw00f:latest';
+const WAFW00F_IMAGE = 'python:3.11-slim';
 const WAFW00F_TIMEOUT_SECONDS = 300;
 const INPUT_DIR = '/input';
 const OUTPUT_DIR = '/output';
@@ -148,6 +148,7 @@ const definition = defineComponent({
   runner: {
     kind: 'docker',
     image: WAFW00F_IMAGE,
+    entrypoint: 'sh',
     network: 'bridge',
     timeoutSeconds: WAFW00F_TIMEOUT_SECONDS,
     command: [],
@@ -211,7 +212,7 @@ const definition = defineComponent({
       await volume.initialize({ [TARGETS_FILE]: targets.join('\n') });
       context.logger.info(`[wafw00f] Created isolated volume: ${volume.getVolumeName()}`);
 
-      const args: string[] = [
+      const wafw00fArgs: string[] = [
         '-i',
         `${INPUT_DIR}/${TARGETS_FILE}`,
         '-o',
@@ -220,19 +221,24 @@ const definition = defineComponent({
         'json',
       ];
 
-      if (findAll) args.push('-a');
-      if (verbose) args.push('-v');
+      if (findAll) wafw00fArgs.push('-a');
+      if (verbose) wafw00fArgs.push('-v');
       for (const flag of customFlagArgs) {
-        if (flag.length > 0) args.push(flag);
+        if (flag.length > 0) wafw00fArgs.push(flag);
       }
+
+      // wafw00f has no official Docker image — install via pip at runtime
+      const escapedArgs = wafw00fArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
+      const shellCmd = `pip install wafw00f -q && wafw00f ${escapedArgs}`;
 
       const runnerConfig: DockerRunnerConfig = {
         kind: 'docker',
         image: baseRunner.image,
+        entrypoint: baseRunner.entrypoint,
         network: baseRunner.network,
         timeoutSeconds: baseRunner.timeoutSeconds ?? WAFW00F_TIMEOUT_SECONDS,
         env: { ...(baseRunner.env ?? {}) },
-        command: [...(baseRunner.command ?? []), ...args],
+        command: ['-c', shellCmd],
         volumes: [
           volume.getVolumeConfig(INPUT_DIR, true),
           volume.getVolumeConfig(OUTPUT_DIR, false),

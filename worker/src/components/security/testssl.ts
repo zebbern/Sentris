@@ -18,7 +18,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
 const TESTSSL_IMAGE = 'drwetter/testssl.sh:latest';
-const TESTSSL_TIMEOUT_SECONDS = 600; // 10 minutes default
+const TESTSSL_TIMEOUT_SECONDS = 900; // 15 minutes — testssl full scans can take 3+ minutes
 const OUTPUT_DIR = '/output';
 const RESULTS_FILE = 'results.json';
 
@@ -56,7 +56,7 @@ const parameterSchema = parameters({
     editor: 'boolean',
     description: 'Test for known TLS vulnerabilities (Heartbleed, POODLE, ROBOT, DROWN, etc.).',
   }),
-  timeout: param(z.number().int().min(60).max(1800).default(300), {
+  timeout: param(z.number().int().min(60).max(1800).default(600), {
     label: 'Timeout (seconds)',
     editor: 'number',
     min: 60,

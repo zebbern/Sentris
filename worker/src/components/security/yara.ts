@@ -87,7 +87,24 @@ const parameterSchema = parameters({
  *   0xoffset:$string_id: matched_data
  */
 function parseYaraOutput(rawOutput: string): { rule: string; tags: string[]; strings: string[] }[] {
-  const lines = rawOutput.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const lines = rawOutput
+    .split(/\r?\n/)
+    // eslint-disable-next-line no-control-regex
+    .map((line) => line.replace(/\x1B\[[0-9;]*m/g, '').trim()) // Strip ANSI escape codes
+    .filter((line) => {
+      if (line.length === 0) return false;
+      // Filter out Docker pull progress and image download noise
+      if (line.startsWith('Unable to find image')) return false;
+      if (line.startsWith('Pulling from')) return false;
+      if (line.includes(': Pulling fs layer')) return false;
+      if (line.includes(': Verifying Checksum')) return false;
+      if (line.includes(': Download complete')) return false;
+      if (line.includes(': Pull complete')) return false;
+      if (line.startsWith('Digest:')) return false;
+      if (line.startsWith('Status:')) return false;
+      if (line.includes('docker.io/')) return false;
+      return true;
+    });
   const matches: { rule: string; tags: string[]; strings: string[] }[] = [];
   let currentMatch: { rule: string; tags: string[]; strings: string[] } | null = null;
 

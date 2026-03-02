@@ -17,7 +17,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const KATANA_IMAGE = 'ghcr.io/projectdiscovery/katana:latest';
+const KATANA_IMAGE = 'projectdiscovery/katana:latest';
 const KATANA_TIMEOUT_SECONDS = 600; // 10 minutes default
 
 const targetValueSchema = z.preprocess(

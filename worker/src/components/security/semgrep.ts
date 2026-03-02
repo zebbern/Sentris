@@ -268,9 +268,10 @@ const definition = defineComponent({
 
     let rawOutput: string;
     try {
-      // Write target code into the volume for scanning
+      // Write target code into the volume root for scanning
+      // (IsolatedContainerVolume does not create subdirectories)
       await volume.initialize({
-        'code/target-code.txt': target,
+        'target-code.txt': target,
       });
       context.logger.info(`[Semgrep] Created isolated volume: ${volume.getVolumeName()}`);
 
@@ -295,8 +296,8 @@ const definition = defineComponent({
         args.push('--lang', parsedParams.lang);
       }
 
-      // Target directory inside container
-      args.push('/inputs/code/');
+      // Target directory inside container (files at volume root)
+      args.push('/inputs/');
 
       // Append custom flags last
       for (const flag of customFlagArgs) {
