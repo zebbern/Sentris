@@ -45,6 +45,8 @@ import {
   WorkflowTagsResponseDto,
 } from './dto/workflow-tags.dto';
 import { WorkflowsService } from './workflows.service';
+import { WorkflowTagsService } from './workflow-tags.service';
+import { WorkflowVersionService } from './workflow-version.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 import { RequireWorkflowRole, WorkflowRoleGuard } from './workflow-role.guard';
@@ -55,6 +57,8 @@ import type { AppConfig } from '../config';
 export class WorkflowsController {
   constructor(
     private readonly workflowsService: WorkflowsService,
+    private readonly workflowTagsService: WorkflowTagsService,
+    private readonly workflowVersionService: WorkflowVersionService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -189,7 +193,7 @@ export class WorkflowsController {
     @CurrentAuth() auth: AuthContext | null,
     @Param('workflowId') workflowId: string,
   ): Promise<WorkflowVersionSummaryDto[]> {
-    return this.workflowsService.listVersions(workflowId, auth);
+    return this.workflowVersionService.listVersions(workflowId, auth);
   }
 
   @Get(':workflowId/versions/:versionId')
@@ -200,7 +204,7 @@ export class WorkflowsController {
     @Param('workflowId') workflowId: string,
     @Param('versionId') versionId: string,
   ): Promise<WorkflowVersionResponseDto> {
-    return this.workflowsService.getWorkflowVersion(workflowId, versionId, auth);
+    return this.workflowVersionService.getWorkflowVersion(workflowId, versionId, auth);
   }
 
   @Delete(':id')
@@ -260,7 +264,7 @@ export class WorkflowsController {
   })
   async commit(@Param('id') id: string, @CurrentAuth() auth: AuthContext | null) {
     try {
-      return await this.workflowsService.commit(id, auth);
+      return await this.workflowVersionService.commit(id, auth);
     } catch (error: unknown) {
       if (error instanceof HttpException) throw error;
       const message = error instanceof Error ? error.message : 'Commit failed';
@@ -372,7 +376,7 @@ export class WorkflowsController {
     @CurrentAuth() auth: AuthContext | null,
     @Param('id') id: string,
   ): Promise<WorkflowTagsResponseDto> {
-    return this.workflowsService.getWorkflowTags(auth, id);
+    return this.workflowTagsService.getWorkflowTags(auth, id);
   }
 
   @Patch(':id/tags')
@@ -386,7 +390,7 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(SetWorkflowTagsSchema)) body: SetWorkflowTagsDto,
   ): Promise<WorkflowTagsResponseDto> {
-    return this.workflowsService.setWorkflowTags(auth, id, body.tags);
+    return this.workflowTagsService.setWorkflowTags(auth, id, body.tags);
   }
 
   @Get()

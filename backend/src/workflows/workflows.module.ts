@@ -20,6 +20,8 @@ import { WorkflowRunObservabilityController } from './workflow-run-observability
 import { WorkflowRunStreamController } from './workflow-run-stream.controller';
 import { InternalRunsController } from './internal-runs.controller';
 import { WorkflowsService } from './workflows.service';
+import { WorkflowTagsService } from './workflow-tags.service';
+import { WorkflowVersionService } from './workflow-version.service';
 import { WorkflowRoleGuard } from './workflow-role.guard';
 // import { WorkflowsBootstrapService } from './workflows.bootstrap';
 
@@ -42,6 +44,8 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
   ],
   providers: [
     WorkflowsService,
+    WorkflowTagsService,
+    WorkflowVersionService,
     WorkflowRepository,
     WorkflowRunRepository,
     WorkflowVersionRepository,
@@ -51,6 +55,13 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     WorkflowRoleGuard,
     WorkflowTagsRepository,
   ],
-  exports: [WorkflowsService, WorkflowRepository, WorkflowRunRepository, WorkflowVersionRepository],
+  exports: [
+    WorkflowsService,
+    WorkflowTagsService,
+    WorkflowVersionService,
+    WorkflowRepository,
+    WorkflowRunRepository,
+    WorkflowVersionRepository,
+  ],
 })
 export class WorkflowsModule {}

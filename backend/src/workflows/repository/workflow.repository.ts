@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { z } from 'zod';
 
@@ -130,6 +130,20 @@ export class WorkflowRepository {
       .where(this.buildIdFilter(id, options.organizationId))
       .limit(1);
     return record;
+  }
+
+  async findByIds(
+    ids: string[],
+    options: WorkflowRepositoryOptions = {},
+  ): Promise<WorkflowRecord[]> {
+    if (ids.length === 0) return [];
+    const filter = options.organizationId
+      ? and(
+          inArray(workflowsTable.id, ids),
+          eq(workflowsTable.organizationId, options.organizationId),
+        )
+      : inArray(workflowsTable.id, ids);
+    return this.db.select().from(workflowsTable).where(filter);
   }
 
   async delete(id: string, options: WorkflowRepositoryOptions = {}): Promise<void> {
