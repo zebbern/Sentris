@@ -23,12 +23,16 @@ const CUSTOM_KEY = 'abcdef1234567890abcdef1234567890'; // 32 hex chars
 describe('TokenEncryptionService', () => {
   let savedIntegrationKey: string | undefined;
   let savedSecretKey: string | undefined;
+  let savedNodeEnv: string | undefined;
 
   beforeEach(() => {
     savedIntegrationKey = process.env.INTEGRATION_STORE_MASTER_KEY;
     savedSecretKey = process.env.SECRET_STORE_MASTER_KEY;
+    savedNodeEnv = process.env.NODE_ENV;
     delete process.env.INTEGRATION_STORE_MASTER_KEY;
     delete process.env.SECRET_STORE_MASTER_KEY;
+    // Default to non-production so dev-key fallback tests work
+    process.env.NODE_ENV = 'test';
   });
 
   afterEach(() => {
@@ -42,6 +46,11 @@ describe('TokenEncryptionService', () => {
       process.env.SECRET_STORE_MASTER_KEY = savedSecretKey;
     } else {
       delete process.env.SECRET_STORE_MASTER_KEY;
+    }
+    if (savedNodeEnv !== undefined) {
+      process.env.NODE_ENV = savedNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
     }
   });
 
@@ -77,8 +86,8 @@ describe('TokenEncryptionService', () => {
       // Ciphertext from a custom key should differ from the dev key
       // (different key → different ciphertext, even for the same plaintext — but
       //  randomized IV guarantees different output regardless; we just verify both paths work)
-      const devService = new TokenEncryptionService(createMockConfigService());
       delete process.env.INTEGRATION_STORE_MASTER_KEY;
+      const devService = new TokenEncryptionService(createMockConfigService());
       const devMaterial = await devService.encrypt(plaintext);
 
       expect(material.ciphertext).not.toBe(devMaterial.ciphertext);
@@ -89,13 +98,15 @@ describe('TokenEncryptionService', () => {
     it('logs a warning when falling back to the insecure dev key', () => {
       const loggerWarnSpy = spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
-      const _service = new TokenEncryptionService(createMockConfigService());
+      try {
+        const _service = new TokenEncryptionService(createMockConfigService());
 
-      expect(loggerWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('insecure development key'),
-      );
-
-      loggerWarnSpy.mockRestore();
+        expect(loggerWarnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Using fallback dev key'),
+        );
+      } finally {
+        loggerWarnSpy.mockRestore();
+      }
     });
 
     it('does not warn when SECRET_STORE_MASTER_KEY is set as fallback', () => {
@@ -103,10 +114,21 @@ describe('TokenEncryptionService', () => {
 
       const loggerWarnSpy = spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
-      const _service = new TokenEncryptionService(createMockConfigService());
+      try {
+        const _service = new TokenEncryptionService(createMockConfigService());
 
-      expect(loggerWarnSpy).not.toHaveBeenCalled();
-      loggerWarnSpy.mockRestore();
+        expect(loggerWarnSpy).not.toHaveBeenCalled();
+      } finally {
+        loggerWarnSpy.mockRestore();
+      }
+    });
+
+    it('throws in production when no encryption key is configured', () => {
+      process.env.NODE_ENV = 'production';
+
+      expect(() => new TokenEncryptionService(createMockConfigService())).toThrow(
+        'INTEGRATION_STORE_MASTER_KEY (or SECRET_STORE_MASTER_KEY) environment variable is required in production',
+      );
     });
   });
 

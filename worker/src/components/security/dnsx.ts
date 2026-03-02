@@ -616,9 +616,7 @@ const definition = defineComponent({
     );
     context.emitProgress(`Running dnsx for ${domainCount} domain${domainCount === 1 ? '' : 's'}`);
 
-    // Extract tenant ID from context (assuming it's available)
-    // TODO: Update this line when context includes tenantId
-    const tenantId = (context as any).tenantId ?? 'default-tenant';
+    const tenantId = context.organizationId ?? 'default-tenant';
 
     // Create isolated volume for this execution
     const volume = new IsolatedContainerVolume(tenantId, context.runId);

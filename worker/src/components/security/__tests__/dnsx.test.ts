@@ -18,8 +18,10 @@ mock.module('../../utils/isolated-volume', () => ({
 
 let componentRegistry: typeof import('@sentris/component-sdk').componentRegistry;
 
-// TODO: Fix flaky Docker timeout issues
-describe.skip('dnsx component', () => {
+const shouldRunDockerTests = process.env.RUN_DOCKER_TESTS === 'true';
+const dockerDescribe = shouldRunDockerTests ? describe : describe.skip;
+
+dockerDescribe('dnsx component', () => {
   beforeAll(async () => {
     ({ componentRegistry } = await import('../../index'));
   });
