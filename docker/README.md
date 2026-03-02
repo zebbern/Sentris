@@ -124,7 +124,7 @@ The worker service writes analytics data to OpenSearch via the Analytics Sink co
 OPENSEARCH_URL=http://opensearch:9200
 ```
 
-This is pre-configured in `docker-compose.full.yml`. For detailed analytics documentation, see [docs/analytics.md](../docs/analytics.md).
+This is pre-configured in `docker-compose.full.yml`. For detailed analytics documentation, see [docs/analytics-pipeline.md](../docs/analytics-pipeline.md).
 
 ## Directory Structure
 
@@ -165,4 +165,4 @@ docker/
 ## See Also
 
 - [PRODUCTION.md](PRODUCTION.md) - Detailed production deployment and customer provisioning guide
-- [docs/analytics.md](../docs/analytics.md) - Analytics pipeline and OpenSearch configuration
+- [docs/analytics-pipeline.md](../docs/analytics-pipeline.md) - Analytics pipeline and OpenSearch configuration
