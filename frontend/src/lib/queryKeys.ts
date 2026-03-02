@@ -12,6 +12,7 @@ export const queryKeys = {
     all: () => ['components', getOrgScope()] as const,
   },
   runs: {
+    root: () => ['runs', getOrgScope()] as const,
     byWorkflow: (workflowId: string) => ['runs', getOrgScope(), workflowId] as const,
     global: () => ['runs', getOrgScope(), '__global__'] as const,
     detail: (runId: string) => ['runs', getOrgScope(), 'detail', runId] as const,
@@ -26,11 +27,13 @@ export const queryKeys = {
   },
   mcpGroups: {
     all: () => ['mcpGroups', getOrgScope()] as const,
+    serversRoot: () => ['mcpGroupServers', getOrgScope()] as const,
     servers: (groupId: string) => ['mcpGroupServers', getOrgScope(), groupId] as const,
     templates: () => ['mcpGroupTemplates', getOrgScope()] as const,
   },
   integrations: {
     providers: () => ['integrationProviders', getOrgScope()] as const,
+    connectionsRoot: () => ['integrationConnections', getOrgScope()] as const,
     connections: (userId?: string) =>
       ['integrationConnections', getOrgScope(), userId || getUserScope()] as const,
     providerConfig: (providerId: string) => ['providerConfig', getOrgScope(), providerId] as const,
@@ -53,6 +56,7 @@ export const queryKeys = {
     byRun: (runId: string) => ['runArtifacts', getOrgScope(), runId] as const,
   },
   humanInputs: {
+    root: () => ['humanInputs', getOrgScope()] as const,
     all: (filters?: Record<string, unknown>) => ['humanInputs', getOrgScope(), filters] as const,
   },
   executions: {

@@ -19,5 +19,5 @@ export function useHumanInputs(filters?: HumanInputFilters) {
 
 export function useInvalidateHumanInputs() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['humanInputs'] });
+  return () => qc.invalidateQueries({ queryKey: queryKeys.humanInputs.root() });
 }

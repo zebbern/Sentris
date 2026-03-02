@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 function safeHostname(url: string): string {
   try {
@@ -77,8 +78,8 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['mcpServers'] }),
-        queryClient.invalidateQueries({ queryKey: ['mcpAllTools'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() }),
       ]);
     } finally {
       setIsRefreshing(false);

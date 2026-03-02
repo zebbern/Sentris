@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import { useArtifactLibrary } from '@/hooks/queries/useArtifactQueries';
+import { queryKeys } from '@/lib/queryKeys';
 import type { ArtifactMetadata } from '@sentris/shared';
 import { ArtifactPickerDialog } from './ArtifactPickerDialog';
 
@@ -96,7 +97,7 @@ export function ArtifactSelector({ parameterId, value, onChange }: ArtifactSelec
         libraryLoading={libraryLoading}
         libraryError={libraryError}
         artifacts={library}
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ['artifactLibrary'] })}
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.root() })}
       />
     </div>
   );

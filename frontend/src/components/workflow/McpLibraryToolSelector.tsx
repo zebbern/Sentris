@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 interface McpLibraryToolSelectorProps {
   /** Whether Custom MCPs is enabled (controls visibility) */
@@ -50,8 +51,8 @@ export function McpLibraryToolSelector({
     setIsRefreshing(true);
     try {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['mcpServers'] }),
-        queryClient.invalidateQueries({ queryKey: ['mcpAllTools'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() }),
       ]);
     } finally {
       setIsRefreshing(false);
