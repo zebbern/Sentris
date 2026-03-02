@@ -1,5 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ArtifactsRepository } from './artifacts.repository';
 import { FilesService } from './files.service';
@@ -34,7 +35,7 @@ export class ArtifactsService {
     auth: AuthContext | null,
     runId: string,
   ): Promise<RunArtifactsResponseDto> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const artifacts = await this.repository.listByRun(runId, { organizationId });
     return {
       runId,
@@ -46,7 +47,7 @@ export class ArtifactsService {
     auth: AuthContext | null,
     filters: ListArtifactFilters,
   ): Promise<ArtifactListResponseDto> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const artifacts = await this.repository.list({
       ...filters,
       organizationId,
@@ -57,7 +58,7 @@ export class ArtifactsService {
   }
 
   async getArtifactRecord(auth: AuthContext | null, artifactId: string) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const artifact = await this.repository.findById(artifactId, { organizationId });
     if (!artifact) {
       throw new NotFoundException(`Artifact ${artifactId} not found`);
@@ -87,7 +88,7 @@ export class ArtifactsService {
   }
 
   async downloadArtifactForRun(auth: AuthContext | null, runId: string, artifactId: string) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const artifact = await this.repository.findByIdForRun(artifactId, runId, { organizationId });
     if (!artifact) {
       throw new NotFoundException(`Artifact ${artifactId} not found for run ${runId}`);
@@ -113,7 +114,7 @@ export class ArtifactsService {
 
   async deleteArtifact(auth: AuthContext | null, artifactId: string): Promise<void> {
     const artifact = await this.getArtifactRecord(auth, artifactId);
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     // Delete the associated file first
     try {
@@ -162,13 +163,5 @@ export class ArtifactsService {
       organizationId: record.organizationId ?? null,
       createdAt: (record.createdAt ?? new Date()).toISOString(),
     } as ArtifactMetadataDto;
-  }
-
-  private requireOrganizationId(auth: AuthContext | null): string {
-    const organizationId = auth?.organizationId;
-    if (!organizationId) {
-      throw new BadRequestException('Organization context is required');
-    }
-    return organizationId;
   }
 }

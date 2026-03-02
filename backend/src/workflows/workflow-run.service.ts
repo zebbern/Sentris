@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import '@sentris/worker/components';
 import { componentRegistry } from '@sentris/component-sdk';
 import { WorkflowDefinition } from '../dsl/types';
@@ -16,6 +16,7 @@ import {
   ExecutionInputPreview,
   ExecutionTriggerMetadata,
 } from '@sentris/shared';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import type { AuthContext } from '../auth/types';
 
 export interface WorkflowRunRequest {
@@ -62,18 +63,8 @@ export class WorkflowRunService {
     private readonly workflowVersionService: WorkflowVersionService,
   ) {}
 
-  private resolveOrganizationId(auth?: AuthContext | null): string | null {
-    return auth?.organizationId ?? null;
-  }
-
-  private requireOrganizationId(auth?: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) throw new ForbiddenException('Organization context is required');
-    return organizationId;
-  }
-
   private async requireRunAccess(runId: string, auth?: AuthContext | null) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const run = await this.runRepository.findByRunId(runId, { organizationId });
     if (!run) throw new NotFoundException(`Workflow run ${runId} not found`);
     return { organizationId, run };
@@ -98,7 +89,7 @@ export class WorkflowRunService {
     request: WorkflowRunRequest = {},
     auth?: AuthContext | null,
   ) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);
     const version = await this.workflowVersionService.resolveWorkflowVersion(
@@ -269,7 +260,7 @@ export class WorkflowRunService {
       parentNodeRef?: string;
     } = {},
   ): Promise<PreparedRunPayload> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(id, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${id} not found`);
     const version = await this.workflowVersionService.resolveWorkflowVersion(

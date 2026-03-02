@@ -7,6 +7,7 @@ import {
 } from '@sentris/shared';
 import type { WorkflowDefinition } from '../dsl/types';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { ScheduleRepository } from './repository/schedule.repository';
 import type { WorkflowScheduleRecord } from '../database/schema';
@@ -27,7 +28,7 @@ export class SchedulesService {
   ) {}
 
   async list(auth: AuthContext | null, filters: ScheduleRepositoryFilters = {}) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const records = await this.repository.list({
       ...filters,
       organizationId,
@@ -319,7 +320,7 @@ export class SchedulesService {
   }
 
   private async findOwnedScheduleOrThrow(id: string, auth: AuthContext | null) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const record = await this.repository.findById(id, { organizationId });
     if (!record) {
       throw new NotFoundException(`Schedule ${id} not found`);
@@ -432,12 +433,5 @@ export class SchedulesService {
         }
       }
     }
-  }
-
-  private requireOrganizationId(auth: AuthContext | null): string {
-    if (!auth?.organizationId) {
-      throw new BadRequestException('Organization context is required');
-    }
-    return auth.organizationId;
   }
 }

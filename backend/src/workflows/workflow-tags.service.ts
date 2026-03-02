@@ -5,6 +5,7 @@ import { WorkflowRoleRepository } from './repository/workflow-role.repository';
 import { WorkflowTagsRepository } from './repository/workflow-tags.repository';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 
 @Injectable()
 export class WorkflowTagsService {
@@ -17,23 +18,11 @@ export class WorkflowTagsService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  private resolveOrganizationId(auth?: AuthContext | null): string | null {
-    return auth?.organizationId ?? null;
-  }
-
-  private requireOrganizationId(auth?: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return organizationId;
-  }
-
   private async requireWorkflowAdmin(
     workflowId: string,
     auth?: AuthContext | null,
   ): Promise<string> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     if (auth?.roles?.includes('ADMIN')) {
       return organizationId;
     }
@@ -85,7 +74,7 @@ export class WorkflowTagsService {
   }
 
   async getWorkflowTags(auth: AuthContext | null, workflowId: string): Promise<{ tags: string[] }> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) {
@@ -99,7 +88,7 @@ export class WorkflowTagsService {
   async listAllTags(
     auth: AuthContext | null,
   ): Promise<{ tags: { name: string; count: number }[] }> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const tags = await this.tagsRepository.listAllTags(organizationId);
     return { tags };
   }

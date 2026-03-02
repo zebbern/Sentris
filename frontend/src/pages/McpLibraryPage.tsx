@@ -1,27 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { DOCS_URLS } from '@/config/docs';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  useMcpServers,
-  useMcpAllTools,
-  useDeleteMcpServer,
-  useToggleMcpServer,
-  useTestMcpConnection,
-  useFetchServerTools,
-  useToggleMcpTool,
-  useDiscoverMcpTools,
-} from '@/hooks/queries/useMcpServerQueries';
+import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
 import { useMcpGroupsWithServers, useMcpGroupTemplates } from '@/hooks/queries/useMcpGroupQueries';
 import { queryKeys } from '@/lib/queryKeys';
-import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
-import type { McpHealthStatus } from '@sentris/shared';
 import { cn } from '@/lib/utils';
-import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -37,13 +24,13 @@ import {
   useEditorActions,
   useJsonImport,
   useGroupActions,
+  useMcpLibraryActions,
+  useMcpLibraryData,
   parseClaudeCodeConfig,
-  type TransportType,
 } from './mcp-library';
 
 export function McpLibraryPage() {
   useDocumentTitle('MCP Library');
-  const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
   const organizationId = useAuthStore((state) => state.organizationId);
@@ -55,26 +42,20 @@ export function McpLibraryPage() {
   const { data: groupTemplates = [], isLoading: isLoadingTemplates } = useMcpGroupTemplates();
   const error = serversError?.message ?? null;
 
-  // ------ Local state ------
+  // ------ Local UI state ------
   const [searchQuery, setSearchQuery] = useState('');
   const [checkingServers, setCheckingServers] = useState<Set<string>>(new Set());
-  const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(new Set());
-  const [testingServer, setTestingServer] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [serverToDelete, setServerToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [toolsDialogOpen, setToolsDialogOpen] = useState(false);
-  const [selectedServerForTools, setSelectedServerForTools] = useState<string | null>(null);
-
-  // ------ Mutations (kept in main because handlers are local) ------
-  const deleteServerMutation = useDeleteMcpServer();
-  const toggleServerMutation = useToggleMcpServer();
-  const testConnectionMutation = useTestMcpConnection();
-  const fetchServerToolsMutation = useFetchServerTools();
-  const toggleToolMutation = useToggleMcpTool();
-  const discoverToolsMutation = useDiscoverMcpTools();
 
   // ------ Extracted hooks ------
+  const actions = useMcpLibraryActions({ servers });
+  const data = useMcpLibraryData({
+    servers,
+    tools,
+    groups,
+    groupTemplates,
+    searchQuery,
+    selectedServerForTools: actions.selectedServerForTools,
+  });
   const editor = useEditorActions({ servers, setCheckingServers });
   const jsonImport = useJsonImport({
     editingServer: editor.editingServer,
@@ -83,7 +64,7 @@ export function McpLibraryPage() {
     setEditingServer: editor.setEditingServer,
     setFormData: editor.setFormData,
     setCheckingServers,
-    setDiscoveringServerIds,
+    setDiscoveringServerIds: actions.setDiscoveringServerIds,
   });
   const groupActions = useGroupActions({ groupCount: groups.length, confirm });
 
@@ -100,42 +81,8 @@ export function McpLibraryPage() {
     }
   }, [jsonImport.jsonValue, editor.activeTab, editor.editingServer, editor.formData.name]);
 
-  // ------ Memoized lookups ------
-  const getGroupServers = useCallback(
-    (groupId: string): McpGroupServerResponse[] => {
-      return groups.find((g) => g.id === groupId)?.servers ?? [];
-    },
-    [groups],
-  );
-
-  const groupedServerIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const server of servers) {
-      if (server.groupId) ids.add(server.id);
-    }
-    for (const group of groups) {
-      for (const gs of getGroupServers(group.id)) {
-        ids.add(gs.serverId);
-      }
-    }
-    return ids;
-  }, [servers, groups, getGroupServers]);
-
-  const filteredCustomServers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const customServers = servers.filter((s) => !groupedServerIds.has(s.id));
-    if (!query) return customServers;
-    return customServers.filter(
-      (s) =>
-        s.name.toLowerCase().includes(query) ||
-        s.description?.toLowerCase().includes(query) ||
-        s.endpoint?.toLowerCase().includes(query),
-    );
-  }, [servers, searchQuery, groupedServerIds]);
-
   // ------ Drag-to-reorder (custom servers only) ------
   const hasActiveFilters = searchQuery.trim().length > 0;
-
   const getServerId = useCallback((s: { id: string }) => s.id, []);
 
   const {
@@ -145,175 +92,11 @@ export function McpLibraryPage() {
     handleDragEnd,
     isDragDisabled,
   } = useSortableList({
-    items: filteredCustomServers,
+    items: data.filteredCustomServers,
     getId: getServerId,
     storageKey: `sentris:sort:mcp-custom:${organizationId}`,
     disabled: hasActiveFilters,
   });
-
-  const importedGroupSlugs = useMemo(() => new Set(groups.map((g) => g.slug)), [groups]);
-
-  const filteredTemplates = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return groupTemplates;
-    return groupTemplates.filter(
-      (t) =>
-        t.name.toLowerCase().includes(query) ||
-        t.slug.toLowerCase().includes(query) ||
-        t.description?.toLowerCase().includes(query),
-    );
-  }, [groupTemplates, searchQuery]);
-
-  const filteredGroups = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return groups;
-    return groups.filter(
-      (g) =>
-        g.name.toLowerCase().includes(query) ||
-        g.slug.toLowerCase().includes(query) ||
-        g.description?.toLowerCase().includes(query),
-    );
-  }, [groups, searchQuery]);
-
-  const toolCountsByServer = useMemo(() => {
-    const counts: Record<string, { enabled: number; total: number }> = {};
-    for (const server of servers) {
-      const serverTools = tools.filter((t) => t.serverId === server.id);
-      counts[server.id] = {
-        enabled: serverTools.filter((t) => t.enabled).length,
-        total: serverTools.length,
-      };
-    }
-    return counts;
-  }, [servers, tools]);
-
-  const serverTools = useMemo(() => {
-    if (!selectedServerForTools) return [];
-    return tools.filter((t) => t.serverId === selectedServerForTools);
-  }, [tools, selectedServerForTools]);
-
-  const selectedServer = useMemo<{ name?: string; transportType?: TransportType } | null>(() => {
-    if (!selectedServerForTools) return null;
-    const direct = servers.find((s) => s.id === selectedServerForTools);
-    if (direct) return direct;
-    for (const group of groups) {
-      const match = getGroupServers(group.id).find((s) => s.serverId === selectedServerForTools);
-      if (match) {
-        return { name: match.serverName, transportType: match.transportType };
-      }
-    }
-    return null;
-  }, [servers, selectedServerForTools, groups, getGroupServers]);
-
-  // ------ Helper functions ------
-  const getGroupServerHealthStatus = (server: {
-    serverId: string;
-    healthStatus: McpHealthStatus;
-  }) => servers.find((s) => s.id === server.serverId)?.lastHealthStatus ?? server.healthStatus;
-
-  const getGroupServerToolCounts = (server: { serverId: string; toolCount: number }) => {
-    const counts = toolCountsByServer[server.serverId];
-    if (counts && !(counts.total === 0 && server.toolCount > 0)) return counts;
-    const fallbackTotal = server.toolCount;
-    return fallbackTotal > 0 ? { enabled: fallbackTotal, total: fallbackTotal } : null;
-  };
-
-  const getServerDiscoveryImage = (serverId: string) => {
-    const server = servers.find((s) => s.id === serverId);
-    if (!server?.groupId) return undefined;
-    const group = groups.find((g) => g.id === server.groupId);
-    return group?.defaultDockerImage ?? undefined;
-  };
-
-  // ------ Handlers ------
-  const handleDelete = async () => {
-    if (!serverToDelete) return;
-    setIsDeleting(true);
-    try {
-      await deleteServerMutation.mutateAsync(serverToDelete);
-      toast({ title: 'Server deleted', description: 'MCP server has been removed.' });
-      setDeleteDialogOpen(false);
-      setServerToDelete(null);
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleToggle = async (serverId: string) => {
-    try {
-      const server = await toggleServerMutation.mutateAsync(serverId);
-      toast({
-        title: server.enabled ? 'Server enabled' : 'Server disabled',
-        description: `${server.name} has been ${server.enabled ? 'enabled' : 'disabled'}.`,
-      });
-    } catch {
-      // Global MutationCache error handler shows the toast
-    }
-  };
-
-  const handleTestConnection = async (serverId: string) => {
-    setTestingServer(serverId);
-    try {
-      const result = await testConnectionMutation.mutateAsync(serverId);
-      toast({
-        title: result.success ? 'Connection successful' : 'Connection failed',
-        description: result.message,
-        variant: result.success ? 'default' : 'destructive',
-      });
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      setTestingServer(null);
-    }
-  };
-
-  const handleViewTools = async (serverId: string) => {
-    setSelectedServerForTools(serverId);
-    setToolsDialogOpen(true);
-    await fetchServerToolsMutation.mutateAsync(serverId);
-  };
-
-  const handleDiscoverServerTools = async (serverId: string, image?: string) => {
-    if (discoveringServerIds.has(serverId)) return;
-    setDiscoveringServerIds((prev) => new Set(prev).add(serverId));
-    try {
-      const discoveredTools = await discoverToolsMutation.mutateAsync({
-        serverId,
-        servers,
-        image,
-      });
-      toast({
-        title: 'Tool discovery complete',
-        description: `Discovered ${discoveredTools.length} tool(s) from this server.`,
-      });
-    } catch {
-      // Global MutationCache error handler shows the toast
-    } finally {
-      setDiscoveringServerIds((prev) => {
-        const next = new Set(prev);
-        next.delete(serverId);
-        return next;
-      });
-    }
-  };
-
-  const handleToggleTool = async (serverId: string, toolId: string) => {
-    try {
-      const tool = await toggleToolMutation.mutateAsync({ serverId, toolId });
-      toast({
-        title: tool.enabled ? 'Tool enabled' : 'Tool disabled',
-        description: `${tool.toolName} has been ${tool.enabled ? 'enabled' : 'disabled'}.`,
-      });
-    } catch (err: unknown) {
-      toast({
-        title: 'Error',
-        description: humanizeApiError(err),
-        variant: 'destructive',
-      });
-    }
-  };
 
   // ------ Main render ------
   return (
@@ -361,12 +144,12 @@ export function McpLibraryPage() {
 
       {/* Group Templates */}
       <GroupTemplatesSection
-        templates={filteredTemplates}
+        templates={data.filteredTemplates}
         isLoading={isLoadingTemplates}
         searchQuery={searchQuery}
         templatesOpen={groupActions.templatesOpen}
         onToggleTemplates={groupActions.toggleTemplates}
-        importedGroupSlugs={importedGroupSlugs}
+        importedGroupSlugs={data.importedGroupSlugs}
         groupDiscoveryPreview={groupActions.groupDiscoveryPreview}
         discoveringGroups={groupActions.discoveringGroups}
         importingTemplates={groupActions.importingTemplates}
@@ -377,18 +160,18 @@ export function McpLibraryPage() {
 
       {/* Imported Groups */}
       <ImportedGroupsSection
-        groups={filteredGroups}
+        groups={data.filteredGroups}
         isLoading={isLoading}
         searchQuery={searchQuery}
         checkingServers={checkingServers}
-        discoveringServerIds={discoveringServerIds}
-        getGroupServers={getGroupServers}
-        getGroupServerHealthStatus={getGroupServerHealthStatus}
-        getGroupServerToolCounts={getGroupServerToolCounts}
-        onToggle={handleToggle}
-        onViewTools={handleViewTools}
+        discoveringServerIds={actions.discoveringServerIds}
+        getGroupServers={data.getGroupServers}
+        getGroupServerHealthStatus={data.getGroupServerHealthStatus}
+        getGroupServerToolCounts={data.getGroupServerToolCounts}
+        onToggle={actions.handleToggle}
+        onViewTools={actions.handleViewTools}
         onDiscoverTools={(serverId) =>
-          handleDiscoverServerTools(serverId, getServerDiscoveryImage(serverId))
+          actions.handleDiscoverServerTools(serverId, data.getServerDiscoveryImage(serverId))
         }
         onRemoveGroup={groupActions.handleRemoveGroup}
       />
@@ -399,17 +182,14 @@ export function McpLibraryPage() {
         isLoading={isLoading}
         searchQuery={searchQuery}
         checkingServers={checkingServers}
-        testingServer={testingServer}
-        toolCountsByServer={toolCountsByServer}
+        testingServer={actions.testingServer}
+        toolCountsByServer={data.toolCountsByServer}
         onCreateNew={editor.handleCreateNew}
-        onToggle={handleToggle}
-        onViewTools={handleViewTools}
-        onTestConnection={handleTestConnection}
+        onToggle={actions.handleToggle}
+        onViewTools={actions.handleViewTools}
+        onTestConnection={actions.handleTestConnection}
         onEdit={editor.handleEdit}
-        onDelete={(serverId) => {
-          setServerToDelete(serverId);
-          setDeleteDialogOpen(true);
-        }}
+        onDelete={actions.openDeleteDialog}
         sensors={sensors}
         collisionDetection={collisionDetection}
         onDragEnd={handleDragEnd}
@@ -449,22 +229,22 @@ export function McpLibraryPage() {
 
       {/* Delete Confirmation */}
       <DeleteServerDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        isDeleting={isDeleting}
-        onDelete={handleDelete}
+        open={actions.deleteDialogOpen}
+        onOpenChange={actions.setDeleteDialogOpen}
+        isDeleting={actions.isDeleting}
+        onDelete={actions.handleDelete}
       />
 
       {/* Tools Dialog */}
       <ToolsDialog
-        open={toolsDialogOpen}
-        onOpenChange={setToolsDialogOpen}
-        serverName={selectedServer?.name ?? 'Unknown'}
-        tools={serverTools}
-        selectedServerForTools={selectedServerForTools}
-        discoveringServerIds={discoveringServerIds}
-        onToggleTool={handleToggleTool}
-        onDiscoverTools={handleDiscoverServerTools}
+        open={actions.toolsDialogOpen}
+        onOpenChange={actions.setToolsDialogOpen}
+        serverName={data.selectedServer?.name ?? 'Unknown'}
+        tools={data.serverTools}
+        selectedServerForTools={actions.selectedServerForTools}
+        discoveringServerIds={actions.discoveringServerIds}
+        onToggleTool={actions.handleToggleTool}
+        onDiscoverTools={actions.handleDiscoverServerTools}
       />
 
       <ConfirmDialog {...dialogProps} />

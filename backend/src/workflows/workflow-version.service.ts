@@ -9,6 +9,7 @@ import { WorkflowVersionRepository } from './repository/workflow-version.reposit
 import { AuditLogService } from '../audit/audit-log.service';
 import type { WorkflowVersionRecord } from '../database/schema';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 
 /** Subset of WorkflowRunRequest that version resolution needs. */
 export interface VersionResolveRequest {
@@ -29,23 +30,11 @@ export class WorkflowVersionService {
 
   // ── Auth helpers (same pattern as WorkflowTagsService) ──────────────────
 
-  private resolveOrganizationId(auth?: AuthContext | null): string | null {
-    return auth?.organizationId ?? null;
-  }
-
-  private requireOrganizationId(auth?: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) {
-      throw new ForbiddenException('Organization context is required');
-    }
-    return organizationId;
-  }
-
   private async requireWorkflowAdmin(
     workflowId: string,
     auth?: AuthContext | null,
   ): Promise<string> {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     if (auth?.roles?.includes('ADMIN')) {
       return organizationId;
     }
@@ -109,7 +98,7 @@ export class WorkflowVersionService {
   }
 
   async listVersions(workflowId: string, auth?: AuthContext | null) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) {
       throw new NotFoundException(`Workflow ${workflowId} not found`);
@@ -126,7 +115,7 @@ export class WorkflowVersionService {
   }
 
   async getWorkflowVersion(workflowId: string, versionId: string, auth?: AuthContext | null) {
-    const organizationId = this.requireOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const version = await this.versionRepository.findById(versionId, { organizationId });
     if (!version || version.workflowId !== workflowId) {
       throw new NotFoundException(
