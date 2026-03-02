@@ -8,7 +8,15 @@
 import { z } from 'zod';
 import type { ComponentPortMetadata, ConnectionType } from './types';
 import { getPortMeta, mergePortMeta, type PortMeta } from './port-meta';
-import { type ZodDef, getDefType, getSchemaType } from './zod-helpers';
+import {
+  type ZodDef,
+  getDefType,
+  getSchemaType,
+  unwrapEffects,
+  unwrapToObject,
+  isOptional,
+  isPrimitiveType,
+} from './zod-helpers';
 
 export interface ValidationResult {
   ok: boolean;
@@ -239,114 +247,7 @@ export function canConnect(source: ConnectionType, target: ConnectionType): bool
   return false;
 }
 
-/**
- * Unwrap optional, nullable, and default effects to get inner type
- */
-function unwrapEffects(schema: z.ZodTypeAny): z.ZodTypeAny {
-  let current = schema;
 
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-
-    if (!def) break;
-
-    const typeName = getDefType(def);
-
-    if (typeName === 'optional' || typeName === 'nullable' || typeName === 'default') {
-      current = def.innerType;
-      continue;
-    }
-
-    if (typeName === 'effects') {
-      current = def.schema;
-      continue;
-    }
-
-    if (typeName === 'pipe') {
-      current = def.out ?? def.schema ?? def.innerType ?? def.in ?? current;
-      if (current === schema) break;
-      continue;
-    }
-
-    break;
-  }
-
-  return current;
-}
-
-/**
- * Check if schema is optional (has optional effect)
- */
-function isOptional(schema: z.ZodTypeAny): boolean {
-  let current = schema;
-  while (true) {
-    const currentDef = (current as any)._def as ZodDef | undefined;
-    if (!currentDef) {
-      break;
-    }
-    const typeName = getDefType(currentDef);
-    if (typeName === 'optional' || typeName === 'default') {
-      return true;
-    }
-    if (typeName === 'nullable' || typeName === 'effects') {
-      current = typeName === 'effects' ? currentDef.schema : currentDef.innerType;
-      continue;
-    }
-    if (typeName === 'pipe') {
-      current = currentDef.out ?? currentDef.schema ?? currentDef.innerType ?? currentDef.in ?? current;
-      continue;
-    }
-    break;
-  }
-
-  return false;
-}
-
-function unwrapToObject(
-  schema: z.ZodTypeAny
-): z.ZodObject<any, any> | null {
-  let current = schema;
-
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-    const typeName = getDefType(def);
-
-    if (!def) {
-      return null;
-    }
-
-    if (typeName === 'object') {
-      return current as z.ZodObject<any, any>;
-    }
-
-    if (typeName === 'optional' || typeName === 'nullable' || typeName === 'default') {
-      current = def.innerType;
-      continue;
-    }
-
-    if (typeName === 'effects') {
-      current = def.schema;
-      continue;
-    }
-
-    if (typeName === 'pipe') {
-      current = def.out ?? def.schema ?? def.innerType ?? def.in ?? current;
-      continue;
-    }
-
-    return null;
-  }
-}
-
-/**
- * Check if schema is a primitive type
- */
-function isPrimitiveType(schema: z.ZodTypeAny): boolean {
-  const typeName = getSchemaType(schema);
-  return ['string', 'number', 'boolean', 'bigint', 'date', 'symbol', 'enum', 'literal'].includes(
-    typeName ?? ''
-  );
-}
 
 /**
  * Get primitive type name

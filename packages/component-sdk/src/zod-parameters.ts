@@ -7,7 +7,13 @@
 import { z } from 'zod';
 import type { ComponentParameterMetadata } from './types';
 import { getParamMeta } from './param-meta';
-import { type ZodDef, getDefType } from './zod-helpers';
+import {
+  type ZodDef,
+  getDefType,
+  unwrapToObject,
+  getObjectShape,
+  isOptional,
+} from './zod-helpers';
 
 export function extractParameters(schema: z.ZodTypeAny): ComponentParameterMetadata[] {
   const parameters: ComponentParameterMetadata[] = [];
@@ -79,67 +85,4 @@ function getDefaultValue(schema: z.ZodTypeAny): unknown {
   }
 }
 
-function isOptional(schema: z.ZodTypeAny): boolean {
-  let current = schema;
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-    if (!def) {
-      return false;
-    }
-    const typeName = getDefType(def);
-    if (typeName === 'optional' || typeName === 'default') {
-      return true;
-    }
-    if (typeName === 'nullable' || typeName === 'effects') {
-      current = typeName === 'effects' ? def.schema : def.innerType;
-      continue;
-    }
-    if (typeName === 'pipe') {
-      current = def.out ?? def.schema ?? def.innerType ?? def.in ?? current;
-      continue;
-    }
-    return false;
-  }
-}
 
-function unwrapToObject(schema: z.ZodTypeAny): z.ZodObject<any, any> | null {
-  let current = schema;
-
-  while (true) {
-    const def = (current as any)._def as ZodDef | undefined;
-    const typeName = getDefType(def);
-
-    if (!def) {
-      return null;
-    }
-
-    if (typeName === 'object') {
-      return current as z.ZodObject<any, any>;
-    }
-
-    if (typeName === 'optional' || typeName === 'nullable' || typeName === 'default') {
-      current = def.innerType;
-      continue;
-    }
-
-    if (typeName === 'effects') {
-      current = def.schema;
-      continue;
-    }
-
-    if (typeName === 'pipe') {
-      current = def.out ?? def.schema ?? def.innerType ?? def.in ?? current;
-      continue;
-    }
-
-    return null;
-  }
-}
-
-function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
-  const shape = (schema as any).shape;
-  if (typeof shape === 'function') {
-    return shape();
-  }
-  return shape ?? {};
-}
