@@ -11,7 +11,7 @@ Security workflow orchestration platform. Visual builder + Temporal for reliabil
 
 ## Development
 
-Full setup guide: `docs/development/dev-environment.md`
+Full setup guide: `docs/development/dev-environment.mdx`
 
 ```bash
 # First time setup
@@ -71,7 +71,7 @@ just instance-env show 6       # Show file status and computed values
 - Backend: `http://localhost:${3211 + instance*100}`
 - Temporal UI (shared): <http://localhost:8081>
 
-Full details: `docs/MULTI-INSTANCE-DEV.md`
+Full details: `docs/MULTI-INSTANCE-DEV.mdx`
 
 ### Multi-Instance Local Dev (Important)
 
@@ -104,7 +104,7 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
 
 #### Keep docs in sync
 
-If you change instance/infra behavior (justfile/scripts/pm2 config), update `docs/MULTI-INSTANCE-DEV.md` and this section accordingly in the same PR.
+If you change instance/infra behavior (justfile/scripts/pm2 config), update `docs/MULTI-INSTANCE-DEV.mdx` and this section accordingly in the same PR.
 
 ### After Backend Route Changes
 

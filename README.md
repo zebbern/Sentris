@@ -78,7 +78,7 @@ pm2 logs           # View application logs
 pm2 status         # Check process status
 ```
 
-> **Advanced:** `just dev` remains available for multi-instance development, Clerk auth auto-detection, and TLS certificate generation. See the [Multi-Instance Guide](docs/MULTI-INSTANCE-DEV.md) for details.
+> **Advanced:** `just dev` remains available for multi-instance development, Clerk auth auto-detection, and TLS certificate generation. See the [Multi-Instance Guide](docs/MULTI-INSTANCE-DEV.mdx) for details.
 
 ---
 
@@ -148,7 +148,7 @@ just dev
 just instance-env init 1
 ```
 
-Each instance gets its own frontend port, backend port, database, and Temporal namespace while sharing a single Docker infra stack. See [Multi-Instance Development Guide](docs/MULTI-INSTANCE-DEV.md) for full details.
+Each instance gets its own frontend port, backend port, database, and Temporal namespace while sharing a single Docker infra stack. See [Multi-Instance Development Guide](docs/MULTI-INSTANCE-DEV.mdx) for full details.
 
 ---
 

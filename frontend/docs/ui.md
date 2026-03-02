@@ -46,4 +46,4 @@ Before shipping UI changes:
 3. Manual run through: load workflow, execute, verify logs stream and timeline updates.
 4. Update screenshots or add a brief “Validation” note in the PR if behaviour changes.
 
-Cross-link any structural change back to `docs/user-guide.md` so other teams can find the latest UX decisions.
+Cross-link any structural change back to `docs/user-guide.mdx` so other teams can find the latest UX decisions.

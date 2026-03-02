@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Workflow execution status values.
  *
- * @see docs/workflows/execution-status.md for detailed documentation
+ * @see docs/workflows/execution-status.mdx for detailed documentation
  *
  * - QUEUED: Waiting to execute
  * - RUNNING: Actively executing
