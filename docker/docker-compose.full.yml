@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
 
   temporal:
-    image: temporalio/auto-setup:latest
+    image: temporalio/auto-setup:1.25.2
     container_name: sentris-temporal
     depends_on:
       postgres:
@@ -47,7 +47,7 @@ services:
       retries: 5
 
   temporal-ui:
-    image: temporalio/ui:latest
+    image: temporalio/ui:2.31.2
     container_name: sentris-temporal-ui
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
@@ -99,7 +99,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:latest
+    image: redis:7.4-alpine
     container_name: sentris-redis
     expose:
       - '6379'
