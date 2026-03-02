@@ -206,7 +206,7 @@ describe('CommandItem', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button.disabled).toBe(true);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('enables component commands when canPlaceComponents is true', () => {
@@ -231,6 +231,6 @@ describe('CommandItem', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button.disabled).toBe(false);
+    expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 });

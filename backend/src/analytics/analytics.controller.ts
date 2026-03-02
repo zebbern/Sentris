@@ -142,8 +142,8 @@ export class AnalyticsController {
       subscriptionTier: settings.subscriptionTier,
       analyticsRetentionDays: settings.analyticsRetentionDays,
       maxRetentionDays,
-      createdAt: settings.createdAt,
-      updatedAt: settings.updatedAt,
+      createdAt: settings.createdAt.toISOString(),
+      updatedAt: settings.updatedAt.toISOString(),
     };
   }
 
@@ -222,8 +222,8 @@ export class AnalyticsController {
       subscriptionTier: updated.subscriptionTier,
       analyticsRetentionDays: updated.analyticsRetentionDays,
       maxRetentionDays,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
     };
   }
 
