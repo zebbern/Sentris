@@ -4,6 +4,16 @@ import { PageTransition } from '@/components/shared/PageTransition';
 import { env } from '@/config/env';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
+/**
+ * Derive a coarse key from the pathname so PageTransition only remounts
+ * on top-level route changes (e.g. /workflows → /templates) but NOT on
+ * param changes within the same page (e.g. /workflows/abc/runs/123 → /workflows/abc/runs/456).
+ */
+function getRouteSegmentKey(pathname: string): string {
+  const segments = pathname.split('/').filter(Boolean);
+  return '/' + segments.slice(0, 2).join('/');
+}
+
 // Lazy-loaded page components
 const DashboardPage = lazyWithRetry(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
@@ -66,7 +76,7 @@ export function AnimatedRoutes() {
   const location = useLocation();
 
   return (
-    <PageTransition key={location.pathname}>
+    <PageTransition key={getRouteSegmentKey(location.pathname)}>
       <Routes location={location}>
         <Route
           path="/"
