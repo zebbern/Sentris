@@ -25,6 +25,7 @@
               "architecture/temporal-orchestration",
               "architecture/streaming-pipelines",
               "architecture/human-in-the-loop",
+              "architecture/analytics-output-port-design",
               "audit-logging"
             ]
           },
@@ -44,7 +45,9 @@
               "development/isolated-volumes",
               "development/workflow-analytics",
               "development/analytics",
+              "development/dev-environment",
               "development/release-process",
+              "MULTI-INSTANCE-DEV",
               "version-check"
             ]
           },
@@ -54,7 +57,7 @@
               "guides/template-library",
               "guides/secrets-management",
               "aws-credentials",
-              "analytics",
+              "analytics-pipeline",
               "mcp-library",
               "workflows/execution-status",
               "workflows/mcp-library-example"
