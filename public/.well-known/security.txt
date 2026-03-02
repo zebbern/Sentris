@@ -1,5 +1,0 @@
-Contact: z_r@tuta.com
-Preferred-Languages: en
-
-# Sentris Flow Security Policy
-# Report security vulnerabilities responsibly to z_r@tuta.com 
