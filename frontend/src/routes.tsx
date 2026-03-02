@@ -1,62 +1,64 @@
-import { lazy } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PageTransition } from '@/components/shared/PageTransition';
 import { env } from '@/config/env';
+import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
 // Lazy-loaded page components
-const DashboardPage = lazy(() =>
+const DashboardPage = lazyWithRetry(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
-const WorkflowList = lazy(() =>
+const WorkflowList = lazyWithRetry(() =>
   import('@/pages/WorkflowList').then((m) => ({ default: m.WorkflowList })),
 );
-const TemplateLibraryPage = lazy(() =>
+const TemplateLibraryPage = lazyWithRetry(() =>
   import('@/pages/TemplateLibraryPage').then((m) => ({ default: m.TemplateLibraryPage })),
 );
-const WorkflowBuilder = lazy(() =>
+const WorkflowBuilder = lazyWithRetry(() =>
   import('@/features/workflow-builder/WorkflowBuilder').then((m) => ({
     default: m.WorkflowBuilder,
   })),
 );
-const SecretsManager = lazy(() =>
+const SecretsManager = lazyWithRetry(() =>
   import('@/pages/SecretsManager').then((m) => ({ default: m.SecretsManager })),
 );
-const ApiKeysManager = lazy(() =>
+const ApiKeysManager = lazyWithRetry(() =>
   import('@/pages/ApiKeysManager').then((m) => ({ default: m.ApiKeysManager })),
 );
-const IntegrationsManager = lazy(() =>
+const IntegrationsManager = lazyWithRetry(() =>
   import('@/pages/IntegrationsManager').then((m) => ({ default: m.IntegrationsManager })),
 );
-const ArtifactLibrary = lazy(() =>
+const ArtifactLibrary = lazyWithRetry(() =>
   import('@/pages/ArtifactLibrary').then((m) => ({ default: m.ArtifactLibrary })),
 );
-const McpLibraryPage = lazy(() =>
+const McpLibraryPage = lazyWithRetry(() =>
   import('@/pages/McpLibraryPage').then((m) => ({ default: m.McpLibraryPage })),
 );
-const IntegrationCallback = lazy(() =>
+const IntegrationCallback = lazyWithRetry(() =>
   import('@/pages/IntegrationCallback').then((m) => ({ default: m.IntegrationCallback })),
 );
-const NotFound = lazy(() => import('@/pages/NotFound').then((m) => ({ default: m.NotFound })));
-const WebhooksPage = lazy(() =>
+const NotFound = lazyWithRetry(() =>
+  import('@/pages/NotFound').then((m) => ({ default: m.NotFound })),
+);
+const WebhooksPage = lazyWithRetry(() =>
   import('@/pages/WebhooksPage').then((m) => ({ default: m.WebhooksPage })),
 );
-const WebhookEditorPage = lazy(() =>
+const WebhookEditorPage = lazyWithRetry(() =>
   import('@/pages/WebhookEditorPage').then((m) => ({ default: m.WebhookEditorPage })),
 );
-const SchedulesPage = lazy(() =>
+const SchedulesPage = lazyWithRetry(() =>
   import('@/pages/SchedulesPage').then((m) => ({ default: m.SchedulesPage })),
 );
-const ActionCenterPage = lazy(() =>
+const ActionCenterPage = lazyWithRetry(() =>
   import('@/pages/ActionCenterPage').then((m) => ({ default: m.ActionCenterPage })),
 );
-const RunRedirect = lazy(() =>
+const RunRedirect = lazyWithRetry(() =>
   import('@/pages/RunRedirect').then((m) => ({ default: m.RunRedirect })),
 );
-const AnalyticsSettingsPage = lazy(() =>
+const AnalyticsSettingsPage = lazyWithRetry(() =>
   import('@/pages/AnalyticsSettingsPage').then((m) => ({ default: m.AnalyticsSettingsPage })),
 );
-const SettingsPage = lazy(() =>
+const SettingsPage = lazyWithRetry(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
 
