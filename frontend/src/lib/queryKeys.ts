@@ -82,4 +82,8 @@ export const queryKeys = {
   analyticsSettings: {
     all: () => ['analyticsSettings', getOrgScope()] as const,
   },
+  dashboard: {
+    stats: () => ['dashboard', getOrgScope(), 'stats'] as const,
+    recentActivity: () => ['dashboard', getOrgScope(), 'recent-activity'] as const,
+  },
 } as const;

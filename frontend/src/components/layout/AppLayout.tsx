@@ -18,6 +18,7 @@ import {
   Settings,
   Package,
   X,
+  LayoutDashboard,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -52,7 +53,8 @@ const settingsItems: NavItem[] = [
 const SETTINGS_HREFS = settingsItems.map((item) => item.href);
 
 const navigationItems: NavItem[] = [
-  { name: 'Workflow Builder', href: '/', icon: Workflow },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Workflows', href: '/workflows', icon: Workflow },
   { name: 'Template Library', href: '/templates', icon: Package },
   { name: 'Schedules', href: '/schedules', icon: CalendarClock },
   { name: 'Webhooks', href: '/webhooks', icon: Webhook },
@@ -115,7 +117,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   const isActive = useCallback(
     (path: string) => {
       if (path === '/') {
-        return location.pathname === '/' || location.pathname.startsWith('/workflows');
+        return location.pathname === '/';
+      }
+      if (path === '/workflows') {
+        return location.pathname === '/workflows' || location.pathname.startsWith('/workflows/');
       }
       return location.pathname === path || location.pathname.startsWith(`${path}/`);
     },
@@ -137,7 +142,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   );
 
   const getPageActions = () => {
-    if (location.pathname === '/') {
+    if (location.pathname === '/workflows') {
       return (
         <Button
           onClick={() => {

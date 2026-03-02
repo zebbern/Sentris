@@ -5,6 +5,9 @@ import { PageTransition } from '@/components/shared/PageTransition';
 import { env } from '@/config/env';
 
 // Lazy-loaded page components
+const DashboardPage = lazy(() =>
+  import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
 const WorkflowList = lazy(() =>
   import('@/pages/WorkflowList').then((m) => ({ default: m.WorkflowList })),
 );
@@ -65,6 +68,14 @@ export function AnimatedRoutes() {
       <Routes location={location}>
         <Route
           path="/"
+          element={
+            <ErrorBoundary>
+              <DashboardPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/workflows"
           element={
             <ErrorBoundary>
               <WorkflowList />
