@@ -5,7 +5,7 @@ description: "LLM integrations for intelligent workflow automation"
 
 AI components in Sentris Flow follow a **Provider-Consumer** architecture. 
 
-1.  **Providers**: Handle credentials, model selection, and API configuration (OpenAI, Gemini, OpenRouter).
+1.  **Providers**: Handle credentials, model selection, and API configuration (OpenAI, Gemini, Anthropic, OpenRouter).
 2.  **Consumers**: Execute specific tasks (Text Generation or Autonomous Agents) using the configuration emitted by a Provider.
 
 ---
@@ -40,6 +40,34 @@ Configures access to Google's Gemini models.
 | `model` | Select | `gemini-3-pro-preview`, `gemini-3-flash-preview`, `gemini-2.5-pro` |
 | `apiBaseUrl` | Text | Optional override for the API base URL |
 | `projectId` | Text | Optional Google Cloud project identifier |
+
+### Anthropic Provider
+
+Configures access to Anthropic's Claude models.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `apiKey` | Secret | Anthropic API key |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `model` | Select | `claude-sonnet-4-20250514`, `claude-opus-4-20250514`, `claude-3-5-haiku-20241022`, `claude-3-5-sonnet-20241022` |
+| `apiBaseUrl` | Text | Optional override for the API base URL |
+
+**Supported Models**
+
+| Model | Description |
+|-------|-------------|
+| `claude-sonnet-4-20250514` | Claude Sonnet 4 — balanced performance and speed (default) |
+| `claude-opus-4-20250514` | Claude Opus 4 — highest capability for complex tasks |
+| `claude-3-5-haiku-20241022` | Claude 3.5 Haiku — fastest and most cost-effective |
+| `claude-3-5-sonnet-20241022` | Claude 3.5 Sonnet — previous-generation balanced model |
+
+**Environment Variables**
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_BASE_URL` | Default base URL override |
 
 ### OpenRouter Provider
 
@@ -192,7 +220,7 @@ The agent will always return validated JSON matching this schema, ready for down
 ## Best Practices
 
 <Note>
-  **The Provider Concept**: Always place a Provider node (OpenAI/Gemini/OpenRouter) at the start of your AI chain. This allows you to swap models or providers for the entire workflow by changing just one node.
+  **The Provider Concept**: Always place a Provider node (OpenAI/Gemini/Anthropic/OpenRouter) at the start of your AI chain. This allows you to swap models or providers for the entire workflow by changing just one node.
 </Note>
 
 ### Prompt Engineering

@@ -37,6 +37,7 @@ import './manual-action/manual-selection';
 import './manual-action/manual-form';
 import './ai/openai-provider';
 import './ai/gemini-provider';
+import './ai/anthropic-provider';
 import './ai/openrouter-provider';
 import './ai/ai-agent';
 import './ai/llm-generate-text';

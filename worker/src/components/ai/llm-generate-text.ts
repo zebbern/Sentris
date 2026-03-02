@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { generateText as generateTextImpl } from 'ai';
 import { createOpenAI as createOpenAIImpl } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI as createGoogleGenerativeAIImpl } from '@ai-sdk/google';
+import { createAnthropic as createAnthropicImpl } from '@ai-sdk/anthropic';
 import {
   componentRegistry,
   ConfigurationError,
@@ -28,7 +29,7 @@ const inputSchema = inputs({
   ),
   chatModel: port(LLMProviderSchema(), {
     label: 'Provider Config',
-    description: 'Connect an OpenAI/Gemini/OpenRouter provider component output.',
+    description: 'Connect an OpenAI/Gemini/Anthropic/OpenRouter provider component output.',
   }),
   modelApiKey: port(
     z
@@ -113,6 +114,7 @@ interface Dependencies {
   generateText?: typeof generateTextImpl;
   createOpenAI?: typeof createOpenAIImpl;
   createGoogleGenerativeAI?: typeof createGoogleGenerativeAIImpl;
+  createAnthropic?: typeof createAnthropicImpl;
 }
 
 // Retry policy for LLM generation - handle transient API errors
@@ -155,6 +157,7 @@ const definition = defineComponent({
     const createOpenAI = dependencies?.createOpenAI ?? createOpenAIImpl;
     const createGoogleGenerativeAI =
       dependencies?.createGoogleGenerativeAI ?? createGoogleGenerativeAIImpl;
+    const createAnthropic = dependencies?.createAnthropic ?? createAnthropicImpl;
 
     const resolvedApiKey = modelApiKey?.trim() || chatModel.apiKey?.trim();
     if (!resolvedApiKey) {
@@ -168,6 +171,7 @@ const definition = defineComponent({
     const model = buildModelFactory(chatModel, resolvedApiKey, {
       createOpenAI,
       createGoogleGenerativeAI,
+      createAnthropic,
     });
 
     context.logger.info(
@@ -197,6 +201,7 @@ function buildModelFactory(
   factories: {
     createOpenAI: typeof createOpenAIImpl;
     createGoogleGenerativeAI: typeof createGoogleGenerativeAIImpl;
+    createAnthropic: typeof createAnthropicImpl;
   },
 ) {
   if (config.provider === 'gemini') {
@@ -204,6 +209,14 @@ function buildModelFactory(
       apiKey,
       ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
       ...(config.projectId ? { projectId: config.projectId } : {}),
+    });
+    return client(config.modelId);
+  }
+
+  if (config.provider === 'anthropic') {
+    const client = factories.createAnthropic({
+      apiKey,
+      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
     return client(config.modelId);
   }

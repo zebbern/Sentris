@@ -13,6 +13,7 @@ import {
 } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { createMCPClient } from '@ai-sdk/mcp';
 import {
   componentRegistry,
@@ -29,15 +30,17 @@ import {
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { AgentStreamRecorder } from './agent-stream-recorder';
 
-type ModelProvider = 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan';
+type ModelProvider = 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan' | 'anthropic';
 
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? '';
 const GEMINI_BASE_URL = process.env.GEMINI_BASE_URL ?? '';
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL ?? '';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
+const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 1024;
 const DEFAULT_MEMORY_SIZE = 8;
@@ -68,6 +71,7 @@ interface AiSdkOverrides {
   stepCountIs?: typeof stepCountIs;
   createOpenAI?: typeof createOpenAI;
   createGoogleGenerativeAI?: typeof createGoogleGenerativeAI;
+  createAnthropic?: typeof createAnthropic;
   createMCPClient?: typeof createMCPClient;
 }
 
@@ -236,6 +240,10 @@ function ensureModelName(provider: ModelProvider, modelId?: string | null): stri
 
   if (provider === 'openrouter') {
     return DEFAULT_OPENROUTER_MODEL;
+  }
+
+  if (provider === 'anthropic') {
+    return DEFAULT_ANTHROPIC_MODEL;
   }
 
   return DEFAULT_OPENAI_MODEL;
@@ -554,6 +562,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
     const createOpenAIImpl = aiSdkOverrides?.createOpenAI ?? createOpenAI;
     const createGoogleGenerativeAIImpl =
       aiSdkOverrides?.createGoogleGenerativeAI ?? createGoogleGenerativeAI;
+    const createAnthropicImpl = aiSdkOverrides?.createAnthropic ?? createAnthropic;
 
     let discoveredTools: ToolSet = {};
     let closeDiscovery: (() => Promise<void>) | undefined;
@@ -616,7 +625,9 @@ Loop the Conversation State output back into the next agent invocation to keep m
             ? GEMINI_BASE_URL
             : effectiveProvider === 'openrouter'
               ? OPENROUTER_BASE_URL
-              : OPENAI_BASE_URL;
+              : effectiveProvider === 'anthropic'
+                ? ANTHROPIC_BASE_URL
+                : OPENAI_BASE_URL;
 
       const sanitizedHeaders =
         chatModel && (chatModel.provider === 'openai' || chatModel.provider === 'openrouter')
@@ -667,9 +678,14 @@ Loop the Conversation State output back into the next agent invocation to keep m
               apiKey: effectiveApiKey,
               ...(baseUrl ? { baseURL: baseUrl } : {}),
             })(effectiveModel)
-          : isOpenRouter
-            ? openAIProvider.chat(effectiveModel)
-            : openAIProvider(effectiveModel);
+          : effectiveProvider === 'anthropic'
+            ? createAnthropicImpl({
+                apiKey: effectiveApiKey,
+                ...(baseUrl ? { baseURL: baseUrl } : {}),
+              })(effectiveModel)
+            : isOpenRouter
+              ? openAIProvider.chat(effectiveModel)
+              : openAIProvider(effectiveModel);
       const agentSettings: ToolLoopAgentSettings<never, AgentTools> = {
         id: `${sessionId}-agent`,
         model,
