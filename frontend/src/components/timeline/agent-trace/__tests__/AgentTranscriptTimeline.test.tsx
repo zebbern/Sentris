@@ -25,7 +25,9 @@ mock.module('../ExpandableText', () => ({
   ExpandableText: ({ text }: { text: string }) => <div data-testid="expandable-text">{text}</div>,
 }));
 
-import { AgentTranscriptTimeline } from '../AgentTranscriptTimeline';
+// Dynamic import with query param to bypass stale mock.module from AgentRunCard.test.tsx
+// @ts-expect-error — query parameter creates a separate module cache entry
+const { AgentTranscriptTimeline } = await import('../AgentTranscriptTimeline?unmocked');
 
 // ---------------------------------------------------------------------------
 // Helpers

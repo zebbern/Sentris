@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
-import { TimelineStatusBar } from '../TimelineStatusBar';
+// Dynamic import with query param to bypass stale mock.module from ExecutionTimeline.test.tsx
+// @ts-expect-error — query parameter creates a separate module cache entry
+const { TimelineStatusBar } = await import('../TimelineStatusBar?unmocked');
 import type { TimelineStatusBarProps } from '../types';
 
 // ---------------------------------------------------------------------------
