@@ -1,0 +1,87 @@
+{
+  "_metadata": {
+    "name": "GitHub SAST Scan",
+    "description": "Static Application Security Testing (SAST) workflow that scans a GitHub repository using Semgrep. Detects code-level security issues including injection flaws, hardcoded secrets, insecure patterns, and code quality problems across multiple languages. Evaluates findings by severity and generates a detailed SAST report.",
+    "category": "sast",
+    "tags": ["sast", "semgrep", "code-analysis", "github", "security", "devsecops"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "GitHub SAST Scan",
+    "description": "Perform static application security testing on a GitHub repository using Semgrep, evaluate findings, and produce a SAST report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "sast",
+    "tags": ["sast", "semgrep", "code-analysis", "github", "security", "devsecops"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 4,
+    "edgeCount": 3
+  },
+  "graph": {
+    "name": "GitHub SAST Scan",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": {
+          "label": "GitHub Repo Submitted",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "semgrep_scan",
+        "type": "sentris.semgrep.run",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "SAST Scan with Semgrep",
+          "config": {
+            "params": {
+              "config": "auto"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "script_evaluate",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Evaluate Findings",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Generate SAST Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-semgrep_scan", "source": "trigger_1", "target": "semgrep_scan" },
+      {
+        "id": "semgrep_scan-script_evaluate",
+        "source": "semgrep_scan",
+        "target": "script_evaluate"
+      },
+      {
+        "id": "script_evaluate-artifact_report",
+        "source": "script_evaluate",
+        "target": "artifact_report"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "github_token",
+      "type": "string",
+      "description": "GitHub Personal Access Token for repository access and scanning"
+    }
+  ]
+}

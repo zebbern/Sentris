@@ -13,7 +13,6 @@ export function useExecutionNodeIO(runId: string | null) {
     ...(runId ? executionNodeIOOptions(runId, isTerminal) : {}),
     queryKey: queryKeys.executions.nodeIO(runId ?? ''),
     queryFn: runId ? executionNodeIOOptions(runId, isTerminal).queryFn : skipToken,
-    enabled: !!runId,
     ...(!runId && { gcTime: 0 }),
   });
 }
@@ -24,7 +23,6 @@ export function useExecutionResult(runId: string | null) {
     ...(runId ? executionResultOptions(runId, isTerminal) : {}),
     queryKey: queryKeys.executions.result(runId ?? ''),
     queryFn: runId ? executionResultOptions(runId, isTerminal).queryFn : skipToken,
-    enabled: !!runId,
     ...(!runId && { gcTime: 0 }),
   });
 }
@@ -35,7 +33,6 @@ export function useExecutionRun(runId: string | null | undefined) {
     ...(runId ? executionRunOptions(runId, isTerminal) : {}),
     queryKey: queryKeys.executions.run(runId ?? ''),
     queryFn: runId ? executionRunOptions(runId, isTerminal).queryFn : skipToken,
-    enabled: !!runId,
     ...(!runId && { gcTime: 0 }),
   });
 }

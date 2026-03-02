@@ -170,91 +170,95 @@ export function ArtifactLibrary() {
                 ))}
               </TableBody>
             </Table>
-          ) : libraryError && library.length > 0 ? (
-            <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
-          ) : library.length === 0 ? (
+          ) : (
             <>
               {libraryError && (
                 <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
               )}
-              <EmptyState
-                icon={FileBox}
-                title="No artifacts found"
-                description="Run workflows with artifact saving enabled to populate this library."
-              />
+              {library.length === 0 && !libraryError ? (
+                <EmptyState
+                  icon={FileBox}
+                  title="No artifacts found"
+                  description="Run workflows with artifact saving enabled to populate this library."
+                />
+              ) : library.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={collisionDetection}
+                  onDragEnd={handleDragEnd}
+                >
+                  <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
+                    <TableHeader>
+                      <TableRow className="text-xs uppercase text-muted-foreground">
+                        <TableHead className="w-10" />
+                        <TableHead className="min-w-[150px]">Name</TableHead>
+                        <TableHead className="min-w-[150px] hidden sm:table-cell">
+                          Workflow
+                        </TableHead>
+                        <TableHead className="min-w-[100px] hidden sm:table-cell">Run</TableHead>
+                        <TableHead className="min-w-[60px]">Size</TableHead>
+                        <TableHead className="min-w-[100px] hidden lg:table-cell">
+                          Created
+                        </TableHead>
+                        <TableHead className="min-w-[120px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <SortableContext
+                        items={orderedArtifacts.map((a) => a.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {orderedArtifacts.map((artifact) => (
+                          <ArtifactLibraryRow
+                            key={artifact.id}
+                            artifact={artifact}
+                            workflowName={workflows[artifact.workflowId] || 'Unknown Workflow'}
+                            isDragDisabled={isDragDisabled}
+                            onDownload={async () => {
+                              try {
+                                await downloadArtifactMutation.mutateAsync({ artifact });
+                              } catch (err: unknown) {
+                                toast({
+                                  title: 'Download failed',
+                                  description: humanizeApiError(err),
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                            onDelete={async () => {
+                              const ok = await confirm({
+                                title: 'Delete artifact',
+                                description: 'Are you sure you want to delete this artifact?',
+                                confirmLabel: 'Delete',
+                              });
+                              if (!ok) return;
+                              try {
+                                await deleteArtifactMutation.mutateAsync(artifact.id);
+                              } catch (err: unknown) {
+                                toast({
+                                  title: 'Failed to delete artifact',
+                                  description: humanizeApiError(err),
+                                  variant: 'destructive',
+                                });
+                              }
+                            }}
+                            isDeleting={
+                              deleteArtifactMutation.isPending &&
+                              deleteArtifactMutation.variables === artifact.id
+                            }
+                            onCopyRemoteUri={async (uri: string) => {
+                              await copy(uri, { showToast: false });
+                            }}
+                            copiedRemoteUri={isCopied}
+                            isDownloading={downloadArtifactMutation.isPending}
+                          />
+                        ))}
+                      </SortableContext>
+                    </TableBody>
+                  </Table>
+                </DndContext>
+              ) : null}
             </>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={collisionDetection}
-              onDragEnd={handleDragEnd}
-            >
-              <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase text-muted-foreground">
-                    <TableHead className="w-10" />
-                    <TableHead className="min-w-[150px]">Name</TableHead>
-                    <TableHead className="min-w-[150px] hidden sm:table-cell">Workflow</TableHead>
-                    <TableHead className="min-w-[100px] hidden sm:table-cell">Run</TableHead>
-                    <TableHead className="min-w-[60px]">Size</TableHead>
-                    <TableHead className="min-w-[100px] hidden lg:table-cell">Created</TableHead>
-                    <TableHead className="min-w-[120px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <SortableContext
-                    items={orderedArtifacts.map((a) => a.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {orderedArtifacts.map((artifact) => (
-                      <ArtifactLibraryRow
-                        key={artifact.id}
-                        artifact={artifact}
-                        workflowName={workflows[artifact.workflowId] || 'Unknown Workflow'}
-                        isDragDisabled={isDragDisabled}
-                        onDownload={async () => {
-                          try {
-                            await downloadArtifactMutation.mutateAsync({ artifact });
-                          } catch (err: unknown) {
-                            toast({
-                              title: 'Download failed',
-                              description: humanizeApiError(err),
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                        onDelete={async () => {
-                          const ok = await confirm({
-                            title: 'Delete artifact',
-                            description: 'Are you sure you want to delete this artifact?',
-                            confirmLabel: 'Delete',
-                          });
-                          if (!ok) return;
-                          try {
-                            await deleteArtifactMutation.mutateAsync(artifact.id);
-                          } catch (err: unknown) {
-                            toast({
-                              title: 'Failed to delete artifact',
-                              description: humanizeApiError(err),
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                        isDeleting={
-                          deleteArtifactMutation.isPending &&
-                          deleteArtifactMutation.variables === artifact.id
-                        }
-                        onCopyRemoteUri={async (uri: string) => {
-                          await copy(uri, { showToast: false });
-                        }}
-                        copiedRemoteUri={isCopied}
-                        isDownloading={downloadArtifactMutation.isPending}
-                      />
-                    ))}
-                  </SortableContext>
-                </TableBody>
-              </Table>
-            </DndContext>
           )}
         </div>
         <ConfirmDialog {...dialogProps} />

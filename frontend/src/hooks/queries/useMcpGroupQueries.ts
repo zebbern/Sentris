@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { mcpGroupsApi } from '@/services/mcpGroupsApi';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -21,9 +21,8 @@ export function useMcpGroupsWithServers() {
 
 export function useMcpGroupServers(groupId: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.mcpGroups.servers(groupId!),
-    queryFn: () => mcpGroupsApi.getGroupServers(groupId!),
-    enabled: !!groupId,
+    queryKey: queryKeys.mcpGroups.servers(groupId ?? ''),
+    queryFn: groupId ? () => mcpGroupsApi.getGroupServers(groupId) : skipToken,
     staleTime: 30_000,
   });
 }
