@@ -6,37 +6,7 @@
  */
 
 import { z } from 'zod';
-
-type ZodDef = { type?: string; typeName?: string; [key: string]: any };
-
-const LEGACY_TYPE_MAP: Record<string, string> = {
-  ZodString: 'string',
-  ZodNumber: 'number',
-  ZodBoolean: 'boolean',
-  ZodBigInt: 'bigint',
-  ZodDate: 'date',
-  ZodSymbol: 'symbol',
-  ZodAny: 'any',
-  ZodUnknown: 'unknown',
-  ZodObject: 'object',
-  ZodArray: 'array',
-  ZodRecord: 'record',
-  ZodUnion: 'union',
-  ZodDiscriminatedUnion: 'union',
-  ZodOptional: 'optional',
-  ZodNullable: 'nullable',
-  ZodDefault: 'default',
-  ZodEffects: 'effects',
-  ZodPipeline: 'pipe',
-  ZodLiteral: 'literal',
-  ZodEnum: 'enum',
-  ZodNativeEnum: 'nativeEnum',
-};
-
-function getDefType(def: ZodDef | undefined): string | undefined {
-  const raw = def?.type ?? def?.typeName;
-  return raw ? LEGACY_TYPE_MAP[raw] ?? raw : undefined;
-}
+import { type ZodDef, getDefType } from './zod-helpers';
 
 function getObjectShape(schema: z.ZodTypeAny): Record<string, z.ZodTypeAny> {
   const shape = (schema as any).shape;

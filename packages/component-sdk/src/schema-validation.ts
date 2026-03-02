@@ -12,38 +12,7 @@ import { z } from 'zod';
 import { getPortMeta } from './port-meta';
 import { getParamMeta } from './param-meta';
 import { deriveConnectionType } from './zod-ports';
-
-type ZodDef = { type?: string; typeName?: string; [key: string]: any };
-
-const LEGACY_TYPE_MAP: Record<string, string> = {
-  ZodString: 'string',
-  ZodNumber: 'number',
-  ZodBoolean: 'boolean',
-  ZodBigInt: 'bigint',
-  ZodDate: 'date',
-  ZodSymbol: 'symbol',
-  ZodAny: 'any',
-  ZodUnknown: 'unknown',
-  ZodObject: 'object',
-  ZodArray: 'array',
-  ZodRecord: 'record',
-  ZodUnion: 'union',
-  ZodDiscriminatedUnion: 'union',
-  ZodOptional: 'optional',
-  ZodNullable: 'nullable',
-  ZodDefault: 'default',
-  ZodEffects: 'effects',
-  ZodPipeline: 'pipe',
-};
-
-function getDefType(def: ZodDef | undefined): string | undefined {
-  const raw = def?.type ?? def?.typeName;
-  return raw ? LEGACY_TYPE_MAP[raw] ?? raw : undefined;
-}
-
-function getSchemaType(schema: z.ZodTypeAny): string | undefined {
-  return getDefType((schema as any)._def);
-}
+import { type ZodDef, getDefType, getSchemaType } from './zod-helpers';
 
 export interface SchemaValidationResult {
   valid: boolean;
