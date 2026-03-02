@@ -36,6 +36,13 @@ export function RegistryServerDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+        {!server && (
+          <SheetHeader className="sr-only">
+            <SheetTitle>Server Details</SheetTitle>
+            <SheetDescription>Loading server information</SheetDescription>
+          </SheetHeader>
+        )}
+
         {isLoading && (
           <div className="space-y-4 py-4" aria-busy="true" aria-label="Loading server details">
             <Skeleton className="h-8 w-3/4" />

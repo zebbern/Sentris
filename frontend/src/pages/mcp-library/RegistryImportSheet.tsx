@@ -116,6 +116,13 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
+        {!server && (
+          <SheetHeader className="sr-only">
+            <SheetTitle>Import Server</SheetTitle>
+            <SheetDescription>Configure and import an MCP server</SheetDescription>
+          </SheetHeader>
+        )}
+
         {isLoading && (
           <div className="space-y-4 py-4">
             <Skeleton className="h-8 w-3/4" />
