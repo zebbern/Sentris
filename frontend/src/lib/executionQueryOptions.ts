@@ -66,7 +66,9 @@ export const executionNodeIOOptions = (runId: string, isTerminal?: boolean) =>
   queryOptions({
     queryKey: queryKeys.executions.nodeIO(runId),
     queryFn: () => api.executions.listNodeIO(runId),
-    staleTime: isTerminal ? Infinity : 10_000,
+    // Don't cache permanently in terminal state — Kafka pipeline latency
+    // may cause the first fetch to return empty, so allow re-fetch after 30s
+    staleTime: isTerminal ? 30_000 : 10_000,
     gcTime: isTerminal ? 10 * 60_000 : 30_000,
   });
 

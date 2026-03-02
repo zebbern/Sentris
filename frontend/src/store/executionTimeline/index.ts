@@ -113,9 +113,20 @@ export const initializeTimelineStore = () => {
 
             // Invalidate execution-scoped queries for final fresh fetch
             import('@/lib/queryClient').then(({ queryClient: qc }) => {
-              qc.invalidateQueries({
-                queryKey: queryKeys.executions.nodeIO(runId),
-              });
+              // Delay nodeIO invalidation to allow Kafka pipeline to deliver data
+              // (100ms–2s typical latency for telemetry.node-io topic)
+              setTimeout(() => {
+                qc.invalidateQueries({
+                  queryKey: queryKeys.executions.nodeIO(runId),
+                });
+              }, 3_000);
+              // Second attempt in case Kafka was slow
+              setTimeout(() => {
+                qc.invalidateQueries({
+                  queryKey: queryKeys.executions.nodeIO(runId),
+                });
+              }, 10_000);
+
               qc.invalidateQueries({
                 queryKey: queryKeys.executions.result(runId),
               });

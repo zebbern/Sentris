@@ -294,6 +294,7 @@ const definition = defineComponent({
         env: { ...(baseRunner.env ?? {}) },
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
+        stdinJson: false, // testssl.sh doesn't read stdin; prevent JSON injection
       };
 
       try {
@@ -317,14 +318,27 @@ const definition = defineComponent({
       } catch (error: unknown) {
         if (error instanceof ContainerError) {
           const details = (error as any).details as Record<string, unknown> | undefined;
-          const capturedStdout = details?.stdout;
-          if (typeof capturedStdout === 'string' && capturedStdout.trim().length > 0) {
+          const exitCode = typeof details?.exitCode === 'number' ? details.exitCode : undefined;
+          const capturedStdout = typeof details?.stdout === 'string' ? details.stdout : '';
+
+          // testssl.sh exit codes 0-6 indicate completed scans:
+          //   0 = no issues, 1-6 = findings of increasing severity.
+          // Codes ≥ 10 signal real errors (242 = bad args, 244 = no connectivity, etc.).
+          const isScanResult = typeof exitCode === 'number' && exitCode >= 0 && exitCode <= 9;
+
+          if (isScanResult && capturedStdout.trim().length > 0) {
+            context.logger.info(
+              `[testssl] Container exited with code ${exitCode} (scan findings). Treating as success.`,
+            );
+            rawOutput = capturedStdout;
+          } else if (capturedStdout.trim().length > 0) {
+            // High / unexpected exit code but we still have stdout — try to salvage
             context.logger.warn(
-              `[testssl] Container exited non-zero but produced output. Preserving partial results.`,
+              `[testssl] Container exited with code ${exitCode ?? '?'} but produced output. Preserving partial results.`,
             );
             rawOutput = capturedStdout;
           } else {
-            throw error;
+            throw error; // Genuine failure with no usable output
           }
         } else {
           throw error;
