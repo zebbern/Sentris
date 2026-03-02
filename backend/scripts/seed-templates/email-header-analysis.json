@@ -1,0 +1,107 @@
+{
+  "_metadata": {
+    "name": "Email Header Analysis",
+    "description": "Email authentication verification workflow that checks SPF, DKIM, and DMARC DNS records for a target domain using DNSX. Validates record syntax, evaluates policy strictness, identifies misconfigurations (e.g., permissive SPF ~all, missing DMARC reject policy), and scores overall email security posture. Produces an actionable compliance report with remediation recommendations.",
+    "category": "email-security",
+    "tags": ["email", "spf", "dkim", "dmarc", "dns", "authentication"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Email Header Analysis",
+    "description": "Verify SPF, DKIM, and DMARC records for a domain, evaluate email authentication posture, and generate a compliance report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "email-security",
+    "tags": ["email", "spf", "dkim", "dmarc", "dns", "authentication"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "Email Header Analysis",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": {
+          "label": "Start Email Auth Check",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "dnsx_email",
+        "type": "sentris.dnsx.run",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Query SPF, DKIM & DMARC Records",
+          "config": {
+            "params": {
+              "recordTypes": ["TXT", "MX", "CNAME"]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "script_parse",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Parse & Validate Email Auth Records",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_score",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Score Email Security Posture",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Generate Email Auth Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#email-security" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-dnsx_email", "source": "trigger_1", "target": "dnsx_email" },
+      { "id": "dnsx_email-script_parse", "source": "dnsx_email", "target": "script_parse" },
+      { "id": "script_parse-script_score", "source": "script_parse", "target": "script_score" },
+      {
+        "id": "script_score-artifact_report",
+        "source": "script_score",
+        "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for email security analysis notifications"
+    }
+  ]
+}

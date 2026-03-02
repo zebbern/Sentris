@@ -98,7 +98,7 @@ pm2 status         # Check process status
 
 ### Template Library
 
-- **24 ready-to-use workflow templates** covering vulnerability scanning, cloud compliance, incident response, OSINT, and more.
+- **30 ready-to-use workflow templates** covering vulnerability scanning, cloud compliance, incident response, OSINT, and more.
 - **One-click deployment**: Browse, preview, and create workflows from templates instantly.
 - **Community publishing**: Share your workflows as templates via GitHub PR with automatic secret sanitization.
 

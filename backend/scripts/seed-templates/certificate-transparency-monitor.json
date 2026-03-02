@@ -1,0 +1,116 @@
+{
+  "_metadata": {
+    "name": "Certificate Transparency Monitor",
+    "description": "Certificate Transparency log monitoring workflow that queries CT APIs (crt.sh) for certificates issued to target domains, filters results by issuance date, matches against a domain watchlist, and alerts on newly issued or unexpected certificates. Useful for detecting unauthorized certificate issuance, subdomain takeover attempts, and shadow IT discovery.",
+    "category": "certificate-monitoring",
+    "tags": ["certificate", "ct-logs", "transparency", "monitoring", "tls", "pki"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Certificate Transparency Monitor",
+    "description": "Monitor CT logs for new certificates issued for target domains, detect anomalies, and alert on unexpected issuance.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "certificate-monitoring",
+    "tags": ["certificate", "ct-logs", "transparency", "monitoring", "tls", "pki"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "Certificate Transparency Monitor",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": {
+          "label": "Start CT Log Monitor",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "http_ct_query",
+        "type": "core.http.request",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Query crt.sh CT Logs",
+          "config": {
+            "params": {
+              "method": "GET",
+              "url": "https://crt.sh/?output=json"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "script_filter",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Filter & Match Domains",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_analyze",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Detect Anomalous Certificates",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Generate CT Monitoring Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Alert on New Certificates",
+          "config": { "params": { "channel": "#cert-monitoring" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-http_ct_query", "source": "trigger_1", "target": "http_ct_query" },
+      {
+        "id": "http_ct_query-script_filter",
+        "source": "http_ct_query",
+        "target": "script_filter"
+      },
+      {
+        "id": "script_filter-script_analyze",
+        "source": "script_filter",
+        "target": "script_analyze"
+      },
+      {
+        "id": "script_analyze-artifact_report",
+        "source": "script_analyze",
+        "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for certificate transparency alerts"
+    }
+  ]
+}
