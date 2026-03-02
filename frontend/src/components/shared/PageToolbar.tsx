@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 
 interface PageToolbarProps {
-  /** Page heading rendered as h1. Omit to skip the title row. */
+  /** Page heading rendered as h2 (the layout top-bar provides the h1). Omit to skip the title row. */
   title?: string;
   /** URL linking to the relevant documentation page. Renders a help icon next to the title. */
   helpUrl?: string;
@@ -52,7 +52,7 @@ export function PageToolbar({
       {hasTitle && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+            <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
             {helpUrl && (
               <TooltipProvider>
                 <Tooltip>

@@ -1,0 +1,98 @@
+{
+  "_metadata": {
+    "name": "Web Application Scan",
+    "description": "End-to-end web application security workflow that probes targets for live HTTP services with HTTPX, crawls discovered hosts for URLs using Katana, and scans all crawled endpoints for vulnerabilities with Nuclei. Results are compiled into an artifact report and delivered via Slack. Ideal for scheduled external web-app assessments.",
+    "category": "web-security",
+    "tags": ["web", "vulnerability", "scanning", "httpx", "katana", "nuclei"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Web Application Scan",
+    "description": "Probe live HTTP services, crawl URLs, scan for vulnerabilities, and deliver a security report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "web-security",
+    "tags": ["web", "vulnerability", "scanning", "httpx", "katana", "nuclei"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "Web Application Scan",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": { "label": "Start Web Scan", "config": { "params": {}, "inputOverrides": {} } }
+      },
+      {
+        "id": "httpx_1",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Probe Live HTTP Services",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "katana_1",
+        "type": "sentris.katana.run",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Crawl Discovered Hosts",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "nuclei_1",
+        "type": "sentris.nuclei.scan",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Scan for Vulnerabilities",
+          "config": {
+            "params": { "severity": "medium,high,critical" },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Generate Scan Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#web-security" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-httpx_1", "source": "trigger_1", "target": "httpx_1" },
+      { "id": "httpx_1-katana_1", "source": "httpx_1", "target": "katana_1" },
+      { "id": "katana_1-nuclei_1", "source": "katana_1", "target": "nuclei_1" },
+      { "id": "nuclei_1-artifact_report", "source": "nuclei_1", "target": "artifact_report" },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for web security scan alerts"
+    }
+  ]
+}

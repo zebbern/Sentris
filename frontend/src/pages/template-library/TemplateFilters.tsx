@@ -67,7 +67,7 @@ export function TemplateFilters({
         </div>
 
         <Select value={selectedCategory || 'all'} onValueChange={onCategoryChange}>
-          <SelectTrigger className="w-full sm:w-[180px] h-9">
+          <SelectTrigger className="w-full sm:w-[180px] h-9" aria-label="Filter by category">
             <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Category" />
           </SelectTrigger>

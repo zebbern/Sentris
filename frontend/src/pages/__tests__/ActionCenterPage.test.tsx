@@ -137,7 +137,7 @@ describe('ActionCenterPage', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 1, name: /Action Center/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /Action Center/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

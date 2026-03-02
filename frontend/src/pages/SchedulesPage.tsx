@@ -330,6 +330,7 @@ export function SchedulesPage() {
             onPauseResume={handlePauseResume}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            error={!!schedulesError}
             onCreateNew={openCreateDrawer}
           />
         </div>

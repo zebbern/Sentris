@@ -37,7 +37,7 @@ export function ScheduleFilters({
       <div className="space-y-2">
         <label className="text-xs uppercase text-muted-foreground">Status</label>
         <Select value={status} onValueChange={onStatusChange}>
-          <SelectTrigger>
+          <SelectTrigger aria-label="Filter by status">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -56,7 +56,7 @@ export function ScheduleFilters({
           onValueChange={onWorkflowChange}
           disabled={workflowsLoading}
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label="Filter by workflow">
             <SelectValue placeholder="All workflows" />
           </SelectTrigger>
           <SelectContent>

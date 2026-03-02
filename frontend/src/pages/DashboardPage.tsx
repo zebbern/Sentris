@@ -117,7 +117,7 @@ interface RecentRunsTableProps {
 
 function RecentRunsSkeleton() {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-hidden="true">
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4">
           <Skeleton className="h-4 w-32" />
@@ -151,7 +151,7 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
 
   return (
     <div className="rounded-md border">
-      <Table>
+      <Table aria-label="Recent workflow runs">
         <TableHeader>
           <TableRow>
             <TableHead>Workflow</TableHead>
@@ -169,6 +169,7 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
               onClick={() => navigate(`/workflows/${run.workflowId}/runs/${run.id}`)}
               role="link"
               tabIndex={0}
+              aria-label={`${run.workflowName} — ${formatStatusText(run.status)}`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -259,7 +260,7 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Page heading */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
       </div>
 
       {/* Onboarding checklist — shown for new users */}
@@ -271,7 +272,7 @@ export function DashboardPage() {
       />
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-busy={isLoading}>
         <StatCard
           title="Workflows"
           value={stats.totalWorkflows}
@@ -308,7 +309,7 @@ export function DashboardPage() {
       </div>
 
       {/* Recent runs */}
-      <section>
+      <section aria-label="Recent runs" aria-busy={isLoading && !errors.runs}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold tracking-tight">Recent Runs</h2>
           <div className="flex items-center gap-2">
@@ -369,7 +370,7 @@ export function DashboardPage() {
       </section>
 
       {/* Quick actions */}
-      <section>
+      <section aria-label="Quick actions">
         <h2 className="text-lg font-semibold tracking-tight mb-4">Quick Actions</h2>
         <QuickActions />
       </section>
