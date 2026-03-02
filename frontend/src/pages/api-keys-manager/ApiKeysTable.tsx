@@ -213,7 +213,7 @@ export function ApiKeysTable({
               <TableBody>
                 {loading && apiKeys.length === 0 ? (
                   <TableSkeleton />
-                ) : apiKeys.length === 0 ? (
+                ) : error && apiKeys.length === 0 ? null : apiKeys.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9}>
                       <EmptyState

@@ -164,7 +164,7 @@ export function TemplateLibraryPage() {
               <CardSkeleton key={i} />
             ))}
           </div>
-        ) : templates.length === 0 ? (
+        ) : error && templates.length === 0 ? null : templates.length === 0 ? (
           <EmptyState
             icon={Layers}
             title="No templates found"

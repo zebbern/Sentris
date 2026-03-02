@@ -262,7 +262,7 @@ export function ActionCenterPage() {
                         ))}
                       </SortableContext>
                     ) : null}
-                    {!isLoading && !hasData && (
+                    {!isLoading && !hasData && !error && (
                       <TableRow>
                         <TableCell colSpan={8}>
                           <EmptyState

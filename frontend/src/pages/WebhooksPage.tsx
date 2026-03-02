@@ -379,31 +379,33 @@ export function WebhooksPage() {
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
-          <WebhooksTable
-            orderedWebhooks={orderedWebhooks}
-            isLoading={isLoading}
-            hasData={hasData}
-            isDragDisabled={isDragDisabled}
-            sensors={sensors}
-            collisionDetection={collisionDetection}
-            onDragEnd={handleDragEnd}
-            selectedIds={selectedIds}
-            toggleId={toggleId}
-            toggleAll={toggleAll}
-            isAllSelected={isAllSelected}
-            isIndeterminate={isIndeterminate}
-            selectedCount={selectedCount}
-            bulkActions={bulkActions}
-            getWorkflowName={getWorkflowNameForWebhook}
-            getStatusBadgeProps={getStatusBadgePropsForWebhook}
-            isActionBusy={isActionBusy}
-            onNavigate={handleNavigateToWebhook}
-            onCopyUrl={handleCopyUrl}
-            onViewHistory={handleViewHistory}
-            onRegeneratePath={handleRegeneratePath}
-            onDelete={handleDelete}
-            onCreateNew={() => navigate('/webhooks/new')}
-          />
+          {(!error || hasData) && (
+            <WebhooksTable
+              orderedWebhooks={orderedWebhooks}
+              isLoading={isLoading}
+              hasData={hasData}
+              isDragDisabled={isDragDisabled}
+              sensors={sensors}
+              collisionDetection={collisionDetection}
+              onDragEnd={handleDragEnd}
+              selectedIds={selectedIds}
+              toggleId={toggleId}
+              toggleAll={toggleAll}
+              isAllSelected={isAllSelected}
+              isIndeterminate={isIndeterminate}
+              selectedCount={selectedCount}
+              bulkActions={bulkActions}
+              getWorkflowName={getWorkflowNameForWebhook}
+              getStatusBadgeProps={getStatusBadgePropsForWebhook}
+              isActionBusy={isActionBusy}
+              onNavigate={handleNavigateToWebhook}
+              onCopyUrl={handleCopyUrl}
+              onViewHistory={handleViewHistory}
+              onRegeneratePath={handleRegeneratePath}
+              onDelete={handleDelete}
+              onCreateNew={() => navigate('/webhooks/new')}
+            />
+          )}
         </div>
       </div>
       <ConfirmDialog {...dialogProps} />

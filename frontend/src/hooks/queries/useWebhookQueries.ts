@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import type { WebhookConfiguration } from '@sentris/shared';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
@@ -15,8 +15,7 @@ export function useWebhooks(options?: { enabled?: boolean }) {
 export function useWebhook(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.webhooks.detail(id || ''),
-    queryFn: () => api.webhooks.get(id!),
-    enabled: !!id,
+    queryFn: id ? () => api.webhooks.get(id) : skipToken,
     staleTime: 30_000,
   });
 }
@@ -24,8 +23,7 @@ export function useWebhook(id: string | undefined) {
 export function useWebhookDeliveries(webhookId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.webhooks.deliveries(webhookId || ''),
-    queryFn: () => api.webhooks.listDeliveries(webhookId!),
-    enabled: !!webhookId,
+    queryFn: webhookId ? () => api.webhooks.listDeliveries(webhookId) : skipToken,
     staleTime: 60_000,
   });
 }

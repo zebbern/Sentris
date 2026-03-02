@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSwipeGesture } from '@/hooks/useSwipeGesture';
 
+const SIDEBAR_COLLAPSED_KEY = 'sentris:sidebar-collapsed';
+
 interface UseSidebarStateOptions {
   isMobile: boolean;
   isTablet: boolean;
@@ -33,8 +35,22 @@ export function useSidebarState({
   isTablet,
   settingsHrefs,
 }: UseSidebarStateOptions): SidebarState {
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile && !isTablet);
-  const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(!isMobile && !isTablet);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (isMobile || isTablet) return false;
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [wasExplicitlyOpened, setWasExplicitlyOpened] = useState(() => {
+    if (isMobile || isTablet) return false;
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
 
@@ -48,8 +64,20 @@ export function useSidebarState({
         (location.pathname.startsWith('/workflows') ||
           location.pathname.startsWith('/webhooks/')) &&
         location.pathname !== '/';
-      setSidebarOpen(!isWorkflowRoute);
-      setWasExplicitlyOpened(!isWorkflowRoute);
+      if (isWorkflowRoute) {
+        setSidebarOpen(false);
+        setWasExplicitlyOpened(false);
+      } else {
+        // Respect persisted user preference for non-workflow routes
+        let preferOpen = true;
+        try {
+          preferOpen = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== 'true';
+        } catch {
+          // Ignore localStorage errors
+        }
+        setSidebarOpen(preferOpen);
+        setWasExplicitlyOpened(preferOpen);
+      }
     }
   }, [location.pathname, isMobile, isTablet]);
 
@@ -106,6 +134,11 @@ export function useSidebarState({
     const newState = !sidebarOpen;
     setSidebarOpen(newState);
     setWasExplicitlyOpened(newState);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!newState));
+    } catch {
+      // Ignore localStorage errors (e.g., storage full, disabled)
+    }
   }, [sidebarOpen]);
 
   // Close sidebar when clicking backdrop on mobile

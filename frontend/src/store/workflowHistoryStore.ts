@@ -106,8 +106,10 @@ const computeStateSignature = (state: GraphState): string => {
  *
  * Usage:
  * ```
- * // In your component
- * const { nodes, edges, applyChange } = useWorkflowHistoryStore()
+ * // In your component — use granular selectors to avoid full-store re-renders
+ * const nodes = useWorkflowHistoryStore((s) => s.nodes);
+ * const edges = useWorkflowHistoryStore((s) => s.edges);
+ * const applyChange = useWorkflowHistoryStore((s) => s.applyChange);
  * const { undo, redo, pastStates, futureStates } = useWorkflowHistoryStore.temporal.getState()
  *
  * // Record an undoable change

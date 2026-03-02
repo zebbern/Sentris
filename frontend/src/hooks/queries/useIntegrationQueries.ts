@@ -27,8 +27,7 @@ export function useIntegrationProviders() {
 export function useIntegrationConnections(userId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.integrations.connections(userId),
-    queryFn: () => api.integrations.listConnections(userId!),
-    enabled: !!userId,
+    queryFn: userId ? () => api.integrations.listConnections(userId) : skipToken,
     staleTime: 60_000,
     select: sortConnections,
   });
@@ -39,7 +38,6 @@ export function useProviderConfig(providerId: string | undefined, enabled = true
   return useQuery({
     queryKey: queryKeys.integrations.providerConfig(providerId || ''),
     queryFn: isEnabled ? () => api.integrations.getProviderConfig(providerId!) : skipToken,
-    enabled: isEnabled,
     staleTime: 30_000,
     ...(isEnabled ? {} : { gcTime: 0 }),
   });
