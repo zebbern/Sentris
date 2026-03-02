@@ -102,6 +102,18 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
   }),
 }));
 
+// --- Workflow tag queries ---
+mock.module('@/hooks/queries/useWorkflowTagQueries', () => ({
+  useWorkflowTags: () => ({
+    data: [],
+    isLoading: false,
+  }),
+  useSetWorkflowTags: () => ({
+    mutate: mock(() => {}),
+    isPending: false,
+  }),
+}));
+
 // --- Auth store ---
 mock.module('@/store/authStore', () => createAuthStoreMock());
 
@@ -160,6 +172,7 @@ const makeWorkflow = (id: string, name: string): WorkflowSummary => ({
   nodeCount: 2,
   createdAt: ISO,
   updatedAt: ISO,
+  tags: [],
 });
 
 const renderWorkflowList = () =>
