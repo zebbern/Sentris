@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
 import { cleanup, act } from '@testing-library/react';
+import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
 import { renderHookWithProviders } from '@/test/render-with-providers';
 
 // ---------------------------------------------------------------------------
@@ -80,13 +81,11 @@ mock.module('@/features/analytics/events', () => ({
   },
 }));
 
-mock.module('@/lib/queryKeys', () => ({
-  queryKeys: {
-    workflows: {
-      versions: (id: string) => ['workflows', id, 'versions'],
-    },
-  },
-}));
+mock.module('@/lib/queryKeys', () =>
+  createQueryKeysMock({
+    workflows: { versions: (id: string) => ['workflows', id, 'versions'] },
+  }),
+);
 
 mock.module('@/lib/logger', () => ({
   logger: {

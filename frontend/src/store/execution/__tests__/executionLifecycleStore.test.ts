@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real store
+mock.module('@/store/executionStore', () => realModuleExports('@/store/executionStore'));
+
 import { useExecutionLifecycleStore } from '../executionLifecycleStore';
 import { useExecutionLogStore } from '../executionLogStore';
 import { useTerminalStreamStore } from '../terminalStreamStore';

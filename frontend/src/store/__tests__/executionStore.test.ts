@@ -1,4 +1,8 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real store
+mock.module('@/store/executionStore', () => realModuleExports('@/store/executionStore'));
 
 // Mock EventSource for streaming tests
 class MockEventSource {

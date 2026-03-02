@@ -1,9 +1,12 @@
 import { describe, it, expect, afterEach, beforeEach, mock } from 'bun:test';
 import { renderHook, act, cleanup } from '@testing-library/react';
+import { realModuleExports } from '@/test/restore-mocks';
 
-// Mock react-router-dom
+// Mock react-router-dom — spread real exports to avoid destroying Link,
+// MemoryRouter, etc. for downstream test files (mock.module bleeds).
 const mockLocation = { pathname: '/' };
 mock.module('react-router-dom', () => ({
+  ...realModuleExports('react-router-dom'),
   useLocation: () => mockLocation,
 }));
 

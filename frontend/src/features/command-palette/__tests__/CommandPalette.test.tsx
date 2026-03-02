@@ -2,6 +2,8 @@ import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createDialogMock } from '@/test/mocks/dialog';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
+import { realModuleExports } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -21,55 +23,40 @@ mock.module('@/components/ui/dialog', createDialogMock);
 
 // --- Command Palette Store ---
 mock.module('@/store/commandPaletteStore', () => ({
-  useCommandPaletteStore: (selector: (s: any) => any) => {
-    const state = {
-      isOpen: mockIsOpen,
-      close: mockClose,
-    };
-    return selector(state);
-  },
+  useCommandPaletteStore: createStoreMock(() => ({
+    isOpen: mockIsOpen,
+    close: mockClose,
+  })),
 }));
 
 // --- Theme Store ---
 mock.module('@/store/themeStore', () => ({
-  useThemeStore: (selector: (s: any) => any) => {
-    const state = {
-      theme: 'dark',
-      startTransition: mock(() => {}),
-    };
-    return selector(state);
-  },
+  useThemeStore: createStoreMock({
+    theme: 'dark',
+    startTransition: mock(() => {}),
+  }),
 }));
 
 // --- Workflow UI Store ---
 mock.module('@/store/workflowUiStore', () => ({
-  useWorkflowUiStore: (selector: (s: any) => any) => {
-    const state = { mode: 'design' };
-    return selector(state);
-  },
+  useWorkflowUiStore: createStoreMock({ mode: 'design' }),
 }));
 
 // --- Workflow Store ---
 mock.module('@/store/workflowStore', () => ({
-  useWorkflowStore: (selector: (s: any) => any) => {
-    const state = { metadata: { id: 'wf-123' } };
-    return selector(state);
-  },
+  useWorkflowStore: createStoreMock({ metadata: { id: 'wf-123' } }),
 }));
 
 // --- Placement Store ---
 mock.module('@/components/layout/sidebar-state', () => ({
-  usePlacementStore: (selector: (s: any) => any) => {
-    const state = { setPlacement: mockSetPlacement };
-    return selector(state);
-  },
+  usePlacementStore: createStoreMock({ setPlacement: mockSetPlacement }),
 }));
 
 // --- React Router ---
 mock.module('react-router-dom', () => ({
+  ...realModuleExports('react-router-dom'),
   useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: '/', search: '', hash: '', state: null, key: 'test' }),
-  MemoryRouter: ({ children }: { children: unknown }) => children,
 }));
 
 // --- Config env ---

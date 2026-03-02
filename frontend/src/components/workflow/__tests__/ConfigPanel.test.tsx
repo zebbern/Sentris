@@ -3,6 +3,7 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import type { FrontendNodeData } from '@/schemas/node';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Mock component index with a known component
 const mockComponent = {
@@ -90,14 +91,12 @@ mock.module('reactflow', () => ({
 }));
 
 mock.module('@/store/workflowStore', () => ({
-  useWorkflowStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ metadata: { id: 'wf-1' }, markDirty: () => {} }),
+  useWorkflowStore: createStoreMock({ metadata: { id: 'wf-1' }, markDirty: () => {} }),
 }));
 
 mock.module('@/hooks/queries/useApiKeyQueries', () => ({
   useApiKeys: () => ({ data: [] }),
-  useApiKeyUiStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ lastCreatedKey: null }),
+  useApiKeyUiStore: createStoreMock({ lastCreatedKey: null }),
 }));
 
 mock.module('@/hooks/useIsMobile', () => ({

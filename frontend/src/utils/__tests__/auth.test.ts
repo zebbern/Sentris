@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Restore real @/utils/auth — bled mocks from other test files (e.g.
+// WorkflowList.test.tsx) replace hasAdminRole with a simplified version
+// that doesn't call normalizeRole.
+mock.module('@/utils/auth', () => realModuleExports('@/utils/auth'));
 
 import { normalizeRole, hasAdminRole } from '../auth';
 

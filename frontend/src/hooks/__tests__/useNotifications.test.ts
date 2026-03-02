@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Mock all store and hook dependencies
 const mockSubscribe = mock();
@@ -7,24 +8,20 @@ const mockPush = mock();
 const mockToast = mock();
 
 mock.module('@/store/executionStore', () => ({
-  useExecutionLifecycleStore: {
+  useExecutionLifecycleStore: createStoreMock({} as Record<string, any>, {
     subscribe: mockSubscribe,
-  },
+  }),
 }));
 
 mock.module('@/store/userPreferencesStore', () => ({
-  useUserPreferencesStore: {
-    getState: () => ({
-      notifyOnRunComplete: true,
-      notifyOnRunFailed: true,
-    }),
-  },
+  useUserPreferencesStore: createStoreMock({
+    notifyOnRunComplete: true,
+    notifyOnRunFailed: true,
+  }),
 }));
 
 mock.module('@/store/notificationStore', () => ({
-  useNotificationStore: {
-    getState: () => ({ push: mockPush }),
-  },
+  useNotificationStore: createStoreMock({ push: mockPush }),
 }));
 
 mock.module('@/hooks/useNotificationPermission', () => ({

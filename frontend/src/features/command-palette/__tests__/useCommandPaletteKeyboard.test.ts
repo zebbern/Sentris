@@ -1,5 +1,6 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { cleanup } from '@testing-library/react';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -14,14 +15,11 @@ const mockClose = mock(() => {});
 // ---------------------------------------------------------------------------
 
 mock.module('@/store/commandPaletteStore', () => ({
-  useCommandPaletteStore: (selector: (s: any) => any) => {
-    const state = {
-      isOpen: mockIsOpen,
-      toggle: mockToggle,
-      close: mockClose,
-    };
-    return selector(state);
-  },
+  useCommandPaletteStore: createStoreMock(() => ({
+    isOpen: mockIsOpen,
+    toggle: mockToggle,
+    close: mockClose,
+  })),
 }));
 
 import { useCommandPaletteKeyboard } from '../useCommandPaletteKeyboard';

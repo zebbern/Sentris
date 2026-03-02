@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real store
+mock.module('@/store/executionTimelineStore', () =>
+  realModuleExports('@/store/executionTimelineStore'),
+);
+
 import { useExecutionTimelineStore, INITIAL_STATE, PLAYBACK_SPEEDS } from '../executionTimeline';
 
 describe('executionTimelineStore (barrel re-export)', () => {

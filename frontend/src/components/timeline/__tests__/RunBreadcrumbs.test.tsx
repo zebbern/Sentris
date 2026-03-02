@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { realModuleExports } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -8,6 +9,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 const mockNavigate = mock(() => {});
 
 mock.module('react-router-dom', () => ({
+  ...realModuleExports('react-router-dom'),
   useNavigate: () => mockNavigate,
 }));
 

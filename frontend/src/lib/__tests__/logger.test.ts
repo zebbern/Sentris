@@ -1,15 +1,26 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'bun:test';
+import { describe, it, expect, afterEach, beforeEach, spyOn, mock } from 'bun:test';
+import { realModuleExports } from '@/test/restore-mocks';
+
+// Override any bled mock.module with the real logger
+mock.module('@/lib/logger', () => realModuleExports('@/lib/logger'));
+
 import { logger } from '../logger';
 
 describe('logger', () => {
+  let logSpy: ReturnType<typeof spyOn>;
+  let warnSpy: ReturnType<typeof spyOn>;
+  let errorSpy: ReturnType<typeof spyOn>;
+
   beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   describe('logger.error', () => {

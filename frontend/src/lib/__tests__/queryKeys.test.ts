@@ -1,17 +1,39 @@
-import { describe, it, expect, mock } from 'bun:test';
+import { afterAll, describe, it, expect, mock } from 'bun:test';
+import { createAuthStoreMock, DEFAULT_AUTH_ORG_ID } from '@/test/mocks/auth-store';
+import { realModuleExports } from '@/test/restore-mocks';
 
-// Mock the auth store to control org scope
-mock.module('@/store/authStore', () => ({
-  useAuthStore: {
-    getState: () => ({
-      organizationId: 'test-org',
-      userId: 'test-user',
-    }),
-  },
-}));
+// Restore real queryKeys module — bled createQueryKeysMock from other test
+// files replaces queryKeys with a simplified stub that lacks org scope.
+mock.module('@/lib/queryKeys', () => realModuleExports('@/lib/queryKeys'));
+
+// The real queryKeys module captured the real useAuthStore at import time.
+// mock.module('@/store/authStore') only affects future imports; the real
+// queryKeys still reads from the original store. Set state directly on the
+// real store so getOrgScope()/getUserScope() return the expected values.
+const realAuthModule = realModuleExports('@/store/authStore') as any;
+realAuthModule.useAuthStore.setState({
+  organizationId: DEFAULT_AUTH_ORG_ID,
+  userId: 'user-1',
+});
+
+// Also register the authStore mock for any downstream imports.
+mock.module('@/store/authStore', () =>
+  createAuthStoreMock({ organizationId: DEFAULT_AUTH_ORG_ID, userId: 'user-1' }),
+);
+
+afterAll(() => {
+  // Reset the real auth store state to avoid polluting other test files.
+  realAuthModule.useAuthStore.setState({
+    organizationId: undefined,
+    userId: undefined,
+  });
+});
 
 // Import after mocking
 import { queryKeys } from '../queryKeys';
+
+const TEST_ORG = DEFAULT_AUTH_ORG_ID;
+const TEST_USER = 'user-1';
 
 describe('queryKeys', () => {
   // --- Structure ---
@@ -42,7 +64,7 @@ describe('queryKeys', () => {
 
   it('includes org scope in keys', () => {
     const key = queryKeys.secrets.all();
-    expect(key).toContain('test-org');
+    expect(key).toContain(TEST_ORG);
   });
 
   // --- Stability ---
@@ -66,12 +88,12 @@ describe('queryKeys', () => {
   it('secrets.all returns [secrets, org]', () => {
     const key = queryKeys.secrets.all();
     expect(key[0]).toBe('secrets');
-    expect(key[1]).toBe('test-org');
+    expect(key[1]).toBe(TEST_ORG);
   });
 
   it('secrets.detail includes the id parameter', () => {
     const key = queryKeys.secrets.detail('sec-123');
-    expect(key).toEqual(['secrets', 'test-org', 'sec-123']);
+    expect(key).toEqual(['secrets', TEST_ORG, 'sec-123']);
   });
 
   // --- Runs ---
@@ -79,12 +101,12 @@ describe('queryKeys', () => {
   it('runs.root returns [runs, org]', () => {
     const key = queryKeys.runs.root();
     expect(key[0]).toBe('runs');
-    expect(key[1]).toBe('test-org');
+    expect(key[1]).toBe(TEST_ORG);
   });
 
   it('runs.byWorkflow includes workflowId', () => {
     const key = queryKeys.runs.byWorkflow('wf-1');
-    expect(key).toEqual(['runs', 'test-org', 'wf-1']);
+    expect(key).toEqual(['runs', TEST_ORG, 'wf-1']);
   });
 
   it('runs.global includes __global__ marker', () => {
@@ -94,7 +116,7 @@ describe('queryKeys', () => {
 
   it('runs.detail includes detail and runId', () => {
     const key = queryKeys.runs.detail('run-1');
-    expect(key).toEqual(['runs', 'test-org', 'detail', 'run-1']);
+    expect(key).toEqual(['runs', TEST_ORG, 'detail', 'run-1']);
   });
 
   // --- Executions ---
@@ -125,7 +147,7 @@ describe('queryKeys', () => {
 
   it('executions.terminalChunks includes runId, nodeRef, and stream', () => {
     const key = queryKeys.executions.terminalChunks('run-1', 'node-1', 'pty');
-    expect(key).toEqual(['executionTerminal', 'test-org', 'run-1', 'node-1', 'pty']);
+    expect(key).toEqual(['executionTerminal', TEST_ORG, 'run-1', 'node-1', 'pty']);
   });
 
   it('executions.nodeIO includes runId', () => {
@@ -150,7 +172,7 @@ describe('queryKeys', () => {
 
   it('webhooks.detail includes webhook id', () => {
     const key = queryKeys.webhooks.detail('wh-1');
-    expect(key).toEqual(['webhooks', 'test-org', 'wh-1']);
+    expect(key).toEqual(['webhooks', TEST_ORG, 'wh-1']);
   });
 
   it('webhooks.deliveries includes webhookId', () => {
@@ -163,27 +185,27 @@ describe('queryKeys', () => {
 
   it('workflows.list returns [workflows, org]', () => {
     const key = queryKeys.workflows.list();
-    expect(key).toEqual(['workflows', 'test-org']);
+    expect(key).toEqual(['workflows', TEST_ORG]);
   });
 
   it('workflows.detail includes workflow id', () => {
     const key = queryKeys.workflows.detail('wf-1');
-    expect(key).toEqual(['workflow', 'test-org', 'wf-1']);
+    expect(key).toEqual(['workflow', TEST_ORG, 'wf-1']);
   });
 
   it('workflows.summary without filters returns [workflowsSummary, org]', () => {
     const key = queryKeys.workflows.summary();
-    expect(key).toEqual(['workflowsSummary', 'test-org']);
+    expect(key).toEqual(['workflowsSummary', TEST_ORG]);
   });
 
   it('workflows.summary with filters includes them', () => {
     const key = queryKeys.workflows.summary({ status: 'active' });
-    expect(key).toEqual(['workflowsSummary', 'test-org', { status: 'active' }]);
+    expect(key).toEqual(['workflowsSummary', TEST_ORG, { status: 'active' }]);
   });
 
   it('workflows.versions includes workflowId', () => {
     const key = queryKeys.workflows.versions('wf-1');
-    expect(key).toEqual(['workflowVersions', 'test-org', 'wf-1']);
+    expect(key).toEqual(['workflowVersions', TEST_ORG, 'wf-1']);
   });
 
   // --- Integrations ---
@@ -191,7 +213,7 @@ describe('queryKeys', () => {
   it('integrations.connections includes userId or default scope', () => {
     const key = queryKeys.integrations.connections();
     expect(key[0]).toBe('integrationConnections');
-    expect(key).toContain('test-user');
+    expect(key).toContain(TEST_USER);
   });
 
   it('integrations.connections with explicit userId uses that', () => {
@@ -204,7 +226,7 @@ describe('queryKeys', () => {
   it('templates.all without filters returns [templates, org, undefined]', () => {
     const key = queryKeys.templates.all();
     expect(key[0]).toBe('templates');
-    expect(key[1]).toBe('test-org');
+    expect(key[1]).toBe(TEST_ORG);
   });
 
   it('templates.categories returns array', () => {

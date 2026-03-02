@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
+import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
 
 // Mock all dependencies before importing the hook
 mock.module('@/lib/queryClient', () => ({
@@ -7,13 +8,13 @@ mock.module('@/lib/queryClient', () => ({
     prefetchQuery: mock(),
   },
 }));
-mock.module('@/lib/queryKeys', () => ({
-  queryKeys: {
+mock.module('@/lib/queryKeys', () =>
+  createQueryKeysMock({
     components: { all: () => ['components'] },
     workflows: { summary: () => ['workflows', 'summary'] },
     templates: { all: () => ['templates'] },
-  },
-}));
+  }),
+);
 mock.module('@/services/api', () => ({
   api: {
     workflows: { listSummary: mock() },

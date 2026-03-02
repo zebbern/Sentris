@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Create mock store selectors
 const mockState = {
@@ -14,11 +15,11 @@ const mockState = {
 };
 
 mock.module('@/store/executionStore', () => ({
-  useExecutionStore: (selector: (s: typeof mockState) => any) => selector(mockState),
+  useExecutionStore: createStoreMock(() => mockState),
 }));
 
 mock.module('@/store/workflowStore', () => ({
-  useWorkflowStore: (selector: (s: any) => any) => selector({ metadata: { id: 'wf-1' } }),
+  useWorkflowStore: createStoreMock({ metadata: { id: 'wf-1' } }),
 }));
 
 import { useWorkflowExecution } from '../useWorkflowExecution';
