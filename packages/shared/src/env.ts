@@ -65,6 +65,12 @@ export const secretStoreKeySchema = z
   .string({ error: 'SECRET_STORE_MASTER_KEY is required' })
   .length(32, { message: 'SECRET_STORE_MASTER_KEY must be exactly 32 characters' });
 
+/** INTEGRATION_STORE_MASTER_KEY — exactly 32 characters, optional (falls back to SECRET_STORE_MASTER_KEY) */
+export const integrationStoreKeySchema = z
+  .string()
+  .length(32, { message: 'INTEGRATION_STORE_MASTER_KEY must be exactly 32 characters' })
+  .optional();
+
 /** LOG_KAFKA_BROKERS — comma-separated string → array of strings */
 export const kafkaBrokersSchema = z
   .string({ error: 'LOG_KAFKA_BROKERS is required' })

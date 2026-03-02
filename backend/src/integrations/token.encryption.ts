@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SecretEncryption, SecretEncryptionMaterial, parseMasterKey } from '@sentris/shared';
 import type { IntegrationsEnvConfig, SecretsConfig } from '../config';
 
-const DEFAULT_DEV_KEY = 'fedcba9876543210fedcba9876543210';
+const FALLBACK_DEV_KEY = 'fedcba9876543210fedcba9876543210';
 
 /**
  * Encryption helper used for storing OAuth credentials at rest.
@@ -18,12 +18,18 @@ export class TokenEncryptionService {
   constructor(private readonly configService: ConfigService) {
     const integrations = this.configService.get<IntegrationsEnvConfig>('integrations')!;
     const secrets = this.configService.get<SecretsConfig>('secrets')!;
-    const rawKey = integrations.masterKey ?? secrets.masterKey ?? DEFAULT_DEV_KEY;
+    let rawKey = integrations.masterKey ?? secrets.masterKey;
 
-    if (!integrations.masterKey && !secrets.masterKey) {
+    if (!rawKey) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'INTEGRATION_STORE_MASTER_KEY (or SECRET_STORE_MASTER_KEY) environment variable is required in production',
+        );
+      }
       this.logger.warn(
-        'INTEGRATION_STORE_MASTER_KEY is not configured. Falling back to insecure development key.',
+        'INTEGRATION_STORE_MASTER_KEY is not configured. Using fallback dev key — not suitable for production.',
       );
+      rawKey = FALLBACK_DEV_KEY;
     }
 
     const masterKey = parseMasterKey(rawKey);

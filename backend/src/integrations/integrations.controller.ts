@@ -17,6 +17,9 @@ import { ConfigService } from '@nestjs/config';
 import { ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
+import { Roles } from '../auth/roles.decorator';
+import { timingSafeCompare } from '../common/crypto-utils';
+
 import {
   CompleteOAuthDto,
   CompleteOAuthSchema,
@@ -71,6 +74,7 @@ export class IntegrationsController {
   }
 
   @Put('providers/:provider/config')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create or update provider OAuth configuration' })
   @ApiOkResponse({ type: ProviderConfigurationResponse })
   async upsertProviderConfiguration(
@@ -93,6 +97,7 @@ export class IntegrationsController {
   }
 
   @Delete('providers/:provider/config')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete provider OAuth configuration' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'Provider configuration deleted' })
@@ -213,10 +218,10 @@ export class IntegrationsController {
     const intCfg = this.configService.get<IntegrationsEnvConfig>('integrations')!;
     const expected = intCfg.internalServiceToken;
     if (!expected) {
-      return;
+      throw new UnauthorizedException('INTERNAL_SERVICE_TOKEN is not configured');
     }
 
-    if (token !== expected) {
+    if (!token || !timingSafeCompare(token, expected)) {
       throw new UnauthorizedException('Invalid internal access token');
     }
   }

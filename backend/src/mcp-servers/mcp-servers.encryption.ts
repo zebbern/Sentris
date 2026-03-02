@@ -16,11 +16,15 @@ export class McpServersEncryptionService {
 
   constructor(private readonly configService: ConfigService) {
     const secrets = this.configService.get<SecretsConfig>('secrets')!;
-    const rawKey = secrets.masterKey ?? FALLBACK_DEV_KEY;
-    if (!secrets.masterKey) {
+    let rawKey = secrets.masterKey;
+    if (!rawKey) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('SECRET_STORE_MASTER_KEY environment variable is required in production');
+      }
       this.logger.warn(
-        'SECRET_STORE_MASTER_KEY is not set. Using insecure default key for development purposes only.',
+        'SECRET_STORE_MASTER_KEY is not set. Using fallback dev key — not suitable for production.',
       );
+      rawKey = FALLBACK_DEV_KEY;
     }
 
     const masterKey = parseMasterKey(rawKey);
