@@ -14,6 +14,13 @@ export { CustomServersTable } from './CustomServersTable';
 export { DeleteServerDialog } from './DeleteServerDialog';
 export { ToolsDialog } from './ToolsDialog';
 
+// Registry components
+export { RegistryCatalogTab } from './RegistryCatalogTab';
+export { RegistryServerCard } from './RegistryServerCard';
+export { RegistryCategoryFilter } from './RegistryCategoryFilter';
+export { RegistryImportSheet } from './RegistryImportSheet';
+export { RegistryServerDetailSheet } from './RegistryServerDetailSheet';
+
 // Hooks
 export { useEditorActions } from './useEditorActions';
 export { useJsonImport } from './useJsonImport';
