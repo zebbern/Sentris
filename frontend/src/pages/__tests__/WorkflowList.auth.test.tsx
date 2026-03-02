@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { MemoryRouter } from 'react-router-dom';
-import { render, screen, cleanup } from '@testing-library/react';
+import { screen, cleanup } from '@testing-library/react';
+import { renderWithProviders } from '@/test/render-with-providers';
 import { createAlertDialogMock } from '@/test/mocks/dialog';
 import {
   createDndCoreMock,
@@ -112,12 +112,7 @@ import { WorkflowList } from '@/pages/WorkflowList';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const renderList = () =>
-  render(
-    <MemoryRouter>
-      <WorkflowList />
-    </MemoryRouter>,
-  );
+const renderList = () => renderWithProviders(<WorkflowList />);
 
 // ---------------------------------------------------------------------------
 // Tests
