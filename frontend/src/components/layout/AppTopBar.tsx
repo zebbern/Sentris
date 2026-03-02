@@ -22,9 +22,9 @@ interface RouteEntry extends PageInfo {
 const ROUTE_CONFIG: RouteEntry[] = [
   {
     path: '/',
-    title: 'Workflow Builder',
-    shortTitle: 'Workflows',
-    subtitle: 'Create and manage security automation workflows',
+    title: 'Dashboard',
+    shortTitle: 'Dashboard',
+    subtitle: 'Security automation overview',
   },
   {
     path: '/templates',

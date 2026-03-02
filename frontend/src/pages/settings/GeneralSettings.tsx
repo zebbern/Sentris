@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const LANDING_PAGE_OPTIONS = [
-  { value: '/', label: 'Workflow Builder', icon: Home },
+  { value: '/', label: 'Dashboard', icon: Home },
   { value: '/templates', label: 'Template Library', icon: Package },
   { value: '/schedules', label: 'Schedules', icon: CalendarClock },
   { value: '/webhooks', label: 'Webhooks', icon: Webhook },
