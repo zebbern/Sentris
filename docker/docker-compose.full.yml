@@ -141,7 +141,8 @@ services:
     image: redpandadata/console:v2.7.2
     container_name: sentris-redpanda-console
     depends_on:
-      - redpanda
+      redpanda:
+        condition: service_healthy
     environment:
       CONFIG_FILEPATH: /etc/redpanda/console-config.yaml
     expose:
