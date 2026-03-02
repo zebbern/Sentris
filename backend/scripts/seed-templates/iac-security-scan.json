@@ -1,0 +1,121 @@
+{
+  "_metadata": {
+    "name": "IaC Security Scan",
+    "description": "Scan Infrastructure-as-Code files (Terraform, CloudFormation, Kubernetes manifests, Dockerfiles) for security misconfigurations using Checkov. Parses findings by severity, generates an artifact report, and notifies the team via Slack.",
+    "category": "compliance",
+    "tags": [
+      "iac",
+      "terraform",
+      "cloudformation",
+      "kubernetes",
+      "checkov",
+      "compliance",
+      "misconfiguration"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "IaC Security Scan",
+    "description": "Detect security misconfigurations in Terraform, CloudFormation, and K8s manifests with Checkov.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "compliance",
+    "tags": [
+      "iac",
+      "terraform",
+      "cloudformation",
+      "kubernetes",
+      "checkov",
+      "compliance",
+      "misconfiguration"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "IaC Security Scan",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "label": "Start IaC Scan",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "checkov_scan",
+        "type": "sentris.checkov.run",
+        "position": { "x": 400, "y": 300 },
+        "data": {
+          "label": "Checkov IaC Scan",
+          "config": {
+            "params": {
+              "framework": "all",
+              "softFail": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "script_parse",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 300 },
+        "data": {
+          "label": "Parse & Categorize Findings",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "semgrep_iac",
+        "type": "sentris.semgrep.run",
+        "position": { "x": 1000, "y": 300 },
+        "data": {
+          "label": "Semgrep IaC Pattern Check",
+          "config": {
+            "params": {
+              "config": "p/terraform,p/dockerfile"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 300 },
+        "data": {
+          "label": "Generate IaC Security Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_team",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 300 },
+        "data": {
+          "label": "Notify DevSecOps Team",
+          "config": { "params": { "channel": "#devsecops" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-checkov_scan", "source": "trigger_1", "target": "checkov_scan" },
+      { "id": "checkov_scan-script_parse", "source": "checkov_scan", "target": "script_parse" },
+      { "id": "script_parse-semgrep_iac", "source": "script_parse", "target": "semgrep_iac" },
+      { "id": "semgrep_iac-artifact_report", "source": "semgrep_iac", "target": "artifact_report" },
+      { "id": "artifact_report-notify_team", "source": "artifact_report", "target": "notify_team" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for IaC scan notifications"
+    }
+  ]
+}

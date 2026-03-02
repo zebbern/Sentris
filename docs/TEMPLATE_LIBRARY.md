@@ -6,40 +6,45 @@ The Template Library feature allows users to share and discover workflow templat
 
 ### Built-in Seed Templates
 
-Sentris Flow ships with 30 ready-to-use workflow templates covering common security operations. These are seeded from `backend/scripts/seed-templates/` on first run:
+Sentris Flow ships with 35 ready-to-use workflow templates covering common security operations. These are seeded from `backend/scripts/seed-templates/` on first run:
 
-| Template                         | Category               | Description                                               |
-| -------------------------------- | ---------------------- | --------------------------------------------------------- |
-| API Security Scan                | api-security           | Discover and test API endpoints for vulnerabilities       |
-| Certificate Transparency Monitor | certificate-monitoring | Monitor CT logs for new certificates on target domains    |
-| Cloud Asset Inventory            | cloud                  | Inventory cloud assets across AWS accounts                |
-| Cloud Compliance Audit           | compliance             | Audit cloud environments against compliance frameworks    |
-| Cloud Compliance Check           | compliance             | Quick cloud compliance posture check                      |
-| Cloud Security Posture Audit     | cloud                  | Full cloud security posture assessment                    |
-| Container Security Scan          | security               | Scan container images for vulnerabilities                 |
-| DNS Security Scan                | dns-security           | Enumerate DNS records and detect dangling DNS entries     |
-| Email Header Analysis            | email-security         | Verify SPF, DKIM, and DMARC email authentication records  |
-| GitHub Repo Secret Scan          | security               | Detect leaked secrets in GitHub repositories              |
-| GitHub Repo Vulnerability Scan   | security               | Scan GitHub repos for known vulnerabilities               |
-| GitHub SAST Scan                 | security               | Static analysis of GitHub repository code                 |
-| Incident Response Triage         | incident-response      | Automated incident triage and initial analysis            |
-| IOC Enrichment Workflow          | threat-intel           | Enrich indicators of compromise with threat intelligence  |
-| Kubernetes Security Audit        | kubernetes-security    | Audit K8s RBAC, pod security, and network policies        |
-| Log Analysis Pipeline            | log-analysis           | Ingest logs, extract IOCs, correlate and enrich findings  |
-| Malware Indicator Scan           | security               | Scan for malware indicators using YARA and VirusTotal     |
-| Network Recon Pipeline           | recon                  | Full network reconnaissance pipeline                      |
-| NPM Dependency Scan              | security               | Audit NPM packages for vulnerabilities                    |
-| OSINT Reconnaissance             | recon                  | Open-source intelligence gathering                        |
-| Phishing Email Analysis          | incident-response      | Analyze phishing emails and extract IOCs                  |
-| Pip Dependency Scan              | security               | Audit Python packages for vulnerabilities                 |
-| Port Scanning                    | network-security       | Scan for open ports with Naabu                            |
-| SSL/TLS Audit                    | security               | Audit SSL/TLS configurations for weaknesses               |
-| Subdomain Enumeration            | network-security       | Enumerate subdomains with Amass and resolve DNS with DNSX |
-| Vulnerability Scanning Pipeline  | security               | Multi-stage vulnerability scanning with notification      |
-| WAF Detection                    | security               | Detect Web Application Firewalls across targets           |
-| Web Application Scan             | security               | Comprehensive web application security assessment         |
-| Web Crawl Discovery              | web-security           | Crawl websites with Katana to discover endpoints          |
-| Web Fuzzing Scan                 | security               | Fuzz web applications for hidden endpoints                |
+| Template                         | Category                 | Description                                                   |
+| -------------------------------- | ------------------------ | ------------------------------------------------------------- |
+| AI Vulnerability Triage          | vulnerability-management | Scan for vulns, then use AI to prioritize and summarize       |
+| API Security Scan                | api-security             | Discover and test API endpoints for vulnerabilities           |
+| Certificate Transparency Monitor | certificate-monitoring   | Monitor CT logs for new certificates on target domains        |
+| Cloud Asset Inventory            | cloud                    | Inventory cloud assets across AWS accounts                    |
+| Cloud Compliance Audit           | compliance               | Audit cloud environments against compliance frameworks        |
+| Cloud Compliance Check           | compliance               | Quick cloud compliance posture check                          |
+| Cloud IAM Audit                  | cloud-security           | Audit AWS IAM for overprivileged roles and unused creds       |
+| Cloud Security Posture Audit     | cloud                    | Full cloud security posture assessment                        |
+| Container Security Scan          | security                 | Scan container images for vulnerabilities                     |
+| DNS Security Scan                | dns-security             | Enumerate DNS records and detect dangling DNS entries         |
+| Email Header Analysis            | email-security           | Verify SPF, DKIM, and DMARC email authentication records      |
+| Employee Offboarding Security    | automation               | Human-in-the-loop IT deprovisioning across Okta/GitHub/Google |
+| GitHub Repo Secret Scan          | security                 | Detect leaked secrets in GitHub repositories                  |
+| GitHub Repo Vulnerability Scan   | security                 | Scan GitHub repos for known vulnerabilities                   |
+| GitHub SAST Scan                 | security                 | Static analysis of GitHub repository code                     |
+| IaC Security Scan                | compliance               | Scan Terraform/CloudFormation/K8s manifests with Checkov      |
+| Incident Response Triage         | incident-response        | Automated incident triage and initial analysis                |
+| IOC Enrichment Workflow          | threat-intel             | Enrich indicators of compromise with threat intelligence      |
+| Kubernetes Security Audit        | kubernetes-security      | Audit K8s RBAC, pod security, and network policies            |
+| Log Analysis Pipeline            | log-analysis             | Ingest logs, extract IOCs, correlate and enrich findings      |
+| Malware Indicator Scan           | security                 | Scan for malware indicators using YARA and VirusTotal         |
+| Network Recon Pipeline           | recon                    | Full network reconnaissance pipeline                          |
+| NPM Dependency Scan              | security                 | Audit NPM packages for vulnerabilities                        |
+| OSINT Reconnaissance             | recon                    | Open-source intelligence gathering                            |
+| Phishing Email Analysis          | incident-response        | Analyze phishing emails and extract IOCs                      |
+| Pip Dependency Scan              | security                 | Audit Python packages for vulnerabilities                     |
+| Port Scanning                    | network-security         | Scan for open ports with Naabu                                |
+| SSL/TLS Audit                    | security                 | Audit SSL/TLS configurations for weaknesses                   |
+| Subdomain Enumeration            | network-security         | Enumerate subdomains with Amass and resolve DNS with DNSX     |
+| Supabase Security Audit          | cloud-security           | Detect RLS misconfigs, exposed keys, and open storage         |
+| Vulnerability Scanning Pipeline  | security                 | Multi-stage vulnerability scanning with notification          |
+| WAF Detection                    | security                 | Detect Web Application Firewalls across targets               |
+| Web Application Scan             | security                 | Comprehensive web application security assessment             |
+| Web Crawl Discovery              | web-security             | Crawl websites with Katana to discover endpoints              |
+| Web Fuzzing Scan                 | security                 | Fuzz web applications for hidden endpoints                    |
 
 ## Architecture
 

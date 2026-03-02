@@ -1,0 +1,178 @@
+{
+  "_metadata": {
+    "name": "Employee Offboarding Security",
+    "description": "Human-in-the-loop IT security workflow for employee departures. A manual approval gate kicks off parallel account deprovisioning across Okta, GitHub, and Google Workspace, then verifies completion and sends a confirmation to the security team via Slack.",
+    "category": "automation",
+    "tags": [
+      "offboarding",
+      "okta",
+      "github",
+      "google-workspace",
+      "manual-approval",
+      "it-automation",
+      "human-in-the-loop"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Employee Offboarding Security",
+    "description": "Approve and execute parallel account deprovisioning across Okta, GitHub, and Google Workspace on employee departure.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "automation",
+    "tags": [
+      "offboarding",
+      "okta",
+      "github",
+      "google-workspace",
+      "manual-approval",
+      "it-automation",
+      "human-in-the-loop"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 8,
+    "edgeCount": 9
+  },
+  "graph": {
+    "name": "Employee Offboarding Security",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "label": "Offboarding Request Received",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "manual_approve",
+        "type": "core.manual_action.approval",
+        "position": { "x": 400, "y": 300 },
+        "data": {
+          "label": "Manager Approval",
+          "config": {
+            "params": {
+              "title": "Employee Offboarding Approval",
+              "message": "Please review and approve the employee offboarding request. This will suspend accounts across Okta, GitHub, and Google Workspace."
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "okta_suspend",
+        "type": "it-automation.okta.user-offboard",
+        "position": { "x": 750, "y": 100 },
+        "data": {
+          "label": "Suspend Okta Account",
+          "config": {
+            "params": {
+              "action": "suspend"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "github_remove",
+        "type": "github.org.membership.remove",
+        "position": { "x": 750, "y": 300 },
+        "data": {
+          "label": "Remove GitHub Org Access",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "google_unassign",
+        "type": "it-automation.google-workspace.user-delete",
+        "position": { "x": 750, "y": 500 },
+        "data": {
+          "label": "Unassign Google Workspace License",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "script_verify",
+        "type": "core.logic.script",
+        "position": { "x": 1100, "y": 300 },
+        "data": {
+          "label": "Verify Deprovisioning",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_audit",
+        "type": "core.artifact.writer",
+        "position": { "x": 1400, "y": 300 },
+        "data": {
+          "label": "Save Offboarding Audit Log",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_confirm",
+        "type": "core.notification.slack",
+        "position": { "x": 1700, "y": 300 },
+        "data": {
+          "label": "Confirm Offboarding Complete",
+          "config": { "params": { "channel": "#it-security" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-manual_approve", "source": "trigger_1", "target": "manual_approve" },
+      { "id": "manual_approve-okta_suspend", "source": "manual_approve", "target": "okta_suspend" },
+      {
+        "id": "manual_approve-github_remove",
+        "source": "manual_approve",
+        "target": "github_remove"
+      },
+      {
+        "id": "manual_approve-google_unassign",
+        "source": "manual_approve",
+        "target": "google_unassign"
+      },
+      { "id": "okta_suspend-script_verify", "source": "okta_suspend", "target": "script_verify" },
+      { "id": "github_remove-script_verify", "source": "github_remove", "target": "script_verify" },
+      {
+        "id": "google_unassign-script_verify",
+        "source": "google_unassign",
+        "target": "script_verify"
+      },
+      {
+        "id": "script_verify-artifact_audit",
+        "source": "script_verify",
+        "target": "artifact_audit"
+      },
+      {
+        "id": "artifact_audit-notify_confirm",
+        "source": "artifact_audit",
+        "target": "notify_confirm"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "okta_api_token",
+      "type": "string",
+      "description": "Okta API token for user account suspension and deprovisioning"
+    },
+    {
+      "name": "github_token",
+      "type": "string",
+      "description": "GitHub Personal Access Token with org:admin scope for membership removal"
+    },
+    {
+      "name": "google_workspace_credentials",
+      "type": "string",
+      "description": "Google Workspace service account credentials JSON for license management"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for offboarding confirmation notifications"
+    }
+  ]
+}

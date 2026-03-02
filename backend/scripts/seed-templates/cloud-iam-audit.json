@@ -1,0 +1,132 @@
+{
+  "_metadata": {
+    "name": "Cloud IAM Audit",
+    "description": "AWS IAM security audit using Prowler to detect overprivileged roles, unused credentials, missing MFA, and IAM policy violations. Findings are analyzed, compiled into an artifact report, and delivered to the security team via Slack.",
+    "category": "cloud-security",
+    "tags": [
+      "aws",
+      "iam",
+      "prowler",
+      "cloud-security",
+      "audit",
+      "mfa",
+      "credentials",
+      "privilege-escalation"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Cloud IAM Audit",
+    "description": "Audit AWS IAM for overprivileged roles, unused credentials, and MFA gaps using Prowler.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "cloud-security",
+    "tags": [
+      "aws",
+      "iam",
+      "prowler",
+      "cloud-security",
+      "audit",
+      "mfa",
+      "credentials",
+      "privilege-escalation"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 6,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "Cloud IAM Audit",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "label": "Start IAM Audit",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "aws_creds",
+        "type": "core.credentials.aws",
+        "position": { "x": 400, "y": 300 },
+        "data": {
+          "label": "Load AWS Credentials",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "prowler_iam",
+        "type": "security.prowler.scan",
+        "position": { "x": 700, "y": 300 },
+        "data": {
+          "label": "Prowler IAM Scan",
+          "config": {
+            "params": {
+              "service": "iam",
+              "severity": "high,critical"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "script_analyze",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 300 },
+        "data": {
+          "label": "Analyze IAM Findings",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 300 },
+        "data": {
+          "label": "Generate IAM Audit Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_team",
+        "type": "core.notification.slack",
+        "position": { "x": 1600, "y": 300 },
+        "data": {
+          "label": "Notify Cloud Security Team",
+          "config": { "params": { "channel": "#cloud-security" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-aws_creds", "source": "trigger_1", "target": "aws_creds" },
+      { "id": "aws_creds-prowler_iam", "source": "aws_creds", "target": "prowler_iam" },
+      { "id": "prowler_iam-script_analyze", "source": "prowler_iam", "target": "script_analyze" },
+      {
+        "id": "script_analyze-artifact_report",
+        "source": "script_analyze",
+        "target": "artifact_report"
+      },
+      { "id": "artifact_report-notify_team", "source": "artifact_report", "target": "notify_team" }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "aws_access_key_id",
+      "type": "string",
+      "description": "AWS access key ID with IAM read permissions for Prowler scanning"
+    },
+    {
+      "name": "aws_secret_access_key",
+      "type": "string",
+      "description": "AWS secret access key paired with the access key ID"
+    },
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for cloud security audit notifications"
+    }
+  ]
+}
