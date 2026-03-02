@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import yaml from 'js-yaml';
 import {
   deserializeNodes,
   deserializeEdges,
@@ -46,9 +47,11 @@ interface UseWorkflowImportExportOptions {
   setMode: (mode: 'design' | 'execution') => void;
 }
 
+export type ExportFormat = 'json' | 'yaml';
+
 interface UseWorkflowImportExportResult {
   handleImportWorkflow: (file: File) => Promise<void>;
-  handleExportWorkflow: () => void;
+  handleExportWorkflow: (format?: ExportFormat) => void;
 }
 
 export function useWorkflowImportExport({
@@ -78,7 +81,12 @@ export function useWorkflowImportExport({
       }
 
       const contents = await file.text();
-      const parsed = WorkflowImportSchema.parse(JSON.parse(contents));
+      const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const isYaml = extension === 'yaml' || extension === 'yml';
+      const raw: unknown = isYaml
+        ? yaml.load(contents, { schema: yaml.DEFAULT_SCHEMA })
+        : JSON.parse(contents);
+      const parsed = WorkflowImportSchema.parse(raw);
 
       const graph =
         'graph' in parsed
@@ -223,80 +231,88 @@ export function useWorkflowImportExport({
     ],
   );
 
-  const handleExportWorkflow = useCallback(() => {
-    if (!canManageWorkflows) {
-      toast({
-        variant: 'destructive',
-        title: 'Insufficient permissions',
-        description: 'Only administrators can export workflows.',
-      });
-      return;
-    }
-
-    if (nodes.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot export workflow',
-        description: 'Add at least one component before exporting.',
-      });
-      return;
-    }
-
-    try {
-      if (typeof window === 'undefined') {
-        throw new Error('Export is only available in a browser environment.');
+  const handleExportWorkflow = useCallback(
+    (format: ExportFormat = 'json') => {
+      if (!canManageWorkflows) {
+        toast({
+          variant: 'destructive',
+          title: 'Insufficient permissions',
+          description: 'Only administrators can export workflows.',
+        });
+        return;
       }
 
-      const exportedNodes = serializeNodes(nodes);
-      const exportedEdges = serializeEdges(edges);
+      if (nodes.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Cannot export workflow',
+          description: 'Add at least one component before exporting.',
+        });
+        return;
+      }
 
-      const payload = {
-        name: metadata.name || 'Untitled Workflow',
-        description: metadata.description || '',
-        graph: {
-          nodes: exportedNodes,
-          edges: exportedEdges,
-          viewport: DEFAULT_WORKFLOW_VIEWPORT,
-        },
-        metadata: {
-          workflowId: metadata.id ?? null,
-          currentVersionId: metadata.currentVersionId ?? null,
-          currentVersion: metadata.currentVersion ?? null,
-          exportedAt: new Date().toISOString(),
-        },
-      };
+      try {
+        if (typeof window === 'undefined') {
+          throw new Error('Export is only available in a browser environment.');
+        }
 
-      const fileContents = JSON.stringify(payload, null, 2);
-      const blob = new Blob([fileContents], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const safeName =
-        (metadata.name || 'workflow')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '') || 'workflow';
+        const exportedNodes = serializeNodes(nodes);
+        const exportedEdges = serializeEdges(edges);
 
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${safeName}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        const payload = {
+          name: metadata.name || 'Untitled Workflow',
+          description: metadata.description || '',
+          graph: {
+            nodes: exportedNodes,
+            edges: exportedEdges,
+            viewport: DEFAULT_WORKFLOW_VIEWPORT,
+          },
+          metadata: {
+            workflowId: metadata.id ?? null,
+            currentVersionId: metadata.currentVersionId ?? null,
+            currentVersion: metadata.currentVersion ?? null,
+            exportedAt: new Date().toISOString(),
+          },
+        };
 
-      toast({
-        variant: 'success',
-        title: 'Workflow exported',
-        description: `${safeName}.json saved to your device.`,
-      });
-    } catch (error: unknown) {
-      logger.error('Failed to export workflow:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Failed to export workflow',
-        description: error instanceof Error ? error.message : 'Unknown error occurred.',
-      });
-    }
-  }, [canManageWorkflows, edges, metadata, nodes, toast]);
+        const isYamlExport = format === 'yaml';
+        const fileContents = isYamlExport
+          ? yaml.dump(payload, { indent: 2, lineWidth: -1, noRefs: true })
+          : JSON.stringify(payload, null, 2);
+        const mimeType = isYamlExport ? 'text/yaml' : 'application/json';
+        const fileExtension = isYamlExport ? 'yaml' : 'json';
+        const blob = new Blob([fileContents], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const safeName =
+          (metadata.name || 'workflow')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'workflow';
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${safeName}.${fileExtension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({
+          variant: 'success',
+          title: 'Workflow exported',
+          description: `${safeName}.${fileExtension} saved to your device.`,
+        });
+      } catch (error: unknown) {
+        logger.error('Failed to export workflow:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Failed to export workflow',
+          description: error instanceof Error ? error.message : 'Unknown error occurred.',
+        });
+      }
+    },
+    [canManageWorkflows, edges, metadata, nodes, toast],
+  );
 
   return {
     handleImportWorkflow,

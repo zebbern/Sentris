@@ -1,4 +1,5 @@
 import { useState, useRef, type ChangeEvent, useEffect } from 'react';
+import type { ExportFormat } from '@/features/workflow-builder/hooks/useWorkflowImportExport';
 import { useIsMac } from '@/hooks/useIsMac';
 import { buildOpenSearchUrl } from './buildOpenSearchUrl';
 import { useNavigate } from 'react-router-dom';
@@ -28,6 +29,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useWorkflowStore } from '@/store/workflowStore';
@@ -48,7 +52,7 @@ interface TopBarProps {
   onRun?: () => void;
   onSave: () => Promise<void> | void;
   onImport?: (file: File) => Promise<void> | void;
-  onExport?: () => void;
+  onExport?: (format?: ExportFormat) => void;
   onPublishTemplate?: () => void;
   canManageWorkflows?: boolean;
   onUndo?: () => void;
@@ -158,15 +162,6 @@ export function TopBar({
     }
     if (onRun) {
       onRun();
-    }
-  };
-
-  const handleExport = () => {
-    if (!canEdit) {
-      return;
-    }
-    if (onExport) {
-      onExport();
     }
   };
 
@@ -485,7 +480,7 @@ export function TopBar({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="application/json"
+                      accept="application/json,.json,.yaml,.yml"
                       className="hidden"
                       onChange={handleFileChange}
                     />
@@ -527,10 +522,20 @@ export function TopBar({
                         </DropdownMenuItem>
                       )}
                       {onExport && (
-                        <DropdownMenuItem onClick={handleExport} disabled={!canEdit}>
-                          <Download className="mr-2 h-4 w-4" />
-                          <span>Export</span>
-                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger disabled={!canEdit}>
+                            <Download className="mr-2 h-4 w-4" />
+                            <span>Export</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuItem onClick={() => onExport('json')}>
+                              <span>JSON (.json)</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onExport('yaml')}>
+                              <span>YAML (.yaml)</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
                       )}
                       {onToggleVersionHistory && (
                         <>
