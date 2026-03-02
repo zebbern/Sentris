@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Search, X, ServerCrash } from 'lucide-react';
+import { Search, X, ServerCrash, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useRegistryCatalog } from '@/hooks/queries/useMcpRegistryQueries';
@@ -17,8 +17,18 @@ import { useDebounce } from '@/hooks/useDebounce';
 const SERVER_TYPE_OPTIONS = ['All', 'Docker', 'Remote'] as const;
 type ServerTypeFilter = (typeof SERVER_TYPE_OPTIONS)[number];
 
+const PAGE_SIZE = 24;
+
+/** Map UI server-type label to the API query param value */
+function toServerTypeParam(filter: ServerTypeFilter): string | undefined {
+  if (filter === 'Docker') return 'server';
+  if (filter === 'Remote') return 'remote';
+  return undefined;
+}
+
 export function RegistryCatalogTab() {
   const queryClient = useQueryClient();
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Filter state
   const [searchInput, setSearchInput] = useState('');
@@ -26,51 +36,54 @@ export function RegistryCatalogTab() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [serverTypeFilter, setServerTypeFilter] = useState<ServerTypeFilter>('All');
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const offset = page * PAGE_SIZE;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, selectedCategory, serverTypeFilter]);
+
   // Sheet state
   const [detailServerName, setDetailServerName] = useState<string | null>(null);
   const [importServerName, setImportServerName] = useState<string | null>(null);
 
-  // Fetch catalog (all items, client-side filtering)
-  const { data: catalogResponse, isLoading, error } = useRegistryCatalog();
+  // Fetch catalog with server-side filtering & pagination
+  const {
+    data: catalogResponse,
+    isLoading,
+    isFetching,
+    isPlaceholderData,
+    error,
+  } = useRegistryCatalog({
+    search: debouncedSearch.trim() || undefined,
+    category: selectedCategory ?? undefined,
+    serverType: toServerTypeParam(serverTypeFilter),
+    limit: PAGE_SIZE,
+    offset,
+  });
 
-  // Client-side filtering
-  const filteredServers = useMemo(() => {
-    if (!catalogResponse?.data) return [];
-    let items = catalogResponse.data;
-
-    // Search filter
-    if (debouncedSearch.trim()) {
-      const query = debouncedSearch.trim().toLowerCase();
-      items = items.filter(
-        (s) =>
-          s.displayName.toLowerCase().includes(query) ||
-          s.description?.toLowerCase().includes(query) ||
-          s.tags.some((t) => t.toLowerCase().includes(query)),
-      );
-    }
-
-    // Category filter
-    if (selectedCategory) {
-      items = items.filter((s) => s.category === selectedCategory);
-    }
-
-    // Server type filter
-    if (serverTypeFilter === 'Docker') {
-      items = items.filter((s) => s.serverType === 'server');
-    } else if (serverTypeFilter === 'Remote') {
-      items = items.filter((s) => s.serverType === 'remote');
-    }
-
-    return items;
-  }, [catalogResponse?.data, debouncedSearch, selectedCategory, serverTypeFilter]);
-
-  const categories = useMemo(
-    () => catalogResponse?.categories ?? [],
-    [catalogResponse?.categories],
-  );
+  const servers = catalogResponse?.data ?? [];
+  const categories = catalogResponse?.categories ?? [];
+  const total = catalogResponse?.pagination?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startItem = total === 0 ? 0 : offset + 1;
+  const endItem = Math.min(offset + PAGE_SIZE, total);
+  const hasNextPage = endItem < total;
+  const hasPrevPage = page > 0;
 
   const hasActiveFilters =
     searchInput.trim().length > 0 || selectedCategory !== null || serverTypeFilter !== 'All';
+
+  // Scroll to grid top on page change (but not on filter changes that reset to page 0)
+  const prevPage = useRef(page);
+  useEffect(() => {
+    if (page !== prevPage.current && page !== 0 && gridRef.current) {
+      gridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    prevPage.current = page;
+  }, [page]);
 
   const clearFilters = useCallback(() => {
     setSearchInput('');
@@ -154,7 +167,7 @@ export function RegistryCatalogTab() {
         />
       )}
 
-      {/* Loading state */}
+      {/* Loading state (initial load only) */}
       {isLoading && (
         <div
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -170,7 +183,7 @@ export function RegistryCatalogTab() {
       )}
 
       {/* Empty state */}
-      {!isLoading && !error && filteredServers.length === 0 && (
+      {!isLoading && !error && servers.length === 0 && (
         <EmptyState
           icon={ServerCrash}
           title="No servers found"
@@ -190,13 +203,16 @@ export function RegistryCatalogTab() {
       )}
 
       {/* Server grid */}
-      {!isLoading && !error && filteredServers.length > 0 && (
+      {!isLoading && !error && servers.length > 0 && (
         <div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          ref={gridRef}
+          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${
+            isFetching && isPlaceholderData ? 'opacity-60' : ''
+          }`}
           role="list"
           aria-label="Registry servers"
         >
-          {filteredServers.map((server) => (
+          {servers.map((server) => (
             <div key={server.name} role="listitem">
               <RegistryServerCard
                 server={server}
@@ -208,15 +224,40 @@ export function RegistryCatalogTab() {
         </div>
       )}
 
-      {/* Results count */}
-      {!isLoading && !error && catalogResponse && (
-        <p
-          className="text-xs text-muted-foreground text-center pt-2"
-          role="status"
-          aria-live="polite"
-        >
-          Showing {filteredServers.length} of {catalogResponse.data.length} servers
-        </p>
+      {/* Pagination controls */}
+      {!isLoading && !error && total > 0 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+            Showing {startItem}–{endItem} of {total} servers
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasPrevPage || isFetching}
+                onClick={() => setPage((p) => p - 1)}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                Page {page + 1} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasNextPage || isFetching}
+                onClick={() => setPage((p) => p + 1)}
+                aria-label="Next page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Detail Sheet */}

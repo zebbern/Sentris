@@ -1,4 +1,10 @@
-import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  skipToken,
+  keepPreviousData,
+} from '@tanstack/react-query';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
@@ -69,6 +75,7 @@ export function useRegistryCatalog(filters?: RegistryCatalogFilters) {
       );
     },
     staleTime: 10 * 60 * 1000, // 10 min — reference data that changes only via daily sync
+    placeholderData: keepPreviousData,
   });
 }
 
