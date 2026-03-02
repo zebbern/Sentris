@@ -19,6 +19,7 @@ import { ErrorBanner } from '@/components/ui/error-banner';
 import { useAuditLogs } from '@/hooks/queries/useAuditLogQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { humanizeApiError } from '@/lib/humanizeApiError';
+import { logger } from '@/lib/logger';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { hasAdminRole } from '@/utils/auth';
@@ -163,7 +164,7 @@ export function AuditLogSettings() {
       anchor.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Failed to export audit logs', err);
+      logger.error('Failed to export audit logs', err);
     } finally {
       setIsExporting(false);
     }

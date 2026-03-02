@@ -6,8 +6,8 @@ import { McpServersEncryptionService } from './mcp-servers.encryption';
 import { McpServersRepository, type McpServerUpdateData } from './mcp-servers.repository';
 import { TemporalService } from '../temporal/temporal.service';
 import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
-import { DEFAULT_ORGANIZATION_ID } from '../auth/constants';
 import type {
   CreateMcpServerDto,
   UpdateMcpServerDto,
@@ -36,18 +36,6 @@ export class McpServersService {
     private readonly auditLogService: AuditLogService,
     private readonly configService: ConfigService,
   ) {}
-
-  private resolveOrganizationId(auth: AuthContext | null): string {
-    return auth?.organizationId ?? DEFAULT_ORGANIZATION_ID;
-  }
-
-  private assertOrganizationId(auth: AuthContext | null): string {
-    const organizationId = this.resolveOrganizationId(auth);
-    if (!organizationId) {
-      throw new BadRequestException('Organization context is required');
-    }
-    return organizationId;
-  }
 
   private mapServerToResponse(
     record: McpServerRecord,
@@ -112,7 +100,7 @@ export class McpServersService {
     auth: AuthContext | null,
     options?: { groupId?: string | null },
   ): Promise<McpServerResponse[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const servers = await this.repository.list({
       organizationId,
       groupId: options?.groupId ?? undefined,
@@ -124,7 +112,7 @@ export class McpServersService {
     auth: AuthContext | null,
     options?: { groupId?: string | null },
   ): Promise<McpServerResponse[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const servers = await this.repository.listEnabled({
       organizationId,
       groupId: options?.groupId ?? undefined,
@@ -133,7 +121,7 @@ export class McpServersService {
   }
 
   async getServer(auth: AuthContext | null, id: string): Promise<McpServerResponse> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(id, { organizationId });
     // Extract header keys for single server fetch (used in edit UI)
     const headerKeys = await this.extractHeaderKeys(server.headers);
@@ -144,7 +132,7 @@ export class McpServersService {
     auth: AuthContext | null,
     input: CreateMcpServerDto,
   ): Promise<McpServerResponse> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     // Validate transport-specific requirements
     this.validateTransportConfig(input);
@@ -263,7 +251,7 @@ export class McpServersService {
     id: string,
     input: UpdateMcpServerDto,
   ): Promise<McpServerResponse> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
 
     // Get current server to validate transport changes
     const current = await this.repository.findById(id, { organizationId });
@@ -366,7 +354,7 @@ export class McpServersService {
   }
 
   async toggleServer(auth: AuthContext | null, id: string): Promise<McpServerResponse> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const current = await this.repository.findById(id, { organizationId });
     const server = await this.repository.update(
       id,
@@ -386,7 +374,7 @@ export class McpServersService {
   }
 
   async deleteServer(auth: AuthContext | null, id: string): Promise<void> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(id, { organizationId });
     await this.repository.delete(id, { organizationId });
 
@@ -403,7 +391,7 @@ export class McpServersService {
     auth: AuthContext | null,
     id: string,
   ): Promise<{ server: McpServerRecord; headers: Record<string, string> | null }> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(id, { organizationId });
 
     let headers: Record<string, string> | null = null;
@@ -422,14 +410,14 @@ export class McpServersService {
   // Tool management
 
   async getServerTools(auth: AuthContext | null, serverId: string): Promise<McpToolResponse[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(serverId, { organizationId });
     const tools = await this.repository.listTools(serverId);
     return tools.map((t) => this.mapToolToResponse(t, server.name));
   }
 
   async getAllTools(auth: AuthContext | null): Promise<McpToolResponse[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const tools = await this.repository.listAllToolsForOrganization({ organizationId });
     return tools.map((t) => this.mapToolToResponse(t));
   }
@@ -443,7 +431,7 @@ export class McpServersService {
       inputSchema?: Record<string, unknown> | null;
     }[],
   ): Promise<McpToolResponse[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(serverId, { organizationId });
     const updated = await this.repository.upsertTools(serverId, tools);
     return updated.map((t) => this.mapToolToResponse(t, server.name));
@@ -454,7 +442,7 @@ export class McpServersService {
     serverId: string,
     toolId: string,
   ): Promise<McpToolResponse> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     // Verify server belongs to organization
     const server = await this.repository.findById(serverId, { organizationId });
     const tool = await this.repository.toggleToolEnabled(toolId);
@@ -466,14 +454,14 @@ export class McpServersService {
     serverId: string,
     status: 'healthy' | 'unhealthy' | 'unknown',
   ): Promise<void> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     await this.repository.updateHealthStatus(serverId, status, { organizationId });
   }
 
   async getHealthStatuses(
     auth: AuthContext | null,
   ): Promise<{ serverId: string; status: HealthStatus; checkedAt: string | null }[]> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const servers = await this.repository.listEnabled({ organizationId });
     return servers.map((s) => ({
       serverId: s.id,
@@ -498,7 +486,7 @@ export class McpServersService {
     message: string;
     toolCount?: number;
   }> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(id, { organizationId });
 
     // Validate that the server has a valid configuration for its transport type
@@ -704,7 +692,7 @@ export class McpServersService {
     auth: AuthContext | null,
     serverId: string,
   ): Promise<{ headers?: Record<string, string>; args?: string[] }> {
-    const organizationId = this.assertOrganizationId(auth);
+    const organizationId = requireOrganizationId(auth);
     const record = await this.repository.findById(serverId, { organizationId });
 
     if (!record) {
