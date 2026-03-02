@@ -187,6 +187,26 @@ export default {
   				to: {
   					height: '0'
   				}
+  			},
+  			fadeSlideIn: {
+  				from: {
+  					opacity: '0',
+  					transform: 'translateY(8px)'
+  				},
+  				to: {
+  					opacity: '1',
+  					transform: 'translateY(0)'
+  				}
+  			},
+  			fadeSlideOut: {
+  				from: {
+  					opacity: '1',
+  					transform: 'translateY(0)'
+  				},
+  				to: {
+  					opacity: '0',
+  					transform: 'translateY(-8px)'
+  				}
   			}
   		},
   		animation: {
