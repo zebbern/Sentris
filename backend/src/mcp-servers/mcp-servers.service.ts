@@ -537,53 +537,38 @@ export class McpServersService {
       });
 
       // Wait for workflow to complete (with timeout)
-      const maxWaitTime = 60_000; // 60 seconds
-      const startTime = Date.now();
+      const WORKFLOW_TIMEOUT_MS = 60_000;
+      try {
+        await Promise.race([
+          this.temporalService.getWorkflowResult({
+            workflowId: workflowResult.workflowId,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Connection test timed out after 60 seconds')),
+              WORKFLOW_TIMEOUT_MS,
+            ),
+          ),
+        ]);
 
-      while (Date.now() - startTime < maxWaitTime) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        const status = await this.temporalService.describeWorkflow({
-          workflowId: workflowResult.workflowId,
-        });
-        const statusValue = status.status.toLowerCase();
-        if (statusValue === 'completed') {
-          // Discovery succeeded - tools are already saved by the workflow
-          await this.repository.updateHealthStatus(id, 'healthy', {});
-          const tools = await this.repository.listTools(id);
-          return {
-            success: true,
-            message: `Connection successful (${tools.length} tools discovered)`,
-            toolCount: tools.length,
-          };
-        }
-        if (statusValue === 'failed') {
-          await this.repository.updateHealthStatus(id, 'unhealthy', {});
-          return {
-            success: false,
-            message: 'Connection test failed - check server configuration',
-          };
-        }
-        if (
-          statusValue === 'terminated' ||
-          statusValue === 'canceled' ||
-          statusValue === 'timed out'
-        ) {
-          await this.repository.updateHealthStatus(id, 'unhealthy', {});
-          return {
-            success: false,
-            message: 'Connection test was canceled or timed out',
-          };
-        }
-        // Continue polling for 'running' status
+        // Discovery succeeded - tools are already saved by the workflow
+        await this.repository.updateHealthStatus(id, 'healthy', {});
+        const tools = await this.repository.listTools(id);
+        return {
+          success: true,
+          message: `Connection successful (${tools.length} tools discovered)`,
+          toolCount: tools.length,
+        };
+      } catch (workflowError) {
+        await this.repository.updateHealthStatus(id, 'unhealthy', {});
+        const errorMessage =
+          workflowError instanceof Error ? workflowError.message : 'Connection test failed';
+        const isTimeout = errorMessage.includes('timed out');
+        return {
+          success: false,
+          message: isTimeout ? errorMessage : 'Connection test failed - check server configuration',
+        };
       }
-
-      // Timeout
-      await this.repository.updateHealthStatus(id, 'unhealthy', {});
-      return {
-        success: false,
-        message: 'Connection test timed out after 60 seconds',
-      };
     } catch (error) {
       // Update health status to unhealthy (configuration is invalid or test failed)
       await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
