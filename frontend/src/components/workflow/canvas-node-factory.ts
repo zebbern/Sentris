@@ -81,15 +81,7 @@ export function createNodeFromComponent(
   }
 
   if ((component.slug ?? component.id) === 'entry-point') {
-    initialParameters.runtimeInputs = [
-      {
-        id: 'input1',
-        label: 'Input 1',
-        type: 'array',
-        required: true,
-        description: '',
-      },
-    ];
+    initialParameters.runtimeInputs = [];
   }
 
   const newNode: Node<FrontendNodeData> = {

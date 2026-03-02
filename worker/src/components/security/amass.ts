@@ -19,7 +19,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const AMASS_IMAGE = 'ghcr.io/zebbern/amass:latest';
+const AMASS_IMAGE = 'caffix/amass:latest';
 const AMASS_TIMEOUT_SECONDS = (() => {
   const raw = process.env.AMASS_TIMEOUT_SECONDS;
   const parsed = raw ? Number.parseInt(raw, 10) : NaN;

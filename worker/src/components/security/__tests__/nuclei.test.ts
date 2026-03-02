@@ -422,7 +422,7 @@ describe('Nuclei Integration', () => {
     const component = componentRegistry.get('sentris.nuclei.scan')!;
     expect(component!.runner.kind).toBe('docker');
     if (component!.runner.kind === 'docker') {
-      expect(component!.runner.image).toBe('ghcr.io/zebbern/nuclei:latest');
+      expect(component!.runner.image).toBe('projectdiscovery/nuclei:latest');
       expect(component!.runner.entrypoint).toBe('nuclei');
     }
   });

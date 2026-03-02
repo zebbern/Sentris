@@ -122,7 +122,7 @@ describe('naabu component', () => {
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/zebbern/naabu:latest');
+      expect(component.runner.image).toBe('projectdiscovery/naabu:latest');
       // Distroless image — no entrypoint override, uses image default
       expect(component.runner.entrypoint).toBeUndefined();
       expect(component.runner.command).toEqual([]);

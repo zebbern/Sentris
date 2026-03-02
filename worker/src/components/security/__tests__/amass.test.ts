@@ -109,13 +109,13 @@ dockerDescribe('amass component', () => {
     expect(result.rawOutput).toBe(rawOutput);
   });
 
-  it('should configure docker runner for ghcr.io/zebbern/amass image', () => {
+  it('should configure docker runner for caffix/amass image', () => {
     const component = componentRegistry.get<AmassInput, AmassOutput>('sentris.amass.enum');
     if (!component) throw new Error('Component not registered');
 
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
-      expect(component.runner.image).toBe('ghcr.io/zebbern/amass:latest');
+      expect(component.runner.image).toBe('caffix/amass:latest');
       expect(component.runner.entrypoint).toBe('sh');
       expect(component.runner.command).toBeInstanceOf(Array);
     }

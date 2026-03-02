@@ -16,7 +16,7 @@ import {
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 
-const NAABU_IMAGE = 'ghcr.io/zebbern/naabu:latest';
+const NAABU_IMAGE = 'projectdiscovery/naabu:latest';
 const INPUT_MOUNT_NAME = 'inputs';
 const CONTAINER_INPUT_DIR = `/${INPUT_MOUNT_NAME}`;
 const TARGETS_FILE_NAME = 'targets.txt';

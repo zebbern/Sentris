@@ -5,15 +5,7 @@ import type { FrontendNodeData } from '@/schemas/node';
 /**
  * Default runtime inputs for the Entry Point node.
  */
-export const ENTRY_DEFAULT_RUNTIME_INPUTS = [
-  {
-    id: 'input1',
-    label: 'Input 1',
-    type: 'array',
-    required: true,
-    description: '',
-  },
-] as const;
+export const ENTRY_DEFAULT_RUNTIME_INPUTS = [] as const;
 
 /**
  * Compute a deterministic JSON signature of a graph (nodes + edges).
