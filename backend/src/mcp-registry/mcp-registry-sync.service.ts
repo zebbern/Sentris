@@ -15,7 +15,7 @@ import {
   GITHUB_REQUEST_TIMEOUT_MS,
   MAX_YAML_SIZE_BYTES,
 } from './registry-featured';
-import { MCP_REGISTRY_REDIS } from './mcp-registry.module';
+import { MCP_REGISTRY_REDIS } from './mcp-registry.constants';
 import type { RegistrySyncResult } from '@sentris/shared';
 
 interface GitHubTreeResponse {

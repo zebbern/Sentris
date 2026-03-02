@@ -6161,6 +6161,188 @@
         ]
       }
     },
+    "/api/v1/mcp-registry/catalog": {
+      "get": {
+        "operationId": "McpRegistryController_getCatalog",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "serverType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "server",
+                "remote"
+              ]
+            }
+          },
+          {
+            "name": "featured",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "tags",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "default": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryCatalogListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Browse/search the Docker MCP Registry catalog",
+        "tags": [
+          "mcp-registry"
+        ]
+      }
+    },
+    "/api/v1/mcp-registry/catalog/{name}": {
+      "get": {
+        "operationId": "McpRegistryController_getCatalogEntry",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryCatalogDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get details for a single registry server",
+        "tags": [
+          "mcp-registry"
+        ]
+      }
+    },
+    "/api/v1/mcp-registry/import": {
+      "post": {
+        "operationId": "McpRegistryController_importServer",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistryImportRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryImportResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Import a registry server into the MCP Library",
+        "tags": [
+          "mcp-registry"
+        ]
+      }
+    },
+    "/api/v1/mcp-registry/sync": {
+      "post": {
+        "operationId": "McpRegistryController_triggerSync",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Trigger a manual registry sync",
+        "tags": [
+          "mcp-registry"
+        ]
+      }
+    },
+    "/api/v1/mcp-registry/sync/status": {
+      "get": {
+        "operationId": "McpRegistryController_getSyncStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get the current registry sync status",
+        "tags": [
+          "mcp-registry"
+        ]
+      }
+    },
     "/api/v1/mcp/gateway": {
       "get": {
         "operationId": "McpGatewayController_handleGateway_get",
@@ -11489,6 +11671,383 @@
         "required": [
           "action",
           "group"
+        ]
+      },
+      "RegistryCatalogListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "serverType": {
+                  "type": "string",
+                  "enum": [
+                    "server",
+                    "remote"
+                  ]
+                },
+                "category": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "iconUrl": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "isFeatured": {
+                  "type": "boolean"
+                },
+                "hasSecrets": {
+                  "type": "boolean"
+                },
+                "hasOAuth": {
+                  "type": "boolean"
+                },
+                "isImported": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "displayName",
+                "description",
+                "serverType",
+                "category",
+                "tags",
+                "iconUrl",
+                "sourceUrl",
+                "isFeatured",
+                "hasSecrets",
+                "hasOAuth",
+                "isImported"
+              ]
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              },
+              "limit": {
+                "type": "number"
+              },
+              "offset": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "data",
+          "pagination",
+          "categories"
+        ]
+      },
+      "RegistryCatalogDetailDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "serverType": {
+            "type": "string",
+            "enum": [
+              "server",
+              "remote"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "hasSecrets": {
+            "type": "boolean"
+          },
+          "hasOAuth": {
+            "type": "boolean"
+          },
+          "isImported": {
+            "type": "boolean"
+          },
+          "dockerImage": {
+            "type": "string",
+            "nullable": true
+          },
+          "remoteConfig": {
+            "type": "object",
+            "properties": {
+              "transportType": {
+                "type": "string",
+                "enum": [
+                  "streamable-http",
+                  "sse"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "transportType",
+              "url"
+            ],
+            "nullable": true
+          },
+          "configRequirements": {
+            "type": "object",
+            "properties": {
+              "secrets": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "env": {
+                      "type": "string"
+                    },
+                    "example": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "env"
+                  ]
+                }
+              },
+              "env": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "example": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "oauthProviders": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "secret": {
+                  "type": "string"
+                },
+                "env": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "provider"
+              ]
+            }
+          },
+          "runConfig": {
+            "type": "object",
+            "properties": {
+              "command": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "volumes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "env": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "displayName",
+          "description",
+          "serverType",
+          "category",
+          "tags",
+          "iconUrl",
+          "sourceUrl",
+          "isFeatured",
+          "hasSecrets",
+          "hasOAuth",
+          "isImported",
+          "dockerImage",
+          "remoteConfig",
+          "configRequirements",
+          "runConfig"
+        ]
+      },
+      "RegistryImportRequestDto": {
+        "type": "object",
+        "properties": {
+          "registryName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "secrets": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "envVars": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "default": true,
+            "type": "boolean"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "registryName"
+        ]
+      },
+      "RegistryImportResponseDto": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "serverName": {
+            "type": "string"
+          },
+          "transportType": {
+            "type": "string",
+            "enum": [
+              "http",
+              "stdio"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "imported",
+              "already_exists"
+            ]
+          }
+        },
+        "required": [
+          "serverId",
+          "serverName",
+          "transportType",
+          "status"
         ]
       },
       "DiscoveryInputDto": {
