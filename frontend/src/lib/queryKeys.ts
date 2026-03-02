@@ -98,7 +98,10 @@ export const queryKeys = {
   },
   // Registry catalog is global (not org-scoped) — shared across all organizations
   mcpRegistry: {
-    catalog: (filters?: Record<string, unknown>) => ['mcpRegistry', 'catalog', filters] as const,
+    catalog: (filters?: Record<string, unknown>) =>
+      filters
+        ? (['mcpRegistry', 'catalog', filters] as const)
+        : (['mcpRegistry', 'catalog'] as const),
     detail: (name: string) => ['mcpRegistry', 'detail', name] as const,
     syncStatus: () => ['mcpRegistry', 'syncStatus'] as const,
     categories: () => ['mcpRegistry', 'categories'] as const,

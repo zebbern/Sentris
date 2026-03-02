@@ -4,10 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Search, X, ServerCrash, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Search,
+  X,
+  ServerCrash,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { useRegistryCatalog } from '@/hooks/queries/useMcpRegistryQueries';
+import {
+  useRegistryCatalog,
+  useTriggerRegistrySync,
+  useRegistrySyncStatus,
+} from '@/hooks/queries/useMcpRegistryQueries';
 import { RegistryCategoryFilter } from './RegistryCategoryFilter';
 import { RegistryServerCard } from './RegistryServerCard';
 import { RegistryServerDetailSheet } from './RegistryServerDetailSheet';
@@ -75,6 +87,31 @@ export function RegistryCatalogTab() {
 
   const hasActiveFilters =
     searchInput.trim().length > 0 || selectedCategory !== null || serverTypeFilter !== 'All';
+
+  // Sync hooks for cold-start auto-sync
+  const syncStatus = useRegistrySyncStatus();
+  const {
+    mutate: triggerSyncMutate,
+    isPending: isSyncing,
+    isError: isSyncError,
+  } = useTriggerRegistrySync();
+
+  // Auto-trigger sync when catalog is empty and no sync has ever run
+  const hasTriggeredAutoSync = useRef(false);
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !error &&
+      total === 0 &&
+      !hasActiveFilters &&
+      syncStatus.data?.lastSyncAt === null &&
+      !hasTriggeredAutoSync.current &&
+      !isSyncing
+    ) {
+      hasTriggeredAutoSync.current = true;
+      triggerSyncMutate();
+    }
+  }, [isLoading, error, total, hasActiveFilters, syncStatus.data, isSyncing, triggerSyncMutate]);
 
   // Scroll to grid top on page change (but not on filter changes that reset to page 0)
   const prevPage = useRef(page);
@@ -183,24 +220,41 @@ export function RegistryCatalogTab() {
       )}
 
       {/* Empty state */}
-      {!isLoading && !error && servers.length === 0 && (
-        <EmptyState
-          icon={ServerCrash}
-          title="No servers found"
-          description={
-            hasActiveFilters
-              ? 'Try adjusting your search or filters.'
-              : 'The registry catalog is empty. It may need to sync.'
-          }
-          action={
-            hasActiveFilters ? (
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
+      {!isLoading &&
+        !error &&
+        servers.length === 0 &&
+        (isSyncing ? (
+          <EmptyState
+            icon={Loader2}
+            title="Syncing catalog\u2026"
+            description="Fetching servers from the Docker MCP Registry. This may take a moment."
+            className="[&_svg]:animate-spin"
+          />
+        ) : (
+          <EmptyState
+            icon={ServerCrash}
+            title="No servers found"
+            description={
+              hasActiveFilters
+                ? 'Try adjusting your search or filters.'
+                : isSyncError
+                  ? 'Sync failed. Please try again.'
+                  : 'The registry catalog is empty. Sync to populate it from the Docker MCP Registry.'
+            }
+            action={
+              hasActiveFilters ? (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => triggerSyncMutate()}>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Sync Now
+                </Button>
+              )
+            }
+          />
+        ))}
 
       {/* Server grid */}
       {!isLoading && !error && servers.length > 0 && (
