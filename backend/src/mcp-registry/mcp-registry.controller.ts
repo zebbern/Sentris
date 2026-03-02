@@ -56,6 +56,7 @@ export class McpRegistryController {
   }
 
   @Get('sync/status')
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get the current registry sync status' })
   async getSyncStatus() {
     return this.mcpRegistryService.getSyncStatus();

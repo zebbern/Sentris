@@ -28,49 +28,50 @@ export class McpRegistryRepository {
   ) {}
 
   /**
-   * Upsert catalog entries in a single transaction.
+   * Upsert catalog entries using batch inserts (chunks of 50).
    */
   async upsertCatalogEntries(
     entries: Omit<NewRegistryCatalogRecord, 'id' | 'createdAt' | 'updatedAt' | 'syncedAt'>[],
   ): Promise<number> {
     if (entries.length === 0) return 0;
 
-    let upsertCount = 0;
+    const UPSERT_BATCH_SIZE = 50;
+    const valuesToInsert = entries.map((entry) => ({
+      ...entry,
+      syncedAt: sql`now()`,
+    }));
 
     await this.db.transaction(async (tx) => {
-      for (const entry of entries) {
+      for (let i = 0; i < valuesToInsert.length; i += UPSERT_BATCH_SIZE) {
+        const chunk = valuesToInsert.slice(i, i + UPSERT_BATCH_SIZE);
         await tx
           .insert(registryCatalog)
-          .values({
-            ...entry,
-            syncedAt: sql`now()`,
-          })
+          .values(chunk)
           .onConflictDoUpdate({
             target: registryCatalog.name,
             set: {
-              displayName: entry.displayName,
-              description: entry.description,
-              serverType: entry.serverType,
-              category: entry.category,
-              tags: entry.tags,
-              iconUrl: entry.iconUrl,
-              sourceUrl: entry.sourceUrl,
-              dockerImage: entry.dockerImage,
-              remoteConfig: entry.remoteConfig,
-              configSchema: entry.configSchema,
-              runConfig: entry.runConfig,
-              oauthConfig: entry.oauthConfig,
-              isFeatured: entry.isFeatured,
-              registryCommitSha: entry.registryCommitSha,
+              displayName: sql`excluded.display_name`,
+              description: sql`excluded.description`,
+              serverType: sql`excluded.server_type`,
+              category: sql`excluded.category`,
+              tags: sql`excluded.tags`,
+              iconUrl: sql`excluded.icon_url`,
+              sourceUrl: sql`excluded.source_url`,
+              dockerImage: sql`excluded.docker_image`,
+              remoteConfig: sql`excluded.remote_config`,
+              configSchema: sql`excluded.config_schema`,
+              runConfig: sql`excluded.run_config`,
+              oauthConfig: sql`excluded.oauth_config`,
+              isFeatured: sql`excluded.is_featured`,
+              registryCommitSha: sql`excluded.registry_commit_sha`,
               syncedAt: sql`now()`,
               updatedAt: sql`now()`,
             },
           });
-        upsertCount++;
       }
     });
 
-    return upsertCount;
+    return entries.length;
   }
 
   /**

@@ -9,7 +9,6 @@ import {
 import { McpRegistryRepository } from './mcp-registry.repository';
 import { McpRegistrySyncService } from './mcp-registry-sync.service';
 import { McpServersService } from '../mcp-servers/mcp-servers.service';
-import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
 import type { AuthContext } from '../auth/types';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import type {
@@ -28,11 +27,19 @@ import type { RegistryCatalogRecord } from '../database/schema';
 export class McpRegistryService {
   private readonly logger = new Logger(McpRegistryService.name);
 
+  private static readonly DENIED_MOUNT_PREFIXES = [
+    '/etc',
+    '/root',
+    '/var/run',
+    '/proc',
+    '/sys',
+    '/dev',
+  ];
+
   constructor(
     private readonly repository: McpRegistryRepository,
     private readonly syncService: McpRegistrySyncService,
     private readonly mcpServersService: McpServersService,
-    private readonly mcpServersRepository: McpServersRepository,
   ) {}
 
   /**
@@ -94,7 +101,7 @@ export class McpRegistryService {
     }
 
     // 2. Check for duplicate import
-    const existingServer = await this.mcpServersRepository.findByRegistrySource(
+    const existingServer = await this.mcpServersService.findByRegistrySource(
       dto.registryName,
       organizationId,
     );
@@ -149,10 +156,16 @@ export class McpRegistryService {
       command = 'docker';
       args = ['run', '-i', '--rm'];
 
-      // Add environment variables from user input
+      // Store secrets in encrypted headers with env: prefix (not as plaintext args)
+      const envHeaders: Record<string, string> = {};
       for (const [key, value] of Object.entries(dto.secrets)) {
-        args.push('-e', `${key}=${value}`);
+        envHeaders[`env:${key}`] = value;
       }
+      if (Object.keys(envHeaders).length > 0) {
+        headers = envHeaders;
+      }
+
+      // Add non-secret environment variables as args
       for (const [key, value] of Object.entries(dto.envVars)) {
         args.push('-e', `${key}=${value}`);
       }
@@ -165,9 +178,15 @@ export class McpRegistryService {
         }
       }
 
-      // Add volumes from run config
+      // Validate and add volumes from run config
       if (entry.runConfig?.volumes) {
         for (const volume of entry.runConfig.volumes) {
+          const hostPath = volume.split(':')[0];
+          if (
+            McpRegistryService.DENIED_MOUNT_PREFIXES.some((prefix) => hostPath.startsWith(prefix))
+          ) {
+            throw new UnprocessableEntityException(`Unsafe volume mount rejected: ${hostPath}`);
+          }
           args.push('-v', volume);
         }
       }
@@ -197,7 +216,7 @@ export class McpRegistryService {
     });
 
     // 6. Set registry_source_name on the created server
-    await this.mcpServersRepository.setRegistrySourceName(serverResponse.id, dto.registryName);
+    await this.mcpServersService.setRegistrySourceName(serverResponse.id, dto.registryName);
 
     this.logger.log(
       `Imported registry server '${dto.registryName}' as '${serverResponse.name}' (${serverResponse.id})`,
@@ -238,14 +257,8 @@ export class McpRegistryService {
   // --- Private helpers ---
 
   private async getImportedRegistryNames(organizationId: string): Promise<Set<string>> {
-    const servers = await this.mcpServersRepository.list({ organizationId });
-    const names = new Set<string>();
-    for (const server of servers) {
-      if (server.registrySourceName) {
-        names.add(server.registrySourceName);
-      }
-    }
-    return names;
+    const names = await this.mcpServersService.listRegistrySourceNames(organizationId);
+    return new Set(names);
   }
 
   private mapToEntry(

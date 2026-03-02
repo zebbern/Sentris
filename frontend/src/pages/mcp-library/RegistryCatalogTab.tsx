@@ -44,7 +44,7 @@ export function RegistryCatalogTab() {
       items = items.filter(
         (s) =>
           s.displayName.toLowerCase().includes(query) ||
-          s.description.toLowerCase().includes(query) ||
+          s.description?.toLowerCase().includes(query) ||
           s.tags.some((t) => t.toLowerCase().includes(query)),
       );
     }
@@ -56,9 +56,9 @@ export function RegistryCatalogTab() {
 
     // Server type filter
     if (serverTypeFilter === 'Docker') {
-      items = items.filter((s) => s.serverType === 'stdio');
+      items = items.filter((s) => s.serverType === 'server');
     } else if (serverTypeFilter === 'Remote') {
-      items = items.filter((s) => s.serverType === 'http');
+      items = items.filter((s) => s.serverType === 'remote');
     }
 
     return items;
@@ -210,7 +210,11 @@ export function RegistryCatalogTab() {
 
       {/* Results count */}
       {!isLoading && !error && catalogResponse && (
-        <p className="text-xs text-muted-foreground text-center pt-2">
+        <p
+          className="text-xs text-muted-foreground text-center pt-2"
+          role="status"
+          aria-live="polite"
+        >
           Showing {filteredServers.length} of {catalogResponse.data.length} servers
         </p>
       )}

@@ -52,29 +52,31 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
         setEnabled(true);
         setGroupId('');
         setValidationErrors(new Set());
+        importMutation.reset();
       }
       onOpenChange(isOpen);
     },
-    [onOpenChange],
+    [onOpenChange, importMutation],
   );
 
-  const requiredSecretNames = useMemo(() => {
+  const requiredSecretEnvKeys = useMemo(() => {
     if (!server) return [];
-    return server.configRequirements.secrets.filter((s) => s.required).map((s) => s.name);
+    // All listed secrets are required (shared schema has no `required` field)
+    return server.configRequirements.secrets.map((s) => s.env);
   }, [server]);
 
   const isFormValid = useMemo(() => {
-    return requiredSecretNames.every((name) => secrets[name]?.trim());
-  }, [requiredSecretNames, secrets]);
+    return requiredSecretEnvKeys.every((envKey) => secrets[envKey]?.trim());
+  }, [requiredSecretEnvKeys, secrets]);
 
   const handleSubmit = useCallback(() => {
     if (!server) return;
 
     // Validate required secrets
     const missing = new Set<string>();
-    for (const name of requiredSecretNames) {
-      if (!secrets[name]?.trim()) {
-        missing.add(name);
+    for (const envKey of requiredSecretEnvKeys) {
+      if (!secrets[envKey]?.trim()) {
+        missing.add(envKey);
       }
     }
     if (missing.size > 0) {
@@ -103,7 +105,7 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
     envVars,
     enabled,
     groupId,
-    requiredSecretNames,
+    requiredSecretEnvKeys,
     importMutation,
     handleOpenChange,
   ]);
@@ -164,35 +166,49 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
               {server.configRequirements.secrets.length > 0 && (
                 <div className="space-y-4">
                   <h4 className="text-sm font-medium">Secrets</h4>
-                  {server.configRequirements.secrets.map((secret) => (
-                    <div key={secret.name} className="space-y-1.5">
-                      <Label htmlFor={`secret-${secret.name}`} className="flex items-center gap-1">
-                        {secret.name}
-                        {secret.required && (
-                          <span className="text-destructive" aria-label="Required">
+                  {server.configRequirements.secrets.map((secret) => {
+                    const hasError = validationErrors.has(secret.env);
+                    const descId = `desc-${secret.env}`;
+                    const errorId = `error-${secret.env}`;
+                    const describedBy =
+                      [secret.example ? descId : null, hasError ? errorId : null]
+                        .filter(Boolean)
+                        .join(' ') || undefined;
+
+                    return (
+                      <div key={secret.env} className="space-y-1.5">
+                        <Label htmlFor={`secret-${secret.env}`} className="flex items-center gap-1">
+                          {secret.name}
+                          <span className="text-destructive" aria-label="required">
                             *
                           </span>
+                        </Label>
+                        {secret.example && (
+                          <p id={descId} className="text-xs text-muted-foreground">
+                            Example: {secret.example}
+                          </p>
                         )}
-                      </Label>
-                      {secret.description && (
-                        <p className="text-xs text-muted-foreground">{secret.description}</p>
-                      )}
-                      <Input
-                        id={`secret-${secret.name}`}
-                        type="password"
-                        placeholder={secret.example || `Enter ${secret.name}`}
-                        value={secrets[secret.name] ?? ''}
-                        onChange={(e) =>
-                          setSecrets((prev) => ({ ...prev, [secret.name]: e.target.value }))
-                        }
-                        aria-invalid={validationErrors.has(secret.name)}
-                        className={validationErrors.has(secret.name) ? 'border-destructive' : ''}
-                      />
-                      {validationErrors.has(secret.name) && (
-                        <p className="text-xs text-destructive">This field is required.</p>
-                      )}
-                    </div>
-                  ))}
+                        <Input
+                          id={`secret-${secret.env}`}
+                          type="password"
+                          placeholder={secret.example || `Enter ${secret.name}`}
+                          value={secrets[secret.env] ?? ''}
+                          onChange={(e) =>
+                            setSecrets((prev) => ({ ...prev, [secret.env]: e.target.value }))
+                          }
+                          aria-invalid={hasError}
+                          aria-required="true"
+                          aria-describedby={describedBy}
+                          className={hasError ? 'border-destructive' : ''}
+                        />
+                        {hasError && (
+                          <p id={errorId} className="text-xs text-destructive">
+                            This field is required.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -204,20 +220,15 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
                     <div key={envVar.name} className="space-y-1.5">
                       <Label htmlFor={`env-${envVar.name}`} className="flex items-center gap-1">
                         {envVar.name}
-                        {envVar.required && (
-                          <span className="text-destructive" aria-label="Required">
-                            *
-                          </span>
-                        )}
                       </Label>
-                      {envVar.description && (
-                        <p className="text-xs text-muted-foreground">{envVar.description}</p>
+                      {envVar.example && (
+                        <p className="text-xs text-muted-foreground">Example: {envVar.example}</p>
                       )}
                       <Input
                         id={`env-${envVar.name}`}
                         type="text"
-                        placeholder={envVar.default || `Enter ${envVar.name}`}
-                        value={envVars[envVar.name] ?? envVar.default ?? ''}
+                        placeholder={envVar.value || envVar.example || `Enter ${envVar.name}`}
+                        value={envVars[envVar.name] ?? envVar.value ?? ''}
                         onChange={(e) =>
                           setEnvVars((prev) => ({ ...prev, [envVar.name]: e.target.value }))
                         }
@@ -267,23 +278,28 @@ export function RegistryImportSheet({ serverName, open, onOpenChange }: Registry
             </div>
 
             <SheetFooter className="pt-4">
-              <Button
-                className="w-full"
-                onClick={handleSubmit}
-                disabled={importMutation.isPending || !isFormValid}
-              >
-                {importMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Import className="h-4 w-4 mr-2" />
-                    Import Server
-                  </>
-                )}
-              </Button>
+              <div className="w-full">
+                <Button
+                  className="w-full"
+                  onClick={handleSubmit}
+                  disabled={importMutation.isPending || !isFormValid}
+                >
+                  {importMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Import className="h-4 w-4 mr-2" />
+                      Import Server
+                    </>
+                  )}
+                </Button>
+                <span role="status" aria-live="polite" className="sr-only">
+                  {importMutation.isPending ? 'Importing server...' : ''}
+                </span>
+              </div>
             </SheetFooter>
           </>
         )}

@@ -4,56 +4,33 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Check, Import, Star, Server, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { RegistryCatalogItem } from '@/hooks/queries/useMcpRegistryQueries';
+import type { RegistryCatalogEntry } from '@/hooks/queries/useMcpRegistryQueries';
 
 interface RegistryServerCardProps {
-  server: RegistryCatalogItem;
+  server: RegistryCatalogEntry;
   onViewDetails: (name: string) => void;
   onImport: (name: string) => void;
 }
 
 const SERVER_TYPE_LABELS: Record<string, { label: string; icon: typeof Server }> = {
-  stdio: { label: 'Docker', icon: Server },
-  http: { label: 'Remote', icon: Globe },
+  server: { label: 'Docker', icon: Server },
+  remote: { label: 'Remote', icon: Globe },
 };
 
 export function RegistryServerCard({ server, onViewDetails, onImport }: RegistryServerCardProps) {
-  const handleCardClick = useCallback(() => {
-    onViewDetails(server.name);
-  }, [server.name, onViewDetails]);
+  const handleImportClick = useCallback(() => {
+    onImport(server.name);
+  }, [server.name, onImport]);
 
-  const handleImportClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      onImport(server.name);
-    },
-    [server.name, onImport],
-  );
-
-  const handleCardKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        onViewDetails(server.name);
-      }
-    },
-    [server.name, onViewDetails],
-  );
-
-  const typeInfo = SERVER_TYPE_LABELS[server.serverType] ?? SERVER_TYPE_LABELS.stdio;
+  const typeInfo = SERVER_TYPE_LABELS[server.serverType] ?? SERVER_TYPE_LABELS.server;
   const TypeIcon = typeInfo.icon;
 
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/30',
+        'transition-colors hover:border-primary/50 hover:bg-accent/30',
         'flex flex-col h-[220px]',
       )}
-      role="button"
-      tabIndex={0}
-      aria-label={`${server.displayName} — ${server.description}`}
-      onClick={handleCardClick}
-      onKeyDown={handleCardKeyDown}
     >
       <CardContent className="flex flex-col flex-1 p-4 gap-3">
         {/* Header: Icon + Name + Featured */}
@@ -74,7 +51,13 @@ export function RegistryServerCard({ server, onViewDetails, onImport }: Registry
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-semibold truncate">{server.displayName}</h3>
+              <button
+                type="button"
+                className="text-sm font-semibold truncate text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                onClick={() => onViewDetails(server.name)}
+              >
+                {server.displayName}
+              </button>
               {server.isFeatured && (
                 <Star
                   className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400"

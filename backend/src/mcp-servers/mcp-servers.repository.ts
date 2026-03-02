@@ -422,4 +422,22 @@ export class McpServersRepository {
       })
       .where(eq(mcpServers.id, serverId));
   }
+
+  /**
+   * List distinct registry source names for an organization.
+   * Used to efficiently check which registry servers are already imported.
+   */
+  async listRegistrySourceNames(organizationId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ name: mcpServers.registrySourceName })
+      .from(mcpServers)
+      .where(
+        and(
+          sql`${mcpServers.registrySourceName} IS NOT NULL`,
+          or(eq(mcpServers.organizationId, organizationId), isNull(mcpServers.organizationId)),
+        ),
+      );
+
+    return rows.map((r) => r.name).filter((n): n is string => n !== null);
+  }
 }
