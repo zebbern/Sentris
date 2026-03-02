@@ -250,7 +250,7 @@ Set up recurring workflows:
 Trigger workflows via REST API:
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/workflows/run \
+curl -X POST http://localhost/api/v1/workflows/run \
   -H "Content-Type: application/json" \
   -d '{"workflowId": "workflow-123", "params": {}}'
 ```
@@ -320,13 +320,13 @@ Configure error handling strategies:
 
 ```bash
 # Check service status
-docker ps
+just dev status
 
 # View logs
-bun --cwd backend run logs
+just dev logs
 
 # Test MCP servers
-curl http://localhost:3000/api/v1/mcp-servers
+curl http://localhost/api/v1/mcp-servers
 ```
 
 ## Resources
