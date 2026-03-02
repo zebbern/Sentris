@@ -366,7 +366,7 @@ export function TopBar({
             <div className="flex-shrink-0 pointer-events-auto">{modeToggle}</div>
           </div>
           {/* Actions on the right - fixed width to match left section for consistent centering */}
-          <div className="flex items-center justify-end gap-1 md:gap-2 flex-shrink-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px] relative z-10">
+          <div className="flex items-center justify-end gap-1 md:gap-2 flex-shrink-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px] relative z-10 overflow-hidden">
             <div className="flex items-center gap-1 md:gap-2">
               {mode === 'design' && (
                 <>
@@ -390,7 +390,7 @@ export function TopBar({
                       className={cn(
                         'text-xs font-medium px-1.5 py-0.5 rounded border ml-0 xl:ml-1',
                         saveBadgeTone,
-                        'hidden sm:inline-block',
+                        'hidden 2xl:inline-block',
                       )}
                     >
                       {saveBadgeText}

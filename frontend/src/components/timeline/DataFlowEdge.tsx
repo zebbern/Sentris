@@ -285,6 +285,11 @@ export const DataFlowEdge = memo(
 
     const isPathHighlighted = data?.isPathHighlighted ?? false;
 
+    const glowColor = useMemo(() => {
+      if (isDimmed || !sourceNodeState) return null;
+      return getEdgeStatusGlowColor(sourceNodeState.status, isDark);
+    }, [isDimmed, sourceNodeState, isDark]);
+
     if (mode !== 'execution' || !selectedRunId) {
       return (
         <>
@@ -331,11 +336,6 @@ export const DataFlowEdge = memo(
         </>
       );
     }
-
-    const glowColor = useMemo(() => {
-      if (isDimmed || !sourceNodeState) return null;
-      return getEdgeStatusGlowColor(sourceNodeState.status, isDark);
-    }, [isDimmed, sourceNodeState, isDark]);
 
     const isRunning = sourceNodeState?.status === 'running';
 
