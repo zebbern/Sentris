@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
@@ -14,6 +14,8 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useSortableList } from '@/hooks/useSortableList';
 import { useAuthStore } from '@/store/authStore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   GroupTemplatesSection,
   ImportedGroupsSection,
@@ -28,6 +30,10 @@ import {
   useMcpLibraryData,
   parseClaudeCodeConfig,
 } from './mcp-library';
+
+const RegistryCatalogTab = lazy(() =>
+  import('./mcp-library/RegistryCatalogTab').then((m) => ({ default: m.RegistryCatalogTab })),
+);
 
 export function McpLibraryPage() {
   useDocumentTitle('MCP Library');
@@ -134,120 +140,145 @@ export function McpLibraryPage() {
         className="mb-6"
       />
 
-      {error && (
-        <ErrorBanner
-          message={error}
-          onRetry={() => queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() })}
-          className="mb-6"
-        />
-      )}
+      <Tabs defaultValue="my-library" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="my-library">My Library</TabsTrigger>
+          <TabsTrigger value="docker-registry">Docker Registry</TabsTrigger>
+        </TabsList>
 
-      {/* Group Templates */}
-      <GroupTemplatesSection
-        templates={data.filteredTemplates}
-        isLoading={isLoadingTemplates}
-        searchQuery={searchQuery}
-        templatesOpen={groupActions.templatesOpen}
-        onToggleTemplates={groupActions.toggleTemplates}
-        importedGroupSlugs={data.importedGroupSlugs}
-        groupDiscoveryPreview={groupActions.groupDiscoveryPreview}
-        discoveringGroups={groupActions.discoveringGroups}
-        importingTemplates={groupActions.importingTemplates}
-        onTestAndDiscover={groupActions.handleGroupTestAndDiscover}
-        onImportDiscovered={groupActions.handleImportDiscoveredTemplate}
-        onClearDiscoveryPreview={groupActions.clearGroupDiscoveryPreview}
-      />
+        <TabsContent value="my-library">
+          {error && (
+            <ErrorBanner
+              message={error}
+              onRetry={() =>
+                queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() })
+              }
+              className="mb-6"
+            />
+          )}
 
-      {/* Imported Groups */}
-      <ImportedGroupsSection
-        groups={data.filteredGroups}
-        isLoading={isLoading}
-        searchQuery={searchQuery}
-        checkingServers={checkingServers}
-        discoveringServerIds={actions.discoveringServerIds}
-        getGroupServers={data.getGroupServers}
-        getGroupServerHealthStatus={data.getGroupServerHealthStatus}
-        getGroupServerToolCounts={data.getGroupServerToolCounts}
-        onToggle={actions.handleToggle}
-        onViewTools={actions.handleViewTools}
-        onDiscoverTools={(serverId) =>
-          actions.handleDiscoverServerTools(serverId, data.getServerDiscoveryImage(serverId))
-        }
-        onRemoveGroup={groupActions.handleRemoveGroup}
-      />
+          {/* Group Templates */}
+          <GroupTemplatesSection
+            templates={data.filteredTemplates}
+            isLoading={isLoadingTemplates}
+            searchQuery={searchQuery}
+            templatesOpen={groupActions.templatesOpen}
+            onToggleTemplates={groupActions.toggleTemplates}
+            importedGroupSlugs={data.importedGroupSlugs}
+            groupDiscoveryPreview={groupActions.groupDiscoveryPreview}
+            discoveringGroups={groupActions.discoveringGroups}
+            importingTemplates={groupActions.importingTemplates}
+            onTestAndDiscover={groupActions.handleGroupTestAndDiscover}
+            onImportDiscovered={groupActions.handleImportDiscoveredTemplate}
+            onClearDiscoveryPreview={groupActions.clearGroupDiscoveryPreview}
+          />
 
-      {/* Custom Servers */}
-      <CustomServersTable
-        servers={orderedCustomServers}
-        isLoading={isLoading}
-        searchQuery={searchQuery}
-        checkingServers={checkingServers}
-        testingServer={actions.testingServer}
-        toolCountsByServer={data.toolCountsByServer}
-        onCreateNew={editor.handleCreateNew}
-        onToggle={actions.handleToggle}
-        onViewTools={actions.handleViewTools}
-        onTestConnection={actions.handleTestConnection}
-        onEdit={editor.handleEdit}
-        onDelete={actions.openDeleteDialog}
-        sensors={sensors}
-        collisionDetection={collisionDetection}
-        onDragEnd={handleDragEnd}
-        isDragDisabled={isDragDisabled}
-      />
+          {/* Imported Groups */}
+          <ImportedGroupsSection
+            groups={data.filteredGroups}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            checkingServers={checkingServers}
+            discoveringServerIds={actions.discoveringServerIds}
+            getGroupServers={data.getGroupServers}
+            getGroupServerHealthStatus={data.getGroupServerHealthStatus}
+            getGroupServerToolCounts={data.getGroupServerToolCounts}
+            onToggle={actions.handleToggle}
+            onViewTools={actions.handleViewTools}
+            onDiscoverTools={(serverId) =>
+              actions.handleDiscoverServerTools(serverId, data.getServerDiscoveryImage(serverId))
+            }
+            onRemoveGroup={groupActions.handleRemoveGroup}
+          />
 
-      {/* Editor Sheet */}
-      <ServerEditorSheet
-        open={editor.editorOpen}
-        onOpenChange={editor.handleEditorClose}
-        editingServer={editor.editingServer}
-        formData={editor.formData}
-        onFormDataChange={editor.setFormData}
-        activeTab={editor.activeTab}
-        onActiveTabChange={editor.setActiveTab}
-        isSaving={editor.isSaving}
-        isImporting={jsonImport.isImporting}
-        headerEntries={editor.headerEntries}
-        secretPickerEntryIndex={editor.secretPickerEntryIndex}
-        onSecretPickerEntryIndexChange={editor.setSecretPickerEntryIndex}
-        onAddHeader={editor.addHeaderEntry}
-        onUpdateHeader={editor.updateHeaderEntry}
-        onRemoveHeader={editor.removeHeaderEntry}
-        discoveryStatus={editor.discoveryStatus}
-        onTestAndDiscover={editor.handleTestAndDiscover}
-        onSave={editor.handleSave}
-        jsonValue={jsonImport.jsonValue}
-        onJsonValueChange={jsonImport.setJsonValue}
-        jsonParseError={jsonImport.jsonParseError}
-        onJsonParseErrorChange={jsonImport.setJsonParseError}
-        isTestingDiscovery={jsonImport.isTestingDiscovery}
-        discoveryPreview={jsonImport.discoveryPreview}
-        onClearDiscoveryPreview={() => jsonImport.setDiscoveryPreview(null)}
-        onJsonTestAndDiscover={jsonImport.handleJsonTestAndDiscover}
-        onJsonSave={jsonImport.handleJsonSave}
-      />
+          {/* Custom Servers */}
+          <CustomServersTable
+            servers={orderedCustomServers}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            checkingServers={checkingServers}
+            testingServer={actions.testingServer}
+            toolCountsByServer={data.toolCountsByServer}
+            onCreateNew={editor.handleCreateNew}
+            onToggle={actions.handleToggle}
+            onViewTools={actions.handleViewTools}
+            onTestConnection={actions.handleTestConnection}
+            onEdit={editor.handleEdit}
+            onDelete={actions.openDeleteDialog}
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragEnd={handleDragEnd}
+            isDragDisabled={isDragDisabled}
+          />
 
-      {/* Delete Confirmation */}
-      <DeleteServerDialog
-        open={actions.deleteDialogOpen}
-        onOpenChange={actions.setDeleteDialogOpen}
-        isDeleting={actions.isDeleting}
-        onDelete={actions.handleDelete}
-      />
+          {/* Editor Sheet */}
+          <ServerEditorSheet
+            open={editor.editorOpen}
+            onOpenChange={editor.handleEditorClose}
+            editingServer={editor.editingServer}
+            formData={editor.formData}
+            onFormDataChange={editor.setFormData}
+            activeTab={editor.activeTab}
+            onActiveTabChange={editor.setActiveTab}
+            isSaving={editor.isSaving}
+            isImporting={jsonImport.isImporting}
+            headerEntries={editor.headerEntries}
+            secretPickerEntryIndex={editor.secretPickerEntryIndex}
+            onSecretPickerEntryIndexChange={editor.setSecretPickerEntryIndex}
+            onAddHeader={editor.addHeaderEntry}
+            onUpdateHeader={editor.updateHeaderEntry}
+            onRemoveHeader={editor.removeHeaderEntry}
+            discoveryStatus={editor.discoveryStatus}
+            onTestAndDiscover={editor.handleTestAndDiscover}
+            onSave={editor.handleSave}
+            jsonValue={jsonImport.jsonValue}
+            onJsonValueChange={jsonImport.setJsonValue}
+            jsonParseError={jsonImport.jsonParseError}
+            onJsonParseErrorChange={jsonImport.setJsonParseError}
+            isTestingDiscovery={jsonImport.isTestingDiscovery}
+            discoveryPreview={jsonImport.discoveryPreview}
+            onClearDiscoveryPreview={() => jsonImport.setDiscoveryPreview(null)}
+            onJsonTestAndDiscover={jsonImport.handleJsonTestAndDiscover}
+            onJsonSave={jsonImport.handleJsonSave}
+          />
 
-      {/* Tools Dialog */}
-      <ToolsDialog
-        open={actions.toolsDialogOpen}
-        onOpenChange={actions.setToolsDialogOpen}
-        serverName={data.selectedServer?.name ?? 'Unknown'}
-        tools={data.serverTools}
-        selectedServerForTools={actions.selectedServerForTools}
-        discoveringServerIds={actions.discoveringServerIds}
-        onToggleTool={actions.handleToggleTool}
-        onDiscoverTools={actions.handleDiscoverServerTools}
-      />
+          {/* Delete Confirmation */}
+          <DeleteServerDialog
+            open={actions.deleteDialogOpen}
+            onOpenChange={actions.setDeleteDialogOpen}
+            isDeleting={actions.isDeleting}
+            onDelete={actions.handleDelete}
+          />
 
-      <ConfirmDialog {...dialogProps} />
+          {/* Tools Dialog */}
+          <ToolsDialog
+            open={actions.toolsDialogOpen}
+            onOpenChange={actions.setToolsDialogOpen}
+            serverName={data.selectedServer?.name ?? 'Unknown'}
+            tools={data.serverTools}
+            selectedServerForTools={actions.selectedServerForTools}
+            discoveringServerIds={actions.discoveringServerIds}
+            onToggleTool={actions.handleToggleTool}
+            onDiscoverTools={actions.handleDiscoverServerTools}
+          />
+
+          <ConfirmDialog {...dialogProps} />
+        </TabsContent>
+
+        <TabsContent value="docker-registry">
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[220px] w-full rounded-lg" />
+                ))}
+              </div>
+            }
+          >
+            <RegistryCatalogTab />
+          </Suspense>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
