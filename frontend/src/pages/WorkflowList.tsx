@@ -288,7 +288,13 @@ export function WorkflowList() {
           }
         />
 
-        {isLoading ? (
+        {error ? (
+          <ErrorBanner
+            message={error?.message ?? 'Failed to load workflows'}
+            onRetry={() => refetch()}
+            className="mb-6"
+          />
+        ) : isLoading ? (
           <div className="border rounded-lg bg-card overflow-hidden">
             <div className="overflow-x-auto">
               <Table className="table-fixed w-full" aria-label="Workflows">
@@ -363,12 +369,6 @@ export function WorkflowList() {
               </Table>
             </div>
           </div>
-        ) : error ? (
-          <ErrorBanner
-            message={error?.message ?? 'Failed to load workflows'}
-            onRetry={() => refetch()}
-            className="mb-6"
-          />
         ) : orderedWorkflows.length === 0 ? (
           <div className="border rounded-lg bg-card">
             <EmptyState

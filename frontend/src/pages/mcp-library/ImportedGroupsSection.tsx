@@ -81,7 +81,9 @@ export function ImportedGroupsSection({
         <Package className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">MCP groups</h2>
         <Badge variant="secondary" className="text-xs">
-          {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+          {isLoading && groups.length === 0
+            ? '…'
+            : `${groups.length} ${groups.length === 1 ? 'group' : 'groups'}`}
         </Badge>
         <div className="ml-auto flex items-center gap-2">
           <TooltipProvider>

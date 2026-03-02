@@ -53,7 +53,9 @@ export function GroupTemplatesSection({
         <Layers className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Group templates</h2>
         <Badge variant="secondary" className="text-xs">
-          {templates.length} {templates.length === 1 ? 'group' : 'groups'}
+          {isLoading && templates.length === 0
+            ? '…'
+            : `${templates.length} ${templates.length === 1 ? 'group' : 'groups'}`}
         </Badge>
         <div className="ml-auto">
           <Button type="button" variant="ghost" size="sm" onClick={onToggleTemplates}>

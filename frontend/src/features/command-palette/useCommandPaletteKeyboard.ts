@@ -13,7 +13,8 @@ export function useCommandPaletteKeyboard() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // Use both e.key (case-insensitive) and e.code for keyboard-layout independence
+      if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) {
         e.preventDefault();
         e.stopPropagation();
         toggle();

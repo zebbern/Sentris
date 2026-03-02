@@ -147,7 +147,7 @@ export function IntegrationsManager() {
           <IntegrationListTable
             connections={connections}
             providers={providers}
-            isLoading={loadingConnections}
+            isLoading={loadingConnections && !error}
             refreshingConnectionId={refreshingConnectionId}
             deletingConnectionId={deletingConnectionId}
             connectingProvider={connectingProvider}
@@ -186,7 +186,7 @@ export function IntegrationsManager() {
             ))}
           </div>
 
-          {(loadingProviders || loadingConnections) && (
+          {(loadingProviders || loadingConnections) && !error && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {Array.from({ length: 3 }).map((_, idx) => (
                 <ProviderCardSkeleton key={`skeleton-${idx}`} />
