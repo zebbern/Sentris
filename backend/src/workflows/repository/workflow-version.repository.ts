@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DRIZZLE_TOKEN } from '../../database/database.module';
@@ -73,6 +73,54 @@ export class WorkflowVersionRepository {
       .limit(1);
 
     return record;
+  }
+
+  async findByIds(
+    ids: string[],
+    options: { organizationId?: string | null } = {},
+  ): Promise<WorkflowVersionRecord[]> {
+    if (ids.length === 0) return [];
+    const filter = options.organizationId
+      ? and(
+          inArray(workflowVersionsTable.id, ids),
+          eq(workflowVersionsTable.organizationId, options.organizationId),
+        )
+      : inArray(workflowVersionsTable.id, ids);
+    return this.db.select().from(workflowVersionsTable).where(filter);
+  }
+
+  /**
+   * Batch-fetch latest version for each workflowId.
+   * Returns one record per workflowId (the highest version number).
+   */
+  async findLatestByWorkflowIds(
+    workflowIds: string[],
+    options: { organizationId?: string | null } = {},
+  ): Promise<WorkflowVersionRecord[]> {
+    if (workflowIds.length === 0) return [];
+    const filter = options.organizationId
+      ? and(
+          inArray(workflowVersionsTable.workflowId, workflowIds),
+          eq(workflowVersionsTable.organizationId, options.organizationId),
+        )
+      : inArray(workflowVersionsTable.workflowId, workflowIds);
+
+    const allVersions = await this.db
+      .select()
+      .from(workflowVersionsTable)
+      .where(filter)
+      .orderBy(desc(workflowVersionsTable.version));
+
+    // Keep only the first (highest version) per workflowId
+    const seen = new Set<string>();
+    const latest: WorkflowVersionRecord[] = [];
+    for (const v of allVersions) {
+      if (!seen.has(v.workflowId)) {
+        seen.add(v.workflowId);
+        latest.push(v);
+      }
+    }
+    return latest;
   }
 
   async findAllByWorkflowId(workflowId: string, options: { organizationId?: string | null } = {}) {

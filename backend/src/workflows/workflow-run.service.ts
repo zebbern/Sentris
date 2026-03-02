@@ -3,12 +3,10 @@ import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nest
 import '@sentris/worker/components';
 import { componentRegistry } from '@sentris/component-sdk';
 import { WorkflowDefinition } from '../dsl/types';
-import { compileWorkflowGraph } from '../dsl/compiler';
-import { WorkflowGraphSchema } from './dto/workflow-graph.dto';
 import { TemporalService } from '../temporal/temporal.service';
-import { WorkflowRecord, WorkflowRepository } from './repository/workflow.repository';
+import { WorkflowRepository } from './repository/workflow.repository';
 import { WorkflowRunRepository } from './repository/workflow-run.repository';
-import { WorkflowVersionRepository } from './repository/workflow-version.repository';
+import { WorkflowVersionService } from './workflow-version.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import {
@@ -18,7 +16,6 @@ import {
   ExecutionInputPreview,
   ExecutionTriggerMetadata,
 } from '@sentris/shared';
-import type { WorkflowVersionRecord } from '../database/schema';
 import type { AuthContext } from '../auth/types';
 
 export interface WorkflowRunRequest {
@@ -58,11 +55,11 @@ export class WorkflowRunService {
 
   constructor(
     private readonly repository: WorkflowRepository,
-    private readonly versionRepository: WorkflowVersionRepository,
     private readonly runRepository: WorkflowRunRepository,
     private readonly temporalService: TemporalService,
     private readonly analyticsService: AnalyticsService,
     private readonly auditLogService: AuditLogService,
+    private readonly workflowVersionService: WorkflowVersionService,
   ) {}
 
   private resolveOrganizationId(auth?: AuthContext | null): string | null {
@@ -104,8 +101,16 @@ export class WorkflowRunService {
     const organizationId = this.requireOrganizationId(auth);
     const workflow = await this.repository.findById(workflowId, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${workflowId} not found`);
-    const version = await this.resolveWorkflowVersion(workflowId, request, organizationId);
-    const definition = await this.ensureDefinitionForVersion(workflow, version, organizationId);
+    const version = await this.workflowVersionService.resolveWorkflowVersion(
+      workflowId,
+      request,
+      organizationId,
+    );
+    const definition = await this.workflowVersionService.ensureDefinitionForVersion(
+      workflow,
+      version,
+      organizationId,
+    );
     return { workflow, version, definition, organizationId };
   }
 
@@ -267,8 +272,12 @@ export class WorkflowRunService {
     const organizationId = this.requireOrganizationId(auth);
     const workflow = await this.repository.findById(id, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${id} not found`);
-    const version = await this.resolveWorkflowVersion(workflow.id, request, organizationId);
-    const compiledDefinition = await this.ensureDefinitionForVersion(
+    const version = await this.workflowVersionService.resolveWorkflowVersion(
+      workflow.id,
+      request,
+      organizationId,
+    );
+    const compiledDefinition = await this.workflowVersionService.ensureDefinitionForVersion(
       workflow,
       version,
       organizationId,
@@ -390,69 +399,6 @@ export class WorkflowRunService {
 
   private runIdFromIdempotencyKey(key: string): string {
     return `sentris-run-${createHash('sha256').update(key).digest('hex')}`;
-  }
-
-  private async resolveWorkflowVersion(
-    workflowId: string,
-    request: WorkflowRunRequest,
-    organizationId: string | null,
-  ): Promise<WorkflowVersionRecord> {
-    if (request.versionId) {
-      const version = await this.versionRepository.findById(request.versionId, {
-        organizationId: organizationId ?? undefined,
-      });
-      if (!version || version.workflowId !== workflowId)
-        throw new NotFoundException(
-          `Workflow ${workflowId} version ${request.versionId} not found`,
-        );
-      return version;
-    }
-    if (request.version) {
-      const version = await this.versionRepository.findByWorkflowAndVersion({
-        workflowId,
-        version: request.version,
-        organizationId,
-      });
-      if (!version)
-        throw new NotFoundException(`Workflow ${workflowId} version ${request.version} not found`);
-      return version;
-    }
-    const latest = await this.versionRepository.findLatestByWorkflowId(workflowId, {
-      organizationId: organizationId ?? undefined,
-    });
-    if (!latest) throw new NotFoundException(`No versions recorded for workflow ${workflowId}`);
-    return latest;
-  }
-
-  private async ensureDefinitionForVersion(
-    workflow: WorkflowRecord,
-    version: WorkflowVersionRecord,
-    organizationId: string | null,
-  ): Promise<WorkflowDefinition> {
-    if (version.compiledDefinition) {
-      const definition = version.compiledDefinition as WorkflowDefinition;
-      const entryAction = definition.actions.find(
-        (a) => a.componentId === 'core.workflow.entrypoint',
-      );
-      if (
-        entryAction &&
-        (!definition.entrypoint || definition.entrypoint.ref !== entryAction.ref)
-      ) {
-        const patched: WorkflowDefinition = { ...definition, entrypoint: { ref: entryAction.ref } };
-        await this.versionRepository.setCompiledDefinition(version.id, patched, {
-          organizationId: organizationId ?? undefined,
-        });
-        return patched;
-      }
-      return definition;
-    }
-    this.logger.log(`Compiling workflow ${workflow.id} version ${version.version} for execution`);
-    const graph = WorkflowGraphSchema.parse(version.graph);
-    const definition = compileWorkflowGraph(graph);
-    await this.versionRepository.setCompiledDefinition(version.id, definition, {
-      organizationId: organizationId ?? undefined,
-    });
-    return definition;
   }
 
   private applyNodeOverrides(

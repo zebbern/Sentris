@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { WorkflowsService } from './workflows.service';
+import { WorkflowVersionService } from './workflow-version.service';
 import type { AppConfig, TemporalTaskConfig } from '../config';
 
 const DEMO_WORKFLOW_NAME = 'Temporal Demo Workflow';
@@ -12,6 +13,7 @@ export class WorkflowsBootstrapService implements OnModuleInit {
 
   constructor(
     private readonly workflowsService: WorkflowsService,
+    private readonly workflowVersionService: WorkflowVersionService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -53,7 +55,7 @@ export class WorkflowsBootstrapService implements OnModuleInit {
     );
 
     if (existing) {
-      await this.workflowsService.commit(existing.id);
+      await this.workflowVersionService.commit(existing.id);
       return existing.id;
     }
 
@@ -100,7 +102,7 @@ export class WorkflowsBootstrapService implements OnModuleInit {
       viewport: { x: 0, y: 0, zoom: 1 },
     });
 
-    await this.workflowsService.commit(created.id);
+    await this.workflowVersionService.commit(created.id);
     return created.id;
   }
 }
