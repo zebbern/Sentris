@@ -102,6 +102,347 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List workflow runs */
+        get: operations["WorkflowRunsController_listRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a workflow run */
+        get: operations["WorkflowRunsController_getRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/children": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List child workflow runs */
+        get: operations["WorkflowRunsController_listChildRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run status */
+        get: operations["WorkflowRunsController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run result */
+        get: operations["WorkflowRunsController_result"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run configuration */
+        get: operations["WorkflowRunsController_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a workflow run */
+        post: operations["WorkflowRunsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run trace events */
+        get: operations["WorkflowRunObservabilityController_trace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run event timeline */
+        get: operations["WorkflowRunObservabilityController_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/dataflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run data flows */
+        get: operations["WorkflowRunObservabilityController_dataflows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List workflow run artifacts */
+        get: operations["WorkflowRunObservabilityController_runArtifacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/artifacts/{artifactId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a workflow run artifact */
+        get: operations["WorkflowRunObservabilityController_downloadRunArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/node-io": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List node inputs and outputs for a workflow run */
+        get: operations["WorkflowRunObservabilityController_getNodeIO"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/node-io/{nodeRef}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get specific node input/output for a workflow run */
+        get: operations["WorkflowRunObservabilityController_getNodeIODetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run logs */
+        get: operations["WorkflowRunObservabilityController_logs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream workflow run updates via SSE */
+        get: operations["WorkflowRunStreamController_stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/terminal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get workflow run terminal output */
+        get: operations["WorkflowRunStreamController_terminalChunks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/terminal/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List terminal archive recordings for a workflow run */
+        get: operations["WorkflowRunStreamController_listTerminalArchives"];
+        put?: never;
+        /** Archive terminal output for a workflow run */
+        post: operations["WorkflowRunStreamController_archiveTerminal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/runs/{runId}/terminal/archive/{recordId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a terminal archive recording */
+        get: operations["WorkflowRunStreamController_downloadTerminalArchive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflow-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all unique tags with usage counts */
+        get: operations["WorkflowTagsController_listAllTags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workflows": {
         parameters: {
             query?: never;
@@ -165,57 +506,6 @@ export interface paths {
         };
         /** List workflow summaries */
         get: operations["WorkflowsController_listSummary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflow runs */
-        get: operations["WorkflowsController_listRuns"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get a workflow run */
-        get: operations["WorkflowsController_getRun"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/children": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List child workflow runs */
-        get: operations["WorkflowsController_listChildRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -309,277 +599,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/workflows/runs/{runId}/status": {
+    "/api/v1/workflows/{id}/tags": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get workflow run status */
-        get: operations["WorkflowsController_status"];
+        /** Get tags for a workflow */
+        get: operations["WorkflowsController_getWorkflowTags"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/result": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run result */
-        get: operations["WorkflowsController_result"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run configuration */
-        get: operations["WorkflowsController_config"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Cancel a workflow run */
-        post: operations["WorkflowsController_cancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/trace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run trace events */
-        get: operations["WorkflowsController_trace"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run event timeline */
-        get: operations["WorkflowsController_events"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/dataflows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run data flows */
-        get: operations["WorkflowsController_dataflows"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/artifacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workflow run artifacts */
-        get: operations["WorkflowsController_runArtifacts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/artifacts/{artifactId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a workflow run artifact */
-        get: operations["WorkflowsController_downloadRunArtifact"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/node-io": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List node inputs and outputs for a workflow run */
-        get: operations["WorkflowsController_getNodeIO"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/node-io/{nodeRef}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get specific node input/output for a workflow run */
-        get: operations["WorkflowsController_getNodeIODetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream workflow run updates via SSE */
-        get: operations["WorkflowsController_stream"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run logs */
-        get: operations["WorkflowsController_logs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get workflow run terminal output */
-        get: operations["WorkflowsController_terminalChunks"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List terminal archive recordings for a workflow run */
-        get: operations["WorkflowsController_listTerminalArchives"];
-        put?: never;
-        /** Archive terminal output for a workflow run */
-        post: operations["WorkflowsController_archiveTerminal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/workflows/runs/{runId}/terminal/archive/{recordId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download a terminal archive recording */
-        get: operations["WorkflowsController_downloadTerminalArchive"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
+        /** Set tags for a workflow (replaces all existing tags) */
+        patch: operations["WorkflowsController_setWorkflowTags"];
         trace?: never;
     };
     "/api/v1/files/upload": {
@@ -2078,6 +2113,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export audit log events as CSV */
+        get: operations["AuditLogsController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -2099,6 +2151,89 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        RunArtifactsResponseDto: {
+            runId: string;
+            artifacts: {
+                /** Format: uuid */
+                id: string;
+                runId: string;
+                /** Format: uuid */
+                workflowId: string;
+                /** Format: uuid */
+                workflowVersionId?: string | null;
+                componentId?: string | null;
+                componentRef: string;
+                /** Format: uuid */
+                fileId: string;
+                name: string;
+                mimeType: string;
+                size: number;
+                destinations: ("run" | "library")[];
+                metadata?: ({
+                    remoteUploads?: {
+                        /** @enum {string} */
+                        type: "s3" | "gcs";
+                        bucket: string;
+                        key: string;
+                        uri: string;
+                        region?: string;
+                        size?: number;
+                        etag?: string;
+                        /** Format: uri */
+                        url?: string;
+                        metadata?: {
+                            [key: string]: unknown;
+                        };
+                    }[];
+                } & {
+                    [key: string]: unknown;
+                }) | null;
+                organizationId?: string | null;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
+        TerminalArchiveRequestDto: {
+            nodeRef: string;
+            /**
+             * @default pty
+             * @enum {string}
+             */
+            stream: "stdout" | "stderr" | "pty";
+            width?: number;
+            height?: number;
+        };
+        TerminalRecordingDto: {
+            id: number;
+            runId: string;
+            nodeRef: string;
+            stream: string;
+            /** Format: uuid */
+            fileId: string;
+            chunkCount: number;
+            durationMs: number;
+            createdAt: string;
+        };
+        TerminalRecordListDto: {
+            runId: string;
+            records: {
+                id: number;
+                runId: string;
+                nodeRef: string;
+                stream: string;
+                /** Format: uuid */
+                fileId: string;
+                chunkCount: number;
+                durationMs: number;
+                createdAt: string;
+            }[];
+        };
+        AllTagsResponseDto: {
+            tags: {
+                name: string;
+                count: number;
+            }[];
+        };
         CreateWorkflowRequestDto: {
             id?: string;
             name: string;
@@ -2441,82 +2576,11 @@ export interface components {
             versionId?: string;
             version?: number;
         };
-        RunArtifactsResponseDto: {
-            runId: string;
-            artifacts: {
-                /** Format: uuid */
-                id: string;
-                runId: string;
-                /** Format: uuid */
-                workflowId: string;
-                /** Format: uuid */
-                workflowVersionId?: string | null;
-                componentId?: string | null;
-                componentRef: string;
-                /** Format: uuid */
-                fileId: string;
-                name: string;
-                mimeType: string;
-                size: number;
-                destinations: ("run" | "library")[];
-                metadata?: ({
-                    remoteUploads?: {
-                        /** @enum {string} */
-                        type: "s3" | "gcs";
-                        bucket: string;
-                        key: string;
-                        uri: string;
-                        region?: string;
-                        size?: number;
-                        etag?: string;
-                        /** Format: uri */
-                        url?: string;
-                        metadata?: {
-                            [key: string]: unknown;
-                        };
-                    }[];
-                } & {
-                    [key: string]: unknown;
-                }) | null;
-                organizationId?: string | null;
-                /** Format: date-time */
-                createdAt: string;
-            }[];
+        WorkflowTagsResponseDto: {
+            tags: string[];
         };
-        TerminalArchiveRequestDto: {
-            nodeRef: string;
-            /**
-             * @default pty
-             * @enum {string}
-             */
-            stream: "stdout" | "stderr" | "pty";
-            width?: number;
-            height?: number;
-        };
-        TerminalRecordingDto: {
-            id: number;
-            runId: string;
-            nodeRef: string;
-            stream: string;
-            /** Format: uuid */
-            fileId: string;
-            chunkCount: number;
-            durationMs: number;
-            createdAt: string;
-        };
-        TerminalRecordListDto: {
-            runId: string;
-            records: {
-                id: number;
-                runId: string;
-                nodeRef: string;
-                stream: string;
-                /** Format: uuid */
-                fileId: string;
-                chunkCount: number;
-                durationMs: number;
-                createdAt: string;
-            }[];
+        SetWorkflowTagsDto: {
+            tags: string[];
         };
         ArtifactListResponseDto: {
             artifacts: {
@@ -3780,9 +3844,771 @@ export interface operations {
             };
         };
     };
-    WorkflowsController_findAll: {
+    WorkflowRunsController_listRuns: {
+        parameters: {
+            query?: {
+                workflowId?: string;
+                status?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List all workflow runs with metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs?: {
+                            id?: string;
+                            workflowId?: string;
+                            organizationId?: string;
+                            /** @enum {string} */
+                            status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
+                            /** Format: date-time */
+                            startTime?: string;
+                            /** Format: date-time */
+                            endTime?: string | null;
+                            temporalRunId?: string;
+                            workflowVersionId?: string | null;
+                            workflowVersion?: number | null;
+                            workflowName?: string;
+                            eventCount?: number;
+                            nodeCount?: number;
+                            duration?: number;
+                            /** @enum {string} */
+                            triggerType?: "manual" | "schedule" | "api";
+                            triggerSource?: string | null;
+                            triggerLabel?: string | null;
+                            inputPreview?: {
+                                runtimeInputs?: {
+                                    [key: string]: unknown;
+                                };
+                                nodeOverrides?: {
+                                    [key: string]: {
+                                        [key: string]: unknown;
+                                    };
+                                };
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunsController_getRun: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metadata for a single workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        workflowId?: string;
+                        organizationId?: string;
+                        /** @enum {string} */
+                        status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
+                        /** Format: date-time */
+                        startTime?: string;
+                        /** Format: date-time */
+                        endTime?: string | null;
+                        temporalRunId?: string | null;
+                        workflowVersionId?: string | null;
+                        workflowVersion?: number | null;
+                        workflowName?: string;
+                        eventCount?: number;
+                        nodeCount?: number;
+                        duration?: number;
+                        /** @enum {string} */
+                        triggerType?: "manual" | "schedule" | "api";
+                        triggerSource?: string | null;
+                        triggerLabel?: string | null;
+                        inputPreview?: {
+                            runtimeInputs?: {
+                                [key: string]: unknown;
+                            };
+                            nodeOverrides?: {
+                                [key: string]: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunsController_listChildRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List direct child workflow runs spawned by a parent run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runs?: {
+                            runId?: string;
+                            workflowId?: string;
+                            workflowName?: string;
+                            parentNodeRef?: string | null;
+                            status?: string;
+                            /** Format: date-time */
+                            startedAt?: string;
+                            /** Format: date-time */
+                            completedAt?: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunsController_status: {
+        parameters: {
+            query?: {
+                temporalRunId?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Temporal execution status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunsController_result: {
+        parameters: {
+            query?: {
+                temporalRunId?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resolved workflow result payload */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunsController_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Inputs and version metadata captured for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        workflowId?: string;
+                        workflowVersionId?: string | null;
+                        workflowVersion?: number | null;
+                        inputs?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunsController_cancel: {
+        parameters: {
+            query?: {
+                temporalRunId?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancels a running workflow execution */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunObservabilityController_trace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trace events for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        events?: {
+                            id?: string;
+                            runId?: string;
+                            nodeId?: string;
+                            /** @enum {string} */
+                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
+                            /** @enum {string} */
+                            level?: "info" | "warn" | "error" | "debug";
+                            /** Format: date-time */
+                            timestamp?: string;
+                            message?: string | null;
+                            error?: {
+                                message?: string;
+                                stack?: string;
+                                code?: string;
+                                type?: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                                fieldErrors?: {
+                                    [key: string]: string[];
+                                };
+                            } | null;
+                            outputSummary?: {
+                                [key: string]: unknown;
+                            } | null;
+                            data?: {
+                                [key: string]: unknown;
+                            } | null;
+                            metadata?: {
+                                activityId?: string;
+                                attempt?: number;
+                                correlationId?: string;
+                                streamId?: string;
+                                /** @enum {string} */
+                                joinStrategy?: "all" | "any" | "first";
+                                triggeredBy?: string;
+                                failure?: {
+                                    /** Format: date-time */
+                                    at?: string;
+                                    reason?: {
+                                        message?: string;
+                                        name?: string;
+                                    };
+                                } | null;
+                                retryPolicy?: {
+                                    maxAttempts?: number;
+                                    initialIntervalSeconds?: number;
+                                    maximumIntervalSeconds?: number;
+                                    backoffCoefficient?: number;
+                                    nonRetryableErrorTypes?: string[];
+                                } | null;
+                            } | null;
+                        }[];
+                        cursor?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full event timeline for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        events?: {
+                            id?: string;
+                            runId?: string;
+                            nodeId?: string;
+                            /** @enum {string} */
+                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
+                            /** @enum {string} */
+                            level?: "info" | "warn" | "error" | "debug";
+                            /** Format: date-time */
+                            timestamp?: string;
+                            message?: string | null;
+                            error?: {
+                                message?: string;
+                                stack?: string;
+                                code?: string;
+                                type?: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                                fieldErrors?: {
+                                    [key: string]: string[];
+                                };
+                            } | null;
+                            outputSummary?: {
+                                [key: string]: unknown;
+                            } | null;
+                            data?: {
+                                [key: string]: unknown;
+                            } | null;
+                            metadata?: {
+                                activityId?: string;
+                                attempt?: number;
+                                correlationId?: string;
+                                streamId?: string;
+                                /** @enum {string} */
+                                joinStrategy?: "all" | "any" | "first";
+                                triggeredBy?: string;
+                                failure?: {
+                                    /** Format: date-time */
+                                    at?: string;
+                                    reason?: {
+                                        message?: string;
+                                        name?: string;
+                                    };
+                                } | null;
+                                retryPolicy?: {
+                                    maxAttempts?: number;
+                                    initialIntervalSeconds?: number;
+                                    maximumIntervalSeconds?: number;
+                                    backoffCoefficient?: number;
+                                    nonRetryableErrorTypes?: string[];
+                                } | null;
+                            } | null;
+                        }[];
+                        cursor?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_dataflows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Derived data flow packets for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        packets?: {
+                            id?: string;
+                            runId?: string;
+                            sourceNode?: string;
+                            targetNode?: string;
+                            inputKey?: string | null;
+                            payload?: {
+                                [key: string]: unknown;
+                            } | null;
+                            timestamp?: number;
+                            visualTime?: number;
+                            size?: number;
+                            /** @enum {string} */
+                            type?: "file" | "json" | "text" | "binary";
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_runArtifacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Artifacts generated for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunArtifactsResponseDto"];
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_downloadRunArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+                artifactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Download artifact for a specific run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunObservabilityController_getNodeIO: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Node inputs/outputs for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        nodes?: {
+                            nodeRef?: string;
+                            componentId?: string;
+                            /** @enum {string} */
+                            status?: "running" | "completed" | "failed" | "skipped";
+                            /** Format: date-time */
+                            startedAt?: string | null;
+                            /** Format: date-time */
+                            completedAt?: string | null;
+                            durationMs?: number | null;
+                            inputs?: {
+                                [key: string]: unknown;
+                            } | null;
+                            outputs?: {
+                                [key: string]: unknown;
+                            } | null;
+                            inputsSize?: number;
+                            outputsSize?: number;
+                            inputsSpilled?: boolean;
+                            outputsSpilled?: boolean;
+                            errorMessage?: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_getNodeIODetail: {
+        parameters: {
+            query?: {
+                /** @description Request full node I/O data instead of a preview */
+                full?: boolean;
+            };
+            header?: never;
+            path: {
+                runId: string;
+                nodeRef: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Specific node input/output for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        nodeRef?: string;
+                        componentId?: string;
+                        /** @enum {string} */
+                        status?: "running" | "completed" | "failed" | "skipped";
+                        /** Format: date-time */
+                        startedAt?: string | null;
+                        /** Format: date-time */
+                        completedAt?: string | null;
+                        durationMs?: number | null;
+                        inputs?: {
+                            [key: string]: unknown;
+                        } | null;
+                        outputs?: {
+                            [key: string]: unknown;
+                        } | null;
+                        inputsSize?: number;
+                        outputsSize?: number;
+                        inputsSpilled?: boolean;
+                        outputsSpilled?: boolean;
+                        inputsTruncated?: boolean;
+                        outputsTruncated?: boolean;
+                        errorMessage?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunObservabilityController_logs: {
+        parameters: {
+            query?: {
+                nodeRef?: string;
+                stream?: "stdout" | "stderr" | "console";
+                level?: "debug" | "info" | "warn" | "error";
+                limit?: number;
+                cursor?: string;
+                startTime?: string;
+                endTime?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Logs for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runId?: string;
+                        logs?: {
+                            id?: string;
+                            runId?: string;
+                            nodeId?: string;
+                            /** @enum {string} */
+                            level?: "debug" | "info" | "warn" | "error";
+                            message?: string;
+                            /** Format: date-time */
+                            timestamp?: string;
+                        }[];
+                        totalCount?: number;
+                        hasMore?: boolean;
+                        nextCursor?: string | null;
+                    };
+                };
+            };
+        };
+    };
+    WorkflowRunStreamController_stream: {
+        parameters: {
+            query?: {
+                temporalRunId?: string;
+                cursor?: string;
+                terminalCursor?: string;
+                logCursor?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events stream for workflow run updates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunStreamController_terminalChunks: {
+        parameters: {
+            query?: {
+                nodeRef?: string;
+                stream?: "stdout" | "stderr" | "pty";
+                cursor?: string;
+                startTime?: string;
+                endTime?: string;
+            };
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Terminal chunks for a workflow run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowRunStreamController_listTerminalArchives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalRecordListDto"];
+                };
+            };
+        };
+    };
+    WorkflowRunStreamController_archiveTerminal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminalArchiveRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TerminalRecordingDto"];
+                };
+            };
+        };
+    };
+    WorkflowRunStreamController_downloadTerminalArchive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+                recordId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Download terminal recording */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    WorkflowTagsController_listAllTags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All tags across workflows, sorted alphabetically */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllTagsResponseDto"];
+                };
+            };
+        };
+    };
+    WorkflowsController_findAll: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
+                tags?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3915,7 +4741,10 @@ export interface operations {
     };
     WorkflowsController_listSummary: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Comma-separated tag names to filter by (intersection — workflows must have ALL tags) */
+                tags?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3944,152 +4773,8 @@ export interface operations {
                         createdAt?: string;
                         /** Format: date-time */
                         updatedAt?: string;
+                        tags?: string[];
                     }[];
-                };
-            };
-        };
-    };
-    WorkflowsController_listRuns: {
-        parameters: {
-            query?: {
-                workflowId?: string;
-                status?: string;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List all workflow runs with metadata */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runs?: {
-                            id?: string;
-                            workflowId?: string;
-                            organizationId?: string;
-                            /** @enum {string} */
-                            status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
-                            /** Format: date-time */
-                            startTime?: string;
-                            /** Format: date-time */
-                            endTime?: string | null;
-                            temporalRunId?: string;
-                            workflowVersionId?: string | null;
-                            workflowVersion?: number | null;
-                            workflowName?: string;
-                            eventCount?: number;
-                            nodeCount?: number;
-                            duration?: number;
-                            /** @enum {string} */
-                            triggerType?: "manual" | "schedule" | "api";
-                            triggerSource?: string | null;
-                            triggerLabel?: string | null;
-                            inputPreview?: {
-                                runtimeInputs?: {
-                                    [key: string]: unknown;
-                                };
-                                nodeOverrides?: {
-                                    [key: string]: {
-                                        [key: string]: unknown;
-                                    };
-                                };
-                            };
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_getRun: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Metadata for a single workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id?: string;
-                        workflowId?: string;
-                        organizationId?: string;
-                        /** @enum {string} */
-                        status?: "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TERMINATED" | "CONTINUED_AS_NEW" | "TIMED_OUT" | "UNKNOWN";
-                        /** Format: date-time */
-                        startTime?: string;
-                        /** Format: date-time */
-                        endTime?: string | null;
-                        temporalRunId?: string | null;
-                        workflowVersionId?: string | null;
-                        workflowVersion?: number | null;
-                        workflowName?: string;
-                        eventCount?: number;
-                        nodeCount?: number;
-                        duration?: number;
-                        /** @enum {string} */
-                        triggerType?: "manual" | "schedule" | "api";
-                        triggerSource?: string | null;
-                        triggerLabel?: string | null;
-                        inputPreview?: {
-                            runtimeInputs?: {
-                                [key: string]: unknown;
-                            };
-                            nodeOverrides?: {
-                                [key: string]: {
-                                    [key: string]: unknown;
-                                };
-                            };
-                        };
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_listChildRuns: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List direct child workflow runs spawned by a parent run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runs?: {
-                            runId?: string;
-                            workflowId?: string;
-                            workflowName?: string;
-                            parentNodeRef?: string | null;
-                            status?: string;
-                            /** Format: date-time */
-                            startedAt?: string;
-                            /** Format: date-time */
-                            completedAt?: string | null;
-                        }[];
-                    };
                 };
             };
         };
@@ -4240,539 +4925,12 @@ export interface operations {
             };
         };
     };
-    WorkflowsController_status: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current Temporal execution status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_result: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Resolved workflow result payload */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_config: {
+    WorkflowsController_getWorkflowTags: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Inputs and version metadata captured for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        workflowId?: string;
-                        workflowVersionId?: string | null;
-                        workflowVersion?: number | null;
-                        inputs?: {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_cancel: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Cancels a running workflow execution */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_trace: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Trace events for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        events?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
-                            /** @enum {string} */
-                            level?: "info" | "warn" | "error" | "debug";
-                            /** Format: date-time */
-                            timestamp?: string;
-                            message?: string | null;
-                            error?: {
-                                message?: string;
-                                stack?: string;
-                                code?: string;
-                                type?: string;
-                                details?: {
-                                    [key: string]: unknown;
-                                };
-                                fieldErrors?: {
-                                    [key: string]: string[];
-                                };
-                            } | null;
-                            outputSummary?: {
-                                [key: string]: unknown;
-                            } | null;
-                            data?: {
-                                [key: string]: unknown;
-                            } | null;
-                            metadata?: {
-                                activityId?: string;
-                                attempt?: number;
-                                correlationId?: string;
-                                streamId?: string;
-                                /** @enum {string} */
-                                joinStrategy?: "all" | "any" | "first";
-                                triggeredBy?: string;
-                                failure?: {
-                                    /** Format: date-time */
-                                    at?: string;
-                                    reason?: {
-                                        message?: string;
-                                        name?: string;
-                                    };
-                                } | null;
-                                retryPolicy?: {
-                                    maxAttempts?: number;
-                                    initialIntervalSeconds?: number;
-                                    maximumIntervalSeconds?: number;
-                                    backoffCoefficient?: number;
-                                    nonRetryableErrorTypes?: string[];
-                                } | null;
-                            } | null;
-                        }[];
-                        cursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_events: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Full event timeline for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        events?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            type?: "STARTED" | "PROGRESS" | "COMPLETED" | "FAILED";
-                            /** @enum {string} */
-                            level?: "info" | "warn" | "error" | "debug";
-                            /** Format: date-time */
-                            timestamp?: string;
-                            message?: string | null;
-                            error?: {
-                                message?: string;
-                                stack?: string;
-                                code?: string;
-                                type?: string;
-                                details?: {
-                                    [key: string]: unknown;
-                                };
-                                fieldErrors?: {
-                                    [key: string]: string[];
-                                };
-                            } | null;
-                            outputSummary?: {
-                                [key: string]: unknown;
-                            } | null;
-                            data?: {
-                                [key: string]: unknown;
-                            } | null;
-                            metadata?: {
-                                activityId?: string;
-                                attempt?: number;
-                                correlationId?: string;
-                                streamId?: string;
-                                /** @enum {string} */
-                                joinStrategy?: "all" | "any" | "first";
-                                triggeredBy?: string;
-                                failure?: {
-                                    /** Format: date-time */
-                                    at?: string;
-                                    reason?: {
-                                        message?: string;
-                                        name?: string;
-                                    };
-                                } | null;
-                                retryPolicy?: {
-                                    maxAttempts?: number;
-                                    initialIntervalSeconds?: number;
-                                    maximumIntervalSeconds?: number;
-                                    backoffCoefficient?: number;
-                                    nonRetryableErrorTypes?: string[];
-                                } | null;
-                            } | null;
-                        }[];
-                        cursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_dataflows: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Derived data flow packets for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        packets?: {
-                            id?: string;
-                            runId?: string;
-                            sourceNode?: string;
-                            targetNode?: string;
-                            inputKey?: string | null;
-                            payload?: {
-                                [key: string]: unknown;
-                            } | null;
-                            timestamp?: number;
-                            visualTime?: number;
-                            size?: number;
-                            /** @enum {string} */
-                            type?: "file" | "json" | "text" | "binary";
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_runArtifacts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Artifacts generated for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunArtifactsResponseDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_downloadRunArtifact: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-                artifactId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download artifact for a specific run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_getNodeIO: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Node inputs/outputs for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        nodes?: {
-                            nodeRef?: string;
-                            componentId?: string;
-                            /** @enum {string} */
-                            status?: "running" | "completed" | "failed" | "skipped";
-                            /** Format: date-time */
-                            startedAt?: string | null;
-                            /** Format: date-time */
-                            completedAt?: string | null;
-                            durationMs?: number | null;
-                            inputs?: {
-                                [key: string]: unknown;
-                            } | null;
-                            outputs?: {
-                                [key: string]: unknown;
-                            } | null;
-                            inputsSize?: number;
-                            outputsSize?: number;
-                            inputsSpilled?: boolean;
-                            outputsSpilled?: boolean;
-                            errorMessage?: string | null;
-                        }[];
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_getNodeIODetail: {
-        parameters: {
-            query?: {
-                /** @description Request full node I/O data instead of a preview */
-                full?: boolean;
-            };
-            header?: never;
-            path: {
-                runId: string;
-                nodeRef: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Specific node input/output for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        nodeRef?: string;
-                        componentId?: string;
-                        /** @enum {string} */
-                        status?: "running" | "completed" | "failed" | "skipped";
-                        /** Format: date-time */
-                        startedAt?: string | null;
-                        /** Format: date-time */
-                        completedAt?: string | null;
-                        durationMs?: number | null;
-                        inputs?: {
-                            [key: string]: unknown;
-                        } | null;
-                        outputs?: {
-                            [key: string]: unknown;
-                        } | null;
-                        inputsSize?: number;
-                        outputsSize?: number;
-                        inputsSpilled?: boolean;
-                        outputsSpilled?: boolean;
-                        inputsTruncated?: boolean;
-                        outputsTruncated?: boolean;
-                        errorMessage?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_stream: {
-        parameters: {
-            query?: {
-                temporalRunId?: string;
-                cursor?: string;
-                terminalCursor?: string;
-                logCursor?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Server-sent events stream for workflow run updates */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_logs: {
-        parameters: {
-            query?: {
-                nodeRef?: string;
-                stream?: "stdout" | "stderr" | "console";
-                level?: "debug" | "info" | "warn" | "error";
-                limit?: number;
-                cursor?: string;
-                startTime?: string;
-                endTime?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Logs for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        runId?: string;
-                        logs?: {
-                            id?: string;
-                            runId?: string;
-                            nodeId?: string;
-                            /** @enum {string} */
-                            level?: "debug" | "info" | "warn" | "error";
-                            message?: string;
-                            /** Format: date-time */
-                            timestamp?: string;
-                        }[];
-                        totalCount?: number;
-                        hasMore?: boolean;
-                        nextCursor?: string | null;
-                    };
-                };
-            };
-        };
-    };
-    WorkflowsController_terminalChunks: {
-        parameters: {
-            query?: {
-                nodeRef?: string;
-                stream?: "stdout" | "stderr" | "pty";
-                cursor?: string;
-                startTime?: string;
-                endTime?: string;
-            };
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Terminal chunks for a workflow run */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    WorkflowsController_listTerminalArchives: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -4783,54 +4941,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TerminalRecordListDto"];
+                    "application/json": components["schemas"]["WorkflowTagsResponseDto"];
                 };
             };
         };
     };
-    WorkflowsController_archiveTerminal: {
+    WorkflowsController_setWorkflowTags: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                runId: string;
+                id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TerminalArchiveRequestDto"];
+                "application/json": components["schemas"]["SetWorkflowTagsDto"];
             };
         };
         responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TerminalRecordingDto"];
-                };
-            };
-        };
-    };
-    WorkflowsController_downloadTerminalArchive: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-                recordId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Download terminal recording */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowTagsResponseDto"];
+                };
             };
         };
     };
@@ -7624,6 +7761,24 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Sync result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuditLogsController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file of audit log events */
             200: {
                 headers: {
                     [name: string]: unknown;

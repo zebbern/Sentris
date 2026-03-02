@@ -15,8 +15,8 @@ export const AnalyticsSettingsResponseSchema = z.object({
   subscriptionTier: z.enum(['free', 'pro', 'enterprise']),
   analyticsRetentionDays: z.number().int(),
   maxRetentionDays: z.number().int(),
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 export class AnalyticsSettingsResponseDto extends createZodDto(AnalyticsSettingsResponseSchema) {}
