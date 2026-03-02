@@ -2,80 +2,17 @@ import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/reac
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
+import type {
+  RegistryCatalogEntry,
+  RegistryCatalogDetail,
+  RegistryCatalogListResponse,
+  RegistryImportRequest,
+  RegistryImportResponse,
+  RegistrySyncStatus,
+} from '@sentris/shared';
 
-// ─── Response Types ──────────────────────────────────────────────────
-
-export interface RegistryCatalogItem {
-  name: string;
-  displayName: string;
-  description: string;
-  serverType: 'stdio' | 'http';
-  category: string;
-  tags: string[];
-  iconUrl: string | null;
-  sourceUrl: string | null;
-  isFeatured: boolean;
-  hasSecrets: boolean;
-  hasOAuth: boolean;
-  isImported: boolean;
-}
-
-export interface RegistryConfigSecret {
-  name: string;
-  description: string;
-  required: boolean;
-  example?: string;
-}
-
-export interface RegistryConfigEnv {
-  name: string;
-  description: string;
-  required: boolean;
-  default?: string;
-}
-
-export interface RegistryCatalogDetail extends RegistryCatalogItem {
-  dockerImage: string | null;
-  remoteConfig: { url: string; transportType: string; headers?: Record<string, string> } | null;
-  configRequirements: {
-    secrets: RegistryConfigSecret[];
-    env: RegistryConfigEnv[];
-  };
-  oauthProviders: string[];
-  runConfig: Record<string, unknown> | null;
-}
-
-export interface RegistryCatalogResponse {
-  data: RegistryCatalogItem[];
-  pagination: { total: number; limit: number; offset: number };
-  categories: string[];
-}
-
-export interface RegistryImportRequest {
-  registryName: string;
-  secrets: Record<string, string>;
-  envVars: Record<string, string>;
-  enabled: boolean;
-  groupId?: string;
-}
-
-export interface RegistryImportResponse {
-  serverId: string;
-  serverName: string;
-  transportType: 'http' | 'stdio';
-  status: 'imported' | 'already_exists';
-}
-
-export interface RegistrySyncStatusResponse {
-  status: 'idle' | 'syncing' | 'success' | 'failed' | 'partial';
-  lastSyncAt: string | null;
-  serversAdded: number;
-  serversUpdated: number;
-  serversRemoved: number;
-  totalServers: number;
-  durationMs: number | null;
-  error: string | null;
-}
+// Re-export shared types for consumers
+export type { RegistryCatalogEntry, RegistryCatalogDetail, RegistryImportRequest };
 
 // ─── API Helper ──────────────────────────────────────────────────────
 
@@ -127,7 +64,7 @@ export function useRegistryCatalog(filters?: RegistryCatalogFilters) {
       if (filters?.limit) params.set('limit', String(filters.limit));
       if (filters?.offset) params.set('offset', String(filters.offset));
       const qs = params.toString();
-      return registryRequest<RegistryCatalogResponse>(
+      return registryRequest<RegistryCatalogListResponse>(
         `/api/v1/mcp-registry/catalog${qs ? `?${qs}` : ''}`,
       );
     },
@@ -188,7 +125,7 @@ export function useImportRegistryServer() {
 export function useRegistrySyncStatus() {
   return useQuery({
     queryKey: queryKeys.mcpRegistry.syncStatus(),
-    queryFn: () => registryRequest<RegistrySyncStatusResponse>('/api/v1/mcp-registry/sync/status'),
+    queryFn: () => registryRequest<RegistrySyncStatus>('/api/v1/mcp-registry/sync/status'),
     staleTime: 60 * 1000, // 1 min
   });
 }

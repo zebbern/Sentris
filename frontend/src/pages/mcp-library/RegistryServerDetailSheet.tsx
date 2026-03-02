@@ -28,7 +28,7 @@ export function RegistryServerDetailSheet({
   const { data: server, isLoading, error } = useRegistryCatalogDetail(serverName);
 
   const typeInfo =
-    server?.serverType === 'http'
+    server?.serverType === 'remote'
       ? { label: 'Remote', icon: Globe }
       : { label: 'Docker', icon: Server };
   const TypeIcon = typeInfo.icon;
@@ -37,7 +37,7 @@ export function RegistryServerDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-lg overflow-y-auto">
         {isLoading && (
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4" aria-busy="true" aria-label="Loading server details">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-20 w-full" />
@@ -46,7 +46,7 @@ export function RegistryServerDetailSheet({
         )}
 
         {error && (
-          <div className="py-8 text-center text-sm text-destructive">
+          <div role="alert" className="py-8 text-center text-sm text-destructive">
             Failed to load server details. Please try again.
           </div>
         )}
@@ -132,6 +132,7 @@ export function RegistryServerDetailSheet({
                       className="text-xs text-primary underline-offset-4 hover:underline truncate max-w-[200px]"
                     >
                       {server.sourceUrl}
+                      <span className="sr-only">(opens in a new tab)</span>
                     </a>
                   </div>
                 )}
@@ -149,7 +150,9 @@ export function RegistryServerDetailSheet({
                         {server.configRequirements.secrets.map((secret) => (
                           <li key={secret.name} className="text-xs text-muted-foreground">
                             <code className="bg-muted px-1 py-0.5 rounded">{secret.name}</code>
-                            {secret.required && <span className="text-destructive ml-1">*</span>}
+                            <span className="text-destructive ml-1" aria-label="required">
+                              *
+                            </span>
                           </li>
                         ))}
                       </ul>

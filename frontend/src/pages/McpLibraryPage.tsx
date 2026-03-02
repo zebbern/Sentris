@@ -141,7 +141,7 @@ export function McpLibraryPage() {
       />
 
       <Tabs defaultValue="my-library" className="w-full">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6" aria-label="MCP Library sections">
           <TabsTrigger value="my-library">My Library</TabsTrigger>
           <TabsTrigger value="docker-registry">Docker Registry</TabsTrigger>
         </TabsList>

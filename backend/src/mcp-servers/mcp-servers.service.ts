@@ -48,7 +48,7 @@ export class McpServersService {
       transportType: record.transportType as TransportType,
       endpoint: record.endpoint,
       command: record.command,
-      args: record.args,
+      args: this.redactSensitiveArgs(record.args),
       hasHeaders: record.headers !== null,
       headerKeys: headerKeys ?? null,
       enabled: record.enabled,
@@ -59,6 +59,26 @@ export class McpServersService {
       updatedAt: record.updatedAt.toISOString(),
       groupId: record.groupId ?? null,
     };
+  }
+
+  /**
+   * Redact values from Docker `-e KEY=VALUE` args that look like secrets.
+   */
+  private redactSensitiveArgs(args: string[] | null): string[] | null {
+    if (!args) return null;
+    const SECRET_KEY_PATTERN = /(?:secret|password|token|key|api_key|apikey|auth|credential)/i;
+    return args.map((arg, index) => {
+      if (index > 0 && args[index - 1] === '-e') {
+        const eqIndex = arg.indexOf('=');
+        if (eqIndex > 0) {
+          const envKey = arg.substring(0, eqIndex);
+          if (SECRET_KEY_PATTERN.test(envKey)) {
+            return `${envKey}=***REDACTED***`;
+          }
+        }
+      }
+      return arg;
+    });
   }
 
   /**
@@ -94,6 +114,34 @@ export class McpServersService {
       enabled: record.enabled,
       discoveredAt: record.discoveredAt.toISOString(),
     };
+  }
+
+  // --- Registry integration helpers ---
+
+  /**
+   * Find a server by its registry source name within an organization.
+   * Used by McpRegistryService for duplicate detection during import.
+   */
+  async findByRegistrySource(
+    registrySourceName: string,
+    organizationId: string,
+  ): Promise<McpServerRecord | null> {
+    return this.repository.findByRegistrySource(registrySourceName, organizationId);
+  }
+
+  /**
+   * Set the registry source name on an existing server.
+   */
+  async setRegistrySourceName(serverId: string, registrySourceName: string): Promise<void> {
+    return this.repository.setRegistrySourceName(serverId, registrySourceName);
+  }
+
+  /**
+   * List distinct registry source names for an organization.
+   * Efficient query that returns only the names, not full server records.
+   */
+  async listRegistrySourceNames(organizationId: string): Promise<string[]> {
+    return this.repository.listRegistrySourceNames(organizationId);
   }
 
   async listServers(

@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
+import Redis from 'ioredis';
 
 import { McpRegistryRepository } from './mcp-registry.repository';
 import { parseServerYaml } from './registry-yaml-parser';
@@ -12,7 +13,9 @@ import {
   SYNC_BATCH_SIZE,
   RATE_LIMIT_THRESHOLD,
   GITHUB_REQUEST_TIMEOUT_MS,
+  MAX_YAML_SIZE_BYTES,
 } from './registry-featured';
+import { MCP_REGISTRY_REDIS } from './mcp-registry.module';
 import type { RegistrySyncResult } from '@sentris/shared';
 
 interface GitHubTreeResponse {
@@ -31,9 +34,13 @@ export class McpRegistrySyncService {
   private readonly token: string | undefined;
   private syncing = false;
 
+  private static readonly SYNC_LOCK_KEY = 'mcp-registry:sync-lock';
+  private static readonly SYNC_LOCK_TTL_SECONDS = 600;
+
   constructor(
     private readonly repository: McpRegistryRepository,
     private readonly configService: ConfigService,
+    @Optional() @Inject(MCP_REGISTRY_REDIS) private readonly redis: Redis | null,
   ) {
     this.repo = this.configService.get<string>('MCP_REGISTRY_REPO') ?? DEFAULT_REGISTRY_REPO;
     this.token = this.configService.get<string>('GITHUB_REGISTRY_TOKEN');
@@ -54,9 +61,30 @@ export class McpRegistrySyncService {
 
   /**
    * Main sync entry point — can be called by cron or manually via API.
+   * Uses a distributed Redis lock to prevent concurrent syncs across instances.
    */
   async triggerSync(): Promise<RegistrySyncResult> {
-    if (this.syncing) {
+    // Acquire distributed lock via Redis (preferred) or fall back to local mutex
+    if (this.redis) {
+      const acquired = await this.redis.set(
+        McpRegistrySyncService.SYNC_LOCK_KEY,
+        '1',
+        'EX',
+        McpRegistrySyncService.SYNC_LOCK_TTL_SECONDS,
+        'NX',
+      );
+      if (!acquired) {
+        return {
+          status: 'skipped',
+          serversAdded: 0,
+          serversUpdated: 0,
+          serversRemoved: 0,
+          totalServers: 0,
+          durationMs: 0,
+          error: 'Sync already in progress on another instance',
+        };
+      }
+    } else if (this.syncing) {
       return {
         status: 'skipped',
         serversAdded: 0,
@@ -114,6 +142,9 @@ export class McpRegistrySyncService {
       };
     } finally {
       this.syncing = false;
+      if (this.redis) {
+        await this.redis.del(McpRegistrySyncService.SYNC_LOCK_KEY).catch(() => {});
+      }
     }
   }
 
@@ -290,12 +321,18 @@ export class McpRegistrySyncService {
 
   private async fetchRawFile(path: string): Promise<string> {
     const url = `${RAW_CONTENT_BASE}/${this.repo}/main/${path}`;
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
-    });
+    const response = await this.githubFetch(url);
 
     if (!response.ok) {
       throw new Error(`Raw file fetch failed for ${path}: ${response.status}`);
+    }
+
+    // Reject unexpectedly large files before reading body
+    const contentLength = response.headers.get('Content-Length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_YAML_SIZE_BYTES) {
+      throw new Error(
+        `File too large for ${path}: ${contentLength} bytes (max ${MAX_YAML_SIZE_BYTES})`,
+      );
     }
 
     return response.text();
