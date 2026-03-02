@@ -165,6 +165,23 @@ export async function registerServerTools(
   // Fetch resolved configuration (with secrets resolved)
   const resolvedConfig = await fetchResolvedConfig(server.id, context);
 
+  // Extract env vars from headers with env: prefix (used for Docker registry-imported servers)
+  const envFromHeaders: Record<string, string> = {};
+  let httpHeaders: Record<string, string> | undefined;
+  if (resolvedConfig.headers) {
+    httpHeaders = {};
+    for (const [key, value] of Object.entries(resolvedConfig.headers)) {
+      if (key.startsWith('env:')) {
+        envFromHeaders[key.slice(4)] = value;
+      } else {
+        httpHeaders[key] = value;
+      }
+    }
+    if (Object.keys(httpHeaders).length === 0) {
+      httpHeaders = undefined;
+    }
+  }
+
   // For stdio servers, we need to spawn a Docker container
   if (server.transportType === 'stdio') {
     const { endpoint, containerId } = await startMcpDockerServer({
@@ -173,6 +190,7 @@ export async function registerServerTools(
       env: {
         MCP_COMMAND: server.command || '',
         MCP_ARGS: JSON.stringify((resolvedConfig.args ?? server.args) || []),
+        ...envFromHeaders,
       },
       port: 0, // Auto-assign port
       params: {},
@@ -180,7 +198,7 @@ export async function registerServerTools(
     });
 
     // Discover tools from the running container
-    const tools = await discoverToolsFromEndpoint(endpoint, resolvedConfig.headers);
+    const tools = await discoverToolsFromEndpoint(endpoint, httpHeaders);
 
     // Register the server with pre-discovered tools
     await registerMcpServer({
@@ -191,14 +209,14 @@ export async function registerServerTools(
       transport: 'stdio',
       endpoint,
       containerId,
-      headers: resolvedConfig.headers,
+      headers: httpHeaders,
       tools,
     });
   }
   // For HTTP servers, register directly with resolved headers
   else if (server.transportType === 'http' && server.endpoint) {
     // Discover tools from the HTTP endpoint
-    const tools = await discoverToolsFromEndpoint(server.endpoint, resolvedConfig.headers);
+    const tools = await discoverToolsFromEndpoint(server.endpoint, httpHeaders);
 
     await registerMcpServer({
       runId: context.runId,
@@ -207,7 +225,7 @@ export async function registerServerTools(
       serverId: server.id,
       transport: 'http',
       endpoint: server.endpoint,
-      headers: resolvedConfig.headers,
+      headers: httpHeaders,
       tools,
     });
   } else {
