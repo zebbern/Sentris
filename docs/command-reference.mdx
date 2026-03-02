@@ -31,10 +31,12 @@ just dev
 
 Starts the full development environment with hot-reload:
 - Checks for environment files
-- Starts Docker infrastructure (Postgres, Temporal, MinIO, Loki)
+- Starts Docker infrastructure (Postgres, Temporal, MinIO, Redis, Loki, OpenSearch, Redpanda)
 - Waits for services to be ready
 - Runs database migrations
 - Starts backend, worker, and frontend via PM2
+
+**Auth mode auto-detection:** If `CLERK_SECRET_KEY` is set in `backend/.env`, secure mode is enabled (Clerk auth + OpenSearch Security). Otherwise, local auth mode is used.
 
 **Access points (all via nginx on port 80):**
 | Service | URL |
@@ -68,6 +70,16 @@ just dev status
 
 Shows status of PM2 processes and Docker containers.
 
+### Clean Development
+
+<Danger>This deletes all data.</Danger>
+
+```bash
+just dev clean
+```
+
+Stops PM2 processes, removes Docker infrastructure and volumes.
+
 ---
 
 ## Production Commands
@@ -78,7 +90,7 @@ Shows status of PM2 processes and Docker containers.
 just prod
 ```
 
-Starts the production environment using Docker Compose with pre-built images.
+Starts the production environment using Docker Compose. Auto-detects security mode: if TLS certs exist in `docker/certs/`, secure mode with multitenancy is enabled.
 
 **Access points (all via nginx on port 80):**
 | Service | URL |
@@ -87,6 +99,14 @@ Starts the production environment using Docker Compose with pre-built images.
 | Backend API | http://localhost/api/ |
 | Analytics | http://localhost/analytics/ |
 | Temporal UI | http://localhost:8081 |
+
+### Start Latest Release
+
+```bash
+just prod start-latest
+```
+
+Fetches the latest release from GitHub, pulls matching GHCR images, and starts production.
 
 ### Build and Start
 
@@ -147,6 +167,8 @@ Starts only the infrastructure containers:
 - MinIO
 - Redis
 - Loki
+- OpenSearch
+- Redpanda
 
 ### Stop Infrastructure
 
@@ -211,24 +233,133 @@ Builds production Docker images without starting containers.
 
 ---
 
+## GHCR Image Commands
+
+### Start with GHCR Images
+
+```bash
+just prod-images
+```
+
+Pulls prebuilt images from GHCR and starts the production environment.
+
+### Build Test Images
+
+```bash
+just prod-images build-test
+```
+
+Builds production images with PostHog analytics baked in. Requires `POSTHOG_API_KEY` and `POSTHOG_HOST` environment variables.
+
+### Stop / Logs / Status / Clean
+
+```bash
+just prod-images stop
+just prod-images logs
+just prod-images status
+just prod-images clean
+```
+
+Manage the GHCR-based production environment.
+
+---
+
+## Security Commands
+
+### Generate TLS Certificates
+
+```bash
+just generate-certs
+```
+
+Generates TLS certificates for OpenSearch in `docker/certs/`. Required before running production in secure mode.
+
+### Initialize OpenSearch Security
+
+```bash
+just security-init
+just security-init --force
+```
+
+Initializes or reinitializes the OpenSearch Security index. Use `--force` to update an existing configuration.
+
+### Hash Password
+
+```bash
+just hash-password
+just hash-password 'my-password'
+```
+
+Generates a BCrypt hash for OpenSearch internal user passwords.
+
+---
+
+## Multi-Instance Commands
+
+### Show Active Instance
+
+```bash
+just instance show
+```
+
+Prints the currently active instance number (stored in `.sentris-instance`).
+
+### Set Active Instance
+
+```bash
+just instance use <0-9>
+```
+
+Sets the active instance for the current workspace. All subsequent `just dev` commands target this instance.
+
+### Initialize Instance Environment
+
+```bash
+just instance-init [N]
+```
+
+Creates instance-specific env files at `.instances/instance-N/`. Never overwrites existing files.
+
+### Manage Instance Env Files
+
+```bash
+just instance-env init [N] [--force]   # Generate env files
+just instance-env update [N]           # Patch instance-specific vars
+just instance-env copy SRC DEST        # Copy env between instances
+just instance-env show [N]             # Show instance config
+```
+
+---
+
 ## Quick Reference
 
 | Command | Description |
 |---------|-------------|
 | `just init` | Initialize environment |
-| `just dev` | Start development |
+| `just dev` | Start development (auto-detects auth mode) |
 | `just dev stop` | Stop development |
 | `just dev logs` | View dev logs |
 | `just dev status` | Check dev status |
-| `just prod` | Start production |
+| `just dev clean` | Clean dev data |
+| `just prod` | Start production (auto-detects security) |
 | `just prod build` | Build and start production |
+| `just prod start-latest` | Download latest release and start |
 | `just prod stop` | Stop production |
 | `just prod logs` | View production logs |
 | `just prod clean` | Clean production data |
+| `just prod-images` | Start with prebuilt GHCR images |
+| `just prod-images build-test` | Build test images with analytics |
+| `just generate-certs` | Generate TLS certificates |
+| `just security-init` | Initialize OpenSearch security |
+| `just hash-password` | Generate BCrypt password hash |
 | `just infra up` | Start infrastructure |
 | `just infra down` | Stop infrastructure |
 | `just infra logs` | View infrastructure logs |
 | `just infra clean` | Clean infrastructure data |
+| `just instance show` | Show active instance |
+| `just instance use N` | Set active instance |
+| `just instance-init [N]` | Init instance env files |
+| `just instance-env ...` | Manage instance env files |
 | `just status` | Show all status |
 | `just db-reset` | Reset database |
 | `just build` | Build images |

@@ -67,17 +67,17 @@ just prod
 
 > **Note:** Frontend and backend containers only expose ports internally. All external traffic flows through nginx on port 80.
 
-### Production Secure Mode (`just prod-secure`)
+### Production Secure Mode (`just prod` with TLS certs)
 
 ```bash
 just generate-certs
 export OPENSEARCH_ADMIN_PASSWORD='secure-password'
 export OPENSEARCH_DASHBOARDS_PASSWORD='secure-password'
-just prod-secure
+just prod
 ```
 
 - **Compose files**: `docker-compose.infra.yml` + `docker-compose.prod.yml` (overlay)
-- **Security**: TLS enabled, authentication required
+- **Security**: Auto-detected from TLS certs in `docker/certs/`. TLS enabled, authentication required
 - **Multitenancy**: Strict SaaS isolation per customer
 - **Nginx**: Uses `nginx.prod.conf` with container networking
 
@@ -152,16 +152,15 @@ docker/
 
 ## Quick Reference
 
-| Command               | Description                                |
-| --------------------- | ------------------------------------------ |
-| `just dev`            | Start dev environment (PM2 + Docker infra) |
-| `just dev stop`       | Stop dev environment                       |
-| `just prod`           | Start full stack in Docker                 |
-| `just prod stop`      | Stop production                            |
-| `just prod-secure`    | Start with security & multitenancy         |
-| `just generate-certs` | Generate TLS certificates                  |
-| `just infra up`       | Start infrastructure only                  |
-| `just help`           | Show all available commands                |
+| Command               | Description                                        |
+| --------------------- | -------------------------------------------------- |
+| `just dev`            | Start dev environment (PM2 + Docker infra)         |
+| `just dev stop`       | Stop dev environment                               |
+| `just prod`           | Start full stack in Docker (auto-detects security) |
+| `just prod stop`      | Stop production                                    |
+| `just generate-certs` | Generate TLS certificates                          |
+| `just infra up`       | Start infrastructure only                          |
+| `just help`           | Show all available commands                        |
 
 ## See Also
 
