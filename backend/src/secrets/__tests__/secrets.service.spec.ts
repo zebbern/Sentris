@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { SecretsService } from '../secrets.service';
@@ -327,6 +328,210 @@ describe('SecretsService', () => {
     await service.deleteSecret(authContext, 'secret-1');
     expect(repository.deleteSecret).toHaveBeenCalledWith('secret-1', {
       organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
+  describe('negative auth paths', () => {
+    const nullOrgAuth: AuthContext = {
+      userId: 'tester',
+      organizationId: null,
+      roles: ['ADMIN'],
+      isAuthenticated: true,
+      provider: 'test',
+    };
+
+    const emptyOrgAuth: AuthContext = {
+      userId: 'tester',
+      organizationId: '' as unknown as string,
+      roles: ['ADMIN'],
+      isAuthenticated: true,
+      provider: 'test',
+    };
+
+    describe('null auth context', () => {
+      it('listSecrets throws ForbiddenException', async () => {
+        await expect(service.listSecrets(null)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecret throws ForbiddenException', async () => {
+        await expect(service.getSecret(null, 'secret-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('createSecret throws ForbiddenException', async () => {
+        await expect(service.createSecret(null, { name: 'test', value: 'val' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('rotateSecret throws ForbiddenException', async () => {
+        await expect(service.rotateSecret(null, 'secret-1', { value: 'new-val' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getSecretValue throws ForbiddenException', async () => {
+        await expect(service.getSecretValue(null, 'secret-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('updateSecret throws ForbiddenException', async () => {
+        await expect(service.updateSecret(null, 'secret-1', { name: 'renamed' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('deleteSecret throws ForbiddenException', async () => {
+        await expect(service.deleteSecret(null, 'secret-1')).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecretByName throws ForbiddenException', async () => {
+        await expect(service.getSecretByName(null, 'some-name')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getSecretValueByName throws ForbiddenException', async () => {
+        await expect(service.getSecretValueByName(null, 'some-name')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+    });
+
+    describe('auth with null organizationId', () => {
+      it('listSecrets throws ForbiddenException', async () => {
+        await expect(service.listSecrets(nullOrgAuth)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecret throws ForbiddenException', async () => {
+        await expect(service.getSecret(nullOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('createSecret throws ForbiddenException', async () => {
+        await expect(
+          service.createSecret(nullOrgAuth, { name: 'test', value: 'val' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('deleteSecret throws ForbiddenException', async () => {
+        await expect(service.deleteSecret(nullOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('rotateSecret throws ForbiddenException', async () => {
+        await expect(
+          service.rotateSecret(nullOrgAuth, 'secret-1', { value: 'new-val' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecretValue throws ForbiddenException', async () => {
+        await expect(service.getSecretValue(nullOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('updateSecret throws ForbiddenException', async () => {
+        await expect(
+          service.updateSecret(nullOrgAuth, 'secret-1', { name: 'updated' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecretByName throws ForbiddenException', async () => {
+        await expect(service.getSecretByName(nullOrgAuth, 'my-secret')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getSecretValueByName throws ForbiddenException', async () => {
+        await expect(service.getSecretValueByName(nullOrgAuth, 'my-secret')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+    });
+
+    describe('auth with empty string organizationId', () => {
+      it('listSecrets throws ForbiddenException', async () => {
+        await expect(service.listSecrets(emptyOrgAuth)).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecret throws ForbiddenException', async () => {
+        await expect(service.getSecret(emptyOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('createSecret throws ForbiddenException', async () => {
+        await expect(
+          service.createSecret(emptyOrgAuth, { name: 'test', value: 'val' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('deleteSecret throws ForbiddenException', async () => {
+        await expect(service.deleteSecret(emptyOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('rotateSecret throws ForbiddenException', async () => {
+        await expect(
+          service.rotateSecret(emptyOrgAuth, 'secret-1', { value: 'new-val' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecretValue throws ForbiddenException', async () => {
+        await expect(service.getSecretValue(emptyOrgAuth, 'secret-1')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('updateSecret throws ForbiddenException', async () => {
+        await expect(
+          service.updateSecret(emptyOrgAuth, 'secret-1', { name: 'updated' }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('getSecretByName throws ForbiddenException', async () => {
+        await expect(service.getSecretByName(emptyOrgAuth, 'my-secret')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+
+      it('getSecretValueByName throws ForbiddenException', async () => {
+        await expect(service.getSecretValueByName(emptyOrgAuth, 'my-secret')).rejects.toThrow(
+          ForbiddenException,
+        );
+      });
+    });
+
+    describe('non-existent resource IDs', () => {
+      it('getSecret propagates repository error for non-existent ID', async () => {
+        repository.findById.mockRejectedValue(new Error('Not found'));
+
+        await expect(service.getSecret(authContext, 'non-existent')).rejects.toThrow('Not found');
+      });
+
+      it('getSecretValue propagates repository error for non-existent ID', async () => {
+        repository.findValueBySecretId.mockRejectedValue(new Error('Not found'));
+
+        await expect(service.getSecretValue(authContext, 'non-existent')).rejects.toThrow(
+          'Not found',
+        );
+      });
+    });
+
+    describe('no repository calls when auth fails', () => {
+      it('does not call repository when auth is null', async () => {
+        await expect(service.listSecrets(null)).rejects.toThrow(ForbiddenException);
+        expect(repository.listSecrets).not.toHaveBeenCalled();
+      });
+
+      it('does not call encryption when auth is null', async () => {
+        await expect(service.createSecret(null, { name: 'test', value: 'val' })).rejects.toThrow(
+          ForbiddenException,
+        );
+        expect(encryption.encrypt).not.toHaveBeenCalled();
+      });
     });
   });
 });
