@@ -33,4 +33,28 @@ export const auditLogsApi = {
     }
     return (await res.json()) as ListAuditLogsResponseDto;
   },
+
+  exportCsv: async (query: {
+    resourceType?: string;
+    action?: string;
+    actorId?: string;
+    from?: string;
+    to?: string;
+  }): Promise<Blob> => {
+    const headers = await getAuthHeaders();
+    const url = new URL(`${API_V1_URL}/audit-logs/export`);
+
+    if (query.resourceType) url.searchParams.set('resourceType', query.resourceType);
+    if (query.action) url.searchParams.set('action', query.action);
+    if (query.actorId) url.searchParams.set('actorId', query.actorId);
+    if (query.from) url.searchParams.set('from', query.from);
+    if (query.to) url.searchParams.set('to', query.to);
+
+    const res = await fetch(url.toString(), { headers });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to export audit logs: ${res.status} ${text}`);
+    }
+    return res.blob();
+  },
 };

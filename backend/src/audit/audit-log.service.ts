@@ -29,6 +29,17 @@ export interface ListAuditLogsInput {
   cursor?: string;
 }
 
+export interface ExportAuditLogsInput {
+  resourceType?: string | string[];
+  resourceId?: string;
+  action?: string | string[];
+  actorId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+const EXPORT_ROW_LIMIT = 10_000;
+
 function actorTypeFromAuth(auth: AuthContext | null): AuditActorType {
   if (!auth) return 'unknown';
   if (auth.provider === 'api-key') return 'api-key';
@@ -148,5 +159,35 @@ export class AuditLogService {
         : null;
 
     return { items, nextCursor };
+  }
+
+  async exportAll(auth: AuthContext | null, input: ExportAuditLogsInput) {
+    if (!this.canRead(auth)) {
+      throw new ForbiddenException('Audit log access denied');
+    }
+
+    const organizationId = auth?.organizationId ?? DEFAULT_ORGANIZATION_ID;
+
+    const resourceTypes = input.resourceType
+      ? (Array.isArray(input.resourceType)
+          ? input.resourceType
+          : input.resourceType.split(',')
+        ).map((s) => s.trim())
+      : undefined;
+
+    const actions = input.action
+      ? (Array.isArray(input.action) ? input.action : input.action.split(',')).map((s) => s.trim())
+      : undefined;
+
+    return this.repository.list({
+      organizationId,
+      resourceType: resourceTypes,
+      resourceId: input.resourceId,
+      action: actions,
+      actorId: input.actorId,
+      from: input.from,
+      to: input.to,
+      limit: EXPORT_ROW_LIMIT,
+    });
   }
 }
