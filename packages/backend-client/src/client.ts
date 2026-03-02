@@ -1817,6 +1817,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mcp-registry/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Browse/search the Docker MCP Registry catalog */
+        get: operations["McpRegistryController_getCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp-registry/catalog/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get details for a single registry server */
+        get: operations["McpRegistryController_getCatalogEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp-registry/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a registry server into the MCP Library */
+        post: operations["McpRegistryController_importServer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp-registry/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Trigger a manual registry sync */
+        post: operations["McpRegistryController_triggerSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mcp-registry/sync/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current registry sync status */
+        get: operations["McpRegistryController_getSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp/gateway": {
         parameters: {
             query?: never;
@@ -3535,6 +3620,104 @@ export interface components {
                 /** Format: date-time */
                 updatedAt: string;
             };
+        };
+        RegistryCatalogListResponseDto: {
+            data: {
+                name: string;
+                displayName: string;
+                description: string | null;
+                /** @enum {string} */
+                serverType: "server" | "remote";
+                category: string | null;
+                tags: string[];
+                iconUrl: string | null;
+                sourceUrl: string | null;
+                isFeatured: boolean;
+                hasSecrets: boolean;
+                hasOAuth: boolean;
+                isImported: boolean;
+            }[];
+            pagination: {
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            categories: string[];
+        };
+        RegistryCatalogDetailDto: {
+            name: string;
+            displayName: string;
+            description: string | null;
+            /** @enum {string} */
+            serverType: "server" | "remote";
+            category: string | null;
+            tags: string[];
+            iconUrl: string | null;
+            sourceUrl: string | null;
+            isFeatured: boolean;
+            hasSecrets: boolean;
+            hasOAuth: boolean;
+            isImported: boolean;
+            dockerImage: string | null;
+            remoteConfig: {
+                /** @enum {string} */
+                transportType: "streamable-http" | "sse";
+                url: string;
+                headers?: {
+                    [key: string]: string;
+                };
+            } | null;
+            configRequirements: {
+                /** @default [] */
+                secrets: {
+                    name: string;
+                    env: string;
+                    example?: string;
+                }[];
+                /** @default [] */
+                env: {
+                    name: string;
+                    example?: string;
+                    value?: string;
+                }[];
+            };
+            /** @default [] */
+            oauthProviders: {
+                provider: string;
+                secret?: string;
+                env?: string;
+            }[];
+            runConfig: {
+                command?: string[];
+                volumes?: string[];
+                env?: {
+                    [key: string]: string;
+                };
+            } | null;
+        };
+        RegistryImportRequestDto: {
+            registryName: string;
+            /** @default {} */
+            secrets: {
+                [key: string]: string;
+            };
+            /** @default {} */
+            envVars: {
+                [key: string]: string;
+            };
+            /** @default true */
+            enabled: boolean;
+            /** Format: uuid */
+            groupId?: string;
+        };
+        RegistryImportResponseDto: {
+            /** Format: uuid */
+            serverId: string;
+            serverName: string;
+            /** @enum {string} */
+            transportType: "http" | "stdio";
+            /** @enum {string} */
+            status: "imported" | "already_exists";
         };
         DiscoveryInputDto: {
             /**
@@ -7226,6 +7409,111 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ImportGroupTemplateResponseDto"];
                 };
+            };
+        };
+    };
+    McpRegistryController_getCatalog: {
+        parameters: {
+            query?: {
+                search?: string;
+                category?: string;
+                serverType?: "server" | "remote";
+                featured?: boolean;
+                tags?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCatalogListResponseDto"];
+                };
+            };
+        };
+    };
+    McpRegistryController_getCatalogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryCatalogDetailDto"];
+                };
+            };
+        };
+    };
+    McpRegistryController_importServer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistryImportRequestDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryImportResponseDto"];
+                };
+            };
+        };
+    };
+    McpRegistryController_triggerSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    McpRegistryController_getSyncStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

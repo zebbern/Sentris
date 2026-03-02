@@ -8,9 +8,10 @@ import { McpRegistryController } from './mcp-registry.controller';
 import { McpRegistryService } from './mcp-registry.service';
 import { McpRegistrySyncService } from './mcp-registry-sync.service';
 import { McpRegistryRepository } from './mcp-registry.repository';
+import { MCP_REGISTRY_REDIS } from './mcp-registry.constants';
 import type { RedisConfig } from '../config';
 
-export const MCP_REGISTRY_REDIS = 'MCP_REGISTRY_REDIS';
+export { MCP_REGISTRY_REDIS };
 
 @Module({
   imports: [DatabaseModule, McpServersModule],
