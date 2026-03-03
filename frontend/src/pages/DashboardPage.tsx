@@ -259,7 +259,7 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Page heading */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
       </div>
 
       {/* Onboarding checklist — shown for new users */}

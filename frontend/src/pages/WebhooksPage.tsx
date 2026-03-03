@@ -55,6 +55,7 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
 };
 
 const WEBHOOK_BASE_URL = env.VITE_API_URL || 'http://localhost:3211';
+const EMPTY_WORKFLOWS: { id: string; name: string }[] = [];
 
 export function WebhooksPage() {
   useDocumentTitle('Webhooks');
@@ -79,7 +80,11 @@ export function WebhooksPage() {
   const { data: webhooks = [], isLoading, error: webhooksError } = useWebhooks();
   const error = webhooksError?.message ?? null;
 
-  const { data: workflowsRaw = [], isLoading: workflowsLoading } = useWorkflowsSummary();
+  const { data: workflowsData, isLoading: workflowsLoading } = useWorkflowsSummary();
+  // Stabilise the reference so a query error (data === undefined) doesn't
+  // create a new [] on every render, which would cascade through useMemo deps
+  // and trigger an infinite re-render loop via useSortableList.
+  const workflowsRaw = workflowsData ?? EMPTY_WORKFLOWS;
   const workflowOptions: WorkflowOption[] = useMemo(
     () => workflowsRaw.map((w) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
     [workflowsRaw],

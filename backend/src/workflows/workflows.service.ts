@@ -537,12 +537,17 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     const workflowIds = filtered.map((r) => r.id);
     const tagsMap = await this.tagsRepository.getTagsByWorkflowIds(workflowIds);
 
+    // raw SQL (db.execute) returns timestamps as strings, not Date objects;
+    // normalise to ISO-8601 regardless of the runtime type.
+    const toISO = (v: Date | string): string =>
+      v instanceof Date ? v.toISOString() : new Date(v).toISOString();
+
     return filtered.map((record) => ({
       ...record,
-      lastRun: record.lastRun?.toISOString() ?? null,
+      lastRun: record.lastRun ? toISO(record.lastRun) : null,
       latestRunStatus: record.latestRunStatus ?? null,
-      createdAt: record.createdAt.toISOString(),
-      updatedAt: record.updatedAt.toISOString(),
+      createdAt: toISO(record.createdAt),
+      updatedAt: toISO(record.updatedAt),
       tags: tagsMap.get(record.id) ?? [],
     }));
   }

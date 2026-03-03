@@ -134,7 +134,7 @@ describe('DashboardPage', () => {
     it('renders heading during loading', () => {
       setup({ isLoading: true });
       renderPage();
-      expect(screen.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Dashboard', level: 2 })).toBeInTheDocument();
     });
 
     it('renders skeleton placeholders when isLoading', () => {
