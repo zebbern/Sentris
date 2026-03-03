@@ -451,8 +451,12 @@ export function normalizeAllFindings(
     try {
       const normalizer = NORMALIZER_MAP[node.componentId] ?? normalizeGeneric;
       findings.push(...normalizer(node.nodeRef, node.componentId, node.outputs));
-    } catch {
-      // Skip nodes whose output can't be normalized.
+    } catch (err) {
+      console.warn(
+        '[normalizeFindings] Failed to normalize node output',
+        { nodeRef: node.nodeRef, componentId: node.componentId },
+        err,
+      );
     }
   }
 
