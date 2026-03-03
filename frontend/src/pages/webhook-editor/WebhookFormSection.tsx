@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import Editor from '@monaco-editor/react';
+import { LazyMonacoEditor } from '@/components/editors/LazyMonacoEditor';
 import type { WebhookFormState, WorkflowOption, RuntimeInput } from './webhookEditorTypes';
 
 interface WebhookFormSectionProps {
@@ -62,7 +62,7 @@ export function WebhookFormSection({
           role="group"
           aria-label="Parsing Script"
         >
-          <Editor
+          <LazyMonacoEditor
             language="typescript"
             value={form.parsingScript}
             onChange={(v) => setForm((prev) => ({ ...prev, parsingScript: v || '' }))}

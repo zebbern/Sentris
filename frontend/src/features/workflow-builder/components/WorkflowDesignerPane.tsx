@@ -7,7 +7,7 @@ import type {
   NodeChange,
   EdgeChange,
 } from '@xyflow/react';
-import { Canvas } from '@/components/workflow/Canvas';
+import { LazyCanvas } from '@/components/workflow/LazyCanvas';
 import {
   WorkflowSchedulesSummaryBar,
   WorkflowSchedulesSidebar,
@@ -172,7 +172,7 @@ export function WorkflowDesignerPane({
               {summaryNode}
             </div>
           )}
-          <Canvas
+          <LazyCanvas
             className="flex-1 h-full relative"
             nodes={nodes}
             edges={edges}

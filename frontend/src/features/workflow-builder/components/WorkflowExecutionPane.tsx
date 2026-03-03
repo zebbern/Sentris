@@ -5,7 +5,7 @@ import type {
   NodeChange,
   EdgeChange,
 } from '@xyflow/react';
-import { Canvas } from '@/components/workflow/Canvas';
+import { LazyCanvas } from '@/components/workflow/LazyCanvas';
 import type { FrontendNodeData } from '@/schemas/node';
 
 type SetNodesFn = (setter: SetStateAction<ReactFlowNode<FrontendNodeData>[]>) => void;
@@ -35,7 +35,7 @@ export function WorkflowExecutionPane({
   return (
     <div className="flex-1 h-full relative">
       {overlay}
-      <Canvas
+      <LazyCanvas
         className="flex-1 h-full relative"
         nodes={nodes}
         edges={edges}
