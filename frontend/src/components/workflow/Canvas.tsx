@@ -33,7 +33,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
-import type { NodeData, FrontendNodeData } from '@/schemas/node';
+import type { NodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
@@ -99,7 +99,7 @@ export function Canvas({
   ...scheduleProps
 }: CanvasProps) {
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
-    Node<FrontendNodeData>
+    Node<NodeData>
   > | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
