@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { ArtifactsService } from '../artifacts.service';
@@ -174,6 +174,6 @@ describe('ArtifactsService', () => {
 
   // ── Organization context ──────────────────────────────────────────
   it('throws when organization context is missing', async () => {
-    await expect(service.listRunArtifacts(null, 'run-1')).rejects.toThrow(BadRequestException);
+    await expect(service.listRunArtifacts(null, 'run-1')).rejects.toThrow(ForbiddenException);
   });
 });
