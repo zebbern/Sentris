@@ -29,7 +29,12 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
         if (!connectionString) {
           throw new Error('DATABASE_URL is not set');
         }
-        return new Pool({ connectionString });
+        return new Pool({
+          connectionString,
+          max: Number(process.env.DB_POOL_MAX ?? 20),
+          idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? 30_000),
+          connectionTimeoutMillis: Number(process.env.DB_POOL_CONNECTION_TIMEOUT_MS ?? 10_000),
+        });
       },
       inject: [ConfigService],
     },

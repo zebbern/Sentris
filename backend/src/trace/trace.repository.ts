@@ -34,9 +34,12 @@ export class TraceRepository implements OnModuleDestroy {
     private readonly db: NodePgDatabase,
     private readonly configService: ConfigService,
   ) {
-    // Create a separate pool for LISTEN/NOTIFY to avoid conflicts
+    // Separate pool for LISTEN/NOTIFY — keep small since SSE clients hold connections open
     this.pool = new Pool({
       connectionString: this.configService.get<string>('database.connectionString'),
+      max: 5,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
     });
   }
 
@@ -51,6 +54,10 @@ export class TraceRepository implements OnModuleDestroy {
     runId: string,
     callback: (payload: string) => void,
   ): Promise<() => Promise<void>> {
+    // Validate runId to prevent SQL injection via LISTEN channel name
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
+      throw new Error(`Invalid runId format: expected UUID, got "${runId}"`);
+    }
     const client = await this.pool.connect();
     const channel = `trace_events_${runId}`;
 
@@ -81,6 +88,10 @@ export class TraceRepository implements OnModuleDestroy {
    * Notify subscribers of new trace events
    */
   async notifyRun(runId: string, payload: string): Promise<void> {
+    // Validate runId to prevent SQL injection via channel name
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
+      throw new Error(`Invalid runId format: expected UUID, got "${runId}"`);
+    }
     const channel = `trace_events_${runId}`;
     await this.pool.query('SELECT pg_notify($1, $2)', [channel, payload]);
   }

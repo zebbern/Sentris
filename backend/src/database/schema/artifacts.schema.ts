@@ -24,6 +24,7 @@ export const artifactsTable = pgTable(
   },
   (table) => ({
     runIdx: index('artifacts_run_idx').on(table.runId, table.createdAt),
+    orgIdx: index('artifacts_organization_id_idx').on(table.organizationId),
   }),
 );
 
