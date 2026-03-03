@@ -68,6 +68,7 @@ Once complete, visit **http://localhost** to access Sentris Flow.
 
 - **Logs**: Real-time execution logs
 - **Results**: Output data and results
+- **Findings**: Aggregated security findings from all workflow nodes
 - **History**: Previous workflow executions
 
 ## Workflows
@@ -89,7 +90,7 @@ Once complete, visit **http://localhost** to access Sentris Flow.
    - Retry settings
    - Resource limits
 3. Monitor execution in real-time via the logs panel
-4. View results in the Results panel when complete
+4. View results in the Results panel when complete. Security scan findings are available in the **Findings** tab
 
 ### Saving and Sharing
 
@@ -226,6 +227,17 @@ Publish a workflow as a community template using the 4-step wizard in the workfl
 4. **Done** — Confirmation with a link to the PR
 
 The wizard auto-detects whether the workflow matches an existing template and offers to update it.
+
+### Findings Panel
+
+The **Findings** tab in the bottom panel aggregates security findings from all nodes in a workflow run. You can:
+
+- **Filter by severity** — Use the severity pills (Critical, High, Medium, Low, Info) to narrow results.
+- **Filter by source** — Select a specific source node from the dropdown.
+- **Export to CSV** — Download the filtered findings as a CSV file.
+- **Export to Markdown** — Download a formatted Markdown report with severity summary and grouped findings.
+
+When the finding count exceeds 500, the table is truncated for performance. Click **Show All** to display the full list.
 
 ### Human-in-the-Loop
 
