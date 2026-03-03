@@ -30,6 +30,7 @@ export const queryKeys = {
     serversRoot: () => ['mcpGroupServers', getOrgScope()] as const,
     servers: (groupId: string) => ['mcpGroupServers', getOrgScope(), groupId] as const,
     templates: () => ['mcpGroupTemplates', getOrgScope()] as const,
+    withServers: () => [...queryKeys.mcpGroups.all(), 'withServers'] as const,
   },
   integrations: {
     providers: () => ['integrationProviders', getOrgScope()] as const,

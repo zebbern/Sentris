@@ -125,7 +125,7 @@ describe('CommandGroup', () => {
       />,
     );
 
-    const buttons = screen.getAllByRole('button');
+    const buttons = screen.getAllByRole('option');
     expect(buttons[0].dataset.selected).toBe('false');
     expect(buttons[1].dataset.selected).toBe('true');
   });

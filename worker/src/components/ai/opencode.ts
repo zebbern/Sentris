@@ -101,7 +101,7 @@ const definition = defineComponent({
     kind: 'docker',
     image: 'ghcr.io/zebbern/opencode:latest',
     entrypoint: 'opencode', // We will override this in execution
-    network: 'host' as const, // Required to access localhost gateway
+    network: 'bridge' as const, // Use bridge network; containers can reach host via host.docker.internal
     command: ['help'],
   },
   inputs: inputSchema,
@@ -159,7 +159,7 @@ const definition = defineComponent({
     };
 
     // 2. Prepare opencode.json config
-    // Note: We use 'host' networking, so we can reach localhost
+    // Note: We use bridge networking; container reaches host via host.docker.internal
     // Correct format from https://opencode.ai/docs/mcp-servers/
     // CRITICAL: oauth: false is required for custom headers (OAuth is auto-detected as default in v1.0.137+)
     // See: https://github.com/anomalyco/opencode/issues/5278
@@ -278,8 +278,8 @@ Please investigate the issue and generate a detailed report.
         // The command will be executed as: /bin/sh /workspace/run.sh
         entrypoint: '/bin/sh',
         command: ['/workspace/run.sh'],
-        // Use host network to access localhost gateway
-        network: 'host' as const,
+        // Use bridge network; container reaches host via host.docker.internal
+        network: 'bridge' as const,
         env: providerEnv,
         volumes: [
           volume.getVolumeConfig('/workspace', false), // Read-write, mounted at /workspace
@@ -287,9 +287,7 @@ Please investigate the issue and generate a detailed report.
         workingDir: '/workspace',
       };
 
-      // If we are using host network, we might need to handle port collisions or security?
-      // For a worker, allow host network is a privileged operation.
-      // Assumption: The worker environment allows this / is trusted.
+      // Bridge networking is used — the container can reach the host via host.docker.internal.
 
       context.emitProgress({
         message: 'Running OpenCode agent...',

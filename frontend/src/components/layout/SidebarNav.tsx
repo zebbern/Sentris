@@ -97,6 +97,7 @@ export function SidebarNav({
                 <li key={item.href}>
                   <Link
                     to={item.href}
+                    aria-current={active ? 'page' : undefined}
                     onMouseEnter={() => prefetchRoute(item.href)}
                     onClick={(e) => {
                       if (e.metaKey || e.ctrlKey || e.shiftKey) return;
@@ -169,6 +170,7 @@ export function SidebarNav({
                   <li key={item.href}>
                     <Link
                       to={item.href}
+                      aria-current={active ? 'page' : undefined}
                       onMouseEnter={() => prefetchRoute(item.href)}
                       onClick={(e) => {
                         if (e.metaKey || e.ctrlKey || e.shiftKey) return;

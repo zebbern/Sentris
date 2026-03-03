@@ -181,7 +181,7 @@ export function LeanSelect({
                 />
               </div>
 
-              <div className="overflow-auto flex-1 py-1 custom-scrollbar">
+              <div className="overflow-auto flex-1 py-1 custom-scrollbar" role="listbox">
                 {loading && options.length === 0 ? (
                   <div className="px-3 py-10 text-sm text-muted-foreground text-center animate-pulse">
                     Loading...
@@ -209,6 +209,8 @@ export function LeanSelect({
                       <button
                         key={String(option.value)}
                         type="button"
+                        role="option"
+                        aria-selected={value === option.value}
                         onClick={() => handleSelect(option.value)}
                         className={cn(
                           'w-full px-3 py-2.5 text-sm text-left hover:bg-primary/5 transition-all flex flex-col gap-0.5 group/item',
@@ -274,7 +276,11 @@ export function LeanSelect({
 
           {/* Backdrop for closing */}
           {createPortal(
-            <div className="fixed inset-0 z-[900]" onClick={() => setIsOpen(false)} />,
+            <div
+              className="fixed inset-0 z-[900]"
+              aria-hidden="true"
+              onClick={() => setIsOpen(false)}
+            />,
             document.body,
           )}
         </>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface WorkflowMetadata {
+export interface WorkflowMetadata {
   id: string | null;
   name: string;
   description: string;

@@ -124,6 +124,9 @@ async function runComponentInDocker<I, O>(
   context: ExecutionContext,
 ): Promise<O> {
   const { image, command, entrypoint, env = {}, network = 'none', platform, containerName, volumes, timeoutSeconds = 300, detached } = runner;
+  const memoryLimit = runner.memoryLimit ?? '512m';
+  const cpuLimit = runner.cpuLimit ?? '1';
+  const pidsLimit = runner.pidsLimit ?? 256;
 
   context.logger.info(`[Docker] Running ${image} with command: ${formatArgs(command)}`);
   context.emitProgress(`Starting Docker container: ${image}`);
@@ -142,6 +145,9 @@ async function runComponentInDocker<I, O>(
       '--rm',
       '-i',
       '--network', network,
+      '--memory', memoryLimit,
+      '--cpus', cpuLimit,
+      '--pids-limit', String(pidsLimit),
       '--label', `sentris.runId=${context.runId}`,
       '--label', `sentris.nodeRef=${context.componentRef}`,
       // Mount the directory containing both input and output

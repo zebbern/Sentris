@@ -54,8 +54,11 @@ export interface MinioServices {
 export function createMinioClient(): MinioServices {
   const endPoint = process.env.MINIO_ENDPOINT ?? 'localhost';
   const port = parseInt(process.env.MINIO_PORT ?? '9000', 10);
-  const accessKey = process.env.MINIO_ACCESS_KEY ?? 'minioadmin';
-  const secretKey = process.env.MINIO_SECRET_KEY ?? 'minioadmin';
+  const accessKey = process.env.MINIO_ACCESS_KEY;
+  const secretKey = process.env.MINIO_SECRET_KEY;
+  if (!accessKey || !secretKey) {
+    throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY environment variables are required');
+  }
   const useSSL = process.env.MINIO_USE_SSL === 'true';
   const bucketName = process.env.MINIO_BUCKET_NAME ?? 'sentris-files';
 

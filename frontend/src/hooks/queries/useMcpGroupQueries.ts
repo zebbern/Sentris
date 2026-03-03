@@ -13,7 +13,7 @@ export function useMcpGroups() {
 /** Fetch groups with embedded servers — avoids N+1 per-group server queries */
 export function useMcpGroupsWithServers() {
   return useQuery({
-    queryKey: [...queryKeys.mcpGroups.all(), 'withServers'] as const,
+    queryKey: queryKeys.mcpGroups.withServers(),
     queryFn: () => mcpGroupsApi.listGroupsWithServers(),
     staleTime: 30_000,
   });

@@ -1,8 +1,12 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-const Sidebar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function Sidebar({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
+  return (
     <aside
       ref={ref}
       className={cn(
@@ -13,12 +17,15 @@ const Sidebar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEle
       )}
       {...props}
     />
-  ),
-);
-Sidebar.displayName = 'Sidebar';
+  );
+}
 
-const SidebarHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function SidebarHeader({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
+  return (
     <div
       ref={ref}
       className={cn(
@@ -27,19 +34,23 @@ const SidebarHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
       )}
       {...props}
     />
-  ),
-);
-SidebarHeader.displayName = 'SidebarHeader';
+  );
+}
 
-const SidebarFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('border-t p-2 mt-auto', className)} {...props} />
-  ),
-);
-SidebarFooter.displayName = 'SidebarFooter';
+function SidebarFooter({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
+  return <div ref={ref} className={cn('border-t p-2 mt-auto', className)} {...props} />;
+}
 
-const SidebarContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+function SidebarContent({
+  className,
+  ref,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { ref?: React.Ref<HTMLDivElement> }) {
+  return (
     <div
       ref={ref}
       className={cn(
@@ -50,31 +61,34 @@ const SidebarContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
       )}
       {...props}
     />
-  ),
-);
-SidebarContent.displayName = 'SidebarContent';
+  );
+}
 
-const SidebarItem = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    isActive?: boolean;
-  }
->(({ className, isActive, ...props }, ref) => (
-  <button
-    ref={ref}
-    className={cn(
-      'flex w-full items-center gap-3 px-3 py-2.5 md:py-2 text-left rounded-lg text-sm font-medium',
-      'transition-colors duration-150',
-      'hover:bg-accent hover:text-accent-foreground',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-      // Touch-friendly sizing on mobile
-      'min-h-[44px] md:min-h-0',
-      isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
-      className,
-    )}
-    {...props}
-  />
-));
-SidebarItem.displayName = 'SidebarItem';
+function SidebarItem({
+  className,
+  isActive,
+  ref,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  isActive?: boolean;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
+  return (
+    <button
+      ref={ref}
+      className={cn(
+        'flex w-full items-center gap-3 px-3 py-2.5 md:py-2 text-left rounded-lg text-sm font-medium',
+        'transition-colors duration-150',
+        'hover:bg-accent hover:text-accent-foreground',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        // Touch-friendly sizing on mobile
+        'min-h-[44px] md:min-h-0',
+        isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
 
 export { Sidebar, SidebarHeader, SidebarFooter, SidebarContent, SidebarItem };

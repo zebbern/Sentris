@@ -94,7 +94,7 @@ describe('sentris.opencode.agent', () => {
     expect(runSpy).toHaveBeenCalled();
     const runnerCall = runSpy.mock.calls[0][0];
     expect(runnerCall.image).toBe('ghcr.io/zebbern/opencode:latest');
-    expect(runnerCall.network).toBe('host');
+    expect(runnerCall.network).toBe('bridge');
     expect(runnerCall.env.OPENAI_API_KEY).toBe('sk-test');
   });
 

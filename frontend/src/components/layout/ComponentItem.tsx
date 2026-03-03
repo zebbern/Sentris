@@ -59,9 +59,12 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
   if (viewMode === 'list') {
     return (
       <div
+        role="button"
+        tabIndex={disabled || component.deprecated ? -1 : 0}
         className={cn(
           'group relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all',
           'hover:bg-muted/50 border border-border/30 hover:border-border/60',
+          'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
           'md:cursor-move', // Desktop: show move cursor
           disabled ? 'cursor-not-allowed opacity-50' : '',
           component.deprecated && 'opacity-50',
@@ -70,6 +73,13 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
         draggable={!component.deprecated && !disabled}
         onDragStart={onDragStart}
         onClick={handleTap}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleTap();
+          }
+        }}
+        aria-label={`Add ${component.name} component`}
       >
         {/* Icon */}
         <div className="flex-shrink-0">
@@ -112,10 +122,13 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
   // Tile view
   return (
     <div
+      role="button"
+      tabIndex={disabled || component.deprecated ? -1 : 0}
       className={cn(
         'group relative flex flex-col p-3 border border-border/50 rounded-lg cursor-pointer transition-all',
         'bg-background/50 hover:bg-background hover:border-border',
         'text-foreground aspect-[4/3]',
+        'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
         'md:cursor-move', // Desktop: show move cursor
         disabled ? 'cursor-not-allowed opacity-50' : 'hover:shadow-sm hover:scale-[1.02]',
         component.deprecated && 'opacity-50',
@@ -124,6 +137,13 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
       draggable={!component.deprecated && !disabled}
       onDragStart={onDragStart}
       onClick={handleTap}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleTap();
+        }
+      }}
+      aria-label={`Add ${component.name} component`}
     >
       {/* Default: Centered icon and name */}
       <div className="flex flex-col items-center justify-center gap-2 flex-1 group-hover:hidden transition-all">
