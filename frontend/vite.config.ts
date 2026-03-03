@@ -76,9 +76,13 @@ export default defineConfig({
           // Analytics
           if (id.includes('posthog-js')) return 'vendor-analytics';
 
+          // Auth
+          if (id.includes('@clerk')) return 'vendor-clerk';
+
           // Heavy vendor chunks — split to enable parallel loading
           if (id.includes('monaco-editor')) return 'vendor-monaco';
-          if (id.includes('@reactflow') || id.includes('reactflow')) return 'vendor-reactflow';
+          if (id.includes('@xyflow') || id.includes('@reactflow') || id.includes('reactflow'))
+            return 'vendor-reactflow';
           if (id.includes('xterm')) return 'vendor-xterm';
           if (id.includes('@dnd-kit')) return 'vendor-dnd';
         },
