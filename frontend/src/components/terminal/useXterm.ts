@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Terminal } from 'xterm';
-import type { FitAddon } from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
+import type { Terminal } from '@xterm/xterm';
+import type { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 import { useThemeStore } from '@/store/themeStore';
 import { logger } from '@/lib/logger';
 import { TERMINAL_THEME, generateSelectionCSS } from './terminal-utils';
@@ -47,8 +47,8 @@ export function useXterm(terminalKey: number): UseXtermResult {
 
       try {
         const [xtermModule, fitModule] = await Promise.all([
-          import('xterm'),
-          import('xterm-addon-fit'),
+          import('@xterm/xterm'),
+          import('@xterm/addon-fit'),
         ]);
         XtermTerminal = xtermModule.Terminal;
         XtermFitAddon = fitModule.FitAddon;
