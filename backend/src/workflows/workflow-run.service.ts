@@ -781,7 +781,15 @@ export class WorkflowRunService {
     run: WorkflowRunRecord,
     organizationId: string,
   ): Promise<WorkflowRunSummary> {
-    const workflow = await this.repository.findById(run.workflowId, { organizationId });
+    const [workflow, startedActions, completedActions, failedActions, eventTimeRange] =
+      await Promise.all([
+        this.repository.findById(run.workflowId, { organizationId }),
+        this.traceRepository.countByType(run.runId, 'NODE_STARTED', organizationId),
+        this.traceRepository.countByType(run.runId, 'NODE_COMPLETED', organizationId),
+        this.traceRepository.countByType(run.runId, 'NODE_FAILED', organizationId),
+        this.traceRepository.getEventTimeRange(run.runId, organizationId),
+      ]);
+
     const workflowName = workflow?.name ?? 'Unknown Workflow';
     const version = run.workflowVersionId
       ? await this.versionRepository.findById(run.workflowVersionId, { organizationId })
@@ -790,14 +798,6 @@ export class WorkflowRunService {
         : undefined;
     const graph = (version?.graph ?? workflow?.graph) as { nodes?: unknown[] } | undefined;
     const nodeCount = graph?.nodes && Array.isArray(graph.nodes) ? graph.nodes.length : 0;
-
-    const [startedActions, completedActions, failedActions] = await Promise.all([
-      this.traceRepository.countByType(run.runId, 'NODE_STARTED', organizationId),
-      this.traceRepository.countByType(run.runId, 'NODE_COMPLETED', organizationId),
-      this.traceRepository.countByType(run.runId, 'NODE_FAILED', organizationId),
-    ]);
-
-    const eventTimeRange = await this.traceRepository.getEventTimeRange(run.runId, organizationId);
     const duration =
       eventTimeRange.firstTimestamp && eventTimeRange.lastTimestamp
         ? this.computeDuration(eventTimeRange.firstTimestamp, eventTimeRange.lastTimestamp)

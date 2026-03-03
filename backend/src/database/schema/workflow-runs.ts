@@ -50,6 +50,11 @@ export const workflowRunsTable = pgTable(
       table.parentRunId,
       table.createdAt,
     ),
+    orgStatusCreatedAtIdx: index('workflow_runs_org_status_created_at_idx').on(
+      table.organizationId,
+      table.status,
+      table.createdAt,
+    ),
   }),
 );
 
