@@ -99,3 +99,22 @@ Status badges use these colors for visual distinction:
 - **Amber** (warning): `TIMED_OUT`, `STALE`
 - **Gray** (neutral): `CANCELLED`, `TERMINATED`
 - **Purple** (attention): `AWAITING_INPUT`
+
+## Auto-Focus on Completion
+
+When a workflow run transitions from a non-terminal status (such as `RUNNING`) to a terminal status (`COMPLETED`, `FAILED`, `CANCELLED`, `TERMINATED`, or `TIMED_OUT`), the inspector automatically switches to the most relevant tab and selects the most relevant node in the timeline.
+
+### Tab selection priority
+
+1. **Artifacts** — If the run produced artifacts, the Artifacts tab opens and the first artifact-producing node is selected.
+2. **Agent** — If the run contains agent trace data, the Agent tab opens and the first AI node is selected.
+3. **Logs** — If the run failed, was terminated, or timed out, the Logs tab opens and the first failing node is selected.
+4. **Input/Output** — For all other completed runs, the I/O tab opens and the last node is selected.
+
+### Overriding auto-focus
+
+If you manually switch tabs while the workflow is still running, auto-focus is disabled for that run. Your tab selection is preserved when the run completes.
+
+Auto-focus only triggers on a live status transition. Navigating to an already-completed run does not trigger it.
+
+A screen reader announcement is emitted when auto-focus activates (e.g., "Run completed — switched to Logs tab").
