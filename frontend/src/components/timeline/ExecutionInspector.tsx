@@ -5,7 +5,7 @@ import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
 import { Button } from '@/components/ui/button';
 import { MessageModal } from '@/components/ui/MessageModal';
-import { StopCircle, RefreshCw, Link2, Globe, Loader2 } from 'lucide-react';
+import { StopCircle, RefreshCw, Link2, Globe, Loader2, FileSearch } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { logger } from '@/lib/logger';
@@ -22,10 +22,16 @@ import { RunArtifactsPanel } from '@/components/artifacts/RunArtifactsPanel';
 import { AgentTracePanel } from '@/components/timeline/AgentTracePanel';
 import { NodeIOInspector } from '@/components/timeline/NodeIOInspector';
 import { NetworkPanel } from '@/components/timeline/NetworkPanel';
+import { FindingsPanel } from '@/components/timeline/FindingsPanel';
 import { getTriggerDisplay } from '@/utils/triggerDisplay';
 import { ExecutionTabs } from '@/components/execution/ExecutionTabs';
 import { RunInfoDisplay } from '@/components/timeline/RunInfoDisplay';
+import { RunResultsSummary } from '@/components/timeline/RunResultsSummary';
 import { isRunLive } from '@/features/workflow-builder/utils/executionRuns';
+import { useAutoFocusOnCompletion } from '@/hooks/useAutoFocusOnCompletion';
+import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
+import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
+import { TERMINAL_STATUSES } from '@sentris/shared';
 
 const formatTime = (timestamp: string) => {
   const date = new Date(timestamp);
@@ -121,6 +127,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
   const [logLevelFilter, setLogLevelFilter] = useState<LogLevelFilter>('all');
   const [timelineHeight, setTimelineHeight] = useState(DEFAULT_TIMELINE_HEIGHT);
   const isResizingTimeline = useRef(false);
+  const userOverrodeTab = useRef(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const rawLogs = getDisplayLogs();
   const navigate = useNavigate();
@@ -202,6 +209,47 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
   const triggerDisplay = selectedRun
     ? getTriggerDisplay(selectedRun.triggerType, selectedRun.triggerLabel)
     : null;
+
+  // --- Auto-focus: switch to the most relevant tab on run completion ---
+  const { data: nodeIOData } = useExecutionNodeIO(selectedRunId);
+  const { data: runArtifacts } = useRunArtifacts(selectedRunId ?? undefined);
+
+  const hasAgentTrace = useMemo(() => {
+    const nodes = nodeIOData?.nodes ?? [];
+    return nodes.some((n: { componentId?: string }) =>
+      (n.componentId ?? '').startsWith('core.ai.'),
+    );
+  }, [nodeIOData]);
+
+  const selectNode = useExecutionTimelineStore((s) => s.selectNode);
+
+  useAutoFocusOnCompletion({
+    selectedRunId,
+    runStatus: selectedRun?.status,
+    nodeIOData: nodeIOData as
+      | {
+          nodes: {
+            nodeRef: string;
+            componentId: string;
+            status: string;
+            outputs: Record<string, unknown> | null;
+          }[];
+        }
+      | undefined,
+    artifactCount: runArtifacts?.length ?? 0,
+    hasAgentTrace,
+    setInspectorTab,
+    selectNode,
+    userOverrodeTab,
+  });
+
+  const handleTabClick = useCallback(
+    (tab: typeof inspectorTab) => {
+      userOverrodeTab.current = true;
+      setInspectorTab(tab);
+    },
+    [setInspectorTab],
+  );
 
   const handleCopyLink = useCallback(async () => {
     if (!selectedRun) return;
@@ -319,6 +367,11 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             </div>
           </div>
         )}
+        {/* Run Results Summary Banner — only for terminal runs */}
+        {selectedRun && TERMINAL_STATUSES.includes(selectedRun.status) && (
+          <RunResultsSummary runId={selectedRunId!} selectedRun={selectedRun} />
+        )}
+
         {!selectedRun && (
           <div className="px-3 py-4 border-b text-xs text-muted-foreground text-center">
             {routeRunId && runLoadTimedOut ? (
@@ -384,7 +437,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
               variant={inspectorTab === 'events' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs"
-              onClick={() => setInspectorTab('events')}
+              onClick={() => handleTabClick('events')}
             >
               Events
             </Button>
@@ -392,7 +445,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
               variant={inspectorTab === 'logs' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs"
-              onClick={() => setInspectorTab('logs')}
+              onClick={() => handleTabClick('logs')}
             >
               Logs
             </Button>
@@ -400,7 +453,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
               variant={inspectorTab === 'agent' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs"
-              onClick={() => setInspectorTab('agent')}
+              onClick={() => handleTabClick('agent')}
             >
               Agent
             </Button>
@@ -408,7 +461,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
               variant={inspectorTab === 'artifacts' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs"
-              onClick={() => setInspectorTab('artifacts')}
+              onClick={() => handleTabClick('artifacts')}
             >
               Artifacts
             </Button>
@@ -416,15 +469,24 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
               variant={inspectorTab === 'io' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs"
-              onClick={() => setInspectorTab('io')}
+              onClick={() => handleTabClick('io')}
             >
               I/O
+            </Button>
+            <Button
+              variant={inspectorTab === 'findings' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-6 px-2.5 text-xs gap-1"
+              onClick={() => handleTabClick('findings')}
+            >
+              <FileSearch className="h-3 w-3" />
+              Findings
             </Button>
             <Button
               variant={inspectorTab === 'network' ? 'default' : 'ghost'}
               size="sm"
               className="h-6 px-2.5 text-xs gap-1"
-              onClick={() => setInspectorTab('network')}
+              onClick={() => handleTabClick('network')}
             >
               <Globe className="h-3 w-3" />
               Network
@@ -581,6 +643,8 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
           {inspectorTab === 'agent' && <AgentTracePanel runId={selectedRunId ?? null} />}
 
           {inspectorTab === 'io' && <NodeIOInspector />}
+
+          {inspectorTab === 'findings' && <FindingsPanel runId={selectedRunId ?? null} />}
 
           {inspectorTab === 'network' && <NetworkPanel />}
         </div>
