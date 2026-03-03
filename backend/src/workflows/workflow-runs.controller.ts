@@ -8,7 +8,7 @@ import {
   TemporalRunQueryDto,
   TemporalRunQuerySchema,
 } from './dto/workflow-graph.dto';
-import { WorkflowsService } from './workflows.service';
+import { WorkflowRunService } from './workflow-run.service';
 import { TerminalArchiveService } from './terminal-archive.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
@@ -37,7 +37,7 @@ export class WorkflowRunsController {
   private readonly logger = new Logger(WorkflowRunsController.name);
 
   constructor(
-    private readonly workflowsService: WorkflowsService,
+    private readonly workflowRunService: WorkflowRunService,
     private readonly terminalArchiveService: TerminalArchiveService,
   ) {}
 
@@ -110,7 +110,7 @@ export class WorkflowRunsController {
     @CurrentAuth() auth: AuthContext | null,
     @Query(new ZodValidationPipe(ListRunsQuerySchema)) query: ListRunsQueryDto,
   ) {
-    return this.workflowsService.listRuns(auth, {
+    return this.workflowRunService.listRuns(auth, {
       workflowId: query.workflowId,
       status: query.status,
       limit: query.limit,
@@ -176,7 +176,7 @@ export class WorkflowRunsController {
     },
   })
   async getRun(@CurrentAuth() auth: AuthContext | null, @Param('runId') runId: string) {
-    return this.workflowsService.getRun(runId, auth);
+    return this.workflowRunService.getRun(runId, auth);
   }
 
   @Get('/runs/:runId/children')
@@ -205,7 +205,7 @@ export class WorkflowRunsController {
     },
   })
   async listChildRuns(@CurrentAuth() auth: AuthContext | null, @Param('runId') runId: string) {
-    return this.workflowsService.listChildRuns(runId, auth);
+    return this.workflowRunService.listChildRuns(runId, auth);
   }
 
   @Get('/runs/:runId/status')
@@ -218,7 +218,7 @@ export class WorkflowRunsController {
     @Query(new ZodValidationPipe(TemporalRunQuerySchema)) query: TemporalRunQueryDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
-    const result = await this.workflowsService.getRunStatus(runId, query.temporalRunId, auth);
+    const result = await this.workflowRunService.getRunStatus(runId, query.temporalRunId, auth);
     if (TERMINAL_COMPLETION_STATUSES.has(result.status)) {
       this.terminalArchiveService.archiveRun(auth, runId).catch((error) => {
         this.logger.warn(`Failed to archive terminal after status fetch for run ${runId}`, error);
@@ -237,7 +237,7 @@ export class WorkflowRunsController {
     @Query(new ZodValidationPipe(TemporalRunQuerySchema)) query: TemporalRunQueryDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
-    const result = await this.workflowsService.getRunResult(runId, query.temporalRunId, auth);
+    const result = await this.workflowRunService.getRunResult(runId, query.temporalRunId, auth);
     return { runId, result };
   }
 
@@ -248,7 +248,7 @@ export class WorkflowRunsController {
     schema: runConfigSchema,
   })
   async config(@Param('runId') runId: string, @CurrentAuth() auth: AuthContext | null) {
-    return this.workflowsService.getRunConfig(runId, auth);
+    return this.workflowRunService.getRunConfig(runId, auth);
   }
 
   @Post('/runs/:runId/cancel')
@@ -261,7 +261,7 @@ export class WorkflowRunsController {
     @Query(new ZodValidationPipe(TemporalRunQuerySchema)) query: TemporalRunQueryDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
-    await this.workflowsService.cancelRun(runId, query.temporalRunId, auth);
+    await this.workflowRunService.cancelRun(runId, query.temporalRunId, auth);
     return { status: 'cancelled', runId };
   }
 }

@@ -5,6 +5,8 @@ import { WorkflowRunService } from '../workflow-run.service';
 import type { PreparedRunPayload } from '../workflow-run.service';
 import type { WorkflowRepository } from '../repository/workflow.repository';
 import type { WorkflowRunRepository } from '../repository/workflow-run.repository';
+import type { WorkflowVersionRepository } from '../repository/workflow-version.repository';
+import type { TraceRepository } from '../../trace/trace.repository';
 import type { TemporalService } from '../../temporal/temporal.service';
 import type { AnalyticsService } from '../../analytics/analytics.service';
 import type { AuditLogService } from '../../audit/audit-log.service';
@@ -163,6 +165,8 @@ describe('WorkflowRunService', () => {
     service = new WorkflowRunService(
       workflowRepo as unknown as WorkflowRepository,
       runRepo as unknown as WorkflowRunRepository,
+      {} as unknown as WorkflowVersionRepository,
+      {} as unknown as TraceRepository,
       temporalSvc as unknown as TemporalService,
       analyticsSvc as unknown as AnalyticsService,
       auditLogSvc as unknown as AuditLogService,

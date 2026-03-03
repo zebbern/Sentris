@@ -6,12 +6,12 @@ import type { ExecutionTriggerMetadata } from '@sentris/shared';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 import { PrepareRunRequestDto, PrepareRunRequestSchema } from './dto/workflow-graph.dto';
-import { WorkflowsService } from './workflows.service';
+import { WorkflowRunService } from './workflow-run.service';
 
 @ApiExcludeController()
 @Controller('internal/runs')
 export class InternalRunsController {
-  constructor(private readonly workflowsService: WorkflowsService) {}
+  constructor(private readonly workflowRunService: WorkflowRunService) {}
 
   @Post()
   async prepareRun(
@@ -28,7 +28,7 @@ export class InternalRunsController {
         label: 'Internal run request',
       } satisfies ExecutionTriggerMetadata);
 
-    const prepared = await this.workflowsService.prepareRunPayload(
+    const prepared = await this.workflowRunService.prepareRunPayload(
       body.workflowId,
       {
         inputs: body.inputs,

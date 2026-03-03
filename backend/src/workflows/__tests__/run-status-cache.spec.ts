@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { TERMINAL_STATUSES } from '@sentris/shared';
-import { WorkflowsService } from '../workflows.service';
+import { WorkflowRunService } from '../workflow-run.service';
 import type { WorkflowRunRepository } from '../repository/workflow-run.repository';
 import type { TemporalService } from '../../temporal/temporal.service';
 import type { AuthRole } from '../../auth/types';
@@ -62,7 +62,7 @@ class NotFoundError extends Error {
 }
 
 describe('Run status caching', () => {
-  let service: WorkflowsService;
+  let service: WorkflowRunService;
   let describeWorkflowFn: ReturnType<typeof mock>;
   let cacheTerminalStatusFn: ReturnType<typeof mock>;
   let hasPendingInputsFn: ReturnType<typeof mock>;
@@ -137,7 +137,7 @@ describe('Run status caching', () => {
       list: mock(() => Promise.resolve([])),
     };
 
-    const roleRepositoryMock = {
+    const _roleRepositoryMock = {
       findByWorkflowAndUser: mock(() => Promise.resolve({ role: 'ADMIN' })),
       upsert: mock(() => Promise.resolve()),
     };
@@ -148,11 +148,10 @@ describe('Run status caching', () => {
       trackWorkflowCancelled: mock(() => {}),
     };
 
-    service = new WorkflowsService(
+    service = new WorkflowRunService(
       repositoryMock as any,
-      roleRepositoryMock as any,
-      versionRepositoryMock as any,
       runRepositoryMock,
+      versionRepositoryMock as any,
       traceRepositoryMock as any,
       temporalServiceMock,
       analyticsServiceMock as any,
