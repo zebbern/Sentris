@@ -11,9 +11,9 @@ export interface DockedTerminal {
   status: 'idle' | 'running' | 'completed' | 'failed';
 }
 
-interface WorkflowUiState {
+export interface WorkflowUiState {
   mode: WorkflowMode;
-  inspectorTab: 'events' | 'logs' | 'artifacts' | 'agent' | 'io' | 'network';
+  inspectorTab: 'events' | 'logs' | 'artifacts' | 'agent' | 'io' | 'network' | 'findings';
   libraryOpen: boolean;
   inspectorWidth: number;
   showDemoComponents: boolean;
