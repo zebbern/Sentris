@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Mail, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from './button';
 
