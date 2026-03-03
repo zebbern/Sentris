@@ -7,6 +7,7 @@ import { TraceService } from '../../trace/trace.service';
 import { WorkflowGraphDto, WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { WorkflowRecord, WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
+import { WorkflowRunService } from '../workflow-run.service';
 import { WorkflowVersionService } from '../workflow-version.service';
 import { WorkflowsController } from '../workflows.controller';
 import { WorkflowRunsController } from '../workflow-runs.controller';
@@ -404,17 +405,26 @@ describe('WorkflowsController', () => {
       versionRepositoryStub as any,
       auditLogMock,
     );
+    const workflowRunService = new WorkflowRunService(
+      repositoryStub as any,
+      runRepositoryStub as any,
+      versionRepositoryStub as any,
+      traceRepositoryStub as any,
+      temporalStub as TemporalService,
+      analyticsServiceMock as any,
+      auditLogMock,
+      workflowVersionService,
+    );
     const workflowsService = new WorkflowsService(
       repositoryStub as WorkflowRepository,
       workflowRoleRepositoryStub as any,
       versionRepositoryStub as any,
       runRepositoryStub as any,
-      traceRepositoryStub as any,
       temporalStub as TemporalService,
-      analyticsServiceMock as any,
       auditLogMock,
       {} as any,
       workflowVersionService,
+      workflowRunService,
     );
     const traceService = new TraceService({
       listByRunId: async () => [],
@@ -455,9 +465,24 @@ describe('WorkflowsController', () => {
       getNodeIO: vi.fn().mockResolvedValue(null),
     };
     controller = new WorkflowsController(workflowsService, {} as any, workflowVersionService, {
-      get: () => undefined,
+      get: (key: string) => {
+        if (key === 'app') return { nodeEnv: 'test' };
+        return undefined;
+      },
     } as any);
-    runsController = new WorkflowRunsController(workflowsService, terminalArchiveService as any);
+    runsController = new WorkflowRunsController(
+      new WorkflowRunService(
+        repositoryStub as any,
+        runRepositoryStub as any,
+        versionRepositoryStub as any,
+        traceRepositoryStub as any,
+        temporalStub as TemporalService,
+        analyticsServiceMock as any,
+        auditLogMock,
+        workflowVersionService,
+      ),
+      terminalArchiveService as any,
+    );
     observabilityController = new WorkflowRunObservabilityController(
       traceService,
       workflowsService,

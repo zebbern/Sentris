@@ -11,6 +11,7 @@ import type {
 } from '../../temporal/temporal.service';
 import { WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
+import { WorkflowRunService } from '../workflow-run.service';
 import { WorkflowVersionService } from '../workflow-version.service';
 import type { AuthContext } from '../../auth/types';
 import type { ExecutionInputPreview, ExecutionTriggerType } from '@sentris/shared';
@@ -464,14 +465,22 @@ describe('WorkflowsService', () => {
       versionRepositoryMock as any,
       auditLogMock,
     );
+    const workflowRunService = new WorkflowRunService(
+      repositoryMock as any,
+      runRepositoryMock as any,
+      versionRepositoryMock as any,
+      traceRepositoryMock as any,
+      temporalService,
+      analyticsServiceMock as any,
+      auditLogMock,
+      workflowVersionService,
+    );
     service = new WorkflowsService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
       versionRepositoryMock as any,
       runRepositoryMock as any,
-      traceRepositoryMock as any,
       temporalService,
-      analyticsServiceMock as any,
       auditLogMock,
       {
         getTagsByWorkflowIds: vi.fn().mockResolvedValue(new Map()),
@@ -481,6 +490,7 @@ describe('WorkflowsService', () => {
         listAllTags: vi.fn().mockResolvedValue([]),
       } as any,
       workflowVersionService,
+      workflowRunService,
     );
   });
 
@@ -691,17 +701,26 @@ describe('WorkflowsService', () => {
       versionRepositoryMock as any,
       failureAuditLog,
     );
+    const failureRunService = new WorkflowRunService(
+      repositoryMock as any,
+      runRepositoryMock as any,
+      versionRepositoryMock as any,
+      traceRepositoryMock as any,
+      failureTemporalService,
+      analyticsServiceMock as any,
+      failureAuditLog,
+      failureVersionService,
+    );
     service = new WorkflowsService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
       versionRepositoryMock as any,
       runRepositoryMock as any,
-      traceRepositoryMock as any,
       failureTemporalService,
-      analyticsServiceMock as any,
       failureAuditLog,
       {} as any,
       failureVersionService,
+      failureRunService,
     );
 
     const versionRecord = createWorkflowVersionRecord('workflow-id');

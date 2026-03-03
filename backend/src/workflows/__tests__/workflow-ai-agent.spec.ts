@@ -192,7 +192,7 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       },
     };
 
-    const traceRepositoryMock = {
+    const _traceRepositoryMock = {
       async countByType() {
         return 0;
       },
@@ -240,7 +240,7 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       },
     };
 
-    const analyticsServiceMock = {
+    const _analyticsServiceMock = {
       trackWorkflowStarted: vi.fn(),
       trackWorkflowCompleted: vi.fn(),
       trackComponentExecuted: vi.fn(),
@@ -265,12 +265,11 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       workflowRoleRepositoryMock as any,
       versionRepositoryMock as any,
       runRepositoryMock as any,
-      traceRepositoryMock as any,
       {} as any,
-      analyticsServiceMock as any,
       auditLogServiceMock as any,
       {} as any,
       workflowVersionService,
+      {} as any,
     );
 
     const definition = await workflowVersionService.commit(workflowId, authContext);
