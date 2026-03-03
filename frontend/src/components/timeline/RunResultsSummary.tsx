@@ -126,7 +126,7 @@ export function RunResultsSummary({ runId, selectedRun, className }: RunResultsS
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors"
+          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
           aria-expanded={isOpen}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -186,7 +186,7 @@ export function RunResultsSummary({ runId, selectedRun, className }: RunResultsS
               </span>
               <button
                 type="button"
-                className="flex items-center gap-1 hover:text-foreground transition-colors"
+                className="flex items-center gap-1 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
                   setInspectorTab('artifacts');

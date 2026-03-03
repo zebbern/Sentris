@@ -17,11 +17,11 @@ import {
 const SEVERITY_LABELS: FindingSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
 
 const SEVERITY_BADGE_CLASSES: Record<FindingSeverity, string> = {
-  critical: 'bg-red-600 text-white',
-  high: 'bg-orange-500 text-white',
+  critical: 'bg-red-700 text-white',
+  high: 'bg-orange-700 text-white',
   medium: 'bg-yellow-500 text-black',
-  low: 'bg-blue-400 text-white',
-  info: 'bg-gray-400 text-white',
+  low: 'bg-blue-700 text-white',
+  info: 'bg-gray-600 text-white',
 };
 
 const SEVERITY_EMOJI: Record<FindingSeverity, string> = {
@@ -31,6 +31,9 @@ const SEVERITY_EMOJI: Record<FindingSeverity, string> = {
   low: '🔵',
   info: '⚪',
 };
+
+/** Maximum number of rows rendered in the findings table to prevent jank. */
+const FINDINGS_DISPLAY_LIMIT = 500;
 
 // ---------------------------------------------------------------------------
 // Export helpers
@@ -156,6 +159,12 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
     return result;
   }, [allFindings, severityFilter, sourceFilter]);
 
+  // Cap rendered rows to avoid jank with large datasets.
+  const isTruncated = filteredFindings.length > FINDINGS_DISPLAY_LIMIT;
+  const displayedFindings = isTruncated
+    ? filteredFindings.slice(0, FINDINGS_DISPLAY_LIMIT)
+    : filteredFindings;
+
   const counts = useMemo(() => severityCounts(allFindings), [allFindings]);
 
   const handleExportCSV = useCallback(() => {
@@ -180,7 +189,10 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+      <div
+        role="status"
+        className="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted-foreground"
+      >
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading findings…
       </div>
@@ -189,7 +201,10 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
 
   if (queryError) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-sm text-destructive">
+      <div
+        role="alert"
+        className="flex flex-1 items-center justify-center p-8 text-sm text-destructive"
+      >
         Failed to load findings: {queryError.message}
       </div>
     );
@@ -197,7 +212,10 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
 
   if (allFindings.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-muted-foreground">
+      <div
+        role="status"
+        className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-muted-foreground"
+      >
         <Search className="h-8 w-8 opacity-40" />
         <span className="text-sm">No findings for this run</span>
       </div>
@@ -212,8 +230,9 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
         <div className="inline-flex rounded-md border bg-background p-0.5 text-xs gap-0.5 flex-wrap">
           <button
             type="button"
+            aria-pressed={severityFilter === 'all'}
             className={cn(
-              'h-6 px-2 rounded text-xs font-medium transition-colors',
+              'h-6 px-2 rounded text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
               severityFilter === 'all' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
             )}
             onClick={() => setSeverityFilter('all')}
@@ -230,8 +249,9 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
             <button
               key={sev}
               type="button"
+              aria-pressed={severityFilter === sev}
               className={cn(
-                'h-6 px-2 rounded text-xs font-medium transition-colors capitalize',
+                'h-6 px-2 rounded text-xs font-medium transition-colors capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
                 severityFilter === sev ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
               )}
               onClick={() => setSeverityFilter(sev)}
@@ -251,19 +271,25 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
 
         {/* Source node dropdown */}
         {sourceNodes.length > 1 && (
-          <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            className="h-6 rounded border bg-background px-1.5 text-[11px] max-w-[160px]"
-            aria-label="Filter by source node"
-          >
-            <option value="all">All sources</option>
-            {sourceNodes.map((src) => (
-              <option key={src} value={src}>
-                {src}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1">
+            <label htmlFor="source-filter" className="text-xs text-muted-foreground">
+              Source:
+            </label>
+            <select
+              id="source-filter"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="h-6 rounded border bg-background px-1.5 text-[11px] max-w-[160px]"
+              aria-label="Filter by source node"
+            >
+              <option value="all">All sources</option>
+              {sourceNodes.map((src) => (
+                <option key={src} value={src}>
+                  {src}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
 
         {/* Spacer */}
@@ -276,6 +302,7 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
           className="h-6 px-2 text-xs gap-1"
           onClick={handleExportMarkdown}
           title="Export as Markdown"
+          aria-label="Export findings as Markdown"
         >
           <Download className="h-3 w-3" />
           MD
@@ -286,6 +313,7 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
           className="h-6 px-2 text-xs gap-1"
           onClick={handleExportCSV}
           title="Export as CSV"
+          aria-label="Export findings as CSV"
         >
           <FileSpreadsheet className="h-3 w-3" />
           CSV
@@ -304,7 +332,7 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
             </tr>
           </thead>
           <tbody>
-            {filteredFindings.map((f) => (
+            {displayedFindings.map((f) => (
               <tr
                 key={f.id}
                 className="border-b border-border/40 hover:bg-accent/30 transition-colors"
@@ -330,7 +358,10 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
         </table>
 
         {filteredFindings.length === 0 && allFindings.length > 0 && (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+          <div
+            role="status"
+            className="flex items-center justify-center py-8 text-sm text-muted-foreground"
+          >
             No findings match the selected filters.
           </div>
         )}
@@ -338,7 +369,12 @@ export function FindingsPanel({ runId }: FindingsPanelProps) {
 
       {/* Footer count */}
       <div className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">
-        Showing {filteredFindings.length} of {allFindings.length} findings
+        Showing {displayedFindings.length} of {allFindings.length} findings
+        {isTruncated && (
+          <span className="ml-1 text-amber-600">
+            (display limited to {FINDINGS_DISPLAY_LIMIT} — export for full data)
+          </span>
+        )}
       </div>
     </div>
   );

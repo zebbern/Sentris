@@ -223,7 +223,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
 
   const selectNode = useExecutionTimelineStore((s) => s.selectNode);
 
-  useAutoFocusOnCompletion({
+  const autoFocusAnnouncement = useAutoFocusOnCompletion({
     selectedRunId,
     runStatus: selectedRun?.status,
     nodeIOData: nodeIOData as
@@ -291,6 +291,10 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
   const isMobile = useIsMobile();
   return (
     <>
+      {/* Screen reader announcement for auto-focus tab changes */}
+      <div aria-live="polite" className="sr-only">
+        {autoFocusAnnouncement}
+      </div>
       <aside className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
         {/* Multi-run tab bar — only visible when 2+ runs are tracked */}
         <ExecutionTabs />
