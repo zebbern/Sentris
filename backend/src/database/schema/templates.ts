@@ -1,4 +1,5 @@
 import {
+  index,
   pgTable,
   uuid,
   varchar,
@@ -44,28 +45,34 @@ export const templatesTable = pgTable('templates', {
 /**
  * Template submissions table - tracks PR-based template submissions
  */
-export const templatesSubmissionsTable = pgTable('templates_submissions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  templateName: varchar('template_name', { length: 255 }).notNull(),
-  description: text('description'),
-  category: varchar('category', { length: 100 }),
-  repository: varchar('repository', { length: 255 }).notNull(),
-  branch: varchar('branch', { length: 100 }),
-  path: varchar('path', { length: 500 }).notNull(),
-  commitSha: varchar('commit_sha', { length: 100 }),
-  pullRequestNumber: integer('pr_number'),
-  pullRequestUrl: varchar('pr_url', { length: 500 }),
-  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, approved, rejected, merged
-  submittedBy: varchar('submitted_by', { length: 191 }).notNull(),
-  organizationId: varchar('organization_id', { length: 191 }),
-  manifest: jsonb('manifest').$type<TemplateManifest>(),
-  graph: jsonb('graph').$type<Record<string, unknown>>(),
-  feedback: text('feedback'),
-  reviewedBy: varchar('reviewed_by', { length: 191 }),
-  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const templatesSubmissionsTable = pgTable(
+  'templates_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    templateName: varchar('template_name', { length: 255 }).notNull(),
+    description: text('description'),
+    category: varchar('category', { length: 100 }),
+    repository: varchar('repository', { length: 255 }).notNull(),
+    branch: varchar('branch', { length: 100 }),
+    path: varchar('path', { length: 500 }).notNull(),
+    commitSha: varchar('commit_sha', { length: 100 }),
+    pullRequestNumber: integer('pr_number'),
+    pullRequestUrl: varchar('pr_url', { length: 500 }),
+    status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, approved, rejected, merged
+    submittedBy: varchar('submitted_by', { length: 191 }).notNull(),
+    organizationId: varchar('organization_id', { length: 191 }),
+    manifest: jsonb('manifest').$type<TemplateManifest>(),
+    graph: jsonb('graph').$type<Record<string, unknown>>(),
+    feedback: text('feedback'),
+    reviewedBy: varchar('reviewed_by', { length: 191 }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orgIdx: index('templates_submissions_organization_id_idx').on(table.organizationId),
+  }),
+);
 
 // Zod schemas for validation
 export const RequiredSecretSchema = z.object({

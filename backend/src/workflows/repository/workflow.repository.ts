@@ -137,6 +137,11 @@ export class WorkflowRepository {
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord[]> {
     if (ids.length === 0) return [];
+    if (ids.length > 500) {
+      throw new Error(
+        `findByIds: input size ${ids.length} exceeds maximum of 500. Chunk the request or narrow the query.`,
+      );
+    }
     const filter = options.organizationId
       ? and(
           inArray(workflowsTable.id, ids),
@@ -150,44 +155,53 @@ export class WorkflowRepository {
     await this.db.delete(workflowsTable).where(this.buildIdFilter(id, options.organizationId));
   }
 
-  async list(options: WorkflowRepositoryOptions = {}): Promise<WorkflowRecord[]> {
+  async list(
+    options: WorkflowRepositoryOptions & { limit?: number } = {},
+  ): Promise<WorkflowRecord[]> {
+    const limit = options.limit ?? 100;
     if (options.organizationId) {
       return this.db
         .select()
         .from(workflowsTable)
-        .where(eq(workflowsTable.organizationId, options.organizationId));
+        .where(eq(workflowsTable.organizationId, options.organizationId))
+        .limit(limit);
     }
-    return this.db.select().from(workflowsTable);
+    return this.db.select().from(workflowsTable).limit(limit);
   }
 
-  async listSummary(options: WorkflowRepositoryOptions = {}): Promise<WorkflowSummaryRecord[]> {
-    const columns = {
-      id: workflowsTable.id,
-      name: workflowsTable.name,
-      description: workflowsTable.description,
-      organizationId: workflowsTable.organizationId,
-      lastRun: workflowsTable.lastRun,
-      latestRunStatus: sql<string | null>`(
-        SELECT wr.status FROM workflow_runs wr
-        WHERE wr.workflow_id = ${workflowsTable.id}
+  async listSummary(
+    options: WorkflowRepositoryOptions & { limit?: number } = {},
+  ): Promise<WorkflowSummaryRecord[]> {
+    const limit = options.limit ?? 100;
+
+    // Use a LATERAL JOIN to fetch latest run status in a single pass,
+    // avoiding the N+1 correlated subquery that ran once per workflow row.
+    const result = await this.db.execute(sql`
+      SELECT
+        w.id,
+        w.name,
+        w.description,
+        w.organization_id AS "organizationId",
+        w.last_run AS "lastRun",
+        lr.status AS "latestRunStatus",
+        w.run_count AS "runCount",
+        coalesce(jsonb_array_length(w.graph->'nodes'), 0)::int AS "nodeCount",
+        w.created_at AS "createdAt",
+        w.updated_at AS "updatedAt"
+      FROM workflows w
+      LEFT JOIN LATERAL (
+        SELECT wr.status
+        FROM workflow_runs wr
+        WHERE wr.workflow_id = w.id
         ORDER BY wr.created_at DESC
         LIMIT 1
-      )`.as('latest_run_status'),
-      runCount: workflowsTable.runCount,
-      nodeCount: sql<number>`coalesce(jsonb_array_length(${workflowsTable.graph}->'nodes'), 0)`.as(
-        'node_count',
-      ),
-      createdAt: workflowsTable.createdAt,
-      updatedAt: workflowsTable.updatedAt,
-    };
+      ) lr ON true
+      ${options.organizationId ? sql`WHERE w.organization_id = ${options.organizationId}` : sql``}
+      ORDER BY w.updated_at DESC
+      LIMIT ${limit}
+    `);
 
-    if (options.organizationId) {
-      return this.db
-        .select(columns)
-        .from(workflowsTable)
-        .where(eq(workflowsTable.organizationId, options.organizationId));
-    }
-    return this.db.select(columns).from(workflowsTable);
+    return result.rows as unknown as WorkflowSummaryRecord[];
   }
 
   async incrementRunCount(

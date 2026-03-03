@@ -32,13 +32,14 @@ export class ArtifactsRepository {
 
   async listByRun(
     runId: string,
-    options: { organizationId?: string | null } = {},
+    options: { organizationId?: string | null; limit?: number } = {},
   ): Promise<ArtifactRecord[]> {
     return this.db
       .select()
       .from(artifactsTable)
       .where(this.buildRunFilter(runId, options.organizationId))
-      .orderBy(desc(artifactsTable.createdAt));
+      .orderBy(desc(artifactsTable.createdAt))
+      .limit(options.limit ?? 200);
   }
 
   async list(options: ArtifactQueryOptions = {}): Promise<ArtifactRecord[]> {

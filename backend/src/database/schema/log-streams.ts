@@ -25,11 +25,6 @@ export const workflowLogStreamsTable = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    runNodeStreamIdx: uniqueIndex('workflow_log_streams_run_node_stream_idx').on(
-      table.runId,
-      table.nodeRef,
-      table.stream,
-    ),
     runNodeStreamUnique: uniqueIndex('workflow_log_streams_run_node_stream_uidx').on(
       table.runId,
       table.nodeRef,

@@ -13,6 +13,39 @@ import type { AppConfig } from './config/app.config';
 
 import { AppModule } from './app.module';
 
+/**
+ * Build CORS allowed origins based on environment.
+ * In production, only allow explicitly configured origins.
+ * In development, allow localhost origins for multi-instance dev.
+ */
+function buildCorsOrigins(nodeEnv: string): string[] {
+  const envOrigins = process.env.CORS_ALLOWED_ORIGINS;
+  if (envOrigins) {
+    return envOrigins
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
+  }
+
+  if (nodeEnv === 'production') {
+    // In production without explicit CORS_ALLOWED_ORIGINS, deny all cross-origin requests.
+    // Deployers must set CORS_ALLOWED_ORIGINS to their frontend domain.
+    return [];
+  }
+
+  // Development: allow localhost origins for multi-instance dev (instances 0-9)
+  const origins: string[] = ['http://localhost', 'http://localhost:80', 'http://localhost:8090'];
+  for (let i = 0; i <= 9; i++) {
+    const frontendPort = 5173 + i * 100;
+    const backendPort = 3211 + i * 100;
+    origins.push(`http://localhost:${frontendPort}`);
+    origins.push(`http://127.0.0.1:${frontendPort}`);
+    origins.push(`http://localhost:${backendPort}`);
+    origins.push(`http://127.0.0.1:${backendPort}`);
+  }
+  return origins;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn'],
@@ -32,7 +65,11 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
+          // unsafe-inline required for Swagger UI (/api/v1/docs) which injects inline scripts,
+          // and for Vite's dev-mode script injection. A nonce-based approach would require
+          // per-request nonce generation and template integration with both Swagger and Vite.
           scriptSrc: ["'self'", "'unsafe-inline'"],
+          // unsafe-inline required for Swagger UI's inline styles and CSS-in-JS libraries.
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'blob:'],
           connectSrc: ["'self'"],
@@ -41,6 +78,8 @@ async function bootstrap() {
           frameAncestors: ["'self'"],
         },
       },
+      // Disabled because SSE (Server-Sent Events) streaming for trace events requires
+      // cross-origin resource loading that COEP blocks.
       crossOriginEmbedderPolicy: false,
     }),
   );
@@ -57,25 +96,10 @@ async function bootstrap() {
   }
 
   // Enable CORS for frontend
-  // Build dynamic origin list for multi-instance dev (instances 0-9)
-  const instanceOrigins: string[] = [];
-  for (let i = 0; i <= 9; i++) {
-    const frontendPort = 5173 + i * 100;
-    const backendPort = 3211 + i * 100;
-    instanceOrigins.push(`http://localhost:${frontendPort}`);
-    instanceOrigins.push(`http://127.0.0.1:${frontendPort}`);
-    instanceOrigins.push(`http://localhost:${backendPort}`);
-    instanceOrigins.push(`http://127.0.0.1:${backendPort}`);
-  }
+  const corsOrigins = buildCorsOrigins(appCfg.nodeEnv);
 
   app.enableCors({
-    origin: [
-      'http://localhost',
-      'http://localhost:80',
-      'http://localhost:8090',
-      // Add production domain to CORS when deployed
-      ...instanceOrigins,
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
