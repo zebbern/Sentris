@@ -15,12 +15,15 @@ export interface WorkflowSummaryRecord {
   name: string;
   description: string | null;
   organizationId: string | null;
-  lastRun: Date | null;
+  /** Raw SQL may return a string instead of Date for timestamp columns. */
+  lastRun: Date | string | null;
   latestRunStatus: string | null;
   runCount: number;
   nodeCount: number;
-  createdAt: Date;
-  updatedAt: Date;
+  /** Raw SQL may return a string instead of Date for timestamp columns. */
+  createdAt: Date | string;
+  /** Raw SQL may return a string instead of Date for timestamp columns. */
+  updatedAt: Date | string;
 }
 
 type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
