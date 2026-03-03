@@ -138,19 +138,28 @@ export function computeEdgeBundles(edges: Edge[], nodes: Node[]): EdgeBundle[] {
 
       const path = `M ${fanOutX} ${fanOutY} Q ${cpX} ${cpY} ${endX} ${endY}`;
 
+      const color = (t.edge.data as Record<string, unknown> | undefined)?.sourcePortColor as
+        | string
+        | undefined;
+
       return {
         edgeId: t.edge.id,
         targetNodeId: t.edge.target,
         path,
-        color: t.edge.data?.sourcePortColor as string | undefined,
+        color,
       };
     });
 
     // Determine trunk color: if all edges share same port color, use it; otherwise undefined (slate)
     const portColors = new Set(
-      groupEdges.map((e) => e.data?.sourcePortColor as string | undefined).filter(Boolean),
+      groupEdges
+        .map(
+          (e) =>
+            (e.data as Record<string, unknown> | undefined)?.sourcePortColor as string | undefined,
+        )
+        .filter((c): c is string => Boolean(c)),
     );
-    const trunkColor = portColors.size === 1 ? [...portColors][0] : undefined;
+    const trunkColor: string | undefined = portColors.size === 1 ? [...portColors][0] : undefined;
 
     bundles.push({
       sourceNodeId,
