@@ -6,6 +6,7 @@ import { WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { compileWorkflowGraph } from '../../dsl/compiler';
 import type { WorkflowDefinition } from '../../dsl/types';
 import { WorkflowsService } from '../workflows.service';
+import { WorkflowVersionService } from '../workflow-version.service';
 import type { WorkflowRepository } from '../repository/workflow.repository';
 import type { AuthContext } from '../../auth/types';
 
@@ -252,7 +253,14 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       record: vi.fn(),
     };
 
-    const service = new WorkflowsService(
+    const workflowVersionService = new WorkflowVersionService(
+      repositoryMock as WorkflowRepository,
+      workflowRoleRepositoryMock as any,
+      versionRepositoryMock as any,
+      auditLogServiceMock as any,
+    );
+
+    const _service = new WorkflowsService(
       repositoryMock as WorkflowRepository,
       workflowRoleRepositoryMock as any,
       versionRepositoryMock as any,
@@ -262,9 +270,10 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       analyticsServiceMock as any,
       auditLogServiceMock as any,
       {} as any,
+      workflowVersionService,
     );
 
-    const definition = await service.commit(workflowId, authContext);
+    const definition = await workflowVersionService.commit(workflowId, authContext);
 
     expect(savedDefinition).not.toBeNull();
     expect(savedDefinition!.actions.length).toBe(3);

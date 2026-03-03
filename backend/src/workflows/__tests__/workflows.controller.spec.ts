@@ -7,6 +7,7 @@ import { TraceService } from '../../trace/trace.service';
 import { WorkflowGraphDto, WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { WorkflowRecord, WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
+import { WorkflowVersionService } from '../workflow-version.service';
 import { WorkflowsController } from '../workflows.controller';
 import { WorkflowRunsController } from '../workflow-runs.controller';
 import { WorkflowRunObservabilityController } from '../workflow-run-observability.controller';
@@ -168,6 +169,20 @@ describe('WorkflowsController', () => {
       }
       record.compiledDefinition = definition;
       return record;
+    },
+    async findLatestByWorkflowIds(
+      workflowIds: string[],
+      options: { organizationId?: string | null } = {},
+    ) {
+      return workflowIds
+        .map((wfId) => {
+          const list = versionsByWorkflow.get(wfId) ?? [];
+          const filtered = options.organizationId
+            ? list.filter((r) => r.organizationId === options.organizationId)
+            : list;
+          return filtered.length > 0 ? filtered[filtered.length - 1] : undefined;
+        })
+        .filter(Boolean);
     },
   };
   const now = new Date().toISOString();
@@ -382,6 +397,13 @@ describe('WorkflowsController', () => {
       },
     };
 
+    const auditLogMock = { record: vi.fn() } as any;
+    const workflowVersionService = new WorkflowVersionService(
+      repositoryStub as WorkflowRepository,
+      workflowRoleRepositoryStub as any,
+      versionRepositoryStub as any,
+      auditLogMock,
+    );
     const workflowsService = new WorkflowsService(
       repositoryStub as WorkflowRepository,
       workflowRoleRepositoryStub as any,
@@ -390,8 +412,9 @@ describe('WorkflowsController', () => {
       traceRepositoryStub as any,
       temporalStub as TemporalService,
       analyticsServiceMock as any,
-      { record: vi.fn() } as any,
+      auditLogMock,
       {} as any,
+      workflowVersionService,
     );
     const traceService = new TraceService({
       listByRunId: async () => [],
@@ -431,7 +454,9 @@ describe('WorkflowsController', () => {
       listDetails: vi.fn().mockResolvedValue([]),
       getNodeIO: vi.fn().mockResolvedValue(null),
     };
-    controller = new WorkflowsController(workflowsService, { get: () => undefined } as any);
+    controller = new WorkflowsController(workflowsService, {} as any, workflowVersionService, {
+      get: () => undefined,
+    } as any);
     runsController = new WorkflowRunsController(workflowsService, terminalArchiveService as any);
     observabilityController = new WorkflowRunObservabilityController(
       traceService,

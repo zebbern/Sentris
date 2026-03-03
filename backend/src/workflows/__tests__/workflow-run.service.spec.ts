@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { WorkflowRunService } from '../workflow-run.service';
 import type { PreparedRunPayload } from '../workflow-run.service';
@@ -11,12 +11,10 @@ import type { AuditLogService } from '../../audit/audit-log.service';
 import type { WorkflowVersionService } from '../workflow-version.service';
 import type { AuthContext } from '../../auth/types';
 import { DEFAULT_ORGANIZATION_ID } from '../../auth/constants';
+import { componentRegistry } from '@sentris/component-sdk';
 
-// ── Mock side-effect imports ────────────────────────────────────────
-vi.mock('@sentris/component-sdk', () => ({
-  componentRegistry: { get: vi.fn().mockReturnValue(undefined) },
-}));
-vi.mock('@sentris/worker/components', () => ({}));
+// Save the original get method before any tests can modify it
+const _originalRegistryGet = componentRegistry.get.bind(componentRegistry);
 
 // ── Fixtures ────────────────────────────────────────────────────────
 const authContext: AuthContext = {
@@ -129,8 +127,15 @@ describe('WorkflowRunService', () => {
   let versionSvc: Record<string, ReturnType<typeof vi.fn>>;
   let service: WorkflowRunService;
 
+  afterAll(() => {
+    // Restore the real componentRegistry.get so it doesn't leak to other test files
+    componentRegistry.get = _originalRegistryGet;
+  });
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    // Replace registry.get for this file's tests (no retry policy logic needed)
+    componentRegistry.get = vi.fn().mockReturnValue(undefined) as any;
     workflowRepo = {
       findById: vi.fn(),
       incrementRunCount: vi.fn().mockResolvedValue(undefined),

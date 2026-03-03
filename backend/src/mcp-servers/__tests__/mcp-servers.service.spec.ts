@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { McpServersService } from '../mcp-servers.service';
@@ -387,13 +387,7 @@ describe('McpServersService', () => {
   });
 
   // ── Organization context ──────────────────────────────────────────
-  it('falls back to default organization when auth is null', async () => {
-    repo.list.mockResolvedValue([]);
-    const result = await service.listServers(null);
-    expect(result).toEqual([]);
-    expect(repo.list).toHaveBeenCalledWith({
-      organizationId: DEFAULT_ORGANIZATION_ID,
-      groupId: undefined,
-    });
+  it('throws ForbiddenException when auth is null', async () => {
+    await expect(service.listServers(null)).rejects.toThrow(ForbiddenException);
   });
 });

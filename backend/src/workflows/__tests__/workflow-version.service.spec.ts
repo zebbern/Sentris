@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
+import '@sentris/worker/components';
 
 import { WorkflowVersionService } from '../workflow-version.service';
 import type { WorkflowRepository, WorkflowRecord } from '../repository/workflow.repository';
@@ -10,8 +11,8 @@ import type { AuthContext } from '../../auth/types';
 import type { WorkflowVersionRecord } from '../../database/schema';
 import type { WorkflowDefinition } from '../../dsl/types';
 
-// ── Mock DSL compiler ───────────────────────────────────────────────
-const mockDefinition: WorkflowDefinition = {
+// ── Test fixture definition (used where a pre-built definition is needed) ──
+const fixtureDefinition: WorkflowDefinition = {
   version: 2,
   title: 'Test Workflow',
   entrypoint: { ref: 'trigger' },
@@ -30,10 +31,6 @@ const mockDefinition: WorkflowDefinition = {
   ],
   config: { environment: 'default', timeoutSeconds: 0 },
 };
-
-vi.mock('../../dsl/compiler', () => ({
-  compileWorkflowGraph: vi.fn().mockReturnValue(mockDefinition),
-}));
 
 // ── Constants ───────────────────────────────────────────────────────
 const TEST_ORG = 'test-org';
@@ -80,7 +77,7 @@ const validGraph = {
       id: 'trigger',
       type: 'core.workflow.entrypoint',
       position: { x: 0, y: 0 },
-      data: { label: 'Trigger', config: { params: {}, inputOverrides: {} } },
+      data: { label: 'Trigger', config: { params: { runtimeInputs: [] }, inputOverrides: {} } },
     },
   ],
   edges: [],
@@ -148,11 +145,13 @@ describe('WorkflowVersionService', () => {
 
       const result = await service.commit('wf-1', authContext);
 
-      expect(result).toEqual(mockDefinition);
-      expect(repo.saveCompiledDefinition).toHaveBeenCalledWith('wf-1', mockDefinition, {
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].componentId).toBe('core.workflow.entrypoint');
+      expect(result.entrypoint.ref).toBe('trigger');
+      expect(repo.saveCompiledDefinition).toHaveBeenCalledWith('wf-1', result, {
         organizationId: TEST_ORG,
       });
-      expect(versionRepo.setCompiledDefinition).toHaveBeenCalledWith('ver-1', mockDefinition, {
+      expect(versionRepo.setCompiledDefinition).toHaveBeenCalledWith('ver-1', result, {
         organizationId: TEST_ORG,
       });
       expect(auditLog.record).toHaveBeenCalledTimes(1);
@@ -310,7 +309,7 @@ describe('WorkflowVersionService', () => {
   describe('ensureDefinitionForVersion', () => {
     it('should return cached definition when already compiled', async () => {
       const workflow = makeWorkflowRecord();
-      const version = makeVersionRecord({ compiledDefinition: mockDefinition });
+      const version = makeVersionRecord({ compiledDefinition: fixtureDefinition });
 
       const result = await service.ensureDefinitionForVersion(
         workflow as WorkflowRecord,
@@ -318,7 +317,7 @@ describe('WorkflowVersionService', () => {
         TEST_ORG,
       );
 
-      expect(result).toEqual(mockDefinition);
+      expect(result).toEqual(fixtureDefinition);
       expect(versionRepo.setCompiledDefinition).not.toHaveBeenCalled();
     });
 
@@ -332,15 +331,16 @@ describe('WorkflowVersionService', () => {
         TEST_ORG,
       );
 
-      expect(result).toEqual(mockDefinition);
-      expect(versionRepo.setCompiledDefinition).toHaveBeenCalledWith('ver-1', mockDefinition, {
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].componentId).toBe('core.workflow.entrypoint');
+      expect(versionRepo.setCompiledDefinition).toHaveBeenCalledWith('ver-1', result, {
         organizationId: TEST_ORG,
       });
     });
 
     it('should patch definition when entrypoint is missing but entry action exists', async () => {
       const definitionWithoutEntrypoint = {
-        ...mockDefinition,
+        ...fixtureDefinition,
         entrypoint: { ref: 'wrong-ref' },
       };
       const workflow = makeWorkflowRecord();

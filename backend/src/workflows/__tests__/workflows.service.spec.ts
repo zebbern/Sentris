@@ -11,6 +11,7 @@ import type {
 } from '../../temporal/temporal.service';
 import { WorkflowRepository } from '../repository/workflow.repository';
 import { WorkflowsService } from '../workflows.service';
+import { WorkflowVersionService } from '../workflow-version.service';
 import type { AuthContext } from '../../auth/types';
 import type { ExecutionInputPreview, ExecutionTriggerType } from '@sentris/shared';
 
@@ -69,6 +70,7 @@ const sampleGraph = WorkflowGraphSchema.parse({
 
 describe('WorkflowsService', () => {
   let service: WorkflowsService;
+  let workflowVersionService: WorkflowVersionService;
   let createCalls = 0;
   let startCalls: StartWorkflowOptions[] = [];
   let lastDescribeRef: { workflowId: string; runId?: string } | null = null;
@@ -169,6 +171,9 @@ describe('WorkflowsService', () => {
       savedDefinition = definition;
       return makeWorkflowRecord({ compiledDefinition: definition });
     },
+    async findByIds(ids: string[]) {
+      return ids.map((id) => makeWorkflowRecord({ id }));
+    },
     async incrementRunCount() {
       return;
     },
@@ -244,6 +249,23 @@ describe('WorkflowsService', () => {
       }
       record.compiledDefinition = definition;
       return record;
+    },
+    async findLatestByWorkflowIds(
+      workflowIds: string[],
+      options: { organizationId?: string | null } = {},
+    ) {
+      return workflowIds
+        .map((wfId) => {
+          const list = workflowVersionsByWorkflow.get(wfId) ?? [];
+          const filtered = options.organizationId
+            ? list.filter((r) => r.organizationId === options.organizationId)
+            : list;
+          return filtered.length > 0 ? filtered[filtered.length - 1] : undefined;
+        })
+        .filter(Boolean);
+    },
+    async findByIds(ids: string[]) {
+      return ids.map((id) => workflowVersionStore.get(id)).filter(Boolean);
     },
   };
 
@@ -330,6 +352,33 @@ describe('WorkflowsService', () => {
         latest: base,
       };
     },
+    async countByTypeForRuns(runIds: string[], type: string) {
+      const map = new Map<string, number>();
+      for (const rid of runIds) {
+        if (storedRunMeta && storedRunMeta.runId === rid) {
+          if (type === 'NODE_COMPLETED') map.set(rid, completedCount);
+          else if (type === 'NODE_STARTED') map.set(rid, storedRunMeta.totalActions ?? 0);
+          else map.set(rid, 0);
+        }
+      }
+      return map;
+    },
+    async getEventTimeRangesForRuns(runIds: string[]) {
+      const map = new Map<
+        string,
+        { firstTimestamp: string | null; lastTimestamp: string | null }
+      >();
+      for (const rid of runIds) {
+        if (storedRunMeta && storedRunMeta.runId === rid) {
+          const base = new Date();
+          map.set(rid, {
+            firstTimestamp: new Date(base.getTime() - 1000).toISOString(),
+            lastTimestamp: base.toISOString(),
+          });
+        }
+      }
+      return map;
+    },
   };
 
   const workflowRoleRepositoryMock = {
@@ -408,6 +457,13 @@ describe('WorkflowsService', () => {
     resetWorkflowVersions();
 
     const temporalService = buildTemporalStub();
+    const auditLogMock = { record: vi.fn() } as any;
+    workflowVersionService = new WorkflowVersionService(
+      repositoryMock,
+      workflowRoleRepositoryMock as any,
+      versionRepositoryMock as any,
+      auditLogMock,
+    );
     service = new WorkflowsService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
@@ -416,7 +472,7 @@ describe('WorkflowsService', () => {
       traceRepositoryMock as any,
       temporalService,
       analyticsServiceMock as any,
-      { record: vi.fn() } as any,
+      auditLogMock,
       {
         getTagsByWorkflowIds: vi.fn().mockResolvedValue(new Map()),
         getTagsByWorkflowId: vi.fn().mockResolvedValue([]),
@@ -424,6 +480,7 @@ describe('WorkflowsService', () => {
         setTags: vi.fn().mockResolvedValue([]),
         listAllTags: vi.fn().mockResolvedValue([]),
       } as any,
+      workflowVersionService,
     );
   });
 
@@ -437,7 +494,7 @@ describe('WorkflowsService', () => {
 
   it('commits a workflow definition', async () => {
     await service.create(sampleGraph, authContext);
-    const definition = await service.commit('workflow-id', authContext);
+    const definition = await workflowVersionService.commit('workflow-id', authContext);
     expect(definition.actions.length).toBeGreaterThan(0);
     expect(savedDefinition).toEqual(definition);
     const latestVersion = versionRepositoryMock.findLatestByWorkflowId
@@ -627,6 +684,13 @@ describe('WorkflowsService', () => {
       },
     });
 
+    const failureAuditLog = { record: vi.fn() } as any;
+    const failureVersionService = new WorkflowVersionService(
+      repositoryMock,
+      workflowRoleRepositoryMock as any,
+      versionRepositoryMock as any,
+      failureAuditLog,
+    );
     service = new WorkflowsService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
@@ -635,8 +699,9 @@ describe('WorkflowsService', () => {
       traceRepositoryMock as any,
       failureTemporalService,
       analyticsServiceMock as any,
-      { record: vi.fn() } as any,
+      failureAuditLog,
       {} as any,
+      failureVersionService,
     );
 
     const versionRecord = createWorkflowVersionRecord('workflow-id');
@@ -861,7 +926,7 @@ describe('WorkflowsService', () => {
     createWorkflowVersionRecord('workflow-id');
     createWorkflowVersionRecord('workflow-id');
 
-    const versions = await service.listVersions('workflow-id', authContext);
+    const versions = await workflowVersionService.listVersions('workflow-id', authContext);
     expect(versions).toHaveLength(2);
     expect(versions[0].workflowId).toBe('workflow-id');
     expect(versions[0].id).toBeDefined();
@@ -871,7 +936,9 @@ describe('WorkflowsService', () => {
 
   it('throws NotFoundException when listing versions for non-existent workflow', async () => {
     repositoryMock.findById = async () => undefined;
-    await expect(service.listVersions('missing-id', authContext)).rejects.toThrow('not found');
+    await expect(workflowVersionService.listVersions('missing-id', authContext)).rejects.toThrow(
+      'not found',
+    );
   });
 
   // ── listRuns ───────────────────────────────────────────────────────────────
