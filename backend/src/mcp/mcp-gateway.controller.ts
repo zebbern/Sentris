@@ -20,6 +20,11 @@ export class McpGatewayController {
   // SCALING LIMITATION: For horizontal scaling, implement sticky sessions via load balancer
   private readonly transports = new Map<string, StreamableHTTPServerTransport>();
 
+  // Pending initialization promises to prevent race conditions when GET SSE and POST
+  // initialize requests arrive concurrently (@ai-sdk/mcp HttpMCPTransport fires both
+  // simultaneously via `void this.openInboundSse()` followed by POST initialize)
+  private readonly pendingInits = new Map<string, Promise<StreamableHTTPServerTransport>>();
+
   constructor(private readonly mcpGateway: McpGatewayService) {}
 
   @All('gateway')
@@ -60,42 +65,64 @@ export class McpGatewayController {
         return res.status(400).send('Bad Request: No valid session ID provided');
       }
 
-      this.logger.log(
-        `Initializing new MCP transport for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
-      );
-
-      const allowedToolsHeader = req.headers['x-allowed-tools'];
-      const ALLOWED_TOOLS_MAX = 100;
-      const ALLOWED_TOOL_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
-      const allowedTools =
-        typeof allowedToolsHeader === 'string'
-          ? allowedToolsHeader
-              .split(',')
-              .map((t) => t.trim())
-              .filter((t) => ALLOWED_TOOL_NAME_REGEX.test(t))
-              .slice(0, ALLOWED_TOOLS_MAX)
-          : undefined;
-
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
-      this.transports.set(cacheKey, transport);
-
-      try {
-        const server = await this.mcpGateway.getServerForRun(
-          runId,
-          organizationId,
-          allowedTools,
-          allowedNodeIds,
+      // If another request already started initialization for this cache key, await it
+      // instead of creating a duplicate transport (prevents race between GET SSE and POST)
+      const pending = this.pendingInits.get(cacheKey);
+      if (pending) {
+        try {
+          transport = await pending;
+        } catch (error) {
+          this.logger.error(`Pending MCP init failed for run ${runId}: ${error}`);
+          return res
+            .status(error instanceof Error && error.name === 'NotFoundException' ? 404 : 403)
+            .send(error instanceof Error ? error.message : 'Access denied');
+        }
+      } else {
+        this.logger.log(
+          `Initializing new MCP transport for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
         );
-        await server.connect(transport);
-      } catch (error) {
-        this.logger.error(`Failed to initialize MCP server for run ${runId}: ${error}`);
-        this.transports.delete(cacheKey);
-        return res
-          .status(error instanceof Error && error.name === 'NotFoundException' ? 404 : 403)
-          .send(error instanceof Error ? error.message : 'Access denied');
+
+        const allowedToolsHeader = req.headers['x-allowed-tools'];
+        const ALLOWED_TOOLS_MAX = 100;
+        const ALLOWED_TOOL_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
+        const allowedTools =
+          typeof allowedToolsHeader === 'string'
+            ? allowedToolsHeader
+                .split(',')
+                .map((t) => t.trim())
+                .filter((t) => ALLOWED_TOOL_NAME_REGEX.test(t))
+                .slice(0, ALLOWED_TOOLS_MAX)
+            : undefined;
+
+        // Create transport and connect server inside a shared promise so concurrent
+        // requests (GET SSE + POST initialize) both await the same initialization
+        const initPromise = (async () => {
+          const t = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined,
+            enableJsonResponse: true,
+          });
+          const server = await this.mcpGateway.getServerForRun(
+            runId,
+            organizationId,
+            allowedTools,
+            allowedNodeIds,
+          );
+          await server.connect(t);
+          return t;
+        })();
+        this.pendingInits.set(cacheKey, initPromise);
+
+        try {
+          transport = await initPromise;
+          this.transports.set(cacheKey, transport);
+        } catch (error) {
+          this.logger.error(`Failed to initialize MCP server for run ${runId}: ${error}`);
+          return res
+            .status(error instanceof Error && error.name === 'NotFoundException' ? 404 : 403)
+            .send(error instanceof Error ? error.message : 'Access denied');
+        } finally {
+          this.pendingInits.delete(cacheKey);
+        }
       }
     }
 

@@ -14,8 +14,9 @@ import {
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { ToolRegistryService, RegisteredTool } from './tool-registry.service';
 
 /** Minimal shape shared by MCP-discovered tools and pre-discovered DB tools */
@@ -23,6 +24,18 @@ interface DiscoveredTool {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+}
+
+/**
+ * Sanitize a string for use as a tool name component.
+ * LLM providers (e.g. Anthropic) require tool names to match ^[a-zA-Z0-9_-]{1,128}$.
+ * Replaces invalid characters with underscores and collapses consecutive underscores.
+ */
+function sanitizeToolNameSegment(segment: string): string {
+  return segment
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
 }
 import { TemporalService } from '../temporal/temporal.service';
 import { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
@@ -42,6 +55,11 @@ export class McpGatewayService {
   // - Stateful instances dedicated to MCP gateway
   private readonly servers = new Map<string, McpServer>();
   private readonly registeredToolNames = new Map<string, Set<string>>();
+
+  // Raw JSON schemas keyed by proxied tool name. McpServer.registerTool() expects
+  // Zod schemas, but external MCP servers provide raw JSON Schema. We store them here
+  // and inject them via a custom ListTools handler after registration.
+  private readonly externalToolSchemas = new Map<string, Record<string, unknown>>();
 
   // Persistent MCP client pool for external (proxied) tool calls.
   // Key: endpoint URL. The stdio-proxy is stateful and rejects re-initialization,
@@ -97,6 +115,7 @@ export class McpGatewayService {
     this.registeredToolNames.set(cacheKey, toolSet);
     await this.registerTools(server, runId, allowedTools, allowedNodeIds, toolSet);
     this.logger.log(`[getServerForRun] Registered ${toolSet.size} tools for run ${runId}`);
+    this.patchListToolsWithExternalSchemas(server);
     this.servers.set(cacheKey, server);
 
     return server;
@@ -122,6 +141,7 @@ export class McpGatewayService {
         const toolSet = this.registeredToolNames.get(cacheKey) ?? new Set<string>();
         this.registeredToolNames.set(cacheKey, toolSet);
         await this.registerTools(server, runId, undefined, allowedNodeIds, toolSet);
+        this.patchListToolsWithExternalSchemas(server);
       }),
     );
   }
@@ -135,6 +155,40 @@ export class McpGatewayService {
     if (organizationId && run.organizationId !== organizationId) {
       throw new ForbiddenException(`You do not have access to workflow run ${runId}`);
     }
+  }
+
+  /**
+   * Override the ListTools handler to inject raw JSON schemas for external tools.
+   * McpServer.registerTool() only accepts Zod schemas, but external MCP servers
+   * provide raw JSON Schema. This patches the response to include actual schemas
+   * so the AI model can see parameter definitions and pass correct arguments.
+   */
+  private patchListToolsWithExternalSchemas(server: McpServer): void {
+    if (this.externalToolSchemas.size === 0) return;
+
+    const schemasSnapshot = new Map(this.externalToolSchemas);
+
+    // Access the low-level protocol Server to override the ListTools handler.
+    // McpServer stores the underlying Server as `.server`.
+    // `setRequestHandler` uses Map.set internally, safely replacing existing handlers.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const registeredTools = (server as any)._registeredTools as Record<
+      string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { enabled: boolean; description?: string; annotations?: any; _meta?: any }
+    >;
+
+    server.server.setRequestHandler(ListToolsRequestSchema, () => ({
+      tools: Object.entries(registeredTools)
+        .filter(([, tool]) => tool.enabled)
+        .map(([name, tool]) => ({
+          name,
+          description: tool.description,
+          inputSchema: schemasSnapshot.get(name) ?? { type: 'object' as const },
+          annotations: tool.annotations,
+          _meta: tool._meta,
+        })),
+    }));
   }
 
   private async logToolCall(
@@ -393,13 +447,13 @@ export class McpGatewayService {
           this.logger.debug(`[registerTools]   DB result: ${tools.length} tools`);
         }
 
-        const prefix = source.toolName;
+        const prefix = sanitizeToolNameSegment(source.toolName);
         this.logger.debug(
           `[registerTools]   Registering ${tools.length} tools with prefix '${prefix}'`,
         );
 
         for (const t of tools) {
-          const proxiedName = `${prefix}__${t.name}`;
+          const proxiedName = `${prefix}__${sanitizeToolNameSegment(t.name)}`;
 
           if (allowedTools && allowedTools.length > 0 && !allowedTools.includes(proxiedName)) {
             this.logger.debug(`[registerTools]   Skipping ${proxiedName} - not in allowedTools`);
@@ -412,19 +466,31 @@ export class McpGatewayService {
           }
 
           this.logger.debug(`[registerTools]   Registering tool: ${proxiedName}`);
+          // Store raw JSON schema separately — McpServer.registerTool() expects Zod
+          // schemas, but external tools provide raw JSON Schema. We inject schemas
+          // via patchListToolsWithExternalSchemas() after registration.
+          if (t.inputSchema) {
+            this.externalToolSchemas.set(proxiedName, t.inputSchema);
+          }
           server.registerTool(
             proxiedName,
             {
               description: t.description,
-              _meta: { inputSchema: t.inputSchema },
+              inputSchema: z.object({}).passthrough(),
             },
             async (args: Record<string, unknown>) => {
+              this.logger.debug(
+                `[ToolCall] ${proxiedName} → ${t.name} | args: ${JSON.stringify(args)}`,
+              );
               const startTime = Date.now();
               const nodeRef = `mcp:${proxiedName}`;
               await this.logToolCall(runId, proxiedName, 'STARTED', nodeRef);
 
               try {
                 const result = await this.proxyCallToExternal(source, t.name, args);
+                this.logger.debug(
+                  `[ToolCall] ${proxiedName} result: ${JSON.stringify(result).slice(0, 200)}`,
+                );
 
                 await this.logToolCall(runId, proxiedName, 'COMPLETED', nodeRef, {
                   duration: Date.now() - startTime,
