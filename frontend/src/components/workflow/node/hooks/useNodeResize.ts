@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, type RefObject } from 'react';
-import { useReactFlow, useUpdateNodeInternals } from 'reactflow';
+import { useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { useWorkflowStore } from '@/store/workflowStore';
 import type { FrontendNodeData } from '@/schemas/node';
 import { TEXT_BLOCK_SIZES } from '../constants';

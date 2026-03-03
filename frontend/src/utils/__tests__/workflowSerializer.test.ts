@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
-import { MarkerType } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
+import { MarkerType } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 import {

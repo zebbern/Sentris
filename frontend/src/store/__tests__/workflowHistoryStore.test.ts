@@ -7,7 +7,7 @@ mock.module('@/store/workflowHistoryStore', () =>
 );
 
 import { useWorkflowHistoryStore, getTemporalState } from '../workflowHistoryStore';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 // --- Helpers ---

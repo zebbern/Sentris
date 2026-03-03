@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import { api } from '@/services/api';
 import { deserializeNodes, deserializeEdges } from '@/utils/workflowSerializer';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Node, Edge, Connection } from 'reactflow';
+import type { Node, Edge, Connection } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 

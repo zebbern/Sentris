@@ -7,16 +7,16 @@ import {
   type NodeChange,
   type NodeAddChange,
   type EdgeChange,
-} from 'reactflow';
+} from '@xyflow/react';
 import { isEntryPointNode } from '@/utils/entryPointUtils';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ToastContextValue } from '@/components/ui/toast-context';
 
 interface UseWorkflowChangeHandlersParams {
   mode: 'design' | 'execution';
-  designNodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
-  executionNodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
-  designEdgesRef: React.MutableRefObject<ReactFlowEdge[]>;
+  designNodesRef: React.RefObject<ReactFlowNode<FrontendNodeData>[]>;
+  executionNodesRef: React.RefObject<ReactFlowNode<FrontendNodeData>[]>;
+  designEdgesRef: React.RefObject<ReactFlowEdge[]>;
   onNodesChangeBase: (changes: NodeChange[]) => void;
   onEdgesChangeBase: (changes: EdgeChange[]) => void;
   captureSnapshot: (nodes: ReactFlowNode<FrontendNodeData>[], edges: ReactFlowEdge[]) => void;
@@ -68,7 +68,7 @@ export function useWorkflowChangeHandlers({
 
       const filteredChanges = changes.filter((change) => {
         if (change.type === 'add' && 'item' in change) {
-          const node = (change as NodeAddChange<FrontendNodeData>).item;
+          const node = (change as NodeAddChange<ReactFlowNode<FrontendNodeData>>).item;
           const currentNodes =
             mode === 'design' ? designNodesRef.current : executionNodesRef.current;
           if (isEntryPointNode(node) && currentNodes.some(isEntryPointNode)) {
@@ -115,7 +115,7 @@ export function useWorkflowChangeHandlers({
             );
           }
 
-          captureSnapshot(nextNodes, nextEdges);
+          captureSnapshot(nextNodes as ReactFlowNode<FrontendNodeData>[], nextEdges);
         }
       }
 

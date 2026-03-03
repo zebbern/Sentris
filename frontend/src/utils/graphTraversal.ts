@@ -1,4 +1,4 @@
-import type { Edge } from 'reactflow';
+import type { Edge } from '@xyflow/react';
 
 /**
  * Find the full path of connected edges from a starting edge,

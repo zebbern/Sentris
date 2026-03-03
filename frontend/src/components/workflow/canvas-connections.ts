@@ -6,7 +6,7 @@ import {
   type Edge,
   type EdgeChange,
   type OnConnect,
-} from 'reactflow';
+} from '@xyflow/react';
 
 import type { NodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';

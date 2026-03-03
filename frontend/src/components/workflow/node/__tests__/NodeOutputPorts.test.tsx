@@ -6,7 +6,7 @@ import type { NodeVisualState } from '@/store/executionTimelineStore';
 // Mock reactflow Handle component
 // All reactflow mocks must provide a consistent superset of exports because
 // bun:test mock.module is global and the last registered factory wins.
-mock.module('reactflow', () => ({
+mock.module('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: any) => children,
   NodeResizer: () => <div data-testid="node-resizer" />,
   Handle: ({ id, ...rest }: { id: string; [key: string]: unknown }) => (

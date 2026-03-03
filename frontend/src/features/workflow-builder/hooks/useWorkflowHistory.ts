@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge, NodeChange } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge, NodeChange } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import {
   useWorkflowHistoryStore,

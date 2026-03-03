@@ -7,7 +7,7 @@ import { useWebhooks } from '@/hooks/queries/useWebhookQueries';
 import type { WebhookConfiguration, WebhookInputDefinition } from '@sentris/shared';
 import { WebhookDetails } from './WebhookDetails';
 import { useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
-import type { Node as ReactFlowNode } from 'reactflow';
+import type { Node as ReactFlowNode } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 

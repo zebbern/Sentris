@@ -1,4 +1,4 @@
-import type { NodeProps } from 'reactflow';
+import type { NodeProps, Node } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 /**
@@ -7,8 +7,8 @@ import type { FrontendNodeData } from '@/schemas/node';
  * may create on every render even when the underlying values haven't changed.
  */
 export function areWorkflowNodePropsEqual(
-  prev: NodeProps<FrontendNodeData>,
-  next: NodeProps<FrontendNodeData>,
+  prev: NodeProps<Node<FrontendNodeData>>,
+  next: NodeProps<Node<FrontendNodeData>>,
 ): boolean {
   if (prev.id !== next.id) return false;
   if (prev.selected !== next.selected) return false;

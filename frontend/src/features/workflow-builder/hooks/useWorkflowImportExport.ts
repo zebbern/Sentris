@@ -12,7 +12,7 @@ import {
   cloneEdges,
 } from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
 import type { FrontendNodeData } from '@/schemas/node';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import { api } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';

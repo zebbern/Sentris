@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Node, Edge } from 'reactflow';
+import type { Node, Edge } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 import { getGraphChangeDescription } from '../graphDiff';

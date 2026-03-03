@@ -15,7 +15,7 @@ import { ConfigPanelOutputs } from './config-panel/ConfigPanelOutputs';
 import { ConfigPanelSchedules } from './config-panel/ConfigPanelSchedules';
 import { ConfigPanelExamples } from './config-panel/ConfigPanelExamples';
 import { ConfigPanelFooter } from './config-panel/ConfigPanelFooter';
-import { useReactFlow } from 'reactflow';
+import { useReactFlow } from '@xyflow/react';
 import { API_V1_URL, api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { logger } from '@/lib/logger';

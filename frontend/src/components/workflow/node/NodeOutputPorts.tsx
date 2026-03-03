@@ -1,4 +1,4 @@
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import { Check, GitBranch, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NodeVisualState } from '@/store/executionTimelineStore';

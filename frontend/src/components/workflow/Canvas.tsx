@@ -18,8 +18,8 @@ import {
   type NodeChange,
   type EdgeChange,
   type ReactFlowInstance,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 import { WorkflowNode } from './WorkflowNode';
 import { TerminalNode } from './TerminalNode';
@@ -33,7 +33,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
-import type { NodeData } from '@/schemas/node';
+import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
 import { EntryPointActionsContext } from './entry-point-context';
@@ -98,7 +98,9 @@ export function Canvas({
   webhooksPanelExpanded,
   ...scheduleProps
 }: CanvasProps) {
-  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
+    Node<FrontendNodeData>
+  > | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const { data: componentIndex } = useComponents();
@@ -135,7 +137,7 @@ export function Canvas({
 
   const onConnectStart = useCallback(
     (
-      _event: React.MouseEvent | React.TouchEvent,
+      _event: MouseEvent | TouchEvent,
       params: {
         nodeId: string | null;
         handleId: string | null;
@@ -455,7 +457,7 @@ export function Canvas({
                 onConnectStart={onConnectStart}
                 onConnectEnd={onConnectEnd}
                 connectionLineComponent={ConnectionLine}
-                onInit={(instance: ReactFlowInstance) => {
+                onInit={(instance) => {
                   setReactFlowInstance(instance);
                   if (nodes.length > 0) {
                     try {
@@ -482,7 +484,7 @@ export function Canvas({
                 edgeTypes={edgeTypes}
                 nodesDraggable={mode === 'design'}
                 nodesConnectable={mode === 'design'}
-                edgesUpdatable={mode === 'design'}
+                edgesReconnectable={mode === 'design'}
                 deleteKeyCode={mode === 'design' ? ['Backspace', 'Delete'] : []}
                 elementsSelectable
                 className={isPlacementActive ? '[&_.react-flow__pane]:!cursor-crosshair' : ''}

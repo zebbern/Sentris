@@ -7,7 +7,7 @@
  * visually indicate fan-out bundles.
  */
 
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 
 /** A single fan-out target with its own path from the fan-out point. */
 export interface FanOutTarget {
@@ -60,8 +60,8 @@ function buildNodeRectMap(nodes: Node[]): Map<string, NodeRect> {
     map.set(node.id, {
       x: node.position.x,
       y: node.position.y,
-      width: node.width ?? 250,
-      height: node.height ?? 80,
+      width: node.measured?.width ?? 250,
+      height: node.measured?.height ?? 80,
     });
   }
   return map;
@@ -142,12 +142,14 @@ export function computeEdgeBundles(edges: Edge[], nodes: Node[]): EdgeBundle[] {
         edgeId: t.edge.id,
         targetNodeId: t.edge.target,
         path,
-        color: t.edge.data?.sourcePortColor,
+        color: t.edge.data?.sourcePortColor as string | undefined,
       };
     });
 
     // Determine trunk color: if all edges share same port color, use it; otherwise undefined (slate)
-    const portColors = new Set(groupEdges.map((e) => e.data?.sourcePortColor).filter(Boolean));
+    const portColors = new Set(
+      groupEdges.map((e) => e.data?.sourcePortColor as string | undefined).filter(Boolean),
+    );
     const trunkColor = portColors.size === 1 ? [...portColors][0] : undefined;
 
     bundles.push({

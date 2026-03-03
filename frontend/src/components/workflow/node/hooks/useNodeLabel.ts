@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useReactFlow } from 'reactflow';
+import { useReactFlow } from '@xyflow/react';
 import { useWorkflowStore } from '@/store/workflowStore';
 import type { FrontendNodeData } from '@/schemas/node';
 

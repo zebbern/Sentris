@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Node as ReactFlowNode } from 'reactflow';
+import type { Node as ReactFlowNode } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import { logger } from '@/lib/logger';

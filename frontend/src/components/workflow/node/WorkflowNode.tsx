@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { NodeResizer, type NodeProps, useReactFlow } from 'reactflow';
+import { NodeResizer, type NodeProps, type Node, useReactFlow } from '@xyflow/react';
 import { ShieldAlert } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,7 @@ const TOOL_MODE_ONLY_COMPONENTS = new Set([
  * Enhanced WorkflowNode - Visual representation with timeline states.
  * Delegates to extracted hooks for state logic and sub-components for rendering.
  */
-const WorkflowNodeInner = ({ data, selected, id }: NodeProps<FrontendNodeData>) => {
+const WorkflowNodeInner = ({ data, selected, id }: NodeProps<Node<FrontendNodeData>>) => {
   const nodeRef = useRef<HTMLDivElement | null>(null);
 
   // ── Store hooks ──────────────────────────────────────────────────────

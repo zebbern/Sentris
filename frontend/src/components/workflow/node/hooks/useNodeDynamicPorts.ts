@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useUpdateNodeInternals } from 'reactflow';
+import { useUpdateNodeInternals } from '@xyflow/react';
 import { logger } from '@/lib/logger';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata, OutputPort, InputPort } from '@/schemas/component';

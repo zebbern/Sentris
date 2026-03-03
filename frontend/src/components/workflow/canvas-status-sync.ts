@@ -1,5 +1,5 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 import type { NodeData } from '@/schemas/node';
 

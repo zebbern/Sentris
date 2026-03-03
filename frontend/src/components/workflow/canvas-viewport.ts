@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import type { Node, ReactFlowInstance } from 'reactflow';
+import type { Node, ReactFlowInstance } from '@xyflow/react';
 
 import type { NodeData } from '@/schemas/node';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
@@ -7,7 +7,7 @@ import { isEntryPointNode } from '@/utils/entryPointUtils';
 import { logger } from '@/lib/logger';
 
 export interface UseCanvasViewportDeps {
-  reactFlowInstance: ReactFlowInstance | null;
+  reactFlowInstance: ReactFlowInstance<Node<NodeData>> | null;
   nodes: Node<NodeData>[];
   edges: { length: number };
   mode: string;

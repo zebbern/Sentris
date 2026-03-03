@@ -6,7 +6,7 @@
  * boxes instead of passing straight through them.
  */
 
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,8 +58,8 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
 
 /** Get the bounding rect for a React Flow node (after layout). */
 function nodeToRect(node: Node): Rect | null {
-  const w = node.width ?? (node.style?.width as number) ?? 200;
-  const h = node.height ?? (node.style?.height as number) ?? 80;
+  const w = node.measured?.width ?? (node.style?.width as number) ?? 200;
+  const h = node.measured?.height ?? (node.style?.height as number) ?? 80;
   const x = node.position.x;
   const y = node.position.y;
   return { left: x, top: y, right: x + w, bottom: y + h };

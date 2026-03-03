@@ -9,7 +9,7 @@
  */
 
 import { memo, useMemo } from 'react';
-import { useEdges, useNodes, useViewport } from 'reactflow';
+import { useEdges, useNodes, useViewport } from '@xyflow/react';
 
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useThemeStore } from '@/store/themeStore';

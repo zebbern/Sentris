@@ -1,12 +1,12 @@
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { Node, NodeMouseHandler, ReactFlowInstance } from 'reactflow';
+import type { Node, NodeMouseHandler, ReactFlowInstance } from '@xyflow/react';
 
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 
 interface UseCanvasNodeInteractionsDeps {
   nodes: Node<NodeData>[];
   setNodes: Dispatch<SetStateAction<Node<NodeData>[]>>;
-  reactFlowInstance: ReactFlowInstance | null;
+  reactFlowInstance: ReactFlowInstance<Node<NodeData>> | null;
   mode: string;
   selectedNodeId: string | null;
   selectedNode: Node<NodeData> | null;

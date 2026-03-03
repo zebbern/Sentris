@@ -1,4 +1,4 @@
-import { Handle, Position, useReactFlow } from 'reactflow';
+import { Handle, Position, useReactFlow } from '@xyflow/react';
 import { KeyRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FrontendNodeData } from '@/schemas/node';

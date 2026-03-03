@@ -1,7 +1,7 @@
 import { describe, it, afterEach, expect, mock } from 'bun:test';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import { createStoreMock } from '@/test/mocks/createStoreMock';
 
@@ -75,7 +75,7 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
   getComponentFromCache: () => null,
 }));
 
-mock.module('reactflow', () => ({
+mock.module('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: any) => children,
   NodeResizer: () => null,
   Handle: ({ id, ...rest }: any) => <div data-testid={`handle-${id}`} {...rest} />,

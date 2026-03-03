@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { memo } from 'react';
-import { ReactFlowProvider } from 'reactflow';
+import { ReactFlowProvider } from '@xyflow/react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ExecutionInspector } from '@/components/timeline/ExecutionInspector';
 import { RunBreadcrumbs } from '@/components/timeline/RunBreadcrumbs';

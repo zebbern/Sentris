@@ -23,7 +23,7 @@ import {
 } from '@/utils/portUtils';
 import type { InputPort } from '@/schemas/component';
 import type { FrontendNodeData, InputMapping } from '@/schemas/node';
-import type { Edge, Node as RFNode } from 'reactflow';
+import type { Edge, Node as RFNode } from '@xyflow/react';
 
 export interface ConfigPanelInputsProps {
   componentInputs: InputPort[];
