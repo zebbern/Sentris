@@ -60,7 +60,7 @@ export function generateFindingHash(
   ...fields: (string | undefined | null)[]
 ): string {
   const normalized = fields
-    .map((f) => (f ?? '').toLowerCase().trim())
+    .map((f) => String(f ?? '').toLowerCase().trim())
     .join('|');
   return createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
