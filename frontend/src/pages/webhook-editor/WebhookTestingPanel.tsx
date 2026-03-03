@@ -1,7 +1,7 @@
 import { Play, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import Editor from '@monaco-editor/react';
+import { LazyMonacoEditor } from '@/components/editors/LazyMonacoEditor';
 import { cn } from '@/lib/utils';
 import type { RuntimeInput, WebhookTestResult } from './webhookEditorTypes';
 
@@ -52,7 +52,7 @@ export function WebhookTestingPanel({
               role="group"
               aria-label="Test Payload (JSON)"
             >
-              <Editor
+              <LazyMonacoEditor
                 language="json"
                 value={testPayload}
                 onChange={(v) => setTestPayload(v || '')}
@@ -68,7 +68,7 @@ export function WebhookTestingPanel({
               role="group"
               aria-label="Test Headers (JSON)"
             >
-              <Editor
+              <LazyMonacoEditor
                 language="json"
                 value={testHeaders}
                 onChange={(v) => setTestHeaders(v || '')}

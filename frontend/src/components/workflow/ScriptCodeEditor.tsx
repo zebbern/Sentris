@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import Editor, { OnMount, loader } from '@monaco-editor/react';
+import type { OnMount } from '@monaco-editor/react';
+import { LazyMonacoEditor } from '@/components/editors/LazyMonacoEditor';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
@@ -10,9 +11,6 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
-
-// Configure Monaco to use CDN
-loader.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs' } });
 
 interface Variable {
   name: string;
@@ -279,7 +277,7 @@ export function ScriptCodeEditor({
 
       {/* Monaco Editor */}
       <div className="rounded-md border overflow-hidden">
-        <Editor
+        <LazyMonacoEditor
           height="280px"
           language="typescript"
           value={code}
