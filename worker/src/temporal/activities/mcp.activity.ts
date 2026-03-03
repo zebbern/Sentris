@@ -32,7 +32,7 @@ async function callInternalApi(path: string, body: any) {
   }
 
   const baseUrl = normalizeBaseUrl(DEFAULT_API_BASE_URL);
-  const url = `${baseUrl}/internal/mcp/${path}`;
+  const url = `${baseUrl}/api/v1/internal/mcp/${path}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
