@@ -24,6 +24,9 @@ export function CommandItem({
 
   return (
     <button
+      id={`cmd-${command.id}`}
+      role="option"
+      aria-selected={isSelected}
       data-selected={isSelected}
       onClick={onExecute}
       onMouseEnter={onMouseEnter}

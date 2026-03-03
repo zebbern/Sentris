@@ -1,3 +1,6 @@
+// NOTE: pm2 is AGPL-3.0 licensed. It is used ONLY for local development
+// orchestration (devDependencies). It must NEVER be included in production
+// Docker images or distributed artifacts.
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');

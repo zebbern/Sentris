@@ -241,6 +241,14 @@ export function CommandPalette() {
             }
             className="flex-1 bg-transparent border-none outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-base placeholder:text-muted-foreground/60"
             aria-label="Search commands"
+            role="combobox"
+            aria-expanded={true}
+            aria-controls="command-palette-list"
+            aria-activedescendant={
+              flatCommandList[selectedIndex]
+                ? `cmd-${flatCommandList[selectedIndex].id}`
+                : undefined
+            }
             autoComplete="off"
             spellCheck={false}
           />
@@ -250,7 +258,12 @@ export function CommandPalette() {
         </div>
 
         {/* Command list */}
-        <div ref={listRef} className="max-h-[400px] overflow-y-auto overflow-x-hidden">
+        <div
+          ref={listRef}
+          id="command-palette-list"
+          role="listbox"
+          className="max-h-[400px] overflow-y-auto overflow-x-hidden"
+        >
           {(isLoadingWorkflows || isLoadingComponents) && query && (
             <div className="px-4 py-3 text-sm text-muted-foreground">Loading...</div>
           )}

@@ -121,8 +121,12 @@ export function NotificationCenter() {
                           {notification.title}
                         </span>
                         {!notification.read && (
-                          <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                          <span
+                            className="h-2 w-2 flex-shrink-0 rounded-full bg-primary"
+                            aria-hidden="true"
+                          />
                         )}
+                        {!notification.read && <span className="sr-only">(unread)</span>}
                       </div>
                       {notification.description && (
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">

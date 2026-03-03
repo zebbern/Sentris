@@ -357,7 +357,10 @@ async function registerServerWithBackend(
 ): Promise<void> {
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
   const internalApiUrl = `${backendUrl}/api/v1/internal/mcp`;
-  const internalToken = process.env.INTERNAL_SERVICE_TOKEN || 'local-internal-token';
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
+  if (!internalToken) {
+    throw new Error('INTERNAL_SERVICE_TOKEN environment variable is required');
+  }
 
   // Use a unique nodeId for each server to avoid overwriting in Redis
   // Format: ${groupNodeId}/${serverId} (e.g., "aws-mcp-group/aws-cloudtrail")

@@ -5,13 +5,14 @@ import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 
 import * as schema from './schema';
 
-const FALLBACK_DEV_KEY = '0123456789abcdef0123456789abcdef';
-
 export class SecretsAdapter implements ISecretsService {
   private readonly encryption: SecretEncryption;
 
   constructor(private readonly db: NodePgDatabase<typeof schema>) {
-    const rawKey = process.env.SECRET_STORE_MASTER_KEY ?? FALLBACK_DEV_KEY;
+    const rawKey = process.env.SECRET_STORE_MASTER_KEY;
+    if (!rawKey) {
+      throw new Error('SECRET_STORE_MASTER_KEY environment variable is required');
+    }
     this.encryption = new SecretEncryption(parseMasterKey(rawKey));
   }
 

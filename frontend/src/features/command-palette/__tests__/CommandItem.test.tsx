@@ -128,7 +128,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button'));
+    fireEvent.click(screen.getByRole('option'));
     expect(onExecute).toHaveBeenCalledTimes(1);
   });
 
@@ -146,7 +146,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByRole('button'));
+    fireEvent.mouseEnter(screen.getByRole('option'));
     expect(onMouseEnter).toHaveBeenCalledTimes(1);
   });
 
@@ -163,7 +163,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    const button = screen.getByRole('button');
+    const button = screen.getByRole('option');
     expect(button.dataset.selected).toBe('true');
   });
 
@@ -180,7 +180,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    const button = screen.getByRole('button');
+    const button = screen.getByRole('option');
     expect(button.dataset.selected).toBe('false');
   });
 
@@ -205,7 +205,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    const button = screen.getByRole('button');
+    const button = screen.getByRole('option');
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -230,7 +230,7 @@ describe('CommandItem', () => {
       />,
     );
 
-    const button = screen.getByRole('button');
+    const button = screen.getByRole('option');
     expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 });

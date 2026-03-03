@@ -47,7 +47,7 @@ const definition = defineComponent({
   runner: {
     kind: 'docker',
     image: 'node:20-alpine',
-    network: 'host',
+    network: 'bridge',
     entrypoint: '/bin/sh',
     command: ['-c', 'node /workspace/server.js'],
   },
@@ -172,7 +172,7 @@ process.on('SIGTERM', () => {
       const runnerConfig = {
         kind: 'docker' as const,
         image: 'node:20-alpine',
-        network: 'host' as const,
+        network: 'bridge' as const,
         entrypoint: 'node',
         command: ['/workspace/server.js'],
         volumes: [volume.getVolumeConfig('/workspace', false)],

@@ -41,6 +41,9 @@ export interface DockerRunnerConfig {
   detached?: boolean; // If true, start container and return immediately without waiting for exit
   autoRemove?: boolean; // If true, keep --rm even when detached (auto-remove on exit)
   ports?: Record<string, number>; // Port mapping host (e.g., "0.0.0.0:8080" or "127.0.0.1:8080") -> container port
+  memoryLimit?: string; // Docker --memory flag (e.g., '512m', '1g'). Default: '512m'
+  cpuLimit?: string; // Docker --cpus flag (e.g., '1', '0.5'). Default: '1'
+  pidsLimit?: number; // Docker --pids-limit flag. Default: 256
 }
 
 

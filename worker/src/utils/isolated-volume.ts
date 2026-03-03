@@ -1,9 +1,8 @@
-import { spawn } from 'child_process';
+import { spawn, execFile as execFileCallback } from 'child_process';
 import { promisify } from 'util';
-import { exec as execCallback } from 'child_process';
 import { ValidationError, ConfigurationError, ContainerError } from '@sentris/component-sdk';
 
-const exec = promisify(execCallback);
+const execFile = promisify(execFileCallback);
 
 /**
  * Manages isolated Docker volumes for multi-tenant SaaS environments.
@@ -511,9 +510,14 @@ export class IsolatedContainerVolume {
  */
 export async function cleanupOrphanedVolumes(olderThanHours = 24): Promise<number> {
   try {
-    const { stdout } = await exec(
-      'docker volume ls --filter "label=studio.managed=true" --format "{{.Name}}|||{{.CreatedAt}}"',
-    );
+    const { stdout } = await execFile('docker', [
+      'volume',
+      'ls',
+      '--filter',
+      'label=studio.managed=true',
+      '--format',
+      '{{.Name}}|||{{.CreatedAt}}',
+    ]);
 
     if (!stdout.trim()) {
       return 0;
@@ -532,7 +536,7 @@ export async function cleanupOrphanedVolumes(olderThanHours = 24): Promise<numbe
 
       if (createdTime < cutoffTime) {
         try {
-          await exec(`docker volume rm ${volumeName}`);
+          await execFile('docker', ['volume', 'rm', volumeName]);
           console.log(`Removed orphaned volume: ${volumeName}`);
           removedCount++;
         } catch (error: unknown) {
