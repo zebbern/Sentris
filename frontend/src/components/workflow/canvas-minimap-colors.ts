@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import type { NodeData } from '@/schemas/node';
 
 /** Maps node execution status to MiniMap display colors. */

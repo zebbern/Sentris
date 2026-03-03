@@ -1,4 +1,4 @@
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import type { WorkflowSchedule } from '@sentris/shared';
 

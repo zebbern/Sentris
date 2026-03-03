@@ -1,6 +1,6 @@
 import { describe, it, afterEach, expect, mock } from 'bun:test';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 // Control validation warnings per test

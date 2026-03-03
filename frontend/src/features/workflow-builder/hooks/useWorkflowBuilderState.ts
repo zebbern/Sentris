@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';

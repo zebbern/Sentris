@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import type { Node as ReactFlowNode } from 'reactflow';
+import type { Node as ReactFlowNode } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import { useExecutionStore } from '@/store/executionStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';

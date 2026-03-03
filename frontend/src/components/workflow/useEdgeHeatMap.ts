@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Edge } from 'reactflow';
+import type { Edge } from '@xyflow/react';
 import type { DataPacket } from '@/store/executionTimelineStore';
 
 export interface EdgeHeatMetrics {

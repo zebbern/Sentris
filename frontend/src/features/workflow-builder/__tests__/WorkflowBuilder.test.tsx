@@ -95,7 +95,7 @@ const mockGraphControllers = {
 let capturedTopBarProps: Record<string, unknown> = {};
 
 // --- Module mocks: infrastructure ---
-mock.module('reactflow', () => ({
+mock.module('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="reactflow-provider">{children}</div>
   ),
@@ -300,7 +300,7 @@ const renderBuilder = () => renderWithProviders(<WorkflowBuilder />);
 
 // --- Teardown ---
 const MOCKED = [
-  'reactflow',
+  '@xyflow/react',
   'react-router-dom',
   '@/components/ui/use-toast',
   '@/hooks/useDocumentTitle',

@@ -7,7 +7,7 @@
  */
 
 import { useMemo } from 'react';
-import { getBezierPath, Position, useNodes } from 'reactflow';
+import { getBezierPath, Position, useNodes } from '@xyflow/react';
 
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { computeSmartEdgePath } from './edge-routing';

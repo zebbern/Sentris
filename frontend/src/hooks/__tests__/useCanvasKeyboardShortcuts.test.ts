@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
-import type { Node, Edge } from 'reactflow';
+import type { Node, Edge } from '@xyflow/react';
 import { useCanvasKeyboardShortcuts } from '../useCanvasKeyboardShortcuts';
+import type { FrontendNodeData } from '@/schemas/node';
 
 afterEach(cleanup);
 
@@ -10,11 +11,15 @@ function dispatchKey(key: string, el: HTMLElement = document.body) {
   el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
 
-function createNode(id: string, selected = false, data: Record<string, unknown> = {}): Node {
+function createNode(
+  id: string,
+  selected = false,
+  data: Record<string, unknown> = {},
+): Node<FrontendNodeData> {
   return {
     id,
     position: { x: 0, y: 0 },
-    data,
+    data: { label: '', config: { params: {}, inputOverrides: {} }, ...data } as FrontendNodeData,
     selected,
   };
 }

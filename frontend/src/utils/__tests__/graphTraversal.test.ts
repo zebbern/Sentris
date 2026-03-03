@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Edge } from 'reactflow';
+import type { Edge } from '@xyflow/react';
 
 import { findFullPath, findFullPathNodes } from '../graphTraversal';
 

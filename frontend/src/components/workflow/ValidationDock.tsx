@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { getNodeValidationWarnings } from '@/utils/connectionValidation';
-import type { Node, Edge } from 'reactflow';
+import type { Node, Edge } from '@xyflow/react';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import { useIsMobile } from '@/hooks/useIsMobile';
 

@@ -7,7 +7,7 @@ import type { FrontendNodeData } from '@/schemas/node';
 // Inline provider avoids reactflow ESM resolution issues when running in test suite
 const ReactFlowProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 
-mock.module('reactflow', () => ({
+mock.module('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: any) => children,
   NodeResizer: () => <div data-testid="node-resizer" />,
   Handle: ({ id, ...rest }: any) => <div data-testid={`handle-${id}`} {...rest} />,
@@ -117,11 +117,14 @@ describe('WorkflowNode – text block rendering', () => {
               data={nodeData}
               selected={false}
               type="workflow"
-              xPos={0}
-              yPos={0}
               zIndex={0}
               isConnectable={true}
               dragging={false}
+              selectable={true}
+              deletable={true}
+              draggable={true}
+              positionAbsoluteX={0}
+              positionAbsoluteY={0}
             />
           </ReactFlowProvider>
         </MemoryRouter>
@@ -159,11 +162,14 @@ describe('WorkflowNode – text block rendering', () => {
               data={nodeData}
               selected={false}
               type="workflow"
-              xPos={0}
-              yPos={0}
               zIndex={0}
               isConnectable={true}
               dragging={false}
+              selectable={true}
+              deletable={true}
+              draggable={true}
+              positionAbsoluteX={0}
+              positionAbsoluteY={0}
             />
           </ReactFlowProvider>
         </MemoryRouter>

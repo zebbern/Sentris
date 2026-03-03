@@ -1,4 +1,4 @@
-import { getBezierPath, type ConnectionLineComponentProps, Position } from 'reactflow';
+import { getBezierPath, type ConnectionLineComponentProps, Position } from '@xyflow/react';
 import { useConnectionPreview } from './connection-preview-context';
 import { getEdgeColor } from './edge-colors';
 import { useThemeStore } from '@/store/themeStore';

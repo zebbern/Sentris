@@ -1,14 +1,15 @@
-import { type NodeProps } from 'reactflow';
+import { type NodeProps, type Node } from '@xyflow/react';
 import { NodeTerminalPanel } from '../terminal/NodeTerminalPanel';
 
 interface TerminalNodeData {
+  [key: string]: unknown;
   parentNodeId: string;
   runId: string | null;
   timelineSync: boolean;
   onClose: () => void;
 }
 
-export function TerminalNode({ data }: NodeProps<TerminalNodeData>) {
+export function TerminalNode({ data }: NodeProps<Node<TerminalNodeData>>) {
   return (
     <div className="nodrag nowheel nopan">
       <NodeTerminalPanel

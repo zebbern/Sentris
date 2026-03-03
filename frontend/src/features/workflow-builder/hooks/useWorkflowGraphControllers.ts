@@ -7,7 +7,7 @@ import {
   type EdgeChange,
   type Node as ReactFlowNode,
   type Edge as ReactFlowEdge,
-} from 'reactflow';
+} from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import {
   ENTRY_COMPONENT_ID,
@@ -25,14 +25,14 @@ export interface GraphSnapshot {
 export interface GraphController {
   nodes: ReactFlowNode<FrontendNodeData>[];
   edges: ReactFlowEdge[];
-  setNodes: ReturnType<typeof useNodesState<FrontendNodeData>>[1];
+  setNodes: ReturnType<typeof useNodesState<ReactFlowNode<FrontendNodeData>>>[1];
   setEdges: ReturnType<typeof useEdgesState>[1];
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
-  nodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
-  edgesRef: React.MutableRefObject<ReactFlowEdge[]>;
-  preservedStateRef: React.MutableRefObject<GraphSnapshot | null>;
-  savedSnapshotRef: React.MutableRefObject<GraphSnapshot | null>;
+  nodesRef: React.RefObject<ReactFlowNode<FrontendNodeData>[]>;
+  edgesRef: React.RefObject<ReactFlowEdge[]>;
+  preservedStateRef: React.RefObject<GraphSnapshot | null>;
+  savedSnapshotRef: React.RefObject<GraphSnapshot | null>;
 }
 
 export interface WorkflowGraphControllers {
@@ -68,7 +68,7 @@ const createNodesChangeHandler =
     toast,
     shouldMarkDirty,
   }: {
-    nodesRef: React.MutableRefObject<ReactFlowNode<FrontendNodeData>[]>;
+    nodesRef: React.RefObject<ReactFlowNode<FrontendNodeData>[]>;
     onNodesChangeBase: (changes: NodeChange[]) => void;
     toast: ToastFn;
     shouldMarkDirty?: () => void;
@@ -97,7 +97,7 @@ const createNodesChangeHandler =
 
     const filteredChanges = changes.filter((change) => {
       if (change.type === 'add' && 'item' in change) {
-        const node = (change as NodeAddChange<FrontendNodeData>).item;
+        const node = (change as NodeAddChange<ReactFlowNode<FrontendNodeData>>).item;
         if (isEntryPointNode(node) && currentNodes.some(isEntryPointNode)) {
           toast({
             variant: 'destructive',
@@ -140,13 +140,15 @@ export const useWorkflowGraphControllers = ({
   toast: ToastFn;
   onDesignGraphDirty?: () => void;
 }): WorkflowGraphControllers => {
-  const [designNodes, setDesignNodes, onDesignNodesChangeBase] = useNodesState<FrontendNodeData>(
-    [],
-  );
-  const [designEdges, setDesignEdges, onDesignEdgesChangeBase] = useEdgesState([]);
-  const [executionNodes, setExecutionNodes, onExecutionNodesChangeBase] =
-    useNodesState<FrontendNodeData>([]);
-  const [executionEdges, setExecutionEdges, onExecutionEdgesChangeBase] = useEdgesState([]);
+  const [designNodes, setDesignNodes, onDesignNodesChangeBase] = useNodesState<
+    ReactFlowNode<FrontendNodeData>
+  >([]);
+  const [designEdges, setDesignEdges, onDesignEdgesChangeBase] = useEdgesState<ReactFlowEdge>([]);
+  const [executionNodes, setExecutionNodes, onExecutionNodesChangeBase] = useNodesState<
+    ReactFlowNode<FrontendNodeData>
+  >([]);
+  const [executionEdges, setExecutionEdges, onExecutionEdgesChangeBase] =
+    useEdgesState<ReactFlowEdge>([]);
 
   const designNodesRef = useRef(designNodes);
   const designEdgesRef = useRef(designEdges);
@@ -173,7 +175,7 @@ export const useWorkflowGraphControllers = ({
     () =>
       createNodesChangeHandler({
         nodesRef: designNodesRef,
-        onNodesChangeBase: onDesignNodesChangeBase,
+        onNodesChangeBase: onDesignNodesChangeBase as (changes: NodeChange[]) => void,
         toast,
         shouldMarkDirty: onDesignGraphDirty,
       }),
@@ -184,7 +186,7 @@ export const useWorkflowGraphControllers = ({
     () =>
       createNodesChangeHandler({
         nodesRef: executionNodesRef,
-        onNodesChangeBase: onExecutionNodesChangeBase,
+        onNodesChangeBase: onExecutionNodesChangeBase as (changes: NodeChange[]) => void,
         toast,
       }),
     [onExecutionNodesChangeBase, toast],
@@ -193,7 +195,7 @@ export const useWorkflowGraphControllers = ({
   const designEdgesChange = useMemo(
     () =>
       createEdgesChangeHandler({
-        onEdgesChangeBase: onDesignEdgesChangeBase,
+        onEdgesChangeBase: onDesignEdgesChangeBase as (changes: EdgeChange[]) => void,
         shouldMarkDirty: onDesignGraphDirty,
       }),
     [onDesignEdgesChangeBase, onDesignGraphDirty],
@@ -202,7 +204,7 @@ export const useWorkflowGraphControllers = ({
   const executionEdgesChange = useMemo(
     () =>
       createEdgesChangeHandler({
-        onEdgesChangeBase: onExecutionEdgesChangeBase,
+        onEdgesChangeBase: onExecutionEdgesChangeBase as (changes: EdgeChange[]) => void,
       }),
     [onExecutionEdgesChangeBase],
   );

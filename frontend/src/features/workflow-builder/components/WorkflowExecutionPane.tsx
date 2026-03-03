@@ -4,7 +4,7 @@ import type {
   Edge as ReactFlowEdge,
   NodeChange,
   EdgeChange,
-} from 'reactflow';
+} from '@xyflow/react';
 import { Canvas } from '@/components/workflow/Canvas';
 import type { FrontendNodeData } from '@/schemas/node';
 

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import {
   cloneNodes,
   cloneEdges,

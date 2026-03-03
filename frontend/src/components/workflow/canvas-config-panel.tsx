@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 import { ConfigPanel } from './ConfigPanel';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';

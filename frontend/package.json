@@ -108,7 +108,7 @@
     "react-day-picker": "^9.13.2",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.3",
-    "reactflow": "^11.11.4",
+    "@xyflow/react": "^12.6.0",
     "tailwind-merge": "^3.3.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",

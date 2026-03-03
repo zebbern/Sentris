@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { MarkdownView } from '@/components/ui/markdown';
-import { useReactFlow } from 'reactflow';
+import { useReactFlow } from '@xyflow/react';
 import { useWorkflowStore } from '@/store/workflowStore';
 import type { FrontendNodeData } from '@/schemas/node';
 

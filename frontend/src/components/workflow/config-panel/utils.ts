@@ -1,6 +1,6 @@
 import type { FrontendNodeData } from '@/schemas/node';
 import type { JsonSchemaProperty, ToolSchemaField } from './types';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 /** Build a sample value for an entry-point runtime input, used in example payloads. */
 export const buildSampleValueForRuntimeInput = (type?: string, id?: string) => {

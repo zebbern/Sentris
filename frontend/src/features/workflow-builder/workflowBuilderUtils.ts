@@ -1,4 +1,4 @@
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import { serializeNodes, serializeEdges } from '@/utils/workflowSerializer';
 import type { FrontendNodeData } from '@/schemas/node';
 

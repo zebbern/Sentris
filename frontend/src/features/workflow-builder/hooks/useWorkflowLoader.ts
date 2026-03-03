@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import {
   cloneNodes,
   cloneEdges,
@@ -111,7 +111,7 @@ export function useWorkflowLoader({
         label: component?.name ?? 'Entry Point',
         config: {
           params: {
-            runtimeInputs: ENTRY_DEFAULT_RUNTIME_INPUTS.map((input) => ({ ...input })),
+            runtimeInputs: [...ENTRY_DEFAULT_RUNTIME_INPUTS],
           },
           inputOverrides: {},
         },

@@ -1,4 +1,4 @@
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import { CalendarClock, Settings, Webhook } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';

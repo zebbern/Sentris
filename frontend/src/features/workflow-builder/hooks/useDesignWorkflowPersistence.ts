@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 import { api, API_BASE_URL } from '@/services/api';
 import { serializeWorkflowForCreate, serializeWorkflowForUpdate } from '@/utils/workflowSerializer';

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { Edge, Node } from 'reactflow';
+import type { Edge, Node } from '@xyflow/react';
 import type { NodeData } from '@/schemas/node';
 import { findFullPath } from '@/utils/graphTraversal';
 

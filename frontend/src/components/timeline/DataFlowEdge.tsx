@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BaseEdge, EdgeLabelRenderer, EdgeProps } from 'reactflow';
+import { BaseEdge, EdgeLabelRenderer, EdgeProps } from '@xyflow/react';
 import { Package, FileText, Database, Code } from 'lucide-react';
 import { useExecutionTimelineStore, type DataPacket } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';

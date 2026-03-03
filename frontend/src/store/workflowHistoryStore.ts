@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { temporal, type TemporalState } from 'zundo';
-import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from 'reactflow';
+import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
 import type { FrontendNodeData } from '@/schemas/node';
 
 /**
