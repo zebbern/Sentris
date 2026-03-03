@@ -7,6 +7,16 @@ import type { ExecutionContext, RunnerConfig, DockerRunnerConfig } from './types
 import { createTerminalChunkEmitter } from './terminal';
 import { ContainerError, TimeoutError, ValidationError, ConfigurationError } from './errors';
 
+/**
+ * Strip ANSI escape codes from text.
+ * Docker containers and PTY output often contain color/control codes
+ * that pollute structured output (JSON parsing, line splitting).
+ */
+function stripAnsiCodes(text: string): string {
+  // Covers SGR (colors), cursor movement, and other CSI sequences
+  return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-9;]*[ -/]*[@-~])/g, '');
+}
+
 // Standard output file path inside the container
 const CONTAINER_OUTPUT_PATH = '/sentris-output';
 const OUTPUT_FILENAME = 'result.json';
@@ -257,16 +267,19 @@ async function readOutputFromFile<O>(
   // Fallback: Use stdout (for backwards compatibility with legacy components)
   // This allows components that just write to stdout to continue working.
   if (stdout.trim().length > 0) {
-    context.logger.info(`[Docker] No output file found, using stdout fallback (${stdout.length} bytes)`);
+    // Strip ANSI escape codes before parsing — Docker/PTY output often contains
+    // color codes that break JSON parsing and pollute line-based output.
+    const cleanStdout = stripAnsiCodes(stdout);
+    context.logger.info(`[Docker] No output file found, using stdout fallback (${cleanStdout.length} bytes)`);
 
     // Try to parse stdout as JSON
     try {
-      const output = JSON.parse(stdout.trim());
+      const output = JSON.parse(cleanStdout.trim());
       return output as O;
     } catch {
       // Not JSON - return raw string as output
       // This handles components like subfinder that output plain text
-      return stdout.trim() as unknown as O;
+      return cleanStdout.trim() as unknown as O;
     }
   }
 
