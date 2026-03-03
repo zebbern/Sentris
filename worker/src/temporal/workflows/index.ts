@@ -1,8 +1,6 @@
 import {
   ApplicationFailure,
-  condition,
   defineQuery,
-  getExternalWorkflowHandle,
   proxyActivities,
   setHandler,
   startChild,
@@ -12,7 +10,6 @@ import {
 import { runWorkflowWithScheduler } from '../workflow-scheduler.js';
 import { buildActionPayload } from '../input-resolver.js';
 import {
-  MCP_SERVER_COMPONENTS,
   isMcpServerComponent,
   isMcpGroupComponent,
   isApprovalPending,
@@ -20,6 +17,10 @@ import {
   extractFailureMessage,
   mapRetryPolicy,
 } from './workflow-helpers.js';
+import { handleSubWorkflowCall } from './sub-workflow-handler.js';
+import { handleToolModeRegistration } from './tool-mode-handler.js';
+import { handleHumanInput } from './human-input-handler.js';
+import type { PendingHumanInputOutput } from './human-input-handler.js';
 import {
   resolveHumanInputSignal,
   executeToolCallSignal,
@@ -308,295 +309,18 @@ export async function sentrisWorkflowRun(
         }
 
         if (action.componentId === 'core.workflow.call') {
-          const MAX_SUBWORKFLOW_DEPTH = 10;
-
-          if (depth >= MAX_SUBWORKFLOW_DEPTH) {
-            throw ApplicationFailure.nonRetryable(
-              `Maximum sub-workflow nesting depth (${MAX_SUBWORKFLOW_DEPTH}) exceeded`,
-              'SubWorkflowDepthError',
-              [{ runId: input.runId, nodeRef: action.ref, depth }],
-            );
-          }
-
-          for (const warning of warnings) {
-            await recordTraceEventActivity({
-              type: 'NODE_PROGRESS',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              message: `Input '${warning.target}' mapped from ${warning.sourceRef}.${warning.sourceHandle} was undefined`,
-              level: 'warn',
-              data: warning,
-              context: {
-                activityId: 'workflow-orchestration',
-              },
-            });
-          }
-
-          if (warnings.length > 0) {
-            const missing = warnings.map((warning) => `'${warning.target}'`).join(', ');
-            throw ApplicationFailure.nonRetryable(
-              `Missing required inputs for ${action.ref}: ${missing}`,
-              'ValidationError',
-              [{ runId: input.runId, nodeRef: action.ref }],
-            );
-          }
-
-          const childWorkflowId = mergedParams.workflowId;
-          if (typeof childWorkflowId !== 'string' || childWorkflowId.trim().length === 0) {
-            throw ApplicationFailure.nonRetryable(
-              'core.workflow.call requires a workflowId parameter',
-              'ValidationError',
-              [{ runId: input.runId, nodeRef: action.ref }],
-            );
-          }
-
-          if (callChain.includes(childWorkflowId)) {
-            throw ApplicationFailure.nonRetryable(
-              `Circular sub-workflow call detected for workflow ${childWorkflowId}`,
-              'SubWorkflowCycleError',
-              [{ runId: input.runId, nodeRef: action.ref, callChain }],
-            );
-          }
-
-          const versionStrategy =
-            mergedParams.versionStrategy === 'specific' ? 'specific' : 'latest';
-          const versionIdRaw = mergedParams.versionId;
-          const versionId =
-            versionStrategy === 'specific' &&
-            typeof versionIdRaw === 'string' &&
-            versionIdRaw.trim().length > 0
-              ? versionIdRaw.trim()
-              : undefined;
-
-          if (versionStrategy === 'specific' && !versionId) {
-            throw ApplicationFailure.nonRetryable(
-              'versionId is required when versionStrategy is "specific"',
-              'ValidationError',
-              [{ runId: input.runId, nodeRef: action.ref }],
-            );
-          }
-
-          const timeoutSecondsRaw = mergedParams.timeoutSeconds;
-          const timeoutSeconds =
-            typeof timeoutSecondsRaw === 'number' &&
-            Number.isFinite(timeoutSecondsRaw) &&
-            timeoutSecondsRaw > 0
-              ? Math.floor(timeoutSecondsRaw)
-              : 300;
-
-          const childRuntimeInputsRaw = mergedParams.childRuntimeInputs;
-          const childRuntimeInputs = Array.isArray(childRuntimeInputsRaw)
-            ? childRuntimeInputsRaw
-            : [];
-          const childInputIds = childRuntimeInputs
-            .map((entry) => {
-              if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-                return undefined;
-              }
-              const id = (entry as Record<string, unknown>).id;
-              return typeof id === 'string' ? id : undefined;
-            })
-            .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-            .map((id) => id.trim());
-
-          const reservedIds = new Set([
-            'workflowId',
-            'versionStrategy',
-            'versionId',
-            'timeoutSeconds',
-            'childRuntimeInputs',
-            'childWorkflowName',
-          ]);
-
-          const childInputs: Record<string, unknown> = {};
-          for (const id of childInputIds) {
-            if (reservedIds.has(id)) continue;
-            childInputs[id] = mergedInputs[id];
-          }
-
-          const childRunId = `sentris-run-${uuid4()}`;
-
-          await recordTraceEventActivity({
-            type: 'NODE_STARTED',
-            runId: input.runId,
-            nodeRef: action.ref,
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            context: {
-              activityId: 'workflow-orchestration',
-              childRunId,
-            },
+          return handleSubWorkflowCall({
+            input,
+            action,
+            mergedInputs,
+            mergedParams,
+            warnings,
+            depth,
+            callChain,
+            results,
+            activities: { prepareRunPayloadActivity, recordTraceEventActivity },
+            workflowFn: sentrisWorkflowRun,
           });
-
-          let prepared: PreparedRunPayload;
-          try {
-            prepared = await prepareRunPayloadActivity({
-              workflowId: childWorkflowId,
-              versionId,
-              inputs: childInputs,
-              trigger: {
-                type: 'api',
-                sourceId: input.runId,
-                label: `Sub-workflow from ${input.workflowId}:${action.ref}`,
-              },
-              organizationId: input.organizationId ?? null,
-              runId: childRunId,
-              parentRunId: input.runId,
-              parentNodeRef: action.ref,
-            });
-          } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error);
-            await recordTraceEventActivity({
-              type: 'NODE_FAILED',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              message,
-              level: 'error',
-              error: {
-                message,
-                type: 'SubWorkflowPrepareError',
-                details: { childRunId },
-              },
-              context: {
-                activityId: 'workflow-orchestration',
-                childRunId,
-              },
-            });
-            throw error;
-          }
-
-          const child = await startChild(sentrisWorkflowRun, {
-            args: [
-              {
-                runId: prepared.runId,
-                workflowId: prepared.workflowId,
-                definition: prepared.definition as RunWorkflowActivityInput['definition'],
-                inputs: prepared.inputs ?? {},
-                workflowVersionId: prepared.workflowVersionId,
-                workflowVersion: prepared.workflowVersion,
-                organizationId: prepared.organizationId,
-                parentRunId: input.runId,
-                parentNodeRef: action.ref,
-                depth: depth + 1,
-                callChain: [...callChain, childWorkflowId],
-              },
-            ],
-            workflowId: prepared.runId,
-          });
-
-          const timeoutMs = timeoutSeconds * 1000;
-          let outcome:
-            | { kind: 'result'; result: Awaited<ReturnType<typeof child.result>> }
-            | { kind: 'timeout' };
-          try {
-            outcome = await Promise.race([
-              child.result().then((result) => ({ kind: 'result' as const, result })),
-              sleep(timeoutMs).then(() => ({ kind: 'timeout' as const })),
-            ]);
-          } catch (childError: unknown) {
-            // child.result() rejects when the child workflow throws (sentrisWorkflowRun
-            // always throws on failure rather than returning { success: false }).
-            // Record NODE_FAILED so the UI shows the node as failed instead of stuck running.
-            const message = childError instanceof Error ? childError.message : String(childError);
-            await recordTraceEventActivity({
-              type: 'NODE_FAILED',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              message,
-              level: 'error',
-              error: {
-                message,
-                type: 'SubWorkflowError',
-                details: { childRunId },
-              },
-              context: {
-                activityId: 'workflow-orchestration',
-                childRunId,
-              },
-            });
-            throw childError;
-          }
-
-          if (outcome.kind === 'timeout') {
-            const externalHandle = getExternalWorkflowHandle(child.workflowId);
-            await externalHandle.cancel();
-
-            await recordTraceEventActivity({
-              type: 'NODE_FAILED',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              message: `Sub-workflow timed out after ${timeoutSeconds}s`,
-              level: 'error',
-              error: {
-                message: `Sub-workflow timed out after ${timeoutSeconds}s`,
-                type: 'TimeoutError',
-                details: { timeoutSeconds, childRunId },
-              },
-              context: {
-                activityId: 'workflow-orchestration',
-                childRunId,
-              },
-            });
-
-            throw ApplicationFailure.nonRetryable(
-              `Sub-workflow timed out after ${timeoutSeconds}s`,
-              'TimeoutError',
-              [{ runId: input.runId, nodeRef: action.ref, childRunId, timeoutSeconds }],
-            );
-          }
-
-          const childResult = outcome.result;
-          if (!childResult.success) {
-            const message = childResult.error ?? 'Sub-workflow failed';
-
-            await recordTraceEventActivity({
-              type: 'NODE_FAILED',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              message,
-              level: 'error',
-              error: {
-                message,
-                type: 'SubWorkflowFailure',
-                details: { childRunId },
-              },
-              context: {
-                activityId: 'workflow-orchestration',
-                childRunId,
-              },
-            });
-
-            throw ApplicationFailure.nonRetryable(message, 'SubWorkflowFailure', [
-              { runId: input.runId, nodeRef: action.ref, childRunId },
-            ]);
-          }
-
-          const nodeOutput = {
-            result: childResult.outputs,
-            childRunId,
-          };
-
-          results.set(action.ref, nodeOutput);
-
-          await recordTraceEventActivity({
-            type: 'NODE_COMPLETED',
-            runId: input.runId,
-            nodeRef: action.ref,
-            timestamp: new Date().toISOString(),
-            outputSummary: nodeOutput,
-            level: 'info',
-            context: {
-              activityId: 'workflow-orchestration',
-              childRunId,
-            },
-          });
-
-          return {};
         }
 
         const nodeMetadata = input.definition.nodes?.[action.ref];
@@ -639,91 +363,21 @@ export async function sentrisWorkflowRun(
         const shouldSkipExecution = isToolMode && !isMcpGroup;
 
         if (shouldSkipExecution) {
-          console.log(`[Workflow] Node ${action.ref} is in tool mode, registering...`);
-
-          // Track any started containers for cleanup on failure
-          let startedContainerId: string | undefined;
-
-          try {
-            if (isMcpServerComponent(action.componentId)) {
-              const { runComponentActivity: runMcp } = proxyActivities<{
-                runComponentActivity(
-                  input: RunComponentActivityInput,
-                ): Promise<RunComponentActivityOutput>;
-              }>({
-                startToCloseTimeout: '10 minutes',
-                heartbeatTimeout: '30 seconds',
-                retry: retryOptions,
-              });
-
-              const mcpOutput = await runMcp(activityInput);
-              const output = mcpOutput.output as { endpoint?: string; containerId?: string };
-              const endpoint = output.endpoint;
-              const containerId = output.containerId;
-
-              if (!endpoint) {
-                throw new Error('MCP server output missing endpoint');
-              }
-
-              if (!containerId) {
-                throw new Error('MCP server output missing containerId');
-              }
-
-              startedContainerId = containerId;
-
-              const mcpMeta = MCP_SERVER_COMPONENTS[action.componentId];
-              const toolName = mcpMeta.toolName(mergedParams);
-              const description = mcpMeta.description;
-
-              await registerLocalMcpActivity({
-                runId: input.runId,
-                nodeId: action.ref,
-                toolName,
-                description,
-                inputSchema: {},
-                image: (mergedParams.image as string) || 'unknown',
-                port: (mergedParams.port as number) || 8080,
-                endpoint,
-                containerId,
-              });
-            } else {
-              await prepareAndRegisterToolActivity({
-                runId: input.runId,
-                nodeId: action.ref,
-                componentId: action.componentId,
-                inputs: mergedInputs,
-                params: mergedParams,
-              });
-            }
-
-            console.log(`[Workflow] Node ${action.ref} registered as tool, setting results.`);
-            const toolResult = { mode: 'tool', status: 'ready', tools: [] };
-            results.set(action.ref, toolResult);
-
-            await recordTraceEventActivity({
-              type: 'NODE_COMPLETED',
-              runId: input.runId,
-              nodeRef: action.ref,
-              timestamp: new Date().toISOString(),
-              outputSummary: toolResult,
-              level: 'info',
-            });
-
-            return { activePorts: ['default', 'tools'] };
-          } catch (error: unknown) {
-            // Cleanup any MCP containers that were started before failure
-            if (startedContainerId) {
-              console.warn(
-                `[Workflow] Cleaning up MCP container ${startedContainerId} after registration failure`,
-              );
-              try {
-                await cleanupRunResourcesActivity({ runId: input.runId });
-              } catch (cleanupError: unknown) {
-                console.error(`[Workflow] Failed to cleanup MCP container: ${cleanupError}`);
-              }
-            }
-            throw error;
-          }
+          return handleToolModeRegistration({
+            runId: input.runId,
+            action: { ref: action.ref, componentId: action.componentId },
+            mergedInputs,
+            mergedParams,
+            activityInput,
+            retryOptions,
+            results,
+            activities: {
+              registerLocalMcpActivity,
+              prepareAndRegisterToolActivity,
+              cleanupRunResourcesActivity,
+              recordTraceEventActivity,
+            },
+          });
         }
 
         // MCP groups in tool mode: execute FIRST, then register as ready AFTER discovery completes.
@@ -828,151 +482,21 @@ export async function sentrisWorkflowRun(
             `[Workflow] Pending human input detected at ${action.ref} (type=${(output.output as Record<string, unknown>).inputType ?? 'approval'})`,
           );
 
-          const pendingData = output.output as {
-            pending: true;
-            inputType?: 'approval' | 'form' | 'selection' | 'review' | 'acknowledge';
-            title: string;
-            description?: string;
-            contextData?: Record<string, unknown>;
-            inputSchema?: Record<string, unknown>;
-            options?: unknown[];
-            multiple?: boolean;
-            schema?: Record<string, unknown>;
-            timeoutAt?: string;
-          };
-
-          // Create the human input request in the database
-          const approvalResult = await createHumanInputRequestActivity({
+          return handleHumanInput({
             runId: input.runId,
             workflowId: input.workflowId,
-            nodeRef: action.ref,
-            inputType: pendingData.inputType ?? 'approval',
-            title: pendingData.title,
-            description: pendingData.description,
-            context:
-              pendingData.contextData ??
-              (mergedParams.data ? { data: mergedParams.data } : undefined),
-            inputSchema:
-              pendingData.inputSchema ??
-              (pendingData.options
-                ? { options: pendingData.options, multiple: pendingData.multiple }
-                : undefined) ??
-              (pendingData.schema ? { schema: pendingData.schema } : undefined),
-            timeoutMs: pendingData.timeoutAt
-              ? new Date(pendingData.timeoutAt).getTime() - Date.now()
-              : undefined,
-            organizationId: input.organizationId ?? null,
-          });
-
-          console.log(
-            `[Workflow] Created human input request ${approvalResult.requestId} for ${action.ref}`,
-          );
-
-          // Check if we already have a resolution (signal arrived before we started waiting)
-          let resolution = humanInputResolutions.get(action.ref);
-
-          if (!resolution) {
-            // Wait for the human input signal
-            console.log(`[Workflow] Waiting for human input signal for ${action.ref}...`);
-
-            // Calculate timeout duration
-            const timeoutMs = pendingData.timeoutAt
-              ? Math.max(0, new Date(pendingData.timeoutAt).getTime() - Date.now())
-              : undefined;
-
-            // Wait for signal or timeout
-            let signalReceived: boolean;
-            if (timeoutMs !== undefined) {
-              signalReceived = await condition(
-                () => humanInputResolutions.has(action.ref),
-                timeoutMs,
-              );
-            } else {
-              // No timeout - wait indefinitely
-              await condition(() => humanInputResolutions.has(action.ref));
-              signalReceived = true;
-            }
-
-            if (!signalReceived) {
-              // Timeout occurred
-              console.log(`[Workflow] Human input timeout for ${action.ref}`);
-              await expireHumanInputRequestActivity(approvalResult.requestId);
-              throw ApplicationFailure.nonRetryable(
-                `Human input request timed out for node ${action.ref}`,
-                'TimeoutError',
-                [{ nodeRef: action.ref, requestId: approvalResult.requestId, timeoutMs }],
-              );
-            }
-
-            resolution = humanInputResolutions.get(action.ref)!;
-          }
-
-          console.log(
-            `[Workflow] Human input resolved for ${action.ref}: approved=${resolution.approved}`,
-          );
-
-          // Store the final result (merging in responseData for dynamic ports)
-          // Include both 'approved' and 'rejected' fields so downstream nodes can consume either port's data
-          results.set(action.ref, {
-            approved: resolution.approved,
-            rejected: !resolution.approved,
-            respondedBy: resolution.respondedBy,
-            responseNote: resolution.responseNote,
-            respondedAt: resolution.respondedAt,
-            requestId: approvalResult.requestId,
-            ...(typeof resolution.responseData === 'object' ? resolution.responseData : {}),
-          });
-
-          // Determine active ports based on resolution
-          const activePorts: string[] = ['respondedBy', 'responseNote', 'respondedAt', 'requestId'];
-
-          const inputType = (pendingData.inputType ?? 'approval') as string;
-
-          if (inputType === 'approval' || inputType === 'review') {
-            // Standard approval gating
-            activePorts.push(resolution.approved ? 'approved' : 'rejected');
-          } else if (inputType === 'selection') {
-            // Activate ports for selected options
-            const selection = (resolution.responseData as Record<string, unknown>)?.selection;
-            if (selection !== undefined && selection !== null) {
-              activePorts.push('selection');
-              if (Array.isArray(selection)) {
-                selection.forEach((val: string) => activePorts.push(`option:${val}`));
-              } else if (typeof selection === 'string') {
-                activePorts.push(`option:${selection}`);
-              }
-            }
-
-            if (resolution.approved) {
-              activePorts.push('approved');
-            } else {
-              activePorts.push('rejected');
-            }
-          } else {
-            // Fallback for form/acknowledge
-            if (resolution.approved) {
-              activePorts.push('approved');
-            } else {
-              activePorts.push('rejected');
-            }
-          }
-
-          // Explicitly mark the node as completed via trace (since we suppressed it earlier)
-          await recordTraceEventActivity({
-            type: 'NODE_COMPLETED',
-            runId: input.runId,
-            nodeRef: action.ref,
-            timestamp: new Date().toISOString(),
-            outputSummary: results.get(action.ref),
-            data: { activatedPorts: activePorts },
-            level: 'info',
-            context: {
-              activityId: 'workflow-orchestration',
+            organizationId: input.organizationId,
+            actionRef: action.ref,
+            mergedParams,
+            pendingData: output.output as PendingHumanInputOutput,
+            results,
+            humanInputResolutions,
+            activities: {
+              createHumanInputRequestActivity,
+              expireHumanInputRequestActivity,
+              recordTraceEventActivity,
             },
           });
-
-          // Return active ports to scheduler for conditional execution
-          return { activePorts };
         } else {
           // Normal component - just store the result
           results.set(action.ref, output.output);
