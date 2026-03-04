@@ -1,0 +1,1 @@
+export const TEMPLATE_CACHE_REDIS = Symbol('TEMPLATE_CACHE_REDIS');

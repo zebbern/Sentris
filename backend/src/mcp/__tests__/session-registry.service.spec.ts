@@ -291,30 +291,44 @@ describe('SessionRegistryService', () => {
   });
 
   describe('instanceId', () => {
-    it('uses HOSTNAME env var when available', () => {
+    it('includes HOSTNAME and discriminator', () => {
       const originalHostname = process.env.HOSTNAME;
-      process.env.HOSTNAME = 'test-container-id';
-
-      const svc = new SessionRegistryService(redis as any);
-      expect(svc.instanceId).toBe('test-container-id');
-
-      if (originalHostname !== undefined) {
-        process.env.HOSTNAME = originalHostname;
-      } else {
-        delete process.env.HOSTNAME;
+      const originalInstance = process.env.SENTRIS_INSTANCE;
+      const originalPmId = process.env.pm_id;
+      try {
+        process.env.HOSTNAME = 'test-container-id';
+        process.env.SENTRIS_INSTANCE = '2';
+        const svc = new SessionRegistryService(redis as any);
+        expect(svc.instanceId).toBe('test-container-id-2');
+      } finally {
+        if (originalHostname !== undefined) process.env.HOSTNAME = originalHostname;
+        else delete process.env.HOSTNAME;
+        if (originalInstance !== undefined) process.env.SENTRIS_INSTANCE = originalInstance;
+        else delete process.env.SENTRIS_INSTANCE;
+        if (originalPmId !== undefined) process.env.pm_id = originalPmId;
+        else delete process.env.pm_id;
       }
     });
 
-    it('falls back to os.hostname()', () => {
+    it('falls back to os.hostname() with PID', () => {
       const originalHostname = process.env.HOSTNAME;
-      delete process.env.HOSTNAME;
-
-      const svc = new SessionRegistryService(redis as any);
-      expect(svc.instanceId).toBeTruthy();
-      expect(typeof svc.instanceId).toBe('string');
-
-      if (originalHostname !== undefined) {
-        process.env.HOSTNAME = originalHostname;
+      const originalInstance = process.env.SENTRIS_INSTANCE;
+      const originalPmId = process.env.pm_id;
+      try {
+        delete process.env.HOSTNAME;
+        delete process.env.SENTRIS_INSTANCE;
+        delete process.env.pm_id;
+        const svc = new SessionRegistryService(redis as any);
+        expect(svc.instanceId).toBeTruthy();
+        expect(typeof svc.instanceId).toBe('string');
+        expect(svc.instanceId).toContain('-');
+      } finally {
+        if (originalHostname !== undefined) process.env.HOSTNAME = originalHostname;
+        else delete process.env.HOSTNAME;
+        if (originalInstance !== undefined) process.env.SENTRIS_INSTANCE = originalInstance;
+        else delete process.env.SENTRIS_INSTANCE;
+        if (originalPmId !== undefined) process.env.pm_id = originalPmId;
+        else delete process.env.pm_id;
       }
     });
   });

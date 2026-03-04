@@ -57,6 +57,10 @@ describe('TerminalArchiveService', () => {
       filesService,
       repo,
       workflowsService,
+      {
+        tryAcquire: vi.fn().mockResolvedValue(true),
+        release: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
 
     const record = await service.archive(null, 'run-1', { nodeRef: 'node' } as any);
@@ -94,6 +98,10 @@ describe('TerminalArchiveService', () => {
       filesService,
       repo,
       workflowsService,
+      {
+        tryAcquire: vi.fn().mockResolvedValue(true),
+        release: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
 
     const result = await service.replay({ organizationId: 'org-1' } as any, 'run-1', {

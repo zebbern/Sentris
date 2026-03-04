@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 
 import { DatabaseModule } from '../database/database.module';
 import { TemporalModule } from '../temporal/temporal.module';
@@ -6,6 +8,7 @@ import { StorageModule } from '../storage/storage.module';
 import { TerminalModule } from '../terminal/terminal.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { NodeIOModule } from '../node-io/node-io.module';
+import type { RedisConfig } from '../config';
 import { WorkflowRepository } from './repository/workflow.repository';
 import { WorkflowRunRepository } from './repository/workflow-run.repository';
 import { WorkflowVersionRepository } from './repository/workflow-version.repository';
@@ -24,6 +27,9 @@ import { WorkflowRunService } from './workflow-run.service';
 import { WorkflowTagsService } from './workflow-tags.service';
 import { WorkflowVersionService } from './workflow-version.service';
 import { WorkflowRoleGuard } from './workflow-role.guard';
+import { FlowContextCacheService } from './flow-context-cache.service';
+import { ArchivingLockService } from './archiving-lock.service';
+import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
 // import { WorkflowsBootstrapService } from './workflows.bootstrap';
 
 @Module({
@@ -44,6 +50,36 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     InternalRunsController, // different prefix, order doesn't matter
   ],
   providers: [
+    {
+      provide: FLOW_CONTEXT_REDIS,
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.url ?? redis.terminalUrl;
+        if (!url) {
+          new Logger('WorkflowsModule').warn('Redis URL not set; flow context cache disabled');
+          return null;
+        }
+        const client = new Redis(url);
+        client.on('error', (err) => new Logger('WorkflowsModule').warn(`FLOW_CONTEXT_REDIS error: ${err.message}`));
+        return client;
+      },
+      inject: [ConfigService],
+    },
+    {
+      provide: ARCHIVING_REDIS,
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.url ?? redis.terminalUrl;
+        if (!url) {
+          new Logger('WorkflowsModule').warn('Redis URL not set; archiving lock disabled');
+          return null;
+        }
+        const client = new Redis(url);
+        client.on('error', (err) => new Logger('WorkflowsModule').warn(`ARCHIVING_REDIS error: ${err.message}`));
+        return client;
+      },
+      inject: [ConfigService],
+    },
     WorkflowsService,
     WorkflowRunService,
     WorkflowTagsService,
@@ -54,6 +90,8 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
     WorkflowRoleRepository,
     TerminalRecordRepository,
     TerminalArchiveService,
+    FlowContextCacheService,
+    ArchivingLockService,
     WorkflowRoleGuard,
     WorkflowTagsRepository,
   ],

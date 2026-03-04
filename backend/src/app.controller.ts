@@ -14,6 +14,7 @@ import {
   createSessionToken,
 } from './auth/session.utils';
 import { OpenSearchTenantService } from './analytics/opensearch-tenant.service';
+import { ProvisioningLockService } from './common/redis/provisioning-lock.service';
 
 @Controller()
 export class AppController {
@@ -25,6 +26,7 @@ export class AppController {
   constructor(
     private readonly configService: ConfigService,
     private readonly tenantService: OpenSearchTenantService,
+    private readonly provisioningLock: ProvisioningLockService,
   ) {
     this.authCfg = this.configService.get<AuthConfig>('auth')!;
   }
@@ -56,28 +58,61 @@ export class AppController {
     res.setHeader('X-Auth-User-Id', auth.userId || '');
 
     // Ensure OpenSearch tenant exists for this org (fire-and-forget, cached)
-    // Uses a Map of promises so: (1) concurrent requests share the same in-flight provisioning,
-    // (2) failures are removed from cache to allow retry on next auth request.
+    // Three-layer dedup:
+    //   1. Local Map — same-instance Promise dedup (avoids Redis round-trip on every request)
+    //   2. Redis "done" marker — cross-instance completion check
+    //   3. Redis SETNX lock — cross-instance in-flight dedup
     if (normalizedOrgId && !this.provisioningOrgs.has(normalizedOrgId)) {
-      const promise = this.tenantService.ensureTenantExists(normalizedOrgId).then(
-        (success) => {
-          if (!success) {
-            // Provisioning returned false (validation error, etc.) — allow retry
-            this.provisioningOrgs.delete(normalizedOrgId);
-          }
-          return success;
-        },
-        (err) => {
-          // Remove from cache so it retries next request
-          this.provisioningOrgs.delete(normalizedOrgId);
-          this.logger.error(`Failed to provision OpenSearch tenant for ${normalizedOrgId}: ${err}`);
-          return false;
-        },
-      );
-      this.provisioningOrgs.set(normalizedOrgId, promise);
+      this.tryProvisionOrg(normalizedOrgId);
     }
 
     return { valid: true };
+  }
+
+  /**
+   * Attempt to provision an org's OpenSearch tenant with distributed locking.
+   * Fire-and-forget — errors never block auth validation.
+   */
+  private tryProvisionOrg(orgId: string): void {
+    const promise = this.doProvisionOrg(orgId).then(
+      (success) => {
+        if (!success) {
+          // Provisioning returned false or was skipped — allow retry
+          this.provisioningOrgs.delete(orgId);
+        }
+        return success;
+      },
+      (err) => {
+        this.provisioningOrgs.delete(orgId);
+        this.logger.error(`Failed to provision OpenSearch tenant for ${orgId}: ${err}`);
+        return false;
+      },
+    );
+    this.provisioningOrgs.set(orgId, promise);
+  }
+
+  /**
+   * Core provisioning logic with Redis-backed distributed lock.
+   * Returns true if provisioning succeeded or was already done.
+   */
+  private async doProvisionOrg(orgId: string): Promise<boolean> {
+    // Check Redis completion marker — avoids provisioning call if another instance already succeeded
+    const alreadyDone = await this.provisioningLock.isProvisioned(orgId);
+    if (alreadyDone) return true;
+
+    // Acquire distributed lock — returns false if another instance is already provisioning
+    const acquired = await this.provisioningLock.tryAcquire(orgId);
+    if (!acquired) return true; // Another instance is handling it — treat as success
+
+    try {
+      const success = await this.tenantService.ensureTenantExists(orgId);
+      if (success) {
+        await this.provisioningLock.markProvisioned(orgId);
+      }
+      return success;
+    } finally {
+      await this.provisioningLock.release(orgId);
+    }
   }
 
   /**

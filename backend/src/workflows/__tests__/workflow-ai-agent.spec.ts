@@ -270,6 +270,11 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
       {} as any,
       workflowVersionService,
       {} as any,
+      {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
 
     const definition = await workflowVersionService.commit(workflowId, authContext);

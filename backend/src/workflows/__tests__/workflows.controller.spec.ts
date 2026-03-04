@@ -425,6 +425,11 @@ describe('WorkflowsController', () => {
       {} as any,
       workflowVersionService,
       workflowRunService,
+      {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
     const traceService = new TraceService({
       listByRunId: async () => [],

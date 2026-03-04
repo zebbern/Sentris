@@ -25,6 +25,7 @@ import {
   UpdateWorkflowMetadataDto,
 } from './dto/workflow-graph.dto';
 import { WorkflowRecord, WorkflowRepository } from './repository/workflow.repository';
+import { FlowContextCacheService } from './flow-context-cache.service';
 import { WorkflowRoleRepository } from './repository/workflow-role.repository';
 import { WorkflowRunRepository } from './repository/workflow-run.repository';
 import { WorkflowVersionRepository } from './repository/workflow-version.repository';
@@ -105,6 +106,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     private readonly tagsRepository: WorkflowTagsRepository,
     private readonly workflowVersionService: WorkflowVersionService,
     private readonly workflowRunService: WorkflowRunService,
+    private readonly flowContextCache: FlowContextCacheService,
   ) {}
 
   onModuleInit(): void {
@@ -718,14 +720,34 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   async releaseFlowContext(runId: string): Promise<void> {
     this.flowContexts.delete(runId);
     this.flowContextTimestamps.delete(runId);
+    await this.flowContextCache.delete(runId);
   }
 
   private async getFlowContext(runId: string): Promise<FlowContext> {
-    const cached = this.flowContexts.get(runId);
-    if (cached) {
-      return cached;
+    // 1. Check in-memory cache first (fastest)
+    const memoryCached = this.flowContexts.get(runId);
+    if (memoryCached) {
+      return memoryCached;
     }
 
+    // 2. Check Redis cache (cross-instance sharing)
+    const redisCached = await this.flowContextCache.get(runId);
+    if (redisCached) {
+      // Rebuild full FlowContext — definition is not stored in Redis,
+      // but the caller only needs targetsBySource for packet resolution.
+      const context: FlowContext = {
+        workflowId: redisCached.workflowId,
+        workflowVersionId: redisCached.workflowVersionId,
+        workflowVersion: redisCached.workflowVersion,
+        definition: { actions: [] } as unknown as WorkflowDefinition,
+        targetsBySource: redisCached.targetsBySource,
+      };
+      this.flowContexts.set(runId, context);
+      this.flowContextTimestamps.set(runId, Date.now());
+      return context;
+    }
+
+    // 3. Fall back to DB lookup
     const run = await this.runRepository.findByRunId(runId);
     if (!run) {
       throw new NotFoundException(`Run ${runId} not found`);
@@ -764,8 +786,11 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
       targetsBySource,
     };
 
+    // Write-through to both in-memory and Redis
     this.flowContexts.set(runId, context);
     this.flowContextTimestamps.set(runId, Date.now());
+    await this.flowContextCache.set(runId, context);
+
     return context;
   }
 
