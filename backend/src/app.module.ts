@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'node:path';
@@ -8,7 +8,6 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import Redis from 'ioredis';
 
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { validateBackendEnv } from './config/env.validate';
 import {
   appConfig,
@@ -52,6 +51,8 @@ import { McpRegistryModule } from './mcp-registry/mcp-registry.module';
 import { TemplatesModule } from './templates/templates.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
+import { CorrelationIdMiddleware } from './common/middleware';
+import { HealthModule } from './health';
 
 const coreModules = [
   AgentsModule,
@@ -74,6 +75,7 @@ const coreModules = [
   StudioMcpModule,
   TemplatesModule,
   AuditModule,
+  HealthModule,
 ];
 
 const testingModules = process.env.NODE_ENV === 'production' ? [] : [TestingSupportModule];
@@ -139,7 +141,6 @@ function getEnvFilePaths(): string[] {
   ],
   controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,
@@ -162,4 +163,8 @@ function getEnvFilePaths(): string[] {
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

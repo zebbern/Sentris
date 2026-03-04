@@ -36,6 +36,8 @@ export interface StartWorkflowOptions {
   args?: unknown[];
   memo?: Record<string, unknown>;
   searchAttributes?: Record<string, unknown>;
+  /** Correlation ID from the originating HTTP request (X-Request-Id). Propagated via workflow memo. */
+  correlationId?: string;
 }
 
 export interface WorkflowRunReference {
@@ -126,11 +128,18 @@ export class TemporalService implements OnModuleDestroy {
     // Map workflow type string to function reference
     const workflowFn = this.getWorkflowFunction(options.workflowType);
 
+    // Propagate correlation ID (X-Request-Id) via memo so the worker can
+    // read it from workflowInfo().memo and include it in log entries.
+    const memo = { ...options.memo };
+    if (options.correlationId) {
+      memo['correlationId'] = options.correlationId;
+    }
+
     const handle = await client.start(workflowFn, {
       workflowId,
       taskQueue,
       args: (options.args ?? []) as Parameters<typeof workflowFn>,
-      memo: options.memo,
+      memo,
       searchAttributes: options.searchAttributes as WorkflowOptions['searchAttributes'],
       workflowExecutionTimeout: '2 hours',
     });

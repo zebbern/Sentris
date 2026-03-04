@@ -29,18 +29,23 @@ export class LoggingInterceptor implements NestInterceptor {
     const response = ctx.getResponse<Response>();
 
     const { method, url } = request;
+    const correlationId: string | undefined = (request as unknown as Record<string, unknown>)[
+      'correlationId'
+    ] as string | undefined;
     const startTime = Date.now();
 
     return next.handle().pipe(
       tap({
         next: () => {
           const duration = Date.now() - startTime;
-          this.logger.log(`${method} ${url} ${response.statusCode} — ${duration}ms`);
+          const cid = correlationId ? ` [${correlationId}]` : '';
+          this.logger.log(`${method} ${url} ${response.statusCode} — ${duration}ms${cid}`);
         },
         error: (err) => {
           const duration = Date.now() - startTime;
           const status = err instanceof HttpException ? err.getStatus() : 500;
-          this.logger.warn(`${method} ${url} ${status} — ${duration}ms`);
+          const cid = correlationId ? ` [${correlationId}]` : '';
+          this.logger.warn(`${method} ${url} ${status} — ${duration}ms${cid}`);
         },
       }),
     );

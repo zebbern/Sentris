@@ -36,6 +36,7 @@ import {
 import { executeWebhookParsingScriptActivity } from '../activities/webhook-parsing.activity';
 import { logHeartbeat } from '../../utils/debug-logger';
 import { validateWorkerEnv } from '../../config/env.validate';
+import { startHealthServer, type HealthServerHandle } from '../../health/health-server';
 import {
   createDatabasePool,
   createMinioClient,
@@ -107,6 +108,12 @@ async function main() {
   initializeTraceActivity({ trace: kafka.trace });
   console.log(`✅ Service adapters initialized`);
 
+  // Start the HTTP health server
+  const healthServer: HealthServerHandle = await startHealthServer({
+    temporalConnection: connection,
+    terminalRedis: kafka.terminalRedis,
+  });
+
   // Create worker
   const activities = {
     runComponentActivity,
@@ -176,6 +183,9 @@ async function main() {
         .quit()
         .catch((e: unknown) => console.error('Failed to close terminal Redis', e));
     }
+    await healthServer
+      .close()
+      .catch((e: unknown) => console.error('Failed to close health server', e));
     console.log('✅ Worker shutdown complete');
   }
 }

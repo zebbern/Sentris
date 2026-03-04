@@ -152,4 +152,62 @@ describe('LoggingInterceptor', () => {
       });
     });
   });
+
+  describe('correlation ID', () => {
+    it('includes correlation ID in successful request log', () => {
+      const request = makeMockRequest({ correlationId: 'req-abc-123' });
+      const response = makeMockResponse({ statusCode: 200 });
+      const context = makeMockExecutionContext('http', request, response);
+      const handler = makeMockCallHandler();
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      return new Promise<void>((resolve) => {
+        interceptor.intercept(context as any, handler as any).subscribe({
+          complete: () => {
+            expect(logSpy).toHaveBeenCalled();
+            const message = logSpy.mock.calls[0][0] as string;
+            expect(message).toContain('[req-abc-123]');
+            resolve();
+          },
+        });
+      });
+    });
+
+    it('includes correlation ID in error request log', () => {
+      const request = makeMockRequest({ correlationId: 'req-err-456' });
+      const response = makeMockResponse();
+      const context = makeMockExecutionContext('http', request, response);
+      const handler = makeMockCallHandlerWithError(new Error('boom'));
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+
+      return new Promise<void>((resolve) => {
+        interceptor.intercept(context as any, handler as any).subscribe({
+          error: () => {
+            expect(warnSpy).toHaveBeenCalled();
+            const message = warnSpy.mock.calls[0][0] as string;
+            expect(message).toContain('[req-err-456]');
+            resolve();
+          },
+        });
+      });
+    });
+
+    it('logs without correlation ID when not present', () => {
+      const request = makeMockRequest();
+      const response = makeMockResponse({ statusCode: 200 });
+      const context = makeMockExecutionContext('http', request, response);
+      const handler = makeMockCallHandler();
+      const logSpy = vi.spyOn(Logger.prototype, 'log');
+
+      return new Promise<void>((resolve) => {
+        interceptor.intercept(context as any, handler as any).subscribe({
+          complete: () => {
+            const message = logSpy.mock.calls[0][0] as string;
+            expect(message).not.toContain('[');
+            resolve();
+          },
+        });
+      });
+    });
+  });
 });
