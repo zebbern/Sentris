@@ -54,6 +54,15 @@ export const findingTriageTable = pgTable(
       table.organizationId,
       table.assigneeUserId,
     ),
+    orgCreatedAtIdx: index('finding_triage_org_created_at_idx').on(
+      table.organizationId,
+      table.createdAt,
+    ),
+    orgSeverityCreatedAtIdx: index('finding_triage_org_severity_created_at_idx').on(
+      table.organizationId,
+      table.severityOverride,
+      table.createdAt,
+    ),
   }),
 );
 

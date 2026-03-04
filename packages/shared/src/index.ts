@@ -10,4 +10,6 @@ export * from './mcp-registry.js';
 export * from './notifications.js';
 export * from './finding-triage.js';
 export * from './ticketing.js';
+export * from './triage-analytics.js';
+export * from './sla-policy.js';
 export * from './env.js';

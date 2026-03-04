@@ -927,6 +927,437 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/findings/{id}/ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get linked ticket for a finding */
+        get: operations["FindingTriageController_getTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/posture-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get posture trend over time by severity */
+        get: operations["TriageAnalyticsController_getPostureTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/triage-velocity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get triage velocity (status changes) over time */
+        get: operations["TriageAnalyticsController_getTriageVelocity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/mttr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mean Time to Remediate by severity */
+        get: operations["TriageAnalyticsController_getMttr"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/sla-compliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get SLA compliance rates by severity */
+        get: operations["TriageAnalyticsController_getSlaCompliance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/status-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current status distribution of all findings */
+        get: operations["TriageAnalyticsController_getStatusDistribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/analytics/top-assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get top assignees by triage volume */
+        get: operations["TriageAnalyticsController_getTopAssignees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/sla-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get SLA policies for the organization */
+        get: operations["TriageAnalyticsController_getSlaPolicies"];
+        /** Upsert SLA policies for the organization */
+        put: operations["TriageAnalyticsController_upsertSlaPolicies"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/org/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List organization members for assignee picker */
+        get: operations["OrgMembersController_listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Jira connection status */
+        get: operations["TicketingController_getConnection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Initiate Jira OAuth 2.0 connection */
+        post: operations["TicketingController_connect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Handle Jira OAuth callback */
+        get: operations["TicketingController_callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect Jira integration */
+        delete: operations["TicketingController_disconnect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update ticketing configuration */
+        put: operations["TicketingController_updateConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jira projects */
+        get: operations["TicketingController_listProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/issue-types/{projectKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Jira issue types for a project */
+        get: operations["TicketingController_listIssueTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticketing/jira/webhook/{secret}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Jira webhook
+         * @description Public endpoint for receiving Jira issue transition webhooks. Authentication is via the unguessable URL secret.
+         */
+        post: operations["JiraWebhookController_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all integration providers */
+        get: operations["IntegrationsController_listProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/providers/{provider}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get provider OAuth configuration */
+        get: operations["IntegrationsController_getProviderConfiguration"];
+        /** Create or update provider OAuth configuration */
+        put: operations["IntegrationsController_upsertProviderConfiguration"];
+        post?: never;
+        /** Delete provider OAuth configuration */
+        delete: operations["IntegrationsController_deleteProviderConfiguration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List integration connections */
+        get: operations["IntegrationsController_listConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/{provider}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start OAuth authorization flow */
+        post: operations["IntegrationsController_startOAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/{provider}/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete OAuth token exchange */
+        post: operations["IntegrationsController_completeOAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/connections/{id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh an integration connection */
+        post: operations["IntegrationsController_refreshConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/connections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect an integration connection */
+        delete: operations["IntegrationsController_disconnectConnection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/integrations/connections/{id}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue a connection access token */
+        post: operations["IntegrationsController_issueConnectionToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/api-keys": {
         parameters: {
             query?: never;
@@ -1097,144 +1528,6 @@ export interface paths {
         /** Rotate a secret value */
         put: operations["SecretsController_rotateSecret"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List all integration providers */
-        get: operations["IntegrationsController_listProviders"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/providers/{provider}/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get provider OAuth configuration */
-        get: operations["IntegrationsController_getProviderConfiguration"];
-        /** Create or update provider OAuth configuration */
-        put: operations["IntegrationsController_upsertProviderConfiguration"];
-        post?: never;
-        /** Delete provider OAuth configuration */
-        delete: operations["IntegrationsController_deleteProviderConfiguration"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List integration connections */
-        get: operations["IntegrationsController_listConnections"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/{provider}/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Start OAuth authorization flow */
-        post: operations["IntegrationsController_startOAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/{provider}/exchange": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete OAuth token exchange */
-        post: operations["IntegrationsController_completeOAuth"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Refresh an integration connection */
-        post: operations["IntegrationsController_refreshConnection"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Disconnect an integration connection */
-        delete: operations["IntegrationsController_disconnectConnection"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/connections/{id}/token": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Issue a connection access token */
-        post: operations["IntegrationsController_issueConnectionToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2507,23 +2800,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/org/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List organization members for assignee picker */
-        get: operations["OrgMembersController_listMembers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3114,6 +3390,108 @@ export interface components {
             assigneeUserId?: string;
             comment?: string;
         };
+        UpsertSlaPoliciesDto: {
+            policies: {
+                /** @enum {string} */
+                severity: "critical" | "high" | "medium" | "low" | "info";
+                deadlineHours: number;
+            }[];
+        };
+        ConnectJiraDto: {
+            /** Format: uri */
+            redirectUri: string;
+        };
+        UpdateTicketingConfigDto: {
+            projectKey: string;
+            issueTypeId: string;
+            statusMapping: {
+                [key: string]: string;
+            };
+            autoCreateOnStatuses: ("new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk")[];
+        };
+        IntegrationProviderResponse: {
+            id: string;
+            name: string;
+            description: string;
+            docsUrl?: string;
+            defaultScopes: string[];
+            supportsRefresh: boolean;
+            /** @description Indicates whether the provider has been configured with client credentials */
+            isConfigured: boolean;
+        };
+        ProviderConfigurationResponse: {
+            provider: string;
+            /** @description Stored OAuth client identifier */
+            clientId?: string;
+            /** @description True when a client secret has been stored for this provider */
+            hasClientSecret: boolean;
+            /**
+             * @description Origin of the credential configuration
+             * @enum {string}
+             */
+            configuredBy: "environment" | "user";
+            /** @description Last update timestamp in ISO 8601 format */
+            updatedAt?: string;
+        };
+        UpsertProviderConfigDto: {
+            clientId: string;
+            clientSecret?: string;
+        };
+        IntegrationConnectionResponse: {
+            id: string;
+            provider: string;
+            providerName: string;
+            userId: string;
+            scopes: string[];
+            tokenType: string;
+            expiresAt?: string;
+            createdAt: string;
+            updatedAt: string;
+            /** @enum {string} */
+            status: "active" | "expired";
+            supportsRefresh: boolean;
+            hasRefreshToken: boolean;
+            /** @description Provider-specific metadata saved alongside the connection */
+            metadata?: Record<string, never>;
+        };
+        StartOAuthDto: {
+            userId: string;
+            /** Format: uri */
+            redirectUri: string;
+            scopes?: string[];
+        };
+        OAuthStartResponseDto: {
+            provider: string;
+            authorizationUrl: string;
+            state: string;
+            /**
+             * @description Suggested client-side TTL for the authorization URL
+             * @example 300
+             */
+            expiresIn: number;
+        };
+        CompleteOAuthDto: {
+            userId: string;
+            /** Format: uri */
+            redirectUri: string;
+            scopes?: string[];
+            state: string;
+            code: string;
+        };
+        RefreshConnectionDto: {
+            userId: string;
+        };
+        DisconnectConnectionDto: {
+            userId: string;
+        };
+        ConnectionTokenResponseDto: {
+            provider: string;
+            userId: string;
+            accessToken: string;
+            tokenType: string;
+            scopes: string[];
+            expiresAt?: string;
+        };
         ApiKeyResponseDto: {
             id: string;
             name: string;
@@ -3364,89 +3742,6 @@ export interface components {
             name?: string;
             description?: string | null;
             tags?: string[] | null;
-        };
-        IntegrationProviderResponse: {
-            id: string;
-            name: string;
-            description: string;
-            docsUrl?: string;
-            defaultScopes: string[];
-            supportsRefresh: boolean;
-            /** @description Indicates whether the provider has been configured with client credentials */
-            isConfigured: boolean;
-        };
-        ProviderConfigurationResponse: {
-            provider: string;
-            /** @description Stored OAuth client identifier */
-            clientId?: string;
-            /** @description True when a client secret has been stored for this provider */
-            hasClientSecret: boolean;
-            /**
-             * @description Origin of the credential configuration
-             * @enum {string}
-             */
-            configuredBy: "environment" | "user";
-            /** @description Last update timestamp in ISO 8601 format */
-            updatedAt?: string;
-        };
-        UpsertProviderConfigDto: {
-            clientId: string;
-            clientSecret?: string;
-        };
-        IntegrationConnectionResponse: {
-            id: string;
-            provider: string;
-            providerName: string;
-            userId: string;
-            scopes: string[];
-            tokenType: string;
-            expiresAt?: string;
-            createdAt: string;
-            updatedAt: string;
-            /** @enum {string} */
-            status: "active" | "expired";
-            supportsRefresh: boolean;
-            hasRefreshToken: boolean;
-            /** @description Provider-specific metadata saved alongside the connection */
-            metadata?: Record<string, never>;
-        };
-        StartOAuthDto: {
-            userId: string;
-            /** Format: uri */
-            redirectUri: string;
-            scopes?: string[];
-        };
-        OAuthStartResponseDto: {
-            provider: string;
-            authorizationUrl: string;
-            state: string;
-            /**
-             * @description Suggested client-side TTL for the authorization URL
-             * @example 300
-             */
-            expiresIn: number;
-        };
-        CompleteOAuthDto: {
-            userId: string;
-            /** Format: uri */
-            redirectUri: string;
-            scopes?: string[];
-            state: string;
-            code: string;
-        };
-        RefreshConnectionDto: {
-            userId: string;
-        };
-        DisconnectConnectionDto: {
-            userId: string;
-        };
-        ConnectionTokenResponseDto: {
-            provider: string;
-            userId: string;
-            accessToken: string;
-            tokenType: string;
-            scopes: string[];
-            expiresAt?: string;
         };
         ScheduleResponseDto: {
             /** Format: uuid */
@@ -6082,6 +6377,580 @@ export interface operations {
             };
         };
     };
+    FindingTriageController_getTicket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getPostureTrend: {
+        parameters: {
+            query: {
+                period: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getTriageVelocity: {
+        parameters: {
+            query: {
+                period: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getMttr: {
+        parameters: {
+            query: {
+                period: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getSlaCompliance: {
+        parameters: {
+            query: {
+                period: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getStatusDistribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getTopAssignees: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_getSlaPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TriageAnalyticsController_upsertSlaPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertSlaPoliciesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OrgMembersController_listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_getConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_connect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectJiraDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_callback: {
+        parameters: {
+            query: {
+                code: string;
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_disconnect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_updateConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTicketingConfigDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_listProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TicketingController_listIssueTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    JiraWebhookController_receive: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-hub-signature": string;
+            };
+            path: {
+                /** @description The webhook secret included in the registered callback URL */
+                secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Webhook processed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid webhook signature */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IntegrationsController_listProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationProviderResponse"][];
+                };
+            };
+        };
+    };
+    IntegrationsController_getProviderConfiguration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
+                };
+            };
+        };
+    };
+    IntegrationsController_upsertProviderConfiguration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertProviderConfigDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
+                };
+            };
+        };
+    };
+    IntegrationsController_deleteProviderConfiguration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider configuration deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IntegrationsController_listConnections: {
+        parameters: {
+            query: {
+                userId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationConnectionResponse"][];
+                };
+            };
+        };
+    };
+    IntegrationsController_startOAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartOAuthDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthStartResponseDto"];
+                };
+            };
+        };
+    };
+    IntegrationsController_completeOAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteOAuthDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
+                };
+            };
+        };
+    };
+    IntegrationsController_refreshConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshConnectionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
+                };
+            };
+        };
+    };
+    IntegrationsController_disconnectConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisconnectConnectionDto"];
+            };
+        };
+        responses: {
+            /** @description Connection removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IntegrationsController_issueConnectionToken: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-internal-token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTokenResponseDto"];
+                };
+            };
+        };
+    };
     ApiKeysController_list: {
         parameters: {
             query?: {
@@ -6610,234 +7479,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SecretSummaryResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_listProviders: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationProviderResponse"][];
-                };
-            };
-        };
-    };
-    IntegrationsController_getProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_upsertProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpsertProviderConfigDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProviderConfigurationResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_deleteProviderConfiguration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Provider configuration deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IntegrationsController_listConnections: {
-        parameters: {
-            query: {
-                userId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"][];
-                };
-            };
-        };
-    };
-    IntegrationsController_startOAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartOAuthDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OAuthStartResponseDto"];
-                };
-            };
-        };
-    };
-    IntegrationsController_completeOAuth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteOAuthDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_refreshConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefreshConnectionDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntegrationConnectionResponse"];
-                };
-            };
-        };
-    };
-    IntegrationsController_disconnectConnection: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DisconnectConnectionDto"];
-            };
-        };
-        responses: {
-            /** @description Connection removed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    IntegrationsController_issueConnectionToken: {
-        parameters: {
-            query?: never;
-            header: {
-                "x-internal-token": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConnectionTokenResponseDto"];
                 };
             };
         };
@@ -9041,23 +9682,6 @@ export interface operations {
                         };
                     };
                 };
-            };
-        };
-    };
-    OrgMembersController_listMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };

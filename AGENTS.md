@@ -242,6 +242,15 @@ Notification channels route run lifecycle events (`run.completed`, `run.failed`,
 
 External ticket systems (Jira) sync with finding triage state. Outbound: `finding.triage.changed` EventEmitter2 events trigger ticket creation/updates. Inbound: HMAC-verified webhooks from Jira update triage status. Circular sync prevention via `source` parameter. OAuth 2.0 tokens stored encrypted (AES-256-GCM).
 
+### Triage Analytics & SLA Policies
+
+The `/analytics` page provides triage performance metrics derived from `finding_triage` and `finding_triage_events` tables.
+
+- **6 analytics endpoints** under `GET /findings/analytics/*`: posture-trend (area chart data by severity), triage-velocity (status transitions over time), MTTR (mean time to remediation by severity), SLA compliance (deadline adherence by severity), status-distribution (current triage status breakdown), top-assignees (leaderboard by resolution volume).
+- **SLA policy management** (`GET/PUT /findings/sla-policies`): Configurable per-org severity→deadline mappings. Admin-only write access via `@Roles('ADMIN')`. Atomic replacement via transactional delete+insert.
+- **Database**: `sla_policies` table with unique `(organization_id, severity)` constraint. Time-series indexes on `finding_triage(organization_id, created_at)` and `(organization_id, severity_override, created_at)` for aggregation query performance.
+- **Frontend**: recharts charts (AreaChart, BarChart, PieChart), MTTR KPI cards, top assignees table, SLA policy settings form. WCAG 2.2 AA accessible — visually-hidden data tables, `role="img"` containers, `aria-busy` loading states, `prefers-reduced-motion` support.
+
 ---
 
 ## Recent Changes
@@ -274,6 +283,18 @@ External ticket systems (Jira) sync with finding triage state. Outbound: `findin
 - **Security**: SSRF allowlist (api.atlassian.com, auth.atlassian.com, \*.atlassian.net), issue key regex validation, org-scoped lookups, timing-safe HMAC verify.
 - **Database**: `ticketing_connections` (per-org provider config + encrypted tokens) and `ticket_links` (finding↔ticket mapping with sync status).
 - **78 tests** covering service, listener, controller, adapter, webhook handler, and frontend components.
+
+### Triage Trends & Analytics Dashboard
+
+- **Security posture trend**: Stacked area chart showing finding counts over time grouped by severity (critical/high/medium/low/info) with configurable time range (7d/30d/90d).
+- **Triage velocity**: Bar chart showing status transition throughput per time period — how many findings move through each triage state.
+- **MTTR KPI cards**: Mean Time to Remediation per severity with human-readable formatting (e.g., "2d 5h"). Null-safe for severities with no resolved findings.
+- **SLA compliance**: Per-severity compliance rate visualization. Color-coded bars (green ≥90%, yellow 50-89%, red <50%). Requires SLA policies to be configured.
+- **Status distribution**: Donut chart showing current breakdown across all 7 triage statuses with counts and percentages.
+- **Top assignees table**: Leaderboard ranking assignees by total findings, resolved count, and resolution rate. Includes unassigned findings.
+- **SLA policy configuration**: Admin-only settings to define per-org severity→deadline mappings (e.g., Critical=24h, High=72h). Stored in `sla_policies` table. Changes apply to future triage actions only.
+- **Accessibility**: WCAG 2.2 AA — visually-hidden data tables for screen readers, proper ARIA roles, contrast-safe colors, `prefers-reduced-motion` animation control.
+- **104 tests** covering backend aggregation queries, DTO validation, frontend chart components, and E2E endpoint verification.
 
 ---
 

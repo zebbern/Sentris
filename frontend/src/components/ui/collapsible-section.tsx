@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -16,12 +16,15 @@ export function CollapsibleSection({
   children,
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const contentId = useId();
 
   return (
     <div className="rounded-lg border overflow-hidden">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={`${contentId}-content`}
         className="w-full flex items-center justify-between px-3 py-2.5 text-left bg-muted/30 hover:bg-muted/50 transition-colors border-b"
       >
         <div className="flex items-center gap-2">
@@ -38,7 +41,11 @@ export function CollapsibleSection({
           </Badge>
         )}
       </button>
-      {isOpen && <div className="px-3 pb-3 pt-2 border-t">{children}</div>}
+      {isOpen && (
+        <div id={`${contentId}-content`} className="px-3 pb-3 pt-2 border-t">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

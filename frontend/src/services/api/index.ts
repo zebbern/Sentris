@@ -26,6 +26,7 @@ import { findingsApi } from './findings';
 import { notificationChannelsApi } from './notificationChannels';
 import { orgMembersApi } from './orgMembers';
 import { ticketingApi } from './ticketing';
+import { triageAnalyticsApi } from './triage-analytics';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -47,6 +48,7 @@ export const api = {
   notificationChannels: notificationChannelsApi,
   orgMembers: orgMembersApi,
   ticketing: ticketingApi,
+  triageAnalytics: triageAnalyticsApi,
 
   // Generic HTTP methods
   get: httpGet,
