@@ -1,7 +1,6 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -24,6 +23,18 @@ import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useFindingsQuery, type FindingItem } from '@/hooks/queries/useFindingsQueries';
 import { useDebounce } from '@/hooks/useDebounce';
+import { ExportButton } from '@/features/findings/ExportButton';
+import { SeverityBadge } from '@/features/findings/SeverityBadge';
+import { SeverityChart } from '@/features/findings/SeverityChart';
+import { DateRangeFilter } from '@/features/findings/DateRangeFilter';
+import { WorkflowFilter } from '@/features/findings/WorkflowFilter';
+import { ToolFilter } from '@/features/findings/ToolFilter';
+
+const FindingDetailSheet = lazy(() =>
+  import('@/features/findings/FindingDetailSheet').then((m) => ({
+    default: m.FindingDetailSheet,
+  })),
+);
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -40,28 +51,9 @@ const SEVERITY_OPTIONS = [
 
 const PAGE_SIZE = 25;
 
-type BadgeVariant = 'destructive' | 'warning' | 'default' | 'secondary' | 'outline';
-
-const SEVERITY_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string }> = {
-  critical: { variant: 'destructive', label: 'Critical' },
-  high: { variant: 'destructive', label: 'High' },
-  medium: { variant: 'warning', label: 'Medium' },
-  low: { variant: 'default', label: 'Low' },
-  info: { variant: 'secondary', label: 'Info' },
-};
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-function SeverityBadge({ severity }: { severity?: string }) {
-  const normalised = severity?.toLowerCase() ?? 'unknown';
-  const config = SEVERITY_BADGE_MAP[normalised] ?? {
-    variant: 'outline' as const,
-    label: severity ?? 'Unknown',
-  };
-  return <Badge variant={config.variant}>{config.label}</Badge>;
-}
 
 function FindingsTableSkeleton() {
   return (
@@ -110,6 +102,10 @@ export function FindingsPage() {
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState('all');
   const [page, setPage] = useState(1);
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
+  const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
+  const [componentId, setComponentId] = useState<string | undefined>(undefined);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -124,14 +120,33 @@ export function FindingsPage() {
     setPage(1);
   }, []);
 
+  const handleDateRangeChange = useCallback((range: { from?: Date; to?: Date } | undefined) => {
+    setDateRange(range);
+    setPage(1);
+  }, []);
+
+  const handleWorkflowChange = useCallback((id: string | undefined) => {
+    setWorkflowId(id);
+    setPage(1);
+  }, []);
+
+  const handleComponentChange = useCallback((id: string | undefined) => {
+    setComponentId(id);
+    setPage(1);
+  }, []);
+
   const queryParams = useMemo(
     () => ({
       page,
       pageSize: PAGE_SIZE,
       severity: severity !== 'all' ? severity : undefined,
       search: debouncedSearch || undefined,
+      workflowId,
+      componentId,
+      dateFrom: dateRange?.from?.toISOString(),
+      dateTo: dateRange?.to?.toISOString(),
     }),
-    [page, severity, debouncedSearch],
+    [page, severity, debouncedSearch, workflowId, componentId, dateRange],
   );
 
   const { data, isLoading, error, refetch } = useFindingsQuery(queryParams);
@@ -140,7 +155,12 @@ export function FindingsPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const hasFilters = severity !== 'all' || debouncedSearch.length > 0;
+  const hasFilters =
+    severity !== 'all' ||
+    debouncedSearch.length > 0 ||
+    !!workflowId ||
+    !!componentId ||
+    !!dateRange;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -154,19 +174,42 @@ export function FindingsPage() {
         onSearchChange={handleSearchChange}
         searchPlaceholder="Search findings by name, asset, workflow…"
         filters={
-          <Select value={severity} onValueChange={handleSeverityChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Severity" />
-            </SelectTrigger>
-            <SelectContent>
-              {SEVERITY_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={severity} onValueChange={handleSeverityChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Severity" />
+              </SelectTrigger>
+              <SelectContent>
+                {SEVERITY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <WorkflowFilter value={workflowId} onChange={handleWorkflowChange} />
+            <ToolFilter value={componentId} onChange={handleComponentChange} />
+            <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
+            <ExportButton
+              severity={queryParams.severity}
+              search={queryParams.search}
+              workflowId={queryParams.workflowId}
+              componentId={queryParams.componentId}
+              dateFrom={queryParams.dateFrom}
+              dateTo={queryParams.dateTo}
+            />
+          </>
         }
+      />
+
+      {/* Severity Chart */}
+      <SeverityChart
+        severity={queryParams.severity}
+        search={queryParams.search}
+        workflowId={queryParams.workflowId}
+        componentId={queryParams.componentId}
+        dateFrom={queryParams.dateFrom}
+        dateTo={queryParams.dateTo}
       />
 
       {/* Error */}
@@ -200,7 +243,11 @@ export function FindingsPage() {
               </TableHeader>
               <TableBody>
                 {items.map((finding) => (
-                  <TableRow key={finding.id}>
+                  <TableRow
+                    key={finding.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setSelectedFindingId(finding.id)}
+                  >
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatTimestamp(finding.timestamp)}
                     </TableCell>
@@ -250,6 +297,15 @@ export function FindingsPage() {
           </div>
         </>
       )}
+
+      {/* Finding Detail Sheet */}
+      <Suspense fallback={null}>
+        <FindingDetailSheet
+          findingId={selectedFindingId}
+          isOpen={!!selectedFindingId}
+          onClose={() => setSelectedFindingId(null)}
+        />
+      </Suspense>
     </div>
   );
 }

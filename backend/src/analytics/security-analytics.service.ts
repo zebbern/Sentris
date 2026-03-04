@@ -20,6 +20,13 @@ export class SecurityAnalyticsService {
   constructor(private readonly openSearchClient: OpenSearchClient) {}
 
   /**
+   * Check if the OpenSearch client is available for queries.
+   */
+  isAvailable(): boolean {
+    return this.openSearchClient.isClientEnabled();
+  }
+
+  /**
    * Index a single document to OpenSearch with metadata
    */
   async indexDocument(

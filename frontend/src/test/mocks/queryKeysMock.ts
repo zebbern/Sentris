@@ -104,6 +104,11 @@ const DEFAULT_QUERY_KEYS = {
   analyticsSettings: {
     all: stub('analyticsSettings'),
   },
+  findings: {
+    all: stub('findings'),
+    detail: stub('findings', 'detail'),
+    stats: stub('findings', 'stats'),
+  },
   dashboard: {
     stats: stub('dashboard', 'stats'),
     recentActivity: stub('dashboard', 'recent-activity'),
