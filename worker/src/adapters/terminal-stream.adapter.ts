@@ -17,6 +17,7 @@ export class RedisTerminalStreamAdapter {
 
   async append(chunk: TerminalChunkInput): Promise<void> {
     const key = this.buildKey(chunk);
+    const trackingKey = this.buildTrackingKey(chunk.runId);
 
     const payload = JSON.stringify({
       chunkIndex: chunk.chunkIndex,
@@ -27,7 +28,14 @@ export class RedisTerminalStreamAdapter {
       runnerKind: chunk.runnerKind,
     });
 
-    await this.redis.xadd(key, 'MAXLEN', '~', this.maxEntries, '*', 'data', payload);
+    const pipeline = this.redis.pipeline();
+    pipeline.xadd(key, 'MAXLEN', '~', this.maxEntries, '*', 'data', payload);
+    pipeline.sadd(trackingKey, key);
+    await pipeline.exec();
+  }
+
+  private buildTrackingKey(runId: string): string {
+    return `terminal:${runId}:_keys`;
   }
 
   private buildKey(chunk: TerminalChunkInput): string {

@@ -47,8 +47,7 @@ export class TerminalStreamService implements OnModuleDestroy {
     if (!this.redis) {
       return [];
     }
-    const pattern = `terminal:${runId}:*`;
-    const keys = await this.scanKeys(pattern);
+    const keys = await this.getKeysForRun(runId);
     const seen = new Map<string, TerminalStreamDescriptor>();
     for (const key of keys) {
       const { nodeRef, stream } = this.parseKey(key);
@@ -65,14 +64,32 @@ export class TerminalStreamService implements OnModuleDestroy {
       return 0;
     }
 
-    const nodePattern = options.nodeRef ? this.sanitizeNode(options.nodeRef) : '*';
-    const streamPattern = options.stream ?? '*';
-    const pattern = `terminal:${runId}:${nodePattern}:${streamPattern}`;
-    const keys = await this.scanKeys(pattern);
+    let keys = await this.getKeysForRun(runId);
+
+    // Filter keys by node/stream pattern if specified
+    if (options.nodeRef || options.stream) {
+      const nodePattern = options.nodeRef ? this.sanitizeNode(options.nodeRef) : null;
+      const streamPattern = options.stream ?? null;
+      keys = keys.filter((key) => {
+        const { nodeRef, stream } = this.parseKey(key);
+        if (nodePattern && nodeRef !== nodePattern) return false;
+        if (streamPattern && stream !== streamPattern) return false;
+        return true;
+      });
+    }
+
     if (keys.length === 0) {
       return 0;
     }
-    return this.redis!.del(...keys);
+
+    const trackingKey = this.buildTrackingKey(runId);
+    const pipeline = this.redis!.pipeline();
+    pipeline.del(...keys);
+    pipeline.del(trackingKey);
+    const results = await pipeline.exec();
+
+    // Return the count from the first DEL (the stream keys)
+    return (results?.[0]?.[1] as number) ?? 0;
   }
 
   async fetchChunks(
@@ -84,11 +101,19 @@ export class TerminalStreamService implements OnModuleDestroy {
     }
 
     const state = this.parseCursor(options.cursor);
-    const nodePattern = options.nodeRef ? this.sanitizeNode(options.nodeRef) : '*';
-    const streamPattern = options.stream ?? '*';
-    const pattern = `terminal:${runId}:${nodePattern}:${streamPattern}`;
+    let keys = await this.getKeysForRun(runId);
 
-    const keys = await this.scanKeys(pattern);
+    // Filter keys by node/stream pattern if specified
+    if (options.nodeRef || options.stream) {
+      const nodePattern = options.nodeRef ? this.sanitizeNode(options.nodeRef) : null;
+      const streamPattern = options.stream ?? null;
+      keys = keys.filter((key) => {
+        const { nodeRef, stream } = this.parseKey(key);
+        if (nodePattern && nodeRef !== nodePattern) return false;
+        if (streamPattern && stream !== streamPattern) return false;
+        return true;
+      });
+    }
     if (keys.length === 0) {
       return { cursor: this.serializeCursor(state), chunks: [] };
     }
@@ -131,6 +156,31 @@ export class TerminalStreamService implements OnModuleDestroy {
       cursor: this.serializeCursor(nextState),
       chunks,
     };
+  }
+
+  /**
+   * Resolves keys for a run using the tracking SET first, falling back to SCAN
+   * for backward compatibility with data written before SET-based tracking.
+   */
+  private async getKeysForRun(runId: string): Promise<string[]> {
+    if (!this.redis) {
+      return [];
+    }
+
+    const trackingKey = this.buildTrackingKey(runId);
+    const tracked = await this.redis.smembers(trackingKey);
+    if (tracked.length > 0) {
+      return tracked;
+    }
+
+    // Fallback: SCAN for keys written before tracking was added
+    const scanned = await this.scanKeys(`terminal:${runId}:*`);
+    // Exclude the tracking key itself from results
+    return scanned.filter((key) => key !== trackingKey);
+  }
+
+  private buildTrackingKey(runId: string): string {
+    return `terminal:${runId}:_keys`;
   }
 
   private async scanKeys(pattern: string): Promise<string[]> {
