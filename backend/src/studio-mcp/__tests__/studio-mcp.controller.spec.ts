@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from 'bun:test';
 import { StudioMcpController } from '../studio-mcp.controller';
 import type { StudioMcpService } from '../studio-mcp.service';
+import type { SessionRegistryService } from '../../mcp/session-registry.service';
 import type { AuthContext } from '../../auth/types';
 import type { Request, Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,6 +27,7 @@ function createMockRes(): Response & { _status: number; _json: unknown } {
       res._json = body;
       return res;
     },
+    cookie: jest.fn(),
     on: jest.fn(),
   } as unknown as Response & { _status: number; _json: unknown };
   return res;
@@ -46,6 +48,7 @@ function createMockReq(
 describe('StudioMcpController', () => {
   let controller: StudioMcpController;
   let mcpService: StudioMcpService;
+  let sessionRegistry: SessionRegistryService;
 
   const authUser1: AuthContext = {
     userId: 'user-1',
@@ -78,7 +81,16 @@ describe('StudioMcpController', () => {
       createServer: jest.fn().mockReturnValue(new McpServer({ name: 'test', version: '1.0.0' })),
     } as unknown as StudioMcpService;
 
-    controller = new StudioMcpController(mcpService);
+    sessionRegistry = {
+      register: jest.fn().mockResolvedValue(undefined),
+      deregister: jest.fn().mockResolvedValue(undefined),
+      refresh: jest.fn().mockResolvedValue(undefined),
+      getSession: jest.fn().mockResolvedValue(null),
+      listActiveSessions: jest.fn().mockResolvedValue({ sessions: [], count: 0 }),
+      instanceId: 'test-host',
+    } as unknown as SessionRegistryService;
+
+    controller = new StudioMcpController(mcpService, sessionRegistry);
   });
 
   it('rejects unauthenticated requests with 401', async () => {

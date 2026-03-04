@@ -6,6 +6,8 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import type { AuthContext } from '../auth/types';
+import { SessionRegistryService } from '../mcp/session-registry.service';
+import { setAffinityCookie } from '../mcp/set-affinity-cookie';
 import { StudioMcpService } from './studio-mcp.service';
 
 /**
@@ -32,7 +34,10 @@ export class StudioMcpController {
   // NOTE: In-memory — single-instance design. For horizontal scaling, use sticky sessions.
   private readonly sessions = new Map<string, McpSession>();
 
-  constructor(private readonly studioMcpService: StudioMcpService) {}
+  constructor(
+    private readonly studioMcpService: StudioMcpService,
+    private readonly sessionRegistry: SessionRegistryService,
+  ) {}
 
   @All()
   @ApiOperation({ summary: 'Studio MCP endpoint (Streamable HTTP) for external agents' })
@@ -73,10 +78,18 @@ export class StudioMcpController {
 
       const { transport } = session;
 
+      // Refresh affinity cookie on every request to an existing session
+      setAffinityCookie(req, res, sessionId, '/api/v1/studio-mcp');
+
       if (isGet) {
         res.on('close', () => {
           this.logger.log(`Studio MCP SSE closed for session ${sessionId}`);
           this.sessions.delete(sessionId);
+
+          // Deregister session from Redis
+          this.sessionRegistry.deregister(sessionId).catch((err: unknown) => {
+            this.logger.warn(`Session registry deregister failed: ${err}`);
+          });
         });
         // Cast: Express Request extends IncomingMessage; handleRequest accepts it at runtime
         void transport.handleRequest(req as any, res as any);
@@ -84,6 +97,13 @@ export class StudioMcpController {
         this.logger.log(`Studio MCP session terminated: ${sessionId}`);
         await transport.handleRequest(req as any, res as any, body);
         this.sessions.delete(sessionId);
+
+        // Deregister session from Redis
+        try {
+          await this.sessionRegistry.deregister(sessionId);
+        } catch (regError) {
+          this.logger.warn(`Session registry deregister failed: ${regError}`);
+        }
       } else {
         await transport.handleRequest(req as any, res as any, body);
       }
@@ -101,13 +121,20 @@ export class StudioMcpController {
       `New Studio MCP session for org=${auth.organizationId}, provider=${auth.provider}`,
     );
 
+    // Pre-generate session ID so we can set the affinity cookie before
+    // handleRequest sends the response (headers must be set before write)
+    const newSessionId = randomUUID();
+
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
+      sessionIdGenerator: () => newSessionId,
       enableJsonResponse: true,
     });
 
     const server = this.studioMcpService.createServer(auth);
     await server.connect(transport);
+
+    // Set affinity cookie BEFORE handleRequest — it writes+ends the response
+    setAffinityCookie(req, res, newSessionId, '/api/v1/studio-mcp');
 
     // Handle the initialize request (sends response with Mcp-Session-Id header)
     await transport.handleRequest(req as any, res as any, body);
@@ -120,6 +147,17 @@ export class StudioMcpController {
         organizationId: auth.organizationId,
       });
       this.logger.log(`Studio MCP session created: ${transport.sessionId}`);
+
+      // Register session in Redis for admin observability
+      try {
+        await this.sessionRegistry.register(transport.sessionId, {
+          userId: auth.userId,
+          organizationId: auth.organizationId,
+          sessionType: 'studio-mcp',
+        });
+      } catch (regError) {
+        this.logger.warn(`Session registry register failed: ${regError}`);
+      }
     }
   }
 }
