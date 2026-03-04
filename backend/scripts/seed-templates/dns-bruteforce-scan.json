@@ -1,0 +1,99 @@
+{
+  "_metadata": {
+    "name": "DNS Bruteforce Scan",
+    "description": "Subdomain discovery workflow using ShuffleDNS for high-speed DNS brute-forcing with massdns as the resolver backend. Enumerates subdomains against a wordlist, formats results into a structured discovery report, and delivers findings via Slack. Ideal for expanding attack surface visibility beyond passive enumeration.",
+    "category": "dns-security",
+    "tags": ["dns", "bruteforce", "subdomain", "shuffledns", "massdns", "enumeration"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "DNS Bruteforce Scan",
+    "description": "Brute-force subdomains with ShuffleDNS, format results, and deliver a discovery report via Slack.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "dns-security",
+    "tags": ["dns", "bruteforce", "subdomain", "shuffledns", "massdns", "enumeration"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 4
+  },
+  "graph": {
+    "name": "DNS Bruteforce Scan",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 250 },
+        "data": {
+          "label": "Start DNS Bruteforce",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "shuffledns_1",
+        "type": "sentris.shuffledns.massdns",
+        "position": { "x": 400, "y": 250 },
+        "data": {
+          "label": "Bruteforce Subdomains",
+          "config": {
+            "params": {},
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "format_results",
+        "type": "core.logic.script",
+        "position": { "x": 700, "y": 250 },
+        "data": {
+          "label": "Format Discovery Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1000, "y": 250 },
+        "data": {
+          "label": "Save Bruteforce Report",
+          "config": { "params": {}, "inputOverrides": {} }
+        }
+      },
+      {
+        "id": "notify_results",
+        "type": "core.notification.slack",
+        "position": { "x": 1300, "y": 250 },
+        "data": {
+          "label": "Notify Security Team",
+          "config": { "params": { "channel": "#dns-security" }, "inputOverrides": {} }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-shuffledns_1", "source": "trigger_1", "target": "shuffledns_1" },
+      {
+        "id": "shuffledns_1-format_results",
+        "source": "shuffledns_1",
+        "target": "format_results"
+      },
+      {
+        "id": "format_results-artifact_report",
+        "source": "format_results",
+        "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "slack_webhook_url",
+      "type": "string",
+      "description": "Slack incoming webhook URL for DNS bruteforce scan alerts"
+    }
+  ]
+}

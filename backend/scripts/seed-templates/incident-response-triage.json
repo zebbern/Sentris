@@ -2,7 +2,7 @@
   "_metadata": {
     "name": "Incident Response Triage",
     "description": "Automated incident response workflow that collects alert data, enriches indicators of compromise (IOCs) via VirusTotal and AbuseIPDB, generates a severity assessment, and creates a ticket with findings. Accelerates SOC analyst response time.",
-    "category": "incident response",
+    "category": "incident-response",
     "tags": ["incident-response", "triage", "ioc", "soar", "virustotal"],
     "author": "sentris-team",
     "version": "1.0.0"
@@ -12,7 +12,7 @@
     "description": "Enrich IOCs, assess severity, and create tickets automatically on security alerts.",
     "version": "1.0.0",
     "author": "sentris-team",
-    "category": "incident response",
+    "category": "incident-response",
     "tags": ["incident-response", "triage", "ioc", "soar", "virustotal"],
     "entryPoint": "trigger_1",
     "nodeCount": 7,
