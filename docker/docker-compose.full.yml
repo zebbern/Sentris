@@ -218,11 +218,12 @@ services:
     image: docker:27-dind
     container_name: sentris-dind
     privileged: true
-    command: ['--host=tcp://0.0.0.0:2375', '--storage-driver=overlay2']
+    command: ['--host=tcp://0.0.0.0:2376', '--storage-driver=overlay2']
     environment:
-      - DOCKER_TLS_CERTDIR=
+      - DOCKER_TLS_CERTDIR=/certs
     volumes:
       - docker_data:/var/lib/docker
+      - dind_certs:/certs
     healthcheck:
       test: ['CMD', 'docker', 'info']
       interval: 30s
@@ -262,18 +263,18 @@ services:
       - AUTH_PROVIDER=${AUTH_PROVIDER:-local}
       - CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
-      - SESSION_SECRET=${SESSION_SECRET:-}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET is required}
       # Set to 'true' to disable analytics
       - DISABLE_ANALYTICS=${DISABLE_ANALYTICS:-false}
       # Internal service token for worker->backend auth
-      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       # OpenSearch tenant provisioning
       - OPENSEARCH_SECURITY_ENABLED=${OPENSEARCH_SECURITY_ENABLED:-false}
       - OPENSEARCH_URL=http://opensearch:9200
       - OPENSEARCH_DASHBOARDS_URL=http://opensearch-dashboards:5601/analytics
       - OPENSEARCH_ADMIN_USERNAME=${OPENSEARCH_ADMIN_USERNAME:-admin}
       - OPENSEARCH_ADMIN_PASSWORD=${OPENSEARCH_ADMIN_PASSWORD:-}
-      - SECRET_STORE_MASTER_KEY=${SECRET_STORE_MASTER_KEY:-abcdefghijklmnopqrstuvwxyz012345}
+      - SECRET_STORE_MASTER_KEY=${SECRET_STORE_MASTER_KEY:?SECRET_STORE_MASTER_KEY is required}
     # Internal only - accessed via nginx at /api/
     expose:
       - '3211'
@@ -345,7 +346,9 @@ services:
       - MINIO_PORT=9000
       - LOKI_URL=http://loki:3100
       - TERMINAL_REDIS_URL=redis://redis:6379
-      - DOCKER_HOST=tcp://dind:2375
+      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_CERT_PATH=/certs/client
       - LOG_KAFKA_BROKERS=redpanda:9092
       - LOG_KAFKA_TOPIC=telemetry.logs
       - LOG_KAFKA_CLIENT_ID=sentris-worker
@@ -356,7 +359,7 @@ services:
       - OPENSEARCH_DASHBOARDS_URL=http://opensearch-dashboards:5601/analytics
       # Tenant provisioning (for multi-tenant security mode)
       - BACKEND_URL=http://backend:3211
-      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN is required}
       - OPENSEARCH_SECURITY_ENABLED=${OPENSEARCH_SECURITY_ENABLED:-false}
     depends_on:
       postgres:
@@ -373,6 +376,8 @@ services:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+    volumes:
+      - dind_certs:/certs/client:ro
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', '-e', 'process.exit(0)']
@@ -408,6 +413,7 @@ volumes:
   loki_data:
   temporal_data:
   docker_data:
+  dind_certs:
   redis_data:
   redpanda_data:
   opensearch_data:

@@ -4,20 +4,22 @@ This guide covers deploying the analytics infrastructure with security and SaaS 
 
 ## Overview
 
-| Environment | Security | Multitenancy | Use Case |
-|-------------|----------|--------------|----------|
-| Development | Disabled | No | Local development, fast iteration |
-| Production | Enabled | Yes (Strict) | Multi-tenant SaaS deployment |
+| Environment | Security | Multitenancy | Use Case                          |
+| ----------- | -------- | ------------ | --------------------------------- |
+| Development | Disabled | No           | Local development, fast iteration |
+| Production  | Enabled  | Yes (Strict) | Multi-tenant SaaS deployment      |
 
 ## SaaS Multitenancy Model
 
 **Key Principles:**
+
 - Each customer gets complete data isolation by default
 - No shared dashboards - sharing is explicitly opt-in
 - Each customer has their own index pattern (`{customer_id}-*`)
 - Tenants, roles, and users are created dynamically via backend
 
 **Index Naming Convention:**
+
 ```
 {customer_id}-analytics-*     # Analytics data
 {customer_id}-workflows-*     # Workflow results
@@ -40,18 +42,18 @@ docker compose -f docker-compose.infra.yml -f docker-compose.prod.yml up -d
 
 ## Files Overview
 
-| File | Purpose |
-|------|---------|
-| `docker-compose.infra.yml` | Base infrastructure (dev mode, PM2 on host) |
-| `docker-compose.full.yml` | Full stack containerized (simple prod, no security) |
-| `docker-compose.prod.yml` | Security overlay (combines with infra.yml for SaaS) |
-| `nginx/nginx.dev.conf` | Nginx routing to host (PM2 services) |
-| `nginx/nginx.prod.conf` | Nginx routing to containers |
-| `opensearch-dashboards.yml` | Dashboards config (dev) |
-| `opensearch-dashboards.prod.yml` | Dashboards config (prod with multitenancy) |
-| `scripts/generate-certs.sh` | TLS certificate generator |
-| `opensearch-security/` | Security plugin configuration |
-| `certs/` | Generated certificates (gitignored) |
+| File                             | Purpose                                             |
+| -------------------------------- | --------------------------------------------------- |
+| `docker-compose.infra.yml`       | Base infrastructure (dev mode, PM2 on host)         |
+| `docker-compose.full.yml`        | Full stack containerized (simple prod, no security) |
+| `docker-compose.prod.yml`        | Security overlay (combines with infra.yml for SaaS) |
+| `nginx/nginx.dev.conf`           | Nginx routing to host (PM2 services)                |
+| `nginx/nginx.prod.conf`          | Nginx routing to containers                         |
+| `opensearch-dashboards.yml`      | Dashboards config (dev)                             |
+| `opensearch-dashboards.prod.yml` | Dashboards config (prod with multitenancy)          |
+| `scripts/generate-certs.sh`      | TLS certificate generator                           |
+| `opensearch-security/`           | Security plugin configuration                       |
+| `certs/`                         | Generated certificates (gitignored)                 |
 
 See [README.md](README.md) for detailed usage of each compose file.
 
@@ -60,6 +62,7 @@ See [README.md](README.md) for detailed usage of each compose file.
 When a new customer is onboarded, the backend must create:
 
 ### 1. Create Customer Tenant
+
 ```bash
 PUT /_plugins/_security/api/tenants/{customer_id}
 {
@@ -68,6 +71,7 @@ PUT /_plugins/_security/api/tenants/{customer_id}
 ```
 
 ### 2. Create Customer Role (with Index Isolation)
+
 ```bash
 PUT /_plugins/_security/api/roles/customer_{customer_id}_rw
 {
@@ -84,6 +88,7 @@ PUT /_plugins/_security/api/roles/customer_{customer_id}_rw
 ```
 
 ### 3. Create Customer User
+
 ```bash
 PUT /_plugins/_security/api/internalusers/{user_email}
 {
@@ -97,6 +102,7 @@ PUT /_plugins/_security/api/internalusers/{user_email}
 ```
 
 ### 4. Map User to Role
+
 ```bash
 PUT /_plugins/_security/api/rolesmapping/customer_{customer_id}_rw
 {
@@ -116,6 +122,7 @@ The `scripts/generate-certs.sh` script generates:
 - **admin.pem / admin-key.pem** - Admin certificate for cluster management
 
 For production:
+
 - Use a proper CA (Let's Encrypt, internal PKI)
 - Store private keys in a secrets manager (Vault, AWS Secrets Manager)
 - Set up certificate rotation before expiration
@@ -124,16 +131,17 @@ For production:
 
 Only two system users are defined (in `internal_users.yml`):
 
-| User | Purpose |
-|------|---------|
-| `admin` | Platform operations - DO NOT give to customers |
-| `kibanaserver` | Dashboards backend communication |
+| User           | Purpose                                        |
+| -------------- | ---------------------------------------------- |
+| `admin`        | Platform operations - DO NOT give to customers |
+| `kibanaserver` | Dashboards backend communication               |
 
 Customer users are created dynamically via the Security REST API.
 
 ### Password Hashing
 
 Generate password hashes for users:
+
 ```bash
 docker run -it opensearchproject/opensearch:2.11.1 \
   /usr/share/opensearch/plugins/opensearch-security/tools/hash.sh -p YOUR_PASSWORD
@@ -155,10 +163,23 @@ curl -u user@customer.com:password \
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENSEARCH_ADMIN_PASSWORD` | Yes | Admin user password |
-| `OPENSEARCH_DASHBOARDS_PASSWORD` | Yes | kibanaserver user password |
+### Required for `docker-compose.full.yml` (Full Stack / Production)
+
+The following variables **must** be set before running `docker compose -f docker-compose.full.yml up`.
+Docker Compose will fail fast with an error if any are missing.
+
+| Variable                  | Required | Description                                                                                 |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `SECRET_STORE_MASTER_KEY` | Yes      | 32-byte key for encrypting secrets at rest. Generate with `openssl rand -hex 16`            |
+| `SESSION_SECRET`          | Yes      | Secret used to sign session cookies. Generate with `openssl rand -base64 32`                |
+| `INTERNAL_SERVICE_TOKEN`  | Yes      | Shared token for worker→backend API authentication. Generate with `openssl rand -base64 32` |
+
+### Required for Production Security Overlay (`docker-compose.prod.yml`)
+
+| Variable                         | Required | Description                |
+| -------------------------------- | -------- | -------------------------- |
+| `OPENSEARCH_ADMIN_PASSWORD`      | Yes      | Admin user password        |
+| `OPENSEARCH_DASHBOARDS_PASSWORD` | Yes      | kibanaserver user password |
 
 ## Updating Security Configuration
 
@@ -179,12 +200,14 @@ docker exec -it sentris-opensearch \
 ### Container fails to start
 
 Check logs:
+
 ```bash
 docker logs sentris-opensearch
 docker logs sentris-opensearch-dashboards
 ```
 
 Common issues:
+
 - Certificate permissions (should be 600 for keys, 644 for certs)
 - Missing environment variables
 - Incorrect certificate paths
@@ -206,6 +229,7 @@ curl -k -u admin:PASSWORD https://localhost:9200/_cluster/health
 ### Cross-tenant data leak
 
 If a customer can see another customer's data:
+
 1. Verify index_patterns in role are correctly scoped to `{customer_id}-*`
 2. Check role mapping is correct
 3. Ensure user's backend_roles match their customer ID
@@ -213,11 +237,13 @@ If a customer can see another customer's data:
 ## Switching Between Environments
 
 **Development (no security):**
+
 ```bash
 docker compose -f docker-compose.infra.yml up -d
 ```
 
 **Production (with security):**
+
 ```bash
 docker compose -f docker-compose.infra.yml -f docker-compose.prod.yml up -d
 ```

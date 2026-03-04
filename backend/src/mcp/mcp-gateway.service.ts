@@ -16,7 +16,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ErrorCode, McpError, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
 import { ToolRegistryService, RegisteredTool } from './tool-registry.service';
 
 /** Minimal shape shared by MCP-discovered tools and pre-discovered DB tools */
@@ -476,7 +475,6 @@ export class McpGatewayService {
             proxiedName,
             {
               description: t.description,
-              inputSchema: z.object({}).passthrough(),
             },
             async (args: Record<string, unknown>) => {
               this.logger.debug(
