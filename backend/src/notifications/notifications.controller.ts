@@ -1,14 +1,18 @@
 import {
   Controller,
+  DefaultValuePipe,
+  Delete,
   Get,
+  Param,
+  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Put,
-  Delete,
-  Param,
+  Query,
   Body,
   UseGuards,
-  ParseUUIDPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -87,7 +91,20 @@ export class NotificationsController {
   async listDeliveries(
     @CurrentAuth() auth: AuthContext,
     @Param('id', new ParseUUIDPipe()) id: string,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
   ) {
-    return this.notificationsService.listDeliveries(auth, id);
+    return this.notificationsService.listDeliveries(auth, id, limit, offset);
+  }
+
+  @Post(':id/deliveries/:deliveryId/resend')
+  @ApiOperation({ summary: 'Resend a failed delivery' })
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  async resendDelivery(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('deliveryId', new ParseUUIDPipe()) deliveryId: string,
+  ) {
+    return this.notificationsService.resendDelivery(auth, id, deliveryId);
   }
 }

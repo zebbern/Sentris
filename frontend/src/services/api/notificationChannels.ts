@@ -22,5 +22,14 @@ export const notificationChannelsApi = {
 
   testChannel: (id: string) => httpPost<undefined>(`${BASE}/${id}/test`),
 
-  listDeliveries: (id: string) => httpGet<NotificationDelivery[]>(`${BASE}/${id}/deliveries`),
+  listDeliveries: (id: string, params?: { limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit));
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
+    const qs = searchParams.toString();
+    return httpGet<NotificationDelivery[]>(`${BASE}/${id}/deliveries${qs ? `?${qs}` : ''}`);
+  },
+
+  resendDelivery: (channelId: string, deliveryId: string) =>
+    httpPost<NotificationDelivery>(`${BASE}/${channelId}/deliveries/${deliveryId}/resend`),
 };

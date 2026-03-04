@@ -87,6 +87,9 @@ export const NotificationDeliverySchema = z.object({
   status: z.enum(['pending', 'sent', 'failed']),
   payload: z.record(z.string(), z.unknown()),
   errorMessage: z.string().nullable(),
+  durationMs: z.number().nullable(),
+  responseStatus: z.number().nullable(),
+  responseBody: z.string().nullable(),
   createdAt: z.string().datetime(),
   sentAt: z.string().datetime().nullable(),
 });

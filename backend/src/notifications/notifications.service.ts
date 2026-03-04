@@ -1,8 +1,8 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
-  BadRequestException,
   NotImplementedException,
 } from '@nestjs/common';
 import {
@@ -17,6 +17,7 @@ import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
 import { NotificationChannelRepository } from './repository/notification-channel.repository';
 import { NotificationDeliveryRepository } from './repository/notification-delivery.repository';
+import { NotificationDispatcherService } from './notification-dispatcher.service';
 import { SlackNotificationAdapter } from './adapters/slack.adapter';
 import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../database/schema';
 
@@ -29,6 +30,7 @@ export class NotificationsService {
     private readonly deliveryRepository: NotificationDeliveryRepository,
     private readonly slackAdapter: SlackNotificationAdapter,
     private readonly auditLogService: AuditLogService,
+    private readonly dispatcherService: NotificationDispatcherService,
   ) {}
 
   async list(auth: AuthContext | null): Promise<NotificationChannel[]> {
@@ -177,6 +179,8 @@ export class NotificationsService {
   async listDeliveries(
     auth: AuthContext | null,
     channelId: string,
+    limit = 20,
+    offset = 0,
   ): Promise<NotificationDelivery[]> {
     const organizationId = requireOrganizationId(auth);
 
@@ -186,8 +190,64 @@ export class NotificationsService {
       throw new NotFoundException(`Notification channel ${channelId} not found`);
     }
 
-    const records = await this.deliveryRepository.listByChannelId(channelId);
+    const clampedLimit = Math.max(1, Math.min(limit, 100));
+    const clampedOffset = Math.max(0, offset);
+
+    const records = await this.deliveryRepository.listByChannelId(
+      channelId,
+      clampedLimit,
+      clampedOffset,
+    );
     return records.map((r) => this.toDeliveryResponse(r));
+  }
+
+  async resendDelivery(
+    auth: AuthContext | null,
+    channelId: string,
+    deliveryId: string,
+  ): Promise<NotificationDelivery> {
+    const organizationId = requireOrganizationId(auth);
+
+    // Verify channel exists and belongs to the organization
+    const channel = await this.channelRepository.findById(channelId, { organizationId });
+    if (!channel) {
+      throw new NotFoundException(`Notification channel ${channelId} not found`);
+    }
+
+    // Load original delivery and verify it belongs to the channel
+    const delivery = await this.deliveryRepository.findById(deliveryId);
+    if (!delivery || delivery.channelId !== channelId) {
+      throw new NotFoundException(`Delivery ${deliveryId} not found`);
+    }
+
+    // Only failed deliveries can be re-sent
+    if (delivery.status !== 'failed') {
+      throw new BadRequestException('Only failed deliveries can be re-sent');
+    }
+
+    // Dispatch using original payload and event type
+    const payload = delivery.payload as unknown as RunLifecycleEvent;
+    const newDeliveryId = await this.dispatcherService.dispatchToChannel(
+      channel,
+      payload,
+      delivery.eventType,
+    );
+
+    // Audit log the resend action
+    this.auditLogService.record(auth, {
+      action: 'notification_delivery.resend',
+      resourceType: 'notification_delivery',
+      resourceId: deliveryId,
+      metadata: { newDeliveryId, channelId },
+    });
+
+    // Return the new delivery record
+    const newDelivery = await this.deliveryRepository.findById(newDeliveryId);
+    if (!newDelivery) {
+      throw new NotFoundException('New delivery record not found after resend');
+    }
+
+    return this.toDeliveryResponse(newDelivery);
   }
 
   private validateConfig(type: string, config: Record<string, unknown>): void {
@@ -239,6 +299,9 @@ export class NotificationsService {
       status: record.status,
       payload: record.payload,
       errorMessage: record.errorMessage,
+      durationMs: record.durationMs ?? null,
+      responseStatus: record.responseStatus ?? null,
+      responseBody: record.responseBody ?? null,
       createdAt: record.createdAt.toISOString(),
       sentAt: record.sentAt?.toISOString() ?? null,
     };

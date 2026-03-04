@@ -279,4 +279,98 @@ describe('SlackNotificationAdapter', () => {
       expect(result.error).toContain('Invalid URL');
     });
   });
+
+  // ── Response capture ──────────────────────────────────────────
+
+  describe('response capture', () => {
+    it('returns responseStatus on success', async () => {
+      globalThis.fetch = (async () => {
+        return new Response('ok', { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.responseStatus).toBe(200);
+    });
+
+    it('returns responseBody on success', async () => {
+      globalThis.fetch = (async () => {
+        return new Response('ok', { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.responseBody).toBe('ok');
+    });
+
+    it('truncates responseBody to 2048 bytes with suffix', async () => {
+      const longBody = 'x'.repeat(3000);
+      globalThis.fetch = (async () => {
+        return new Response(longBody, { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.responseBody!.length).toBeLessThan(longBody.length);
+      expect(result.responseBody!.endsWith('... [truncated]')).toBe(true);
+      // The non-truncated prefix should be 2048 chars
+      expect(result.responseBody!).toBe('x'.repeat(2048) + '... [truncated]');
+    });
+
+    it('does not truncate responseBody at exactly 2048 bytes', async () => {
+      const exactBody = 'y'.repeat(2048);
+      globalThis.fetch = (async () => {
+        return new Response(exactBody, { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(true);
+      expect(result.responseBody).toBe(exactBody);
+    });
+
+    it('returns responseStatus on failure (non-2xx)', async () => {
+      globalThis.fetch = (async () => {
+        return new Response('not_found', { status: 404 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(false);
+      expect(result.responseStatus).toBe(404);
+    });
+
+    it('returns responseBody on failure (non-2xx)', async () => {
+      globalThis.fetch = (async () => {
+        return new Response('internal_error', { status: 500 });
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(false);
+      expect(result.responseBody).toBe('internal_error');
+    });
+
+    it('does not include responseStatus or responseBody on network exception', async () => {
+      globalThis.fetch = (async () => {
+        throw new Error('connect ECONNREFUSED');
+      }) as unknown as typeof fetch;
+
+      const channel = makeChannel();
+      const result = await adapter.send(channel, testPayload);
+
+      expect(result.success).toBe(false);
+      expect(result.responseStatus).toBeUndefined();
+      expect(result.responseBody).toBeUndefined();
+    });
+  });
 });

@@ -19,11 +19,29 @@ export function useNotificationChannel(id: string | undefined) {
   });
 }
 
-export function useNotificationChannelDeliveries(channelId: string | undefined) {
+export function useNotificationChannelDeliveries(
+  channelId: string | undefined,
+  params?: { limit?: number; offset?: number },
+) {
   return useQuery({
-    queryKey: queryKeys.notificationChannels.deliveries(channelId || ''),
-    queryFn: channelId ? () => api.notificationChannels.listDeliveries(channelId) : skipToken,
+    queryKey: [...queryKeys.notificationChannels.deliveries(channelId || ''), params] as const,
+    queryFn: channelId
+      ? () => api.notificationChannels.listDeliveries(channelId, params)
+      : skipToken,
     staleTime: 60_000,
+  });
+}
+
+export function useResendDelivery() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, deliveryId }: { channelId: string; deliveryId: string }) =>
+      api.notificationChannels.resendDelivery(channelId, deliveryId),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.notificationChannels.deliveries(variables.channelId),
+      });
+    },
   });
 }
 

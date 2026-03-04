@@ -35,13 +35,27 @@ export class NotificationDeliveryRepository {
     return record;
   }
 
-  async listByChannelId(channelId: string, limit = 100): Promise<NotificationDeliveryRecord[]> {
+  async findById(id: string): Promise<NotificationDeliveryRecord | undefined> {
+    const [record] = await this.db
+      .select()
+      .from(notificationDeliveriesTable)
+      .where(eq(notificationDeliveriesTable.id, id))
+      .limit(1);
+    return record;
+  }
+
+  async listByChannelId(
+    channelId: string,
+    limit = 100,
+    offset = 0,
+  ): Promise<NotificationDeliveryRecord[]> {
     return this.db
       .select()
       .from(notificationDeliveriesTable)
       .where(eq(notificationDeliveriesTable.channelId, channelId))
       .orderBy(desc(notificationDeliveriesTable.createdAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   }
 
   async listByRunId(runId: string): Promise<NotificationDeliveryRecord[]> {

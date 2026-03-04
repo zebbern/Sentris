@@ -6896,6 +6896,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -6914,6 +6930,38 @@
           }
         },
         "summary": "List delivery history for a notification channel",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/channels/{id}/deliveries/{deliveryId}/resend": {
+      "post": {
+        "operationId": "NotificationsController_resendDelivery",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Resend a failed delivery",
         "tags": [
           "notifications"
         ]
@@ -13175,6 +13223,18 @@
             "type": "string",
             "nullable": true
           },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "responseStatus": {
+            "type": "number",
+            "nullable": true
+          },
+          "responseBody": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -13195,6 +13255,9 @@
           "status",
           "payload",
           "errorMessage",
+          "durationMs",
+          "responseStatus",
+          "responseBody",
           "createdAt",
           "sentAt"
         ]
