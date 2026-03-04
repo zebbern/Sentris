@@ -98,6 +98,10 @@ export const queryKeys = {
     detail: (id: string) => ['findings', getOrgScope(), 'detail', id] as const,
     stats: (filters?: Record<string, unknown>) =>
       ['findings', getOrgScope(), 'stats', filters] as const,
+    history: (findingId: string) => ['findings', getOrgScope(), 'history', findingId] as const,
+  },
+  orgMembers: {
+    all: () => ['orgMembers', getOrgScope()] as const,
   },
   dashboard: {
     stats: () => ['dashboard', getOrgScope(), 'stats'] as const,

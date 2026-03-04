@@ -24,6 +24,7 @@ import { webhooksApi } from './webhooks';
 import { analyticsSettingsApi } from './analytics';
 import { findingsApi } from './findings';
 import { notificationChannelsApi } from './notificationChannels';
+import { orgMembersApi } from './orgMembers';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -43,6 +44,7 @@ export const api = {
   analyticsSettings: analyticsSettingsApi,
   findings: findingsApi,
   notificationChannels: notificationChannelsApi,
+  orgMembers: orgMembersApi,
 
   // Generic HTTP methods
   get: httpGet,
@@ -67,7 +69,11 @@ export type {
   FindingsExportParams,
   FindingsStatsResponse,
   FindingsStatsParams,
+  FindingTriageResponse,
+  FindingTriageEventResponse,
+  BulkTriageResult,
 } from './findings';
+export type { OrgMember, OrgMembersResponse } from './orgMembers';
 export type { ArtifactListFilters } from './artifacts';
 export type { UploadedFileResponse } from './files';
 export type { TerminalChunkResponse } from './executions';

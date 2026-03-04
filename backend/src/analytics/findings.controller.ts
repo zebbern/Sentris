@@ -32,6 +32,8 @@ import {
   FindingsStatsQuerySchema,
   FindingsStatsResponseDto,
 } from './dto/findings-stats.dto';
+import { FindingTriageService } from '../findings/finding-triage.service';
+import { type FindingTriageStatus } from '../findings/dto/triage-update.dto';
 
 @ApiTags('findings')
 @Controller('findings')
@@ -41,6 +43,7 @@ export class FindingsController {
   constructor(
     private readonly securityAnalyticsService: SecurityAnalyticsService,
     private readonly auditLogService: AuditLogService,
+    private readonly findingTriageService: FindingTriageService,
   ) {}
 
   /**
@@ -160,15 +163,97 @@ export class FindingsController {
     const opensearchQuery = this.buildFindingsFilter(query);
 
     try {
+      // Handle triage status filtering
+      let additionalIdFilter: string[] | null = null;
+      let excludeIds: string[] | null = null;
+      const hasTriageStatusFilter = !!query.triageStatus;
+      const hasAssigneeFilter = !!query.assigneeUserId;
+      let hasNewFilter = false;
+      let nonNewStatuses: FindingTriageStatus[] = [];
+
+      if (hasTriageStatusFilter) {
+        const requestedStatuses = query
+          .triageStatus!.split(',')
+          .map((s) => s.trim()) as FindingTriageStatus[];
+        hasNewFilter = requestedStatuses.includes('new');
+        nonNewStatuses = requestedStatuses.filter((s) => s !== 'new') as FindingTriageStatus[];
+
+        if (hasNewFilter && nonNewStatuses.length === 0) {
+          // Only "new" — exclude all findings that have triage records
+          excludeIds = await this.findingTriageService.getAllTriagedIds(auth.organizationId);
+        } else if (hasNewFilter && nonNewStatuses.length > 0) {
+          // "new" + other statuses — get IDs for non-new statuses, but don't filter by ID
+          // (we can't easily combine "has ID in list OR not in triage table")
+          // Strategy: query normally, then post-filter
+          additionalIdFilter = null;
+        } else {
+          // Only non-new statuses
+          const matchingIds = await this.findingTriageService.getTriageByStatus(
+            auth.organizationId,
+            nonNewStatuses,
+          );
+          if (matchingIds.length === 0) {
+            return { items: [], total: 0, page, pageSize };
+          }
+          additionalIdFilter = matchingIds;
+        }
+      }
+
+      // Build the final query
+      let finalQuery = opensearchQuery;
+
+      if (additionalIdFilter) {
+        finalQuery = {
+          bool: {
+            must: [opensearchQuery],
+            filter: [{ ids: { values: additionalIdFilter } }],
+          },
+        };
+      }
+
+      if (excludeIds && excludeIds.length > 0) {
+        finalQuery = {
+          bool: {
+            must: [opensearchQuery],
+            must_not: [{ ids: { values: excludeIds } }],
+          },
+        };
+      }
+
       const result = await this.securityAnalyticsService.query(auth.organizationId, {
-        query: opensearchQuery,
+        query: finalQuery,
         size: pageSize,
         from,
       });
 
       const items: FindingItem[] = result.hits.map((hit) => this.mapHitToFindingItem(hit));
 
-      return { items, total: result.total, page, pageSize };
+      // Enrich with triage state from PG
+      const enrichedItems = await this.findingTriageService.enrichWithTriageState(
+        auth.organizationId,
+        items,
+      );
+
+      // Post-filter by assignee if specified
+      let finalItems = enrichedItems;
+
+      // Post-filter for new + non-new triage status combo
+      if (hasNewFilter && nonNewStatuses.length > 0) {
+        const nonNewSet = new Set<string>(nonNewStatuses);
+        finalItems = finalItems.filter(
+          (item) =>
+            (item.triage === null && hasNewFilter) ||
+            (item.triage?.status != null && nonNewSet.has(item.triage.status)),
+        );
+      }
+
+      if (hasAssigneeFilter) {
+        finalItems = enrichedItems.filter(
+          (item) => item.triage?.assigneeUserId === query.assigneeUserId,
+        );
+      }
+
+      return { items: finalItems, total: result.total, page, pageSize };
     } catch (error) {
       this.logger.error(`Failed to query findings: ${error}`);
       // Return empty results on OpenSearch errors (graceful degradation)

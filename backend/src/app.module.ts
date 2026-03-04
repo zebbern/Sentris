@@ -52,6 +52,8 @@ import { McpGroupsModule } from './mcp-groups/mcp-groups.module';
 import { McpRegistryModule } from './mcp-registry/mcp-registry.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TemplatesModule } from './templates/templates.module';
+import { FindingTriageModule } from './findings/finding-triage.module';
+import { OrgMembersModule } from './org/org-members.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
 import { CorrelationIdMiddleware } from './common/middleware';
@@ -84,6 +86,8 @@ const coreModules = [
   TemplatesModule,
   AuditModule,
   HealthModule,
+  FindingTriageModule,
+  OrgMembersModule,
 ];
 
 const testingModules = process.env.NODE_ENV === 'production' ? [] : [TestingSupportModule];

@@ -876,6 +876,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/findings/{id}/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update triage state for a finding */
+        patch: operations["FindingTriageController_updateTriage"];
+        trace?: never;
+    };
+    "/api/v1/findings/bulk-triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk update triage state for multiple findings */
+        post: operations["FindingTriageController_bulkTriage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/findings/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get triage event history for a finding */
+        get: operations["FindingTriageController_getHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/api-keys": {
         parameters: {
             query?: never;
@@ -2060,6 +2111,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/channels/{id}/deliveries/{deliveryId}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend a failed delivery */
+        post: operations["NotificationsController_resendDelivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp/gateway": {
         parameters: {
             query?: never;
@@ -2431,6 +2499,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["HealthController_readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/org/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List organization members for assignee picker */
+        get: operations["OrgMembersController_listMembers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2972,6 +3057,13 @@ export interface components {
                 raw?: {
                     [key: string]: unknown;
                 };
+                triage?: {
+                    status: string;
+                    assigneeUserId: string | null;
+                    severityOverride: string | null;
+                    notes: string | null;
+                    updatedAt: string;
+                } | null;
             }[];
             total: number;
             page: number;
@@ -2998,6 +3090,29 @@ export interface components {
             raw: {
                 [key: string]: unknown;
             };
+            triage?: {
+                status: string;
+                assigneeUserId: string | null;
+                severityOverride: string | null;
+                notes: string | null;
+                updatedAt: string;
+            } | null;
+        };
+        TriageUpdateDto: {
+            /** @enum {string} */
+            status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
+            assigneeUserId?: string;
+            /** @enum {string|null} */
+            severityOverride?: "critical" | "high" | "medium" | "low" | "info" | null;
+            notes?: string | null;
+            comment?: string;
+        };
+        BulkTriageDto: {
+            findingIds: string[];
+            /** @enum {string} */
+            status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
+            assigneeUserId?: string;
+            comment?: string;
         };
         ApiKeyResponseDto: {
             id: string;
@@ -4018,6 +4133,9 @@ export interface components {
                 [key: string]: unknown;
             };
             errorMessage: string | null;
+            durationMs: number | null;
+            responseStatus: number | null;
+            responseBody: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -5809,6 +5927,8 @@ export interface operations {
                 componentId?: string;
                 dateFrom?: string;
                 dateTo?: string;
+                triageStatus?: string;
+                assigneeUserId?: string;
             };
             header?: never;
             path?: never;
@@ -5898,6 +6018,67 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FindingDetailResponseDto"];
                 };
+            };
+        };
+    };
+    FindingTriageController_updateTriage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FindingTriageController_bulkTriage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkTriageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    FindingTriageController_getHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -8090,7 +8271,10 @@ export interface operations {
     };
     NotificationsController_listDeliveries: {
         parameters: {
-            query?: never;
+            query: {
+                limit: number;
+                offset: number;
+            };
             header?: never;
             path: {
                 id: string;
@@ -8106,6 +8290,26 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NotificationDeliveryResponseDto"][];
                 };
+            };
+        };
+    };
+    NotificationsController_resendDelivery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -8837,6 +9041,23 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    OrgMembersController_listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
