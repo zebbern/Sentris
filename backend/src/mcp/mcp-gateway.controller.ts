@@ -1,6 +1,7 @@
 import { Controller, All, UseGuards, Req, Res, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { randomUUID } from 'crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
@@ -98,7 +99,7 @@ export class McpGatewayController {
         // requests (GET SSE + POST initialize) both await the same initialization
         const initPromise = (async () => {
           const t = new StreamableHTTPServerTransport({
-            sessionIdGenerator: undefined,
+            sessionIdGenerator: () => randomUUID(),
             enableJsonResponse: true,
           });
           const server = await this.mcpGateway.getServerForRun(
