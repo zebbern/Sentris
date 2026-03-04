@@ -16,7 +16,7 @@
     "tags": ["cloud", "aws", "iam", "trufflehog", "secrets", "audit"],
     "entryPoint": "trigger_1",
     "nodeCount": 7,
-    "edgeCount": 7
+    "edgeCount": 8
   },
   "graph": {
     "name": "Cloud Security Posture Audit",
@@ -90,6 +90,11 @@
         "id": "trufflehog_1-script_aggregate",
         "source": "trufflehog_1",
         "target": "script_aggregate"
+      },
+      {
+        "id": "script_aggregate-notify_report",
+        "source": "script_aggregate",
+        "target": "notify_report"
       }
     ]
   },

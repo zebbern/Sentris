@@ -16,7 +16,7 @@
     "tags": ["phishing", "email", "analysis", "virustotal", "soar"],
     "entryPoint": "trigger_1",
     "nodeCount": 6,
-    "edgeCount": 5
+    "edgeCount": 6
   },
   "graph": {
     "name": "Phishing Email Analysis",
@@ -69,7 +69,12 @@
       { "id": "script_extract-vt_urls", "source": "script_extract", "target": "vt_urls" },
       { "id": "script_extract-http_domain", "source": "script_extract", "target": "http_domain" },
       { "id": "vt_urls-script_verdict", "source": "vt_urls", "target": "script_verdict" },
-      { "id": "http_domain-script_verdict", "source": "http_domain", "target": "script_verdict" }
+      { "id": "http_domain-script_verdict", "source": "http_domain", "target": "script_verdict" },
+      {
+        "id": "script_verdict-notify_verdict",
+        "source": "script_verdict",
+        "target": "notify_verdict"
+      }
     ]
   },
   "requiredSecrets": [

@@ -16,7 +16,7 @@
     "tags": ["kubernetes", "k8s", "rbac", "pod-security", "network-policy", "cluster-audit"],
     "entryPoint": "trigger_1",
     "nodeCount": 8,
-    "edgeCount": 8
+    "edgeCount": 9
   },
   "graph": {
     "name": "Kubernetes Security Audit",
@@ -131,6 +131,11 @@
         "id": "script_remediation-artifact_report",
         "source": "script_remediation",
         "target": "artifact_report"
+      },
+      {
+        "id": "artifact_report-notify_results",
+        "source": "artifact_report",
+        "target": "notify_results"
       }
     ]
   },
