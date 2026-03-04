@@ -1,0 +1,200 @@
+{
+  "id": "2ba11531-f3f8-413a-ac95-3f122cedef96",
+  "name": "Test - MCP Agent",
+  "description": "",
+  "graph": {
+    "name": "Test - MCP Agent",
+    "edges": [
+      {
+        "id": "reactflow__edge-anthropic-provider-1772496712364chatModel-ai-agent-1772496799842chatModel",
+        "type": "default",
+        "source": "anthropic-provider-1772496712364",
+        "target": "ai-agent-1772496799842",
+        "sourceHandle": "chatModel",
+        "targetHandle": "chatModel"
+      },
+      {
+        "id": "reactflow__edge-mcp-library-1772496784793tools-ai-agent-1772496799842tools",
+        "type": "default",
+        "source": "mcp-library-1772496784793",
+        "target": "ai-agent-1772496799842",
+        "sourceHandle": "tools",
+        "targetHandle": "tools"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "entry-point-1772496667398",
+        "data": {
+          "label": "Entry Point",
+          "config": { "params": { "runtimeInputs": [] }, "inputOverrides": {} },
+          "dynamicInputs": [
+            {
+              "id": "__runtimeData",
+              "label": "Runtime Data",
+              "connectionType": { "kind": "primitive", "name": "json" },
+              "editor": "json",
+              "required": false,
+              "valuePriority": "manual-first"
+            }
+          ],
+          "dynamicOutputs": []
+        },
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "anthropic-provider-1772496712364",
+        "data": {
+          "label": "Anthropic Provider",
+          "config": {
+            "params": { "model": "claude-sonnet-4-20250514", "apiBaseUrl": "" },
+            "inputOverrides": { "apiKey": "324c6f80-9c27-4312-9cd3-4c238521a73a" }
+          },
+          "dynamicInputs": [
+            {
+              "id": "apiKey",
+              "label": "API Key",
+              "connectionType": { "kind": "primitive", "name": "secret" },
+              "editor": "secret",
+              "required": true,
+              "description": "Connect the Secret Loader output containing the Anthropic API key."
+            }
+          ],
+          "dynamicOutputs": [
+            {
+              "id": "chatModel",
+              "label": "LLM Provider Config",
+              "connectionType": {
+                "kind": "contract",
+                "name": "core.ai.llm-provider.v1",
+                "credential": true
+              },
+              "required": true,
+              "description": "Portable provider payload (provider, model, overrides) for wiring into AI Agent or one-shot nodes."
+            }
+          ]
+        },
+        "type": "core.provider.anthropic",
+        "position": { "x": 130.9803861730239, "y": 23.999999999999975 }
+      },
+      {
+        "id": "mcp-library-1772496784793",
+        "data": {
+          "label": "Custom MCPs",
+          "config": {
+            "params": { "enabledServers": ["6f41b91c-4a5a-4ae3-bde3-8356f523b26c"] },
+            "inputOverrides": {}
+          },
+          "dynamicInputs": [],
+          "dynamicOutputs": [
+            {
+              "id": "tools",
+              "label": "Tools",
+              "connectionType": { "kind": "contract", "name": "mcp.tool" },
+              "required": false,
+              "description": "MCP tools from selected servers"
+            }
+          ]
+        },
+        "type": "mcp.custom",
+        "position": { "x": 593.5238987897744, "y": 187.56808685764483 }
+      },
+      {
+        "id": "ai-agent-1772496799842",
+        "data": {
+          "label": "AI SDK Agent",
+          "config": {
+            "params": {
+              "maxTokens": 1024,
+              "stepLimit": 4,
+              "memorySize": 8,
+              "temperature": 0.7,
+              "systemPrompt": "You are a helpful assistant. Use available tools to complete tasks."
+            },
+            "inputOverrides": {
+              "userInput": "Use the echo tool to echo 'Hello from MCP!' and tell me the result."
+            }
+          },
+          "dynamicInputs": [
+            {
+              "id": "userInput",
+              "label": "User Input",
+              "connectionType": { "kind": "primitive", "name": "text" },
+              "required": true,
+              "description": "Incoming user text for this agent turn."
+            },
+            {
+              "id": "conversationState",
+              "label": "Conversation State",
+              "connectionType": { "kind": "primitive", "name": "json" },
+              "required": false,
+              "description": "Optional prior conversation state to maintain memory across turns."
+            },
+            {
+              "id": "chatModel",
+              "label": "Chat Model",
+              "connectionType": {
+                "kind": "contract",
+                "name": "core.ai.llm-provider.v1",
+                "credential": true
+              },
+              "required": false,
+              "description": "Provider configuration. Example: {\"provider\":\"gemini\",\"modelId\":\"gemini-2.5-flash\",\"apiKey\":\"gm-...\"}"
+            },
+            {
+              "id": "modelApiKey",
+              "label": "Model API Key",
+              "connectionType": { "kind": "primitive", "name": "secret" },
+              "editor": "secret",
+              "required": false,
+              "description": "Optional override API key supplied via a Secret Loader output."
+            },
+            {
+              "id": "tools",
+              "label": "Connected Tools",
+              "connectionType": { "kind": "contract", "name": "mcp.tool" },
+              "required": false,
+              "description": "Connect tool-mode nodes here to scope gateway tool discovery for this agent."
+            }
+          ],
+          "dynamicOutputs": [
+            {
+              "id": "responseText",
+              "label": "Agent Response",
+              "connectionType": { "kind": "primitive", "name": "text" },
+              "required": true,
+              "description": "Final assistant message produced by the agent."
+            },
+            {
+              "id": "conversationState",
+              "label": "Conversation State",
+              "connectionType": { "kind": "primitive", "name": "json" },
+              "required": true,
+              "description": "Updated conversation memory for subsequent agent turns."
+            },
+            {
+              "id": "agentRunId",
+              "label": "Agent Run ID",
+              "connectionType": { "kind": "primitive", "name": "text" },
+              "required": true,
+              "description": "Unique identifier for streaming and replaying this agent session."
+            }
+          ]
+        },
+        "type": "core.ai.agent",
+        "position": { "x": 593.6274405086741, "y": 93.99999999999997 }
+      }
+    ],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 },
+    "description": ""
+  },
+  "organizationId": "local-dev",
+  "compiledDefinition": null,
+  "lastRun": "2026-03-03T00:34:29.680Z",
+  "runCount": 3,
+  "createdAt": "2026-03-03T00:16:50.229Z",
+  "updatedAt": "2026-03-03T00:34:29.680Z",
+  "currentVersionId": "8afbd66e-62a9-42e9-91ed-e6ad170f54c1",
+  "currentVersion": 1
+}
