@@ -111,9 +111,9 @@ export async function cleanupRunResourcesActivity(
     return;
   }
 
-  const { exec } = await import('node:child_process');
+  const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   // Get container IDs from tool registry (primary method)
   const response = (await callInternalApi('cleanup', { runId: input.runId })) as {
@@ -125,9 +125,14 @@ export async function cleanupRunResourcesActivity(
   // MCP containers follow the pattern: mcp-server-{image}-{timestamp}
   let namePatternContainerIds: string[] = [];
   try {
-    const { stdout } = await execAsync(
-      `docker ps -a --filter "name=mcp-server-" --format "{{.Names}}"`,
-    );
+    const { stdout } = await execFileAsync('docker', [
+      'ps',
+      '-a',
+      '--filter',
+      'name=mcp-server-',
+      '--format',
+      '{{.Names}}',
+    ]);
     namePatternContainerIds = stdout
       .split('\n')
       .map((line) => line.trim())
@@ -161,7 +166,7 @@ export async function cleanupRunResourcesActivity(
           return;
         }
         try {
-          await execAsync(`docker rm -f ${containerId}`);
+          await execFileAsync('docker', ['rm', '-f', containerId]);
           console.log(`[MCP Cleanup] Removed container: ${containerId}`);
         } catch (error: unknown) {
           console.warn(`[MCP Cleanup] Failed to remove container ${containerId}:`, error);
@@ -176,9 +181,16 @@ export async function cleanupRunResourcesActivity(
   }
 
   try {
-    const { stdout } = await execAsync(
-      `docker volume ls --filter "label=studio.managed=true" --filter "label=studio.run=${input.runId}" --format "{{.Name}}"`,
-    );
+    const { stdout } = await execFileAsync('docker', [
+      'volume',
+      'ls',
+      '--filter',
+      'label=studio.managed=true',
+      '--filter',
+      `label=studio.run=${input.runId}`,
+      '--format',
+      '{{.Name}}',
+    ]);
     const volumeNames = stdout
       .split('\n')
       .map((line) => line.trim())
@@ -195,7 +207,7 @@ export async function cleanupRunResourcesActivity(
           return;
         }
         try {
-          await execAsync(`docker volume rm ${volumeName}`);
+          await execFileAsync('docker', ['volume', 'rm', volumeName]);
         } catch (error: unknown) {
           console.warn(`[MCP Cleanup] Failed to remove volume ${volumeName}:`, error);
         }

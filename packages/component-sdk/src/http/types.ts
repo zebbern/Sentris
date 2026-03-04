@@ -30,6 +30,16 @@ export interface HttpInstrumentationOptions {
   sensitiveHeaders?: string[];
   sensitiveQueryParams?: string[];
   correlationId?: string;
+  /** SSRF guard configuration. Enabled by default. */
+  ssrfGuard?: {
+    /** Whether SSRF validation is enabled. Defaults to `true`. */
+    enabled?: boolean;
+    /**
+     * Hostnames that are explicitly allowed even if they would otherwise be
+     * blocked (e.g., the backend API host). Case-insensitive comparison.
+     */
+    allowedInternalHosts?: string[];
+  };
 }
 
 export const DEFAULT_MAX_REQUEST_BODY_SIZE = 10 * 1024;
