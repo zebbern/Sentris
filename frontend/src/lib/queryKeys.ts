@@ -114,6 +114,14 @@ export const queryKeys = {
     deliveries: (channelId: string) =>
       ['notificationChannels', getOrgScope(), 'deliveries', channelId] as const,
   },
+  ticketing: {
+    connection: () => ['ticketing', getOrgScope(), 'connection'] as const,
+    projects: () => ['ticketing', getOrgScope(), 'projects'] as const,
+    issueTypes: (projectKey: string) =>
+      ['ticketing', getOrgScope(), 'issueTypes', projectKey] as const,
+    findingTicket: (findingId: string) =>
+      ['ticketing', getOrgScope(), 'ticket', findingId] as const,
+  },
   mcpRegistry: {
     catalog: (filters?: Record<string, unknown>) =>
       filters

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import type { FindingTriageRecord } from '../database/schema';
 import type { AuthContext } from '../auth/types';
@@ -24,6 +25,17 @@ interface TriageUpdateInput {
   severityOverride?: string | null;
   notes?: string | null;
   comment?: string;
+}
+
+/** Payload emitted on the `finding.triage.changed` event. */
+export interface FindingTriageChangedEvent {
+  findingTriageId: string;
+  findingOpensearchId: string;
+  organizationId: string;
+  status: string;
+  previousStatus: string;
+  /** Origin of the change — used for circular-sync prevention. */
+  source: string;
 }
 
 export interface TriageResponseDto {
@@ -55,15 +67,21 @@ export class FindingTriageService {
     private readonly auditLogService: AuditLogService,
     private readonly securityAnalyticsService: SecurityAnalyticsService,
     private readonly orgMembersService: OrgMembersService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
    * Update (or create) triage state for a single finding.
+   *
+   * @param source Origin of the change (default `'user'`). Pass `'jira_webhook'`
+   *   for changes originating from an inbound Jira webhook so the ticketing
+   *   listener can skip re-syncing to avoid infinite loops.
    */
   async upsertTriage(
     auth: AuthContext,
     findingOpensearchId: string,
     input: TriageUpdateInput,
+    source = 'user',
   ): Promise<TriageResponseDto> {
     const organizationId = requireOrganizationId(auth);
     const userId = auth.userId!;
@@ -118,6 +136,20 @@ export class FindingTriageService {
         ),
       },
     });
+
+    try {
+      this.eventEmitter.emit('finding.triage.changed', {
+        findingTriageId: record.id,
+        findingOpensearchId,
+        organizationId,
+        status: record.status,
+        previousStatus: currentStatus,
+        source,
+        userId: auth.userId,
+      } satisfies FindingTriageChangedEvent & { userId: string | null });
+    } catch (err) {
+      this.logger.warn(`Failed to emit finding.triage.changed event: ${err}`);
+    }
 
     return this.toResponse(record);
   }
@@ -183,6 +215,20 @@ export class FindingTriageService {
       const events = this.buildEvents(existing, input, record.id, userId);
       allEvents.push(...events);
       results.push({ findingId, success: true });
+
+      try {
+        this.eventEmitter.emit('finding.triage.changed', {
+          findingTriageId: record.id,
+          findingOpensearchId: findingId,
+          organizationId,
+          status: record.status,
+          previousStatus: currentStatus,
+          source: 'user',
+          userId,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to emit finding.triage.changed event for ${findingId}: ${err}`);
+      }
     }
 
     if (allEvents.length > 0) {
@@ -238,6 +284,18 @@ export class FindingTriageService {
         createdAt: e.createdAt.toISOString(),
       })),
     };
+  }
+
+  /**
+   * Get a triage record by organization and finding OpenSearch ID.
+   */
+  async getTriageRecord(
+    organizationId: string,
+    findingOpensearchId: string,
+  ): Promise<FindingTriageRecord | null> {
+    return (
+      (await this.repository.findByOrgAndFindingId(organizationId, findingOpensearchId)) ?? null
+    );
   }
 
   /**

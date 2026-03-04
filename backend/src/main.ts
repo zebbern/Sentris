@@ -49,6 +49,8 @@ function buildCorsOrigins(nodeEnv: string): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn'],
+    // Preserve raw body buffer for HMAC webhook verification (e.g. Jira webhooks).
+    rawBody: true,
   });
 
   const configService = app.get(ConfigService);

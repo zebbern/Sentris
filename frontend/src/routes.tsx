@@ -74,6 +74,9 @@ const SettingsPage = lazyWithRetry(() =>
 const FindingsPage = lazyWithRetry(() =>
   import('@/pages/FindingsPage').then((m) => ({ default: m.FindingsPage })),
 );
+const TicketingCallback = lazyWithRetry(() =>
+  import('@/pages/settings/TicketingCallback').then((m) => ({ default: m.TicketingCallback })),
+);
 
 export function AnimatedRoutes() {
   const location = useLocation();
@@ -233,6 +236,14 @@ export function AnimatedRoutes() {
         ) : (
           <Route path="/analytics-settings" element={<Navigate to="/settings" replace />} />
         )}
+        <Route
+          path="/settings/ticketing/callback"
+          element={
+            <ErrorBoundary>
+              <TicketingCallback />
+            </ErrorBoundary>
+          }
+        />
         <Route
           path="/settings/*"
           element={

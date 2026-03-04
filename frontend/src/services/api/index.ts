@@ -25,6 +25,7 @@ import { analyticsSettingsApi } from './analytics';
 import { findingsApi } from './findings';
 import { notificationChannelsApi } from './notificationChannels';
 import { orgMembersApi } from './orgMembers';
+import { ticketingApi } from './ticketing';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -45,6 +46,7 @@ export const api = {
   findings: findingsApi,
   notificationChannels: notificationChannelsApi,
   orgMembers: orgMembersApi,
+  ticketing: ticketingApi,
 
   // Generic HTTP methods
   get: httpGet,
@@ -83,6 +85,7 @@ export type {
   IntegrationProviderConfiguration,
   OAuthStartResponse,
 } from './integrations';
+export type { ConnectResponse, JiraProject, JiraIssueType } from './ticketing';
 
 // --- Client utility re-exports ---
 export { API_BASE_URL, API_V1_URL, getApiAuthHeaders } from './client';
