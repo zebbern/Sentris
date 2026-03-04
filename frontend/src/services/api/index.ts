@@ -57,7 +57,15 @@ export type {
   UpdateAnalyticsSettingsInput,
   SubscriptionTier,
 } from './analytics';
-export type { FindingItem, FindingsResponse, FindingsQueryParams } from './findings';
+export type {
+  FindingItem,
+  FindingDetailResponse,
+  FindingsResponse,
+  FindingsQueryParams,
+  FindingsExportParams,
+  FindingsStatsResponse,
+  FindingsStatsParams,
+} from './findings';
 export type { ArtifactListFilters } from './artifacts';
 export type { UploadedFileResponse } from './files';
 export type { TerminalChunkResponse } from './executions';

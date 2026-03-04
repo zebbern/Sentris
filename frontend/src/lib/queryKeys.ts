@@ -95,6 +95,9 @@ export const queryKeys = {
   },
   findings: {
     all: (filters?: Record<string, unknown>) => ['findings', getOrgScope(), filters] as const,
+    detail: (id: string) => ['findings', getOrgScope(), 'detail', id] as const,
+    stats: (filters?: Record<string, unknown>) =>
+      ['findings', getOrgScope(), 'stats', filters] as const,
   },
   dashboard: {
     stats: () => ['dashboard', getOrgScope(), 'stats'] as const,
