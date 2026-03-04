@@ -39,6 +39,9 @@ export const workerEnvSchema = z
     OPENSEARCH_PASSWORD: z.string().optional(),
     OPENSEARCH_DASHBOARDS_URL: z.string().optional().default(''),
 
+    // --- Health server ---
+    WORKER_HEALTH_PORT: z.coerce.number().optional(),
+
     // --- AI provider keys (all optional) ---
     OPENAI_API_KEY: z.string().optional(),
     ANTHROPIC_API_KEY: z.string().optional(),

@@ -419,6 +419,7 @@ module.exports = {
           TEMPORAL_NAMESPACE: `sentris-dev-${instanceNum}`,
           TEMPORAL_TASK_QUEUE: `sentris-dev-${instanceNum}`,
           SKIP_CONTAINER_CLEANUP: process.env.SKIP_CONTAINER_CLEANUP || 'false',
+          WORKER_HEALTH_PORT: getInstancePort(9100, instanceNum),
         },
         swcBinaryPath ? { SWC_BINARY_PATH: swcBinaryPath } : {},
       ),

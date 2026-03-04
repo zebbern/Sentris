@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 
-import { AppService } from './app.service';
 import { CurrentAuth } from './auth/auth-context.decorator';
 import type { AuthContext } from './auth/types';
 import { Public } from './auth/public.decorator';
@@ -24,18 +23,10 @@ export class AppController {
   private readonly provisioningOrgs = new Map<string, Promise<boolean>>();
 
   constructor(
-    private readonly appService: AppService,
     private readonly configService: ConfigService,
     private readonly tenantService: OpenSearchTenantService,
   ) {
     this.authCfg = this.configService.get<AuthConfig>('auth')!;
-  }
-
-  @Public()
-  @SkipThrottle()
-  @Get('/health')
-  health() {
-    return this.appService.getHealth();
   }
 
   /**
