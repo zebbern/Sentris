@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   jsonb,
   pgTable,
@@ -29,6 +30,11 @@ export const workflowVersionsTable = pgTable(
   },
   (table) => ({
     workflowVersionUniqueIdx: uniqueIndex('workflow_versions_workflow_version_uidx').on(
+      table.workflowId,
+      table.version,
+    ),
+    orgWorkflowVersionIdx: index('workflow_versions_org_workflow_version_idx').on(
+      table.organizationId,
       table.workflowId,
       table.version,
     ),
