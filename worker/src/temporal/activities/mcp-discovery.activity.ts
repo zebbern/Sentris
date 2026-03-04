@@ -481,12 +481,12 @@ async function cleanupContainer(containerId: string | undefined): Promise<void> 
     return;
   }
 
-  const { exec } = await import('node:child_process');
+  const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
-  const execAsync = promisify(exec);
+  const execFileAsync = promisify(execFile);
 
   try {
-    await execAsync(`docker rm -f ${containerId}`);
+    await execFileAsync('docker', ['rm', '-f', containerId]);
   } catch (error: unknown) {
     console.error(`[MCP Discovery] Failed to cleanup container ${containerId}:`, error);
   }

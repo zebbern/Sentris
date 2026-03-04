@@ -23,6 +23,7 @@ export * from './tool-helpers';
 export * from './http/types';
 export * from './http/har-builder';
 export * from './http/instrumented-fetch';
+export * from './http/ssrf-guard';
 export * from './http/adapters/interface';
 export * from './http/adapters';
 export * from './define-component';

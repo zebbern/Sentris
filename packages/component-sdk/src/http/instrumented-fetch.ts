@@ -5,6 +5,7 @@ import { performance } from 'perf_hooks';
 import type { ExecutionContext } from '../types';
 import { getTimingAdapter } from './adapters';
 import { buildHarEntry, buildHarRequest, buildHarResponse, harToCurl } from './har-builder';
+import { validateUrlForSsrf } from './ssrf-guard';
 import {
   DEFAULT_MAX_REQUEST_BODY_SIZE,
   DEFAULT_MAX_RESPONSE_BODY_SIZE,
@@ -15,7 +16,7 @@ import {
   type HttpRequestInput,
 } from './types';
 
-const resolveOptions = (options?: HttpInstrumentationOptions): Required<Omit<HttpInstrumentationOptions, 'correlationId'>> => ({
+const resolveOptions = (options?: HttpInstrumentationOptions): Required<Omit<HttpInstrumentationOptions, 'correlationId' | 'ssrfGuard'>> => ({
   maxRequestBodySize: options?.maxRequestBodySize ?? DEFAULT_MAX_REQUEST_BODY_SIZE,
   maxResponseBodySize: options?.maxResponseBodySize ?? DEFAULT_MAX_RESPONSE_BODY_SIZE,
   sensitiveHeaders: options?.sensitiveHeaders ?? DEFAULT_SENSITIVE_HEADERS,
@@ -50,6 +51,13 @@ export async function instrumentedFetch(
   const startTime = new Date().toISOString();
   const startMs = performance.now();
   const resolvedOptions = resolveOptions(options);
+
+  // ── SSRF guard: validate URL before making the request ──────────────
+  if (options.ssrfGuard?.enabled !== false) {
+    await validateUrlForSsrf(url, {
+      allowedInternalHosts: options.ssrfGuard?.allowedInternalHosts,
+    });
+  }
 
   timingAdapter.startTracking(correlationId, url);
 
