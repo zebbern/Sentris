@@ -26,4 +26,5 @@ export * from './organization-settings';
 export * from './templates';
 export * from './workflow-tags';
 export * from './finding-triage';
+export * from './sla-policies';
 export * from './ticketing';

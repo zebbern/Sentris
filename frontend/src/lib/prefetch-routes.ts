@@ -22,6 +22,7 @@ const routePrefetchMap: Record<string, PrefetchFn> = {
   '/secrets': () => void import('@/pages/SecretsManager'),
   '/api-keys': () => void import('@/pages/ApiKeysManager'),
   '/mcp-library': () => void import('@/pages/McpLibraryPage'),
+  '/analytics': () => void import('@/pages/TriageAnalyticsPage'),
   '/analytics-settings': () => void import('@/pages/AnalyticsSettingsPage'),
   '/settings': () => void import('@/pages/SettingsPage'),
 };

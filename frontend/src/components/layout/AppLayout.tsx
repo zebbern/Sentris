@@ -20,6 +20,7 @@ import {
   X,
   LayoutDashboard,
   ShieldAlert,
+  TrendingUp,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -61,6 +62,7 @@ const navigationItems: NavItem[] = [
   { name: 'Webhooks', href: '/webhooks', icon: Webhook },
   { name: 'Action Center', href: '/action-center', icon: Zap },
   { name: 'Findings', href: '/findings', icon: ShieldAlert },
+  { name: 'Analytics', href: '/analytics', icon: TrendingUp },
   ...(env.VITE_ENABLE_CONNECTIONS
     ? [{ name: 'Connections', href: '/integrations', icon: Plug }]
     : []),

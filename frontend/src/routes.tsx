@@ -77,6 +77,9 @@ const FindingsPage = lazyWithRetry(() =>
 const TicketingCallback = lazyWithRetry(() =>
   import('@/pages/settings/TicketingCallback').then((m) => ({ default: m.TicketingCallback })),
 );
+const TriageAnalyticsPage = lazyWithRetry(() =>
+  import('@/pages/TriageAnalyticsPage').then((m) => ({ default: m.TriageAnalyticsPage })),
+);
 
 export function AnimatedRoutes() {
   const location = useLocation();
@@ -221,6 +224,14 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <FindingsPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ErrorBoundary>
+              <TriageAnalyticsPage />
             </ErrorBoundary>
           }
         />

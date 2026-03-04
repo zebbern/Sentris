@@ -3378,6 +3378,770 @@
         ]
       }
     },
+    "/api/v1/findings/{id}/ticket": {
+      "get": {
+        "operationId": "FindingTriageController_getTicket",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get linked ticket for a finding",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/posture-trend": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getPostureTrend",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get posture trend over time by severity",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/triage-velocity": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getTriageVelocity",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get triage velocity (status changes) over time",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/mttr": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getMttr",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get Mean Time to Remediate by severity",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/sla-compliance": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getSlaCompliance",
+        "parameters": [
+          {
+            "name": "period",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get SLA compliance rates by severity",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/status-distribution": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getStatusDistribution",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get current status distribution of all findings",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/analytics/top-assignees": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getTopAssignees",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get top assignees by triage volume",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/sla-policies": {
+      "get": {
+        "operationId": "TriageAnalyticsController_getSlaPolicies",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get SLA policies for the organization",
+        "tags": [
+          "findings"
+        ]
+      },
+      "put": {
+        "operationId": "TriageAnalyticsController_upsertSlaPolicies",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSlaPoliciesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Upsert SLA policies for the organization",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/org/members": {
+      "get": {
+        "operationId": "OrgMembersController_listMembers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List organization members for assignee picker",
+        "tags": [
+          "org"
+        ]
+      }
+    },
+    "/api/v1/ticketing/connection": {
+      "get": {
+        "operationId": "TicketingController_getConnection",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get Jira connection status",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/connect": {
+      "post": {
+        "operationId": "TicketingController_connect",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectJiraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Initiate Jira OAuth 2.0 connection",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/callback": {
+      "get": {
+        "operationId": "TicketingController_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Handle Jira OAuth callback",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/disconnect": {
+      "delete": {
+        "operationId": "TicketingController_disconnect",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Disconnect Jira integration",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/config": {
+      "put": {
+        "operationId": "TicketingController_updateConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTicketingConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update ticketing configuration",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/projects": {
+      "get": {
+        "operationId": "TicketingController_listProjects",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List Jira projects",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/issue-types/{projectKey}": {
+      "get": {
+        "operationId": "TicketingController_listIssueTypes",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List Jira issue types for a project",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/jira/webhook/{secret}": {
+      "post": {
+        "description": "Public endpoint for receiving Jira issue transition webhooks. Authentication is via the unguessable URL secret.",
+        "operationId": "JiraWebhookController_receive",
+        "parameters": [
+          {
+            "name": "secret",
+            "required": true,
+            "in": "path",
+            "description": "The webhook secret included in the registered callback URL",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-hub-signature",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook processed"
+          },
+          "401": {
+            "description": "Invalid webhook signature"
+          }
+        },
+        "summary": "Receive Jira webhook",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/integrations/providers": {
+      "get": {
+        "operationId": "IntegrationsController_listProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IntegrationProviderResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List all integration providers",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/providers/{provider}/config": {
+      "get": {
+        "operationId": "IntegrationsController_getProviderConfiguration",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConfigurationResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get provider OAuth configuration",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "put": {
+        "operationId": "IntegrationsController_upsertProviderConfiguration",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertProviderConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConfigurationResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or update provider OAuth configuration",
+        "tags": [
+          "integrations"
+        ]
+      },
+      "delete": {
+        "operationId": "IntegrationsController_deleteProviderConfiguration",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Provider configuration deleted"
+          }
+        },
+        "summary": "Delete provider OAuth configuration",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/connections": {
+      "get": {
+        "operationId": "IntegrationsController_listConnections",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IntegrationConnectionResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List integration connections",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/{provider}/start": {
+      "post": {
+        "operationId": "IntegrationsController_startOAuth",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartOAuthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthStartResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start OAuth authorization flow",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/{provider}/exchange": {
+      "post": {
+        "operationId": "IntegrationsController_completeOAuth",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteOAuthDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationConnectionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Complete OAuth token exchange",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/connections/{id}/refresh": {
+      "post": {
+        "operationId": "IntegrationsController_refreshConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationConnectionResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Refresh an integration connection",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/connections/{id}": {
+      "delete": {
+        "operationId": "IntegrationsController_disconnectConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisconnectConnectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connection removed"
+          }
+        },
+        "summary": "Disconnect an integration connection",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
+    "/api/v1/integrations/connections/{id}/token": {
+      "post": {
+        "operationId": "IntegrationsController_issueConnectionToken",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTokenResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Issue a connection access token",
+        "tags": [
+          "integrations"
+        ]
+      }
+    },
     "/api/v1/api-keys": {
       "get": {
         "operationId": "ApiKeysController_list",
@@ -4491,353 +5255,6 @@
         "summary": "Rotate a secret value",
         "tags": [
           "secrets"
-        ]
-      }
-    },
-    "/api/v1/integrations/providers": {
-      "get": {
-        "operationId": "IntegrationsController_listProviders",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/IntegrationProviderResponse"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List all integration providers",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/providers/{provider}/config": {
-      "get": {
-        "operationId": "IntegrationsController_getProviderConfiguration",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProviderConfigurationResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get provider OAuth configuration",
-        "tags": [
-          "integrations"
-        ]
-      },
-      "put": {
-        "operationId": "IntegrationsController_upsertProviderConfiguration",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpsertProviderConfigDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProviderConfigurationResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Create or update provider OAuth configuration",
-        "tags": [
-          "integrations"
-        ]
-      },
-      "delete": {
-        "operationId": "IntegrationsController_deleteProviderConfiguration",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Provider configuration deleted"
-          }
-        },
-        "summary": "Delete provider OAuth configuration",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/connections": {
-      "get": {
-        "operationId": "IntegrationsController_listConnections",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/IntegrationConnectionResponse"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "List integration connections",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/{provider}/start": {
-      "post": {
-        "operationId": "IntegrationsController_startOAuth",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartOAuthDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthStartResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Start OAuth authorization flow",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/{provider}/exchange": {
-      "post": {
-        "operationId": "IntegrationsController_completeOAuth",
-        "parameters": [
-          {
-            "name": "provider",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteOAuthDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IntegrationConnectionResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Complete OAuth token exchange",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/connections/{id}/refresh": {
-      "post": {
-        "operationId": "IntegrationsController_refreshConnection",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshConnectionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IntegrationConnectionResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Refresh an integration connection",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/connections/{id}": {
-      "delete": {
-        "operationId": "IntegrationsController_disconnectConnection",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DisconnectConnectionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Connection removed"
-          }
-        },
-        "summary": "Disconnect an integration connection",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/api/v1/integrations/connections/{id}/token": {
-      "post": {
-        "operationId": "IntegrationsController_issueConnectionToken",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "x-internal-token",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectionTokenResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Issue a connection access token",
-        "tags": [
-          "integrations"
         ]
       }
     },
@@ -7856,21 +8273,6 @@
           "Health"
         ]
       }
-    },
-    "/api/v1/org/members": {
-      "get": {
-        "operationId": "OrgMembersController_listMembers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "List organization members for assignee picker",
-        "tags": [
-          "org"
-        ]
-      }
     }
   },
   "info": {
@@ -9922,6 +10324,389 @@
           "findingIds"
         ]
       },
+      "UpsertSlaPoliciesDto": {
+        "type": "object",
+        "properties": {
+          "policies": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "critical",
+                    "high",
+                    "medium",
+                    "low",
+                    "info"
+                  ]
+                },
+                "deadlineHours": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8760
+                }
+              },
+              "required": [
+                "severity",
+                "deadlineHours"
+              ]
+            }
+          }
+        },
+        "required": [
+          "policies"
+        ]
+      },
+      "ConnectJiraDto": {
+        "type": "object",
+        "properties": {
+          "redirectUri": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "redirectUri"
+        ]
+      },
+      "UpdateTicketingConfigDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "issueTypeId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statusMapping": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "autoCreateOnStatuses": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "new",
+                "triaged",
+                "in_progress",
+                "fixed",
+                "verified",
+                "wont_fix",
+                "accepted_risk"
+              ]
+            }
+          }
+        },
+        "required": [
+          "projectKey",
+          "issueTypeId",
+          "statusMapping",
+          "autoCreateOnStatuses"
+        ]
+      },
+      "IntegrationProviderResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "docsUrl": {
+            "type": "string"
+          },
+          "defaultScopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supportsRefresh": {
+            "type": "boolean"
+          },
+          "isConfigured": {
+            "type": "boolean",
+            "description": "Indicates whether the provider has been configured with client credentials"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "defaultScopes",
+          "supportsRefresh",
+          "isConfigured"
+        ]
+      },
+      "ProviderConfigurationResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Stored OAuth client identifier"
+          },
+          "hasClientSecret": {
+            "type": "boolean",
+            "description": "True when a client secret has been stored for this provider"
+          },
+          "configuredBy": {
+            "type": "string",
+            "enum": [
+              "environment",
+              "user"
+            ],
+            "description": "Origin of the credential configuration"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Last update timestamp in ISO 8601 format"
+          }
+        },
+        "required": [
+          "provider",
+          "hasClientSecret",
+          "configuredBy"
+        ]
+      },
+      "UpsertProviderConfigDto": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "clientSecret": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "clientId"
+        ]
+      },
+      "IntegrationConnectionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerName": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tokenType": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired"
+            ]
+          },
+          "supportsRefresh": {
+            "type": "boolean"
+          },
+          "hasRefreshToken": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Provider-specific metadata saved alongside the connection"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "providerName",
+          "userId",
+          "scopes",
+          "tokenType",
+          "createdAt",
+          "updatedAt",
+          "status",
+          "supportsRefresh",
+          "hasRefreshToken"
+        ]
+      },
+      "StartOAuthDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "redirectUri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "redirectUri"
+        ]
+      },
+      "OAuthStartResponseDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "authorizationUrl": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Suggested client-side TTL for the authorization URL",
+            "example": 300
+          }
+        },
+        "required": [
+          "provider",
+          "authorizationUrl",
+          "state",
+          "expiresIn"
+        ]
+      },
+      "CompleteOAuthDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "redirectUri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "userId",
+          "redirectUri",
+          "state",
+          "code"
+        ]
+      },
+      "RefreshConnectionDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "DisconnectConnectionDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "ConnectionTokenResponseDto": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "userId",
+          "accessToken",
+          "tokenType",
+          "scopes"
+        ]
+      },
       "ApiKeyResponseDto": {
         "type": "object",
         "properties": {
@@ -10769,296 +11554,6 @@
             "nullable": true
           }
         }
-      },
-      "IntegrationProviderResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "docsUrl": {
-            "type": "string"
-          },
-          "defaultScopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "supportsRefresh": {
-            "type": "boolean"
-          },
-          "isConfigured": {
-            "type": "boolean",
-            "description": "Indicates whether the provider has been configured with client credentials"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "description",
-          "defaultScopes",
-          "supportsRefresh",
-          "isConfigured"
-        ]
-      },
-      "ProviderConfigurationResponse": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string"
-          },
-          "clientId": {
-            "type": "string",
-            "description": "Stored OAuth client identifier"
-          },
-          "hasClientSecret": {
-            "type": "boolean",
-            "description": "True when a client secret has been stored for this provider"
-          },
-          "configuredBy": {
-            "type": "string",
-            "enum": [
-              "environment",
-              "user"
-            ],
-            "description": "Origin of the credential configuration"
-          },
-          "updatedAt": {
-            "type": "string",
-            "description": "Last update timestamp in ISO 8601 format"
-          }
-        },
-        "required": [
-          "provider",
-          "hasClientSecret",
-          "configuredBy"
-        ]
-      },
-      "UpsertProviderConfigDto": {
-        "type": "object",
-        "properties": {
-          "clientId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "clientSecret": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "clientId"
-        ]
-      },
-      "IntegrationConnectionResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string"
-          },
-          "providerName": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "tokenType": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "active",
-              "expired"
-            ]
-          },
-          "supportsRefresh": {
-            "type": "boolean"
-          },
-          "hasRefreshToken": {
-            "type": "boolean"
-          },
-          "metadata": {
-            "type": "object",
-            "description": "Provider-specific metadata saved alongside the connection"
-          }
-        },
-        "required": [
-          "id",
-          "provider",
-          "providerName",
-          "userId",
-          "scopes",
-          "tokenType",
-          "createdAt",
-          "updatedAt",
-          "status",
-          "supportsRefresh",
-          "hasRefreshToken"
-        ]
-      },
-      "StartOAuthDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "redirectUri": {
-            "type": "string",
-            "format": "uri"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "userId",
-          "redirectUri"
-        ]
-      },
-      "OAuthStartResponseDto": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string"
-          },
-          "authorizationUrl": {
-            "type": "string"
-          },
-          "state": {
-            "type": "string"
-          },
-          "expiresIn": {
-            "type": "number",
-            "description": "Suggested client-side TTL for the authorization URL",
-            "example": 300
-          }
-        },
-        "required": [
-          "provider",
-          "authorizationUrl",
-          "state",
-          "expiresIn"
-        ]
-      },
-      "CompleteOAuthDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "redirectUri": {
-            "type": "string",
-            "format": "uri"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "state": {
-            "type": "string",
-            "minLength": 1
-          },
-          "code": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId",
-          "redirectUri",
-          "state",
-          "code"
-        ]
-      },
-      "RefreshConnectionDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId"
-        ]
-      },
-      "DisconnectConnectionDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId"
-        ]
-      },
-      "ConnectionTokenResponseDto": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string"
-          },
-          "userId": {
-            "type": "string"
-          },
-          "accessToken": {
-            "type": "string"
-          },
-          "tokenType": {
-            "type": "string"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "expiresAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "provider",
-          "userId",
-          "accessToken",
-          "tokenType",
-          "scopes"
-        ]
       },
       "ScheduleResponseDto": {
         "type": "object",
