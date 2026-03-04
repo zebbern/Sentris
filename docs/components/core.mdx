@@ -25,22 +25,31 @@ Starts a workflow manually. Configure runtime inputs to collect data (files, tex
 
 ---
 
-### Webhook
+### HTTP Request
 
-Sends JSON payloads to external HTTP endpoints with retries and timeouts.
+Sends HTTP requests to external endpoints with configurable method, authentication, and content type.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `url` | URL | Destination endpoint |
+| `headers` | JSON | Optional HTTP headers |
+| `body` | Any | Optional request body |
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `url` | URL | Destination endpoint |
-| `method` | Select | POST, PUT, or PATCH |
-| `payload` | JSON | Request body |
-| `headers` | JSON | HTTP headers |
-| `timeoutMs` | Number | Request timeout (default: 30000) |
-| `retries` | Number | Retry attempts (default: 3) |
+| `method` | Select | GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS |
+| `contentType` | Select | JSON, Form URL Encoded, Text/Plain, Custom |
+| `authentication` | Select | None, Bearer Token, Basic Auth, Custom Header |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `status` | Number | HTTP status code |
+| `body` | String | Response body |
 
 **Example use cases:**
-- Send scan results to Slack or Teams
-- POST assets to a custom API
+- Fetch external threat intelligence feeds
+- POST scan results to a custom API or webhook
+- Integrate with REST APIs that require authentication
 
 ---
 
@@ -246,3 +255,122 @@ Indexes workflow output data into OpenSearch for analytics dashboards, queries, 
 <Note>
   See [Workflow Analytics](/development/workflow-analytics) for detailed setup and querying guide.
 </Note>
+
+---
+
+## Logic & Routing
+
+### Logic Script
+
+Executes custom JavaScript/TypeScript logic within a workflow. Useful for data transformations, conditional logic, and custom processing that does not warrant a full component.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `data` | Any | Input data to process |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `result` | Any | Processed output from the script |
+
+**Example use cases:**
+- Filter and reshape scan output before passing to downstream components
+- Implement custom scoring or prioritization logic
+- Parse non-standard data formats
+
+---
+
+### Conditional Router
+
+Routes workflow execution to different branches based on configurable conditions. Evaluates input data against rules to determine which output port to activate.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `data` | Any | Data to evaluate conditions against |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| Dynamic | Any | One output port per configured route |
+
+**Example use cases:**
+- Route high-severity findings to immediate alerting, low-severity to a report
+- Branch workflows based on scan result count or type
+- Implement conditional logic without writing code
+
+---
+
+### Deduplicator
+
+Removes duplicate entries from an array based on a configurable key field. Useful for deduplicating results from multiple scan sources.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `items` | Array | Array of items to deduplicate |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `unique` | Array | Deduplicated items |
+
+**Example use cases:**
+- Deduplicate subdomains discovered by multiple tools (Subfinder + Amass)
+- Remove duplicate vulnerabilities from overlapping scans
+
+---
+
+### Workflow Call
+
+Invokes another Sentris Flow workflow as a sub-workflow. Enables workflow composition and reuse.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `workflowId` | String | ID of the workflow to call |
+| `input` | Any | Input data to pass to the sub-workflow |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `result` | Any | Output from the sub-workflow |
+
+**Example use cases:**
+- Reuse a common scanning pipeline across multiple parent workflows
+- Build modular workflow libraries with shared building blocks
+
+---
+
+## Data Sources
+
+### Text Block
+
+Provides a static text value as an input source. Useful for injecting constant values like target lists, prompts, or configuration strings.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `text` | Textarea | Static text content |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `text` | String | The configured text value |
+
+**Example use cases:**
+- Provide a list of target domains as workflow input
+- Inject a static system prompt for AI components
+
+---
+
+## MCP
+
+### MCP Library
+
+Discovers and exposes tools from the Sentris MCP Library. Provides access to pre-configured Model Context Protocol (MCP) servers for AI agents.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `servers` | Select | MCP servers to connect to from the library |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `tools` | List | Normalized MCP tool definitions for AI agents |
+
+**Example use cases:**
+- Connect AI agents to AWS tools (CloudWatch, CloudTrail)
+- Expose custom MCP servers to autonomous agents
+
+See the [MCP Library Guide](/mcp-library) for setup and available servers.

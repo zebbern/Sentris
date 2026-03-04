@@ -8,7 +8,7 @@ description: "Self-host Sentris Flow on your infrastructure"
 - Docker Desktop with ≥8 GB RAM
 - [Bun](https://bun.sh) runtime
 - [just](https://github.com/casey/just) command runner
-- Open ports: `5433`, `7233`, `8081`, `9000`, `9001`, `3100`
+- Open ports: `80` (nginx), `5433` (PostgreSQL), `7233` (Temporal), `8081` (Temporal UI), `9000` (MinIO), `9001` (MinIO Console), `3100` (Loki), `6379` (Redis), `9092` (Redpanda/Kafka), `9200` (OpenSearch), `9644` (Redpanda Admin), `8082` (Redpanda Console), `5601` (OpenSearch Dashboards)
 
 ---
 
@@ -53,9 +53,9 @@ just dev
 
 The `just dev` command automatically:
 - Checks that environment files exist
-- Starts Docker infrastructure (Postgres, Temporal, MinIO, Loki)
+- Starts Docker infrastructure (Postgres, Temporal, MinIO, Redis, Redpanda, Loki, OpenSearch, nginx)
 - Waits for services to be ready
-- Runs database migrations
+- Runs database migrations (applies pending Drizzle schema changes automatically)
 - Starts backend, worker, and frontend with hot-reload
 
 ---
@@ -70,7 +70,7 @@ In development mode, all application services are accessible through nginx on po
 | Backend API | http://localhost/api/ | REST API (via nginx) |
 | Analytics | http://localhost/analytics/ | OpenSearch Dashboards (via nginx) |
 | Temporal UI | http://localhost:8081 | Workflow management |
-| PostgreSQL | http://localhost:5433 | Database |
+| PostgreSQL | localhost:5433 | Database |
 | MinIO | http://localhost:9000 | Object storage |
 | MinIO Console | http://localhost:9001 | Credentials: `minioadmin/minioadmin` |
 | Loki | http://localhost:3100 | Logs |

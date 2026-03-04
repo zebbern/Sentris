@@ -7,15 +7,42 @@ Components are the building blocks of Sentris Flow workflows. Each component per
 
 ## Component Categories
 
-<CardGroup cols={2}>
-  <Card title="Core" icon="cube" href="/components/core">
-    Triggers, file handling, data transformation, and outputs
+<CardGroup cols={3}>
+  <Card title="Input" icon="download" href="/components/core">
+    Data sources, triggers, and credential access
   </Card>
-  <Card title="Security" icon="shield" href="/components/security">
-    Subdomain discovery, port scanning, DNS resolution, secret detection
+  <Card title="Transform" icon="arrows-rotate" href="/components/core">
+    Data processing, text manipulation, and formatting
   </Card>
   <Card title="AI" icon="brain" href="/components/ai">
-    Provider configurations and autonomous agents
+    AI-powered analysis and generation tools
+  </Card>
+  <Card title="MCP" icon="plug" href="/components/ai">
+    Model Context Protocol servers and tool gateways
+  </Card>
+  <Card title="Security" icon="shield" href="/components/security">
+    Security scanning and assessment tools
+  </Card>
+  <Card title="IT Ops" icon="building" href="/components/core">
+    IT operations and user management workflows
+  </Card>
+  <Card title="Notification" icon="bell" href="/components/core">
+    Slack, Jira, and other messaging alerts
+  </Card>
+  <Card title="Manual Action" icon="user-check" href="/components/core">
+    Human-in-the-loop interactions, approvals, and manual tasks
+  </Card>
+  <Card title="Output" icon="upload" href="/components/core">
+    Data export, storage destinations, and integrations
+  </Card>
+  <Card title="Process" icon="gear" href="/components/core">
+    Routing, deduplication, and workflow orchestration
+  </Card>
+  <Card title="Cloud" icon="cloud" href="/components/core">
+    Cloud provider integrations and services
+  </Card>
+  <Card title="Core" icon="wrench" href="/components/core">
+    Core platform utilities and credential management
   </Card>
 </CardGroup>
 
@@ -32,16 +59,23 @@ Components run inside Docker containers for isolation and reliability. Workflows
 ## Component Structure
 
 ```typescript
-interface ComponentDefinition<Input, Output> {
-  id: string;           // Unique identifier
-  label: string;        // Display name
-  category: string;     // Category for grouping
-  runner: RunnerConfig; // Execution configuration
-  inputSchema: ZodSchema<Input>;
-  outputSchema: ZodSchema<Output>;
-  execute: (input: Input, context: ExecutionContext) => Promise<Output>;
-}
+import { defineComponent, inputs, outputs, parameters, port, param } from '@sentris/component-sdk';
+
+const definition = defineComponent({
+  id: string,              // Unique identifier (e.g. 'sentris.dnsx.run')
+  label: string,           // Display name
+  category: ComponentCategory, // Category for grouping (see above)
+  runner: RunnerConfig,    // Execution configuration ('inline' | 'docker' | 'remote')
+  inputs: inputs({ ... }), // Typed input ports via port() helper
+  outputs: outputs({ ... }), // Typed output ports via port() helper
+  parameters?: parameters({ ... }), // Optional configurable params via param() helper
+  docs?: string,           // Documentation string
+  retryPolicy?: ComponentRetryPolicy,
+  execute: (payload: { inputs, params }, context: ExecutionContext) => Promise<Output>,
+});
 ```
+
+See the [Component Development Guide](/development/component-development) for full examples with `defineComponent`.
 
 ## Example Pipelines
 

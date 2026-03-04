@@ -16,10 +16,14 @@ Components live in `worker/src/components/<category>/`:
 ```
 worker/src/components/
 ├── security/        # Security tools (dnsx, subfinder, nuclei)
-├── core/            # Core utilities (http-request, file-loader)
-├── ai/              # AI components (llm, agents)
-├── notification/    # Notifications (slack, email)
-└── manual-action/   # Human-in-the-loop (approvals, forms)
+├── core/            # Core utilities (http-request, file-loader, text-block)
+├── ai/              # AI components (llm, agents, opencode)
+├── notification/    # Notifications (slack, jira)
+├── manual-action/   # Human-in-the-loop (approvals, forms)
+├── github/          # GitHub integrations (connection-provider, remove-org-membership)
+├── it-automation/   # IT ops (atlassian-offboarding, okta, google-workspace)
+├── dev/             # Development utilities (mock-agent)
+└── test/            # Test utilities (sleep-parallel, live-event-heartbeat)
 ```
 
 ### Category Source of Truth
