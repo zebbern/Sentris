@@ -8,6 +8,8 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { Public } from '../auth/public.decorator';
 import { McpAuthGuard, type McpGatewayRequest } from './mcp-auth.guard';
 import { McpGatewayService } from './mcp-gateway.service';
+import { SessionRegistryService } from './session-registry.service';
+import { setAffinityCookie } from './set-affinity-cookie';
 
 @ApiTags('mcp')
 @Controller('mcp')
@@ -26,7 +28,10 @@ export class McpGatewayController {
   // simultaneously via `void this.openInboundSse()` followed by POST initialize)
   private readonly pendingInits = new Map<string, Promise<StreamableHTTPServerTransport>>();
 
-  constructor(private readonly mcpGateway: McpGatewayService) {}
+  constructor(
+    private readonly mcpGateway: McpGatewayService,
+    private readonly sessionRegistry: SessionRegistryService,
+  ) {}
 
   @All('gateway')
   @ApiOperation({ summary: 'Unified MCP Gateway endpoint (Streamable HTTP)' })
@@ -51,6 +56,7 @@ export class McpGatewayController {
         : runId;
 
     let transport = this.transports.get(cacheKey);
+    const isExistingTransport = !!transport;
     const body = req.body as unknown;
     const isPost = req.method === 'POST';
     const isGet = req.method === 'GET';
@@ -116,6 +122,19 @@ export class McpGatewayController {
         try {
           transport = await initPromise;
           this.transports.set(cacheKey, transport);
+          setAffinityCookie(req, res, cacheKey, '/api/v1/mcp');
+
+          // Register session in Redis for admin observability
+          try {
+            await this.sessionRegistry.register(cacheKey, {
+              userId: (auth.extra.userId as string) ?? null,
+              organizationId,
+              sessionType: 'mcp-gateway',
+              runId,
+            });
+          } catch (regError) {
+            this.logger.warn(`Session registry register failed: ${regError}`);
+          }
         } catch (error) {
           this.logger.error(`Failed to initialize MCP server for run ${runId}: ${error}`);
           return res
@@ -131,6 +150,12 @@ export class McpGatewayController {
       return res.status(400).send('Bad Request: Server not initialized');
     }
 
+    // Refresh affinity cookie on subsequent requests (skip for newly-initialized sessions
+    // which already had the cookie set in the init block above)
+    if (isExistingTransport) {
+      setAffinityCookie(req, res, cacheKey, '/api/v1/mcp');
+    }
+
     if (isGet) {
       // Cleanup on client disconnect (specifically for the SSE stream)
       res.on('close', async () => {
@@ -141,13 +166,30 @@ export class McpGatewayController {
         // but for Sentris run-bounded sessions, closing SSE usually means the agent is done.
         this.transports.delete(cacheKey);
         await this.mcpGateway.cleanupRun(runId);
+
+        // Deregister session from Redis
+        try {
+          await this.sessionRegistry.deregister(cacheKey);
+        } catch (regError) {
+          this.logger.warn(`Session registry deregister failed: ${regError}`);
+        }
       });
 
       // Handle the initial GET request to start the SSE stream
       // We don't await this because for SSE, it blocks until the connection is closed.
       void transport.handleRequest(req, res);
+    } else if (isDelete) {
+      // Handle DELETE (Session termination) — clean up transport and registry
+      await transport.handleRequest(req, res, req.body);
+      this.transports.delete(cacheKey);
+      await this.mcpGateway.cleanupRun(runId);
+      try {
+        await this.sessionRegistry.deregister(cacheKey);
+      } catch (e) {
+        this.logger.warn(`Session registry deregister failed: ${e}`);
+      }
     } else {
-      // Handle POST (Messages) or DELETE (Session termination)
+      // Handle POST (Messages)
       await transport.handleRequest(req, res, req.body);
     }
   }

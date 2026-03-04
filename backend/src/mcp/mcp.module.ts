@@ -5,6 +5,7 @@ import { ToolRegistryService, TOOL_REGISTRY_REDIS } from './tool-registry.servic
 import { McpGatewayService } from './mcp-gateway.service';
 import { McpAuthService } from './mcp-auth.service';
 import { McpGatewayController } from './mcp-gateway.controller';
+import { McpSessionsController } from './mcp-sessions.controller';
 import { SecretsModule } from '../secrets/secrets.module';
 import { InternalMcpController } from './internal-mcp.controller';
 import { WorkflowsModule } from '../workflows/workflows.module';
@@ -15,7 +16,8 @@ import { McpGroupsModule } from '../mcp-groups/mcp-groups.module';
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
 import { DatabaseModule } from '../database/database.module';
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
-import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
+import { SessionRegistryService } from './session-registry.service';
+import { MCP_DISCOVERY_REDIS, SESSION_REGISTRY_REDIS } from './mcp.tokens';
 import type { RedisConfig } from '../config';
 
 @Global()
@@ -28,7 +30,12 @@ import type { RedisConfig } from '../config';
     DatabaseModule,
     McpGroupsModule,
   ],
-  controllers: [McpGatewayController, InternalMcpController, McpDiscoveryController],
+  controllers: [
+    McpGatewayController,
+    InternalMcpController,
+    McpDiscoveryController,
+    McpSessionsController,
+  ],
   providers: [
     {
       provide: MCP_DISCOVERY_REDIS,
@@ -54,12 +61,26 @@ import type { RedisConfig } from '../config';
       },
       inject: [ConfigService],
     },
+    {
+      provide: SESSION_REGISTRY_REDIS,
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.url || redis.terminalUrl;
+        if (!url) {
+          new Logger('McpModule').warn('Redis URL not set; session registry disabled');
+          return null;
+        }
+        return new Redis(url);
+      },
+      inject: [ConfigService],
+    },
     ToolRegistryService,
     McpAuthService,
     McpGatewayService,
     McpDiscoveryOrchestratorService,
     McpServersRepository,
+    SessionRegistryService,
   ],
-  exports: [ToolRegistryService, McpGatewayService, McpAuthService],
+  exports: [ToolRegistryService, McpGatewayService, McpAuthService, SessionRegistryService],
 })
 export class McpModule {}
