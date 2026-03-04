@@ -15,6 +15,7 @@ const routePrefetchMap: Record<string, PrefetchFn> = {
   '/schedules': () => void import('@/pages/SchedulesPage'),
   '/webhooks': () => void import('@/pages/WebhooksPage'),
   '/action-center': () => void import('@/pages/ActionCenterPage'),
+  '/findings': () => void import('@/pages/FindingsPage'),
   '/workflows/:id': () => void import('@/features/workflow-builder/WorkflowBuilder'),
   '/integrations': () => void import('@/pages/IntegrationsManager'),
   '/artifacts': () => void import('@/pages/ArtifactLibrary'),
