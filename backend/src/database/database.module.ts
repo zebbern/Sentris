@@ -67,6 +67,6 @@ export const DRIZZLE_TOKEN = Symbol('DRIZZLE_CONNECTION');
     },
     MigrationGuard,
   ],
-  exports: [DRIZZLE_TOKEN],
+  exports: [DRIZZLE_TOKEN, Pool],
 })
 export class DatabaseModule {}

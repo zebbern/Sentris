@@ -69,6 +69,12 @@ const ROUTE_CONFIG: RouteEntry[] = [
     subtitle: 'Review and respond to pending items',
   },
   {
+    path: '/findings',
+    title: 'Findings',
+    shortTitle: 'Findings',
+    subtitle: 'Security findings from workflow scans',
+  },
+  {
     path: '/mcp-library',
     title: 'MCP Servers',
     shortTitle: 'MCP Servers',
