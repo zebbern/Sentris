@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TemplatesRepository } from './templates.repository';
+import { EtagCacheService } from './etag-cache.service';
 import type { TemplatesConfig } from '../config';
 import { TemplateManifest } from '../database/schema/templates';
 
@@ -75,6 +76,7 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly templatesRepository: TemplatesRepository,
+    private readonly etagCacheService: EtagCacheService,
   ) {}
 
   /**
@@ -170,7 +172,22 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
 
     const headers = this.getHeaders();
-    const cached = this.etagCache.get(url) as CachedResponse<GitHubFile[]> | undefined;
+
+    // L1 cache (local Map) → L2 cache (Redis)
+    let cached = this.etagCache.get(url) as CachedResponse<GitHubFile[]> | undefined;
+    if (!cached) {
+      try {
+        const redisCached = await this.etagCacheService.get(url);
+        if (redisCached) {
+          cached = redisCached as CachedResponse<GitHubFile[]>;
+          // Populate L1 from L2 hit
+          this.etagCache.set(url, cached);
+        }
+      } catch (error) {
+        this.logger.warn(`Redis etag cache read failed for directory ${path}: ${error}`);
+      }
+    }
+
     if (cached?.etag) {
       headers['If-None-Match'] = cached.etag;
     }
@@ -204,10 +221,15 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
     const data = (await response.json()) as GitHubFile[];
     const files = Array.isArray(data) ? data : [];
 
-    // Cache the response with its ETag for future conditional requests
+    // Write-through: L1 (local Map) + L2 (Redis)
     const etag = response.headers.get('etag');
     if (etag) {
       this.etagCache.set(url, { etag, data: files });
+      try {
+        await this.etagCacheService.set(url, etag, files);
+      } catch (error) {
+        this.logger.warn(`Redis etag cache write failed for directory ${path}: ${error}`);
+      }
     }
 
     return { files, cached: false };
@@ -224,7 +246,22 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
 
     const headers = this.getHeaders();
-    const cached = this.etagCache.get(url) as CachedResponse<string> | undefined;
+
+    // L1 cache (local Map) → L2 cache (Redis)
+    let cached = this.etagCache.get(url) as CachedResponse<string> | undefined;
+    if (!cached) {
+      try {
+        const redisCached = await this.etagCacheService.get(url);
+        if (redisCached) {
+          cached = redisCached as CachedResponse<string>;
+          // Populate L1 from L2 hit
+          this.etagCache.set(url, cached);
+        }
+      } catch (error) {
+        this.logger.warn(`Redis etag cache read failed for file ${path}: ${error}`);
+      }
+    }
+
     if (cached?.etag) {
       headers['If-None-Match'] = cached.etag;
     }
@@ -259,10 +296,15 @@ export class GitHubSyncService implements OnModuleInit, OnModuleDestroy {
       content = await dlResponse.text();
     }
 
-    // Cache the response with its ETag
+    // Write-through: L1 (local Map) + L2 (Redis)
     const etag = response.headers.get('etag');
     if (etag && content) {
       this.etagCache.set(url, { etag, data: content });
+      try {
+        await this.etagCacheService.set(url, etag, content);
+      } catch (error) {
+        this.logger.warn(`Redis etag cache write failed for file ${path}: ${error}`);
+      }
     }
 
     return { content, cached: false };

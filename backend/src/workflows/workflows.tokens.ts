@@ -1,0 +1,2 @@
+export const FLOW_CONTEXT_REDIS = Symbol('FLOW_CONTEXT_REDIS');
+export const ARCHIVING_REDIS = Symbol('ARCHIVING_REDIS');

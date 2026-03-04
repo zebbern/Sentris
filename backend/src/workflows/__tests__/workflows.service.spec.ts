@@ -491,6 +491,11 @@ describe('WorkflowsService', () => {
       } as any,
       workflowVersionService,
       workflowRunService,
+      {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
   });
 
@@ -721,6 +726,11 @@ describe('WorkflowsService', () => {
       {} as any,
       failureVersionService,
       failureRunService,
+      {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+      } as any,
     );
 
     const versionRecord = createWorkflowVersionRecord('workflow-id');

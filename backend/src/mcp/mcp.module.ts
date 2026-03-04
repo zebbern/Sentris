@@ -42,7 +42,9 @@ import type { RedisConfig } from '../config';
       useFactory: (configService: ConfigService) => {
         const redis = configService.get<RedisConfig>('redis')!;
         const redisUrl = redis.url || redis.terminalUrl || 'redis://localhost:6379';
-        return new Redis(redisUrl);
+        const client = new Redis(redisUrl);
+        client.on('error', (err) => new Logger('McpModule').warn(`MCP_DISCOVERY_REDIS error: ${err.message}`));
+        return client;
       },
       inject: [ConfigService],
     },
@@ -57,7 +59,9 @@ import type { RedisConfig } from '../config';
         if (!url) {
           return null;
         }
-        return new Redis(url);
+        const client = new Redis(url);
+        client.on('error', (err) => new Logger('McpModule').warn(`TOOL_REGISTRY_REDIS error: ${err.message}`));
+        return client;
       },
       inject: [ConfigService],
     },
@@ -70,7 +74,9 @@ import type { RedisConfig } from '../config';
           new Logger('McpModule').warn('Redis URL not set; session registry disabled');
           return null;
         }
-        return new Redis(url);
+        const client = new Redis(url);
+        client.on('error', (err) => new Logger('McpModule').warn(`SESSION_REGISTRY_REDIS error: ${err.message}`));
+        return client;
       },
       inject: [ConfigService],
     },

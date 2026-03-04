@@ -1,4 +1,4 @@
-import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
+import { Logger, Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'node:path';
@@ -24,6 +24,7 @@ import {
   templatesConfig,
   temporalTaskConfig,
 } from './config';
+import type { RedisConfig } from './config';
 import { OpenSearchModule } from './config/opensearch.module';
 import { AgentsModule } from './agents/agents.module';
 import { AuthModule } from './auth/auth.module';
@@ -53,6 +54,10 @@ import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
 import { CorrelationIdMiddleware } from './common/middleware';
 import { HealthModule } from './health';
+import { PROVISIONING_REDIS } from './common/redis/redis.tokens';
+import { ProvisioningLockService } from './common/redis/provisioning-lock.service';
+import { InstanceHeartbeatModule } from './common/redis/instance-heartbeat.module';
+import { AdminInstancesController } from './common/redis/admin-instances.controller';
 
 const coreModules = [
   AgentsModule,
@@ -136,11 +141,28 @@ function getEnvFilePaths(): string[] {
     }),
     OpenSearchModule,
     ScheduleModule.forRoot(),
+    InstanceHeartbeatModule,
     ...coreModules,
     ...testingModules,
   ],
-  controllers: [AppController],
+  controllers: [AppController, AdminInstancesController],
   providers: [
+    {
+      provide: PROVISIONING_REDIS,
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis')!;
+        const url = redis.url ?? redis.terminalUrl;
+        if (!url) {
+          new Logger('AppModule').warn('Redis URL not set; provisioning lock disabled');
+          return null;
+        }
+        const client = new Redis(url);
+        client.on('error', (err) => new Logger('AppModule').warn(`PROVISIONING_REDIS error: ${err.message}`));
+        return client;
+      },
+      inject: [ConfigService],
+    },
+    ProvisioningLockService,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

@@ -10,11 +10,12 @@
  * Non-fatal: Registry failures are logged but never break MCP functionality.
  */
 
-import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, Inject, OnModuleDestroy, Optional } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { hostname } from 'node:os';
 
 import { SESSION_REGISTRY_REDIS } from './mcp.tokens';
+import { InstanceHeartbeatService } from '../common/redis/instance-heartbeat.service';
+import { buildInstanceId } from '../common/redis/instance-id.util';
 
 const SESSION_TTL_SECONDS = 7200; // 2 hours
 const WARN_SESSION_COUNT = 1000;
@@ -35,8 +36,11 @@ export class SessionRegistryService implements OnModuleDestroy {
   private readonly logger = new Logger(SessionRegistryService.name);
   readonly instanceId: string;
 
-  constructor(@Inject(SESSION_REGISTRY_REDIS) private readonly redis: Redis | null) {
-    this.instanceId = process.env.HOSTNAME || hostname();
+  constructor(
+    @Inject(SESSION_REGISTRY_REDIS) private readonly redis: Redis | null,
+    @Optional() private readonly heartbeat: InstanceHeartbeatService | null = null,
+  ) {
+    this.instanceId = buildInstanceId();
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -165,5 +169,53 @@ export class SessionRegistryService implements OnModuleDestroy {
       this.logger.warn(`Failed to list active sessions: ${error}`);
       return { sessions: [], count: 0 };
     }
+  }
+
+  /**
+   * Detect sessions owned by instances that are no longer alive.
+   * Cross-references session instanceId with heartbeat keys.
+   * Admin-only — not called automatically.
+   */
+  async detectStaleSessions(): Promise<(SessionRegistryData & { sessionId: string })[]> {
+    if (!this.heartbeat) return [];
+
+    const { sessions } = await this.listActiveSessions();
+    if (sessions.length === 0) return [];
+
+    // Collect unique instanceIds and check liveness in parallel
+    const instanceIds = [...new Set(sessions.map((s) => s.instanceId))];
+    const livenessMap = new Map<string, boolean>();
+
+    await Promise.all(
+      instanceIds.map(async (id) => {
+        const alive = await this.heartbeat!.isInstanceAlive(id);
+        livenessMap.set(id, alive);
+      }),
+    );
+
+    return sessions.filter((s) => livenessMap.get(s.instanceId) === false);
+  }
+
+  /**
+   * Remove stale session registry entries owned by dead instances.
+   * The actual transport is already dead; this is registry cleanup only.
+   * Admin-only trigger — never called automatically.
+   */
+  async cleanupStaleSessions(): Promise<{ removedCount: number; sessionIds: string[] }> {
+    const staleSessions = await this.detectStaleSessions();
+    if (staleSessions.length === 0) return { removedCount: 0, sessionIds: [] };
+
+    const removedIds: string[] = [];
+
+    for (const session of staleSessions) {
+      await this.deregister(session.sessionId);
+      removedIds.push(session.sessionId);
+    }
+
+    if (removedIds.length > 0) {
+      this.logger.log(`Cleaned up ${removedIds.length} stale session(s): ${removedIds.join(', ')}`);
+    }
+
+    return { removedCount: removedIds.length, sessionIds: removedIds };
   }
 }

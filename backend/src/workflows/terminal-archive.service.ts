@@ -11,25 +11,26 @@ import { TerminalRecordRepository } from './repository/terminal-record.repositor
 import type { WorkflowTerminalRecord } from '../database/schema';
 import { WorkflowsService } from './workflows.service';
 import { TerminalArchiveRequestDto } from './dto/terminal-record.dto';
+import { ArchivingLockService } from './archiving-lock.service';
 
 @Injectable()
 export class TerminalArchiveService {
   private readonly logger = new Logger(TerminalArchiveService.name);
-  private readonly archivingRuns = new Set<string>();
 
   constructor(
     private readonly terminalStreamService: TerminalStreamService,
     private readonly filesService: FilesService,
     private readonly terminalRecordRepository: TerminalRecordRepository,
     private readonly workflowsService: WorkflowsService,
+    private readonly archivingLockService: ArchivingLockService,
   ) {}
 
   async archiveRun(auth: AuthContext | null, runId: string): Promise<WorkflowTerminalRecord[]> {
-    if (this.archivingRuns.has(runId)) {
+    const acquired = await this.archivingLockService.tryAcquire(runId);
+    if (!acquired) {
       return [];
     }
 
-    this.archivingRuns.add(runId);
     try {
       const { run, organizationId } = await this.resolveRunContext(runId, auth);
       const existing = await this.terminalRecordRepository.listByRun(runId, organizationId);
@@ -62,7 +63,7 @@ export class TerminalArchiveService {
       }
       return results;
     } finally {
-      this.archivingRuns.delete(runId);
+      await this.archivingLockService.release(runId);
     }
   }
 

@@ -1,13 +1,16 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SecretEncryptionMaterial } from '@sentris/shared';
 import { randomBytes, createHash } from 'crypto';
+import type Redis from 'ioredis';
 
 import {
   IntegrationProviderConfig,
@@ -18,6 +21,7 @@ import {
 } from './integration-providers';
 import { IntegrationsRepository } from './integrations.repository';
 import { TokenEncryptionService } from './token.encryption';
+import { INTEGRATION_CACHE_REDIS } from './integrations.tokens';
 import type { IntegrationTokenRecord } from '../database/schema';
 
 export interface OAuthStartResponse {
@@ -59,6 +63,12 @@ type ResolvedProviderConfig = IntegrationProviderConfig & {
 
 const TOKEN_REFRESH_BUFFER_MS = 60_000; // proactively refresh 1 minute before expiry
 
+/** Polling interval for version-counter based cache invalidation */
+const VERSION_POLL_INTERVAL_MS = 30_000; // 30 seconds
+
+/** Redis key for the monotonic version counter */
+const PROVIDER_OVERRIDES_VERSION_KEY = 'sentris:provider-overrides:version';
+
 interface TokenRequestOptions {
   grantType: 'authorization_code' | 'refresh_token';
   code?: string;
@@ -77,15 +87,21 @@ interface ProviderCredentialOverride {
 }
 
 @Injectable()
-export class IntegrationsService implements OnModuleInit {
+export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationsService.name);
   private readonly providers: Record<string, IntegrationProviderConfig>;
   private providerOverrides = new Map<string, ProviderCredentialOverride>();
+
+  /** Locally-tracked version of the provider overrides cache */
+  private cachedVersion = 0;
+  /** Interval handle for polling the version counter */
+  private versionCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly repository: IntegrationsRepository,
     private readonly encryption: TokenEncryptionService,
     private readonly configService: ConfigService,
+    @Inject(INTEGRATION_CACHE_REDIS) private readonly redis: Redis | null,
   ) {
     const intConfig = this.configService.get('integrations')!;
     this.providers = loadIntegrationProviders(intConfig);
@@ -93,6 +109,73 @@ export class IntegrationsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.reloadProviderOverrides();
+    await this.syncVersionFromRedis();
+
+    // Start version-counter polling for cross-instance invalidation
+    this.versionCheckInterval = setInterval(
+      () => this.checkVersionAndReload(),
+      VERSION_POLL_INTERVAL_MS,
+    );
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.versionCheckInterval) {
+      clearInterval(this.versionCheckInterval);
+      this.versionCheckInterval = null;
+    }
+    try {
+      await this.redis?.quit();
+    } catch {
+      // ignore — shutting down
+    }
+  }
+
+  /**
+   * Read the current version counter from Redis and sync local state.
+   * Called once at startup so the instance knows the baseline version.
+   */
+  private async syncVersionFromRedis(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const version = Number(await this.redis.get(PROVIDER_OVERRIDES_VERSION_KEY)) || 0;
+      this.cachedVersion = version;
+    } catch (error) {
+      this.logger.warn(`Failed to read provider-overrides version from Redis: ${error}`);
+    }
+  }
+
+  /**
+   * Poll Redis for version changes. If the remote version exceeds the local
+   * version, reload providerOverrides from the database.
+   */
+  private async checkVersionAndReload(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const version = Number(await this.redis.get(PROVIDER_OVERRIDES_VERSION_KEY)) || 0;
+      if (version > this.cachedVersion) {
+        this.logger.log(
+          `Provider overrides version changed (${this.cachedVersion} → ${version}), reloading from DB`,
+        );
+        await this.reloadProviderOverrides();
+        this.cachedVersion = version;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to check provider-overrides version: ${error}`);
+    }
+  }
+
+  /**
+   * Increment the version counter in Redis. Called after any mutation
+   * to providerOverrides so other instances pick up the change.
+   */
+  private async incrementVersion(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const newVersion = await this.redis.incr(PROVIDER_OVERRIDES_VERSION_KEY);
+      this.cachedVersion = newVersion;
+    } catch (error) {
+      this.logger.warn(`Failed to increment provider-overrides version: ${error}`);
+    }
   }
 
   listProviders(): IntegrationProviderSummary[] {
@@ -202,6 +285,8 @@ export class IntegrationsService implements OnModuleInit {
       clientSecret: record.clientSecret as SecretEncryptionMaterial,
       updatedAt: new Date(record.updatedAt),
     });
+
+    await this.incrementVersion();
   }
 
   async deleteProviderConfiguration(providerId: string): Promise<void> {
@@ -209,6 +294,8 @@ export class IntegrationsService implements OnModuleInit {
 
     await this.repository.deleteProviderConfig(providerId);
     this.providerOverrides.delete(providerId);
+
+    await this.incrementVersion();
   }
 
   async listConnections(userId: string): Promise<IntegrationConnection[]> {
