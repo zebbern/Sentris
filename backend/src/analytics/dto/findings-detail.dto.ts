@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { FindingItemSchema } from './findings-query.dto';
 
 export const FindingIdParamSchema = z.object({
-  id: z.string().min(1, 'Finding ID is required'),
+  id: z.string().min(1, 'Finding ID is required').max(512),
 });
 
 export class FindingIdParamDto extends createZodDto(FindingIdParamSchema) {}

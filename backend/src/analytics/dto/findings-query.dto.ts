@@ -11,6 +11,8 @@ export const FindingsQuerySchema = z.object({
   componentId: z.string().max(200).optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
+  triageStatus: z.string().max(200).optional(),
+  assigneeUserId: z.string().max(191).optional(),
 });
 
 export class FindingsQueryDto extends createZodDto(FindingsQuerySchema) {}
@@ -27,6 +29,16 @@ export const FindingItemSchema = z.object({
   component_id: z.string().optional(),
   node_ref: z.string().optional(),
   raw: z.record(z.string(), z.unknown()).optional(),
+  triage: z
+    .object({
+      status: z.string(),
+      assigneeUserId: z.string().nullable(),
+      severityOverride: z.string().nullable(),
+      notes: z.string().nullable(),
+      updatedAt: z.string(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type FindingItem = z.infer<typeof FindingItemSchema>;

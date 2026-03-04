@@ -242,6 +242,18 @@ Notification channels route run lifecycle events (`run.completed`, `run.failed`,
 
 ## Recent Changes
 
+### Vulnerability Lifecycle Management (VLM) UI
+
+- **Kanban board** for finding triage with drag-drop status transitions between columns.
+- **7-state lifecycle**: `new` → `triaged` → `in_progress` → `fixed` → `verified` (terminal). Any non-terminal state can move to `wont_fix` or `accepted_risk`; both can reopen to `triaged`.
+- **Bulk triage actions**: Select up to 100 findings and apply status and/or assignee changes in a single operation.
+- **Finding detail sheet**: Slide-over panel with triage controls (status, assignee picker, severity override, notes) and an activity timeline of all triage events.
+- **Hybrid data strategy**: Immutable finding data in OpenSearch, mutable triage state in PostgreSQL (`finding_triage` + `finding_triage_events` tables). Batch PG lookup merges triage records into OpenSearch results.
+- **Org member listing** via Clerk API integration for the assignee picker.
+- **State machine** (`packages/shared/src/finding-triage.ts`): Pure function shared between frontend and backend for transition validation.
+- **Status filter**: Filter the findings list by triage status.
+- **109 new tests** covering state machine, service, controller, kanban view, detail sheet, and bulk operations.
+
 ### Webhook Inspector (Delivery Inspection & Resend)
 
 - **Response metadata capture**: Notification adapters now return response metadata (`durationMs`, `responseStatus`, `responseBody`) alongside success/error. The dispatcher stores these fields in the `notification_deliveries` table.

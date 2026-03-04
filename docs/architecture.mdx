@@ -171,6 +171,65 @@ Failed deliveries can be resent through the same dispatch path. The resend endpo
 
 ---
 
+## Vulnerability Lifecycle Management
+
+The VLM subsystem manages mutable triage state for security findings while keeping the immutable finding data in OpenSearch.
+
+### Hybrid Data Strategy
+
+Findings are stored in two systems, each owning a different concern:
+
+| System | Data Owned | Characteristics |
+|--------|-----------|----------------|
+| **OpenSearch** | Immutable finding data (severity, source, raw output, metadata) | Fast full-text search, aggregations |
+| **PostgreSQL** | Mutable triage state (status, assignee, severity override, notes) | ACID transactions, relational integrity |
+
+This split avoids reindexing OpenSearch on every triage change and keeps write-heavy lifecycle operations in PostgreSQL.
+
+### Query Enrichment
+
+The `FindingTriageService.enrichWithTriageState()` method merges the two data sources:
+
+1. The findings list is fetched from OpenSearch (search, filter, paginate).
+2. The resulting OpenSearch IDs are batch-fetched from the `finding_triage` table in PostgreSQL.
+3. Triage records are mapped by `finding_opensearch_id` and merged into each finding result.
+
+This batch approach avoids N+1 queries — a single PostgreSQL query fetches triage state for the entire page of results.
+
+For **status filtering**, the flow is reversed: PostgreSQL is queried first to resolve OpenSearch IDs matching the target statuses, then those IDs are passed as a filter to the OpenSearch query.
+
+### State Machine
+
+Transition validation uses a pure function defined in `packages/shared/src/finding-triage.ts` and shared between frontend and backend. The `VALID_TRANSITIONS` map defines allowed next states for each status:
+
+```
+new → triaged, wont_fix, accepted_risk
+triaged → in_progress, wont_fix, accepted_risk
+in_progress → fixed, wont_fix, accepted_risk
+fixed → verified, in_progress
+verified → (terminal)
+wont_fix → triaged
+accepted_risk → triaged
+```
+
+The frontend uses this map to enable/disable drag-drop targets in the Kanban view. The backend enforces it before persisting any transition.
+
+### Database Tables
+
+**`finding_triage`** — One record per (organization, OpenSearch finding) pair. Stores current triage status, assignee, severity override, notes, and SLA deadline.
+
+Indexes:
+- `finding_triage_org_finding_idx` (unique) — `(organization_id, finding_opensearch_id)`
+- `finding_triage_status_idx` — `(organization_id, status)`
+- `finding_triage_assignee_idx` — `(organization_id, assignee_user_id)`
+
+**`finding_triage_events`** — Append-only audit log of every triage change. Each event records the event type, field changed, old/new values, acting user, optional comment, and timestamp. Cascades on deletion of the parent triage record.
+
+Indexes:
+- `finding_triage_events_triage_idx` — `(finding_triage_id, created_at)`
+
+---
+
 ## Health Checks
 
 | Service | Endpoint | Type | Indicators |

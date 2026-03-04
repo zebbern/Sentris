@@ -299,6 +299,52 @@ Resends are rate limited to **10 per channel per minute**. If you exceed this li
 
 Email and PagerDuty channel types are planned for a future release.
 
+### Vulnerability Lifecycle Management
+
+Manage the full lifecycle of security findings — from initial discovery through triage, remediation, and verification.
+
+#### Triage Workflow
+
+Every finding starts in the **New** state. The 7-state lifecycle enforces valid transitions:
+
+| State | Valid Next States |
+|-------|-------------------|
+| **New** | Triaged, Won't Fix, Accepted Risk |
+| **Triaged** | In Progress, Won't Fix, Accepted Risk |
+| **In Progress** | Fixed, Won't Fix, Accepted Risk |
+| **Fixed** | Verified, In Progress |
+| **Verified** | *(terminal — no further transitions)* |
+| **Won't Fix** | Triaged *(reopen)* |
+| **Accepted Risk** | Triaged *(reopen)* |
+
+Invalid transitions are rejected by the backend with an error that includes the current status and valid next states.
+
+#### Kanban Board
+
+1. Navigate to the **Findings** page (`/findings`).
+2. Switch to **Kanban** view using the view toggle in the toolbar.
+3. Each column represents a triage status. Findings are displayed as cards within their current status column.
+4. **Drag and drop** a card from one column to another to change its triage status. The transition is validated against the state machine — only valid target columns accept the drop.
+
+#### Bulk Actions
+
+1. In the findings table or Kanban view, select multiple findings (up to 100).
+2. Choose a new **status** and/or **assignee** from the bulk action controls.
+3. Click **Apply** to update all selected findings in a single operation.
+4. The result summary shows how many succeeded and any that failed (e.g., due to invalid transitions).
+
+#### Finding Detail
+
+Click any finding row (table view) or card (Kanban view) to open the **detail sheet**:
+
+- **Triage controls** — Update status, assignee, severity override, and notes.
+- **Assignee picker** — Lists organization members via Clerk integration.
+- **Activity timeline** — Chronological history of every triage change: status transitions, assignments, severity overrides, and comments with user attribution and timestamps.
+
+#### Status Filter
+
+Use the **Status** dropdown in the findings toolbar to filter the list by triage status (e.g., show only "In Progress" findings). The filter applies to both table and Kanban views.
+
 ### Human-in-the-Loop
 
 Pause workflows for human intervention:

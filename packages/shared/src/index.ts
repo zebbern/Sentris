@@ -8,4 +8,5 @@ export * from './webhooks.js';
 export * from './mcp.js';
 export * from './mcp-registry.js';
 export * from './notifications.js';
+export * from './finding-triage.js';
 export * from './env.js';

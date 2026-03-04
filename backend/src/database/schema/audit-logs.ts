@@ -13,7 +13,8 @@ export type AuditResourceType =
   | 'mcp_server'
   | 'mcp_group'
   | 'human_input'
-  | 'notification_channel';
+  | 'notification_channel'
+  | 'finding_triage';
 
 export const auditLogsTable = pgTable(
   'audit_logs',

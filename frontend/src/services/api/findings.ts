@@ -1,4 +1,21 @@
-import { httpGet, getAuthHeaders, API_V1_URL } from './client';
+import { httpGet, httpPatch, httpPost, getAuthHeaders, API_V1_URL } from './client';
+import type {
+  FindingTriageResponse,
+  FindingTriageEventResponse,
+  BulkTriageResult,
+  UpdateFindingTriage,
+  BulkTriage,
+} from '@sentris/shared';
+
+export type { FindingTriageResponse, FindingTriageEventResponse, BulkTriageResult };
+
+export interface FindingTriage {
+  status: string;
+  assigneeUserId: string | null;
+  severityOverride: string | null;
+  notes: string | null;
+  updatedAt: string;
+}
 
 export interface FindingItem {
   id: string;
@@ -12,6 +29,7 @@ export interface FindingItem {
   component_id?: string;
   node_ref?: string;
   raw?: Record<string, unknown>;
+  triage?: FindingTriage | null;
 }
 
 /** Full detail response — same as FindingItem but `raw` is always present. */
@@ -36,6 +54,8 @@ export interface FindingsQueryParams {
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
+  triageStatus?: string;
+  assigneeUserId?: string;
 }
 
 export interface FindingsExportParams {
@@ -75,6 +95,8 @@ export const findingsApi = {
     if (params.componentId) searchParams.set('componentId', params.componentId);
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.triageStatus) searchParams.set('triageStatus', params.triageStatus);
+    if (params.assigneeUserId) searchParams.set('assigneeUserId', params.assigneeUserId);
 
     const qs = searchParams.toString();
     const path = qs ? `/findings?${qs}` : '/findings';
@@ -119,5 +141,27 @@ export const findingsApi = {
     const qs = searchParams.toString();
     const path = qs ? `/findings/stats?${qs}` : '/findings/stats';
     return httpGet<FindingsStatsResponse>(path);
+  },
+
+  updateTriage: async (
+    findingId: string,
+    data: UpdateFindingTriage,
+  ): Promise<FindingTriageResponse> => {
+    return httpPatch<FindingTriageResponse>(`/findings/${findingId}/triage`, data);
+  },
+
+  bulkTriage: async (data: BulkTriage): Promise<BulkTriageResult> => {
+    return httpPost<BulkTriageResult>('/findings/bulk-triage', data);
+  },
+
+  getHistory: async (
+    findingId: string,
+    limit = 50,
+  ): Promise<{ events: FindingTriageEventResponse[] }> => {
+    const params = new URLSearchParams();
+    if (limit !== 50) params.set('limit', String(limit));
+    const qs = params.toString();
+    const path = qs ? `/findings/${findingId}/history?${qs}` : `/findings/${findingId}/history`;
+    return httpGet<{ events: FindingTriageEventResponse[] }>(path);
   },
 };

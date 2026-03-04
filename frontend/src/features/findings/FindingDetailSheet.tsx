@@ -13,6 +13,9 @@ import {
 } from '@/components/ui/sheet';
 import { useFindingDetailQuery } from '@/hooks/queries/useFindingsQueries';
 import { SeverityBadge } from '@/features/findings/SeverityBadge';
+import { FindingTriageControls } from '@/features/findings/FindingTriageControls';
+import { FindingTimeline } from '@/features/findings/FindingTimeline';
+import type { FindingTriageStatus } from '@/features/findings/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +55,22 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetailSheetProps) {
   const { data: finding, isLoading, error } = useFindingDetailQuery(findingId);
   const [isRawExpanded, setIsRawExpanded] = useState(false);
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(true);
+
+  // Derive triage state from enriched finding (parallel agent adds `triage` field)
+  const triageData = (finding as Record<string, unknown> | undefined)?.triage as
+    | {
+        status: FindingTriageStatus;
+        assigneeUserId: string | null;
+        severityOverride: string | null;
+        notes: string | null;
+      }
+    | null
+    | undefined;
+  const triageStatus: FindingTriageStatus = triageData?.status ?? 'new';
+  const assigneeUserId = triageData?.assigneeUserId ?? null;
+  const severityOverride = triageData?.severityOverride ?? null;
+  const triageNotes = triageData?.notes ?? null;
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -120,6 +139,21 @@ export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetail
               </div>
             </section>
 
+            {/* Triage */}
+            <section>
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Triage
+              </h4>
+              <FindingTriageControls
+                findingId={finding.id}
+                currentStatus={triageStatus}
+                assigneeUserId={assigneeUserId}
+                severityOverride={severityOverride}
+                notes={triageNotes}
+                originalSeverity={finding.severity}
+              />
+            </section>
+
             {/* Raw Data */}
             <section>
               <Button
@@ -140,6 +174,29 @@ export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetail
                 <pre className="mt-2 rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto max-h-96">
                   {JSON.stringify(finding.raw, null, 2)}
                 </pre>
+              )}
+            </section>
+
+            {/* Activity Timeline */}
+            <section>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start px-0 font-semibold text-muted-foreground uppercase tracking-wider text-sm"
+                onClick={() => setIsTimelineExpanded((prev) => !prev)}
+                aria-expanded={isTimelineExpanded}
+              >
+                {isTimelineExpanded ? (
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 mr-1" />
+                )}
+                Activity
+              </Button>
+              {isTimelineExpanded && (
+                <div className="mt-2">
+                  <FindingTimeline findingId={finding.id} />
+                </div>
               )}
             </section>
           </div>
