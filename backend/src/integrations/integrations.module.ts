@@ -26,7 +26,9 @@ import { INTEGRATION_CACHE_REDIS } from './integrations.tokens';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('IntegrationsModule').warn(`INTEGRATION_CACHE_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('IntegrationsModule').warn(`INTEGRATION_CACHE_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],
@@ -35,6 +37,6 @@ import { INTEGRATION_CACHE_REDIS } from './integrations.tokens';
     IntegrationsRepository,
     TokenEncryptionService,
   ],
-  exports: [IntegrationsService],
+  exports: [IntegrationsService, TokenEncryptionService],
 })
 export class IntegrationsModule {}

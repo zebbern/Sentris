@@ -14,6 +14,7 @@ import {
 import { useFindingDetailQuery } from '@/hooks/queries/useFindingsQueries';
 import { SeverityBadge } from '@/features/findings/SeverityBadge';
 import { FindingTriageControls } from '@/features/findings/FindingTriageControls';
+import { LinkedTicket } from '@/features/findings/LinkedTicket';
 import { FindingTimeline } from '@/features/findings/FindingTimeline';
 import type { FindingTriageStatus } from '@/features/findings/types';
 
@@ -152,6 +153,11 @@ export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetail
                 notes={triageNotes}
                 originalSeverity={finding.severity}
               />
+            </section>
+
+            {/* Linked Ticket */}
+            <section>
+              <LinkedTicket findingId={finding.id} />
             </section>
 
             {/* Raw Data */}

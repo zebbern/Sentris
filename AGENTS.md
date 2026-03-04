@@ -238,6 +238,10 @@ Notification channels route run lifecycle events (`run.completed`, `run.failed`,
 - **Delivery tracking**: Every dispatch creates a record in the `notification_deliveries` table with status (`pending` → `sent` | `failed`) and error details.
 - **Frontend**: Settings > Channels tab (admin-only) for CRUD, test delivery, and delivery history.
 
+### Bidirectional Ticketing
+
+External ticket systems (Jira) sync with finding triage state. Outbound: `finding.triage.changed` EventEmitter2 events trigger ticket creation/updates. Inbound: HMAC-verified webhooks from Jira update triage status. Circular sync prevention via `source` parameter. OAuth 2.0 tokens stored encrypted (AES-256-GCM).
+
 ---
 
 ## Recent Changes
@@ -260,6 +264,16 @@ Notification channels route run lifecycle events (`run.completed`, `run.failed`,
 - **Re-send capability**: Failed deliveries can be resent via the delivery detail panel. Resends create new delivery records through the same dispatch path (SSRF protection preserved). Rate limited to 10 resends per channel per minute.
 - **Delivery detail panel**: Collapsible accordion in delivery history shows full request/response inspection — request payload, response HTTP status, response body, and latency.
 - **Pagination**: Delivery history supports paginated loading via a "Load More" button.
+
+### Bidirectional Jira Ticketing
+
+- **OAuth 2.0 (3LO)** authentication with Atlassian Cloud. Encrypted token storage (AES-256-GCM) and automatic refresh with per-org mutex to prevent race conditions.
+- **Outbound sync**: When finding triage status changes (`finding.triage.changed` event via EventEmitter2), tickets are automatically created in Jira with matching status transitions.
+- **Inbound sync**: Jira webhooks notify status changes back. HMAC-SHA256 verified, reverse status mapping updates triage state. Circular sync prevention via `source` parameter.
+- **Frontend**: Settings > Ticketing tab for OAuth connection, project/issue type selection, status mapping configuration, and auto-create toggles. LinkedTicket component shows sync status in finding detail.
+- **Security**: SSRF allowlist (api.atlassian.com, auth.atlassian.com, \*.atlassian.net), issue key regex validation, org-scoped lookups, timing-safe HMAC verify.
+- **Database**: `ticketing_connections` (per-org provider config + encrypted tokens) and `ticket_links` (finding↔ticket mapping with sync status).
+- **78 tests** covering service, listener, controller, adapter, webhook handler, and frontend components.
 
 ---
 

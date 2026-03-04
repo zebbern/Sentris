@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { FindingTriageController } from '../finding-triage.controller';
 import type { FindingTriageService } from '../finding-triage.service';
+import type { TicketingService } from '../../ticketing/ticketing.service';
 import type { AuthContext } from '../../auth/types';
 
 // ---------------------------------------------------------------------------
@@ -78,6 +79,12 @@ function makeTriageService() {
   } as unknown as FindingTriageService;
 }
 
+function makeTicketingService(): TicketingService {
+  return {
+    getTicketLink: mock(() => Promise.resolve(null)),
+  } as unknown as TicketingService;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -85,10 +92,12 @@ function makeTriageService() {
 describe('FindingTriageController', () => {
   let controller: FindingTriageController;
   let service: FindingTriageService;
+  let ticketingService: TicketingService;
 
   beforeEach(() => {
     service = makeTriageService();
-    controller = new FindingTriageController(service);
+    ticketingService = makeTicketingService();
+    controller = new FindingTriageController(service, ticketingService);
   });
 
   // -----------------------------------------------------------------------

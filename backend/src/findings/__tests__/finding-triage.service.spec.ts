@@ -91,6 +91,7 @@ describe('FindingTriageService', () => {
   let analyticsQueryMock: ReturnType<typeof mock>;
   let analyticsAvailableMock: ReturnType<typeof mock>;
   let orgMembersListMock: ReturnType<typeof mock>;
+  let eventEmitterMock: { emit: ReturnType<typeof mock> };
 
   beforeEach(() => {
     idCounter = 0;
@@ -127,11 +128,16 @@ describe('FindingTriageService', () => {
       listMembers: orgMembersListMock,
     };
 
+    eventEmitterMock = {
+      emit: mock(() => true),
+    };
+
     service = new FindingTriageService(
       repoMock as unknown as FindingTriageRepository,
       auditLogService as unknown as AuditLogService,
       securityAnalyticsService as unknown as SecurityAnalyticsService,
       orgMembersService as unknown as OrgMembersService,
+      eventEmitterMock as any,
     );
   });
 
