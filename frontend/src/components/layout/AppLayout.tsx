@@ -19,6 +19,7 @@ import {
   Package,
   X,
   LayoutDashboard,
+  ShieldAlert,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -59,6 +60,7 @@ const navigationItems: NavItem[] = [
   { name: 'Schedules', href: '/schedules', icon: CalendarClock },
   { name: 'Webhooks', href: '/webhooks', icon: Webhook },
   { name: 'Action Center', href: '/action-center', icon: Zap },
+  { name: 'Findings', href: '/findings', icon: ShieldAlert },
   ...(env.VITE_ENABLE_CONNECTIONS
     ? [{ name: 'Connections', href: '/integrations', icon: Plug }]
     : []),

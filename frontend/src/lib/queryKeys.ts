@@ -93,6 +93,9 @@ export const queryKeys = {
   analyticsSettings: {
     all: () => ['analyticsSettings', getOrgScope()] as const,
   },
+  findings: {
+    all: (filters?: Record<string, unknown>) => ['findings', getOrgScope(), filters] as const,
+  },
   dashboard: {
     stats: () => ['dashboard', getOrgScope(), 'stats'] as const,
     recentActivity: () => ['dashboard', getOrgScope(), 'recent-activity'] as const,

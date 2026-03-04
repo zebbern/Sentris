@@ -5,10 +5,11 @@ import { SecurityAnalyticsService } from './security-analytics.service';
 import { OrganizationSettingsService } from './organization-settings.service';
 import { OpenSearchTenantService } from './opensearch-tenant.service';
 import { AnalyticsController } from './analytics.controller';
+import { FindingsController } from './findings.controller';
 
 @Module({
   imports: [ConfigModule],
-  controllers: [AnalyticsController],
+  controllers: [AnalyticsController, FindingsController],
   providers: [
     AnalyticsService,
     SecurityAnalyticsService,

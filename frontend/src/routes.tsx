@@ -71,6 +71,9 @@ const AnalyticsSettingsPage = lazyWithRetry(() =>
 const SettingsPage = lazyWithRetry(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
+const FindingsPage = lazyWithRetry(() =>
+  import('@/pages/FindingsPage').then((m) => ({ default: m.FindingsPage })),
+);
 
 export function AnimatedRoutes() {
   const location = useLocation();
@@ -207,6 +210,14 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <ActionCenterPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/findings"
+          element={
+            <ErrorBoundary>
+              <FindingsPage />
             </ErrorBoundary>
           }
         />

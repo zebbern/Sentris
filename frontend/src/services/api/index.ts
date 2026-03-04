@@ -22,6 +22,7 @@ import { artifactsApi } from './artifacts';
 import { humanInputsApi } from './humanInputs';
 import { webhooksApi } from './webhooks';
 import { analyticsSettingsApi } from './analytics';
+import { findingsApi } from './findings';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -39,6 +40,7 @@ export const api = {
   humanInputs: humanInputsApi,
   webhooks: webhooksApi,
   analyticsSettings: analyticsSettingsApi,
+  findings: findingsApi,
 
   // Generic HTTP methods
   get: httpGet,
@@ -55,6 +57,7 @@ export type {
   UpdateAnalyticsSettingsInput,
   SubscriptionTier,
 } from './analytics';
+export type { FindingItem, FindingsResponse, FindingsQueryParams } from './findings';
 export type { ArtifactListFilters } from './artifacts';
 export type { UploadedFileResponse } from './files';
 export type { TerminalChunkResponse } from './executions';
