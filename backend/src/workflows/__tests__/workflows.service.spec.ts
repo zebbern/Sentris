@@ -474,6 +474,7 @@ describe('WorkflowsService', () => {
       analyticsServiceMock as any,
       auditLogMock,
       workflowVersionService,
+      { emit: vi.fn() } as any,
     );
     service = new WorkflowsService(
       repositoryMock,
@@ -715,6 +716,7 @@ describe('WorkflowsService', () => {
       analyticsServiceMock as any,
       failureAuditLog,
       failureVersionService,
+      { emit: vi.fn() } as any,
     );
     service = new WorkflowsService(
       repositoryMock,

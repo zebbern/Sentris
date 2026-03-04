@@ -52,6 +52,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List alive backend instances (admin only) */
+        get: operations["AdminInstancesController_listInstances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/instances/stale-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detect sessions owned by dead instances (admin only) */
+        get: operations["AdminInstancesController_detectStaleSessions"];
+        put?: never;
+        post?: never;
+        /** Clean up stale sessions owned by dead instances (admin only) */
+        delete: operations["AdminInstancesController_cleanupStaleSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{agentRunId}/parts": {
         parameters: {
             query?: never;
@@ -1946,6 +1981,77 @@ export interface paths {
         };
         /** Get the current registry sync status */
         get: operations["McpRegistryController_getSyncStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all notification channels */
+        get: operations["NotificationsController_list"];
+        put?: never;
+        /** Create a notification channel */
+        post: operations["NotificationsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/channels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a notification channel by ID */
+        get: operations["NotificationsController_get"];
+        /** Update a notification channel */
+        put: operations["NotificationsController_update"];
+        post?: never;
+        /** Delete a notification channel */
+        delete: operations["NotificationsController_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/channels/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test notification to a channel */
+        post: operations["NotificationsController_test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/channels/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List delivery history for a notification channel */
+        get: operations["NotificationsController_listDeliveries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3862,6 +3968,61 @@ export interface components {
             /** @enum {string} */
             status: "imported" | "already_exists";
         };
+        NotificationChannelResponseDto: {
+            /** Format: uuid */
+            id: string;
+            organizationId: string;
+            name: string;
+            /** @enum {string} */
+            type: "slack" | "email" | "pagerduty";
+            config: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "active" | "inactive";
+            events: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateNotificationChannelDto: {
+            name: string;
+            /** @enum {string} */
+            type: "slack" | "email" | "pagerduty";
+            config: {
+                [key: string]: unknown;
+            };
+            events: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
+        };
+        UpdateNotificationChannelDto: {
+            name?: string;
+            config?: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status?: "active" | "inactive";
+            events?: ("run.completed" | "run.failed" | "run.cancelled" | "run.timed_out")[];
+        };
+        NotificationDeliveryResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            channelId: string;
+            runId: string | null;
+            eventType: string;
+            /** @enum {string} */
+            status: "pending" | "sent" | "failed";
+            payload: {
+                [key: string]: unknown;
+            };
+            errorMessage: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            sentAt: string | null;
+        };
         DiscoveryInputDto: {
             /**
              * @description Transport type for MCP server
@@ -4038,7 +4199,7 @@ export interface components {
                 actorDisplay: string | null;
                 action: string;
                 /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input";
+                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel";
                 resourceId: string | null;
                 resourceName: string | null;
                 metadata: {
@@ -4106,6 +4267,60 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminInstancesController_listInstances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns all alive backend instances with metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminInstancesController_detectStaleSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns sessions whose owning instance is no longer alive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminInstancesController_cleanupStaleSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removes stale session registry entries and returns removed count */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5590,6 +5805,10 @@ export interface operations {
                 severity?: "critical" | "high" | "medium" | "low" | "info";
                 search?: string;
                 sortOrder?: "asc" | "desc";
+                workflowId?: string;
+                componentId?: string;
+                dateFrom?: string;
+                dateTo?: string;
             };
             header?: never;
             path?: never;
@@ -5610,7 +5829,14 @@ export interface operations {
     };
     FindingsController_getStats: {
         parameters: {
-            query?: never;
+            query?: {
+                severity?: "critical" | "high" | "medium" | "low" | "info";
+                search?: string;
+                workflowId?: string;
+                componentId?: string;
+                dateFrom?: string;
+                dateTo?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5636,6 +5862,10 @@ export interface operations {
                 sortOrder?: "asc" | "desc";
                 format?: "csv" | "json";
                 limit?: number;
+                workflowId?: string;
+                componentId?: string;
+                dateFrom?: string;
+                dateTo?: string;
             };
             header?: never;
             path?: never;
@@ -7729,6 +7959,153 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponseDto"][];
+                };
+            };
+        };
+    };
+    NotificationsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateNotificationChannelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNotificationChannelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelResponseDto"];
+                };
+            };
+        };
+    };
+    NotificationsController_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationsController_listDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeliveryResponseDto"][];
+                };
             };
         };
     };

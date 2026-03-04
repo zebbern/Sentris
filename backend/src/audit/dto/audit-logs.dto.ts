@@ -13,6 +13,7 @@ export const AuditResourceTypeSchema = z.enum([
   'mcp_server',
   'mcp_group',
   'human_input',
+  'notification_channel',
 ]);
 
 export const AuditLogEntrySchema = z.object({

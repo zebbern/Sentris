@@ -249,6 +249,41 @@ The standalone **Findings** page (`/findings`) provides a cross-workflow view of
 - **Severity chart** — Visual distribution of findings by severity.
 - **Advanced filters** — Narrow results by date range, workflow, tool, severity, and status.
 
+### Notification Channels
+
+Notification channels route workflow run events to external services so your team stays informed without watching the dashboard. When a run completes, fails, is cancelled, or times out, Sentris delivers a notification to every matching channel.
+
+#### Supported Event Types
+
+| Event | Fires When |
+|-------|------------|
+| `run.completed` | A workflow run finishes successfully |
+| `run.failed` | A workflow run encounters an error |
+| `run.cancelled` | A workflow run is manually cancelled |
+| `run.timed_out` | A workflow run exceeds its timeout |
+
+#### Configuring a Slack Webhook Channel
+
+1. Navigate to **Settings > Channels** (admin-only).
+2. Click **Add Channel**.
+3. Enter a descriptive name (e.g., "Security Alerts — Slack").
+4. Select **Slack** as the channel type.
+5. Paste your Slack Incoming Webhook URL. The URL must belong to `hooks.slack.com` or `hooks.slack-gov.com`.
+6. Select one or more event types to subscribe to.
+7. Click **Create**.
+
+#### Testing a Channel
+
+After creating a channel, click the **Test** button to send a sample notification. A test delivery appears in the channel's delivery history with its status (`sent` or `failed`).
+
+#### Viewing Delivery History
+
+Open a channel and select the **Deliveries** tab to see a log of every notification dispatched through it. Each entry shows the event type, delivery status, timestamp, and error message (if any).
+
+#### Coming Soon
+
+Email and PagerDuty channel types are planned for a future release.
+
 ### Human-in-the-Loop
 
 Pause workflows for human intervention:
