@@ -23,6 +23,7 @@ import { humanInputsApi } from './humanInputs';
 import { webhooksApi } from './webhooks';
 import { analyticsSettingsApi } from './analytics';
 import { findingsApi } from './findings';
+import { notificationChannelsApi } from './notificationChannels';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -41,6 +42,7 @@ export const api = {
   webhooks: webhooksApi,
   analyticsSettings: analyticsSettingsApi,
   findings: findingsApi,
+  notificationChannels: notificationChannelsApi,
 
   // Generic HTTP methods
   get: httpGet,

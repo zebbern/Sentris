@@ -104,6 +104,12 @@ export const queryKeys = {
     recentActivity: () => ['dashboard', getOrgScope(), 'recent-activity'] as const,
   },
   // Registry catalog is global (not org-scoped) — shared across all organizations
+  notificationChannels: {
+    all: () => ['notificationChannels', getOrgScope()] as const,
+    detail: (id: string) => ['notificationChannels', getOrgScope(), id] as const,
+    deliveries: (channelId: string) =>
+      ['notificationChannels', getOrgScope(), 'deliveries', channelId] as const,
+  },
   mcpRegistry: {
     catalog: (filters?: Record<string, unknown>) =>
       filters

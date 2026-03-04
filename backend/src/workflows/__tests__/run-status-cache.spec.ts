@@ -157,6 +157,7 @@ describe('Run status caching', () => {
       analyticsServiceMock as any,
       { record: mock(() => {}) } as any,
       {} as any,
+      { emit: mock(() => true) } as any,
     );
   });
 

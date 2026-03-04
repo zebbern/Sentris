@@ -7,4 +7,5 @@ export * from './schedules.js';
 export * from './webhooks.js';
 export * from './mcp.js';
 export * from './mcp-registry.js';
+export * from './notifications.js';
 export * from './env.js';

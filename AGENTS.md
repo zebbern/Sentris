@@ -228,6 +228,16 @@ The `/findings` page provides a standalone view of aggregated security findings 
 - Severity distribution chart
 - Advanced filters: date range, workflow, tool, severity, status
 
+### Notification Routing
+
+Notification channels route run lifecycle events (`run.completed`, `run.failed`, `run.cancelled`, `run.timed_out`) to external services.
+
+- **EventEmitter2** dispatches `run.status.terminal` events (fire-and-forget, non-blocking via `@OnEvent('run.status.terminal', { async: true })`).
+- **Dispatcher pattern**: `NotificationDispatcherService` listens for events, resolves matching channels, and delegates to type-specific adapters (`SlackNotificationAdapter`).
+- **SSRF protection**: Slack webhook URLs are validated against a domain allowlist (`hooks.slack.com`, `hooks.slack-gov.com`). DNS IP validation blocks internal network targets.
+- **Delivery tracking**: Every dispatch creates a record in the `notification_deliveries` table with status (`pending` → `sent` | `failed`) and error details.
+- **Frontend**: Settings > Channels tab (admin-only) for CRUD, test delivery, and delivery history.
+
 ---
 
 <!-- markdownlint-disable MD033 -->

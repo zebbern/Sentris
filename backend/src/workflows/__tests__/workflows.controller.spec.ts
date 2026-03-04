@@ -414,6 +414,7 @@ describe('WorkflowsController', () => {
       analyticsServiceMock as any,
       auditLogMock,
       workflowVersionService,
+      { emit: vi.fn() } as any,
     );
     const workflowsService = new WorkflowsService(
       repositoryStub as WorkflowRepository,
@@ -485,6 +486,7 @@ describe('WorkflowsController', () => {
         analyticsServiceMock as any,
         auditLogMock,
         workflowVersionService,
+        { emit: vi.fn() } as any,
       ),
       terminalArchiveService as any,
     );

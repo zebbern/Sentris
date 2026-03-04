@@ -135,6 +135,34 @@ Components are the building blocks of workflows:
 
 ---
 
+## Notification Routing
+
+Notification channels deliver alerts to external services when workflow runs reach a terminal state.
+
+### Event Dispatch
+
+The backend uses **EventEmitter2** (via `@nestjs/event-emitter`) to emit a `run.status.terminal` event whenever a run completes, fails, is cancelled, or times out. The event is fire-and-forget and non-blocking — it does not delay the API response to the client.
+
+### Dispatcher & Adapters
+
+`NotificationDispatcherService` listens for `run.status.terminal` events with `@OnEvent('run.status.terminal', { async: true })`. For each event it:
+
+1. Resolves all active channels whose subscribed events match the run status.
+2. Dispatches in parallel via `Promise.allSettled`, delegating to a type-specific adapter (e.g., `SlackNotificationAdapter`).
+3. Records each dispatch in the `notification_deliveries` table with status `pending`, then updates to `sent` or `failed`.
+
+New channel types (email, PagerDuty) are added by implementing the `NotificationAdapter` abstract class.
+
+### SSRF Protection for Webhooks
+
+Slack webhook URLs are validated against a domain allowlist (`hooks.slack.com`, `hooks.slack-gov.com`). DNS resolution results are checked to reject internal network IPs, preventing SSRF through DNS rebinding.
+
+### Delivery Tracking
+
+The `notification_deliveries` table stores every dispatch attempt with channel reference, run ID, event type, status (`pending` → `sent` | `failed`), error message, and timestamps. Indexed by `(channel_id, created_at)` and `run_id` for efficient queries.
+
+---
+
 ## Health Checks
 
 | Service | Endpoint | Type | Indicators |

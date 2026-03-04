@@ -3,6 +3,7 @@ import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'node:path';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard, seconds } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
@@ -49,6 +50,7 @@ import { HumanInputsModule } from './human-inputs/human-inputs.module';
 import { McpServersModule } from './mcp-servers/mcp-servers.module';
 import { McpGroupsModule } from './mcp-groups/mcp-groups.module';
 import { McpRegistryModule } from './mcp-registry/mcp-registry.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { TemplatesModule } from './templates/templates.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
@@ -76,6 +78,7 @@ const coreModules = [
   McpServersModule,
   McpGroupsModule,
   McpRegistryModule,
+  NotificationsModule,
   McpModule,
   StudioMcpModule,
   TemplatesModule,
@@ -140,6 +143,7 @@ function getEnvFilePaths(): string[] {
       },
     }),
     OpenSearchModule,
+    EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     InstanceHeartbeatModule,
     ...coreModules,
@@ -157,7 +161,9 @@ function getEnvFilePaths(): string[] {
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('AppModule').warn(`PROVISIONING_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('AppModule').warn(`PROVISIONING_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],

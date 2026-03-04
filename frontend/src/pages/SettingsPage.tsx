@@ -8,6 +8,7 @@ import { GeneralSettings } from '@/pages/settings/GeneralSettings';
 import { AppearanceSettings } from '@/pages/settings/AppearanceSettings';
 import { NotificationSettings } from '@/pages/settings/NotificationSettings';
 import { KeyboardShortcutsSettings } from '@/pages/settings/KeyboardShortcutsSettings';
+import { ChannelSettings } from '@/pages/settings/ChannelSettings';
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
@@ -35,6 +36,11 @@ export function SettingsPage() {
       label: 'Shortcuts',
       to: '/settings/shortcuts',
       adminOnly: false,
+    },
+    {
+      label: 'Channels',
+      to: '/settings/channels',
+      adminOnly: true,
     },
     {
       label: 'Audit',
@@ -78,6 +84,7 @@ export function SettingsPage() {
             <Route path="appearance" element={<AppearanceSettings />} />
             <Route path="notifications" element={<NotificationSettings />} />
             <Route path="shortcuts" element={<KeyboardShortcutsSettings />} />
+            {isAdmin && <Route path="channels" element={<ChannelSettings />} />}
             {isAdmin && <Route path="audit" element={<AuditLogSettings />} />}
             <Route path="*" element={<Navigate to="/settings/general" replace />} />
           </Routes>

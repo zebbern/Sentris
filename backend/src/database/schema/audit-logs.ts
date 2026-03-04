@@ -12,7 +12,8 @@ export type AuditResourceType =
   | 'schedule'
   | 'mcp_server'
   | 'mcp_group'
-  | 'human_input';
+  | 'human_input'
+  | 'notification_channel';
 
 export const auditLogsTable = pgTable(
   'audit_logs',

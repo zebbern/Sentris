@@ -171,6 +171,7 @@ describe('WorkflowRunService', () => {
       analyticsSvc as unknown as AnalyticsService,
       auditLogSvc as unknown as AuditLogService,
       versionSvc as unknown as WorkflowVersionService,
+      { emit: vi.fn() } as any,
     );
   });
 

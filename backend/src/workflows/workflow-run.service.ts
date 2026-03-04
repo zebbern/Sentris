@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { status as grpcStatus, type ServiceError } from '@grpc/grpc-js';
 import { WorkflowNotFoundError } from '@temporalio/client';
 import '@sentris/worker/components';
@@ -96,6 +97,7 @@ export class WorkflowRunService {
     private readonly analyticsService: AnalyticsService,
     private readonly auditLogService: AuditLogService,
     private readonly workflowVersionService: WorkflowVersionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async requireRunAccess(runId: string, auth?: AuthContext | null) {
@@ -542,6 +544,19 @@ export class WorkflowRunService {
               temporalStatus.closeTime ? new Date(temporalStatus.closeTime) : undefined,
             )
             .catch((err) => this.logger.warn(`Failed to cache status for ${run.runId}: ${err}`));
+
+          // Fire-and-forget: emit run lifecycle event for notification dispatch
+          try {
+            this.eventEmitter.emit('run.status.terminal', {
+              runId: run.runId,
+              workflowId: run.workflowId,
+              organizationId,
+              status: normalizedStatus,
+              completedAt: temporalStatus.closeTime,
+            });
+          } catch (emitErr) {
+            this.logger.warn(`Failed to emit run.status.terminal for ${run.runId}: ${emitErr}`);
+          }
         }
       } catch (error: unknown) {
         if (this.isNotFoundError(error)) {
