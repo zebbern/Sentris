@@ -41,9 +41,10 @@ bun run dev:stop
 pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml down
 
 # Health checks
-curl -sf http://localhost:3211/api  # Backend API
-curl -sf http://localhost:5173      # Frontend
-curl -sf http://localhost           # Nginx (auth gate)
+curl -sf http://localhost:3211/health        # Backend liveness
+curl -sf http://localhost:3211/health/ready   # Backend readiness (Postgres/Redis/Temporal)
+curl -sf http://localhost:5173               # Frontend
+curl -sf http://localhost                    # Nginx (auth gate)
 
 just help                          # All commands
 ```
@@ -188,7 +189,7 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 ### Component Runners
 
 - **inline** — TypeScript code (HTTP calls, transforms, file ops)
-- **docker** — Containers (security tools: Subfinder, DNSX, Nuclei)
+- **docker** — Containers via `execFile()` (no shell; security tools: Subfinder, DNSX, Nuclei)
 - **remote** — External executors (future: K8s, ECS)
 
 ### Real-time Streaming
@@ -196,6 +197,36 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 - Terminal: Redis Streams → SSE → xterm.js
 - Events: Kafka → WebSocket
 - Logs: Loki + PostgreSQL
+
+### Health Checks
+
+- **Backend**: `GET /health` (liveness) and `GET /health/ready` (readiness) via Terminus. Indicators: Postgres, Redis, Temporal.
+- **Worker**: `GET :9100+N*100/health` per worker instance.
+
+### Sticky Sessions & MCP Session Registry
+
+- **Nginx** uses consistent hash on the `mcp_affinity` cookie for MCP routes, ensuring stateful MCP connections stick to the same backend instance.
+- **Redis session registry**: keys at `mcp:sessions:{sessionId}` track active MCP sessions.
+- **Admin endpoint**: `GET /api/v1/mcp/sessions` lists active MCP sessions.
+
+### Observability
+
+- **Correlation IDs**: `X-Request-Id` middleware assigns a unique ID per request. The ID propagates through logging context and Temporal workflow metadata.
+
+### Security Hardening
+
+- **SSRF guard**: `component-sdk` exports `validateUrlForSsrf()` — blocks RFC 1918, link-local, loopback, CGN, Docker hostnames, and DNS rebinding before any outbound HTTP request.
+- **exec→spawn migration**: All Docker commands in the worker use `execFile()` (no shell interpolation).
+
+### Findings Dashboard
+
+The `/findings` page provides a standalone view of aggregated security findings across workflow runs:
+
+- Table with severity, source, status columns
+- Detail view for individual findings
+- Export (CSV / JSON)
+- Severity distribution chart
+- Advanced filters: date range, workflow, tool, severity, status
 
 ---
 

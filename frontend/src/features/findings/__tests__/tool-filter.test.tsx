@@ -12,9 +12,11 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
   useComponents: () => ({
     data: {
       byId: {
-        'comp-1': { id: 'comp-1', slug: 'nuclei' },
-        'comp-2': { id: 'comp-2', slug: 'subfinder' },
-        'comp-3': { id: 'comp-3', slug: 'httpx' },
+        'comp-1': { id: 'comp-1', slug: 'nuclei', category: 'security' },
+        'comp-2': { id: 'comp-2', slug: 'subfinder', category: 'security' },
+        'comp-3': { id: 'comp-3', slug: 'httpx', category: 'security' },
+        'comp-4': { id: 'comp-4', slug: 'slack-notify', category: 'notification' },
+        'comp-5': { id: 'comp-5', slug: 'ai-summarize', category: 'ai' },
       },
     },
   }),
@@ -65,8 +67,15 @@ describe('ToolFilter', () => {
     expect(screen.getByText('All tools')).toBeTruthy();
   });
 
-  it('shows selected component name when value is set', () => {
+  it('shows selected component name when value is set to a security tool', () => {
     render(<ToolFilter value="comp-1" onChange={vi.fn()} />, { wrapper: Wrapper });
     expect(screen.getByText('nuclei')).toBeTruthy();
+  });
+
+  it('does not display non-security tools when selected as value', () => {
+    // comp-4 is notification category — it should not be a valid selectable value
+    render(<ToolFilter value="comp-4" onChange={vi.fn()} />, { wrapper: Wrapper });
+    // The trigger should NOT show 'slack-notify' since it's filtered out
+    expect(screen.queryByText('slack-notify')).toBeNull();
   });
 });

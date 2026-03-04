@@ -28,7 +28,9 @@ export function ToolFilter({ value, onChange }: ToolFilterProps) {
   };
 
   const components = componentIndex
-    ? Object.values(componentIndex.byId).sort((a, b) => a.slug.localeCompare(b.slug))
+    ? Object.values(componentIndex.byId)
+        .filter((c) => c.category === 'security')
+        .sort((a, b) => a.slug.localeCompare(b.slug))
     : [];
 
   return (
