@@ -280,6 +280,21 @@ After creating a channel, click the **Test** button to send a sample notificatio
 
 Open a channel and select the **Deliveries** tab to see a log of every notification dispatched through it. Each entry shows the event type, delivery status, timestamp, and error message (if any).
 
+When the delivery list grows long, click **Load More** at the bottom to load additional pages of delivery history.
+
+#### Delivery Inspection & Resend
+
+Expand any delivery row in the Deliveries tab to open the **detail panel**. It shows:
+
+- **Latency** — Round-trip time in milliseconds (`durationMs`).
+- **Request payload** — The JSON body sent to the external service.
+- **Response status** — The HTTP status code returned by the destination.
+- **Response body** — The raw response content from the destination.
+
+If a delivery has a `failed` status, a **Resend** button appears in the detail panel. Clicking it dispatches a new delivery through the same notification path, preserving all SSRF protections. A new delivery record is created for the resend attempt.
+
+Resends are rate limited to **10 per channel per minute**. If you exceed this limit, wait before retrying.
+
 #### Coming Soon
 
 Email and PagerDuty channel types are planned for a future release.

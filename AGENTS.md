@@ -240,6 +240,17 @@ Notification channels route run lifecycle events (`run.completed`, `run.failed`,
 
 ---
 
+## Recent Changes
+
+### Webhook Inspector (Delivery Inspection & Resend)
+
+- **Response metadata capture**: Notification adapters now return response metadata (`durationMs`, `responseStatus`, `responseBody`) alongside success/error. The dispatcher stores these fields in the `notification_deliveries` table.
+- **Re-send capability**: Failed deliveries can be resent via the delivery detail panel. Resends create new delivery records through the same dispatch path (SSRF protection preserved). Rate limited to 10 resends per channel per minute.
+- **Delivery detail panel**: Collapsible accordion in delivery history shows full request/response inspection — request payload, response HTTP status, response body, and latency.
+- **Pagination**: Delivery history supports paginated loading via a "Load More" button.
+
+---
+
 <!-- markdownlint-disable MD033 -->
 
 <skills_system priority="1">

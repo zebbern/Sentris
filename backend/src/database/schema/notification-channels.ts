@@ -1,4 +1,14 @@
-import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 
 export const notificationChannelsTable = pgTable(
   'notification_channels',
@@ -36,6 +46,9 @@ export const notificationDeliveriesTable = pgTable(
     errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     sentAt: timestamp('sent_at', { withTimezone: true }),
+    durationMs: integer('duration_ms'),
+    responseStatus: smallint('response_status'),
+    responseBody: text('response_body'),
   },
   (table) => ({
     channelCreatedAtIdx: index('notification_deliveries_channel_created_at_idx').on(

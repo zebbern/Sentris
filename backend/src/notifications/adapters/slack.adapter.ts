@@ -8,6 +8,7 @@ import { NotificationAdapter } from './notification.adapter';
 
 const ALLOWED_DOMAINS = ['hooks.slack.com', 'hooks.slack-gov.com'];
 const REQUEST_TIMEOUT_MS = 5_000;
+const MAX_RESPONSE_BODY_BYTES = 2048;
 
 /** Status label for human-readable Slack messages. */
 const STATUS_EMOJI: Record<string, string> = {
@@ -53,14 +54,26 @@ export class SlackNotificationAdapter extends NotificationAdapter {
 
       clearTimeout(timeout);
 
+      const responseText = await response.text().catch(() => '');
+      const truncatedBody =
+        Buffer.byteLength(responseText) > MAX_RESPONSE_BODY_BYTES
+          ? Buffer.from(responseText).subarray(0, MAX_RESPONSE_BODY_BYTES).toString() +
+            '... [truncated]'
+          : responseText;
+
       if (response.ok) {
-        return { success: true };
+        return {
+          success: true,
+          responseStatus: response.status,
+          responseBody: truncatedBody,
+        };
       }
 
-      const responseText = await response.text().catch(() => '');
       return {
         success: false,
         error: `Slack responded with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
+        responseStatus: response.status,
+        responseBody: truncatedBody,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';

@@ -61,11 +61,11 @@ export class NotificationDispatcherService {
     }
   }
 
-  private async dispatchToChannel(
+  async dispatchToChannel(
     channel: NotificationChannelRecord,
     payload: RunLifecycleEvent,
     eventType: string,
-  ): Promise<void> {
+  ): Promise<string> {
     // Create a pending delivery record
     const delivery = await this.deliveryRepository.create({
       channelId: channel.id,
@@ -75,8 +75,15 @@ export class NotificationDispatcherService {
       payload: payload as unknown as Record<string, unknown>,
     });
 
+    const startTime = Date.now();
+
     try {
-      let result: { success: boolean; error?: string };
+      let result: {
+        success: boolean;
+        error?: string;
+        responseStatus?: number;
+        responseBody?: string;
+      };
 
       if (channel.type === 'slack') {
         result = await this.slackAdapter.send(channel, payload);
@@ -87,28 +94,40 @@ export class NotificationDispatcherService {
         };
       }
 
+      const durationMs = Date.now() - startTime;
+
       if (result.success) {
         await this.deliveryRepository.update(delivery.id, {
           status: 'sent',
           sentAt: new Date(),
+          durationMs,
+          responseStatus: result.responseStatus,
+          responseBody: result.responseBody,
         });
         this.logger.log(`Delivery ${delivery.id} to channel ${channel.id} succeeded`);
       } else {
         await this.deliveryRepository.update(delivery.id, {
           status: 'failed',
           errorMessage: result.error ?? 'Unknown error',
+          durationMs,
+          responseStatus: result.responseStatus,
+          responseBody: result.responseBody,
         });
         this.logger.warn(
           `Delivery ${delivery.id} to channel ${channel.id} failed: ${result.error}`,
         );
       }
     } catch (error: unknown) {
+      const durationMs = Date.now() - startTime;
       const message = error instanceof Error ? error.message : 'Unknown error';
       await this.deliveryRepository.update(delivery.id, {
         status: 'failed',
         errorMessage: message,
+        durationMs,
       });
       this.logger.error(`Delivery ${delivery.id} to channel ${channel.id} threw: ${message}`);
     }
+
+    return delivery.id;
   }
 }
