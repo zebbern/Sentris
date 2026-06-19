@@ -11,6 +11,7 @@ import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../.
 import type { NotificationChannelRepository } from '../repository/notification-channel.repository';
 import type { NotificationDeliveryRepository } from '../repository/notification-delivery.repository';
 import type { SlackNotificationAdapter } from '../adapters/slack.adapter';
+import type { NotificationDispatcherService } from '../notification-dispatcher.service';
 import { NotificationsService } from '../notifications.service';
 
 // ---------------------------------------------------------------------------
@@ -67,6 +68,9 @@ function makeDeliveryRecord(
     status: overrides.status ?? 'sent',
     payload: overrides.payload ?? {},
     errorMessage: overrides.errorMessage ?? null,
+    durationMs: overrides.durationMs ?? null,
+    responseStatus: overrides.responseStatus ?? null,
+    responseBody: overrides.responseBody ?? null,
     createdAt: overrides.createdAt ?? now,
     sentAt: overrides.sentAt ?? now,
   };
@@ -178,6 +182,9 @@ describe('NotificationsService', () => {
     auditRecordCalls = [];
 
     const slackAdapter = { send: slackAdapterSend } as unknown as SlackNotificationAdapter;
+    const dispatcherService = {
+      dispatchToChannel: mock(() => Promise.resolve('del-1')),
+    } as unknown as NotificationDispatcherService;
     const auditLogService = {
       record: (...args: unknown[]) => {
         auditRecordCalls.push(args);
@@ -189,6 +196,7 @@ describe('NotificationsService', () => {
       deliveryRepo as unknown as NotificationDeliveryRepository,
       slackAdapter,
       auditLogService as any,
+      dispatcherService,
     );
   });
 

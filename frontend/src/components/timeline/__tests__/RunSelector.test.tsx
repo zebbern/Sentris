@@ -128,10 +128,10 @@ mock.module('@/components/timeline/RunInfoDisplay', () => ({
 
 // Mock Radix DropdownMenu to render inline (no portal) for testing
 mock.module('@/components/ui/dropdown-menu', () => ({
-  DropdownMenu: ({ children, open, _onOpenChange }: any) => {
+  DropdownMenu: ({ children, open }: any) => {
     return <div data-open={open}>{children}</div>;
   },
-  DropdownMenuTrigger: ({ children, _asChild }: any) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: any) => <>{children}</>,
   DropdownMenuContent: ({ children }: any) => <div data-testid="dropdown-content">{children}</div>,
   DropdownMenuItem: ({ children, onSelect, className }: any) => (
     <div role="menuitem" className={className} onClick={onSelect}>

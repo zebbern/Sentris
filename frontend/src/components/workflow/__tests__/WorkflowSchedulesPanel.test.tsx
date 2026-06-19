@@ -49,7 +49,7 @@ function createSchedule(overrides: Partial<WorkflowSchedule> = {}): WorkflowSche
     status: 'active',
     lastRunAt: null,
     nextRunAt: '2026-03-02T00:00:00Z',
-    inputPayload: {},
+    inputPayload: { runtimeInputs: {}, nodeOverrides: {} },
     temporalScheduleId: null,
     temporalSnapshot: {},
     organizationId: null,

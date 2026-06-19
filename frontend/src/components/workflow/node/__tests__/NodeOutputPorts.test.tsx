@@ -28,8 +28,13 @@ const { NodeOutputPorts } = await import('../NodeOutputPorts');
 const DEFAULT_VISUAL_STATE: NodeVisualState = {
   status: 'idle',
   progress: 0,
-  events: 0,
+  startTime: 0,
+  eventCount: 0,
   totalEvents: 0,
+  lastEvent: null,
+  dataFlow: { input: [], output: [] },
+  attempts: 0,
+  retryCount: 0,
 };
 
 function createOutputPort(overrides: Partial<OutputPort> = {}): OutputPort {

@@ -10,6 +10,7 @@ import { FindingsController } from '../findings.controller';
 import type { SecurityAnalyticsService } from '../security-analytics.service';
 import type { AuditLogService } from '../../audit/audit-log.service';
 import type { AuthContext } from '../../auth/types';
+import type { FindingTriageService } from '../../findings/finding-triage.service';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -55,16 +56,30 @@ function makeAuditLogService(): AuditLogService {
   return { record: jest.fn() } as unknown as AuditLogService;
 }
 
+function makeFindingTriageService(): FindingTriageService {
+  return {
+    getAllTriagedIds: jest.fn().mockResolvedValue([]),
+    getTriageByStatus: jest.fn().mockResolvedValue([]),
+    enrichWithTriageState: jest
+      .fn()
+      .mockImplementation((_: string, items: unknown[]) =>
+        Promise.resolve(items.map((item) => ({ ...(item as object), triage: null }))),
+      ),
+  } as unknown as FindingTriageService;
+}
+
 function createController(
   overrides: {
     securityAnalytics?: SecurityAnalyticsService;
     auditLog?: AuditLogService;
+    findingTriage?: FindingTriageService;
   } = {},
 ) {
   const securityAnalytics = overrides.securityAnalytics ?? makeSecurityAnalyticsService();
   const auditLog = overrides.auditLog ?? makeAuditLogService();
-  const controller = new FindingsController(securityAnalytics, auditLog);
-  return { controller, securityAnalytics, auditLog };
+  const findingTriage = overrides.findingTriage ?? makeFindingTriageService();
+  const controller = new FindingsController(securityAnalytics, auditLog, findingTriage);
+  return { controller, securityAnalytics, auditLog, findingTriage };
 }
 
 // ---------------------------------------------------------------------------

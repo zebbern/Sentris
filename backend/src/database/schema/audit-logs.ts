@@ -2,19 +2,23 @@ import { index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-o
 
 export type AuditActorType = 'user' | 'api-key' | 'internal' | 'unknown';
 
-export type AuditResourceType =
-  | 'workflow'
-  | 'secret'
-  | 'api_key'
-  | 'webhook'
-  | 'artifact'
-  | 'analytics'
-  | 'schedule'
-  | 'mcp_server'
-  | 'mcp_group'
-  | 'human_input'
-  | 'notification_channel'
-  | 'finding_triage';
+export const AUDIT_RESOURCE_TYPES = [
+  'workflow',
+  'secret',
+  'api_key',
+  'webhook',
+  'artifact',
+  'analytics',
+  'schedule',
+  'mcp_server',
+  'mcp_group',
+  'human_input',
+  'notification_channel',
+  'notification_delivery',
+  'finding_triage',
+] as const;
+
+export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];
 
 export const auditLogsTable = pgTable(
   'audit_logs',

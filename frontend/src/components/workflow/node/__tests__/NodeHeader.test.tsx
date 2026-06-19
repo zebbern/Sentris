@@ -49,13 +49,6 @@ const idleStyle: NodeStateStyle = {
   icon: null,
 };
 
-const _errorStyle: NodeStateStyle = {
-  border: 'border-red-500',
-  bg: 'bg-red-50',
-  icon: 'XCircle',
-  iconClass: 'text-red-600',
-};
-
 function createDefaultProps(overrides: Record<string, unknown> = {}) {
   return {
     id: 'node-1',

@@ -23,7 +23,7 @@ function createVisualState(overrides: Partial<NodeVisualState> = {}): NodeVisual
 function createTimelineEvent(overrides: Partial<TimelineEvent> = {}): TimelineEvent {
   return {
     id: 'evt-1',
-    type: 'node_started',
+    type: 'STARTED',
     message: 'Node execution started',
     timestamp: '2026-03-01T00:00:00Z',
     nodeRef: 'node-1',
@@ -41,7 +41,7 @@ describe('NodeStatusMessages', () => {
   });
 
   it('renders timeline last-event type when timeline is active', () => {
-    const event = createTimelineEvent({ type: 'node_started' });
+    const event = createTimelineEvent({ type: 'STARTED' });
     render(
       <NodeStatusMessages
         isTimelineActive={true}
@@ -52,12 +52,12 @@ describe('NodeStatusMessages', () => {
       />,
     );
 
-    expect(screen.getByText('Last: node started')).toBeInTheDocument();
+    expect(screen.getByText('Last: STARTED')).toBeInTheDocument();
   });
 
   it('renders timeline event message when present', () => {
     const event = createTimelineEvent({
-      type: 'node_completed',
+      type: 'COMPLETED',
       message: 'Scan completed successfully',
     });
     render(

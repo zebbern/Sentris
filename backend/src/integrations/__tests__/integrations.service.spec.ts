@@ -211,6 +211,7 @@ describe('IntegrationsService', () => {
       repo as unknown as IntegrationsRepository,
       encryption as unknown as TokenEncryptionService,
       configSvc as any,
+      null,
     );
   });
 
@@ -414,6 +415,7 @@ describe('IntegrationsService', () => {
         repo as unknown as IntegrationsRepository,
         encryption as unknown as TokenEncryptionService,
         configSvc as any,
+        null,
       );
       await expect(
         svc2.startOAuthSession('nocreds', { userId: 'u', redirectUri: 'https://x' }),

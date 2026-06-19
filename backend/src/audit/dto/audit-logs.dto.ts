@@ -1,20 +1,10 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
+import { AUDIT_RESOURCE_TYPES } from '../../database/schema/audit-logs';
+
 export const AuditActorTypeSchema = z.enum(['user', 'api-key', 'internal', 'unknown']);
-export const AuditResourceTypeSchema = z.enum([
-  'workflow',
-  'secret',
-  'api_key',
-  'webhook',
-  'artifact',
-  'analytics',
-  'schedule',
-  'mcp_server',
-  'mcp_group',
-  'human_input',
-  'notification_channel',
-]);
+export const AuditResourceTypeSchema = z.enum(AUDIT_RESOURCE_TYPES);
 
 export const AuditLogEntrySchema = z.object({
   id: z.string().uuid(),
