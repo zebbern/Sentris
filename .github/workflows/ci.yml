@@ -21,9 +21,6 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: workproject
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +36,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-store-${{ runner.os }}-${{ hashFiles('workproject/bun.lock') }}
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-store-${{ runner.os }}-
 
@@ -56,9 +53,6 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: workproject
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +68,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-store-${{ runner.os }}-${{ hashFiles('workproject/bun.lock') }}
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-store-${{ runner.os }}-
 
@@ -91,9 +85,6 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: workproject
     steps:
       - uses: actions/checkout@v4
 
@@ -109,7 +100,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-store-${{ runner.os }}-${{ hashFiles('workproject/bun.lock') }}
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-store-${{ runner.os }}-
 
@@ -127,9 +118,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [typecheck]
-    defaults:
-      run:
-        working-directory: workproject
     steps:
       - uses: actions/checkout@v4
 
@@ -145,7 +133,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-store-${{ runner.os }}-${{ hashFiles('workproject/bun.lock') }}
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-store-${{ runner.os }}-
 
@@ -162,9 +150,6 @@ jobs:
     name: API Contract Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: workproject
     steps:
       - uses: actions/checkout@v4
 
@@ -180,7 +165,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-store-${{ runner.os }}-${{ hashFiles('workproject/bun.lock') }}
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-store-${{ runner.os }}-
 

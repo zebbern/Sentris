@@ -36,7 +36,9 @@ import { TEMPLATE_CACHE_REDIS } from './templates.tokens';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('TemplatesModule').warn(`TEMPLATE_CACHE_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('TemplatesModule').warn(`TEMPLATE_CACHE_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],

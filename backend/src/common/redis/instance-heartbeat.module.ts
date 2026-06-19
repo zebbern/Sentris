@@ -25,7 +25,11 @@ import { InstanceHeartbeatService } from './instance-heartbeat.service';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('InstanceHeartbeatModule').warn(`INSTANCE_HEARTBEAT_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('InstanceHeartbeatModule').warn(
+            `INSTANCE_HEARTBEAT_REDIS error: ${err.message}`,
+          ),
+        );
         return client;
       },
       inject: [ConfigService],

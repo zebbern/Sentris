@@ -50,9 +50,7 @@ describe('TriageAnalyticsService', () => {
       getTopAssignees: mock(() => Promise.resolve([])),
     };
 
-    service = new TriageAnalyticsService(
-      repoMock as unknown as TriageAnalyticsRepository,
-    );
+    service = new TriageAnalyticsService(repoMock as unknown as TriageAnalyticsRepository);
   });
 
   // -----------------------------------------------------------------------
@@ -123,9 +121,7 @@ describe('TriageAnalyticsService', () => {
     });
 
     it('throws ForbiddenException without organization context', async () => {
-      await expect(service.getPostureTrend(AUTH_NO_ORG, '7d')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(service.getPostureTrend(AUTH_NO_ORG, '7d')).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -352,9 +348,7 @@ describe('TriageAnalyticsService', () => {
     });
 
     it('throws ForbiddenException without organization context', async () => {
-      await expect(service.getStatusDistribution(AUTH_NO_ORG)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(service.getStatusDistribution(AUTH_NO_ORG)).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -418,9 +412,7 @@ describe('TriageAnalyticsService', () => {
     });
 
     it('throws ForbiddenException without organization context', async () => {
-      await expect(service.getTopAssignees(AUTH_NO_ORG, 10)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(service.getTopAssignees(AUTH_NO_ORG, 10)).rejects.toThrow(ForbiddenException);
     });
   });
 

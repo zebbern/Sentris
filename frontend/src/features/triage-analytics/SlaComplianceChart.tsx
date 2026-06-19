@@ -32,8 +32,7 @@ interface SlaComplianceChartProps {
 export function SlaComplianceChart({ period }: SlaComplianceChartProps) {
   const { data, isLoading, isError, error, refetch } = useSlaCompliance(period);
   const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const chartData = useMemo(() => {
     if (!data?.severities) return [];
@@ -120,7 +119,11 @@ export function SlaComplianceChart({ period }: SlaComplianceChartProps) {
             strokeDasharray="3 3"
             label={{ value: '90%', position: 'right', fontSize: 10 }}
           />
-          <Bar dataKey="complianceRate" radius={[4, 4, 0, 0]} isAnimationActive={!prefersReducedMotion}>
+          <Bar
+            dataKey="complianceRate"
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={!prefersReducedMotion}
+          >
             {chartData.map((entry) => (
               <Cell key={entry.key} fill={getComplianceColor(entry.complianceRate)} />
             ))}

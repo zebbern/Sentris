@@ -7,7 +7,7 @@
     "dev": "bun run migration:push --force && bun --watch src/main.ts",
     "start": "bun run migration:push && bun run src/main.ts",
     "start:prod": "bun run build/main.js",
-    "build": "bun build src/main.ts --outdir build --target bun",
+    "build": "bun build src/main.ts --outdir build --target bun --external @nestjs/websockets/socket-module --external nats --external @nestjs/mongoose --external @mikro-orm/core --external @nestjs/typeorm/dist/common/typeorm.utils --external @nestjs/sequelize/dist/common/sequelize.utils --external class-transformer/storage",
     "test": "bun test",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

@@ -33,8 +33,7 @@ interface TriageVelocityChartProps {
 export function TriageVelocityChart({ period }: TriageVelocityChartProps) {
   const { data, isLoading, isError, error, refetch } = useTriageVelocity(period);
   const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (isLoading) {
     return (
@@ -56,15 +55,16 @@ export function TriageVelocityChart({ period }: TriageVelocityChartProps) {
           <Activity className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Triage Velocity</h3>
         </div>
-        <ErrorBanner message={error?.message ?? 'Failed to load triage velocity'} onRetry={() => refetch()} />
+        <ErrorBanner
+          message={error?.message ?? 'Failed to load triage velocity'}
+          onRetry={() => refetch()}
+        />
       </div>
     );
   }
 
   const buckets = data?.buckets ?? [];
-  const hasData = buckets.some((b) =>
-    STATUS_KEYS.some((k) => b[k] > 0),
-  );
+  const hasData = buckets.some((b) => STATUS_KEYS.some((k) => b[k] > 0));
 
   if (!hasData) {
     return (

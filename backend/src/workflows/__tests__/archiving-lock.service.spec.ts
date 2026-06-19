@@ -37,12 +37,7 @@ class MockRedis {
    * Minimal Lua eval supporting the compare-and-delete script.
    * Simulates: if GET(KEYS[1]) == ARGV[1] then DEL(KEYS[1]) else 0
    */
-  async eval(
-    _script: string,
-    _numKeys: number,
-    key: string,
-    value: string,
-  ): Promise<number> {
+  async eval(_script: string, _numKeys: number, key: string, value: string): Promise<number> {
     if (this.kv.get(key) === value) {
       this.kv.delete(key);
       this.ttls.delete(key);

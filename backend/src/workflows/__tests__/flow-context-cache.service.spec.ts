@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import {
-  FlowContextCacheService,
-  type CachedFlowContext,
-} from '../flow-context-cache.service';
+import { FlowContextCacheService, type CachedFlowContext } from '../flow-context-cache.service';
 
 // ── MockRedis ───────────────────────────────────────────────────────
 
@@ -72,10 +69,7 @@ function makeSampleFlowContext(): CachedFlowContext {
           { targetRef: 'node-c', sourceHandle: 'output', inputKey: 'data' },
         ],
       ],
-      [
-        'node-b:result',
-        [{ targetRef: 'node-d', sourceHandle: 'result', inputKey: 'payload' }],
-      ],
+      ['node-b:result', [{ targetRef: 'node-d', sourceHandle: 'result', inputKey: 'payload' }]],
     ]),
   };
 }
