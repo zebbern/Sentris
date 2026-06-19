@@ -18,6 +18,9 @@ function makeDeliveryRecord(
     status: overrides.status ?? 'pending',
     payload: overrides.payload ?? { runId: 'run-1' },
     errorMessage: overrides.errorMessage ?? null,
+    durationMs: overrides.durationMs ?? null,
+    responseStatus: overrides.responseStatus ?? null,
+    responseBody: overrides.responseBody ?? null,
     createdAt: overrides.createdAt ?? now,
     sentAt: overrides.sentAt ?? null,
   };

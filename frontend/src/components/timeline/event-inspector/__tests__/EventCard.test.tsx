@@ -14,7 +14,7 @@ mock.module('@/components/workflow/ExecutionErrorView', () => ({
 mock.module('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: any) => <>{children}</>,
   Tooltip: ({ children }: any) => <>{children}</>,
-  TooltipTrigger: ({ children, asChild: _asChild, ..._rest }: any) => <>{children}</>,
+  TooltipTrigger: ({ children }: any) => <>{children}</>,
   TooltipContent: ({ children }: any) => <div>{children}</div>,
 }));
 

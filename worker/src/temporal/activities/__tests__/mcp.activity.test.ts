@@ -46,7 +46,7 @@ describe('MCP Activities', () => {
     delete process.env.SKIP_CONTAINER_CLEANUP;
 
     // Spy on global fetch — this is more resilient than replacing globalThis.fetch
-    vi.spyOn(globalThis, 'fetch').mockImplementation(vi.fn());
+    vi.spyOn(globalThis, 'fetch').mockImplementation(vi.fn() as unknown as typeof fetch);
     mockExecFile.mockReset();
   });
 
@@ -89,7 +89,7 @@ describe('MCP Activities', () => {
     });
 
     it('throws ServiceError when API returns non-200 response', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ error: 'Bad Request' }, false, 400),
       );
 
@@ -116,7 +116,7 @@ describe('MCP Activities', () => {
   describe('registerComponentToolActivity', () => {
     it('sends correct payload to register-component endpoint', async () => {
       const mockResponse = createMockFetchResponse({ success: true });
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse);
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse);
 
       const input = {
         runId: 'run-1',
@@ -131,7 +131,8 @@ describe('MCP Activities', () => {
       await registerComponentToolActivity(input);
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-      const [url, options] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, options] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0];
       // URL suffix is stable; base URL may vary depending on env at module load time
       expect(url).toContain('/internal/mcp/register-component');
       expect(options.method).toBe('POST');
@@ -150,7 +151,7 @@ describe('MCP Activities', () => {
 
   describe('registerRemoteMcpActivity', () => {
     it('sends correct payload with http transport', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ success: true }),
       );
 
@@ -163,7 +164,8 @@ describe('MCP Activities', () => {
         endpoint: 'http://remote-server:8080/mcp',
       });
 
-      const [url, options] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const [url, options] = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0];
       expect(url).toContain('register-mcp-server');
 
       const body = JSON.parse(options.body);
@@ -173,7 +175,7 @@ describe('MCP Activities', () => {
     });
 
     it('includes Authorization header when authToken is provided', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ success: true }),
       );
 
@@ -187,13 +189,15 @@ describe('MCP Activities', () => {
         authToken: 'bearer-token-abc',
       });
 
-      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      const body = JSON.parse(
+        (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+      );
       expect(body.headers).toBeDefined();
       expect(body.headers.Authorization).toBe('Bearer bearer-token-abc');
     });
 
     it('does not include headers when authToken is not provided', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ success: true }),
       );
 
@@ -206,7 +210,9 @@ describe('MCP Activities', () => {
         endpoint: 'http://remote:8080',
       });
 
-      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      const body = JSON.parse(
+        (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+      );
       expect(body.headers).toBeUndefined();
     });
   });
@@ -215,7 +221,7 @@ describe('MCP Activities', () => {
 
   describe('registerLocalMcpActivity', () => {
     it('sends correct payload with stdio transport', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ success: true }),
       );
 
@@ -231,7 +237,9 @@ describe('MCP Activities', () => {
         containerId: 'container-abc',
       });
 
-      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      const body = JSON.parse(
+        (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+      );
       expect(body.transport).toBe('stdio');
       expect(body.endpoint).toBe('http://localhost:9090');
       expect(body.containerId).toBe('container-abc');
@@ -239,7 +247,7 @@ describe('MCP Activities', () => {
     });
 
     it('uses default port and generates containerId from image when not provided', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ success: true }),
       );
 
@@ -255,7 +263,9 @@ describe('MCP Activities', () => {
         containerId: '',
       });
 
-      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      const body = JSON.parse(
+        (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+      );
       // When port is 0 (falsy), default to 8080
       expect(body.endpoint).toBe('http://localhost:8080');
       // When containerId is '' (falsy), fallback to docker-{sanitized-image}
@@ -270,7 +280,7 @@ describe('MCP Activities', () => {
       // Note: SKIP_CONTAINER_CLEANUP is read at module load time as a const,
       // so we test the conditional behavior indirectly.
       // With the env var not set to 'true', it should proceed.
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: [] }),
       );
 
@@ -279,12 +289,12 @@ describe('MCP Activities', () => {
       await cleanupRunResourcesActivity({ runId: 'run-cleanup-1' });
 
       // Should have called the cleanup API
-      const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const url = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(url).toContain('cleanup');
     });
 
     it('removes containers returned by cleanup API', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: ['container-1', 'container-2'] }),
       );
 
@@ -310,7 +320,7 @@ describe('MCP Activities', () => {
     });
 
     it('skips containers with unsafe IDs', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: ['valid-container', '; rm -rf /'] }),
       );
 
@@ -329,7 +339,7 @@ describe('MCP Activities', () => {
     });
 
     it('skips volume cleanup for unsafe runId', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: [] }),
       );
 
@@ -354,7 +364,7 @@ describe('MCP Activities', () => {
 
   describe('areAllToolsReadyActivity', () => {
     it('passes runId and requiredNodeIds to tools-ready endpoint', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ ready: true }),
       );
 
@@ -365,16 +375,18 @@ describe('MCP Activities', () => {
 
       expect(result.ready).toBe(true);
 
-      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      const body = JSON.parse(
+        (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
+      );
       expect(body.runId).toBe('run-tools-1');
       expect(body.requiredNodeIds).toEqual(['node-a', 'node-b']);
 
-      const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const url = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(url).toContain('tools-ready');
     });
 
     it('returns ready=false when tools are not ready', async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ ready: false }),
       );
 
