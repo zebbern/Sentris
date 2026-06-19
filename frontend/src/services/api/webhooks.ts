@@ -6,6 +6,12 @@ import type {
 } from '@sentris/shared';
 import { apiClient, type ApiResponse } from './client';
 
+function getApiErrorMessage(error: ApiResponse['error'], fallback: string): string {
+  if (!error) return fallback;
+  if (typeof error === 'string') return error;
+  return error.message ?? fallback;
+}
+
 export const webhooksApi = {
   list: async (): Promise<WebhookConfiguration[]> => {
     const response = await apiClient.listWebhookConfigurations();
@@ -59,12 +65,14 @@ export const webhooksApi = {
     payload: Record<string, unknown>;
     headers: Record<string, string>;
   }): Promise<TestWebhookScriptResponse> => {
-    const response = await apiClient.testWebhookScript({
+    const response = (await apiClient.testWebhookScript({
       parsingScript: payload.script,
       testPayload: payload.payload,
       testHeaders: payload.headers,
-    });
-    if (response.error) throw new Error('Failed to test webhook script');
+    })) as ApiResponse<TestWebhookScriptResponse>;
+    if (response.error) {
+      throw new Error(getApiErrorMessage(response.error, 'Failed to test webhook script'));
+    }
     return response.data as TestWebhookScriptResponse;
   },
 

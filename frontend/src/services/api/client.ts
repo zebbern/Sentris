@@ -89,6 +89,7 @@ export async function getApiAuthHeaders(): Promise<Record<string, string>> {
 // Create type-safe API client
 export const apiClient = createSentrisClient({
   baseUrl: API_BASE_URL,
+  credentials: 'include',
   middleware: {
     async onRequest({ request }) {
       const headers = await getAuthHeaders();
@@ -104,8 +105,6 @@ export const apiClient = createSentrisClient({
       if (!request.headers.has('Content-Type')) {
         request.headers.set('Content-Type', 'application/json');
       }
-
-      return request;
     },
   },
 });
