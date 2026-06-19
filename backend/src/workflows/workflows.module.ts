@@ -30,7 +30,6 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
 import { FlowContextCacheService } from './flow-context-cache.service';
 import { ArchivingLockService } from './archiving-lock.service';
 import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
-// import { WorkflowsBootstrapService } from './workflows.bootstrap';
 
 @Module({
   imports: [
@@ -60,7 +59,9 @@ import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('WorkflowsModule').warn(`FLOW_CONTEXT_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('WorkflowsModule').warn(`FLOW_CONTEXT_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],
@@ -75,7 +76,9 @@ import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('WorkflowsModule').warn(`ARCHIVING_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('WorkflowsModule').warn(`ARCHIVING_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],

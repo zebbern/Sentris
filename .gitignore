@@ -13,6 +13,10 @@ build/
 # Context dumps (may contain secrets)
 .context
 
+# Local agent/task scratch state
+.tasks/
+.claude/
+
 # Environment variables
 .env
 .env.local

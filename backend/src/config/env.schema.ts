@@ -97,9 +97,6 @@ export const backendEnvSchema = z
 
     // --- Runtime ---
     NODE_ENV: z.string().optional().default('development'),
-
-    // --- Temporal ---
-    TEMPORAL_BOOTSTRAP_DEMO: stringToBoolean(false),
   })
   .merge(temporalConfigSchema)
   .superRefine((data, ctx) => {
