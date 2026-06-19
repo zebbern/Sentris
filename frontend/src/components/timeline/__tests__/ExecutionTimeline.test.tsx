@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Store mocks
@@ -95,6 +96,18 @@ const { ExecutionTimeline } = await import('../ExecutionTimeline?unmocked');
 // ---------------------------------------------------------------------------
 
 describe('ExecutionTimeline', () => {
+  afterAll(() => {
+    restoreMockedModules([
+      '@/store/executionTimelineStore',
+      '@/store/workflowUiStore',
+      '@/components/timeline/execution-timeline/PlaybackControls',
+      '@/components/timeline/execution-timeline/TimelineTrack',
+      '@/components/timeline/execution-timeline/TimelineOverview',
+      '@/components/timeline/execution-timeline/TimelineStatusBar',
+      '@/components/timeline/execution-timeline/utils',
+    ]);
+  });
+
   afterEach(() => {
     cleanup();
     timelineState = { ...defaultTimelineState };

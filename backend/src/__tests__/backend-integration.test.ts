@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import { AppModule } from '../app.module';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
@@ -140,6 +139,8 @@ interface Component {
   beforeAll(async () => {
     // eslint-disable-next-line no-console
     console.log('🚀 Starting backend integration test setup...');
+
+    const { AppModule } = await import('../app.module');
 
     // Create NestJS test application
     const moduleFixture: TestingModule = await Test.createTestingModule({

@@ -1,9 +1,10 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterAll, afterEach, mock } from 'bun:test';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GlobalAuthContext } from '../../../auth/auth-context-def';
 import type { FrontendAuthProvider } from '../../../auth/types';
 import type { ReactNode } from 'react';
+import { realModuleExports } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mocks — stub out heavy dependencies that ProtectedRoute imports
@@ -36,6 +37,10 @@ mock.module('../AdminLoginForm', () => ({
 import { ProtectedRoute } from '../ProtectedRoute';
 
 afterEach(cleanup);
+
+afterAll(() => {
+  mock.module('../../../store/authStore', () => realModuleExports('@/store/authStore'));
+});
 
 // ---------------------------------------------------------------------------
 // Helpers

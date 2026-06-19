@@ -1,8 +1,9 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
 import { screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { createAlertDialogMock } from '@/test/mocks/dialog';
 import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mock dialog / sheet / tooltip components (passthrough for test rendering)
@@ -179,6 +180,20 @@ function renderPanel(workflowId = 'wf-1') {
 // ---------------------------------------------------------------------------
 
 describe('VersionHistoryPanel', () => {
+  afterAll(() => {
+    restoreMockedModules([
+      '@/components/ui/alert-dialog',
+      '@/components/ui/sheet',
+      '@/components/ui/tooltip',
+      '@/hooks/queries/useWorkflowQueries',
+      '@/store/workflowStore',
+      '@/store/workflowUiStore',
+      '@/services/api',
+      '@/lib/queryKeys',
+      '@/components/ui/use-toast',
+    ]);
+  });
+
   beforeEach(() => {
     cleanup();
     resetMocks();

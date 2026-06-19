@@ -300,6 +300,7 @@ async function fetchConnectionAccessToken(
     process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
 
   const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const allowedInternalHost = getUrlHostname(normalizedBase);
 
   if (!internalToken) {
     context.emitProgress({
@@ -326,7 +327,12 @@ async function fetchConnectionAccessToken(
             'Content-Type': 'application/json',
           },
     },
-    { sensitiveHeaders },
+    {
+      sensitiveHeaders,
+      ...(allowedInternalHost
+        ? { ssrfGuard: { allowedInternalHosts: [allowedInternalHost] } }
+        : {}),
+    },
   );
 
   if (!response.ok) {
@@ -362,6 +368,14 @@ async function fetchConnectionAccessToken(
     scopes: payload.scopes,
     expiresAt: payload.expiresAt,
   };
+}
+
+function getUrlHostname(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
 }
 
 async function resolveLogin(

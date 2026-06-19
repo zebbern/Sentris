@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Store and query mocks
@@ -63,6 +64,16 @@ const { NodeIOInspector } = await import('../NodeIOInspector?unmocked');
 // ---------------------------------------------------------------------------
 
 describe('NodeIOInspector', () => {
+  afterAll(() => {
+    restoreMockedModules([
+      '@/store/executionTimelineStore',
+      '@/hooks/queries/useExecutionQueries',
+      '@/services/api',
+      '@/lib/logger',
+      '@/components/ui/MessageModal',
+    ]);
+  });
+
   afterEach(() => {
     cleanup();
     mockSelectedRunId = 'run-1';

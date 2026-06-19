@@ -1,6 +1,7 @@
-import { describe, it, expect, afterEach, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, afterAll, afterEach, beforeEach, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
 import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // Mock all dependencies before importing the hook
 mock.module('@/lib/queryClient', () => ({
@@ -65,6 +66,16 @@ afterEach(() => {
     Object.defineProperty(navigator, 'onLine', savedOnLine);
   }
 });
+
+afterAll(() =>
+  restoreMockedModules([
+    '@/auth/useAuth',
+    '@/hooks/queries/useComponentQueries',
+    '@/lib/queryClient',
+    '@/lib/queryKeys',
+    '@/services/api',
+  ]),
+);
 
 describe('usePrefetchOnIdle', () => {
   it('calls requestIdleCallback when authenticated and API is available', () => {

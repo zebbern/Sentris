@@ -1,7 +1,8 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
 import { cleanup, act } from '@testing-library/react';
 import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
 import { renderHookWithProviders } from '@/test/render-with-providers';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -155,6 +156,17 @@ function resetMocks() {
 // ---------------------------------------------------------------------------
 
 describe('useWorkflowRunner', () => {
+  afterAll(() => {
+    restoreMockedModules([
+      '@/store/executionStore',
+      '@/store/executionTimelineStore',
+      '@/services/api',
+      '@/features/analytics/events',
+      '@/lib/queryKeys',
+      '@/lib/logger',
+    ]);
+  });
+
   beforeEach(() => {
     cleanup();
     resetMocks();

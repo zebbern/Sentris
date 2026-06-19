@@ -179,7 +179,7 @@ describe('FindingsPage', () => {
     expect(screen.getAllByText('Severity').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Asset')).toBeInTheDocument();
-    expect(screen.getByText('Workflow')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Workflow' })).toBeInTheDocument();
     expect(screen.getByText('Run ID')).toBeInTheDocument();
   });
 });
