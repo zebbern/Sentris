@@ -5,6 +5,7 @@ export interface ClientConfig {
   baseUrl?: string;
   headers?: Record<string, string>;
   middleware?: Middleware | Middleware[];
+  credentials?: RequestCredentials;
 }
 
 type CreateWorkflowPayload = components['schemas']['CreateWorkflowRequestDto'];
@@ -40,6 +41,7 @@ export class SentrisApiClient {
     
     this.client = createClient<paths>({
       baseUrl: this.baseUrl,
+      credentials: config.credentials,
       headers: {
         'Content-Type': 'application/json',
         ...config.headers,
