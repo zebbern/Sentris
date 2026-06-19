@@ -14464,7 +14464,9 @@
                     "mcp_server",
                     "mcp_group",
                     "human_input",
-                    "notification_channel"
+                    "notification_channel",
+                    "notification_delivery",
+                    "finding_triage"
                   ]
                 },
                 "resourceId": {

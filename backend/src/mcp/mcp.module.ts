@@ -43,7 +43,9 @@ import type { RedisConfig } from '../config';
         const redis = configService.get<RedisConfig>('redis')!;
         const redisUrl = redis.url || redis.terminalUrl || 'redis://localhost:6379';
         const client = new Redis(redisUrl);
-        client.on('error', (err) => new Logger('McpModule').warn(`MCP_DISCOVERY_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('McpModule').warn(`MCP_DISCOVERY_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],
@@ -60,7 +62,9 @@ import type { RedisConfig } from '../config';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('McpModule').warn(`TOOL_REGISTRY_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('McpModule').warn(`TOOL_REGISTRY_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],
@@ -75,7 +79,9 @@ import type { RedisConfig } from '../config';
           return null;
         }
         const client = new Redis(url);
-        client.on('error', (err) => new Logger('McpModule').warn(`SESSION_REGISTRY_REDIS error: ${err.message}`));
+        client.on('error', (err) =>
+          new Logger('McpModule').warn(`SESSION_REGISTRY_REDIS error: ${err.message}`),
+        );
         return client;
       },
       inject: [ConfigService],

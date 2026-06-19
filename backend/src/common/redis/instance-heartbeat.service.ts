@@ -13,7 +13,6 @@
 
 import { Injectable, Logger, Inject, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { hostname } from 'node:os';
 
 import { INSTANCE_HEARTBEAT_REDIS } from './redis.tokens';
 import { buildInstanceId } from './instance-id.util';

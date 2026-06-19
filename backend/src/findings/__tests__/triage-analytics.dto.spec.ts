@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  AnalyticsPeriodQuerySchema,
-  TopAssigneesQuerySchema,
-} from '../dto/triage-analytics.dto';
+import { AnalyticsPeriodQuerySchema, TopAssigneesQuerySchema } from '../dto/triage-analytics.dto';
 import { UpsertSlaPoliciesSchema } from '@sentris/shared';
 
 // ---------------------------------------------------------------------------

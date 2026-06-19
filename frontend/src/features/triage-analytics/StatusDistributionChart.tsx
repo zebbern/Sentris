@@ -11,8 +11,7 @@ import { STATUS_COLORS, CHART_TOOLTIP_STYLE, formatStatusLabel } from './constan
 export function StatusDistributionChart() {
   const { data, isLoading, isError, error, refetch } = useStatusDistribution();
   const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const chartData = useMemo(() => {
     if (!data?.statuses) return [];
@@ -99,20 +98,11 @@ export function StatusDistributionChart() {
             }
           >
             {chartData.map((entry) => (
-              <Cell
-                key={entry.key}
-                fill={STATUS_COLORS[entry.key] ?? '#6b7280'}
-              />
+              <Cell key={entry.key} fill={STATUS_COLORS[entry.key] ?? '#6b7280'} />
             ))}
           </Pie>
-          <Tooltip
-            contentStyle={CHART_TOOLTIP_STYLE}
-          />
-          <Legend
-            formatter={(value: string) => (
-              <span className="text-xs">{value}</span>
-            )}
-          />
+          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+          <Legend formatter={(value: string) => <span className="text-xs">{value}</span>} />
         </PieChart>
       </ResponsiveContainer>
       <table className="sr-only">

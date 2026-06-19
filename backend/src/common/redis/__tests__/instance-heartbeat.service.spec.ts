@@ -1,8 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test';
-import {
-  InstanceHeartbeatService,
-  type InstanceInfo,
-} from '../instance-heartbeat.service';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { InstanceHeartbeatService, type InstanceInfo } from '../instance-heartbeat.service';
 
 /** Minimal Redis mock for heartbeat service tests */
 class MockRedis {

@@ -139,8 +139,7 @@ export const queryKeys = {
     mttr: (period: string) => ['triageAnalytics', getOrgScope(), 'mttr', period] as const,
     slaCompliance: (period: string) =>
       ['triageAnalytics', getOrgScope(), 'slaCompliance', period] as const,
-    statusDistribution: () =>
-      ['triageAnalytics', getOrgScope(), 'statusDistribution'] as const,
+    statusDistribution: () => ['triageAnalytics', getOrgScope(), 'statusDistribution'] as const,
     topAssignees: (limit?: number) =>
       ['triageAnalytics', getOrgScope(), 'topAssignees', limit] as const,
   },

@@ -80,12 +80,7 @@ export class EtagCacheService implements OnModuleDestroy {
 
     try {
       const cached: CachedResponse<unknown> = { etag, data };
-      await this.redis.set(
-        this.getKey(url),
-        JSON.stringify(cached),
-        'EX',
-        ETAG_CACHE_TTL_SECONDS,
-      );
+      await this.redis.set(this.getKey(url), JSON.stringify(cached), 'EX', ETAG_CACHE_TTL_SECONDS);
     } catch (error) {
       this.logger.warn(`Failed to set etag cache for ${this.hashUrl(url)}: ${error}`);
     }

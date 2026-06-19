@@ -23,8 +23,7 @@ interface PostureTrendChartProps {
 export function PostureTrendChart({ period }: PostureTrendChartProps) {
   const { data, isLoading, isError, error, refetch } = usePostureTrend(period);
   const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (isLoading) {
     return (
@@ -46,7 +45,10 @@ export function PostureTrendChart({ period }: PostureTrendChartProps) {
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Posture Trend</h3>
         </div>
-        <ErrorBanner message={error?.message ?? 'Failed to load posture trend'} onRetry={() => refetch()} />
+        <ErrorBanner
+          message={error?.message ?? 'Failed to load posture trend'}
+          onRetry={() => refetch()}
+        />
       </div>
     );
   }

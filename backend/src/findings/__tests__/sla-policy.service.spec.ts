@@ -63,9 +63,7 @@ describe('SlaPolicyService', () => {
       upsertPolicies: mock(() => Promise.resolve([])),
     };
 
-    service = new SlaPolicyService(
-      repoMock as unknown as SlaPolicyRepository,
-    );
+    service = new SlaPolicyService(repoMock as unknown as SlaPolicyRepository);
   });
 
   // -----------------------------------------------------------------------
@@ -200,9 +198,9 @@ describe('SlaPolicyService', () => {
     });
 
     it('throws ForbiddenException without organization context', async () => {
-      await expect(
-        service.upsertPolicies(AUTH_NO_ORG, { policies: [] }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.upsertPolicies(AUTH_NO_ORG, { policies: [] })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

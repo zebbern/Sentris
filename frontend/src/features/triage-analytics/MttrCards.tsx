@@ -78,9 +78,7 @@ export function MttrCards({ period }: MttrCardsProps) {
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                 <span className="text-2xl font-bold tracking-tight">{mttrDisplay}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {resolvedDisplay} resolved
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{resolvedDisplay} resolved</p>
             </CardContent>
           </Card>
         );
