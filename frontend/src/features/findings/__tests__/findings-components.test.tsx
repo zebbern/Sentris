@@ -1,8 +1,9 @@
-import { describe, it, expect, mock, afterEach, vi } from 'bun:test';
+import { describe, it, expect, mock, afterEach, afterAll, vi } from 'bun:test';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -93,6 +94,16 @@ function Wrapper({ children }: { children: ReactNode }) {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+afterAll(() => {
+  restoreMockedModules([
+    '@/services/api',
+    '@/services/api/findings',
+    '@/components/ui/use-toast',
+    '@/components/ui/dropdown-menu',
+    '@/components/ui/sheet',
+  ]);
 });
 
 // ---------------------------------------------------------------------------
@@ -254,7 +265,7 @@ describe('FindingDetailSheet', () => {
       expect(screen.getAllByText('SQL Injection').length).toBeGreaterThanOrEqual(1);
     });
 
-    expect(screen.getByText('High')).toBeTruthy();
+    expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('example.com')).toBeTruthy();
     expect(screen.getByText('Web Scan')).toBeTruthy();
   });

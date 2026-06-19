@@ -24,7 +24,7 @@
     "dev:stack": "bun run dev:infra && pm2 logs sentris-frontend-0",
     "dev:stack:stop": "bash -lc 'pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 || true && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml down'",
     "typecheck": "tsc --build",
-    "test": "rm -rf worker/dist && bun test",
+    "test": "rm -rf worker/dist && bun test packages && bun test backend && bun test worker && bun test e2e-tests && bun --cwd=frontend run test",
     "test:e2e": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true bun test --force-exit e2e-tests'",
     "test:e2e:core": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true bun test --force-exit e2e-tests/core'",
     "test:e2e:pipeline": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true bun test --force-exit e2e-tests/pipeline'",

@@ -1,6 +1,8 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterAll, afterEach, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { realModuleExports } from '@/test/restore-mocks';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
+import type { ComponentProps } from 'react';
 
 // ---------------------------------------------------------------------------
 // Store & hook mocks
@@ -218,6 +220,21 @@ function resetMocks() {
   mockStopExecution.mockClear();
 }
 
+function renderInspector(props: ComponentProps<typeof ExecutionInspector> = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ExecutionInspector {...props} />
+    </QueryClientProvider>,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -228,8 +245,27 @@ describe('ExecutionInspector', () => {
     resetMocks();
   });
 
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/timeline/ExecutionTimeline',
+      '@/components/timeline/RunSelector',
+      '@/features/workflow-builder/utils/executionRuns',
+      '@/hooks/queries/useRunQueries',
+      '@/hooks/useCopyToClipboard',
+      '@/hooks/useIsMobile',
+      '@/hooks/useWorkflowExecution',
+      '@/lib/logger',
+      '@/store/executionStore',
+      '@/store/executionTimelineStore',
+      '@/store/workflowStore',
+      '@/store/workflowUiStore',
+      '@/utils/triggerDisplay',
+      'react-router-dom',
+    ]),
+  );
+
   it('renders RunSelector and ExecutionTimeline', () => {
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('run-selector')).toBeTruthy();
     expect(screen.getByTestId('execution-timeline')).toBeTruthy();
@@ -237,13 +273,13 @@ describe('ExecutionInspector', () => {
 
   it('renders Events tab content by default', () => {
     mockInspectorTab = 'events';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('event-inspector')).toBeTruthy();
   });
 
   it('renders tab navigation buttons', () => {
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByText('Events')).toBeTruthy();
     expect(screen.getByText('Logs')).toBeTruthy();
@@ -254,7 +290,7 @@ describe('ExecutionInspector', () => {
   });
 
   it('calls setInspectorTab when switching tabs', () => {
-    render(<ExecutionInspector />);
+    renderInspector();
 
     fireEvent.click(screen.getByText('Agent'));
     expect(mockSetInspectorTab).toHaveBeenCalledWith('agent');
@@ -262,28 +298,28 @@ describe('ExecutionInspector', () => {
 
   it('renders Agent panel when agent tab is active', () => {
     mockInspectorTab = 'agent';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('agent-trace-panel')).toBeTruthy();
   });
 
   it('renders Artifacts panel when artifacts tab is active', () => {
     mockInspectorTab = 'artifacts';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('artifacts-panel')).toBeTruthy();
   });
 
   it('renders I/O panel when io tab is active', () => {
     mockInspectorTab = 'io';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('node-io-inspector')).toBeTruthy();
   });
 
   it('renders Network panel when network tab is active', () => {
     mockInspectorTab = 'network';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByTestId('network-panel')).toBeTruthy();
   });
@@ -291,21 +327,21 @@ describe('ExecutionInspector', () => {
   it('shows Stop button when run is active', () => {
     mockExecRunId = 'run-1';
     mockExecStatus = 'running';
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByText('Stop')).toBeTruthy();
   });
 
   it('shows Rerun button when onRerunRun is provided', () => {
     const onRerun = mock(() => {});
-    render(<ExecutionInspector onRerunRun={onRerun} />);
+    renderInspector({ onRerunRun: onRerun });
 
     expect(screen.getByText('Rerun')).toBeTruthy();
   });
 
   it('shows "Select a run to explore" when no run is selected', () => {
     mockSelectedRunId = null;
-    render(<ExecutionInspector />);
+    renderInspector();
 
     expect(screen.getByText('Select a run to explore')).toBeTruthy();
   });

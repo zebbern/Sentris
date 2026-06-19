@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { createQueryKeysMock } from '@/test/mocks/queryKeysMock';
-import { realModuleExports } from '@/test/restore-mocks';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 
 // ---------------------------------------------------------------------------
@@ -188,6 +188,25 @@ function resetMocks() {
 // ---------------------------------------------------------------------------
 
 describe('RunSelector', () => {
+  afterAll(() => {
+    restoreMockedModules([
+      '@/store/executionTimelineStore',
+      '@/store/executionStore',
+      '@/store/workflowStore',
+      '@/store/workflowUiStore',
+      '@/hooks/queries/useRunQueries',
+      '@tanstack/react-query',
+      '@/lib/queryKeys',
+      'react-router-dom',
+      '@/hooks/useCopyToClipboard',
+      '@/hooks/useIsMobile',
+      '@/utils/timeFormat',
+      '@/features/workflow-builder/utils/executionRuns',
+      '@/components/timeline/RunInfoDisplay',
+      '@/components/ui/dropdown-menu',
+    ]);
+  });
+
   afterEach(() => {
     cleanup();
     resetMocks();
