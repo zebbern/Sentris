@@ -10,6 +10,7 @@
  */
 import { ApplicationFailure, condition } from '@temporalio/workflow';
 import type { HumanInputResolution } from '../signals.js';
+import { workflowDiagnosticLog } from '../workflow-diagnostics.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,7 +114,7 @@ export async function handleHumanInput(
     organizationId: organizationId ?? null,
   });
 
-  console.log(
+  workflowDiagnosticLog(
     `[Workflow] Created human input request ${approvalResult.requestId} for ${actionRef}`,
   );
 
@@ -121,7 +122,7 @@ export async function handleHumanInput(
   let resolution = humanInputResolutions.get(actionRef);
 
   if (!resolution) {
-    console.log(`[Workflow] Waiting for human input signal for ${actionRef}...`);
+    workflowDiagnosticLog(`[Workflow] Waiting for human input signal for ${actionRef}...`);
 
     // Calculate timeout duration
     const timeoutMs = pendingData.timeoutAt
@@ -139,7 +140,7 @@ export async function handleHumanInput(
     }
 
     if (!signalReceived) {
-      console.log(`[Workflow] Human input timeout for ${actionRef}`);
+      workflowDiagnosticLog(`[Workflow] Human input timeout for ${actionRef}`);
       await expireHumanInputRequestActivity(approvalResult.requestId);
       throw ApplicationFailure.nonRetryable(
         `Human input request timed out for node ${actionRef}`,
@@ -151,7 +152,9 @@ export async function handleHumanInput(
     resolution = humanInputResolutions.get(actionRef)!;
   }
 
-  console.log(`[Workflow] Human input resolved for ${actionRef}: approved=${resolution.approved}`);
+  workflowDiagnosticLog(
+    `[Workflow] Human input resolved for ${actionRef}: approved=${resolution.approved}`,
+  );
 
   // Store the final result (merging responseData for dynamic ports)
   results.set(actionRef, {
