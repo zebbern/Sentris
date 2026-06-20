@@ -21,6 +21,7 @@ import { handleSubWorkflowCall } from './sub-workflow-handler.js';
 import { handleToolModeRegistration } from './tool-mode-handler.js';
 import { handleHumanInput } from './human-input-handler.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
+import { workflowDiagnosticLog } from '../workflow-diagnostics.js';
 import {
   resolveHumanInputSignal,
   executeToolCallSignal,
@@ -127,7 +128,7 @@ export async function sentrisWorkflowRun(
 
   // Set up signal handler for human input resolutions
   setHandler(resolveHumanInputSignal, (resolution: HumanInputResolution) => {
-    console.log(
+    workflowDiagnosticLog(
       `[Workflow] Received human input signal for ${resolution.nodeRef}: approved=${resolution.approved}`,
     );
     humanInputResolutions.set(resolution.nodeRef, resolution);
@@ -152,7 +153,7 @@ export async function sentrisWorkflowRun(
       return;
     }
 
-    console.log(
+    workflowDiagnosticLog(
       `[Workflow] Received tool call signal: callId=${request.callId}, componentId=${request.componentId}`,
     );
 
@@ -198,7 +199,9 @@ export async function sentrisWorkflowRun(
       };
 
       toolCallResults.set(request.callId, result);
-      console.log(`[Workflow] Tool call completed: callId=${request.callId}, success=true`);
+      workflowDiagnosticLog(
+        `[Workflow] Tool call completed: callId=${request.callId}, success=true`,
+      );
 
       // Resolve any pending waiters
       const pending = pendingToolCalls.get(request.callId);
@@ -215,7 +218,9 @@ export async function sentrisWorkflowRun(
       };
 
       toolCallResults.set(request.callId, result);
-      console.log(`[Workflow] Tool call failed: callId=${request.callId}, error=${errorMessage}`);
+      workflowDiagnosticLog(
+        `[Workflow] Tool call failed: callId=${request.callId}, error=${errorMessage}`,
+      );
 
       const pending = pendingToolCalls.get(request.callId);
       if (pending) {
@@ -232,8 +237,8 @@ export async function sentrisWorkflowRun(
     },
   );
 
-  console.log(`[Workflow] Starting sentris workflow run: ${input.runId}`);
-  console.log(
+  workflowDiagnosticLog(`[Workflow] Starting sentris workflow run: ${input.runId}`);
+  workflowDiagnosticLog(
     `[Workflow] Definition actions:`,
     input.definition.actions.map((a) => a.ref),
   );
@@ -256,7 +261,7 @@ export async function sentrisWorkflowRun(
   try {
     await runWorkflowWithScheduler(input.definition, {
       onNodeSkipped: async (actionRef) => {
-        console.log(`[Workflow] Node skipped: ${actionRef}`);
+        workflowDiagnosticLog(`[Workflow] Node skipped: ${actionRef}`);
         await recordTraceEventActivity({
           type: 'NODE_SKIPPED',
           runId: input.runId,
@@ -269,7 +274,10 @@ export async function sentrisWorkflowRun(
         });
       },
       run: async (actionRef, schedulerContext) => {
-        console.log(`[Workflow] Running action ${actionRef} with context:`, schedulerContext);
+        workflowDiagnosticLog(
+          `[Workflow] Running action ${actionRef} with context:`,
+          schedulerContext,
+        );
         const action = actionsByRef.get(actionRef);
         if (!action) {
           throw ApplicationFailure.nonRetryable(`Action not found: ${actionRef}`, 'NotFoundError', [
@@ -287,7 +295,7 @@ export async function sentrisWorkflowRun(
 
         if (isEntrypointRef && input.inputs) {
           if (isEntrypointComponent) {
-            console.log(
+            workflowDiagnosticLog(
               `[Workflow] Applying inputs to entrypoint component '${action.ref}' (${action.componentId})`,
             );
             mergedInputs.__runtimeData = input.inputs;
@@ -384,7 +392,7 @@ export async function sentrisWorkflowRun(
         // This prevents a race condition where the agent starts before child servers are discovered.
         // The agent's areAllToolsReadyActivity check will poll until this registration happens.
         if (isToolMode && isMcpGroup) {
-          console.log(
+          workflowDiagnosticLog(
             `[Workflow] MCP Group node ${action.ref} is in tool mode, will register as ready AFTER execution completes (to avoid race with agent tool discovery)`,
           );
         }
@@ -408,7 +416,7 @@ export async function sentrisWorkflowRun(
 
         // Wait for connected tools to be ready if this node has tool dependencies
         if (nodeMetadata?.connectedToolNodeIds && nodeMetadata.connectedToolNodeIds.length > 0) {
-          console.log(
+          workflowDiagnosticLog(
             `[Workflow] Node ${action.ref} has tool dependencies: ${nodeMetadata.connectedToolNodeIds.join(', ')}, waiting for tools to be ready...`,
           );
           const MAX_WAIT_TIME_MS = 120000; // 2 minutes
@@ -422,13 +430,13 @@ export async function sentrisWorkflowRun(
             });
 
             if (readyCheck.ready) {
-              console.log(
+              workflowDiagnosticLog(
                 `[Workflow] All tools ready for ${action.ref}: ${nodeMetadata.connectedToolNodeIds.join(', ')}`,
               );
               break;
             }
 
-            console.log(
+            workflowDiagnosticLog(
               `[Workflow] Tools not ready yet for ${action.ref}, retrying in ${POLL_INTERVAL_MS}ms...`,
             );
             await sleep(POLL_INTERVAL_MS);
@@ -452,7 +460,7 @@ export async function sentrisWorkflowRun(
         }
 
         // Debug logging: Track component execution start
-        console.log(
+        workflowDiagnosticLog(
           `[Workflow] Executing component ${action.componentId} (node ${action.ref})${isMcpGroup ? ' [MCP Group]' : ''}${isToolMode ? ' [Tool Mode]' : ''}`,
         );
 
@@ -461,7 +469,7 @@ export async function sentrisWorkflowRun(
         // MCP groups in tool mode: NOW register the parent as ready after execution completes.
         // This ensures child servers are discovered and registered before the agent starts.
         if (isToolMode && isMcpGroup) {
-          console.log(
+          workflowDiagnosticLog(
             `[Workflow] MCP Group node ${action.ref} execution complete, now registering parent as ready...`,
           );
           await prepareAndRegisterToolActivity({
@@ -471,14 +479,14 @@ export async function sentrisWorkflowRun(
             inputs: mergedInputs,
             params: mergedParams,
           });
-          console.log(
+          workflowDiagnosticLog(
             `[Workflow] MCP Group node ${action.ref} registered as ready (child servers already registered during execution)`,
           );
         }
 
         // Check if this is a pending human input request (approval gate, form, choice, etc.)
         if (isApprovalPending(output.output)) {
-          console.log(
+          workflowDiagnosticLog(
             `[Workflow] Pending human input detected at ${action.ref} (type=${(output.output as Record<string, unknown>).inputType ?? 'approval'})`,
           );
 
@@ -549,7 +557,7 @@ export async function sentrisWorkflowRun(
       [{ outputs, error: normalizedError.message }],
     );
   } finally {
-    console.log(
+    workflowDiagnosticLog(
       `[Workflow] Cleaning up MCP containers for run ${input.runId} (success=${workflowCompletedSuccessfully})`,
     );
     await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {

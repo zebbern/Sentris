@@ -9,6 +9,7 @@
  */
 import { proxyActivities } from '@temporalio/workflow';
 import { MCP_SERVER_COMPONENTS, isMcpServerComponent } from './workflow-helpers.js';
+import { workflowDiagnosticLog } from '../workflow-diagnostics.js';
 import type {
   RunComponentActivityInput,
   RunComponentActivityOutput,
@@ -72,7 +73,7 @@ export async function handleToolModeRegistration(
     },
   } = params;
 
-  console.log(`[Workflow] Node ${action.ref} is in tool mode, registering...`);
+  workflowDiagnosticLog(`[Workflow] Node ${action.ref} is in tool mode, registering...`);
 
   let startedContainerId: string | undefined;
 
@@ -127,7 +128,7 @@ export async function handleToolModeRegistration(
       });
     }
 
-    console.log(`[Workflow] Node ${action.ref} registered as tool, setting results.`);
+    workflowDiagnosticLog(`[Workflow] Node ${action.ref} registered as tool, setting results.`);
     const toolResult = { mode: 'tool', status: 'ready', tools: [] };
     results.set(action.ref, toolResult);
 
