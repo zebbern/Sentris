@@ -48,6 +48,21 @@ describe('frontend test runner planning', () => {
     expect(usesMockModule(plain)).toBe(false);
   });
 
+  it('ignores mock.module text inside comments and string literals', () => {
+    tempDir = mkdtempSync(path.join(tmpdir(), 'sentris-test-plan-'));
+    const file = path.join(tempDir, 'fixture.test.ts');
+
+    writeFileSync(
+      file,
+      [
+        'const fixture = "mock.module(\'@/store\', () => ({}));";',
+        "// mock.module('@/commented', () => ({}));",
+      ].join('\n'),
+    );
+
+    expect(usesMockModule(file)).toBe(false);
+  });
+
   it('batches adjacent non-mocked files while isolating mock.module files', () => {
     const files = [
       'src/a.test.ts',
