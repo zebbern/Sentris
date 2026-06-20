@@ -2,6 +2,10 @@ import type { TerminalChunkInput, ExecutionContext } from './types';
 
 export type TerminalChunkEmitter = (data: Uint8Array | string) => void;
 
+function shouldDebugTerminalChunks(): boolean {
+  return process.env.SENTRIS_DEBUG_TERMINAL === '1';
+}
+
 export function createTerminalChunkEmitter(
   context: ExecutionContext,
   stream: TerminalChunkInput['stream'] = 'pty',
@@ -45,7 +49,10 @@ export function createTerminalChunkEmitter(
       runnerKind: 'docker',
     };
 
-    if (chunkIndex <= 3 || dataString.includes('[') || dataString.includes('progress')) {
+    if (
+      shouldDebugTerminalChunks() &&
+      (chunkIndex <= 3 || dataString.includes('[') || dataString.includes('progress'))
+    ) {
       console.debug('[TerminalChunkEmitter] emitting chunk', {
         nodeRef: context.componentRef,
         stream,

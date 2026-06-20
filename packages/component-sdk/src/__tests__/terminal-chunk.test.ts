@@ -50,13 +50,67 @@ describe('Terminal chunk emitter', () => {
     expect(timeDiff).toBeGreaterThanOrEqual(25);
   });
 
-    it('no-ops when terminalCollector is missing', () => {
+  it('does not write debug logs by default', () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      const collector = vi.fn();
       const context = createExecutionContext({
         runId: 'run-1',
         componentRef: 'node.a',
+        terminalCollector: collector,
       });
 
       const emitter = createTerminalChunkEmitter(context, 'stdout');
-      expect(() => emitter('data')).not.toThrow();
+      emitter('data');
+
+      expect(debugSpy).not.toHaveBeenCalled();
+    } finally {
+      debugSpy.mockRestore();
+    }
+  });
+
+  it('writes debug logs when terminal debug logging is enabled', () => {
+    const previousDebugFlag = process.env.SENTRIS_DEBUG_TERMINAL;
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      process.env.SENTRIS_DEBUG_TERMINAL = '1';
+      const collector = vi.fn();
+      const context = createExecutionContext({
+        runId: 'run-1',
+        componentRef: 'node.a',
+        terminalCollector: collector,
+      });
+
+      const emitter = createTerminalChunkEmitter(context, 'stdout');
+      emitter('data');
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[TerminalChunkEmitter] emitting chunk',
+        expect.objectContaining({
+          nodeRef: 'node.a',
+          chunkIndex: 1,
+          dataLength: 4,
+        }),
+      );
+    } finally {
+      if (previousDebugFlag === undefined) {
+        delete process.env.SENTRIS_DEBUG_TERMINAL;
+      } else {
+        process.env.SENTRIS_DEBUG_TERMINAL = previousDebugFlag;
+      }
+      debugSpy.mockRestore();
+    }
+  });
+
+  it('no-ops when terminalCollector is missing', () => {
+    const context = createExecutionContext({
+      runId: 'run-1',
+      componentRef: 'node.a',
     });
+
+    const emitter = createTerminalChunkEmitter(context, 'stdout');
+    expect(() => emitter('data')).not.toThrow();
+  });
 });
