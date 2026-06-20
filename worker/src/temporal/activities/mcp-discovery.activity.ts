@@ -12,6 +12,7 @@ import type {
   GroupDiscoveryActivityResult,
   McpTool,
 } from '../types';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 import Redis from 'ioredis';
 
 // Initialize Redis for caching
@@ -36,7 +37,7 @@ export async function cacheDiscoveryResultActivity(input: {
     cachedAt: new Date().toISOString(),
   });
   await redis.setex(key, 300, value); // 5 minutes TTL
-  console.log(
+  workflowDiagnosticLog(
     `[MCP Discovery] Cached discovery results: ${input.tools.length} tools for token ${input.cacheToken}`,
   );
 }
