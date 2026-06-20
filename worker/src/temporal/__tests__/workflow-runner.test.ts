@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it, vi } from 'bun:test';
 import { z } from 'zod';
 import {
   componentRegistry,
@@ -39,6 +39,74 @@ describe('executeWorkflow', () => {
       };
 
       componentRegistry.register(component);
+    }
+
+    if (!componentRegistry.has('test.silent.echo')) {
+      const component: ComponentDefinition = {
+        id: 'test.silent.echo',
+        label: 'Test Silent Echo',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          value: withPortMeta(z.string(), { label: 'Value' }),
+        }),
+        outputs: outputs({
+          echoed: withPortMeta(z.string(), { label: 'Echoed' }),
+        }),
+        async execute({ inputs }) {
+          return { echoed: inputs.value };
+        },
+      };
+
+      componentRegistry.register(component);
+    }
+  });
+
+  it('does not write workflow diagnostics to console.log by default', async () => {
+    const previousDebugFlag = process.env.SENTRIS_DEBUG_WORKFLOW;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      delete process.env.SENTRIS_DEBUG_WORKFLOW;
+
+      const definition: WorkflowDefinition = {
+        version: 1,
+        title: 'Quiet workflow diagnostics',
+        entrypoint: { ref: 'node-1' },
+        config: {
+          environment: 'test',
+          timeoutSeconds: 30,
+        },
+        nodes: {
+          'node-1': { ref: 'node-1' },
+        },
+        edges: [],
+        dependencyCounts: {
+          'node-1': 0,
+        },
+        actions: [
+          {
+            ref: 'node-1',
+            componentId: 'test.silent.echo',
+            params: {},
+            inputOverrides: { value: 'quiet' },
+            dependsOn: [],
+            inputMappings: {},
+          },
+        ],
+      };
+
+      const result = await executeWorkflow(definition, {}, { runId: 'quiet-diagnostics' });
+
+      expect(result.success).toBe(true);
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      if (previousDebugFlag === undefined) {
+        delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      } else {
+        process.env.SENTRIS_DEBUG_WORKFLOW = previousDebugFlag;
+      }
+      logSpy.mockRestore();
     }
   });
 

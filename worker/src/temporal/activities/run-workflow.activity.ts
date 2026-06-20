@@ -8,6 +8,7 @@ import type {
 import type { IFileStorageService, ITraceService, ISecretsService } from '@sentris/component-sdk';
 import type { ArtifactServiceFactory } from '../artifact-factory';
 import { isTraceMetadataAware } from '../utils/trace-metadata';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 interface WorkflowActivityServices {
   storage: IFileStorageService;
@@ -48,14 +49,18 @@ function getWorkflowServices(): WorkflowActivityServices {
 export async function runWorkflowActivity(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
-  console.log(`╔══════════════════════════════════════════════════════════════════════════════╗`);
-  console.log(`🔧 [ACTIVITY START] runWorkflowActivity called`);
-  console.log(`📋 Run ID: ${input.runId}`);
-  console.log(`📋 Workflow ID: ${input.workflowId}`);
-  console.log(`📋 Actions count: ${input.definition.actions.length}`);
-  console.log(`📋 Action refs: ${input.definition.actions.map((a) => a.ref).join(', ')}`);
-  console.log(`📋 Inputs keys: ${Object.keys(input.inputs || {}).join(', ')}`);
-  console.log(`╚══════════════════════════════════════════════════════════════════════════════╝`);
+  workflowDiagnosticLog(
+    `╔══════════════════════════════════════════════════════════════════════════════╗`,
+  );
+  workflowDiagnosticLog(`🔧 [ACTIVITY START] runWorkflowActivity called`);
+  workflowDiagnosticLog(`📋 Run ID: ${input.runId}`);
+  workflowDiagnosticLog(`📋 Workflow ID: ${input.workflowId}`);
+  workflowDiagnosticLog(`📋 Actions count: ${input.definition.actions.length}`);
+  workflowDiagnosticLog(`📋 Action refs: ${input.definition.actions.map((a) => a.ref).join(', ')}`);
+  workflowDiagnosticLog(`📋 Inputs keys: ${Object.keys(input.inputs || {}).join(', ')}`);
+  workflowDiagnosticLog(
+    `╚══════════════════════════════════════════════════════════════════════════════╝`,
+  );
   const startTime = Date.now();
 
   const svc = getWorkflowServices();
@@ -68,7 +73,7 @@ export async function runWorkflowActivity(
       });
     }
 
-    console.log(`⏳ [ACTIVITY] About to call executeWorkflow for ${input.runId}`);
+    workflowDiagnosticLog(`⏳ [ACTIVITY] About to call executeWorkflow for ${input.runId}`);
     const result = await executeWorkflow(
       input.definition,
       {
@@ -88,10 +93,10 @@ export async function runWorkflowActivity(
       },
     );
     const duration = Date.now() - startTime;
-    console.log(
+    workflowDiagnosticLog(
       `✅ [ACTIVITY DONE] runWorkflow completed for run: ${input.runId} in ${duration}ms`,
     );
-    console.log(`📊 [ACTIVITY] Result keys: ${Object.keys(result || {}).join(', ')}`);
+    workflowDiagnosticLog(`📊 [ACTIVITY] Result keys: ${Object.keys(result || {}).join(', ')}`);
     return result;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
@@ -110,7 +115,7 @@ export async function runWorkflowActivity(
     throw error;
   } finally {
     if (isTraceMetadataAware(svc.trace) && typeof svc.trace.finalizeRun === 'function') {
-      console.log(`🧹 [ACTIVITY] Finalizing trace metadata for ${input.runId}`);
+      workflowDiagnosticLog(`🧹 [ACTIVITY] Finalizing trace metadata for ${input.runId}`);
       svc.trace.finalizeRun(input.runId);
     }
   }
