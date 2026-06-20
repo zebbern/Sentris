@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom';
 import globalJsdom from 'global-jsdom';
 
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 const cleanup = globalJsdom('<!doctype html><html><body></body></html>', {
   url: 'http://localhost',
 });
