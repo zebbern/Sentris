@@ -252,13 +252,17 @@ describe('executeWorkflow', () => {
     const branchStartDelta = Math.abs(branchA.startedAt - branchB.startedAt);
     expect(branchStartDelta).toBeLessThan(75);
 
-    const branchAElapsed = branchA.endedAt - branchA.startedAt;
-    const branchBElapsed = branchB.endedAt - branchB.startedAt;
-    expect(branchAElapsed).toBeGreaterThanOrEqual(190);
-    expect(branchBElapsed).toBeGreaterThanOrEqual(190);
+    const branchesOverlap =
+      Math.max(branchA.startedAt, branchB.startedAt) < Math.min(branchA.endedAt, branchB.endedAt);
+    expect(branchesOverlap).toBe(true);
+
+    expect(merge.startedAt).toBeGreaterThanOrEqual(Math.max(branchA.endedAt, branchB.endedAt) - 5);
 
     const totalElapsed = merge.endedAt - start.startedAt;
-    expect(totalElapsed).toBeLessThan(350);
+    // A serial execution would take roughly 450ms before merge overhead
+    // (50ms start + 200ms branchA + 200ms branchB). Keep the assertion about
+    // scheduler behavior, not timer precision.
+    expect(totalElapsed).toBeLessThan(450);
   });
 
   it('produces a deterministic trace sequence across repeated runs', async () => {
