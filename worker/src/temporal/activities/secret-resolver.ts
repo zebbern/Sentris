@@ -12,6 +12,7 @@ import {
   type ComponentPortMetadata,
   type ISecretsService,
 } from '@sentris/component-sdk';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 /**
  * Resolve secret references found in `inputOverrides` and write the
@@ -67,11 +68,13 @@ export async function resolveSecretInputOverrides(
 
     // This is a secret reference, resolve it
     try {
-      console.log(`[Activity] Resolving secret reference for input '${key}'...`);
+      workflowDiagnosticLog(`[Activity] Resolving secret reference for input '${key}'...`);
       const resolved = await secrets.get(value);
       if (resolved?.value) {
         inputs[key] = resolved.value;
-        console.log(`[Activity] Successfully resolved secret reference for input '${key}'`);
+        workflowDiagnosticLog(
+          `[Activity] Successfully resolved secret reference for input '${key}'`,
+        );
       } else {
         console.warn(`[Activity] Secret reference not found in store for input '${key}'`);
       }
@@ -121,11 +124,13 @@ export async function resolveSecretParams(
     }
 
     try {
-      console.log(`[Activity] Resolving secret reference for param '${key}'...`);
+      workflowDiagnosticLog(`[Activity] Resolving secret reference for param '${key}'...`);
       const resolved = await secrets.get(value);
       if (resolved?.value) {
         params[key] = resolved.value;
-        console.log(`[Activity] Successfully resolved secret reference for param '${key}'`);
+        workflowDiagnosticLog(
+          `[Activity] Successfully resolved secret reference for param '${key}'`,
+        );
       } else {
         console.warn(`[Activity] Secret reference not found in store for param '${key}'`);
       }

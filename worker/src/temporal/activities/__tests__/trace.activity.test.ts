@@ -40,14 +40,28 @@ describe('recordTraceEventActivity', () => {
   });
 
   it('records trace event via the trace service when initialized', async () => {
+    const previousDebugValue = process.env.SENTRIS_DEBUG_WORKFLOW;
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const trace = createMockTrace();
-    initializeTraceActivity({ trace: trace as any });
 
-    const event = createTraceEvent({ type: 'NODE_COMPLETED', nodeRef: 'node-2' });
-    await recordTraceEventActivity(event);
+    try {
+      delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      initializeTraceActivity({ trace: trace as any });
 
-    expect(trace.record).toHaveBeenCalledTimes(1);
-    expect(trace.record).toHaveBeenCalledWith(event);
+      const event = createTraceEvent({ type: 'NODE_COMPLETED', nodeRef: 'node-2' });
+      await recordTraceEventActivity(event);
+
+      expect(trace.record).toHaveBeenCalledTimes(1);
+      expect(trace.record).toHaveBeenCalledWith(event);
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      if (previousDebugValue === undefined) {
+        delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      } else {
+        process.env.SENTRIS_DEBUG_WORKFLOW = previousDebugValue;
+      }
+    }
   });
 
   it('records different event types correctly', async () => {

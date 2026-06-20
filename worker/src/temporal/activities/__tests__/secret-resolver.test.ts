@@ -71,22 +71,36 @@ function createComponent(opts: {
 
 describe('resolveSecretInputOverrides', () => {
   it('resolves a secret-type input override via secrets.get()', async () => {
+    const previousDebugValue = process.env.SENTRIS_DEBUG_WORKFLOW;
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const secrets = createMockSecrets({ 'secret-id-1': 'my-api-key' });
     const component = createComponent({
       inputPorts: [{ id: 'apiKey', editor: 'secret' }],
     });
 
-    const inputs: Record<string, unknown> = {};
-    const overrides = { apiKey: 'secret-id-1' };
+    try {
+      delete process.env.SENTRIS_DEBUG_WORKFLOW;
 
-    await resolveSecretInputOverrides(inputs, overrides, {
-      secrets,
-      component,
-      resolvedParams: {},
-    });
+      const inputs: Record<string, unknown> = {};
+      const overrides = { apiKey: 'secret-id-1' };
 
-    expect(inputs.apiKey).toBe('my-api-key');
-    expect(secrets.get).toHaveBeenCalledWith('secret-id-1');
+      await resolveSecretInputOverrides(inputs, overrides, {
+        secrets,
+        component,
+        resolvedParams: {},
+      });
+
+      expect(inputs.apiKey).toBe('my-api-key');
+      expect(secrets.get).toHaveBeenCalledWith('secret-id-1');
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      if (previousDebugValue === undefined) {
+        delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      } else {
+        process.env.SENTRIS_DEBUG_WORKFLOW = previousDebugValue;
+      }
+    }
   });
 
   it('leaves non-secret input overrides untouched', async () => {
@@ -267,23 +281,37 @@ describe('resolveSecretInputOverrides', () => {
 
 describe('resolveSecretParams', () => {
   it('resolves secret-type parameter and writes to params', async () => {
+    const previousDebugValue = process.env.SENTRIS_DEBUG_WORKFLOW;
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const secrets = createMockSecrets({ 'param-secret': 'secret-val' });
     const component = createComponent({
       paramPorts: [{ id: 'password', editor: 'secret' }],
     });
 
-    const params: Record<string, unknown> = {};
+    try {
+      delete process.env.SENTRIS_DEBUG_WORKFLOW;
 
-    await resolveSecretParams(
-      params,
-      { password: 'param-secret' },
-      {
-        secrets,
-        component,
-      },
-    );
+      const params: Record<string, unknown> = {};
 
-    expect(params.password).toBe('secret-val');
+      await resolveSecretParams(
+        params,
+        { password: 'param-secret' },
+        {
+          secrets,
+          component,
+        },
+      );
+
+      expect(params.password).toBe('secret-val');
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      if (previousDebugValue === undefined) {
+        delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      } else {
+        process.env.SENTRIS_DEBUG_WORKFLOW = previousDebugValue;
+      }
+    }
   });
 
   it('leaves non-secret parameters untouched', async () => {

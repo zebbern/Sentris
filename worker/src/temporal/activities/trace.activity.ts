@@ -1,4 +1,5 @@
 import type { ITraceService, TraceEvent } from '@sentris/component-sdk';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 // Trace service instance will be injected at runtime
 let trace: ITraceService | undefined;
@@ -20,5 +21,5 @@ export async function recordTraceEventActivity(event: TraceEvent): Promise<void>
   }
 
   trace.record(event);
-  console.log(`[TraceActivity] Recorded event ${event.type} for ${event.nodeRef}`);
+  workflowDiagnosticLog(`[TraceActivity] Recorded event ${event.type} for ${event.nodeRef}`);
 }
