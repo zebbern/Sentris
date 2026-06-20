@@ -63,6 +63,40 @@ function makeTicketLink(overrides: Record<string, unknown> = {}) {
   };
 }
 
+class MockRedis {
+  private readonly kv = new Map<string, string>();
+  private readonly ttls = new Map<string, number>();
+
+  async set(key: string, value: string, mode?: string, ttl?: number): Promise<string> {
+    this.kv.set(key, value);
+    if (mode === 'EX' && ttl) {
+      this.ttls.set(key, ttl);
+    }
+    return 'OK';
+  }
+
+  async get(key: string): Promise<string | null> {
+    return this.kv.get(key) ?? null;
+  }
+
+  async del(key: string): Promise<number> {
+    const existed = this.kv.has(key);
+    this.kv.delete(key);
+    this.ttls.delete(key);
+    return existed ? 1 : 0;
+  }
+
+  async quit(): Promise<void> {}
+
+  getTtl(key: string): number | undefined {
+    return this.ttls.get(key);
+  }
+
+  has(key: string): boolean {
+    return this.kv.has(key);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -135,12 +169,13 @@ function createMocks() {
   return { repoMock, adapterMock, encryptionMock, configMock };
 }
 
-function createService(mocks: ReturnType<typeof createMocks>) {
+function createService(mocks: ReturnType<typeof createMocks>, redis: MockRedis | null = null) {
   return new TicketingService(
     mocks.repoMock as unknown as TicketingRepository,
     mocks.adapterMock as unknown as JiraAdapter,
     mocks.encryptionMock as unknown as TokenEncryptionService,
     mocks.configMock as any,
+    redis as any,
   );
 }
 
@@ -189,8 +224,12 @@ describe('TicketingService', () => {
   // -----------------------------------------------------------------------
 
   describe('startOAuthFlow', () => {
-    it('returns authorization URL with correct scopes', () => {
-      const result = service.startOAuthFlow(ORG_ID, USER_ID, 'https://app.example.com/callback');
+    it('returns authorization URL with correct scopes', async () => {
+      const result = await service.startOAuthFlow(
+        ORG_ID,
+        USER_ID,
+        'https://app.example.com/callback',
+      );
 
       expect(result.authorizationUrl).toContain('https://auth.atlassian.com/authorize');
       expect(result.authorizationUrl).toContain('read%3Ajira-work');
@@ -200,8 +239,12 @@ describe('TicketingService', () => {
       expect(typeof result.state).toBe('string');
     });
 
-    it('returns a UUID state parameter', () => {
-      const result = service.startOAuthFlow(ORG_ID, USER_ID, 'https://app.example.com/callback');
+    it('returns a UUID state parameter', async () => {
+      const result = await service.startOAuthFlow(
+        ORG_ID,
+        USER_ID,
+        'https://app.example.com/callback',
+      );
 
       // UUID v4 format check
       expect(result.state).toMatch(
@@ -209,13 +252,13 @@ describe('TicketingService', () => {
       );
     });
 
-    it('throws when Jira OAuth is not configured', () => {
+    it('throws when Jira OAuth is not configured', async () => {
       mocks.configMock.get.mockReturnValue('');
       const svc = createService(mocks);
 
-      expect(() => svc.startOAuthFlow(ORG_ID, USER_ID, 'https://app.example.com/callback')).toThrow(
-        BadRequestException,
-      );
+      await expect(
+        svc.startOAuthFlow(ORG_ID, USER_ID, 'https://app.example.com/callback'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -232,7 +275,11 @@ describe('TicketingService', () => {
 
     it('throws when no accessible Jira cloud resources found', async () => {
       // Set up a valid state first
-      const { state } = service.startOAuthFlow(ORG_ID, USER_ID, 'https://app.example.com/callback');
+      const { state } = await service.startOAuthFlow(
+        ORG_ID,
+        USER_ID,
+        'https://app.example.com/callback',
+      );
 
       // Mock the code exchange
       const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -247,6 +294,36 @@ describe('TicketingService', () => {
       await expect(service.handleOAuthCallback('code-123', state)).rejects.toThrow(
         'No accessible Jira Cloud sites found',
       );
+
+      fetchSpy.mockRestore();
+    });
+
+    it('consumes OAuth state across service instances through Redis', async () => {
+      const redis = new MockRedis();
+      const startService = createService(mocks, redis);
+      const callbackService = createService(mocks, redis);
+
+      const { state } = await startService.startOAuthFlow(
+        ORG_ID,
+        USER_ID,
+        'https://app.example.com/callback',
+      );
+      const redisKey = `sentris:ticketing:oauth-state:${state}`;
+
+      expect(redis.getTtl(redisKey)).toBe(300);
+
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(callbackService.handleOAuthCallback('code-123', state)).resolves.toEqual({
+        success: true,
+      });
+
+      expect(redis.has(redisKey)).toBe(false);
 
       fetchSpy.mockRestore();
     });

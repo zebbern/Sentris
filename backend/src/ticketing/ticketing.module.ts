@@ -1,5 +1,9 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { forwardRef, Logger, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 
+import { TICKETING_OAUTH_REDIS } from '../common/redis/redis.tokens';
+import type { RedisConfig } from '../config';
 import { DatabaseModule } from '../database/database.module';
 import { FindingTriageModule } from '../findings/finding-triage.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
@@ -12,9 +16,31 @@ import { JiraWebhookController } from './jira/jira-webhook.controller';
 import { JiraWebhookService } from './jira/jira-webhook.service';
 
 @Module({
-  imports: [DatabaseModule, IntegrationsModule, forwardRef(() => FindingTriageModule)],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    IntegrationsModule,
+    forwardRef(() => FindingTriageModule),
+  ],
   controllers: [TicketingController, JiraWebhookController],
   providers: [
+    {
+      provide: TICKETING_OAUTH_REDIS,
+      useFactory: (configService: ConfigService) => {
+        const redis = configService.get<RedisConfig>('redis');
+        const url = redis?.url ?? redis?.terminalUrl;
+        if (!url) {
+          new Logger('TicketingModule').warn('Redis URL not set; ticketing OAuth state disabled');
+          return null;
+        }
+        const client = new Redis(url);
+        client.on('error', (err) =>
+          new Logger('TicketingModule').warn(`TICKETING_OAUTH_REDIS error: ${err.message}`),
+        );
+        return client;
+      },
+      inject: [ConfigService],
+    },
     TicketingService,
     TicketingRepository,
     TicketingListenerService,
