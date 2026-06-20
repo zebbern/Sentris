@@ -1,31 +1,11 @@
-import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
-const TEST_FILE_PATTERN = /\.(test|spec)\.[jt]sx?$/;
-
-function collectTestFiles(dir: string): string[] {
-  const entries = readdirSync(dir, { withFileTypes: true });
-  const files: string[] = [];
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      files.push(...collectTestFiles(fullPath));
-      continue;
-    }
-
-    if (entry.isFile() && TEST_FILE_PATTERN.test(entry.name)) {
-      files.push(fullPath);
-    }
-  }
-
-  return files;
-}
-
-function toPosixRelative(filePath: string): string {
-  return path.relative(process.cwd(), filePath).split(path.sep).join(path.posix.sep);
-}
+import {
+  collectTestFiles,
+  planFrontendTestRuns,
+  toPosixRelative,
+  usesMockModule,
+} from './run-tests-plan';
 
 function runBunTest(args: string[]): number {
   const result = Bun.spawnSync(
@@ -42,24 +22,32 @@ function runBunTest(args: string[]): number {
   return result.exitCode ?? 1;
 }
 
-const cliArgs = process.argv.slice(2);
+function main(): number {
+  const cliArgs = process.argv.slice(2);
 
-if (cliArgs.length > 0) {
-  process.exit(runBunTest(cliArgs));
-}
-
-const srcDir = path.join(process.cwd(), 'src');
-const files = collectTestFiles(srcDir)
-  .map(toPosixRelative)
-  .sort((a, b) => a.localeCompare(b));
-
-for (const file of files) {
-  console.log(`\n[frontend:test] ${file}`);
-  const exitCode = runBunTest([file]);
-
-  if (exitCode !== 0) {
-    process.exit(exitCode);
+  if (cliArgs.length > 0) {
+    return runBunTest(cliArgs);
   }
+
+  const srcDir = path.join(process.cwd(), 'src');
+  const files = collectTestFiles(srcDir).map((file) => toPosixRelative(file));
+  const runs = planFrontendTestRuns(files, (file) => usesMockModule(path.resolve(file)));
+
+  for (const run of runs) {
+    console.log(`\n[frontend:test] ${run.isolated ? 'isolated' : 'batch'}: ${run.label}`);
+    const exitCode = runBunTest(run.files);
+
+    if (exitCode !== 0) {
+      return exitCode;
+    }
+  }
+
+  const isolatedCount = runs.filter((run) => run.isolated).length;
+  const batchedCount = files.length - isolatedCount;
+  console.log(
+    `\n[frontend:test] Completed ${files.length} test files in ${runs.length} processes (${batchedCount} batched, ${isolatedCount} isolated).`,
+  );
+  return 0;
 }
 
-console.log(`\n[frontend:test] Completed ${files.length} test files serially.`);
+process.exit(main());
