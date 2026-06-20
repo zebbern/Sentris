@@ -1,6 +1,6 @@
 import { startMcpDockerServer } from '../../components/core/mcp-runtime';
 import { Context } from '@temporalio/activity';
-import { createExecutionContext } from '@sentris/component-sdk';
+import { createExecutionContext, type LogEventInput } from '@sentris/component-sdk';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -19,6 +19,19 @@ import Redis from 'ioredis';
 const redisUrl =
   process.env.REDIS_URL || process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379';
 const redis = new Redis(redisUrl);
+
+function logMcpDiscoveryEntry(prefix: string, entry: LogEventInput): void {
+  const message = `[${prefix}] ${entry.message}`;
+  if (entry.level === 'error') {
+    console.error(message);
+    return;
+  }
+  if (entry.level === 'warn') {
+    console.warn(message);
+    return;
+  }
+  workflowDiagnosticLog(message);
+}
 
 /**
  * Cache discovery results in Redis
@@ -218,16 +231,7 @@ async function spawnStdioContainer(input: {
     runId: `mcp-discovery-${Date.now()}`,
     componentRef: 'mcp-discovery',
     logCollector: (entry) => {
-      // Log to console for discovery activity
-      const logMethod =
-        entry.level === 'error'
-          ? console.error
-          : entry.level === 'warn'
-            ? console.warn
-            : entry.level === 'debug'
-              ? console.debug
-              : console.log;
-      logMethod(`[MCP Discovery] ${entry.message}`);
+      logMcpDiscoveryEntry('MCP Discovery', entry);
     },
   });
 
@@ -270,15 +274,7 @@ async function spawnNamedServersContainer(input: {
     runId: `mcp-group-discovery-${Date.now()}`,
     componentRef: 'mcp-group-discovery',
     logCollector: (entry) => {
-      const logMethod =
-        entry.level === 'error'
-          ? console.error
-          : entry.level === 'warn'
-            ? console.warn
-            : entry.level === 'debug'
-              ? console.debug
-              : console.log;
-      logMethod(`[MCP Group Discovery] ${entry.message}`);
+      logMcpDiscoveryEntry('MCP Group Discovery', entry);
     },
   });
 

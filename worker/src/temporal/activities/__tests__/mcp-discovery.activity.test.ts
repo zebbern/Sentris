@@ -3,7 +3,17 @@ import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } fr
 const redisSetex = vi.fn(async (_key: string, _ttlSeconds: number, _value: string) => 'OK');
 const redisGet = vi.fn(async (_key: string): Promise<string | null> => null);
 const mockHeartbeat = vi.fn();
-const mockStartMcpDockerServer = vi.fn(async () => ({
+
+interface MockMcpDockerServerInput {
+  context: {
+    logger: {
+      debug: (...args: unknown[]) => void;
+      info: (...args: unknown[]) => void;
+    };
+  };
+}
+
+const mockStartMcpDockerServer = vi.fn(async (_input: MockMcpDockerServerInput) => ({
   endpoint: 'http://localhost:4100/mcp',
   containerId: 'mcp-container-1',
 }));
@@ -164,6 +174,51 @@ describe('MCP discovery activity diagnostics', () => {
       expect(consoleLogSpy).not.toHaveBeenCalled();
     } finally {
       consoleLogSpy.mockRestore();
+    }
+  });
+
+  test('discoverMcpGroupToolsActivity does not mirror docker info/debug collector logs to console by default', async () => {
+    mockStartMcpDockerServer.mockImplementationOnce(async (input: MockMcpDockerServerInput) => {
+      input.context.logger.info('stdio proxy started');
+      input.context.logger.debug('stdio proxy details');
+      return {
+        endpoint: 'http://localhost:4100/mcp',
+        containerId: 'mcp-container-1',
+      };
+    });
+    globalThis.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
+      const href = String(url);
+      if (href.endsWith('/health')) {
+        return createJsonResponse({
+          status: 'ok',
+          servers: [{ ready: true }],
+        });
+      }
+      return createJsonResponse({
+        result: {
+          tools: [{ name: 'list_buckets', description: 'List storage buckets' }],
+        },
+      });
+    }) as unknown as typeof fetch;
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      await discoverMcpGroupToolsActivity({
+        servers: [
+          {
+            name: 'storage',
+            transport: 'stdio',
+            command: 'storage-mcp',
+          },
+        ],
+      });
+
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleLogSpy.mockRestore();
+      consoleDebugSpy.mockRestore();
     }
   });
 });
