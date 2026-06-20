@@ -1,6 +1,7 @@
-import { describe, it, expect, mock, afterEach } from 'bun:test';
+import { describe, it, expect, mock, afterEach, afterAll } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import type { CommandGroup as CommandGroupType, NavigationCommand } from '../command-palette-types';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Module mocks (BEFORE import)
@@ -21,6 +22,8 @@ import { CommandGroup } from '../CommandGroup';
 afterEach(() => {
   cleanup();
 });
+
+afterAll(() => restoreMockedModules(['@/components/ui/DynamicIcon']));
 
 const TestIcon = ({ className }: { className?: string }) => (
   <svg data-testid="test-icon" className={className} />

@@ -1,9 +1,9 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from 'bun:test';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createDialogMock } from '@/test/mocks/dialog';
 import { createStoreMock } from '@/test/mocks/createStoreMock';
-import { realModuleExports } from '@/test/restore-mocks';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -136,6 +136,28 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
 });
+
+afterAll(() =>
+  restoreMockedModules([
+    '@/components/layout/sidebar-state',
+    '@/components/ui/dialog',
+    '@/components/ui/DynamicIcon',
+    '@/config/env',
+    '@/hooks/queries/useApiKeyQueries',
+    '@/hooks/queries/useComponentQueries',
+    '@/hooks/queries/useScheduleQueries',
+    '@/hooks/queries/useSecretQueries',
+    '@/hooks/queries/useTemplateQueries',
+    '@/hooks/queries/useWebhookQueries',
+    '@/hooks/queries/useWorkflowQueries',
+    '@/schemas/workflow',
+    '@/store/commandPaletteStore',
+    '@/store/themeStore',
+    '@/store/workflowStore',
+    '@/store/workflowUiStore',
+    'react-router-dom',
+  ]),
+);
 
 describe('CommandPalette', () => {
   it('renders when isOpen is true', () => {

@@ -248,7 +248,15 @@ describe('ExecutionInspector', () => {
   afterAll(() =>
     restoreMockedModules([
       '@/components/timeline/ExecutionTimeline',
+      '@/components/timeline/EventInspector',
+      '@/components/timeline/AgentTracePanel',
+      '@/components/timeline/NetworkPanel',
+      '@/components/timeline/NodeIOInspector',
       '@/components/timeline/RunSelector',
+      '@/components/timeline/RunInfoDisplay',
+      '@/components/artifacts/RunArtifactsPanel',
+      '@/components/execution/ExecutionTabs',
+      '@/components/ui/MessageModal',
       '@/features/workflow-builder/utils/executionRuns',
       '@/hooks/queries/useRunQueries',
       '@/hooks/useCopyToClipboard',

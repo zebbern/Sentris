@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { realModuleExports } from '@/test/restore-mocks';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -63,6 +63,8 @@ describe('RunBreadcrumbs', () => {
     cleanup();
     resetMocks();
   });
+
+  afterAll(() => restoreMockedModules(['@/hooks/queries/useExecutionQueries', 'react-router-dom']));
 
   it('returns null when run has no parentRunId', () => {
     const run = makeRun({ parentRunId: null });

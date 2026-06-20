@@ -1,5 +1,6 @@
-import { describe, it, expect, mock, afterEach, beforeEach } from 'bun:test';
+import { describe, it, expect, mock, afterEach, afterAll, beforeEach } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Module mocks (BEFORE import)
@@ -112,6 +113,15 @@ describe('TerminalDockPanel', () => {
   afterEach(() => {
     cleanup();
   });
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/tooltip',
+      '@/store/executionTimelineStore',
+      '@/store/workflowUiStore',
+      '../NodeTerminalPanel',
+    ]),
+  );
 
   it('renders nothing when there are no docked terminals', () => {
     mockDockedTerminals = [];

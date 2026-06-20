@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, afterAll, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { createThemeStoreMock } from '@/test/mocks/theme-store';
 import { createUserPreferencesStoreMock } from '@/test/mocks/user-preferences-store';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable auth state
@@ -61,6 +62,16 @@ describe('SettingsPage', () => {
   });
 
   afterEach(cleanup);
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/hooks/queries/useAuditLogQueries',
+      '@/hooks/useNotificationPermission',
+      '@/store/authStore',
+      '@/store/themeStore',
+      '@/store/userPreferencesStore',
+    ]),
+  );
 
   it('renders navigation tabs', () => {
     renderSettings();
