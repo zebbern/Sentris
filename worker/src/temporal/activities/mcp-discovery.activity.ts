@@ -447,14 +447,14 @@ async function waitForContainerReady(endpoint: string): Promise<void> {
           const servers = data.servers ?? [];
           const allReady = servers.every((s) => s.ready);
           if (servers.length > 0 && allReady) {
-            console.log(
+            workflowDiagnosticLog(
               `[MCP Discovery] Container ready after ${attempt + 1}s (${servers.length} server(s) ready)`,
             );
             return;
           }
           // HTTP is up but waiting for STDIO client connection
           if (attempt % 10 === 0) {
-            console.log(
+            workflowDiagnosticLog(
               `[MCP Discovery] HTTP ready, waiting for STDIO client... (${servers.filter((s) => s.ready).length}/${servers.length} ready)`,
             );
           }
