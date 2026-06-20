@@ -275,6 +275,82 @@ describe('core.ai.agent (refactor)', () => {
     }
   });
 
+  test('routes gateway discovery diagnostics through the component logger', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    vi.spyOn(MockToolLoopAgent.prototype, 'generate').mockResolvedValue(
+      createGenerationResult({ text: 'Agent final answer' }),
+    );
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock: typeof fetch = async () =>
+      new Response(JSON.stringify({ token: 'gateway-token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+
+    createMCPClientMock.mockResolvedValue({
+      tools: async () => ({
+        ping: {
+          inputSchema: { type: 'object', properties: {} },
+          execute: async () => ({ type: 'json', value: { ok: true } }),
+        },
+      }),
+      close: async () => {},
+    });
+
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const loggerInfo = vi.fn();
+    const baseContext = createTestContext();
+    const contextWithTools: ExecutionContext = createTestContext({
+      logger: {
+        ...baseContext.logger,
+        info: loggerInfo,
+      },
+      metadata: {
+        ...baseContext.metadata,
+        connectedToolNodeIds: ['tool-node-1'],
+      },
+    });
+
+    try {
+      await runComponentWithRunner(
+        component!.runner,
+        component!.execute,
+        {
+          inputs: {
+            userInput: 'Use tools',
+            conversationState: undefined,
+            chatModel: {
+              provider: 'openai',
+              modelId: 'gpt-4o-mini',
+            },
+            modelApiKey: 'sk-test',
+          },
+          params: {
+            systemPrompt: '',
+            temperature: 0.3,
+            maxTokens: 64,
+            memorySize: 3,
+            stepLimit: 1,
+          },
+        },
+        contextWithTools,
+      );
+
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(loggerInfo).toHaveBeenCalledWith(
+        '[AGENT] Connecting to MCP gateway at http://localhost:3211/api/v1/mcp/gateway to discover tools',
+      );
+      expect(loggerInfo).toHaveBeenCalledWith('[AGENT] Discovered 1 tools from gateway: ping');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('stores tool outputs in conversation state', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();

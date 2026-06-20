@@ -310,7 +310,6 @@ const definition = defineComponent({
       },
     };
 
-    console.log('[LogicScript] Starting execution (inputs via mounted file)');
     context.emitProgress({
       message: 'Starting script execution in Docker...',
       level: 'info',
@@ -345,7 +344,6 @@ const definition = defineComponent({
       }
     });
 
-    console.log('[LogicScript] Execution completed with outputs:', finalOutput);
     context.emitProgress({
       message: 'Script execution completed',
       level: 'info',
