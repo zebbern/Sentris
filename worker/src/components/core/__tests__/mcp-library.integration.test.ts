@@ -2,37 +2,41 @@ import { beforeAll, beforeEach, afterEach, describe, expect, test, vi } from 'bu
 import { createExecutionContext, componentRegistry } from '@sentris/component-sdk';
 import type { McpLibraryInput, McpLibraryOutput } from '../mcp-library';
 
-// Mock the docker runtime utils to avoid actual Docker calls
-const mockRegisterServerTools = vi.fn(async () => {
-  // Mock successful registration
-});
+const mockStartMcpDockerServer = vi.fn(async () => ({
+  endpoint: 'http://localhost:3000/mcp',
+  containerId: 'container-123',
+}));
 
-const mockFetchEnabledServers = vi.fn(async (serverIds: string[]) => {
-  // Return mock servers
-  return serverIds.map((id) => ({
-    id,
-    name: `Server ${id}`,
-    description: null,
-    transportType: 'stdio' as const,
-    command: `command-${id}`,
-    args: [],
-    endpoint: null,
-    hasHeaders: false,
-    headerKeys: null,
-    enabled: true,
-    healthCheckUrl: null,
-    lastHealthCheck: null,
-    lastHealthStatus: null as unknown as 'healthy' | 'unhealthy' | 'unknown' | null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }));
-});
+vi.mock('../mcp-runtime', () => ({
+  startMcpDockerServer: mockStartMcpDockerServer,
+}));
 
-vi.mock('../mcp-library-utils', () => ({
-  fetchEnabledServers: (...args: Parameters<typeof mockFetchEnabledServers>) =>
-    mockFetchEnabledServers(...args),
-  registerServerTools: (...args: Parameters<typeof mockRegisterServerTools>) =>
-    mockRegisterServerTools(...args),
+const mockConnect = vi.fn(async () => {});
+const mockListTools = vi.fn(async () => ({
+  tools: [
+    {
+      name: 'ping',
+      description: 'Ping a target',
+      inputSchema: { type: 'object', properties: {} },
+    },
+  ],
+}));
+const mockClose = vi.fn(async () => {});
+
+class MockClient {
+  connect = mockConnect;
+  listTools = mockListTools;
+  close = mockClose;
+}
+
+const mockTransport = vi.fn();
+
+vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
+  Client: MockClient,
+}));
+
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+  StreamableHTTPClientTransport: mockTransport,
 }));
 
 // Save the original fetch before any mocking
@@ -47,6 +51,7 @@ describe('MCP Library Integration Tests', () => {
     vi.clearAllMocks();
     process.env.BACKEND_URL = 'http://localhost:3000';
     process.env.INTERNAL_SERVICE_TOKEN = 'test-internal-token';
+    delete process.env.SENTRIS_DEBUG_WORKFLOW;
   });
 
   afterEach(() => {
@@ -63,7 +68,7 @@ describe('MCP Library Integration Tests', () => {
     }));
 
     // Mock fetch implementation
-    global.fetch = vi.fn(async (url: string) => {
+    global.fetch = vi.fn(async (url: string, init?: RequestInit) => {
       // Internal token generation endpoint
       if (url.includes('/generate-token')) {
         return new Response(JSON.stringify({ token: 'test-internal-token' }), {
@@ -74,7 +79,7 @@ describe('MCP Library Integration Tests', () => {
 
       // Fetch all servers endpoint
       if (url.includes('/mcp-servers') && !url.includes('/resolve')) {
-        return new Response(JSON.stringify({ servers: serversWithTimestamps }), {
+        return new Response(JSON.stringify(serversWithTimestamps), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -102,8 +107,8 @@ describe('MCP Library Integration Tests', () => {
         );
       }
 
-      // Register local endpoint
-      if (url.includes('/register-local')) {
+      // Register discovered tools endpoint
+      if (url.includes('/register-mcp-server') && init?.method === 'POST') {
         return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -154,9 +159,15 @@ describe('MCP Library Integration Tests', () => {
 
       // Verify result
       expect(result).toEqual({});
-      // Verify the mock functions were called
-      expect(mockFetchEnabledServers).toHaveBeenCalled();
-      expect(mockRegisterServerTools).toHaveBeenCalled();
+      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/v1/mcp-servers',
+        expect.any(Object),
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/v1/internal/mcp/register-mcp-server',
+        expect.objectContaining({ method: 'POST' }),
+      );
     });
 
     test('should handle server not found gracefully', async () => {
@@ -232,8 +243,7 @@ describe('MCP Library Integration Tests', () => {
       );
 
       expect(result).toEqual({});
-      expect(mockFetchEnabledServers).toHaveBeenCalled();
-      expect(mockRegisterServerTools).toHaveBeenCalledTimes(2);
+      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(2);
     });
 
     test('should filter out disabled servers', async () => {
@@ -271,8 +281,7 @@ describe('MCP Library Integration Tests', () => {
       );
 
       expect(result).toEqual({});
-      // The mock returns servers for all requested IDs, so both will be registered
-      expect(mockRegisterServerTools).toHaveBeenCalledTimes(2);
+      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -349,6 +358,7 @@ describe('MCP Library Integration Tests', () => {
       );
 
       expect(true).toBe(true); // Test passes if no error thrown
+      expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
     });
   });
 

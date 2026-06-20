@@ -4,6 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import { mcpDiagnosticLog } from './mcp-diagnostics';
 
 /**
  * Schema for MCP Group Templates (code-defined)
@@ -134,15 +135,15 @@ export async function executeMcpGroupNode(
   groupTemplate: McpGroupTemplate,
 ): Promise<{ endpoints: McpServerEndpoint[] }> {
   const enabledServers = params.enabledServers || [];
-  console.log(`[executeMcpGroupNode] ============================================`);
-  console.log(`[executeMcpGroupNode] Starting execution for group ${groupTemplate.slug}`);
-  console.log(`[executeMcpGroupNode] Component ref: ${context.componentRef}`);
-  console.log(`[executeMcpGroupNode] Run ID: ${context.runId}`);
-  console.log(`[executeMcpGroupNode] Enabled servers: ${enabledServers.join(', ')}`);
-  console.log(
+  mcpDiagnosticLog(`[executeMcpGroupNode] ============================================`);
+  mcpDiagnosticLog(`[executeMcpGroupNode] Starting execution for group ${groupTemplate.slug}`);
+  mcpDiagnosticLog(`[executeMcpGroupNode] Component ref: ${context.componentRef}`);
+  mcpDiagnosticLog(`[executeMcpGroupNode] Run ID: ${context.runId}`);
+  mcpDiagnosticLog(`[executeMcpGroupNode] Enabled servers: ${enabledServers.join(', ')}`);
+  mcpDiagnosticLog(
     `[executeMcpGroupNode] [DEBUG] componentRef should match workflow node ID for proper gateway filtering`,
   );
-  console.log(
+  mcpDiagnosticLog(
     `[executeMcpGroupNode] [DEBUG] Child server nodeIds will be: ${enabledServers.map((s) => `${context.componentRef}/${s}`).join(', ')}`,
   );
 
@@ -153,18 +154,18 @@ export async function executeMcpGroupNode(
   }
 
   if (enabledServers.length === 0) {
-    console.log(`[executeMcpGroupNode] No enabled servers, returning empty endpoints`);
+    mcpDiagnosticLog(`[executeMcpGroupNode] No enabled servers, returning empty endpoints`);
     return { endpoints: [] };
   }
 
   // Build environment variables from credential mapping
   const env = buildCredentialEnv(credentials, groupTemplate.credentialMapping);
-  console.log(`[executeMcpGroupNode] Built credential env:`, Object.keys(env));
+  mcpDiagnosticLog(`[executeMcpGroupNode] Built credential env:`, Object.keys(env));
 
   // Get enabled servers from template (no API call needed!)
   const enabledServerTemplates = groupTemplate.servers.filter((s) => enabledServers.includes(s.id));
 
-  console.log(
+  mcpDiagnosticLog(
     `[executeMcpGroupNode] Processing ${enabledServerTemplates.length} enabled servers from template`,
   );
 
@@ -189,11 +190,11 @@ export async function executeMcpGroupNode(
 
     // Process each enabled server
     for (const serverTemplate of enabledServerTemplates) {
-      console.log(`[executeMcpGroupNode] ----------------------------------------`);
-      console.log(`[executeMcpGroupNode] Starting container for server: ${serverTemplate.id}`);
-      console.log(`[executeMcpGroupNode] Command: ${serverTemplate.command}`);
-      console.log(`[executeMcpGroupNode] Args: ${JSON.stringify(serverTemplate.args || [])}`);
-      console.log(`[executeMcpGroupNode] Image: ${groupTemplate.defaultDockerImage}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] ----------------------------------------`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Starting container for server: ${serverTemplate.id}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Command: ${serverTemplate.command}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Args: ${JSON.stringify(serverTemplate.args || [])}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Image: ${groupTemplate.defaultDockerImage}`);
 
       // Set MCP_COMMAND for the stdio proxy
       // MCP_NAMED_SERVERS='{}' disables the built-in named-servers.json config
@@ -208,7 +209,7 @@ export async function executeMcpGroupNode(
         serverEnv.MCP_ARGS = JSON.stringify(serverTemplate.args);
       }
 
-      console.log(`[executeMcpGroupNode] Env vars:`, Object.keys(serverEnv));
+      mcpDiagnosticLog(`[executeMcpGroupNode] Env vars:`, Object.keys(serverEnv));
 
       const result = await startMcpDockerServer({
         image: groupTemplate.defaultDockerImage,
@@ -220,16 +221,16 @@ export async function executeMcpGroupNode(
         volumes,
       });
 
-      console.log(`[executeMcpGroupNode] Container started successfully!`);
-      console.log(`[executeMcpGroupNode] Endpoint: ${result.endpoint}`);
-      console.log(`[executeMcpGroupNode] Container ID: ${result.containerId}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Container started successfully!`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Endpoint: ${result.endpoint}`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Container ID: ${result.containerId}`);
 
       // Register with backend using hierarchical node ID (parent/child format)
       // This allows explicit hierarchical queries instead of fragile prefix matching
       const uniqueNodeId = `${context.componentRef}/${serverTemplate.id}`;
-      console.log(`[executeMcpGroupNode] Registering with backend...`);
-      console.log(`[executeMcpGroupNode] Unique nodeId: ${uniqueNodeId}`);
-      console.log(
+      mcpDiagnosticLog(`[executeMcpGroupNode] Registering with backend...`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Unique nodeId: ${uniqueNodeId}`);
+      mcpDiagnosticLog(
         `[executeMcpGroupNode] Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3211'}`,
       );
 
@@ -240,7 +241,7 @@ export async function executeMcpGroupNode(
         context,
       );
 
-      console.log(`[executeMcpGroupNode] Registration successful!`);
+      mcpDiagnosticLog(`[executeMcpGroupNode] Registration successful!`);
 
       endpoints.push({
         endpoint: result.endpoint,
@@ -249,14 +250,14 @@ export async function executeMcpGroupNode(
       });
     }
 
-    console.log(`[executeMcpGroupNode] ============================================`);
-    console.log(`[executeMcpGroupNode] Execution complete!`);
-    console.log(`[executeMcpGroupNode] Total endpoints: ${endpoints.length}`);
-    console.log(
+    mcpDiagnosticLog(`[executeMcpGroupNode] ============================================`);
+    mcpDiagnosticLog(`[executeMcpGroupNode] Execution complete!`);
+    mcpDiagnosticLog(`[executeMcpGroupNode] Total endpoints: ${endpoints.length}`);
+    mcpDiagnosticLog(
       `[executeMcpGroupNode] Endpoints:`,
       endpoints.map((e) => `${e.serverId} -> ${e.endpoint}`),
     );
-    console.log(`[executeMcpGroupNode] ============================================`);
+    mcpDiagnosticLog(`[executeMcpGroupNode] ============================================`);
     return { endpoints };
   } catch (error: unknown) {
     // Cleanup volume on error
@@ -295,7 +296,7 @@ async function discoverToolsWithRetry(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     let client: Client | null = null;
     try {
-      console.log(
+      mcpDiagnosticLog(
         `[discoverToolsWithRetry] Attempt ${attempt}/${maxRetries}: Discovering tools from ${endpoint}`,
       );
 
@@ -321,7 +322,7 @@ async function discoverToolsWithRetry(
         description: t.description,
         inputSchema: t.inputSchema as Record<string, unknown> | undefined,
       }));
-      console.log(
+      mcpDiagnosticLog(
         `[discoverToolsWithRetry] ✓ Discovered ${tools.length} tools on attempt ${attempt}`,
       );
       return tools;
@@ -332,7 +333,7 @@ async function discoverToolsWithRetry(
 
       if (attempt < maxRetries) {
         const delayMs = Math.min(baseDelayMs * Math.pow(2, attempt - 1), 5000);
-        console.log(`[discoverToolsWithRetry] Retrying in ${delayMs}ms...`);
+        mcpDiagnosticLog(`[discoverToolsWithRetry] Retrying in ${delayMs}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -366,14 +367,14 @@ async function registerServerWithBackend(
   // Format: ${groupNodeId}/${serverId} (e.g., "aws-mcp-group/aws-cloudtrail")
   const uniqueNodeId = `${context.componentRef}/${serverId}`;
 
-  console.log(`[registerServerWithBackend] Registering server ${serverId}`);
-  console.log(`[registerServerWithBackend] Unique nodeId: ${uniqueNodeId}`);
-  console.log(`[registerServerWithBackend] Endpoint: ${endpoint}`);
+  mcpDiagnosticLog(`[registerServerWithBackend] Registering server ${serverId}`);
+  mcpDiagnosticLog(`[registerServerWithBackend] Unique nodeId: ${uniqueNodeId}`);
+  mcpDiagnosticLog(`[registerServerWithBackend] Endpoint: ${endpoint}`);
 
   // Discover tools from endpoint with retry logic
-  console.log(`[registerServerWithBackend] Discovering tools from endpoint...`);
+  mcpDiagnosticLog(`[registerServerWithBackend] Discovering tools from endpoint...`);
   const discoveredTools = await discoverToolsWithRetry(endpoint);
-  console.log(`[registerServerWithBackend] Discovered ${discoveredTools.length} tools`);
+  mcpDiagnosticLog(`[registerServerWithBackend] Discovered ${discoveredTools.length} tools`);
 
   // Register using the new clean API
   const registerResponse = await fetch(`${internalApiUrl}/register-mcp-server`, {
@@ -400,7 +401,7 @@ async function registerServerWithBackend(
     throw new Error(`Failed to register server ${serverId}: ${registerResponse.statusText}`);
   }
 
-  console.log(
+  mcpDiagnosticLog(
     `[registerServerWithBackend] ✓ Registered ${serverId} with ${discoveredTools.length} tools`,
   );
 }
