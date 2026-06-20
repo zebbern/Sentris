@@ -28,6 +28,7 @@ import { createLightweightSummary } from './utils/component-output';
 import { buildActionPayload } from './input-resolver';
 import { isComponentFailure, extractFailureMessage } from './workflows/workflow-helpers';
 import type { ArtifactServiceFactory } from './artifact-factory';
+import { workflowDiagnosticLog } from './workflow-diagnostics';
 
 export interface ExecuteWorkflowOptions {
   runId?: string;
@@ -52,9 +53,9 @@ export async function executeWorkflow(
   options: ExecuteWorkflowOptions = {},
 ): Promise<WorkflowRunResult> {
   const runId = options.runId ?? randomUUID();
-  console.log(`🏃 [WORKFLOW RUNNER] executeWorkflow called for runId: ${runId}`);
-  console.log(`📋 [WORKFLOW RUNNER] Definition has ${definition.actions.length} actions`);
-  console.log(`📋 [WORKFLOW RUNNER] Entrypoint ref: ${definition.entrypoint.ref}`);
+  workflowDiagnosticLog(`🏃 [WORKFLOW RUNNER] executeWorkflow called for runId: ${runId}`);
+  workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Definition has ${definition.actions.length} actions`);
+  workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Entrypoint ref: ${definition.entrypoint.ref}`);
 
   const results = new Map<string, unknown>();
   const actionsByRef = new Map<string, (typeof definition.actions)[number]>(
@@ -85,7 +86,7 @@ export async function executeWorkflow(
       actionRef: string,
       schedulerContext: WorkflowSchedulerRunContext,
     ): Promise<{ activePorts?: string[] | undefined } | null> => {
-      console.log(
+      workflowDiagnosticLog(
         `🎯 [WORKFLOW RUNNER] runAction called for: ${actionRef} (triggered by: ${schedulerContext.triggeredBy || 'root'})`,
       );
 
@@ -242,7 +243,7 @@ export async function executeWorkflow(
       if (isEntrypointRef && request.inputs) {
         // Only apply inputs to the actual entrypoint component, not just any node matching the entrypoint ref
         if (isEntrypointComponent) {
-          console.log(
+          workflowDiagnosticLog(
             `[WorkflowRunner] Applying inputs to entrypoint component '${action.ref}' (${action.componentId})`,
           );
           inputs.__runtimeData = request.inputs;
@@ -311,14 +312,14 @@ export async function executeWorkflow(
       });
 
       try {
-        console.log(
+        workflowDiagnosticLog(
           `⚡️ [WORKFLOW RUNNER] Executing component: ${action.componentId} for action: ${actionRef}`,
         );
         const rawOutput = await component.execute(
           { inputs: parsedInputs, params: parsedParams },
           context,
         );
-        console.log(
+        workflowDiagnosticLog(
           `✅ [WORKFLOW RUNNER] Component execution completed: ${action.componentId} for action: ${actionRef}`,
         );
         let output = component.outputs.parse(rawOutput);
@@ -351,7 +352,7 @@ export async function executeWorkflow(
           }
         }
         results.set(action.ref, output);
-        console.log(`💾 [WORKFLOW RUNNER] Result stored for: ${actionRef}`);
+        workflowDiagnosticLog(`💾 [WORKFLOW RUNNER] Result stored for: ${actionRef}`);
         // Record node I/O completion
         await options.nodeIO?.recordCompletion({
           runId,
@@ -460,8 +461,8 @@ export async function executeWorkflow(
       run: runAction,
     });
 
-    console.log(`📊 [WORKFLOW RUNNER] runWorkflowWithScheduler completed for ${runId}`);
-    console.log(`📊 [WORKFLOW RUNNER] Total results stored: ${results.size}`);
+    workflowDiagnosticLog(`📊 [WORKFLOW RUNNER] runWorkflowWithScheduler completed for ${runId}`);
+    workflowDiagnosticLog(`📊 [WORKFLOW RUNNER] Total results stored: ${results.size}`);
 
     const outputsObject: Record<string, unknown> = {};
     let reportedFailure = false;
@@ -476,8 +477,10 @@ export async function executeWorkflow(
       }
     });
 
-    console.log(`📊 [WORKFLOW RUNNER] Output keys: ${Object.keys(outputsObject).join(', ')}`);
-    console.log(`📊 [WORKFLOW RUNNER] Reported failure: ${reportedFailure}`);
+    workflowDiagnosticLog(
+      `📊 [WORKFLOW RUNNER] Output keys: ${Object.keys(outputsObject).join(', ')}`,
+    );
+    workflowDiagnosticLog(`📊 [WORKFLOW RUNNER] Reported failure: ${reportedFailure}`);
 
     if (reportedFailure) {
       const baseMessage = 'One or more workflow actions failed';
@@ -492,7 +495,7 @@ export async function executeWorkflow(
       };
     }
 
-    console.log(`✅ [WORKFLOW RUNNER] Workflow completed successfully for ${runId}`);
+    workflowDiagnosticLog(`✅ [WORKFLOW RUNNER] Workflow completed successfully for ${runId}`);
     return { outputs: outputsObject, success: true };
   } catch (error: unknown) {
     console.error(`❌ [WORKFLOW RUNNER] Workflow threw exception for ${runId}:`, error);
