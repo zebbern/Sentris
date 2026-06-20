@@ -52,6 +52,9 @@ export function SidebarNav({
   const { isAuthenticated } = useAuth();
   const authProvider = useAuthProvider();
   const showUserButton = isAuthenticated || authProvider.name === 'clerk';
+  const collapsedIconButtonClass = isCompact
+    ? 'h-9 w-9 min-h-9 px-0 py-0 mx-auto justify-center gap-0'
+    : 'h-11 w-11 min-h-11 px-0 py-0 mx-auto justify-center gap-0';
 
   return (
     <>
@@ -80,7 +83,7 @@ export function SidebarNav({
                         className={cn(
                           'flex items-center',
                           isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
-                          sidebarOpen ? 'justify-start px-4' : 'justify-center',
+                          sidebarOpen ? 'justify-start px-4' : collapsedIconButtonClass,
                         )}
                       >
                         <Icon className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
@@ -113,7 +116,7 @@ export function SidebarNav({
                       className={cn(
                         'flex items-center',
                         isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
-                        sidebarOpen ? 'justify-start px-4' : 'justify-center',
+                        sidebarOpen ? 'justify-start px-4' : collapsedIconButtonClass,
                       )}
                     >
                       <Icon className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
@@ -137,10 +140,15 @@ export function SidebarNav({
                 'w-full flex items-center rounded-lg transition-colors',
                 isCompact ? 'gap-2 py-1.5' : 'gap-3 py-2',
                 'hover:bg-muted/50 text-muted-foreground hover:text-foreground',
-                sidebarOpen ? 'justify-between px-4' : 'justify-center',
+                sidebarOpen ? 'justify-between px-4' : collapsedIconButtonClass,
               )}
             >
-              <div className={cn('flex items-center', isCompact ? 'gap-2' : 'gap-3')}>
+              <div
+                className={cn(
+                  'flex items-center',
+                  sidebarOpen ? (isCompact ? 'gap-2' : 'gap-3') : 'gap-0 justify-center',
+                )}
+              >
                 <Settings className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
                 <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact} fontWeight="font-medium">
                   Manage
@@ -186,7 +194,7 @@ export function SidebarNav({
                         className={cn(
                           'flex items-center',
                           isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-3',
-                          sidebarOpen ? 'justify-start px-4' : 'justify-center',
+                          sidebarOpen ? 'justify-start px-4' : collapsedIconButtonClass,
                         )}
                       >
                         <Icon
@@ -211,11 +219,13 @@ export function SidebarNav({
             className={cn(
               'w-full flex items-center gap-3 py-2.5 rounded-lg transition-colors',
               'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground',
-              sidebarOpen ? 'justify-between px-4' : 'justify-center',
+              sidebarOpen ? 'justify-between px-4' : collapsedIconButtonClass,
             )}
             aria-label="Open command palette"
           >
-            <div className="flex items-center gap-3">
+            <div
+              className={cn('flex items-center', sidebarOpen ? 'gap-3' : 'gap-0 justify-center')}
+            >
               <Search className="h-4 w-4 flex-shrink-0" />
               <NavLabel sidebarOpen={sidebarOpen} isCompact={false}>
                 Search...
