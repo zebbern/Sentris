@@ -1,9 +1,18 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import type { SecretEncryptionMaterial } from '@sentris/shared';
 import type { TicketingConnectionConfig } from '@sentris/shared';
+import type Redis from 'ioredis';
 
+import { TICKETING_OAUTH_REDIS } from '../common/redis/redis.tokens';
 import { TokenEncryptionService } from '../integrations/token.encryption';
 import { TicketingRepository } from './ticketing.repository';
 import { JiraAdapter, JiraApiError } from './jira/jira.adapter';
@@ -29,10 +38,7 @@ export interface ConnectionStatus {
 }
 
 // ---------------------------------------------------------------------------
-// OAuth state in-memory cache (TTL 5 minutes)
-// TODO(S2-4): Migrate OAuth state to Redis for multi-instance support.
-//   Use SET with EX (5min TTL) for storage, GET+DEL for consumption.
-//   See PROVISIONING_REDIS token in common/redis/redis.tokens.ts for pattern.
+// OAuth state cache (Redis-backed with local fallback, TTL 5 minutes)
 // ---------------------------------------------------------------------------
 
 interface OAuthStateCacheEntry {
@@ -42,14 +48,16 @@ interface OAuthStateCacheEntry {
   expiresAt: number;
 }
 
+const OAUTH_STATE_TTL_SECONDS = 5 * 60;
 const OAUTH_STATE_TTL_MS = 5 * 60 * 1000;
+const OAUTH_STATE_KEY_PREFIX = 'sentris:ticketing:oauth-state:';
 
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
 @Injectable()
-export class TicketingService {
+export class TicketingService implements OnModuleDestroy {
   private readonly logger = new Logger(TicketingService.name);
   private readonly jiraClientId: string;
   private readonly jiraClientSecret: string;
@@ -62,10 +70,19 @@ export class TicketingService {
     private readonly jiraAdapter: JiraAdapter,
     private readonly encryption: TokenEncryptionService,
     configService: ConfigService,
+    @Inject(TICKETING_OAUTH_REDIS) private readonly oauthStateRedis: Redis | null,
   ) {
     this.jiraClientId = configService.get<string>('JIRA_CLIENT_ID', '');
     this.jiraClientSecret = configService.get<string>('JIRA_CLIENT_SECRET', '');
     this.jiraCallbackUrl = configService.get<string>('JIRA_CALLBACK_URL', '');
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    try {
+      await this.oauthStateRedis?.quit();
+    } catch {
+      // ignore
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -98,20 +115,19 @@ export class TicketingService {
   // OAuth 2.0 (3LO)
   // ---------------------------------------------------------------------------
 
-  startOAuthFlow(
+  async startOAuthFlow(
     organizationId: string,
     userId: string,
     redirectUri: string,
-  ): OAuthConnectResponse {
+  ): Promise<OAuthConnectResponse> {
     this.requireJiraConfig();
     const state = randomUUID();
-    this.oauthStateCache.set(state, {
+    await this.storeOAuthState(state, {
       organizationId,
       userId,
       redirectUri,
       expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
     });
-    this.cleanExpiredStates();
 
     const url = new URL('https://auth.atlassian.com/authorize');
     url.searchParams.set('audience', 'api.atlassian.com');
@@ -130,12 +146,10 @@ export class TicketingService {
 
   async handleOAuthCallback(code: string, state: string): Promise<{ success: boolean }> {
     this.requireJiraConfig();
-    const cached = this.oauthStateCache.get(state);
-    if (!cached || cached.expiresAt < Date.now()) {
-      this.oauthStateCache.delete(state ?? '');
+    const cached = await this.consumeOAuthState(state);
+    if (!cached) {
       throw new BadRequestException('Invalid or expired OAuth state');
     }
-    this.oauthStateCache.delete(state);
     const { organizationId, userId } = cached;
 
     const tokenResponse = await this.exchangeCodeForTokens(code);
@@ -482,5 +496,53 @@ export class TicketingService {
     for (const [key, entry] of this.oauthStateCache) {
       if (entry.expiresAt < now) this.oauthStateCache.delete(key);
     }
+  }
+
+  private async storeOAuthState(state: string, entry: OAuthStateCacheEntry): Promise<void> {
+    if (this.oauthStateRedis) {
+      try {
+        await this.oauthStateRedis.set(
+          this.oauthStateKey(state),
+          JSON.stringify(entry),
+          'EX',
+          OAUTH_STATE_TTL_SECONDS,
+        );
+        return;
+      } catch (error) {
+        this.logger.warn(`Failed to store Jira OAuth state in Redis: ${error}`);
+      }
+    }
+
+    this.oauthStateCache.set(state, entry);
+    this.cleanExpiredStates();
+  }
+
+  private async consumeOAuthState(state: string): Promise<OAuthStateCacheEntry | null> {
+    if (this.oauthStateRedis) {
+      try {
+        const key = this.oauthStateKey(state);
+        const raw = await this.oauthStateRedis.get(key);
+        if (raw) {
+          await this.oauthStateRedis.del(key);
+          const parsed = JSON.parse(raw) as OAuthStateCacheEntry;
+          if (parsed.expiresAt < Date.now()) return null;
+          return parsed;
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to consume Jira OAuth state from Redis: ${error}`);
+      }
+    }
+
+    const cached = this.oauthStateCache.get(state);
+    if (!cached || cached.expiresAt < Date.now()) {
+      this.oauthStateCache.delete(state);
+      return null;
+    }
+    this.oauthStateCache.delete(state);
+    return cached;
+  }
+
+  private oauthStateKey(state: string): string {
+    return `${OAUTH_STATE_KEY_PREFIX}${state}`;
   }
 }
