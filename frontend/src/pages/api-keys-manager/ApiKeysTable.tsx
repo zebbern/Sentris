@@ -134,7 +134,6 @@ export function ApiKeysTable({
   return (
     <>
       <PageToolbar
-        title="API Keys"
         searchValue={searchQuery}
         onSearchChange={onSearchChange}
         searchPlaceholder="Filter by name..."

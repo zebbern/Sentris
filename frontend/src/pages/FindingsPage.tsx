@@ -245,7 +245,6 @@ export function FindingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageToolbar
-        title="Findings"
         searchValue={search}
         onSearchChange={handleSearchChange}
         searchPlaceholder="Search findings by name, asset, workflow…"

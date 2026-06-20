@@ -131,10 +131,13 @@ describe('DashboardPage', () => {
 
   // Loading
   describe('loading state', () => {
-    it('renders heading during loading', () => {
+    it('omits the redundant page heading supplied by the app top bar during loading', () => {
       setup({ isLoading: true });
       renderPage();
-      expect(screen.getByRole('heading', { name: 'Dashboard', level: 2 })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Dashboard', level: 2 }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Workflows')).toBeInTheDocument();
     });
 
     it('renders skeleton placeholders when isLoading', () => {

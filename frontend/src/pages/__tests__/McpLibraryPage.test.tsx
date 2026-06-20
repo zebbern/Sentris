@@ -255,10 +255,13 @@ describe('McpLibraryPage', () => {
     expect(screen.getByText('Add Server')).toBeInTheDocument();
   });
 
-  it('renders page heading', () => {
+  it('omits the redundant page heading supplied by the app top bar', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 2, name: /MCP Library/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /^MCP Library$/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Filter by server name')).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no servers', () => {

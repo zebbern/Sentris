@@ -27,7 +27,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { PageToolbar } from '@/components/shared/PageToolbar';
-import { DOCS_URLS } from '@/config/docs';
 import { ActionCenterRow } from '@/pages/action-center/ActionCenterRow';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -157,8 +156,6 @@ export function ActionCenterPage() {
 
           {/* Filters */}
           <PageToolbar
-            title="Action Center"
-            helpUrl={DOCS_URLS.humanInTheLoop}
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Filter by title, node, or run ID"

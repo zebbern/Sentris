@@ -99,10 +99,12 @@ describe('FindingsPage', () => {
     cleanup();
   });
 
-  it('renders page heading', () => {
+  it('omits the redundant page heading supplied by the app top bar', () => {
     setupStore();
     renderPage();
-    expect(screen.getByRole('heading', { level: 2, name: /Findings/i })).toBeInTheDocument();
+
+    expect(screen.queryByRole('heading', { level: 2, name: /^Findings$/ })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search findings by name/i)).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

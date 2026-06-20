@@ -75,6 +75,12 @@ const ROUTE_CONFIG: RouteEntry[] = [
     subtitle: 'Security findings from workflow scans',
   },
   {
+    path: '/analytics',
+    title: 'Triage Analytics',
+    shortTitle: 'Analytics',
+    subtitle: 'Analyze triage performance and remediation health',
+  },
+  {
     path: '/mcp-library',
     title: 'MCP Servers',
     shortTitle: 'MCP Servers',
