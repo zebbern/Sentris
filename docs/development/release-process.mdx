@@ -105,7 +105,7 @@ Since packages aren't published to npm, sync versions with Docker releases:
 
 ```bash
 # Sync all package versions with release tag
-bun run scripts/sync-versions.ts v1.0.0
+bun run release:sync-versions v1.0.0
 ```
 
 #### Option 3: Changesets (For Published Packages)
@@ -130,7 +130,7 @@ Before creating a release:
 - [ ] Run tests: `bun run test`
 - [ ] Run typecheck: `bun run typecheck`
 - [ ] Run lint: `bun run lint`
-- [ ] Update package versions (if syncing): `bun run scripts/sync-versions.ts v1.0.0`
+- [ ] Update package versions (if syncing): `bun run release:sync-versions v1.0.0`
 - [ ] Commit version changes (if any)
 
 Create the release:

@@ -29,12 +29,14 @@
     "test:e2e:core": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true bun test --force-exit e2e-tests/core'",
     "test:e2e:pipeline": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true bun test --force-exit e2e-tests/pipeline'",
     "test:e2e:cloud": "bash -lc 'SENTRIS_INSTANCE=${SENTRIS_INSTANCE:-$(./scripts/active-instance.sh get)} RUN_E2E=true RUN_CLOUD_E2E=true bun test --force-exit e2e-tests/cloud'",
+    "test:e2e:setup": "bun e2e-tests/scripts/setup-e2e-env.ts",
     "dev:docs": "cd docs && mint dev",
     "lint": "bun run lint:frontend && bun run lint:backend && bun run lint:worker",
     "lint:frontend": "bun --cwd=frontend run lint",
     "lint:backend": "bun --cwd=backend run lint",
     "lint:worker": "bun --cwd=worker run lint",
     "lint:fix": "bun run lint:frontend --fix && bun run lint:backend --fix && bun run lint:worker --fix",
+    "release:sync-versions": "bun scripts/sync-versions.ts",
     "prepare": "husky"
   },
   "devDependencies": {
