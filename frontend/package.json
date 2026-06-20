@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "analyze": "ANALYZE=true vite build",
-    "test": "bun test --preload ./src/test/setup.ts --max-concurrency=1",
+    "test": "bun src/test/run-tests-serial.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
