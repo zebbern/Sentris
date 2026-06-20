@@ -1,6 +1,10 @@
 import { vi } from 'bun:test';
 import { ExecutionContext, ISecretsService } from '@sentris/component-sdk';
 
+function shouldMirrorTestDiagnostics(): boolean {
+  return process.env.SENTRIS_DEBUG_TESTS === '1';
+}
+
 export function createMockExecutionContext(
   overrides: Partial<ExecutionContext> = {},
 ): ExecutionContext {
@@ -49,7 +53,9 @@ export function createMockTrace(): any {
   return {
     record: vi.fn().mockImplementation((event) => {
       events.push(event);
-      console.log('TRACE:', event.type, event.nodeRef, event.message);
+      if (shouldMirrorTestDiagnostics()) {
+        console.log('TRACE:', event.type, event.nodeRef, event.message);
+      }
     }),
     flush: vi.fn().mockResolvedValue(undefined),
     setRunMetadata: vi.fn(),
@@ -63,7 +69,9 @@ export function createMockLogCollector(): any {
   return {
     append: vi.fn().mockImplementation((log) => {
       logs.push(log);
-      console.log('LOG:', log.level, log.message);
+      if (shouldMirrorTestDiagnostics()) {
+        console.log('LOG:', log.level, log.message);
+      }
       return Promise.resolve();
     }),
     flush: vi.fn().mockResolvedValue(undefined),
