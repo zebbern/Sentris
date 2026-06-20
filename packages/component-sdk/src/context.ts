@@ -1,17 +1,23 @@
 // Simple format function to avoid webpack issues with node:util
 function format(...args: unknown[]): string {
-  return args.map(arg => {
-    if (typeof arg === 'string') return arg;
-    if (arg === null || arg === undefined) return String(arg);
-    if (typeof arg === 'object') {
-      try {
-        return JSON.stringify(arg);
-      } catch {
-        return String(arg);
+  return args
+    .map((arg) => {
+      if (typeof arg === 'string') return arg;
+      if (arg === null || arg === undefined) return String(arg);
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg);
+        } catch {
+          return String(arg);
+        }
       }
-    }
-    return String(arg);
-  }).join(' ');
+      return String(arg);
+    })
+    .join(' ');
+}
+
+function shouldMirrorComponentDiagnostics(): boolean {
+  return process.env.SENTRIS_DEBUG_COMPONENTS === '1';
 }
 
 import type {
@@ -51,8 +57,21 @@ export interface CreateContextOptions {
 }
 
 export function createExecutionContext(options: CreateContextOptions): ExecutionContext {
-  const { runId, componentRef, metadata: metadataInput, storage, secrets, artifacts, trace, logCollector, terminalCollector, agentTracePublisher, workflowId, workflowName, organizationId } =
-    options;
+  const {
+    runId,
+    componentRef,
+    metadata: metadataInput,
+    storage,
+    secrets,
+    artifacts,
+    trace,
+    logCollector,
+    terminalCollector,
+    agentTracePublisher,
+    workflowId,
+    workflowName,
+    organizationId,
+  } = options;
   const metadata = createMetadata(runId, componentRef, metadataInput);
   const scopedTrace = trace ? createScopedTrace(trace, metadata) : undefined;
 
@@ -98,11 +117,15 @@ export function createExecutionContext(options: CreateContextOptions): Execution
   const logger: Logger = Object.freeze({
     debug: (...args: unknown[]) => {
       pushLog('stdout', 'debug', args);
-      console.debug(`[${componentRef}]`, ...args);
+      if (shouldMirrorComponentDiagnostics()) {
+        console.debug(`[${componentRef}]`, ...args);
+      }
     },
     info: (...args: unknown[]) => {
       pushLog('stdout', 'info', args);
-      console.log(`[${componentRef}]`, ...args);
+      if (shouldMirrorComponentDiagnostics()) {
+        console.log(`[${componentRef}]`, ...args);
+      }
     },
     warn: (...args: unknown[]) => {
       pushLog('stdout', 'warn', args);
@@ -114,14 +137,15 @@ export function createExecutionContext(options: CreateContextOptions): Execution
     },
   }) as Logger;
 
-
   const emitProgress = (progress: ProgressEventInput | string) => {
     const normalized: ProgressEventInput =
       typeof progress === 'string' ? { message: progress, level: 'info' } : progress;
     const level = normalized.level ?? 'info';
     const message = normalized.message;
 
-    console.log(`[${componentRef}] progress [${level}]: ${message}`);
+    if (shouldMirrorComponentDiagnostics()) {
+      console.log(`[${componentRef}] progress [${level}]: ${message}`);
+    }
     if (scopedTrace) {
       scopedTrace.record({
         type: 'NODE_PROGRESS',
@@ -169,7 +193,9 @@ export function createExecutionContext(options: CreateContextOptions): Execution
           timestamp: new Date().toISOString(),
           metadata,
         });
-        console.debug(`[${componentRef}]`, ...args);
+        if (shouldMirrorComponentDiagnostics()) {
+          console.debug(`[${componentRef}]`, ...args);
+        }
       },
       info: (...args: unknown[]) => {
         logCollector({
@@ -181,7 +207,9 @@ export function createExecutionContext(options: CreateContextOptions): Execution
           timestamp: new Date().toISOString(),
           metadata,
         });
-        console.log(`[${componentRef}]`, ...args);
+        if (shouldMirrorComponentDiagnostics()) {
+          console.log(`[${componentRef}]`, ...args);
+        }
       },
       warn: (...args: unknown[]) => {
         logCollector({

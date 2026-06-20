@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, vi } from 'bun:test';
 import { createExecutionContext } from '../context';
 import type { IFileStorageService, ISecretsService, TraceEvent } from '../interfaces';
 
@@ -33,7 +33,6 @@ describe('ExecutionContext', () => {
       }),
       uploadFile: async () => {},
     };
-
 
     const context = createExecutionContext({
       runId: 'test-run',
@@ -89,6 +88,86 @@ describe('ExecutionContext', () => {
     expect(recordedEvents[0].level).toBe('info');
     expect(recordedEvents[1].message).toBe('Processing step 2');
     expect(recordedEvents[1].level).toBe('info');
+  });
+
+  it('does not mirror progress events to console.log by default', () => {
+    const previousDebugFlag = process.env.SENTRIS_DEBUG_COMPONENTS;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      delete process.env.SENTRIS_DEBUG_COMPONENTS;
+
+      const recordedEvents: TraceEvent[] = [];
+      const context = createExecutionContext({
+        runId: 'run-quiet-progress',
+        componentRef: 'quiet.progress',
+        trace: {
+          record: (event: TraceEvent) => {
+            recordedEvents.push(event);
+          },
+        },
+      });
+
+      context.emitProgress('Processing quietly');
+
+      expect(recordedEvents).toHaveLength(1);
+      expect(recordedEvents[0]).toMatchObject({
+        type: 'NODE_PROGRESS',
+        message: 'Processing quietly',
+      });
+      expect(logSpy).not.toHaveBeenCalled();
+    } finally {
+      if (previousDebugFlag === undefined) {
+        delete process.env.SENTRIS_DEBUG_COMPONENTS;
+      } else {
+        process.env.SENTRIS_DEBUG_COMPONENTS = previousDebugFlag;
+      }
+      logSpy.mockRestore();
+    }
+  });
+
+  it('does not mirror info and debug logger output to console by default', () => {
+    const previousDebugFlag = process.env.SENTRIS_DEBUG_COMPONENTS;
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      delete process.env.SENTRIS_DEBUG_COMPONENTS;
+
+      const logEntries: Array<{
+        level?: string;
+        message: string;
+      }> = [];
+
+      const context = createExecutionContext({
+        runId: 'run-quiet-logger',
+        componentRef: 'quiet.logger',
+        logCollector: (entry) => {
+          logEntries.push({
+            level: entry.level,
+            message: entry.message,
+          });
+        },
+      });
+
+      context.logger.info('hello world');
+      context.logger.debug('debug detail');
+
+      expect(logEntries).toEqual([
+        { level: 'info', message: 'hello world' },
+        { level: 'debug', message: 'debug detail' },
+      ]);
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(debugSpy).not.toHaveBeenCalled();
+    } finally {
+      if (previousDebugFlag === undefined) {
+        delete process.env.SENTRIS_DEBUG_COMPONENTS;
+      } else {
+        process.env.SENTRIS_DEBUG_COMPONENTS = previousDebugFlag;
+      }
+      logSpy.mockRestore();
+      debugSpy.mockRestore();
+    }
   });
 
   it('should support structured progress payloads', () => {
