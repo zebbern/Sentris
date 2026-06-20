@@ -49,6 +49,37 @@ describe('mock.agent', () => {
     expect(result).toEqual({ discoveredTools: [], toolCount: 0, toolCallResults: [] });
   });
 
+  test('writes diagnostics through the execution logger instead of console.log', async () => {
+    const component = componentRegistry.get('mock.agent');
+    expect(component).toBeDefined();
+
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const loggerInfo = vi.fn();
+
+    try {
+      await runComponentWithRunner(
+        component!.runner,
+        component!.execute,
+        { inputs: {}, params: {} },
+        createTestContext({
+          logger: {
+            debug: () => {},
+            info: loggerInfo,
+            error: () => {},
+            warn: () => {},
+          },
+        }),
+      );
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(loggerInfo).toHaveBeenCalledWith(
+        '[mock.agent] No connected tool nodes, returning empty list',
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   test('discovers tools from gateway when connected tools exist', async () => {
     const component = componentRegistry.get('mock.agent');
     expect(component).toBeDefined();

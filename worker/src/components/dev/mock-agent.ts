@@ -142,13 +142,16 @@ const definition = defineComponent({
 
     const callTools = params.callTools ?? true;
     const maxToolCalls = params.maxToolCalls ?? 10;
+    const logDiagnostic = (message: string): void => {
+      context.logger.info(message);
+    };
 
     const connectedIds = connectedToolNodeIds ?? [];
-    console.log(`[mock.agent] connectedToolNodeIds: ${connectedIds.join(', ') || '(none)'}`);
-    console.log(`[mock.agent] callTools=${callTools}, maxToolCalls=${maxToolCalls}`);
+    logDiagnostic(`[mock.agent] connectedToolNodeIds: ${connectedIds.join(', ') || '(none)'}`);
+    logDiagnostic(`[mock.agent] callTools=${callTools}, maxToolCalls=${maxToolCalls}`);
 
     if (connectedIds.length === 0) {
-      console.log('[mock.agent] No connected tool nodes, returning empty list');
+      logDiagnostic('[mock.agent] No connected tool nodes, returning empty list');
       return outputSchema.parse({ discoveredTools: [], toolCount: 0, toolCallResults: [] });
     }
 
@@ -157,7 +160,7 @@ const definition = defineComponent({
 
     // 2. Connect to gateway via MCP SDK client
     const gatewayUrl = DEFAULT_GATEWAY_URL;
-    console.log(`[mock.agent] Connecting to gateway: ${gatewayUrl}`);
+    logDiagnostic(`[mock.agent] Connecting to gateway: ${gatewayUrl}`);
 
     const transport = new TransportImpl(new URL(gatewayUrl), {
       requestInit: {
@@ -183,9 +186,9 @@ const definition = defineComponent({
         description: t.description,
       }));
 
-      console.log(`[mock.agent] Discovered ${tools.length} tools:`);
+      logDiagnostic(`[mock.agent] Discovered ${tools.length} tools:`);
       for (const tool of tools) {
-        console.log(`  - ${tool.name}: ${tool.description ?? '(no description)'}`);
+        logDiagnostic(`  - ${tool.name}: ${tool.description ?? '(no description)'}`);
       }
 
       // Phase 2: Call tools with test arguments
@@ -196,17 +199,17 @@ const definition = defineComponent({
 
         for (const tool of tools) {
           if (callCount >= maxToolCalls) {
-            console.log(`[mock.agent] Reached max tool calls (${maxToolCalls}), stopping.`);
+            logDiagnostic(`[mock.agent] Reached max tool calls (${maxToolCalls}), stopping.`);
             break;
           }
 
           const testArgs = getTestArgsForTool(tool.name);
           if (!testArgs) {
-            console.log(`[mock.agent] No test args for tool '${tool.name}', skipping call.`);
+            logDiagnostic(`[mock.agent] No test args for tool '${tool.name}', skipping call.`);
             continue;
           }
 
-          console.log(
+          logDiagnostic(
             `[mock.agent] ▶ Calling tool '${tool.name}' with args: ${JSON.stringify(testArgs)}`,
           );
           const startTime = Date.now();
@@ -232,7 +235,7 @@ const definition = defineComponent({
             }
 
             if (isError) {
-              console.log(
+              logDiagnostic(
                 `[mock.agent] ✗ Tool '${tool.name}' returned error (${durationMs}ms): ${outputText.substring(0, 200)}`,
               );
               toolCallResults.push({
@@ -242,10 +245,10 @@ const definition = defineComponent({
                 error: outputText.substring(0, 500),
               });
             } else {
-              console.log(
+              logDiagnostic(
                 `[mock.agent] ✓ Tool '${tool.name}' succeeded (${durationMs}ms), output length: ${outputText.length} chars`,
               );
-              console.log(
+              logDiagnostic(
                 `[mock.agent]   Preview: ${outputText.substring(0, 200)}${outputText.length > 200 ? '...' : ''}`,
               );
               toolCallResults.push({
@@ -261,7 +264,7 @@ const definition = defineComponent({
           } catch (error: unknown) {
             const durationMs = Date.now() - startTime;
             const errorMsg = error instanceof Error ? error.message : String(error);
-            console.log(
+            logDiagnostic(
               `[mock.agent] ✗ Tool '${tool.name}' threw exception (${durationMs}ms): ${errorMsg}`,
             );
             toolCallResults.push({
@@ -277,7 +280,7 @@ const definition = defineComponent({
 
         const succeeded = toolCallResults.filter((r) => r.success).length;
         const failed = toolCallResults.filter((r) => !r.success).length;
-        console.log(
+        logDiagnostic(
           `[mock.agent] Tool call summary: ${succeeded} succeeded, ${failed} failed out of ${toolCallResults.length} calls`,
         );
       }
