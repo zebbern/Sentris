@@ -5,6 +5,7 @@ import type { ITraceService } from '@sentris/component-sdk';
 import { ConfigurationError } from '@sentris/component-sdk';
 import * as schema from '../../adapters/schema';
 import type { HumanInputType } from '../../adapters/schema';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 /**
  * Human input request creation input
@@ -97,7 +98,7 @@ export async function createHumanInputRequestActivity(
     organizationId: input.organizationId ?? null,
   });
 
-  console.log(
+  workflowDiagnosticLog(
     `[HumanInputActivity] Created ${input.inputType} request ${requestId} for run ${input.runId}, node ${input.nodeRef}`,
   );
 
@@ -148,7 +149,7 @@ export async function cancelHumanInputRequestActivity(requestId: string): Promis
     })
     .where(eq(schema.humanInputRequestsTable.id, requestId));
 
-  console.log(`[HumanInputActivity] Cancelled human input request ${requestId}`);
+  workflowDiagnosticLog(`[HumanInputActivity] Cancelled human input request ${requestId}`);
 }
 
 /**
@@ -168,5 +169,5 @@ export async function expireHumanInputRequestActivity(requestId: string): Promis
     })
     .where(eq(schema.humanInputRequestsTable.id, requestId));
 
-  console.log(`[HumanInputActivity] Expired human input request ${requestId}`);
+  workflowDiagnosticLog(`[HumanInputActivity] Expired human input request ${requestId}`);
 }
