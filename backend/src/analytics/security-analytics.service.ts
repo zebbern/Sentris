@@ -209,14 +209,18 @@ export class SecurityAnalyticsService {
           ? (response.body.hits.total.value ?? 0)
           : (response.body.hits.total ?? 0);
 
-      const hits = response.body.hits.hits.map(
-        (hit: { _id: string; _source?: Record<string, unknown>; _score?: string | number }) => ({
-          _id: hit._id as string,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
-          _source: (hit._source ?? {}) as Record<string, any>,
-          ...(hit._score !== undefined && { _score: Number(hit._score) }),
-        }),
-      );
+      const rawHits = response.body.hits.hits as {
+        _id?: string;
+        _source?: Record<string, unknown>;
+        _score?: string | number;
+      }[];
+
+      const hits = rawHits.map((hit) => ({
+        _id: hit._id ?? '',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
+        _source: (hit._source ?? {}) as Record<string, any>,
+        ...(hit._score !== undefined && { _score: Number(hit._score) }),
+      }));
 
       return {
         total,
