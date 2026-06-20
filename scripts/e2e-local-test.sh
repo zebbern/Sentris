@@ -26,7 +26,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  Missing $ENV_FILE"
     echo ""
     echo "Setting up environment..."
-    bun run e2e-tests/scripts/setup-e2e-env.ts || {
+    bun run test:e2e:setup || {
         echo "❌ Setup cancelled"
         exit 1
     }

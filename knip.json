@@ -7,15 +7,25 @@
     "e2e-tests/**/*.test.ts",
     "e2e-tests/**/*.spec.ts",
     "e2e-tests/scripts/**/*.ts",
+    "backend/src/**/*.test.ts",
+    "backend/src/**/*.spec.ts",
     "backend/src/main.ts",
     "backend/src/**/*.module.ts",
     "backend/scripts/**/*.ts",
+    "frontend/src/**/*.test.ts",
+    "frontend/src/**/*.test.tsx",
+    "frontend/src/**/*.spec.ts",
+    "frontend/src/**/*.spec.tsx",
     "frontend/src/main.tsx",
     "frontend/src/App.tsx",
     "frontend/vite.config.ts",
+    "worker/src/**/*.test.ts",
+    "worker/src/**/*.spec.ts",
     "worker/src/temporal/workers/**/*.ts",
     "worker/src/health/health-server.ts",
     "worker/scripts/**/*.ts",
+    "packages/*/src/**/*.test.ts",
+    "packages/*/src/**/*.spec.ts",
     "packages/*/src/index.ts"
   ],
   "project": [
@@ -31,13 +41,23 @@
     "worker/scripts/**/*.ts",
     "packages/*/src/**/*.ts"
   ],
+  "workspaces": {
+    "frontend": {
+      "entry": [
+        "src/main.tsx",
+        "src/App.tsx",
+        "vite.config.ts",
+        "src/test/run-tests-serial.ts",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "src/**/*.spec.ts",
+        "src/**/*.spec.tsx"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "vite.config.ts"]
+    }
+  },
   "ignore": [".tasks/**", ".instances/**", "docs/**", "docker/**", "**/dist/**"],
   "ignoreFiles": [
-    "**/__tests__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
     "backend/scripts/**/*.ts",
     "backend/src/mcp-servers/index.ts",
     "backend/src/mcp/index.ts",
