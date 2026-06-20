@@ -319,6 +319,36 @@ describe('MCP Activities', () => {
       expect(rmCalls.length).toBe(2);
     });
 
+    it('does not mirror successful cleanup diagnostics to console.log by default', async () => {
+      delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createMockFetchResponse({ containerIds: ['container-1'] }),
+      );
+
+      mockExecFile.mockImplementation(async (cmd: string, args: string[]) => {
+        if (args.includes('ps')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (args.includes('rm')) {
+          return { stdout: '', stderr: '' };
+        }
+        if (args.includes('volume')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      try {
+        await cleanupRunResourcesActivity({ runId: 'run-cleanup-quiet' });
+
+        expect(consoleSpy).not.toHaveBeenCalled();
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+
     it('skips containers with unsafe IDs', async () => {
       (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: ['valid-container', '; rm -rf /'] }),

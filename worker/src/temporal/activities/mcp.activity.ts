@@ -14,6 +14,7 @@ import {
   AreAllToolsReadyActivityInput,
   AreAllToolsReadyActivityOutput,
 } from '../types';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 const DEFAULT_API_BASE_URL =
   process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
@@ -138,7 +139,7 @@ export async function cleanupRunResourcesActivity(
       .map((line) => line.trim())
       .filter(Boolean);
 
-    console.log(
+    workflowDiagnosticLog(
       `[MCP Cleanup] Found ${namePatternContainerIds.length} containers matching name pattern`,
     );
   } catch (error: unknown) {
@@ -150,13 +151,13 @@ export async function cleanupRunResourcesActivity(
     new Set([...registryContainerIds, ...namePatternContainerIds]),
   );
 
-  console.log(
+  workflowDiagnosticLog(
     `[MCP Cleanup] Cleaning up ${allContainerIds.length} containers for run ${input.runId} ` +
       `(${registryContainerIds.length} from registry, ${namePatternContainerIds.length} from name pattern)`,
   );
 
   if (allContainerIds.length === 0) {
-    console.log(`[MCP Cleanup] No containers to clean up for run ${input.runId}`);
+    workflowDiagnosticLog(`[MCP Cleanup] No containers to clean up for run ${input.runId}`);
   } else {
     await Promise.all(
       allContainerIds.map(async (containerId: string) => {
@@ -167,7 +168,7 @@ export async function cleanupRunResourcesActivity(
         }
         try {
           await execFileAsync('docker', ['rm', '-f', containerId]);
-          console.log(`[MCP Cleanup] Removed container: ${containerId}`);
+          workflowDiagnosticLog(`[MCP Cleanup] Removed container: ${containerId}`);
         } catch (error: unknown) {
           console.warn(`[MCP Cleanup] Failed to remove container ${containerId}:`, error);
         }
