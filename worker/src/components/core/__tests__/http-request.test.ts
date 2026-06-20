@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { definition } from '../http-request';
 import type { ExecutionContext } from '@sentris/component-sdk';
+import { extractPorts } from '@sentris/component-sdk/zod-ports';
 
 // Helper to create a dummy context
 const mockContext: ExecutionContext = {
@@ -72,6 +73,24 @@ describe('HTTP Request Component', () => {
 
   afterAll(() => {
     server.stop();
+  });
+
+  test('resolvePorts preserves response outputs when auth inputs are dynamic', () => {
+    const resolvedPorts = definition.resolvePorts?.({
+      method: 'GET',
+      contentType: 'application/json',
+      authType: 'bearer',
+      timeout: 1000,
+      failOnError: true,
+    });
+
+    expect(resolvedPorts?.outputs).toBeDefined();
+
+    const outputIds = extractPorts(resolvedPorts!.outputs!).map((port) => port.id);
+    expect(outputIds).toContain('status');
+    expect(outputIds).toContain('data');
+    expect(outputIds).toContain('headers');
+    expect(outputIds).toContain('rawBody');
   });
 
   test('should handle basic GET request', async () => {

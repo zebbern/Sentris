@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import { HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type { ServiceWorkflowResponse } from '../../workflows/dto/workflow-graph.dto';
 import { TemplateService } from '../templates.service';
@@ -47,6 +49,30 @@ function makeTemplate(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2025-01-01T00:00:00Z'),
     updatedAt: new Date('2025-01-01T00:00:00Z'),
     ...overrides,
+  };
+}
+
+const seedTemplateDir = join(import.meta.dir, '../../../scripts/seed-templates');
+const bugBountyCveTemplateFiles = [
+  'bug-bounty-recon-triage.json',
+  'cve-impact-research-brief.json',
+  'exposed-service-cve-mapper.json',
+  'web-attack-surface-quick-win-hunt.json',
+] as const;
+
+function loadSeedTemplate(fileName: (typeof bugBountyCveTemplateFiles)[number]) {
+  return JSON.parse(readFileSync(join(seedTemplateDir, fileName), 'utf8')) as {
+    _metadata: {
+      name: string;
+      description?: string;
+      category: string;
+      tags: string[];
+      author: string;
+      version: string;
+    };
+    manifest: Record<string, unknown>;
+    graph: Record<string, unknown>;
+    requiredSecrets: { name: string; type: string; description: string }[];
   };
 }
 
@@ -166,6 +192,41 @@ describe('TemplateService', () => {
         templateId: 'tpl-1',
         templateName: 'Sample Template',
       });
+    });
+
+    it('creates workflows from the bug bounty and CVE research seed templates', async () => {
+      for (const fileName of bugBountyCveTemplateFiles) {
+        const seedTemplate = loadSeedTemplate(fileName);
+        const tpl = makeTemplate({
+          id: `tpl-${fileName}`,
+          name: seedTemplate._metadata.name,
+          description: seedTemplate._metadata.description ?? '',
+          category: seedTemplate._metadata.category,
+          tags: seedTemplate._metadata.tags,
+          author: seedTemplate._metadata.author,
+          version: seedTemplate._metadata.version,
+          manifest: seedTemplate.manifest,
+          graph: seedTemplate.graph,
+          requiredSecrets: seedTemplate.requiredSecrets,
+        });
+
+        const mockWorkflow = { id: `wf-${fileName}` } as unknown as ServiceWorkflowResponse;
+        templatesRepository.findById.mockResolvedValueOnce(tpl);
+        workflowsService.create.mockResolvedValueOnce(mockWorkflow);
+        templatesRepository.incrementPopularity.mockResolvedValueOnce(undefined);
+
+        const result = await service.useTemplate(tpl.id, {
+          workflowName: `${seedTemplate._metadata.name} Copy`,
+        });
+
+        expect(result.templateName).toBe(seedTemplate._metadata.name);
+        expect(result.workflow.id).toBe(`wf-${fileName}`);
+      }
+
+      expect(workflowsService.create).toHaveBeenCalledTimes(bugBountyCveTemplateFiles.length);
+      expect(templatesRepository.incrementPopularity).toHaveBeenCalledTimes(
+        bugBountyCveTemplateFiles.length,
+      );
     });
 
     it('throws NotFoundException when template is not found', async () => {

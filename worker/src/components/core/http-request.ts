@@ -211,7 +211,7 @@ const definition = defineComponent({
       });
     }
 
-    return { inputs: inputs(inputShape) };
+    return { inputs: inputs(inputShape), outputs: outputSchema };
   },
   async execute({ inputs, params }, context) {
     const { method, contentType, timeout, failOnError, authType } = params;
