@@ -2,22 +2,87 @@ import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } fr
 
 const redisSetex = vi.fn(async (_key: string, _ttlSeconds: number, _value: string) => 'OK');
 const redisGet = vi.fn(async (_key: string): Promise<string | null> => null);
+const mockHeartbeat = vi.fn();
+const mockStartMcpDockerServer = vi.fn(async () => ({
+  endpoint: 'http://localhost:4100/mcp',
+  containerId: 'mcp-container-1',
+}));
+const mockExecFile = vi.fn(
+  (
+    _file: string,
+    _args: string[],
+    callback?: (error: Error | null, stdout: string, stderr: string) => void,
+  ) => {
+    callback?.(null, '', '');
+  },
+);
+const mockSpawn = vi.fn();
 
 class MockRedis {
   setex = redisSetex;
   get = redisGet;
 }
 
+class MockApplicationFailure extends Error {
+  type: string;
+  nonRetryable: boolean;
+  details?: unknown[];
+
+  constructor(message: string, type: string, nonRetryable: boolean, details?: unknown[]) {
+    super(message);
+    this.name = 'ApplicationFailure';
+    this.type = type;
+    this.nonRetryable = nonRetryable;
+    this.details = details;
+  }
+
+  static nonRetryable(message: string, type: string, details?: unknown[]) {
+    return new MockApplicationFailure(message, type, true, details);
+  }
+
+  static retryable(message: string, type: string, details?: unknown[]) {
+    return new MockApplicationFailure(message, type, false, details);
+  }
+}
+
 mock.module('ioredis', () => ({
   default: MockRedis,
 }));
 
+mock.module('@temporalio/activity', () => ({
+  ApplicationFailure: MockApplicationFailure,
+  Context: {
+    current: () => ({
+      heartbeat: mockHeartbeat,
+    }),
+  },
+}));
+
+mock.module('../../../components/core/mcp-runtime', () => ({
+  startMcpDockerServer: mockStartMcpDockerServer,
+}));
+
+mock.module('node:child_process', () => ({
+  execFile: mockExecFile,
+  spawn: mockSpawn,
+}));
+
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
+const originalFetch = globalThis.fetch;
 let cacheDiscoveryResultActivity: typeof import('../mcp-discovery.activity').cacheDiscoveryResultActivity;
+let discoverMcpGroupToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpGroupToolsActivity;
+
+function createJsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    json: vi.fn(async () => body),
+  } as unknown as Response;
+}
 
 describe('MCP discovery activity diagnostics', () => {
   beforeAll(async () => {
-    ({ cacheDiscoveryResultActivity } = await import('../mcp-discovery.activity'));
+    ({ cacheDiscoveryResultActivity, discoverMcpGroupToolsActivity } =
+      await import('../mcp-discovery.activity'));
   });
 
   beforeEach(() => {
@@ -26,6 +91,7 @@ describe('MCP discovery activity diagnostics', () => {
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     if (originalDebugWorkflow === undefined) {
       delete process.env.SENTRIS_DEBUG_WORKFLOW;
     } else {
@@ -52,6 +118,49 @@ describe('MCP discovery activity diagnostics', () => {
         workflowId: 'workflow-1',
         toolCount: 1,
       });
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  test('discoverMcpGroupToolsActivity does not mirror successful stdio readiness diagnostics to console.log by default', async () => {
+    globalThis.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
+      const href = String(url);
+      if (href.endsWith('/health')) {
+        return createJsonResponse({
+          status: 'ok',
+          servers: [{ ready: true }],
+        });
+      }
+      return createJsonResponse({
+        result: {
+          tools: [{ name: 'list_buckets', description: 'List storage buckets' }],
+        },
+      });
+    }) as unknown as typeof fetch;
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const result = await discoverMcpGroupToolsActivity({
+        servers: [
+          {
+            name: 'storage',
+            transport: 'stdio',
+            command: 'storage-mcp',
+          },
+        ],
+      });
+
+      expect(result.results).toEqual([
+        {
+          name: 'storage',
+          tools: [{ name: 'list_buckets', description: 'List storage buckets' }],
+        },
+      ]);
+      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
+      expect(mockExecFile.mock.calls[0]?.[0]).toBe('docker');
+      expect(mockExecFile.mock.calls[0]?.[1]).toEqual(['rm', '-f', 'mcp-container-1']);
       expect(consoleLogSpy).not.toHaveBeenCalled();
     } finally {
       consoleLogSpy.mockRestore();
