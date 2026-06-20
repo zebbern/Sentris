@@ -2,13 +2,28 @@ import {
   createExecutionContext,
   runComponentWithRunner,
   type DockerRunnerConfig,
+  type LogEventInput,
 } from '@sentris/component-sdk';
+import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 export interface ExecuteWebhookParsingScriptActivityInput {
   parsingScript: string;
   payload: Record<string, unknown>;
   headers: Record<string, string>;
   timeoutSeconds?: number;
+}
+
+function logWebhookParsingEntry(entry: LogEventInput): void {
+  const message = `[Webhook Parse] ${entry.message}`;
+  if (entry.level === 'error') {
+    console.error(message);
+    return;
+  }
+  if (entry.level === 'warn') {
+    console.warn(message);
+    return;
+  }
+  workflowDiagnosticLog(message);
 }
 
 /**
@@ -38,8 +53,14 @@ const rx_any = /./;
 const rx_http = /^https?:\\/\\//;
 const rx_path = /^\\.*\\//;
 
+function debugLog(...args) {
+  if (process.env.SENTRIS_DEBUG_WORKFLOW === "1") {
+    console.log(...args);
+  }
+}
+
 async function load_http_module(href) {
-  console.log("[http-loader] Fetching:", href);
+  debugLog("[http-loader] Fetching:", href);
   const response = await fetch(href);
   const text = await response.text();
   if (response.ok) {
@@ -132,7 +153,9 @@ run();
     image: 'oven/bun:alpine',
     entrypoint: 'sh',
     command: ['-c', shellCommand],
-    env: {},
+    env: {
+      SENTRIS_DEBUG_WORKFLOW: process.env.SENTRIS_DEBUG_WORKFLOW ?? '',
+    },
     network: 'bridge',
     timeoutSeconds,
     stdinJson: false,
@@ -141,17 +164,7 @@ run();
   const context = createExecutionContext({
     runId: `webhook-parse-${Date.now()}`,
     componentRef: 'webhook.parse',
-    logCollector: (entry) => {
-      const log =
-        entry.level === 'error'
-          ? console.error
-          : entry.level === 'warn'
-            ? console.warn
-            : entry.level === 'debug'
-              ? console.debug
-              : console.log;
-      log(`[Webhook Parse] ${entry.message}`);
-    },
+    logCollector: logWebhookParsingEntry,
   });
 
   const params = {

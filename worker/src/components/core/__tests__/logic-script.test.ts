@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'bun:test';
 import { definition } from '../logic-script';
-import { extractPorts, type ExecutionContext } from '@sentris/component-sdk';
+import {
+  extractPorts,
+  type DockerRunnerConfig,
+  type ExecutionContext,
+} from '@sentris/component-sdk';
 import * as sdk from '@sentris/component-sdk';
 
 // Mock context
@@ -23,6 +27,12 @@ const mockContext: ExecutionContext = {
     toCurl: () => '',
   },
 };
+
+function decodeGeneratedFile(command: string, filename: 'plugin.ts' | 'harness.ts'): string {
+  const match = command.match(new RegExp(`echo "([^"]+)" \\| base64 -d > ${filename}`));
+  expect(match).not.toBeNull();
+  return Buffer.from(match![1], 'base64').toString('utf8');
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -63,6 +73,50 @@ describe('Logic/Script Component', () => {
     );
 
     expect(consoleLogSpy).not.toHaveBeenCalled();
+  });
+
+  it('gates sandbox success diagnostics behind component debug logging', async () => {
+    const previousDebugFlag = process.env.SENTRIS_DEBUG_COMPONENTS;
+    delete process.env.SENTRIS_DEBUG_COMPONENTS;
+
+    const runSpy = vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ sum: 3 });
+
+    try {
+      await definition.execute(
+        {
+          inputs: {},
+          params: {
+            code: 'export async function script() { return { sum: 1 + 2 }; }',
+            variables: [],
+            returns: [{ name: 'sum', type: 'number' }],
+          },
+        },
+        mockContext,
+      );
+
+      const [runnerConfig] = runSpy.mock.calls[0] as [DockerRunnerConfig, ...unknown[]];
+      const command = runnerConfig.command.join(' ');
+      const pluginSource = decodeGeneratedFile(command, 'plugin.ts');
+      const harnessSource = decodeGeneratedFile(command, 'harness.ts');
+
+      expect(runnerConfig.env).toEqual({ SENTRIS_DEBUG_COMPONENTS: '' });
+      expect(pluginSource).toContain('SENTRIS_DEBUG_COMPONENTS');
+      expect(harnessSource).toContain('SENTRIS_DEBUG_COMPONENTS');
+      expect(pluginSource).not.toContain('console.log("[http-loader] Fetching:", href);');
+      expect(harnessSource).not.toContain("console.log('[Script] Starting execution...');");
+      expect(harnessSource).not.toContain(
+        "console.log('[Script] Execution completed, writing output...');",
+      );
+      expect(harnessSource).not.toContain(
+        "console.log('[Script] Output written to', OUTPUT_PATH);",
+      );
+    } finally {
+      if (previousDebugFlag === undefined) {
+        delete process.env.SENTRIS_DEBUG_COMPONENTS;
+      } else {
+        process.env.SENTRIS_DEBUG_COMPONENTS = previousDebugFlag;
+      }
+    }
   });
 
   it('transpiles and executes TypeScript', async () => {
