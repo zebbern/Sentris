@@ -57,7 +57,7 @@ const SEVERITY_OPTIONS = [
 ];
 
 const PAGE_SIZE = 25;
-const KANBAN_PAGE_SIZE = 200;
+const KANBAN_PAGE_SIZE = 100;
 const MAX_SELECTION = 100;
 
 const STATUS_FILTER_OPTIONS = [

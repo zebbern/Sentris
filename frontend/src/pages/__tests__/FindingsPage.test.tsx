@@ -4,6 +4,7 @@ import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { renderWithProviders } from '@/test/render-with-providers';
 import type { FindingsResponse, FindingItem } from '@/services/api/findings';
+import type { FindingsQueryParams } from '@/services/api';
 
 // --- Mock select components (passthrough for test rendering) ---
 mock.module('@/components/ui/select', createSelectMock);
@@ -18,14 +19,18 @@ const mockQueryState: {
   isLoading: false,
   error: null,
 };
+const mockFindingsQueryParams: FindingsQueryParams[] = [];
 
 mock.module('@/hooks/queries/useFindingsQueries', () => ({
-  useFindingsQuery: () => ({
-    data: mockQueryState.data,
-    isLoading: mockQueryState.isLoading,
-    error: mockQueryState.error,
-    refetch: mock(),
-  }),
+  useFindingsQuery: (params: FindingsQueryParams) => {
+    mockFindingsQueryParams.push(params);
+    return {
+      data: mockQueryState.data,
+      isLoading: mockQueryState.isLoading,
+      error: mockQueryState.error,
+      refetch: mock(),
+    };
+  },
 }));
 
 // --- Auth store ---
@@ -77,9 +82,11 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockQueryState.data = overrides.data ?? undefined;
   mockQueryState.isLoading = overrides.isLoading ?? false;
   mockQueryState.error = overrides.error ?? null;
+  mockFindingsQueryParams.length = 0;
 };
 
-const renderPage = () => renderWithProviders(<FindingsPage />);
+const renderPage = (initialPath = '/findings') =>
+  renderWithProviders(<FindingsPage />, { initialEntries: [initialPath] });
 
 // --- Tests ---
 describe('FindingsPage', () => {
@@ -181,5 +188,15 @@ describe('FindingsPage', () => {
     expect(screen.getByText('Asset')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Workflow' })).toBeInTheDocument();
     expect(screen.getByText('Run ID')).toBeInTheDocument();
+  });
+
+  it('uses the backend maximum page size in Kanban view', () => {
+    setupStore({ data: POPULATED_RESPONSE });
+    renderPage('/findings?view=kanban');
+
+    const latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(screen.getByRole('region', { name: /Kanban board/i })).toBeInTheDocument();
+    expect(latestParams?.page).toBe(1);
+    expect(latestParams?.pageSize).toBe(100);
   });
 });
