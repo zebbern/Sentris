@@ -1,0 +1,293 @@
+{
+  "_metadata": {
+    "name": "Web Attack Surface Quick Win Hunt",
+    "description": "Authorized bug bounty workflow that refreshes live web metadata, crawls endpoints, runs safe exposure checks, reviews TLS posture, and writes a prioritized quick-win lead report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Web Attack Surface Quick Win Hunt",
+    "description": "Find common, authorized bug bounty leads from known live web assets using httpx, Katana, Nuclei, and testssl.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 9,
+    "edgeCount": 11
+  },
+  "graph": {
+    "name": "Web Attack Surface Quick Win Hunt",
+    "description": "Quick web lead triage workflow for authorized bug bounty assets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 300 },
+        "data": {
+          "label": "Live Web Assets Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "liveUrls",
+                  "label": "Live URLs",
+                  "type": "array",
+                  "required": true,
+                  "description": "Known live URLs or hosts from authorized scope."
+                },
+                {
+                  "id": "outOfScopePaths",
+                  "label": "Out-of-scope paths",
+                  "type": "array",
+                  "required": false,
+                  "description": "Paths that should not be tested."
+                },
+                {
+                  "id": "scanIntensity",
+                  "label": "Scan intensity",
+                  "type": "text",
+                  "required": false,
+                  "description": "Operator note such as safe, normal, or thorough."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_refresh",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 420, "y": 300 },
+        "data": {
+          "label": "Refresh Live Metadata",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_live_urls",
+        "type": "core.logic.script",
+        "position": { "x": 740, "y": 300 },
+        "data": {
+          "label": "Extract Live and TLS Targets",
+          "config": {
+            "params": {
+              "variables": [{ "name": "httpResponses", "type": "list-json" }],
+              "returns": [
+                { "name": "liveUrls", "type": "list-text" },
+                { "name": "tlsTargets", "type": "list-text" }
+              ],
+              "code": "export function script(input) {\n  const responses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const liveUrls = responses.map((item) => item?.url || item?.finalUrl || item?.input).filter((value) => typeof value === 'string' && value.length > 0);\n  const tlsTargets = liveUrls.filter((url) => url.startsWith('https://')).map((url) => { try { const parsed = new URL(url); return `${parsed.hostname}:${parsed.port || '443'}`; } catch { return null; } }).filter((value) => typeof value === 'string' && value.length > 0);\n  return { liveUrls: Array.from(new Set(liveUrls)), tlsTargets: Array.from(new Set(tlsTargets)) };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "katana_crawl",
+        "type": "sentris.katana.run",
+        "position": { "x": 1060, "y": 120 },
+        "data": {
+          "label": "Crawl Endpoints",
+          "config": {
+            "params": {
+              "depth": 2,
+              "headless": false,
+              "timeout": 300,
+              "scope": "strict"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "nuclei_quick_checks",
+        "type": "sentris.nuclei.scan",
+        "position": { "x": 1060, "y": 300 },
+        "data": {
+          "label": "Run Safe Quick Checks",
+          "config": {
+            "params": {
+              "rateLimit": 75,
+              "concurrency": 15,
+              "timeout": 8,
+              "retries": 1,
+              "includeRaw": false,
+              "followRedirects": true,
+              "updateTemplates": false,
+              "disableHttpx": true,
+              "severityFilter": ["info", "low", "medium", "high", "critical"]
+            },
+            "inputOverrides": {
+              "templatePaths": ["http/exposures/", "http/misconfiguration/", "http/takeovers/"]
+            }
+          }
+        }
+      },
+      {
+        "id": "select_tls_target",
+        "type": "core.logic.script",
+        "position": { "x": 1060, "y": 500 },
+        "data": {
+          "label": "Select TLS Target",
+          "config": {
+            "params": {
+              "variables": [{ "name": "tlsTargets", "type": "list-text" }],
+              "returns": [{ "name": "tlsTarget", "type": "string" }],
+              "code": "export function script(input) {\n  const targets = Array.isArray(input.tlsTargets) ? input.tlsTargets : [];\n  return { tlsTarget: targets[0] || 'no-https-target-provided.invalid:443' };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "testssl_review",
+        "type": "sentris.testssl.run",
+        "position": { "x": 1380, "y": 500 },
+        "data": {
+          "label": "Review TLS Posture",
+          "config": {
+            "params": {
+              "protocols": true,
+              "ciphers": true,
+              "vulnerabilities": true,
+              "timeout": 600
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "rank_quick_wins",
+        "type": "core.logic.script",
+        "position": { "x": 1700, "y": 300 },
+        "data": {
+          "label": "Rank Quick-Win Leads",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "httpResponses", "type": "list-json" },
+                { "name": "endpoints", "type": "list-text" },
+                { "name": "nucleiFindings", "type": "list-json" },
+                { "name": "tlsFindings", "type": "list-json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const endpoints = Array.isArray(input.endpoints) ? input.endpoints : [];\n  const nucleiFindings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const tlsFindings = Array.isArray(input.tlsFindings) ? input.tlsFindings : [];\n  const quickWins = nucleiFindings.filter((item) => ['medium', 'high', 'critical'].includes(String(item?.severity || '').toLowerCase())).map((item) => ({ source: 'nuclei', templateId: item.templateId, name: item.name, severity: item.severity, matchedAt: item.matchedAt }));\n  return { report: { summary: { liveAssets: httpResponses.length, crawledEndpoints: endpoints.length, nucleiFindings: nucleiFindings.length, tlsFindings: tlsFindings.length, quickWins: quickWins.length }, quickWins: quickWins.slice(0, 100), needsReview: nucleiFindings.slice(0, 100), tlsFindings: tlsFindings.slice(0, 50), interestingEndpoints: endpoints.filter((url) => /admin|debug|api|graphql|swagger|login|backup/i.test(url)).slice(0, 100), nextSteps: ['Validate findings manually before submitting reports', 'Confirm each lead is in scope', 'Avoid destructive checks and respect program rate limits'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 2020, "y": 300 },
+        "data": {
+          "label": "Save Quick-Win Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "web-attack-surface-quick-wins-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-httpx_refresh-liveUrls",
+        "source": "trigger_1",
+        "target": "httpx_refresh",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "httpx_refresh-extract_live_urls-responses",
+        "source": "httpx_refresh",
+        "target": "extract_live_urls",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "extract_live_urls-katana_crawl-liveUrls",
+        "source": "extract_live_urls",
+        "target": "katana_crawl",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "extract_live_urls-nuclei_quick_checks-liveUrls",
+        "source": "extract_live_urls",
+        "target": "nuclei_quick_checks",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "extract_live_urls-select_tls_target-tlsTargets",
+        "source": "extract_live_urls",
+        "target": "select_tls_target",
+        "sourceHandle": "tlsTargets",
+        "targetHandle": "tlsTargets"
+      },
+      {
+        "id": "select_tls_target-testssl_review-tlsTarget",
+        "source": "select_tls_target",
+        "target": "testssl_review",
+        "sourceHandle": "tlsTarget",
+        "targetHandle": "target"
+      },
+      {
+        "id": "httpx_refresh-rank_quick_wins-responses",
+        "source": "httpx_refresh",
+        "target": "rank_quick_wins",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "katana_crawl-rank_quick_wins-endpoints",
+        "source": "katana_crawl",
+        "target": "rank_quick_wins",
+        "sourceHandle": "endpoints",
+        "targetHandle": "endpoints"
+      },
+      {
+        "id": "nuclei_quick_checks-rank_quick_wins-findings",
+        "source": "nuclei_quick_checks",
+        "target": "rank_quick_wins",
+        "sourceHandle": "findings",
+        "targetHandle": "nucleiFindings"
+      },
+      {
+        "id": "testssl_review-rank_quick_wins-findings",
+        "source": "testssl_review",
+        "target": "rank_quick_wins",
+        "sourceHandle": "findings",
+        "targetHandle": "tlsFindings"
+      },
+      {
+        "id": "rank_quick_wins-artifact_report-report",
+        "source": "rank_quick_wins",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

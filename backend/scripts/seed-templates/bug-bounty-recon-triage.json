@@ -1,0 +1,238 @@
+{
+  "_metadata": {
+    "name": "Bug Bounty Recon Triage",
+    "description": "Authorized bug bounty recon workflow that discovers subdomains, resolves live hosts, probes HTTP services, crawls applications, and writes a prioritized recon report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "recon", "subdomains", "httpx", "katana", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Bug Bounty Recon Triage",
+    "description": "Turn in-scope domains into a prioritized recon report with subdomain discovery, DNS resolution, live HTTP probing, crawling, and triage.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "recon", "subdomains", "httpx", "katana", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 8,
+    "edgeCount": 8
+  },
+  "graph": {
+    "name": "Bug Bounty Recon Triage",
+    "description": "Authorized recon triage workflow for bug bounty targets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Scope Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "domains",
+                  "label": "In-scope root domains",
+                  "type": "array",
+                  "required": true,
+                  "description": "Root domains approved by the bug bounty program."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, and rate-limit notes."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "subfinder_discovery",
+        "type": "sentris.subfinder.run",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Discover Subdomains",
+          "config": {
+            "params": {
+              "threads": 10,
+              "timeout": 30,
+              "allSources": false,
+              "recursive": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dnsx_resolve",
+        "type": "sentris.dnsx.run",
+        "position": { "x": 740, "y": 260 },
+        "data": {
+          "label": "Resolve Live Hosts",
+          "config": {
+            "params": {
+              "recordTypes": ["A"],
+              "outputMode": "json",
+              "includeResponses": true,
+              "threads": 100,
+              "retryCount": 2
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 1060, "y": 260 },
+        "data": {
+          "label": "Probe HTTP Services",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_live_urls",
+        "type": "core.logic.script",
+        "position": { "x": 1380, "y": 120 },
+        "data": {
+          "label": "Extract Live URLs",
+          "config": {
+            "params": {
+              "variables": [{ "name": "httpResponses", "type": "list-json" }],
+              "returns": [{ "name": "liveUrls", "type": "list-text" }],
+              "code": "export function script(input) {\n  const responses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const urls = responses.map((item) => item?.url || item?.finalUrl || item?.input).filter((value) => typeof value === 'string' && value.length > 0);\n  return { liveUrls: Array.from(new Set(urls)) };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "katana_crawl",
+        "type": "sentris.katana.run",
+        "position": { "x": 1700, "y": 120 },
+        "data": {
+          "label": "Crawl Live Applications",
+          "config": {
+            "params": {
+              "depth": 2,
+              "headless": false,
+              "timeout": 300,
+              "scope": "strict"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "rank_recon",
+        "type": "core.logic.script",
+        "position": { "x": 2020, "y": 260 },
+        "data": {
+          "label": "Rank Recon Leads",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "httpResponses", "type": "list-json" },
+                { "name": "endpoints", "type": "list-text" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const responses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const endpoints = Array.isArray(input.endpoints) ? input.endpoints : [];\n  const interesting = responses.filter((item) => [200, 401, 403, 500].includes(Number(item?.statusCode))).map((item) => ({ url: item.url, statusCode: item.statusCode, title: item.title, technologies: item.technologies || [] }));\n  return { report: { summary: { liveHosts: responses.length, crawledEndpoints: endpoints.length, interestingAssets: interesting.length }, interestingAssets: interesting.slice(0, 100), endpoints: endpoints.slice(0, 200), nextSteps: ['Review 401/403 assets for auth bypass', 'Inspect unusual titles and technologies', 'Run targeted checks only inside authorized scope'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 2340, "y": 260 },
+        "data": {
+          "label": "Save Recon Triage Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "bug-bounty-recon-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-subfinder_discovery-domains",
+        "source": "trigger_1",
+        "target": "subfinder_discovery",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "subfinder_discovery-dnsx_resolve-subdomains",
+        "source": "subfinder_discovery",
+        "target": "dnsx_resolve",
+        "sourceHandle": "subdomains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "dnsx_resolve-httpx_probe-resolvedHosts",
+        "source": "dnsx_resolve",
+        "target": "httpx_probe",
+        "sourceHandle": "resolvedHosts",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "httpx_probe-extract_live_urls-responses",
+        "source": "httpx_probe",
+        "target": "extract_live_urls",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "extract_live_urls-katana_crawl-liveUrls",
+        "source": "extract_live_urls",
+        "target": "katana_crawl",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "httpx_probe-rank_recon-responses",
+        "source": "httpx_probe",
+        "target": "rank_recon",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "katana_crawl-rank_recon-endpoints",
+        "source": "katana_crawl",
+        "target": "rank_recon",
+        "sourceHandle": "endpoints",
+        "targetHandle": "endpoints"
+      },
+      {
+        "id": "rank_recon-artifact_report-report",
+        "source": "rank_recon",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}
