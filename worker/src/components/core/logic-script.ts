@@ -118,8 +118,14 @@ const rx_any = /./;
 const rx_http = /^https?:\\/\\//;
 const rx_path = /^\\.*\\//;
 
+function debugLog(...args) {
+    if (process.env.SENTRIS_DEBUG_COMPONENTS === "1") {
+        console.log(...args);
+    }
+}
+
 async function load_http_module(href) {
-    console.log("[http-loader] Fetching:", href);
+    debugLog("[http-loader] Fetching:", href);
     const response = await fetch(href);
     const text = await response.text();
     if (response.ok) {
@@ -162,9 +168,15 @@ plugin({
 const harnessCode = `
 import { readFileSync, writeFileSync } from "node:fs";
 
+function debugLog(...args) {
+  if (process.env.SENTRIS_DEBUG_COMPONENTS === "1") {
+    console.log(...args);
+  }
+}
+
 async function run() {
   try {
-    console.log('[Script] Starting execution...');
+    debugLog('[Script] Starting execution...');
     
     // Read the combined payload from the mounted input file
     const inputPath = process.env.SENTRIS_INPUT_PATH || '/sentris-output/input.json';
@@ -191,7 +203,7 @@ async function run() {
     const { script } = await import("./user_script.ts");
     const result = await script(inputValues);
     
-    console.log('[Script] Execution completed, writing output...');
+    debugLog('[Script] Execution completed, writing output...');
     const OUTPUT_PATH = process.env.SENTRIS_OUTPUT_PATH || '/sentris-output/result.json';
     const OUTPUT_DIR = OUTPUT_PATH.substring(0, OUTPUT_PATH.lastIndexOf('/'));
     
@@ -201,7 +213,7 @@ async function run() {
         mkdirSync(OUTPUT_DIR, { recursive: true });
       }
       writeFileSync(OUTPUT_PATH, JSON.stringify(result || {}));
-      console.log('[Script] Output written to', OUTPUT_PATH);
+      debugLog('[Script] Output written to', OUTPUT_PATH);
     } catch (writeErr) {
       console.error('[Script] Failed to write output:', writeErr.message);
       throw writeErr;
@@ -306,7 +318,7 @@ const definition = defineComponent({
       ...baseRunner,
       command: ['-c', shellCommand],
       env: {
-        // No SENTRIS_INPUTS here to avoid E2BIG
+        SENTRIS_DEBUG_COMPONENTS: process.env.SENTRIS_DEBUG_COMPONENTS ?? '',
       },
     };
 

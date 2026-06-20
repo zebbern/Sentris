@@ -18,8 +18,11 @@ import { executeWebhookParsingScriptActivity } from '../webhook-parsing.activity
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
+const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
+
 describe('executeWebhookParsingScriptActivity', () => {
   beforeEach(() => {
+    delete process.env.SENTRIS_DEBUG_WORKFLOW;
     mockRunComponentWithRunner.mockReset();
     mockCreateExecutionContext.mockClear();
     mockCreateExecutionContext.mockReturnValue({
@@ -123,5 +126,32 @@ describe('executeWebhookParsingScriptActivity', () => {
 
     const ctxArg = mockCreateExecutionContext.mock.calls[0][0];
     expect(ctxArg.runId).toContain('webhook-parse-');
+  });
+
+  it('does not mirror parser info/debug collector logs to console by default', async () => {
+    mockRunComponentWithRunner.mockResolvedValue({});
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+
+    try {
+      await executeWebhookParsingScriptActivity({
+        parsingScript: 'export async function script() { return {}; }',
+        payload: {},
+        headers: {},
+      });
+
+      const ctxArg = mockCreateExecutionContext.mock.calls[0][0];
+      ctxArg.logCollector({ level: 'info', message: 'parser started' });
+      ctxArg.logCollector({ level: 'debug', message: 'parser details' });
+
+      expect(consoleLogSpy).not.toHaveBeenCalled();
+      expect(consoleDebugSpy).not.toHaveBeenCalled();
+    } finally {
+      if (originalDebugWorkflow === undefined) {
+        delete process.env.SENTRIS_DEBUG_WORKFLOW;
+      } else {
+        process.env.SENTRIS_DEBUG_WORKFLOW = originalDebugWorkflow;
+      }
+    }
   });
 });
