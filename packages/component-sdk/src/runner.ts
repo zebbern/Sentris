@@ -486,7 +486,6 @@ async function runDockerWithPty<I, O>(
         } : String(error)
       };
 
-      console.log('diag', diag);
       context.logger.warn(
         `[Docker][PTY] Failed to spawn PTY: ${error instanceof Error ? error.message : String(error)}. Diagnostic: ${JSON.stringify(diag)}`,
       );
