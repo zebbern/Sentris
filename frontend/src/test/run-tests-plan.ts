@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import * as ts from 'typescript';
 
 const TEST_FILE_PATTERN = /\.(test|spec)\.[jt]sx?$/;
-const MOCK_MODULE_PATTERN = /\bmock\.module\s*\(/;
 
 export interface FrontendTestRun {
   label: string;
@@ -36,8 +36,49 @@ export function toPosixRelative(filePath: string, cwd = process.cwd()): string {
   return path.relative(cwd, filePath).split(path.sep).join(path.posix.sep);
 }
 
+function getScriptKind(filePath: string): ts.ScriptKind {
+  switch (path.extname(filePath).toLowerCase()) {
+    case '.tsx':
+      return ts.ScriptKind.TSX;
+    case '.jsx':
+      return ts.ScriptKind.JSX;
+    case '.js':
+      return ts.ScriptKind.JS;
+    default:
+      return ts.ScriptKind.TS;
+  }
+}
+
 export function usesMockModule(filePath: string): boolean {
-  return MOCK_MODULE_PATTERN.test(readFileSync(filePath, 'utf8'));
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    readFileSync(filePath, 'utf8'),
+    ts.ScriptTarget.Latest,
+    false,
+    getScriptKind(filePath),
+  );
+
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === 'mock' &&
+      node.expression.name.text === 'module'
+    ) {
+      found = true;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return found;
 }
 
 export function planFrontendTestRuns(
