@@ -46,6 +46,25 @@ describe('Logic/Script Component', () => {
     expect(result).toEqual({ sum: 3 });
   });
 
+  it('does not mirror host-side execution diagnostics to console.log by default', async () => {
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ sum: 3 });
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await definition.execute(
+      {
+        inputs: {},
+        params: {
+          code: 'export async function script() { return { sum: 1 + 2 }; }',
+          variables: [],
+          returns: [{ name: 'sum', type: 'number' }],
+        },
+      },
+      mockContext,
+    );
+
+    expect(consoleLogSpy).not.toHaveBeenCalled();
+  });
+
   it('transpiles and executes TypeScript', async () => {
     vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ msg: 'Value is 10' });
     const tsCode = `

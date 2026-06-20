@@ -476,17 +476,19 @@ interface RegisterGatewayToolsParams {
   gatewayUrl: string;
   sessionToken: string;
   createClient?: typeof createMCPClient;
+  logInfo?: (message: string) => void;
 }
 
 async function registerGatewayTools({
   gatewayUrl,
   sessionToken,
   createClient = createMCPClient,
+  logInfo,
 }: RegisterGatewayToolsParams): Promise<{
   tools: ToolSet;
   close: () => Promise<void>;
 }> {
-  console.log(`[AGENT] Connecting to MCP gateway at ${gatewayUrl} to discover tools`);
+  logInfo?.(`[AGENT] Connecting to MCP gateway at ${gatewayUrl} to discover tools`);
   const mcpClient = await createClient({
     transport: {
       type: 'http',
@@ -496,7 +498,7 @@ async function registerGatewayTools({
   });
 
   const tools = (await mcpClient.tools()) as ToolSet;
-  console.log(
+  logInfo?.(
     `[AGENT] Discovered ${Object.keys(tools).length} tools from gateway: ${Object.keys(tools).join(', ') || 'none'}`,
   );
   return {
@@ -581,6 +583,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
           gatewayUrl: DEFAULT_GATEWAY_URL,
           sessionToken,
           createClient: createMCPClientImpl,
+          logInfo: (message) => context.logger.info(message),
         });
         discoveredTools = discoveryResult.tools;
         closeDiscovery = discoveryResult.close;
