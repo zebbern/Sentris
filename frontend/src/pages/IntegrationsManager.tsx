@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useToast } from '@/components/ui/use-toast';
 import { ErrorBanner } from '@/components/ui/error-banner';
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { getCurrentUserId } from '@/lib/currentUser';
@@ -119,8 +118,6 @@ export function IntegrationsManager() {
   return (
     <div className="flex-1 bg-background" aria-busy={loadingProviders || loadingConnections}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <PageToolbar title="Connections" className="mb-4 md:mb-6" />
-
         {error && (
           <ErrorBanner
             message={error}

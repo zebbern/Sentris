@@ -166,11 +166,14 @@ describe('SchedulesPage', () => {
     cleanup();
   });
 
-  it('renders page heading', () => {
+  it('omits the redundant page heading supplied by the app top bar', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 2, name: /Schedules/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /^Schedules$/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New schedule/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

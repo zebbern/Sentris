@@ -272,7 +272,6 @@ export function SchedulesPage() {
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           <PageToolbar
-            title="Schedules"
             searchValue={filters.search}
             onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
             searchLabel="Search schedules or workflows"

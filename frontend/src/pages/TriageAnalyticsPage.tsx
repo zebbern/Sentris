@@ -28,10 +28,7 @@ export function TriageAnalyticsPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
       {/* Header */}
-      <PageToolbar
-        title="Triage Analytics"
-        actions={<PeriodSelector value={period} onChange={handlePeriodChange} />}
-      />
+      <PageToolbar actions={<PeriodSelector value={period} onChange={handlePeriodChange} />} />
 
       {/* MTTR KPI Cards */}
       <section aria-label="Mean Time to Remediate">

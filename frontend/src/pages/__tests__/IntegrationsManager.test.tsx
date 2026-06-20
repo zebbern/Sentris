@@ -202,10 +202,15 @@ describe('IntegrationsManager', () => {
     expect(screen.getByText('Available providers')).toBeInTheDocument();
   });
 
-  it('renders page heading', () => {
+  it('omits the redundant page heading supplied by the app top bar', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 2, name: /^Connections$/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /^Connections$/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Active connections/i }),
+    ).toBeInTheDocument();
   });
 
   it('renders section headings', () => {

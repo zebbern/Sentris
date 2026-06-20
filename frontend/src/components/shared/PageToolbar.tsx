@@ -111,8 +111,8 @@ export function PageToolbar({
           </div>
           {((!hasTitle && actions) || filters) && (
             <div className="flex flex-wrap gap-2">
-              {!hasTitle && actions}
               {filters}
+              {!hasTitle && actions}
             </div>
           )}
         </div>

@@ -148,11 +148,14 @@ describe('ActionCenterPage', () => {
     ]),
   );
 
-  it('renders page heading', () => {
+  it('omits the redundant page heading supplied by the app top bar', () => {
     setupStore();
     renderPage();
 
-    expect(screen.getByRole('heading', { level: 2, name: /Action Center/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /^Action Center$/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Filter by title, node, or run ID/i)).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {
