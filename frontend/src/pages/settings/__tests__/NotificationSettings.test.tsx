@@ -1,5 +1,6 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -87,6 +88,14 @@ describe('NotificationSettings', () => {
   });
 
   afterEach(cleanup);
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/use-toast',
+      '@/hooks/useNotificationPermission',
+      '@/store/userPreferencesStore',
+    ]),
+  );
 
   // --- Rendering ---
 

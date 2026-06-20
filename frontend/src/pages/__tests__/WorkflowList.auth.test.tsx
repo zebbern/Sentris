@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, afterAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { screen, cleanup } from '@testing-library/react';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { createAlertDialogMock } from '@/test/mocks/dialog';
@@ -10,6 +10,7 @@ import {
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { createSelectMock } from '@/test/mocks/radix-select';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -127,6 +128,26 @@ describe('WorkflowList role gating', () => {
   afterEach(() => {
     cleanup();
   });
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/alert-dialog',
+      '@/components/ui/dropdown-menu',
+      '@/components/ui/select',
+      '@/components/ui/tooltip',
+      '@/components/ui/use-toast',
+      '@/features/analytics/events',
+      '@/hooks/queries/useWorkflowQueries',
+      '@/hooks/useDocumentTitle',
+      '@/hooks/useSortableList',
+      '@/lib/logger',
+      '@/store/authStore',
+      '@/utils/auth',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+    ]),
+  );
 
   it('enables workflow creation for admins', async () => {
     renderList();

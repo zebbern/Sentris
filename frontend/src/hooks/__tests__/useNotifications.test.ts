@@ -1,6 +1,7 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, afterAll, mock } from 'bun:test';
 import { renderHook, cleanup } from '@testing-library/react';
 import { createStoreMock } from '@/test/mocks/createStoreMock';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // Mock all store and hook dependencies
 const mockSubscribe = mock();
@@ -48,6 +49,17 @@ afterEach(() => {
   mockPush.mockReset();
   mockToast.mockReset();
 });
+
+afterAll(() =>
+  restoreMockedModules([
+    '@/components/ui/use-toast',
+    '@/hooks/useNotificationPermission',
+    '@/lib/logger',
+    '@/store/executionStore',
+    '@/store/notificationStore',
+    '@/store/userPreferencesStore',
+  ]),
+);
 
 describe('useNotifications', () => {
   it('subscribes to execution lifecycle store on mount', () => {

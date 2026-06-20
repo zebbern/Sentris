@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { HumanInputRequest } from '@/components/workflow/HumanInputResolutionView';
@@ -11,6 +11,7 @@ import {
   createUseSortableListMock,
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // --- Mock dialog components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
@@ -132,6 +133,20 @@ describe('ActionCenterPage', () => {
   afterEach(() => {
     cleanup();
   });
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/dialog',
+      '@/components/ui/sortable',
+      '@/components/workflow/HumanInputResolutionView',
+      '@/hooks/queries/useHumanInputQueries',
+      '@/hooks/useSortableList',
+      '@/store/authStore',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+    ]),
+  );
 
   it('renders page heading', () => {
     setupStore();

@@ -11,6 +11,7 @@ import {
 } from '@/test/mocks/dnd-kit';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { createSelectMock } from '@/test/mocks/radix-select';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mutable mock state
@@ -280,4 +281,24 @@ describe('WorkflowList delete workflow flow', () => {
 
 afterAll(() => {
   consoleErrorSpy.mockRestore();
+  restoreMockedModules([
+    '@/components/ui/alert-dialog',
+    '@/components/ui/confirm-dialog',
+    '@/components/ui/dropdown-menu',
+    '@/components/ui/select',
+    '@/components/ui/tooltip',
+    '@/components/ui/use-toast',
+    '@/features/analytics/events',
+    '@/hooks/queries/useWorkflowQueries',
+    '@/hooks/queries/useWorkflowTagQueries',
+    '@/hooks/useConfirmDialog',
+    '@/hooks/useDocumentTitle',
+    '@/hooks/useSortableList',
+    '@/lib/logger',
+    '@/store/authStore',
+    '@/utils/auth',
+    '@dnd-kit/core',
+    '@dnd-kit/sortable',
+    '@dnd-kit/utilities',
+  ]);
 });

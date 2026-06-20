@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
 import { fireEvent, screen, cleanup } from '@testing-library/react';
 import type { WebhookConfiguration } from '@sentris/shared';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
@@ -12,6 +12,7 @@ import {
 import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { restoreMockedModules } from '@/test/restore-mocks';
 
 // --- Mock dialog / alert-dialog / select components (passthrough for test rendering) ---
 mock.module('@/components/ui/dialog', createDialogMock);
@@ -177,6 +178,24 @@ describe('WebhooksPage', () => {
   afterEach(() => {
     cleanup();
   });
+
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/alert-dialog',
+      '@/components/ui/dialog',
+      '@/components/ui/select',
+      '@/components/ui/sortable',
+      '@/hooks/queries/useWebhookQueries',
+      '@/hooks/queries/useWorkflowQueries',
+      '@/hooks/useBulkSelection',
+      '@/hooks/useConfirmDialog',
+      '@/hooks/useSortableList',
+      '@/store/authStore',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+    ]),
+  );
 
   it('renders page heading', () => {
     setupStore();
