@@ -3,6 +3,7 @@ import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
+import { mcpDiagnosticLog } from './mcp-diagnostics';
 
 // Schema matching backend API response (McpServerResponse from mcp-servers.dto.ts)
 const McpServerSchema = z.object({
@@ -114,7 +115,7 @@ async function discoverToolsFromEndpoint(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     let client: Client | null = null;
     try {
-      console.log(
+      mcpDiagnosticLog(
         `[discoverTools] Attempt ${attempt}/${maxRetries}: Discovering tools from ${endpoint}`,
       );
 
@@ -137,7 +138,7 @@ async function discoverToolsFromEndpoint(
       await client.close().catch(() => {});
 
       const tools = (res.tools ?? []).map((t) => McpToolSchema.parse(t));
-      console.log(`[discoverTools] ✓ Discovered ${tools.length} tools on attempt ${attempt}`);
+      mcpDiagnosticLog(`[discoverTools] ✓ Discovered ${tools.length} tools on attempt ${attempt}`);
       return tools;
     } catch (error: unknown) {
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -145,7 +146,7 @@ async function discoverToolsFromEndpoint(
 
       if (attempt < maxRetries) {
         const delayMs = Math.min(baseDelayMs * Math.pow(2, attempt - 1), 5000);
-        console.log(`[discoverTools] Retrying in ${delayMs}ms...`);
+        mcpDiagnosticLog(`[discoverTools] Retrying in ${delayMs}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -275,7 +276,7 @@ async function registerMcpServer(input: {
     throw new Error(`Failed to register server ${input.serverId}: ${registerResponse.statusText}`);
   }
 
-  console.log(
+  mcpDiagnosticLog(
     `[registerMcpServer] Registered ${input.serverName} with ${input.tools.length} tools`,
   );
 }
