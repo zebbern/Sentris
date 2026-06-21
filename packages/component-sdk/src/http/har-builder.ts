@@ -66,9 +66,7 @@ export function headersToHar(headers: HttpHeaders | Record<string, string>): Har
 export function maskHeaders(headers: HarHeader[], sensitive: string[]): HarHeader[] {
   const sensitiveSet = normalizeSensitiveHeaders(sensitive);
   return headers.map((header) =>
-    sensitiveSet.has(header.name.toLowerCase())
-      ? { ...header, value: '***' }
-      : header,
+    sensitiveSet.has(header.name.toLowerCase()) ? { ...header, value: '***' } : header,
   );
 }
 
@@ -87,9 +85,7 @@ export function maskQueryParams(
 ): HarQueryString[] {
   const sensitiveSet = new Set(sensitive.map((param) => param.toLowerCase()));
   return queryParams.map((param) =>
-    sensitiveSet.has(param.name.toLowerCase())
-      ? { ...param, value: '***' }
-      : param,
+    sensitiveSet.has(param.name.toLowerCase()) ? { ...param, value: '***' } : param,
   );
 }
 
@@ -113,10 +109,7 @@ export function maskUrlQueryParams(url: string, sensitive: string[]): string {
   }
 }
 
-export function truncateBody(
-  body: string,
-  maxSize: number,
-): { text: string; truncated: boolean } {
+export function truncateBody(body: string, maxSize: number): { text: string; truncated: boolean } {
   if (body.length <= maxSize) {
     return { text: body, truncated: false };
   }
@@ -202,13 +195,14 @@ export async function buildHarResponse(
             chunks.push(chunk.slice(0, remaining));
             bodyText += chunk.slice(0, remaining);
             truncated = true;
-            // Cancel the stream to avoid reading remaining data
-            await reader.cancel();
+            // Do not await clone cancellation: Node's fetch tee can wait until
+            // the original response body is consumed, delaying callers.
+            void reader.cancel().catch(() => undefined);
             break;
           }
         } else {
           truncated = true;
-          await reader.cancel();
+          void reader.cancel().catch(() => undefined);
           break;
         }
       }

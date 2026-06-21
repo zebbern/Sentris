@@ -14,6 +14,7 @@ mock.module('node:util', () => ({
 
 // Import AFTER mocks
 import {
+  buildInternalMcpUrl,
   registerComponentToolActivity,
   registerRemoteMcpActivity,
   registerLocalMcpActivity,
@@ -65,6 +66,15 @@ describe('MCP Activities', () => {
   // ── callInternalApi (tested indirectly) ──────────────────────────────────
 
   describe('callInternalApi error handling', () => {
+    it('does not double-prefix /api/v1 when SENTRIS_API_BASE_URL is already versioned', () => {
+      expect(buildInternalMcpUrl('http://localhost:3211/api/v1', 'cleanup')).toBe(
+        'http://localhost:3211/api/v1/internal/mcp/cleanup',
+      );
+      expect(buildInternalMcpUrl('http://localhost:3211', 'cleanup')).toBe(
+        'http://localhost:3211/api/v1/internal/mcp/cleanup',
+      );
+    });
+
     it('throws non-retryable ApplicationFailure when INTERNAL_SERVICE_TOKEN is missing', async () => {
       delete process.env.INTERNAL_SERVICE_TOKEN;
 

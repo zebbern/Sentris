@@ -53,14 +53,15 @@ function makeTemplate(overrides: Record<string, unknown> = {}) {
 }
 
 const seedTemplateDir = join(import.meta.dir, '../../../scripts/seed-templates');
-const bugBountyCveTemplateFiles = [
+const securityTemplateFiles = [
   'bug-bounty-recon-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
+  'npm-dependency-cve-hunt.json',
   'web-attack-surface-quick-win-hunt.json',
 ] as const;
 
-function loadSeedTemplate(fileName: (typeof bugBountyCveTemplateFiles)[number]) {
+function loadSeedTemplate(fileName: (typeof securityTemplateFiles)[number]) {
   return JSON.parse(readFileSync(join(seedTemplateDir, fileName), 'utf8')) as {
     _metadata: {
       name: string;
@@ -194,8 +195,8 @@ describe('TemplateService', () => {
       });
     });
 
-    it('creates workflows from the bug bounty and CVE research seed templates', async () => {
-      for (const fileName of bugBountyCveTemplateFiles) {
+    it('creates workflows from the security seed templates', async () => {
+      for (const fileName of securityTemplateFiles) {
         const seedTemplate = loadSeedTemplate(fileName);
         const tpl = makeTemplate({
           id: `tpl-${fileName}`,
@@ -223,9 +224,9 @@ describe('TemplateService', () => {
         expect(result.workflow.id).toBe(`wf-${fileName}`);
       }
 
-      expect(workflowsService.create).toHaveBeenCalledTimes(bugBountyCveTemplateFiles.length);
+      expect(workflowsService.create).toHaveBeenCalledTimes(securityTemplateFiles.length);
       expect(templatesRepository.incrementPopularity).toHaveBeenCalledTimes(
-        bugBountyCveTemplateFiles.length,
+        securityTemplateFiles.length,
       );
     });
 

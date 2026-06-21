@@ -143,7 +143,7 @@ const parameterSchema = parameters({
     },
   ),
   updateTemplates: param(
-    z.boolean().default(false).describe('Update built-in templates before scanning'),
+    z.boolean().default(true).describe('Update built-in templates before scanning'),
     {
       label: 'Update Templates',
       editor: 'boolean',
@@ -262,6 +262,14 @@ const nucleiRetryPolicy: ComponentRetryPolicy = {
   nonRetryableErrorTypes: ['ContainerError', 'ValidationError', 'ConfigurationError'],
 };
 
+export function buildNucleiDockerCommand(scanArgs: string[], updateTemplates: boolean): string[] {
+  const launcher = updateTemplates
+    ? 'nuclei -update-templates -silent || nuclei -update-templates || exit $?; exec nuclei "$@"'
+    : 'exec nuclei "$@"';
+
+  return ['-lc', launcher, 'nuclei', ...scanArgs];
+}
+
 const definition = defineComponent({
   id: 'sentris.nuclei.scan',
   label: 'Nuclei Vulnerability Scanner',
@@ -269,19 +277,14 @@ const definition = defineComponent({
   retryPolicy: nucleiRetryPolicy,
   runner: {
     kind: 'docker',
-    // Custom image with pre-installed nuclei-templates baked in at build time.
-    // The upstream projectdiscovery/nuclei:latest ships WITHOUT templates,
-    // so severity-filtered scans find 0 templates and produce no results.
-    // Build: docker build -t ghcr.io/zebbern/nuclei:latest docker/nuclei/
-    image: 'ghcr.io/zebbern/nuclei:latest',
-    entrypoint: 'nuclei',
+    image: 'projectdiscovery/nuclei:latest',
+    entrypoint: 'sh',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
-    // Direct binary execution (distroless image has no shell)
-    // PTY compatibility achieved via -stream flag (prevents buffering)
+    memoryLimit: '1g',
     command: [],
     env: {
-      HOME: '/home/nonroot', // Custom image runs as nonroot user
+      HOME: '/root',
     },
   },
   inputs: inputSchema,
@@ -351,7 +354,6 @@ const definition = defineComponent({
         '-duc', // Disable update check (templates pre-installed in image)
         '-jsonl', // JSONL output format (nuclei v3.6.0+)
         '-stream', // Stream mode: prevents buffering, required for PTY compatibility
-        '-verbose', // Show findings in terminal (overrides silent mode)
         '-l',
         '/inputs/targets.txt', // Targets file
       ];
@@ -366,10 +368,6 @@ const definition = defineComponent({
       args.push('-c', parsedParams.concurrency.toString());
       args.push('-timeout', parsedParams.timeout.toString());
       args.push('-retries', parsedParams.retries.toString());
-
-      if (parsedParams.updateTemplates) {
-        args.push('-update-templates');
-      }
 
       if (parsedParams.followRedirects) {
         args.push('-follow-redirects');
@@ -500,14 +498,15 @@ const definition = defineComponent({
         entrypoint: baseRunner.entrypoint,
         network: baseRunner.network,
         timeoutSeconds: baseRunner.timeoutSeconds,
+        memoryLimit: baseRunner.memoryLimit,
+        cpuLimit: baseRunner.cpuLimit,
+        pidsLimit: baseRunner.pidsLimit,
         env: baseRunner.env,
-        // ✅ Preserve shell wrapper + append TypeScript-built args
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes: [
-          volume.getVolumeConfig('/inputs', true),
-          // ✅ Templates are pre-installed in ghcr.io/zebbern/nuclei:latest
-          // No need for persistent volume since templates are baked into the image
-        ],
+        command: buildNucleiDockerCommand(
+          [...(baseRunner.command ?? []), ...args],
+          parsedParams.updateTemplates,
+        ),
+        volumes: [volume.getVolumeConfig('/inputs', true)],
       };
 
       // ===== Execute nuclei =====

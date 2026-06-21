@@ -42,6 +42,43 @@ describe('HTTP instrumentation', () => {
     }
   });
 
+  it('preserves response body when HAR capture truncates a large response', async () => {
+    const recorded: TraceEvent[] = [];
+    const trace: ITraceService = {
+      record: (event) => {
+        recorded.push(event);
+      },
+    };
+
+    const context = createExecutionContext({
+      runId: 'run-http-large',
+      componentRef: 'test.http',
+      trace,
+    });
+
+    const largeBody = 'a'.repeat(60 * 1024);
+    const originalFetch = globalThis.fetch;
+    const mockFetch = Object.assign(
+      async () =>
+        new Response(largeBody, {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        }),
+      { preconnect: () => {} },
+    ) as typeof fetch;
+    globalThis.fetch = mockFetch;
+
+    try {
+      const response = await context.http.fetch('https://example.com/large');
+      await expect(response.text()).resolves.toBe(largeBody);
+
+      const responseEvent = recorded.find((event) => event.type === 'HTTP_RESPONSE_RECEIVED');
+      expect(responseEvent?.data).toBeDefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('emits HTTP_REQUEST_ERROR when fetch fails', async () => {
     const recorded: TraceEvent[] = [];
     const trace: ITraceService = {

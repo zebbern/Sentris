@@ -144,6 +144,55 @@ const splitCliArgs = (input: string): string[] => {
   return args;
 };
 
+type KatanaScope = z.infer<typeof parameterSchema>['scope'];
+
+export function mapKatanaScope(scope: KatanaScope): 'fqdn' | 'rdn' | 'dn' {
+  switch (scope) {
+    case 'fuzzy':
+      return 'rdn';
+    case 'subs':
+      return 'dn';
+    case 'strict':
+    default:
+      return 'fqdn';
+  }
+}
+
+export function buildKatanaArgs(options: {
+  depth: number;
+  scope: KatanaScope;
+  timeout?: number;
+  headless: boolean;
+  customFlags: string[];
+}): string[] {
+  const args: string[] = [
+    '-list',
+    '/inputs/targets.txt',
+    '-jsonl',
+    '-silent',
+    '-depth',
+    String(options.depth),
+    '-field-scope',
+    mapKatanaScope(options.scope),
+  ];
+
+  if (options.headless) {
+    args.push('-headless');
+  }
+
+  if (options.timeout) {
+    args.push('-timeout', String(options.timeout));
+  }
+
+  for (const flag of options.customFlags) {
+    if (flag.length > 0) {
+      args.push(flag);
+    }
+  }
+
+  return args;
+}
+
 const katanaRetryPolicy: ComponentRetryPolicy = {
   maxAttempts: 2,
   initialIntervalSeconds: 5,
@@ -152,11 +201,13 @@ const katanaRetryPolicy: ComponentRetryPolicy = {
   nonRetryableErrorTypes: ['ContainerError', 'ValidationError', 'ConfigurationError'],
 };
 
-const runnerOutputSchema = z.object({
-  stdout: z.string().optional().default(''),
-  stderr: z.string().optional().default(''),
-  exitCode: z.number().optional().default(0),
-});
+const runnerOutputSchema = z
+  .object({
+    stdout: z.string().optional().default(''),
+    stderr: z.string().optional().default(''),
+    exitCode: z.number().optional().default(0),
+  })
+  .strict();
 
 const definition = defineComponent({
   id: 'sentris.katana.run',
@@ -195,7 +246,7 @@ const definition = defineComponent({
     isLatest: true,
     deprecated: false,
     example:
-      '`katana -u https://example.com -depth 3 -json` - Crawl example.com to depth 3 and output JSON.',
+      '`katana -u https://example.com -depth 3 -jsonl` - Crawl example.com to depth 3 and output JSONL.',
     examples: [
       'Discover hidden endpoints and API routes before vulnerability scanning.',
       'Map application attack surface by crawling JavaScript files and forms.',
@@ -262,32 +313,13 @@ const definition = defineComponent({
       });
       context.logger.info(`[Katana] Created isolated volume: ${volume.getVolumeName()}`);
 
-      // Build Katana CLI args
-      const args: string[] = [
-        '-list',
-        '/inputs/targets.txt',
-        '-json',
-        '-silent',
-        '-depth',
-        String(parsedParams.depth),
-        '-field-scope',
-        parsedParams.scope,
-      ];
-
-      if (parsedParams.headless) {
-        args.push('-headless');
-      }
-
-      if (parsedParams.timeout) {
-        args.push('-timeout', String(parsedParams.timeout));
-      }
-
-      // Append custom flags last
-      for (const flag of customFlagArgs) {
-        if (flag.length > 0) {
-          args.push(flag);
-        }
-      }
+      const args = buildKatanaArgs({
+        depth: parsedParams.depth,
+        scope: parsedParams.scope,
+        timeout: parsedParams.timeout,
+        headless: parsedParams.headless,
+        customFlags: customFlagArgs,
+      });
 
       const runnerConfig: DockerRunnerConfig = {
         kind: 'docker',
@@ -316,7 +348,7 @@ const definition = defineComponent({
           if (parsed.success) {
             rawOutput = parsed.data.stdout ?? '';
           } else {
-            rawOutput = '';
+            rawOutput = JSON.stringify(result);
           }
         } else {
           rawOutput = '';

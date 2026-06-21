@@ -72,6 +72,8 @@ import './security/katana';
 import './security/ffuf';
 import './security/trivy';
 import './security/semgrep';
+import './security/osv';
+import './security/nvd';
 import './security/yara';
 
 // GitHub components

@@ -12,16 +12,17 @@ import { ContainerError, TimeoutError, ValidationError, ConfigurationError } fro
  * Docker containers and PTY output often contain color/control codes
  * that pollute structured output (JSON parsing, line splitting).
  */
-function stripAnsiCodes(text: string): string {
-  // Covers SGR (colors), cursor movement, and other CSI sequences
-  return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-9;]*[ -/]*[@-~])/g, '');
+export function stripAnsiCodes(text: string): string {
+  return text
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, '')
+    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
 }
 
 // Standard output file path inside the container
 const CONTAINER_OUTPUT_PATH = '/sentris-output';
 const OUTPUT_FILENAME = 'result.json';
 
-type PtySpawn = typeof import('node-pty')['spawn'];
+type PtySpawn = (typeof import('node-pty'))['spawn'];
 let cachedPtySpawn: PtySpawn | null = null;
 let cachedDockerPath: string | null = null;
 
@@ -47,12 +48,12 @@ export async function resolveDockerPath(context?: ExecutionContext): Promise<str
   }
 
   // Fallback to searching in PATH
-  context?.logger.info(`[Docker] Checked common paths but could not find docker. Fallback to using "docker" from PATH.`);
+  context?.logger.info(
+    `[Docker] Checked common paths but could not find docker. Fallback to using "docker" from PATH.`,
+  );
   cachedDockerPath = 'docker';
   return 'docker';
 }
-
-
 
 /**
  * Detect Docker image pull progress messages that are sent to stderr
@@ -97,8 +98,102 @@ async function loadPtySpawn(): Promise<PtySpawn | null> {
     cachedPtySpawn = mod.spawn;
     return cachedPtySpawn;
   } catch (error) {
-    console.warn('[Docker][PTY] node-pty module not available:', error instanceof Error ? error.message : error);
+    console.warn(
+      '[Docker][PTY] node-pty module not available:',
+      error instanceof Error ? error.message : error,
+    );
     return null;
+  }
+}
+
+async function runDockerSetupCommand(
+  args: string[],
+  context: ExecutionContext,
+  timeoutSeconds: number,
+): Promise<{ stdout: string; stderr: string }> {
+  const dockerPath = await resolveDockerPath(context);
+
+  return new Promise((resolve, reject) => {
+    let stdout = '';
+    let stderr = '';
+
+    const proc = spawn(dockerPath, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    });
+
+    const timeout = setTimeout(() => {
+      proc.kill();
+      reject(
+        new TimeoutError(
+          `Docker setup command timed out after ${timeoutSeconds}s`,
+          timeoutSeconds * 1000,
+          { details: { dockerArgs: formatArgs(args) } },
+        ),
+      );
+    }, timeoutSeconds * 1000);
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on('error', (error) => {
+      clearTimeout(timeout);
+      reject(
+        new ContainerError(`Failed to run Docker setup command: ${error.message}`, {
+          cause: error,
+          details: { dockerArgs: formatArgs(args) },
+        }),
+      );
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(
+          new ContainerError(`Docker setup command failed with exit code ${code}`, {
+            details: { exitCode: code, stdout, stderr, dockerArgs: formatArgs(args) },
+          }),
+        );
+        return;
+      }
+
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+async function ensureDockerImageAvailable(
+  runner: DockerRunnerConfig,
+  context: ExecutionContext,
+): Promise<void> {
+  const setupTimeoutSeconds = Math.max(300, runner.timeoutSeconds ?? 300);
+  const inspectArgs = ['image', 'inspect', runner.image];
+
+  try {
+    await runDockerSetupCommand(inspectArgs, context, setupTimeoutSeconds);
+    return;
+  } catch {
+    context.emitProgress(`Pulling Docker image: ${runner.image}`);
+  }
+
+  const pullArgs = ['pull'];
+  if (runner.platform && runner.platform.trim().length > 0) {
+    pullArgs.push('--platform', runner.platform);
+  }
+  pullArgs.push(runner.image);
+
+  try {
+    await runDockerSetupCommand(pullArgs, context, setupTimeoutSeconds);
+  } catch (error) {
+    throw new ContainerError(`Failed to pull Docker image: ${runner.image}`, {
+      cause: error instanceof Error ? error : undefined,
+      details: { image: runner.image },
+    });
   }
 }
 
@@ -123,7 +218,18 @@ async function runComponentInDocker<I, O>(
   params: I,
   context: ExecutionContext,
 ): Promise<O> {
-  const { image, command, entrypoint, env = {}, network = 'none', platform, containerName, volumes, timeoutSeconds = 300, detached } = runner;
+  const {
+    image,
+    command,
+    entrypoint,
+    env = {},
+    network = 'none',
+    platform,
+    containerName,
+    volumes,
+    timeoutSeconds = 300,
+    detached,
+  } = runner;
   const memoryLimit = runner.memoryLimit ?? '512m';
   const cpuLimit = runner.cpuLimit ?? '1';
   const pidsLimit = runner.pidsLimit ?? 256;
@@ -139,19 +245,27 @@ async function runComponentInDocker<I, O>(
   try {
     // Write inputs to file instead of passing via env or stdin
     await writeFile(hostInputPath, JSON.stringify(params));
+    await ensureDockerImageAvailable(runner, context);
 
     const dockerArgs = [
       'run',
       '--rm',
       '-i',
-      '--network', network,
-      '--memory', memoryLimit,
-      '--cpus', cpuLimit,
-      '--pids-limit', String(pidsLimit),
-      '--label', `sentris.runId=${context.runId}`,
-      '--label', `sentris.nodeRef=${context.componentRef}`,
+      '--network',
+      network,
+      '--memory',
+      memoryLimit,
+      '--cpus',
+      cpuLimit,
+      '--pids-limit',
+      String(pidsLimit),
+      '--label',
+      `sentris.runId=${context.runId}`,
+      '--label',
+      `sentris.nodeRef=${context.componentRef}`,
       // Mount the directory containing both input and output
-      '-v', `${outputDir}:${CONTAINER_OUTPUT_PATH}`,
+      '-v',
+      `${outputDir}:${CONTAINER_OUTPUT_PATH}`,
     ];
 
     if (containerName) {
@@ -190,42 +304,55 @@ async function runComponentInDocker<I, O>(
 
     dockerArgs.push(image, ...command);
 
-
     const useTerminal = Boolean(context.terminalCollector);
     let capturedStdout = '';
 
     if (runner.detached) {
       // For detached mode, we use -d instead of -i and return the container ID
-      const detachedArgs = dockerArgs.map(arg => arg === '-i' ? '-d' : arg);
+      const detachedArgs = dockerArgs.map((arg) => (arg === '-i' ? '-d' : arg));
       if (!detachedArgs.includes('-d')) {
         detachedArgs.splice(1, 0, '-d');
       }
 
       // In detached mode, keep --rm only when explicitly requested
-      const persistentArgs = runner.autoRemove ? detachedArgs : detachedArgs.filter(arg => arg !== '--rm');
+      const persistentArgs = runner.autoRemove
+        ? detachedArgs
+        : detachedArgs.filter((arg) => arg !== '--rm');
 
-      capturedStdout = await runDockerWithStandardIO(persistentArgs, params, context, timeoutSeconds, runner.stdinJson, true);
+      capturedStdout = await runDockerWithStandardIO(
+        persistentArgs,
+        params,
+        context,
+        timeoutSeconds,
+        runner.stdinJson,
+        true,
+      );
 
       // In detached mode, we return the container ID as part of a specialized output
       return {
         containerId: capturedStdout.trim(),
         status: 'running',
-        endpoint: env.ENDPOINT || `http://localhost:${env.PORT || 8080}`
+        endpoint: env.ENDPOINT || `http://localhost:${env.PORT || 8080}`,
       } as unknown as O;
     }
 
     if (useTerminal) {
       // Remove -i flag for PTY mode (stdin not needed with TTY)
-      const argsWithoutStdin = dockerArgs.filter(arg => arg !== '-i');
+      const argsWithoutStdin = dockerArgs.filter((arg) => arg !== '-i');
       if (!argsWithoutStdin.includes('-t')) {
         argsWithoutStdin.splice(2, 0, '-t');
       }
       // NEVER write JSON to stdin in PTY mode - it pollutes the terminal output
       capturedStdout = await runDockerWithPty(argsWithoutStdin, params, context, timeoutSeconds);
     } else {
-      capturedStdout = await runDockerWithStandardIO(dockerArgs, params, context, timeoutSeconds, runner.stdinJson);
+      capturedStdout = await runDockerWithStandardIO(
+        dockerArgs,
+        params,
+        context,
+        timeoutSeconds,
+        runner.stdinJson,
+      );
     }
-
 
     // Read output from file (with stdout fallback for legacy components)
     return await readOutputFromFile<O>(hostOutputPath, capturedStdout, context);
@@ -240,7 +367,7 @@ async function runComponentInDocker<I, O>(
 /**
  * Read component output from the mounted output file.
  * If file doesn't exist, falls back to stdout parsing for backwards compatibility.
- * 
+ *
  * @param filePath Path to the output file
  * @param stdout Captured stdout as fallback for legacy components
  * @param context Execution context for logging
@@ -248,7 +375,7 @@ async function runComponentInDocker<I, O>(
 async function readOutputFromFile<O>(
   filePath: string,
   stdout: string,
-  context: ExecutionContext
+  context: ExecutionContext,
 ): Promise<O> {
   // First, try to read from the output file (preferred method)
   try {
@@ -276,7 +403,9 @@ async function readOutputFromFile<O>(
     // Strip ANSI escape codes before parsing — Docker/PTY output often contains
     // color codes that break JSON parsing and pollute line-based output.
     const cleanStdout = stripAnsiCodes(stdout);
-    context.logger.info(`[Docker] No output file found, using stdout fallback (${cleanStdout.length} bytes)`);
+    context.logger.info(
+      `[Docker] No output file found, using stdout fallback (${cleanStdout.length} bytes)`,
+    );
 
     // Try to parse stdout as JSON
     try {
@@ -314,17 +443,21 @@ async function runDockerWithStandardIO<I, O>(
 
     const timeout = setTimeout(() => {
       proc.kill();
-      reject(new TimeoutError(`Docker container timed out after ${timeoutSeconds}s`, timeoutSeconds * 1000, {
-        details: { dockerArgs: formatArgs(dockerArgs) },
-      }));
+      reject(
+        new TimeoutError(
+          `Docker container timed out after ${timeoutSeconds}s`,
+          timeoutSeconds * 1000,
+          {
+            details: { dockerArgs: formatArgs(dockerArgs) },
+          },
+        ),
+      );
     }, timeoutSeconds * 1000);
 
     const proc = spawn(dockerPath, dockerArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: process.env,
     });
-
-
 
     let stdout = '';
     let stderr = '';
@@ -355,7 +488,7 @@ async function runDockerWithStandardIO<I, O>(
       const chunk = data.toString();
       stderr += chunk;
       const isProgress = isDockerProgressMessage(chunk);
-      const level = isProgress ? 'info' as const : 'error' as const;
+      const level = isProgress ? ('info' as const) : ('error' as const);
       const logEntry = {
         runId: context.runId,
         nodeRef: context.componentRef,
@@ -383,10 +516,12 @@ async function runDockerWithStandardIO<I, O>(
     proc.on('error', (error) => {
       clearTimeout(timeout);
       context.logger.error(`[Docker] Failed to start: ${error.message}`);
-      reject(new ContainerError(`Failed to start Docker container: ${error.message}`, {
-        cause: error,
-        details: { dockerArgs: formatArgs(dockerArgs) },
-      }));
+      reject(
+        new ContainerError(`Failed to start Docker container: ${error.message}`, {
+          cause: error,
+          details: { dockerArgs: formatArgs(dockerArgs) },
+        }),
+      );
     });
 
     proc.on('close', (code) => {
@@ -403,9 +538,11 @@ async function runDockerWithStandardIO<I, O>(
           data: { exitCode: code, stderr: stderr.slice(0, 500) },
         });
 
-        reject(new ContainerError(`Docker container failed with exit code ${code}: ${stderr}`, {
-          details: { exitCode: code, stderr, stdout, dockerArgs: formatArgs(dockerArgs) },
-        }));
+        reject(
+          new ContainerError(`Docker container failed with exit code ${code}: ${stderr}`, {
+            details: { exitCode: code, stderr, stdout, dockerArgs: formatArgs(dockerArgs) },
+          }),
+        );
         return;
       }
 
@@ -425,10 +562,12 @@ async function runDockerWithStandardIO<I, O>(
       } catch (e) {
         clearTimeout(timeout);
         proc.kill();
-        reject(new ValidationError(`Failed to write input to Docker container: ${e}`, {
-          cause: e as Error,
-          details: { inputType: typeof params },
-        }));
+        reject(
+          new ValidationError(`Failed to write input to Docker container: ${e}`, {
+            cause: e as Error,
+            details: { inputType: typeof params },
+          }),
+        );
       }
     } else {
       // Close stdin immediately if stdinJson is false
@@ -452,7 +591,7 @@ async function runDockerWithPty<I, O>(
   if (!spawnPty) {
     context.logger.warn('[Docker][PTY] node-pty unavailable; falling back to standard IO');
     // Remove -t flag before falling back to standard IO (stdin is not a TTY)
-    const argsWithoutTty = dockerArgs.filter(arg => arg !== '-t');
+    const argsWithoutTty = dockerArgs.filter((arg) => arg !== '-t');
     return runDockerWithStandardIO(argsWithoutTty, params, context, timeoutSeconds);
   }
 
@@ -477,13 +616,16 @@ async function runDockerWithPty<I, O>(
         dockerPath,
         pathEnv: process.env.PATH,
         cwd: process.cwd(),
-        error: error instanceof Error ? {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-          // @ts-ignore
-          code: error.code,
-        } : String(error)
+        error:
+          error instanceof Error
+            ? {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+                // @ts-ignore
+                code: error.code,
+              }
+            : String(error),
       };
 
       context.logger.warn(
@@ -500,13 +642,17 @@ async function runDockerWithPty<I, O>(
       return;
     }
 
-
-
     const timeout = setTimeout(() => {
       ptyProcess.kill();
-      reject(new TimeoutError(`Docker container timed out after ${timeoutSeconds}s`, timeoutSeconds * 1000, {
-        details: { dockerArgs: formatArgs(dockerArgs) },
-      }));
+      reject(
+        new TimeoutError(
+          `Docker container timed out after ${timeoutSeconds}s`,
+          timeoutSeconds * 1000,
+          {
+            details: { dockerArgs: formatArgs(dockerArgs) },
+          },
+        ),
+      );
     }, timeoutSeconds * 1000);
 
     // NEVER write JSON to stdin in PTY mode - it pollutes the terminal output
@@ -529,16 +675,15 @@ async function runDockerWithPty<I, O>(
           data: { exitCode },
         });
 
-        reject(new ContainerError(
-          `Docker PTY execution failed with exit code ${exitCode}`,
-          {
+        reject(
+          new ContainerError(`Docker PTY execution failed with exit code ${exitCode}`, {
             details: {
               exitCode,
               stdout,
               dockerArgs: formatArgs(dockerArgs),
             },
-          },
-        ));
+          }),
+        );
         return;
       }
 
