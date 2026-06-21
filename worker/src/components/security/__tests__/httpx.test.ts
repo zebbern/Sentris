@@ -1,11 +1,29 @@
 import { describe, expect, test, beforeAll, afterEach, vi } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
-import { parseHttpxOutput } from '../httpx';
+import { buildHttpxArgs, parseHttpxOutput } from '../httpx';
 import type { HttpxOutput, InputShape, OutputShape } from '../httpx';
 
 const runHttpxTests = process.env.ENABLE_HTTPX_COMPONENT_TESTS === 'true';
 const describeHttpx = runHttpxTests ? describe : describe.skip;
+
+describe('httpx argument builder', () => {
+  test('does not emit unsupported prefer-https flag', () => {
+    const args = buildHttpxArgs({
+      ports: undefined,
+      statusCodes: undefined,
+      threads: undefined,
+      path: undefined,
+      followRedirects: true,
+      tlsProbe: true,
+      preferHttps: true,
+    });
+
+    expect(args).toContain('-follow-redirects');
+    expect(args).toContain('-tls-probe');
+    expect(args).not.toContain('-prefer-https');
+  });
+});
 
 describeHttpx('httpx component', () => {
   beforeAll(async () => {
@@ -128,7 +146,7 @@ describeHttpx('httpx component', () => {
       context,
     )) as HttpxOutput;
 
-    expect(result.results).toHaveLength(1);
+    expect(result.responses).toHaveLength(1);
     expect(result.resultCount).toBe(1);
     expect(result.rawOutput).toContain('https://example.com');
     expect(result.options.followRedirects).toBe(false);
@@ -145,7 +163,6 @@ describeHttpx('httpx component', () => {
 
     const params = component.inputs.parse({
       targets: ['https://example.com'],
-      followRedirects: true,
     });
 
     const raw = [
@@ -155,11 +172,54 @@ describeHttpx('httpx component', () => {
 
     vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(raw);
 
-    const result = await component.execute({ inputs: params, params: {} }, context);
+    const result = await component.execute(
+      { inputs: params, params: { followRedirects: true } },
+      context,
+    );
 
     expect(result.results).toHaveLength(2);
     expect(result.options.followRedirects).toBe(true);
     expect(result.rawOutput).toContain('https://other.example');
+  });
+
+  test('parses a single httpx JSON object returned by stdout fallback', async () => {
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'httpx-test',
+    });
+
+    const params = component.inputs.parse({
+      targets: ['https://example.com'],
+    });
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({
+      url: 'https://example.com',
+      input: 'https://example.com',
+      host: 'example.com',
+      status_code: 200,
+      title: 'Example Domain',
+      scheme: 'https',
+      webserver: 'ECS',
+      tech: ['HTTP'],
+    });
+
+    const result = await component.execute(
+      { inputs: params, params: { followRedirects: true } },
+      context,
+    );
+
+    expect(result.responses).toHaveLength(1);
+    expect(result.resultCount).toBe(1);
+    expect(result.responses[0]).toMatchObject({
+      url: 'https://example.com',
+      statusCode: 200,
+      title: 'Example Domain',
+      technologies: ['HTTP'],
+    });
+    expect(result.rawOutput).toContain('"url":"https://example.com"');
   });
 
   test('skips execution when no targets are provided', async () => {

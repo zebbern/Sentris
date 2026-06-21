@@ -23,6 +23,16 @@ function normalizeBaseUrl(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
+function normalizeVersionedApiBaseUrl(url: string): string {
+  const baseUrl = normalizeBaseUrl(url);
+  return baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
+}
+
+export function buildInternalMcpUrl(baseUrl: string, path: string): string {
+  const normalizedPath = path.replace(/^\/+/, '');
+  return `${normalizeVersionedApiBaseUrl(baseUrl)}/internal/mcp/${normalizedPath}`;
+}
+
 async function callInternalApi(path: string, body: any) {
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
   if (!internalToken) {
@@ -32,8 +42,7 @@ async function callInternalApi(path: string, body: any) {
     );
   }
 
-  const baseUrl = normalizeBaseUrl(DEFAULT_API_BASE_URL);
-  const url = `${baseUrl}/api/v1/internal/mcp/${path}`;
+  const url = buildInternalMcpUrl(DEFAULT_API_BASE_URL, path);
   const response = await fetch(url, {
     method: 'POST',
     headers: {

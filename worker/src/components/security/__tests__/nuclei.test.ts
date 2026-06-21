@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { componentRegistry } from '@sentris/component-sdk';
-import type { NucleiInput, NucleiOutput } from '../nuclei';
+import { buildNucleiDockerCommand, type NucleiInput, type NucleiOutput } from '../nuclei';
 // Import to trigger registration
 import '../nuclei';
 
@@ -111,7 +111,7 @@ describe('Nuclei Component', () => {
       expect(parsedParams.retries).toBe(1);
       expect(parsedParams.includeRaw).toBe(false);
       expect(parsedParams.followRedirects).toBe(false);
-      expect(parsedParams.updateTemplates).toBe(false);
+      expect(parsedParams.updateTemplates).toBe(true);
       expect(parsedParams.disableHttpx).toBe(true);
     });
 
@@ -213,6 +213,20 @@ describe('Nuclei Component', () => {
       expect(parsed.findings[0].extractedResults).toEqual(['result1']);
       expect(parsed.findings[0].host).toBe('example.com');
     });
+  });
+});
+
+describe('Nuclei Docker launcher', () => {
+  test('updates built-in templates before forwarding scanner arguments', () => {
+    const scanArgs = ['-jsonl', '-l', '/inputs/targets.txt', '-t', 'http/exposures/'];
+
+    const command = buildNucleiDockerCommand(scanArgs, true);
+
+    expect(command[0]).toBe('-lc');
+    expect(command[1]).toContain('nuclei -update-templates');
+    expect(command[1]).toContain('exec nuclei "$@"');
+    expect(command.slice(2)).toEqual(['nuclei', ...scanArgs]);
+    expect(command).not.toContain('-update-templates');
   });
 });
 
@@ -422,8 +436,9 @@ describe('Nuclei Integration', () => {
     const component = componentRegistry.get('sentris.nuclei.scan')!;
     expect(component!.runner.kind).toBe('docker');
     if (component!.runner.kind === 'docker') {
-      expect(component!.runner.image).toBe('ghcr.io/zebbern/nuclei:latest');
-      expect(component!.runner.entrypoint).toBe('nuclei');
+      expect(component!.runner.image).toBe('projectdiscovery/nuclei:latest');
+      expect(component!.runner.entrypoint).toBe('sh');
+      expect(component!.runner.memoryLimit).toBe('1g');
     }
   });
 

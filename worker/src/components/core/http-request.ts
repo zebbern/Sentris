@@ -301,9 +301,30 @@ const definition = defineComponent({
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        throw new TimeoutError(`HTTP request timed out after ${timeout}ms`, timeout, {
-          details: { url, method },
-        });
+        const timeoutError = new TimeoutError(
+          `HTTP request timed out after ${timeout}ms`,
+          timeout,
+          {
+            details: { url, method },
+          },
+        );
+        if (!failOnError) {
+          context.logger.warn(`[HTTP] ${method} ${url} timed out after ${timeout}ms`);
+          return {
+            status: 0,
+            statusText: 'Timeout',
+            data: {
+              error: {
+                type: 'timeout',
+                message: timeoutError.message,
+                timeoutMs: timeout,
+              },
+            },
+            headers: {},
+            rawBody: '',
+          };
+        }
+        throw timeoutError;
       }
       // Wrap network errors appropriately
       if (
@@ -313,6 +334,21 @@ const definition = defineComponent({
         error.message?.includes('socket hang up') ||
         error.name === 'FetchError'
       ) {
+        if (!failOnError) {
+          context.logger.warn(`[HTTP] ${method} ${url} failed: ${error.message}`);
+          return {
+            status: 0,
+            statusText: 'Network Error',
+            data: {
+              error: {
+                type: 'network',
+                message: error.message ?? 'Network error',
+              },
+            },
+            headers: {},
+            rawBody: '',
+          };
+        }
         throw NetworkError.from(error);
       }
       throw error;

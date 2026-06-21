@@ -104,7 +104,7 @@
             "params": {
               "depth": 2,
               "headless": false,
-              "timeout": 300,
+              "timeout": 30,
               "scope": "strict"
             },
             "inputOverrides": {}
@@ -119,18 +119,25 @@
           "label": "Run Safe Quick Checks",
           "config": {
             "params": {
-              "rateLimit": 75,
-              "concurrency": 15,
+              "rateLimit": 10,
+              "concurrency": 3,
               "timeout": 8,
-              "retries": 1,
+              "retries": 0,
               "includeRaw": false,
               "followRedirects": true,
-              "updateTemplates": false,
+              "updateTemplates": true,
               "disableHttpx": true,
               "severityFilter": ["info", "low", "medium", "high", "critical"]
             },
             "inputOverrides": {
-              "templatePaths": ["http/exposures/", "http/misconfiguration/", "http/takeovers/"]
+              "templateIds": [
+                "cors-misconfig",
+                "generic-env",
+                "http-missing-security-headers",
+                "robots-txt",
+                "swagger-api",
+                "openapi"
+              ]
             }
           }
         }

@@ -252,4 +252,33 @@ describe('HTTP Request Component', () => {
       expect(e.message).toContain('timed out');
     }
   });
+
+  test('should return structured timeout error if failOnError is false', async () => {
+    const result = await definition.execute(
+      {
+        inputs: {
+          url: `${baseUrl}/timeout`,
+        },
+        params: {
+          method: 'GET',
+          timeout: 50,
+          contentType: 'application/json',
+          failOnError: false,
+          authType: 'none',
+        },
+      },
+      mockContext,
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.statusText).toBe('Timeout');
+    expect(result.rawBody).toBe('');
+    expect(result.headers).toEqual({});
+    expect(result.data).toMatchObject({
+      error: {
+        type: 'timeout',
+        message: expect.stringContaining('timed out'),
+      },
+    });
+  });
 });

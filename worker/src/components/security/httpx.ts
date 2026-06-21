@@ -146,6 +146,15 @@ const findingSchema = z.object({
 });
 
 type Finding = z.infer<typeof findingSchema>;
+interface HttpxArgOptions {
+  ports?: string;
+  statusCodes?: string;
+  threads?: number;
+  path?: string;
+  followRedirects: boolean;
+  tlsProbe: boolean;
+  preferHttps: boolean;
+}
 
 const outputSchema = outputs({
   responses: port(z.array(findingSchema), {
@@ -188,12 +197,14 @@ const outputSchema = outputs({
   }),
 });
 
-const httpxRunnerOutputSchema = z.object({
-  results: z.array(z.unknown()).optional().default([]),
-  raw: z.string().optional().default(''),
-  stderr: z.string().optional().default(''),
-  exitCode: z.number().optional().default(0),
-});
+const httpxRunnerOutputSchema = z
+  .object({
+    results: z.array(z.unknown()).optional().default([]),
+    raw: z.string().optional().default(''),
+    stderr: z.string().optional().default(''),
+    exitCode: z.number().optional().default(0),
+  })
+  .strict();
 
 const dockerTimeoutSeconds = (() => {
   const raw = process.env.HTTPX_TIMEOUT_SECONDS;
@@ -322,29 +333,7 @@ const definition = defineComponent({
         'targets.txt': targets.join('\n'),
       });
 
-      const httpxArgs: string[] = ['-json', '-silent', '-l', '/inputs/targets.txt', '-stream'];
-
-      if (runnerParams.ports) {
-        httpxArgs.push('-ports', runnerParams.ports);
-      }
-      if (runnerParams.statusCodes) {
-        httpxArgs.push('-status-code', runnerParams.statusCodes);
-      }
-      if (typeof runnerParams.threads === 'number') {
-        httpxArgs.push('-threads', String(runnerParams.threads));
-      }
-      if (runnerParams.path) {
-        httpxArgs.push('-path', runnerParams.path);
-      }
-      if (runnerParams.followRedirects) {
-        httpxArgs.push('-follow-redirects');
-      }
-      if (runnerParams.tlsProbe) {
-        httpxArgs.push('-tls-probe');
-      }
-      if (runnerParams.preferHttps) {
-        httpxArgs.push('-prefer-https');
-      }
+      const httpxArgs = buildHttpxArgs(runnerParams);
 
       const runnerConfig = {
         ...definition.runner,
@@ -540,6 +529,31 @@ function parseHttpxOutput(raw: string): Finding[] {
   }
 
   return findings;
+}
+
+export function buildHttpxArgs(options: HttpxArgOptions): string[] {
+  const httpxArgs: string[] = ['-json', '-silent', '-l', '/inputs/targets.txt', '-stream'];
+
+  if (options.ports) {
+    httpxArgs.push('-ports', options.ports);
+  }
+  if (options.statusCodes) {
+    httpxArgs.push('-status-code', options.statusCodes);
+  }
+  if (typeof options.threads === 'number') {
+    httpxArgs.push('-threads', String(options.threads));
+  }
+  if (options.path) {
+    httpxArgs.push('-path', options.path);
+  }
+  if (options.followRedirects) {
+    httpxArgs.push('-follow-redirects');
+  }
+  if (options.tlsProbe) {
+    httpxArgs.push('-tls-probe');
+  }
+
+  return httpxArgs;
 }
 
 function normaliseNumber(value: unknown): number | null {

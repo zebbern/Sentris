@@ -15,8 +15,8 @@
     "category": "bug-bounty",
     "tags": ["bug-bounty", "recon", "subdomains", "httpx", "katana", "triage"],
     "entryPoint": "trigger_1",
-    "nodeCount": 8,
-    "edgeCount": 8
+    "nodeCount": 9,
+    "edgeCount": 10
   },
   "graph": {
     "name": "Bug Bounty Recon Triage",
@@ -104,6 +104,25 @@
         }
       },
       {
+        "id": "merge_probe_targets",
+        "type": "core.logic.script",
+        "position": { "x": 900, "y": 460 },
+        "data": {
+          "label": "Merge Probe Targets",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domains", "type": "list-text" },
+                { "name": "resolvedHosts", "type": "list-text" }
+              ],
+              "returns": [{ "name": "targets", "type": "list-text" }],
+              "code": "export function script(input) {\n  const values = [];\n  const add = (items) => {\n    if (!Array.isArray(items)) return;\n    for (const item of items) {\n      if (typeof item !== 'string') continue;\n      const trimmed = item.trim();\n      if (trimmed.length > 0) values.push(trimmed);\n    }\n  };\n  add(input.domains);\n  add(input.resolvedHosts);\n  return { targets: Array.from(new Set(values)) };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
         "id": "extract_live_urls",
         "type": "core.logic.script",
         "position": { "x": 1380, "y": 120 },
@@ -129,7 +148,7 @@
             "params": {
               "depth": 2,
               "headless": false,
-              "timeout": 300,
+              "timeout": 30,
               "scope": "strict"
             },
             "inputOverrides": {}
@@ -191,10 +210,24 @@
         "targetHandle": "domains"
       },
       {
-        "id": "dnsx_resolve-httpx_probe-resolvedHosts",
+        "id": "trigger_1-merge_probe_targets-domains",
+        "source": "trigger_1",
+        "target": "merge_probe_targets",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "dnsx_resolve-merge_probe_targets-resolvedHosts",
         "source": "dnsx_resolve",
-        "target": "httpx_probe",
+        "target": "merge_probe_targets",
         "sourceHandle": "resolvedHosts",
+        "targetHandle": "resolvedHosts"
+      },
+      {
+        "id": "merge_probe_targets-httpx_probe-targets",
+        "source": "merge_probe_targets",
+        "target": "httpx_probe",
+        "sourceHandle": "targets",
         "targetHandle": "targets"
       },
       {
