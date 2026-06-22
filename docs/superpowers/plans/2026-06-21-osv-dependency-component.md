@@ -152,7 +152,7 @@ Expected: PASS.
 
 - [x] **Step 1: Upsert active local template row**
 
-Run: `$env:DATABASE_URL='postgresql://sentris:sentris@localhost:5433/sentris_instance_0'; bun --cwd backend scripts/seed-templates.ts`
+Run: `$env:SENTRIS_INSTANCE='0'; bun --cwd backend scripts/seed-templates.ts`
 
 Expected: existing templates skipped. If this script only skips existing template rows, update the active DB row for `NPM Dependency CVE Hunt` from the seed file before live audit.
 

@@ -131,14 +131,20 @@ Add:
 
 - [ ] **Step 2: Sync the seed into instance 0**
 
-Use an explicit `DATABASE_URL=postgresql://sentris:sentris@localhost:5433/sentris_instance_0` when seeding or updating the template row.
+Use the active local instance targeting path when seeding or updating the template row:
+
+```powershell
+$env:SENTRIS_INSTANCE='0'
+bun --cwd backend scripts/seed-templates.ts
+```
+
+Only use `TEMPLATE_SEED_DATABASE_URL` when intentionally overriding the active instance target.
 
 - [ ] **Step 3: Run live audit for only the new template**
 
 Run:
 
 ```powershell
-$env:DATABASE_URL='postgresql://sentris:sentris@localhost:5433/sentris_instance_0'
 $env:TEMPLATE_AUDIT_NAMES='Public Repo Secret Exposure Triage'
 $env:TEMPLATE_AUDIT_FORCE='true'
 bun scripts/template-library-live-audit.ts
