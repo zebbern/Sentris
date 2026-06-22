@@ -99,4 +99,35 @@ describe('TemplateValidationLedgerService', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('returns requires-secrets metadata for credential-gated templates without a live ledger entry', () => {
+    const dir = writeLedger({});
+
+    try {
+      const result = new TemplateValidationLedgerService().getValidationForTemplate({
+        name: 'Security Scan Discord Report',
+        updatedAt: '2026-06-22T04:45:00.000Z',
+        requiredSecrets: [
+          {
+            name: 'DISCORD_WEBHOOK_URL',
+            type: 'string',
+            description: 'Discord Incoming Webhook URL for scan notifications',
+          },
+        ],
+      });
+
+      expect(result).toEqual({
+        status: 'requires-secrets',
+        recommendation: 'review',
+        terminalStatus: null,
+        artifactsCount: null,
+        verifiedAt: null,
+        rationale:
+          'Template is credential-gated and requires live secrets before execution: DISCORD_WEBHOOK_URL.',
+        isCurrent: true,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

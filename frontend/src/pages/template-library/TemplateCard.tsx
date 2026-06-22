@@ -52,6 +52,14 @@ function getValidationBadge(template: Template) {
     };
   }
 
+  if (validation.status === 'requires-secrets') {
+    return {
+      label: 'Requires secrets',
+      Icon: KeyRound,
+      className: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    };
+  }
+
   if (validation.status === 'needs-fix' || validation.status === 'needs-review') {
     return {
       label: validation.status === 'needs-fix' ? 'Needs fix' : 'Needs review',
@@ -79,6 +87,7 @@ function getValidationAction(template: Template) {
   const shouldRevalidate =
     validation.status === 'unknown' ||
     !validation.isCurrent ||
+    validation.status === 'requires-secrets' ||
     validation.status === 'needs-fix' ||
     validation.status === 'needs-review';
 

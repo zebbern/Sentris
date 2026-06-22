@@ -1,4 +1,9 @@
-export type TemplateValidationStatus = 'live-verified' | 'needs-fix' | 'needs-review' | 'unknown';
+export type TemplateValidationStatus =
+  | 'live-verified'
+  | 'requires-secrets'
+  | 'needs-fix'
+  | 'needs-review'
+  | 'unknown';
 
 export type TemplateValidationFilter = 'all' | TemplateValidationStatus | 'stale';
 

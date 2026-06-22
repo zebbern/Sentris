@@ -111,6 +111,9 @@ export function TemplateFilters({
             <SelectItem value="live-verified">
               Live verified ({validationCounts['live-verified']})
             </SelectItem>
+            <SelectItem value="requires-secrets">
+              Requires secrets ({validationCounts['requires-secrets']})
+            </SelectItem>
             <SelectItem value="stale">Validation stale ({validationCounts.stale})</SelectItem>
             <SelectItem value="needs-fix">Needs fix ({validationCounts['needs-fix']})</SelectItem>
             <SelectItem value="needs-review">

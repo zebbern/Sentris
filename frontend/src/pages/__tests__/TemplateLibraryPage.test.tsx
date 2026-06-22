@@ -892,6 +892,57 @@ describe('TemplateLibraryPage', () => {
     expect(mockRevalidateMutate.mock.calls[0]?.[0]).toBe('tmpl-001');
   });
 
+  it('shows credential-gated templates separately from unknown validation', () => {
+    setupStore({
+      templates: [
+        {
+          ...templateA,
+          validation: {
+            status: 'requires-secrets',
+            recommendation: 'review',
+            terminalStatus: null,
+            artifactsCount: null,
+            verifiedAt: null,
+            rationale:
+              'Template is credential-gated and requires live secrets before execution: DISCORD_WEBHOOK_URL.',
+            isCurrent: true,
+          },
+          requiredSecrets: [
+            {
+              name: 'DISCORD_WEBHOOK_URL',
+              type: 'string',
+              description: 'Discord Incoming Webhook URL for scan notifications',
+            },
+          ],
+        } as Template,
+        {
+          ...templateB,
+          id: 'tmpl-unknown',
+          name: 'unknown validation template',
+          validation: {
+            status: 'unknown',
+            recommendation: 'unknown',
+            artifactsCount: null,
+            verifiedAt: null,
+            rationale: 'No validation found.',
+            isCurrent: false,
+          },
+        } as Template,
+      ],
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Requires secrets')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Requires secrets (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Unknown validation (1)' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('option', { name: 'Requires secrets (1)' }));
+
+    expect(screen.getByText('Network Recon Scan')).toBeInTheDocument();
+    expect(screen.queryByText('Unknown Validation Template')).not.toBeInTheDocument();
+  });
+
   it('does not render live-audit guidance for current live-verified templates', () => {
     setupStore({
       templates: [

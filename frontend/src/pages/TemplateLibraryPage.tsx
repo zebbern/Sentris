@@ -64,6 +64,7 @@ function matchesValidationFilter(template: Template, filter: TemplateValidationF
 const VALIDATION_FILTERS: TemplateValidationFilter[] = [
   'all',
   'live-verified',
+  'requires-secrets',
   'stale',
   'needs-fix',
   'needs-review',

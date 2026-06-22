@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export type TemplateValidationStatus = 'live-verified' | 'needs-fix' | 'needs-review' | 'unknown';
+export type TemplateValidationStatus =
+  | 'live-verified'
+  | 'requires-secrets'
+  | 'needs-fix'
+  | 'needs-review'
+  | 'unknown';
 
 export interface TemplateValidationSummary {
   status: TemplateValidationStatus;
@@ -27,9 +32,18 @@ interface TemplateValidationLedger {
   entries?: Record<string, TemplateValidationLedgerEntry>;
 }
 
+interface TemplateRequiredSecretTarget {
+  name?: string | null;
+  type?: string | null;
+  description?: string | null;
+  placeholder?: string | null;
+}
+
 interface TemplateValidationTarget {
   name: string;
   updatedAt?: Date | string | null;
+  requiredSecrets?: TemplateRequiredSecretTarget[] | null;
+  manifest?: { requiredSecrets?: TemplateRequiredSecretTarget[] | null } | null;
 }
 
 const VALID_RECOMMENDATIONS = new Set(['keep', 'fix', 'consolidate', 'delete', 'review']);
@@ -40,6 +54,19 @@ export class TemplateValidationLedgerService {
     const entry = this.findLedgerEntry(template.name);
 
     if (!entry) {
+      const requiredSecretNames = this.getRequiredSecretNames(template);
+      if (requiredSecretNames.length > 0) {
+        return {
+          status: 'requires-secrets',
+          recommendation: 'review',
+          terminalStatus: null,
+          artifactsCount: null,
+          verifiedAt: null,
+          rationale: `Template is credential-gated and requires live secrets before execution: ${requiredSecretNames.join(', ')}.`,
+          isCurrent: true,
+        };
+      }
+
       return {
         status: 'unknown',
         recommendation: 'unknown',
@@ -101,6 +128,18 @@ export class TemplateValidationLedgerService {
     }
 
     return null;
+  }
+
+  private getRequiredSecretNames(template: TemplateValidationTarget): string[] {
+    const requiredSecrets = Array.isArray(template.requiredSecrets)
+      ? template.requiredSecrets
+      : Array.isArray(template.manifest?.requiredSecrets)
+        ? template.manifest.requiredSecrets
+        : [];
+
+    return requiredSecrets
+      .map((secret) => secret?.name?.trim())
+      .filter((name): name is string => Boolean(name));
   }
 
   private normalizeRecommendation(value: unknown): TemplateValidationSummary['recommendation'] {
