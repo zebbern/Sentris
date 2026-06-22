@@ -238,6 +238,7 @@ describe('WebhooksService', () => {
   let repository: InMemoryWebhookRepository;
   let deliveryRepository: InMemoryWebhookDeliveryRepository;
   let service: WebhooksService;
+  let compiledDefinition: WorkflowDefinition;
 
   const ensureWorkflowAdminAccessCalls: unknown[][] = [];
   const ensureWorkflowAdminAccess = async (...args: unknown[]) => {
@@ -258,7 +259,7 @@ describe('WebhooksService', () => {
         workflowId: 'workflow-1',
         version: 1,
       },
-      definition: workflowDefinition,
+      definition: compiledDefinition,
       organizationId: 'org-1',
     };
   };
@@ -315,6 +316,7 @@ describe('WebhooksService', () => {
   };
 
   beforeEach(() => {
+    compiledDefinition = workflowDefinition;
     repository = new InMemoryWebhookRepository();
     deliveryRepository = new InMemoryWebhookDeliveryRepository();
     service = new WebhooksService(
@@ -430,6 +432,47 @@ describe('WebhooksService', () => {
           ],
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('allows required workflow inputs with defaults to be omitted from expected inputs', async () => {
+      compiledDefinition = {
+        ...workflowDefinition,
+        actions: workflowDefinition.actions.map((action) =>
+          action.ref === 'entry'
+            ? {
+                ...action,
+                params: {
+                  runtimeInputs: [
+                    {
+                      id: 'prTitle',
+                      label: 'PR Title',
+                      type: 'text',
+                      required: true,
+                      defaultValue: 'Untitled PR',
+                    },
+                    { id: 'prNumber', label: 'PR Number', type: 'number', required: true },
+                    {
+                      id: 'environment',
+                      label: 'Environment',
+                      type: 'text',
+                      required: false,
+                    },
+                  ],
+                },
+              }
+            : action,
+        ),
+      };
+
+      const result = await service.create(authContext, {
+        workflowId: 'workflow-1',
+        name: 'Defaulted PR Webhook',
+        parsingScript: 'script',
+        expectedInputs: [{ id: 'prNumber', label: 'PR Number', type: 'number', required: true }],
+      });
+
+      expect(result.name).toBe('Defaulted PR Webhook');
+      expect(result.expectedInputs.map((input) => input.id)).toEqual(['prNumber']);
     });
   });
 

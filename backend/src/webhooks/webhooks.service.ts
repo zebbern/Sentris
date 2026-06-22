@@ -509,11 +509,8 @@ export class WebhooksService {
       throw new BadRequestException('Workflow must have an Entry Point component to use webhooks');
     }
 
-    const runtimeInputs: { id?: string; required?: boolean }[] = Array.isArray(
-      entryAction.params?.runtimeInputs,
-    )
-      ? entryAction.params.runtimeInputs
-      : [];
+    const runtimeInputs: { id?: string; required?: boolean; defaultValue?: unknown }[] =
+      Array.isArray(entryAction.params?.runtimeInputs) ? entryAction.params.runtimeInputs : [];
 
     // Verify all expected inputs match entry point's runtime inputs
     for (const expectedInput of expectedInputs) {
@@ -528,7 +525,11 @@ export class WebhooksService {
     // Verify all required runtime inputs are covered
     for (const runtimeInput of runtimeInputs) {
       if (!runtimeInput.id) continue;
-      if (runtimeInput.required !== false) {
+      const hasDefaultValue =
+        Object.prototype.hasOwnProperty.call(runtimeInput, 'defaultValue') &&
+        runtimeInput.defaultValue !== undefined &&
+        runtimeInput.defaultValue !== null;
+      if (runtimeInput.required !== false && !hasDefaultValue) {
         const matchingExpectedInput = expectedInputs.find((ei) => ei.id === runtimeInput.id);
         if (!matchingExpectedInput) {
           throw new BadRequestException(

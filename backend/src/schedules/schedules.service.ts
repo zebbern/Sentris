@@ -397,18 +397,20 @@ export class SchedulesService {
       throw new BadRequestException('Workflow requires an Entry Point to use schedules');
     }
 
-    const runtimeInputs: { id?: string; required?: boolean }[] = Array.isArray(
-      entrypoint.params?.runtimeInputs,
-    )
-      ? entrypoint.params.runtimeInputs
-      : [];
+    const runtimeInputs: { id?: string; required?: boolean; defaultValue?: unknown }[] =
+      Array.isArray(entrypoint.params?.runtimeInputs) ? entrypoint.params.runtimeInputs : [];
 
     for (const inputDef of runtimeInputs) {
       if (!inputDef?.id) {
         continue;
       }
       const value = payload.runtimeInputs?.[inputDef.id];
-      if (inputDef.required !== false && (value === undefined || value === null)) {
+      const hasValue = value !== undefined && value !== null;
+      const hasDefaultValue =
+        Object.prototype.hasOwnProperty.call(inputDef, 'defaultValue') &&
+        inputDef.defaultValue !== undefined &&
+        inputDef.defaultValue !== null;
+      if (inputDef.required !== false && !hasValue && !hasDefaultValue) {
         throw new BadRequestException(`Schedule requires value for runtime input "${inputDef.id}"`);
       }
     }

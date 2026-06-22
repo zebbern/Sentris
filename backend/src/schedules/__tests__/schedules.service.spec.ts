@@ -156,6 +156,7 @@ class InMemoryScheduleRepository implements Partial<ScheduleRepository> {
 describe('SchedulesService', () => {
   let repository: InMemoryScheduleRepository;
   let service: SchedulesService;
+  let compiledDefinition: WorkflowDefinition;
 
   const ensureWorkflowAdminAccessCalls: unknown[][] = [];
   const ensureWorkflowAdminAccess = async (...args: unknown[]) => {
@@ -176,7 +177,7 @@ describe('SchedulesService', () => {
         workflowId: 'workflow-1',
         version: 1,
       },
-      definition: workflowDefinition,
+      definition: compiledDefinition,
       organizationId: 'org-1',
     };
   };
@@ -227,6 +228,7 @@ describe('SchedulesService', () => {
   } as unknown as TemporalService;
 
   beforeEach(() => {
+    compiledDefinition = workflowDefinition;
     repository = new InMemoryScheduleRepository();
     service = new SchedulesService(
       repository as unknown as ScheduleRepository,
@@ -297,6 +299,52 @@ describe('SchedulesService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(createScheduleCalls.length).toBe(0);
+  });
+
+  it('allows schedules to omit required runtime inputs that define defaults', async () => {
+    compiledDefinition = {
+      ...workflowDefinition,
+      actions: workflowDefinition.actions.map((action) =>
+        action.ref === 'entry'
+          ? {
+              ...action,
+              params: {
+                runtimeInputs: [
+                  {
+                    id: 'domain',
+                    label: 'Domain',
+                    type: 'text',
+                    required: true,
+                    defaultValue: 'example.com',
+                  },
+                ],
+              },
+            }
+          : action,
+      ),
+    };
+
+    const schedule = await service.create(authContext, {
+      workflowId: 'workflow-1',
+      workflowVersionId: 'version-1',
+      name: 'Defaulted',
+      cronExpression: '0 10 * * *',
+      timezone: 'UTC',
+      overlapPolicy: 'skip',
+      catchupWindowSeconds: 0,
+      inputPayload: {
+        runtimeInputs: {},
+        nodeOverrides: {},
+      },
+    });
+
+    expect(schedule.inputPayload?.runtimeInputs).toEqual({});
+    expect(createScheduleCalls.length).toBe(1);
+    expect(createScheduleCalls[0]).toMatchObject({
+      dispatchArgs: {
+        runtimeInputs: {},
+      },
+    });
   });
 
   it('updates schedules and propagates Temporal memo + dispatch args', async () => {
