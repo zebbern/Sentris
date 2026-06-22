@@ -40,7 +40,12 @@ if (cli.ledgerCheckOnly) {
   process.exit(process.exitCode ?? 0);
 }
 
-const outputRoot = join(process.cwd(), '.cache', 'security-component-audits', new Date().toISOString().slice(0, 10));
+const outputRoot = join(
+  process.cwd(),
+  '.cache',
+  'security-component-audits',
+  new Date().toISOString().slice(0, 10),
+);
 mkdirSync(outputRoot, { recursive: true });
 
 interface AuditResult {
@@ -63,7 +68,7 @@ for (const componentId of selectedIds) {
     fixture,
   });
 
-  if (skipped && !cli.force) {
+  if (skipped) {
     console.log(`SKIP ${componentId}: ${skipped.error ?? 'ledger current'}`);
     results.push({
       componentId,
@@ -71,6 +76,9 @@ for (const componentId of selectedIds) {
       durationMs: skipped.durationMs,
       error: skipped.error,
     });
+    if (skipped.status === 'skipped') {
+      ledger = upsertSecurityComponentLedgerEntry(ledger, skipped);
+    }
     continue;
   }
 
@@ -126,10 +134,15 @@ for (const componentId of selectedIds) {
 }
 
 writeSecurityComponentLedger(ledger, getDefaultLedgerPath());
-writeFileSync(join(outputRoot, 'security-component-live-audit.json'), JSON.stringify({ results }, null, 2));
+writeFileSync(
+  join(outputRoot, 'security-component-live-audit.json'),
+  JSON.stringify({ results }, null, 2),
+);
 
 const failures = results.filter((result) => result.status === 'failed');
 if (failures.length > 0) {
   process.exitCode = 1;
-  console.error(`Security component live audit failures: ${failures.map((item) => item.componentId).join(', ')}`);
+  console.error(
+    `Security component live audit failures: ${failures.map((item) => item.componentId).join(', ')}`,
+  );
 }

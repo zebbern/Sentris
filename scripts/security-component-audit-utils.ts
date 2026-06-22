@@ -46,7 +46,9 @@ export interface SecurityComponentAuditCliOptions {
   sequential: boolean;
 }
 
-export function parseSecurityComponentAuditCliOptions(argv: string[]): SecurityComponentAuditCliOptions {
+export function parseSecurityComponentAuditCliOptions(
+  argv: string[],
+): SecurityComponentAuditCliOptions {
   const componentIds = new Set<string>();
   let force = false;
   let ledgerCheckOnly = false;
@@ -334,9 +336,7 @@ export function summarizeSecurityComponentLedgerFreshness(
     const entry = ledger?.entries[componentId];
 
     if (fixture.skipReason || (fixture.requiresSecrets?.length ?? 0) > 0) {
-      const hasSecrets = (fixture.requiresSecrets ?? []).every(
-        (name) => process.env[name]?.trim(),
-      );
+      const hasSecrets = (fixture.requiresSecrets ?? []).every((name) => process.env[name]?.trim());
       if (!hasSecrets) {
         return {
           componentId,
@@ -403,10 +403,7 @@ export function summarizeSecurityComponentLedgerFreshness(
   });
 
   const allCurrent = items.every(
-    (item) =>
-      item.status === 'current' ||
-      item.status === 'skipped' ||
-      item.status === 'missing',
+    (item) => item.status === 'current' || item.status === 'skipped' || item.status === 'missing',
   );
 
   return { allCurrent, items };
@@ -423,9 +420,10 @@ export function renderSecurityComponentLedgerFreshness(summary: {
         `- ${item.componentId} [${item.tier}] ${item.status}${item.verifiedAt ? ` (${item.verifiedAt})` : ''}: ${item.rationale}`,
     );
 
-  return [`Security component ledger: ${summary.allCurrent ? 'CURRENT' : 'NEEDS ATTENTION'}`, ...lines].join(
-    '\n',
-  );
+  return [
+    `Security component ledger: ${summary.allCurrent ? 'CURRENT' : 'NEEDS ATTENTION'}`,
+    ...lines,
+  ].join('\n');
 }
 
 export function shouldSkipSecurityComponentLiveAudit(options: {
@@ -435,19 +433,27 @@ export function shouldSkipSecurityComponentLiveAudit(options: {
   force: boolean;
   fixture: SecurityComponentAuditFixture;
 }): SecurityComponentLedgerEntry | undefined {
-  if (options.force) {
-    return undefined;
-  }
+  const requiredSecrets = options.fixture.requiresSecrets ?? [];
+  const missingRequiredSecrets = requiredSecrets.filter((name) => !process.env[name]?.trim());
+  const missingCredentialGate =
+    missingRequiredSecrets.length > 0 ||
+    (requiredSecrets.length === 0 && options.fixture.skipReason !== undefined);
 
-  if (options.fixture.skipReason && !(options.fixture.requiresSecrets ?? []).some((name) => process.env[name]?.trim())) {
+  if (missingCredentialGate) {
     return {
       componentId: options.componentId,
       fingerprint: options.fingerprint,
       tier: options.fixture.tier,
       status: 'skipped',
-      error: options.fixture.skipReason,
+      error:
+        options.fixture.skipReason ??
+        `Missing required secrets: ${missingRequiredSecrets.join(', ')}`,
       verifiedAt: new Date().toISOString(),
     };
+  }
+
+  if (options.force) {
+    return undefined;
   }
 
   const existing = options.ledger?.entries[options.componentId];
