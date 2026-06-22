@@ -3,14 +3,7 @@
     "name": "Web Attack Surface Quick Win Hunt",
     "description": "Authorized bug bounty workflow that refreshes live web metadata, crawls endpoints, runs safe exposure checks, reviews TLS posture, and writes a prioritized quick-win lead report.",
     "category": "bug-bounty",
-    "tags": [
-      "bug-bounty",
-      "web",
-      "nuclei",
-      "katana",
-      "tls",
-      "quick-wins"
-    ],
+    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
     "author": "sentris-team",
     "version": "1.0.0"
   },
@@ -20,14 +13,7 @@
     "version": "1.0.0",
     "author": "sentris-team",
     "category": "bug-bounty",
-    "tags": [
-      "bug-bounty",
-      "web",
-      "nuclei",
-      "katana",
-      "tls",
-      "quick-wins"
-    ],
+    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
     "entryPoint": "trigger_1",
     "nodeCount": 10,
     "edgeCount": 15
@@ -67,6 +53,7 @@
                   "label": "Scan intensity",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "safe",
                   "description": "Operator note such as safe, normal, or thorough."
                 }
               ]
@@ -208,13 +195,7 @@
               "followRedirects": true,
               "updateTemplates": true,
               "disableHttpx": true,
-              "severityFilter": [
-                "info",
-                "low",
-                "medium",
-                "high",
-                "critical"
-              ]
+              "severityFilter": ["info", "low", "medium", "high", "critical"]
             },
             "inputOverrides": {
               "templateIds": [

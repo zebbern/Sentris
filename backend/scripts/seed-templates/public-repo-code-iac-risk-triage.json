@@ -46,6 +46,7 @@
                   "label": "Branch, tag, or commit",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Git ref to inspect. Uses the repository default branch when omitted."
                 },
                 {
@@ -53,6 +54,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, and rate-limit notes to include in the report."
                 }
               ]

@@ -3,14 +3,7 @@
     "name": "Subdomain Takeover Triage",
     "description": "Authorized bug bounty workflow that discovers subdomains, checks DNS and HTTP takeover indicators, runs safe takeover templates, and writes a prioritized candidate report.",
     "category": "bug-bounty",
-    "tags": [
-      "bug-bounty",
-      "takeover",
-      "subdomains",
-      "dns",
-      "httpx",
-      "nuclei"
-    ],
+    "tags": ["bug-bounty", "takeover", "subdomains", "dns", "httpx", "nuclei"],
     "author": "sentris-team",
     "version": "1.0.0"
   },
@@ -20,14 +13,7 @@
     "version": "1.0.0",
     "author": "sentris-team",
     "category": "bug-bounty",
-    "tags": [
-      "bug-bounty",
-      "takeover",
-      "subdomains",
-      "dns",
-      "httpx",
-      "nuclei"
-    ],
+    "tags": ["bug-bounty", "takeover", "subdomains", "dns", "httpx", "nuclei"],
     "entryPoint": "trigger_1",
     "nodeCount": 8,
     "edgeCount": 10
@@ -67,6 +53,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, and rate-limit notes."
                 }
               ]
@@ -140,10 +127,7 @@
           "label": "Resolve CNAME and Address Records",
           "config": {
             "params": {
-              "recordTypes": [
-                "A",
-                "CNAME"
-              ],
+              "recordTypes": ["A", "CNAME"],
               "outputMode": "json",
               "includeResponses": true,
               "threads": 100,
@@ -192,18 +176,10 @@
               "followRedirects": true,
               "updateTemplates": true,
               "disableHttpx": true,
-              "severityFilter": [
-                "info",
-                "low",
-                "medium",
-                "high",
-                "critical"
-              ]
+              "severityFilter": ["info", "low", "medium", "high", "critical"]
             },
             "inputOverrides": {
-              "templatePaths": [
-                "http/takeovers/"
-              ]
+              "templatePaths": ["http/takeovers/"]
             }
           }
         }

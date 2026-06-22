@@ -57,6 +57,7 @@
                   "label": "Scan intensity",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "safe",
                   "description": "Use safe, normal, or thorough. Safe keeps passive expansion and DNS queries tightly bounded."
                 },
                 {
@@ -64,6 +65,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, rate limits, and validation notes to include in the report."
                 }
               ]

@@ -53,6 +53,7 @@
                   "label": "Scan intensity",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "safe",
                   "description": "Use safe or thorough. Safe keeps candidate generation tightly bounded."
                 },
                 {
@@ -60,6 +61,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, and rate-limit notes to copy into the report."
                 }
               ]

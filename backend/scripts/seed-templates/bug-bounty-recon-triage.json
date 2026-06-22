@@ -43,6 +43,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, and rate-limit notes."
                 }
               ]

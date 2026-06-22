@@ -50,6 +50,7 @@
                   "label": "Scan intensity",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "safe",
                   "description": "Use safe, normal, or thorough. Safe caps the wordlist for live triage."
                 },
                 {
@@ -57,6 +58,7 @@
                   "label": "Authorization notes",
                   "type": "text",
                   "required": false,
+                  "defaultValue": "",
                   "description": "Program scope, exclusions, rate limits, and validation notes to include in the report."
                 }
               ]

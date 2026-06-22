@@ -86,6 +86,31 @@ describe('new seed templates', () => {
     expect(unboundedSubfinderNodes).toEqual([]);
   });
 
+  it('defines string defaults for optional text runtime inputs', () => {
+    const missingDefaults: string[] = [];
+
+    for (const fileName of newTemplateFiles) {
+      const filePath = join(seedTemplatesDir, fileName);
+      const template = JSON.parse(readFileSync(filePath, 'utf8'));
+      const entrypoint = template.graph.nodes.find(
+        (node: { id: string }) => node.id === 'trigger_1',
+      );
+      const runtimeInputs = entrypoint?.data.config.params.runtimeInputs ?? [];
+
+      for (const runtimeInput of runtimeInputs) {
+        const inputType = String(runtimeInput.type ?? '');
+        const isOptionalTextInput =
+          runtimeInput.required !== true && ['text', 'textarea', 'string'].includes(inputType);
+
+        if (isOptionalTextInput && typeof runtimeInput.defaultValue !== 'string') {
+          missingDefaults.push(`${fileName}:${runtimeInput.id}`);
+        }
+      }
+    }
+
+    expect(missingDefaults).toEqual([]);
+  });
+
   for (const fileName of newTemplateFiles) {
     it(`${fileName} exists and contains a valid workflow graph`, () => {
       const filePath = join(seedTemplatesDir, fileName);
