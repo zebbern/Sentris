@@ -10,6 +10,7 @@ import {
   summarizeTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
+  resolveTemplateAuditManagedSecretMappings,
   resolveTemplateAuditSecretMappings,
   shouldSkipTemplateValidation,
   summarizeNodeIoNode,
@@ -34,6 +35,32 @@ describe('template library live audit helpers', () => {
 
     expect(inputs['Security Scan Discord Report']).toEqual({
       imageRef: 'alpine:3.18',
+    });
+  });
+
+  it('includes live fixtures for new CVE hunt templates', () => {
+    const inputs = createTemplateLiveAuditInputs();
+
+    expect(inputs['Tech Stack CVE Hunter']).toEqual({
+      liveUrls: ['https://scanme.nmap.org/'],
+      authorizationNotes: 'Live audit: public Nmap scanme target.',
+    });
+    expect(inputs['GitHub Dependency CVE Hunt → Discord']).toMatchObject({
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      includeDevDependencies: false,
+    });
+    expect(inputs['KEV / Fresh CVE Watch Brief']).toEqual({
+      productKeyword: 'nginx',
+      lookbackDays: 365,
+      researchNotes: 'Live audit fixture for keyword CVE watch.',
+    });
+    expect(inputs['Public Repo Full Code Security']).toMatchObject({
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      includeDevDependencies: false,
+    });
+    expect(inputs['Attack Surface Recon Analytics']).toEqual({
+      domains: ['example.com'],
+      authorizationNotes: 'Live audit fixture: passive bounded recon.',
     });
   });
 
@@ -64,6 +91,37 @@ describe('template library live audit helpers', () => {
         TEMPLATE_AUDIT_SECRET_MAPPINGS: '{not-json',
       }),
     ).toThrow('TEMPLATE_AUDIT_SECRET_MAPPINGS must be a JSON object');
+  });
+
+  it('maps template audit secret names to existing managed secret aliases', () => {
+    const resolved = resolveTemplateAuditManagedSecretMappings(
+      ['DISCORD_WEBHOOK_URL', 'MISSING_SECRET'],
+      ['webhook_discord'],
+    );
+
+    expect(resolved).toEqual({
+      secretMappings: {
+        DISCORD_WEBHOOK_URL: 'webhook_discord',
+      },
+      providedSecretNames: ['DISCORD_WEBHOOK_URL'],
+      missingSecretNames: ['MISSING_SECRET'],
+    });
+  });
+
+  it('keeps explicit audit secret mappings ahead of managed secret aliases', () => {
+    const base = resolveTemplateAuditSecretMappings(['DISCORD_WEBHOOK_URL'], {
+      TEMPLATE_AUDIT_SECRET_MAPPINGS: JSON.stringify({
+        DISCORD_WEBHOOK_URL: 'explicit-discord-secret',
+      }),
+    });
+    const resolved = resolveTemplateAuditManagedSecretMappings(
+      ['DISCORD_WEBHOOK_URL'],
+      ['webhook_discord'],
+      base,
+    );
+
+    expect(resolved.secretMappings.DISCORD_WEBHOOK_URL).toBe('explicit-discord-secret');
+    expect(resolved.missingSecretNames).toEqual([]);
   });
 
   it('parses cross-platform targeted audit CLI flags with environment fallbacks', () => {

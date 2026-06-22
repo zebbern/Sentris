@@ -253,6 +253,31 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
     'Security Scan Discord Report': {
       imageRef: 'alpine:3.18',
     },
+    'Tech Stack CVE Hunter': {
+      liveUrls: ['https://scanme.nmap.org/'],
+      authorizationNotes: 'Live audit: public Nmap scanme target.',
+    },
+    'GitHub Dependency CVE Hunt → Discord': {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      ref: '',
+      includeDevDependencies: false,
+      researchNotes: 'Live audit fixture.',
+    },
+    'KEV / Fresh CVE Watch Brief': {
+      productKeyword: 'nginx',
+      lookbackDays: 365,
+      researchNotes: 'Live audit fixture for keyword CVE watch.',
+    },
+    'Public Repo Full Code Security': {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      ref: '',
+      includeDevDependencies: false,
+      authorizationNotes: 'Live audit fixture.',
+    },
+    'Attack Surface Recon Analytics': {
+      domains: ['example.com'],
+      authorizationNotes: 'Live audit fixture: passive bounded recon.',
+    },
   };
 }
 
@@ -279,6 +304,86 @@ function parseSecretMappingsJson(value: string | undefined): Record<string, stri
   } catch {
     throw new Error('TEMPLATE_AUDIT_SECRET_MAPPINGS must be a JSON object');
   }
+}
+
+function normalizeManagedSecretLookup(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function toManagedSecretSnakeCase(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
+}
+
+function uniqueNonEmpty(values: string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+export function getTemplateAuditManagedSecretCandidates(secretName: string): string[] {
+  const trimmed = secretName.trim();
+  const snake = toManagedSecretSnakeCase(trimmed);
+  const candidates = [trimmed, snake, snake.toUpperCase()];
+
+  if (snake.endsWith('_webhook_url')) {
+    const provider = snake.slice(0, -'_webhook_url'.length);
+    candidates.push(
+      `${provider}_webhook`,
+      `webhook_${provider}`,
+      `${provider}-webhook`,
+      `webhook-${provider}`,
+    );
+  }
+
+  if (snake.endsWith('_bot_token')) {
+    const provider = snake.slice(0, -'_bot_token'.length);
+    candidates.push(`${provider}_bot_token`, `bot_token_${provider}`);
+  }
+
+  return uniqueNonEmpty(candidates);
+}
+
+export function resolveTemplateAuditManagedSecretMappings(
+  requiredSecretNames: string[],
+  availableManagedSecretNames: string[],
+  baseResolution: TemplateAuditSecretResolution = resolveTemplateAuditSecretMappings(
+    requiredSecretNames,
+  ),
+): TemplateAuditSecretResolution {
+  const secretMappings = { ...baseResolution.secretMappings };
+  const availableByNormalized = new Map<string, string>();
+
+  for (const availableName of availableManagedSecretNames) {
+    const normalized = normalizeManagedSecretLookup(availableName);
+    if (normalized && !availableByNormalized.has(normalized)) {
+      availableByNormalized.set(normalized, availableName);
+    }
+  }
+
+  const uniqueRequiredNames = Array.from(
+    new Set(requiredSecretNames.map((name) => name.trim()).filter(Boolean)),
+  );
+
+  for (const secretName of uniqueRequiredNames) {
+    if (secretMappings[secretName]) continue;
+
+    for (const candidate of getTemplateAuditManagedSecretCandidates(secretName)) {
+      const managedName = availableByNormalized.get(normalizeManagedSecretLookup(candidate));
+      if (managedName) {
+        secretMappings[secretName] = managedName;
+        break;
+      }
+    }
+  }
+
+  return {
+    secretMappings,
+    providedSecretNames: uniqueRequiredNames.filter((name) => Boolean(secretMappings[name])),
+    missingSecretNames: uniqueRequiredNames.filter((name) => !secretMappings[name]),
+  };
 }
 
 export function resolveTemplateAuditSecretMappings(

@@ -1,0 +1,292 @@
+{
+  "_metadata": {
+    "name": "Attack Surface Recon Analytics",
+    "description": "Slim attack-surface recon pipeline: subdomain discovery, DNS resolution, HTTP probing, deduplicated enrichment, artifact report, and optional analytics indexing.",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "recon",
+      "subdomains",
+      "dnsx",
+      "httpx",
+      "dedupe",
+      "analytics",
+      "attack-surface"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Attack Surface Recon Analytics",
+    "description": "Discover subdomains, resolve DNS, probe live HTTP services, dedupe and enrich results, and index findings for analytics dashboards.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "recon",
+      "subdomains",
+      "dnsx",
+      "httpx",
+      "dedupe",
+      "analytics",
+      "attack-surface"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 15
+  },
+  "graph": {
+    "name": "Attack Surface Recon Analytics",
+    "description": "Reference-style recon workflow with analytics sink for authorized bug bounty targets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Scope Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "domains",
+                  "label": "In-scope root domains",
+                  "type": "array",
+                  "required": true,
+                  "description": "Root domains approved by the bug bounty program."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and rate-limit notes."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "subfinder_discovery",
+        "type": "sentris.subfinder.run",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Discover Subdomains",
+          "config": {
+            "params": {
+              "threads": 10,
+              "timeout": 8,
+              "maxEnumerationTime": 1,
+              "allSources": false,
+              "recursive": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dnsx_resolve",
+        "type": "sentris.dnsx.run",
+        "position": { "x": 740, "y": 260 },
+        "data": {
+          "label": "Resolve DNS Records",
+          "config": {
+            "params": {
+              "recordTypes": ["A"],
+              "outputMode": "json",
+              "includeResponses": true,
+              "threads": 100,
+              "retryCount": 2
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 1060, "y": 260 },
+        "data": {
+          "label": "Probe Live HTTP Endpoints",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dedupe_enrich",
+        "type": "core.logic.script",
+        "position": { "x": 1380, "y": 260 },
+        "data": {
+          "label": "Dedupe and Enrich Assets",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domains", "type": "list-text" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "subdomains", "type": "list-text" },
+                { "name": "dnsRecords", "type": "list-json" },
+                { "name": "httpResponses", "type": "list-json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const domains = Array.isArray(input.domains) ? input.domains : [];\n  const subdomains = Array.isArray(input.subdomains) ? input.subdomains : [];\n  const dnsRecords = Array.isArray(input.dnsRecords) ? input.dnsRecords : [];\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  const hostMap = new Map();\n  for (const record of dnsRecords) {\n    const host = String(record?.host || record?.domain || record?.name || '').toLowerCase();\n    if (!host) continue;\n    const ips = Array.isArray(record?.a) ? record.a : Array.isArray(record?.ips) ? record.ips : Array.isArray(record?.A) ? record.A : [];\n    hostMap.set(host, { host, dnsRecords: ips, technologies: [], statusCode: null, title: null, url: null });\n  }\n  for (const resp of httpResponses) {\n    const url = resp?.url || resp?.finalUrl || resp?.input;\n    if (typeof url !== 'string' || url.length === 0) continue;\n    let host = '';\n    try { host = new URL(url).hostname.toLowerCase(); } catch { host = String(resp?.host || resp?.input || '').toLowerCase(); }\n    if (!host) continue;\n    const existing = hostMap.get(host) || { host, dnsRecords: [], technologies: [], statusCode: null, title: null, url: null };\n    existing.url = url;\n    existing.statusCode = resp?.statusCode ?? existing.statusCode;\n    existing.title = resp?.title ?? existing.title;\n    existing.technologies = Array.isArray(resp?.technologies) ? resp.technologies : existing.technologies;\n    hostMap.set(host, existing);\n  }\n  const score = (item) => (Number(item.statusCode) === 200 ? 2 : item.statusCode ? 1 : 0) + (Array.isArray(item.technologies) ? item.technologies.length : 0);\n  const assets = Array.from(hostMap.values()).sort((a, b) => score(b) - score(a) || a.host.localeCompare(b.host));\n  const technologies = Array.from(new Set(assets.flatMap((item) => (Array.isArray(item.technologies) ? item.technologies : []))));\n  return {\n    report: {\n      summary: {\n        domains,\n        subdomainsFound: subdomains.length,\n        resolvedHosts: dnsRecords.length,\n        liveEndpoints: httpResponses.length,\n        enrichedAssets: assets.length,\n        technologies\n      },\n      authorizationNotes,\n      assets: assets.slice(0, 150),\n      nextSteps: [\n        'Validate discovered hosts remain in authorized program scope',\n        'Review live endpoints with unusual titles, technologies, or status codes',\n        'Escalate to deeper recon templates for crawling and targeted testing'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1700, "y": 260 },
+        "data": {
+          "label": "Save Recon Brief",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "attack-surface-recon-analytics-{{date}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "analytics_sink",
+        "type": "core.analytics.sink",
+        "position": { "x": 1060, "y": 80 },
+        "data": {
+          "label": "Index Recon Results",
+          "config": {
+            "params": {
+              "dataInputs": [
+                { "id": "subfinder", "label": "Subfinder", "sourceTag": "subfinder" },
+                { "id": "dnsx", "label": "DNSx", "sourceTag": "dnsx" },
+                { "id": "httpx", "label": "HTTPx", "sourceTag": "httpx" }
+              ],
+              "indexSuffix": "attack-surface-recon",
+              "assetKeyField": "auto",
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-subfinder_discovery-domains",
+        "source": "trigger_1",
+        "target": "subfinder_discovery",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "subfinder_discovery-dnsx_resolve-subdomains",
+        "source": "subfinder_discovery",
+        "target": "dnsx_resolve",
+        "sourceHandle": "subdomains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "dnsx_resolve-httpx_probe-targets",
+        "source": "dnsx_resolve",
+        "target": "httpx_probe",
+        "sourceHandle": "resolvedHosts",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-dedupe_enrich-domains",
+        "source": "trigger_1",
+        "target": "dedupe_enrich",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "trigger_1-dedupe_enrich-authorizationNotes",
+        "source": "trigger_1",
+        "target": "dedupe_enrich",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "subfinder_discovery-dedupe_enrich-subdomains",
+        "source": "subfinder_discovery",
+        "target": "dedupe_enrich",
+        "sourceHandle": "subdomains",
+        "targetHandle": "subdomains"
+      },
+      {
+        "id": "dnsx_resolve-dedupe_enrich-dnsRecords",
+        "source": "dnsx_resolve",
+        "target": "dedupe_enrich",
+        "sourceHandle": "dnsRecords",
+        "targetHandle": "dnsRecords"
+      },
+      {
+        "id": "httpx_probe-dedupe_enrich-responses",
+        "source": "httpx_probe",
+        "target": "dedupe_enrich",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "dedupe_enrich-artifact_report-report",
+        "source": "dedupe_enrich",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      },
+      {
+        "id": "subfinder_discovery-analytics_sink",
+        "source": "subfinder_discovery",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "dnsx_resolve-analytics_sink",
+        "source": "dnsx_resolve",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "httpx_probe-analytics_sink",
+        "source": "httpx_probe",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "subfinder_discovery-analytics_sink-results",
+        "source": "subfinder_discovery",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "subfinder"
+      },
+      {
+        "id": "dnsx_resolve-analytics_sink-results",
+        "source": "dnsx_resolve",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "dnsx"
+      },
+      {
+        "id": "httpx_probe-analytics_sink-results",
+        "source": "httpx_probe",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "httpx"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

@@ -11,6 +11,7 @@ import {
   renderTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
+  resolveTemplateAuditManagedSecretMappings,
   resolveTemplateAuditSecretMappings,
   shouldSkipTemplateValidation,
   summarizeTemplateValidationLedgerFreshness,
@@ -153,7 +154,7 @@ const API_BASE =
   process.env.API_BASE ??
   `http://127.0.0.1:${3211 + (Number.isFinite(DEFAULT_INSTANCE) ? DEFAULT_INSTANCE : 0) * 100}/api/v1`;
 const INTERNAL_TOKEN = process.env.SENTRIS_INTERNAL_TOKEN ?? 'local-internal-token';
-const ORG_ID = CLI_OPTIONS.organizationId ?? 'org_dev';
+const ORG_ID = CLI_OPTIONS.organizationId ?? 'local-dev';
 const RUN_TIMEOUT_MS = Number.parseInt(process.env.TEMPLATE_AUDIT_TIMEOUT_MS ?? '420000', 10);
 const NODE_IO_CAPTURE_TIMEOUT_MS = Number.parseInt(
   process.env.TEMPLATE_AUDIT_NODE_IO_TIMEOUT_MS ?? '30000',
@@ -163,6 +164,7 @@ const NODE_IO_CAPTURE_POLL_MS = Number.parseInt(
   process.env.TEMPLATE_AUDIT_NODE_IO_POLL_MS ?? '1000',
   10,
 );
+const API_FETCH_RETRY_DELAYS_MS = [250, 1000, 3000];
 const KEEP_WORKFLOWS = process.env.KEEP_AUDIT_WORKFLOWS === 'true';
 const FORCE_AUDIT = CLI_OPTIONS.force;
 const LEDGER_CHECK_ONLY = CLI_OPTIONS.ledgerCheckOnly;
@@ -173,6 +175,8 @@ const LEDGER_PATH =
   process.env.TEMPLATE_AUDIT_LEDGER_PATH ??
   join(process.cwd(), '.cache', 'template-live-audit-ledger.json');
 const AUDIT_TEMPLATE_NAMES = CLI_OPTIONS.templateNames;
+const DISABLE_MANAGED_SECRET_LOOKUP =
+  process.env.TEMPLATE_AUDIT_DISABLE_MANAGED_SECRET_LOOKUP === 'true';
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -191,6 +195,7 @@ const TERMINAL_STATUSES = new Set([
 ]);
 
 const LIVE_INPUTS = createTemplateLiveAuditInputs();
+let managedAuditSecretNames: string[] = [];
 
 function ensureOutputDir() {
   mkdirSync(OUTPUT_ROOT, { recursive: true });
@@ -229,30 +234,49 @@ function sanitizeFileName(value: string): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...HEADERS,
-      ...(init?.headers ?? {}),
-    },
-  });
+  let lastError: unknown;
 
-  const text = await response.text();
-  let body: unknown = null;
-  if (text.trim().length > 0) {
+  for (let attempt = 0; attempt <= API_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      body = JSON.parse(text);
-    } catch {
-      body = text;
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: {
+          ...HEADERS,
+          ...(init?.headers ?? {}),
+        },
+      });
+
+      const text = await response.text();
+      let body: unknown = null;
+      if (text.trim().length > 0) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = text;
+        }
+      }
+
+      if (!response.ok) {
+        const message = typeof body === 'string' ? body : JSON.stringify(body);
+        const error = new Error(`${response.status} ${response.statusText}: ${message}`);
+        if (![429, 502, 503, 504].includes(response.status) || attempt >= API_FETCH_RETRY_DELAYS_MS.length) {
+          throw error;
+        }
+        lastError = error;
+      } else {
+        return body as T;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt >= API_FETCH_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
     }
+
+    await Bun.sleep(API_FETCH_RETRY_DELAYS_MS[attempt]);
   }
 
-  if (!response.ok) {
-    const message = typeof body === 'string' ? body : JSON.stringify(body);
-    throw new Error(`${response.status} ${response.statusText}: ${message}`);
-  }
-
-  return body as T;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 function readSeedTemplates(): Map<string, { file: string; template: SeedTemplate }> {
@@ -283,6 +307,36 @@ function getRuntimeInputs(template: SeedTemplate | ApiTemplate): RuntimeInput[] 
   return Array.isArray(raw) ? (raw as RuntimeInput[]) : [];
 }
 
+function hasScannerRuntimeTarget(runtimeInputs: RuntimeInput[]): boolean {
+  const targetTerms = [
+    'code',
+    'cpe',
+    'domain',
+    'domains',
+    'iac',
+    'image',
+    'package',
+    'repo',
+    'repository',
+    'repositoryurl',
+    'target',
+    'url',
+    'urls',
+    'website',
+    'wordlist',
+  ];
+
+  return runtimeInputs.some((input) => {
+    const haystack = [input.id, input.label, input.description]
+      .filter((value): value is string => typeof value === 'string')
+      .join(' ')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+
+    return targetTerms.some((term) => haystack.includes(term));
+  });
+}
+
 function getEntryRuntimeInputState(
   template: SeedTemplate | ApiTemplate,
 ): 'missing' | 'empty' | 'present' {
@@ -294,6 +348,15 @@ function getEntryRuntimeInputState(
 
 function getRequiredSecretNames(template: SeedTemplate | ApiTemplate): string[] {
   return (template.requiredSecrets ?? []).map((secret) => secret.name).filter(Boolean);
+}
+
+function resolveAuditSecretMappings(requiredSecrets: string[]) {
+  const envResolution = resolveTemplateAuditSecretMappings(requiredSecrets);
+  return resolveTemplateAuditManagedSecretMappings(
+    requiredSecrets,
+    managedAuditSecretNames,
+    envResolution,
+  );
 }
 
 function hasUnmappedSlackNode(template: SeedTemplate | ApiTemplate): boolean {
@@ -313,7 +376,7 @@ function classifyTemplate(
 ): AuditResult['classification'] {
   const runtimeInputs = getRuntimeInputs(seed ?? template);
   const requiredSecrets = getRequiredSecretNames(seed ?? template);
-  const secretResolution = resolveTemplateAuditSecretMappings(requiredSecrets);
+  const secretResolution = resolveAuditSecretMappings(requiredSecrets);
   const hasAllAuditSecrets =
     requiredSecrets.length > 0 && secretResolution.missingSecretNames.length === 0;
   const hasLiveInputs = Boolean(LIVE_INPUTS[template.name]);
@@ -422,7 +485,7 @@ function analyzeRecommendation(
   }
 
   if (requiredSecrets.length > 0) {
-    const missingSecrets = resolveTemplateAuditSecretMappings(requiredSecrets).missingSecretNames;
+    const missingSecrets = resolveAuditSecretMappings(requiredSecrets).missingSecretNames;
     return {
       recommendation: 'review',
       rationale:
@@ -433,10 +496,11 @@ function analyzeRecommendation(
   }
 
   if (
-    components.includes('sentris.trivy.run') ||
-    components.includes('sentris.semgrep.run') ||
-    components.includes('sentris.ffuf.run') ||
-    components.includes('sentris.checkov.run')
+    !hasScannerRuntimeTarget(runtimeInputs) &&
+    (components.includes('sentris.trivy.run') ||
+      components.includes('sentris.semgrep.run') ||
+      components.includes('sentris.ffuf.run') ||
+      components.includes('sentris.checkov.run'))
   ) {
     return {
       recommendation: 'fix',
@@ -583,7 +647,7 @@ async function auditTemplate(
   const classification = classifyTemplate(template, seed);
   const components = getComponents(source);
   const requiredSecrets = getRequiredSecretNames(source);
-  const secretResolution = resolveTemplateAuditSecretMappings(requiredSecrets);
+  const secretResolution = resolveAuditSecretMappings(requiredSecrets);
   const runtimeInputs = getRuntimeInputs(source);
   const validationFingerprint = createValidationFingerprint(template, seed, classification);
   const prefix = `${sanitizeFileName(template.name)}-${template.id.slice(0, 8)}`;
@@ -710,6 +774,27 @@ async function auditTemplate(
 
 let validationLedger: TemplateValidationLedger | undefined;
 
+async function readManagedAuditSecretNames(): Promise<string[]> {
+  if (DISABLE_MANAGED_SECRET_LOOKUP) {
+    console.log('Managed audit secret lookup disabled by TEMPLATE_AUDIT_DISABLE_MANAGED_SECRET_LOOKUP.');
+    return [];
+  }
+
+  try {
+    const secrets = await apiFetch<{ name?: string }[]>('/secrets');
+    const names = secrets.map((secret) => secret.name).filter(Boolean) as string[];
+    console.log(`Managed audit secrets visible for ${ORG_ID}: ${names.length}`);
+    return names;
+  } catch (error) {
+    console.warn(
+      `Managed audit secret lookup unavailable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return [];
+  }
+}
+
 async function main() {
   await maybeUseExistingHttpsFixture();
 
@@ -717,6 +802,7 @@ async function main() {
 
   await apiFetch('/health');
   await apiFetch('/health/ready');
+  managedAuditSecretNames = await readManagedAuditSecretNames();
 
   validationLedger = readValidationLedger();
   const seedTemplates = readSeedTemplates();

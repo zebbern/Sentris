@@ -8,17 +8,22 @@ const seedTemplatesDir = join(import.meta.dir, '../../../scripts/seed-templates'
 
 const newTemplateFiles = [
   'api-surface-exposure-triage.json',
+  'attack-surface-recon-analytics.json',
   'bug-bounty-recon-triage.json',
   'container-image-cve-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
+  'github-dependency-cve-hunt-discord-report.json',
   'github-repo-dependency-cve-triage.json',
+  'kev-fresh-cve-watch-brief.json',
   'npm-dependency-cve-hunt.json',
   'passive-osint-subdomain-expansion.json',
   'public-repo-code-iac-risk-triage.json',
+  'public-repo-full-code-security.json',
   'public-repo-secret-exposure-triage.json',
   'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
+  'tech-stack-cve-hunter.json',
   'web-api-fuzz-triage.json',
   'web-attack-surface-quick-win-hunt.json',
 ];
@@ -1676,5 +1681,360 @@ describe('new seed templates', () => {
     expect(result.report.summary.actionableFindings).toBe(1);
     expect(result.report.priorityFindings).toHaveLength(1);
     expect(result.attachmentContent).toContain('"priorityFindings"');
+  });
+
+  it('tech-stack-cve-hunter wires httpx, NVD, artifact, and Run Report Discord with Run after', () => {
+    const filePath = join(seedTemplatesDir, 'tech-stack-cve-hunter.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+
+    expect(nodeTypes).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.httpx.scan',
+      'core.logic.script',
+      'sentris.nvd.cve.query',
+      'core.logic.script',
+      'core.artifact.writer',
+      'core.notification.run-report-discord',
+    ]);
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
+    ]);
+
+    const discordNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'run_report_discord',
+    );
+    expect(discordNode.data.config.inputOverrides.webhookUrl).toBe('{{SECRET_PLACEHOLDER}}');
+
+    const runAfterEdge = template.graph.edges.find(
+      (edge: { id: string }) => edge.id === 'artifact_report-run_report_discord-after',
+    );
+    expect(runAfterEdge).toEqual(
+      expect.objectContaining({
+        source: 'artifact_report',
+        target: 'run_report_discord',
+        sourceHandle: 'saved',
+        targetHandle: 'after',
+      }),
+    );
+
+    const nvdNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'query_nvd_candidates',
+    );
+    expect(nvdNode.data.config.params.timeoutMs).toBeGreaterThanOrEqual(60_000);
+  });
+
+  it('tech-stack-cve-hunter build script strips versions and includes sourceUrls', () => {
+    const filePath = join(seedTemplatesDir, 'tech-stack-cve-hunter.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const buildNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_cve_queries',
+    );
+    const result = runTemplateScript<{
+      keywordSearch: string;
+      fingerprints: Record<string, unknown>;
+    }>(buildNode.data.config.params.code, {
+      httpResponses: [
+        {
+          url: 'https://app.example.com',
+          statusCode: 200,
+          title: 'Dashboard',
+          technologies: ['nginx:1.18.0', 'Ubuntu'],
+        },
+      ],
+    });
+
+    expect(result.keywordSearch).toBe('nginx');
+    expect(result.fingerprints.sourceUrls).toEqual(['https://app.example.com']);
+  });
+
+  it('github-dependency-cve-hunt-discord-report wires Run Report Discord after artifact save', () => {
+    const filePath = join(seedTemplatesDir, 'github-dependency-cve-hunt-discord-report.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+
+    expect(nodeTypes).toContain('core.notification.run-report-discord');
+    expect(template.manifest.nodeCount).toBe(10);
+    expect(template.manifest.edgeCount).toBe(29);
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
+    ]);
+
+    const runAfterEdge = template.graph.edges.find(
+      (edge: { id: string }) => edge.id === 'artifact_report-run_report_discord-after',
+    );
+    expect(runAfterEdge?.targetHandle).toBe('after');
+    expect(runAfterEdge?.sourceHandle).toBe('saved');
+  });
+
+  it('kev-fresh-cve-watch-brief wires keyword NVD lookup and KEV enrichment', () => {
+    const filePath = join(seedTemplatesDir, 'kev-fresh-cve-watch-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const nvdNode = graph.nodes.find((node: { id: string }) => node.id === 'query_nvd');
+    const assembleNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_watch_brief',
+    );
+    const edges = graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(nvdNode?.type).toBe('sentris.nvd.cve.query');
+    expect(nvdNode.data.config.params.resultsPerPage).toBe(20);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:productKeyword->query_nvd:keywordSearch',
+        'fetch_kev:status->assemble_watch_brief:kevStatus',
+      ]),
+    );
+    expect(
+      assembleNode.data.config.params.variables.map((variable: { name: string }) => variable.name),
+    ).toEqual(expect.arrayContaining(['productKeyword', 'lookbackDays', 'nvdStatus', 'kevStatus']));
+  });
+
+  it('kev-fresh-cve-watch-brief prioritizes KEV-listed recent CVEs', () => {
+    const filePath = join(seedTemplatesDir, 'kev-fresh-cve-watch-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_watch_brief',
+    );
+    const recent = new Date().toISOString();
+    const result = runTemplateScript<{
+      brief: {
+        summary: Record<string, unknown>;
+        watchlist: { id: string; knownExploited: boolean; priorityReasons: string[] }[];
+        kevMatches: unknown[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      productKeyword: 'nginx',
+      lookbackDays: 365,
+      researchNotes: 'audit fixture',
+      nvdStatus: 200,
+      nvdStatusText: 'OK',
+      kevStatus: 200,
+      kevStatusText: 'OK',
+      nvdData: {
+        vulnerabilities: [
+          {
+            cve: {
+              id: 'CVE-2024-0001',
+              published: recent,
+              lastModified: recent,
+              descriptions: [{ lang: 'en', value: 'nginx remote code execution issue' }],
+              metrics: {
+                cvssMetricV31: [
+                  {
+                    cvssData: { baseScore: 9.8, baseSeverity: 'CRITICAL' },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      kevData: {
+        vulnerabilities: [
+          {
+            cveID: 'CVE-2024-0001',
+            vendorProject: 'nginx',
+            product: 'nginx',
+            dateAdded: recent,
+          },
+        ],
+      },
+    });
+
+    expect(result.brief.summary.kevMatchCount).toBe(1);
+    expect(result.brief.watchlist[0].id).toBe('CVE-2024-0001');
+    expect(result.brief.watchlist[0].knownExploited).toBe(true);
+    expect(result.brief.watchlist[0].priorityReasons).toEqual(
+      expect.arrayContaining(['listed in CISA KEV', 'matches product keyword']),
+    );
+  });
+
+  it('public-repo-full-code-security wires parallel scanners, dedupe, artifact, and analytics sink', () => {
+    const filePath = join(seedTemplatesDir, 'public-repo-full-code-security.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle ?? '*'}->${edge.target}:${edge.targetHandle ?? '*'}`,
+    );
+
+    expect(nodeTypes).toEqual(
+      expect.arrayContaining([
+        'sentris.trufflehog.scan',
+        'sentris.repository.files.extract',
+        'sentris.repository.manifest.extract',
+        'sentris.semgrep.run',
+        'sentris.osv.query',
+        'core.logic.script',
+        'core.artifact.writer',
+        'core.analytics.sink',
+      ]),
+    );
+    expect(
+      template.graph.nodes.filter((node: { type: string }) => node.type === 'sentris.osv.query'),
+    ).toHaveLength(5);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:repositoryUrl->trufflehog_scan:scanTarget',
+        'extract_repo_files:sourceBundle->semgrep_scan:target',
+        'dedupe_findings:report->artifact_report:content',
+        'trufflehog_scan:results->analytics_sink:trufflehog',
+        'semgrep_scan:results->analytics_sink:semgrep',
+        'osv_npm_query:results->analytics_sink:osv_npm',
+      ]),
+    );
+    expect(template.requiredSecrets).toEqual([]);
+
+    const analyticsNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'analytics_sink',
+    );
+    expect(analyticsNode.data.config.params.failOnError).toBe(false);
+    expect(analyticsNode.data.config.params.indexSuffix).toBe('repo-full-scan');
+  });
+
+  it('public-repo-full-code-security dedupe script merges and deduplicates cross-scanner findings', () => {
+    const filePath = join(seedTemplatesDir, 'public-repo-full-code-security.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const dedupeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'dedupe_findings',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: Record<string, unknown>;
+        priorityFindings: { source: string; dedupeKey: string }[];
+      };
+    }>(dedupeNode.data.config.params.code, {
+      repositoryUrl: 'https://github.com/example/app',
+      ref: 'main',
+      authorizationNotes: 'authorized',
+      secrets: [
+        {
+          Verified: true,
+          DetectorName: 'AWS',
+          DetectorType: 'AWS',
+          Redacted: 'AKIA...',
+          SourceMetadata: { Data: { Git: { file: 'config.env' } } },
+        },
+      ],
+      secretCount: 1,
+      verifiedCount: 1,
+      hasVerifiedSecrets: true,
+      semgrepFindings: [
+        {
+          checkId: 'javascript.lang.security.audit',
+          message: 'SQL injection risk',
+          severity: 'ERROR',
+          path: 'src/db.js',
+          startLine: 10,
+        },
+        {
+          checkId: 'javascript.lang.security.audit',
+          message: 'SQL injection risk',
+          severity: 'ERROR',
+          path: 'src/db.js',
+          startLine: 10,
+        },
+      ],
+      semgrepCount: 2,
+      npmFindings: [
+        {
+          id: 'GHSA-abc',
+          severity: 'high',
+          summary: 'Prototype pollution',
+          packageSpec: 'lodash@4.17.20',
+          packageName: 'lodash',
+        },
+      ],
+      pypiFindings: [],
+      goFindings: [],
+      mavenFindings: [],
+      packagistFindings: [],
+      npmSummary: { findings: 1 },
+      pypiSummary: {},
+      goSummary: {},
+      mavenSummary: {},
+      packagistSummary: {},
+    });
+
+    expect(result.report.summary.findings).toBe(3);
+    expect(result.report.summary.verifiedSecretCount).toBe(1);
+    expect(result.report.summary.semgrepFindings).toBe(2);
+    expect(result.report.summary.dependencyFindings).toBe(1);
+    expect(result.report.priorityFindings.map((item) => item.source).sort()).toEqual(
+      ['osv-npm', 'semgrep', 'trufflehog'].sort(),
+    );
+    expect(new Set(result.report.priorityFindings.map((item) => item.dedupeKey)).size).toBe(3);
+  });
+
+  it('attack-surface-recon-analytics wires subfinder, dnsx, httpx, dedupe, artifact, and analytics sink', () => {
+    const filePath = join(seedTemplatesDir, 'attack-surface-recon-analytics.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle ?? '*'}->${edge.target}:${edge.targetHandle ?? '*'}`,
+    );
+
+    expect(nodeTypes).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.subfinder.run',
+      'sentris.dnsx.run',
+      'sentris.httpx.scan',
+      'core.logic.script',
+      'core.artifact.writer',
+      'core.analytics.sink',
+    ]);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:domains->subfinder_discovery:domains',
+        'subfinder_discovery:subdomains->dnsx_resolve:domains',
+        'dnsx_resolve:resolvedHosts->httpx_probe:targets',
+        'dedupe_enrich:report->artifact_report:content',
+        'subfinder_discovery:results->analytics_sink:subfinder',
+        'dnsx_resolve:results->analytics_sink:dnsx',
+        'httpx_probe:results->analytics_sink:httpx',
+      ]),
+    );
+    expect(template.requiredSecrets).toEqual([]);
+  });
+
+  it('attack-surface-recon-analytics dedupe script merges DNS and HTTP rows for the same host', () => {
+    const filePath = join(seedTemplatesDir, 'attack-surface-recon-analytics.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const dedupeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'dedupe_enrich',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: Record<string, unknown>;
+        assets: { host: string; url: string | null; statusCode: number | null }[];
+      };
+    }>(dedupeNode.data.config.params.code, {
+      domains: ['example.com'],
+      authorizationNotes: 'authorized',
+      subdomains: ['www.example.com', 'api.example.com'],
+      dnsRecords: [
+        { host: 'www.example.com', a: ['93.184.216.34'] },
+        { host: 'api.example.com', a: ['93.184.216.35'] },
+      ],
+      httpResponses: [
+        {
+          url: 'https://www.example.com',
+          statusCode: 200,
+          title: 'Example Domain',
+          technologies: ['nginx'],
+        },
+      ],
+    });
+
+    expect(result.report.summary.subdomainsFound).toBe(2);
+    expect(result.report.summary.enrichedAssets).toBe(2);
+    expect(result.report.assets[0].host).toBe('www.example.com');
+    expect(result.report.assets[0].url).toBe('https://www.example.com');
+    expect(result.report.assets[0].statusCode).toBe(200);
   });
 });

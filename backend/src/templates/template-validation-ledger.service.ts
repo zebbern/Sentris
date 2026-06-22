@@ -108,11 +108,13 @@ export class TemplateValidationLedgerService {
   }
 
   private ledgerPaths(): string[] {
+    const configuredPath = process.env.TEMPLATE_AUDIT_LEDGER_PATH?.trim();
+    if (configuredPath) return [configuredPath];
+
     const paths = [
-      process.env.TEMPLATE_AUDIT_LEDGER_PATH,
       join(process.cwd(), '.cache', 'template-live-audit-ledger.json'),
       join(process.cwd(), '..', '.cache', 'template-live-audit-ledger.json'),
-    ].filter((value): value is string => Boolean(value));
+    ];
 
     return Array.from(new Set(paths));
   }

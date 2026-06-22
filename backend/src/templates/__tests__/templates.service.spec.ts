@@ -54,14 +54,19 @@ function makeTemplate(overrides: Record<string, unknown> = {}) {
 
 const seedTemplateDir = join(import.meta.dir, '../../../scripts/seed-templates');
 const securityTemplateFiles = [
+  'attack-surface-recon-analytics.json',
   'bug-bounty-recon-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
+  'github-dependency-cve-hunt-discord-report.json',
   'github-repo-dependency-cve-triage.json',
+  'kev-fresh-cve-watch-brief.json',
   'npm-dependency-cve-hunt.json',
+  'public-repo-full-code-security.json',
   'public-repo-secret-exposure-triage.json',
   'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
+  'tech-stack-cve-hunter.json',
   'web-attack-surface-quick-win-hunt.json',
 ] as const;
 
