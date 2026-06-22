@@ -99,8 +99,9 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
 - If the user says “use instance N”, prefer either:
   - `just instance use N` then run `just dev` / `bun run test:e2e`, or
   - explicit env override (`SENTRIS_INSTANCE=N just dev ...`) for one-off commands.
-- Backend maintenance scripts that mutate or inspect local Postgres data must use the shared script database resolver (`backend/scripts/lib/script-database-target.ts`) instead of reading `DATABASE_URL` directly. `DATABASE_URL` is for the running backend process, Drizzle CLI, and explicit app env files; local scripts should target `SENTRIS_INSTANCE` / `.sentris-instance` by default and only use script-specific overrides such as `TEMPLATE_SEED_DATABASE_URL` or the generic `SENTRIS_SCRIPT_DATABASE_URL`.
-- Maintenance scripts must print the target database before mutating data.
+- Local maintenance scripts that mutate or inspect local Postgres data must use the shared script runtime (`scripts/lib/local-script-runtime.ts`) instead of reading `DATABASE_URL` directly. `DATABASE_URL` is for the running app process, Drizzle CLI, and explicit app env files; local scripts should target `SENTRIS_INSTANCE` / `.sentris-instance` by default and only use script-specific overrides such as `TEMPLATE_SEED_DATABASE_URL` or the generic `SENTRIS_SCRIPT_DATABASE_URL`.
+- Local scripts that start or inspect Temporal workflows must also use `getScriptTemporalTarget()` from the shared script runtime instead of reading `TEMPORAL_NAMESPACE` / `TEMPORAL_TASK_QUEUE` directly. Use script-specific `*_TEMPORAL_NAMESPACE` + `*_TEMPORAL_TASK_QUEUE` variables or `SENTRIS_SCRIPT_TEMPORAL_NAMESPACE` + `SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE` when intentionally targeting another namespace.
+- Maintenance scripts must print the target database and/or Temporal target before mutating data or starting workflows.
 
 #### Ports / URLs
 

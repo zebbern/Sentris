@@ -12,7 +12,7 @@ set -euo pipefail
 APPS=(backend worker frontend)
 BASE_BACKEND_PORT=3211
 BASE_FRONTEND_PORT=5173
-BASE_DB_NAME="sentris"
+BASE_DB_NAME="sentris_instance"
 BASE_TEMPORAL_NS="sentris-dev"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,19 +48,11 @@ get_frontend_port() {
 }
 
 get_db_name() {
-  if [ "$1" -eq 0 ]; then
-    echo "$BASE_DB_NAME"
-  else
-    echo "${BASE_DB_NAME}_instance_$1"
-  fi
+  echo "${BASE_DB_NAME}_$1"
 }
 
 get_temporal_ns() {
-  if [ "$1" -eq 0 ]; then
-    echo "$BASE_TEMPORAL_NS"
-  else
-    echo "${BASE_TEMPORAL_NS}-$1"
-  fi
+  echo "${BASE_TEMPORAL_NS}-$1"
 }
 
 get_db_url() {

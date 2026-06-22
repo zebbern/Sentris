@@ -14,7 +14,10 @@ import { randomUUID } from 'crypto';
 import { readFileSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
+import {
+  formatDatabaseTarget,
+  getScriptDatabaseTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

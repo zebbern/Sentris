@@ -10,15 +10,24 @@ import { Connection, Client } from '@temporalio/client';
 import type { WorkflowDefinition } from '../src/temporal/types';
 import { sentrisWorkflowRun } from '../src/temporal/workflows';
 import '../src/components';
+import {
+  formatDatabaseTarget,
+  formatTemporalTarget,
+  getScriptDatabaseTarget,
+  getScriptTemporalTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '..', '.env') });
 
-const DATABASE_URL =
-  process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris';
+const databaseTarget = getScriptDatabaseTarget({
+  overrideEnvVar: 'LONG_LIVED_WORKFLOW_DATABASE_URL',
+});
+const temporalTarget = getScriptTemporalTarget({
+  namespaceOverrideEnvVar: 'LONG_LIVED_WORKFLOW_TEMPORAL_NAMESPACE',
+  taskQueueOverrideEnvVar: 'LONG_LIVED_WORKFLOW_TEMPORAL_TASK_QUEUE',
+});
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
-const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 
 const OUTPUT_DIR = join(__dirname, '..', 'benchmarks');
 
@@ -116,9 +125,13 @@ async function collectTraces(pool: Pool, runId: string): Promise<TraceRow[]> {
 }
 
 async function main() {
-  const pool = new Pool({ connectionString: DATABASE_URL });
+  console.log(formatDatabaseTarget(databaseTarget));
+  console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
+  console.log(formatTemporalTarget(temporalTarget));
+
+  const pool = new Pool({ connectionString: databaseTarget.connectionString });
   const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
-  const client = new Client({ connection, namespace: TEMPORAL_NAMESPACE });
+  const client = new Client({ connection, namespace: temporalTarget.namespace });
 
   try {
     const runId = `long-lived-${randomUUID()}`;
@@ -127,7 +140,7 @@ async function main() {
 
     const handle = await client.workflow.start(sentrisWorkflowRun, {
       workflowId: runId,
-      taskQueue: TEMPORAL_TASK_QUEUE,
+      taskQueue: temporalTarget.taskQueue,
       args: [
         {
           runId,

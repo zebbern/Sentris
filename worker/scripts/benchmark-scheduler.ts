@@ -10,13 +10,19 @@ import type { WorkflowDefinition } from '../src/temporal/types';
 import { sentrisWorkflowRun } from '../src/temporal/workflows';
 import { executeWorkflow } from '../src/temporal/workflow-runner';
 import '../src/components';
+import {
+  formatTemporalTarget,
+  getScriptTemporalTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '..', '.env') });
 
+const temporalTarget = getScriptTemporalTarget({
+  namespaceOverrideEnvVar: 'BENCHMARK_TEMPORAL_NAMESPACE',
+  taskQueueOverrideEnvVar: 'BENCHMARK_TEMPORAL_TASK_QUEUE',
+});
 const TEMPORAL_ADDRESS = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-const TEMPORAL_NAMESPACE = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
-const TEMPORAL_TASK_QUEUE = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 const OUTPUT_DIR = join(__dirname, '..', 'benchmarks');
 
 type BenchmarkMode = 'serial' | 'parallel';
@@ -169,7 +175,7 @@ async function runTemporalBenchmark(
 
     const handle = await client.workflow.start(sentrisWorkflowRun, {
       workflowId: runId,
-      taskQueue: TEMPORAL_TASK_QUEUE,
+      taskQueue: temporalTarget.taskQueue,
       args: [
         {
           runId,
@@ -232,8 +238,9 @@ async function runInlineBenchmark(
 async function main() {
   const iterations = Number.parseInt(process.env.BENCHMARK_ITERATIONS ?? '3', 10);
 
+  console.log(formatTemporalTarget(temporalTarget));
   const connection = await Connection.connect({ address: TEMPORAL_ADDRESS });
-  const client = new Client({ connection, namespace: TEMPORAL_NAMESPACE });
+  const client = new Client({ connection, namespace: temporalTarget.namespace });
 
   try {
     console.log(`Running benchmark with ${iterations} iteration(s) per mode...`);

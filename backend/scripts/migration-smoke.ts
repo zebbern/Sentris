@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { Pool } from 'pg';
-import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
+import {
+  formatDatabaseTarget,
+  getScriptDatabaseTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 async function main() {
   const databaseTarget = getScriptDatabaseTarget({

@@ -2,7 +2,10 @@ import { Pool, PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
 import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 import * as bcrypt from 'bcryptjs';
-import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
+import {
+  formatDatabaseTarget,
+  getScriptDatabaseTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 

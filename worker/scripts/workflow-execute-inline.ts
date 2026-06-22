@@ -11,6 +11,10 @@ import { executeWorkflow } from '../src/temporal/workflow-runner';
 import type { WorkflowDefinition } from '../src/temporal/types';
 import { FileStorageAdapter, TraceAdapter, SecretsAdapter } from '../src/adapters';
 import * as schema from '../src/adapters/schema';
+import {
+  formatDatabaseTarget,
+  getScriptDatabaseTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 async function loadDefinition(pool: Pool, workflowId: string): Promise<WorkflowDefinition> {
   const { rows } = await pool.query<{ compiled_definition: WorkflowDefinition | null }>(
@@ -31,9 +35,13 @@ async function main() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   config({ path: join(__dirname, '..', '.env') });
 
-  const connectionString =
-    process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris';
-  const pool = new Pool({ connectionString });
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'WORKFLOW_INLINE_DATABASE_URL',
+  });
+  console.log(formatDatabaseTarget(databaseTarget));
+  console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
+
+  const pool = new Pool({ connectionString: databaseTarget.connectionString });
   const db = drizzle(pool, { schema });
 
   const minioBucket = process.env.MINIO_BUCKET_NAME ?? 'sentris-files';

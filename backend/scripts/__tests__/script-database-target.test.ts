@@ -1,16 +1,19 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { afterEach, describe, expect, it } from 'bun:test';
 import {
+  formatTemporalTarget,
   getScriptDatabaseTarget,
+  getScriptTemporalTarget,
   readActiveInstance,
   redactConnectionString,
-} from '../lib/script-database-target';
+} from '../../../scripts/lib/local-script-runtime';
 
 let cleanupDirs: string[] = [];
 const scriptsDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = resolve(scriptsDir, '..', '..');
 
 function createRootWithInstance(instance: string): string {
   const root = mkdtempSync(join(tmpdir(), 'sentris-script-db-target-'));
@@ -97,6 +100,46 @@ describe('script database target resolver', () => {
     ).toBe('postgresql://sentris:***@localhost:5433/sentris_instance_0');
   });
 
+  it('uses the active instance instead of stale Temporal env for local scripts', () => {
+    const target = getScriptTemporalTarget({
+      env: {
+        SENTRIS_INSTANCE: '4',
+        TEMPORAL_NAMESPACE: 'sentris-dev',
+        TEMPORAL_TASK_QUEUE: 'sentris-default',
+      },
+      repoRoot: createRootWithInstance('2'),
+    });
+
+    expect(target.namespace).toBe('sentris-dev-4');
+    expect(target.taskQueue).toBe('sentris-dev-4');
+    expect(target.source).toBe('env:SENTRIS_INSTANCE');
+    expect(target.ignoredTemporalEnv).toBe(true);
+    expect(formatTemporalTarget(target)).toContain(
+      'TEMPORAL_NAMESPACE/TEMPORAL_TASK_QUEUE ignored',
+    );
+  });
+
+  it('allows script-specific Temporal overrides when intentionally targeting another namespace', () => {
+    const target = getScriptTemporalTarget({
+      namespaceOverrideEnvVar: 'WORKFLOW_RUNNER_TEMPORAL_NAMESPACE',
+      taskQueueOverrideEnvVar: 'WORKFLOW_RUNNER_TEMPORAL_TASK_QUEUE',
+      env: {
+        SENTRIS_INSTANCE: '4',
+        SENTRIS_SCRIPT_TEMPORAL_NAMESPACE: 'generic-namespace',
+        SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE: 'generic-task-queue',
+        WORKFLOW_RUNNER_TEMPORAL_NAMESPACE: 'manual-namespace',
+        WORKFLOW_RUNNER_TEMPORAL_TASK_QUEUE: 'manual-task-queue',
+      },
+      repoRoot: createRootWithInstance('2'),
+    });
+
+    expect(target.namespace).toBe('manual-namespace');
+    expect(target.taskQueue).toBe('manual-task-queue');
+    expect(target.source).toBe(
+      'env:WORKFLOW_RUNNER_TEMPORAL_NAMESPACE/env:WORKFLOW_RUNNER_TEMPORAL_TASK_QUEUE',
+    );
+  });
+
   it('prevents backend maintenance scripts from reading DATABASE_URL directly', () => {
     const scriptFiles = readdirSync(scriptsDir)
       .filter((file) => file.endsWith('.ts'))
@@ -104,11 +147,57 @@ describe('script database target resolver', () => {
 
     for (const file of scriptFiles) {
       const source = readFileSync(join(scriptsDir, file), 'utf-8');
-      expect(source, `${file} should use script-database-target.ts`).not.toContain(
+      expect(source, `${file} should use local-script-runtime.ts`).not.toContain(
         'process.env.DATABASE_URL',
       );
       expect(source, `${file} should not fall back to the legacy sentris database`).not.toContain(
         'postgresql://sentris:sentris@localhost:5433/sentris',
+      );
+    }
+  });
+
+  it('prevents all local database maintenance scripts from reading DATABASE_URL directly', () => {
+    const databaseScriptFiles = [
+      join(scriptsDir, 'delete-all-workflow-runs.ts'),
+      join(scriptsDir, 'migration-smoke.ts'),
+      join(scriptsDir, 'seed-stress-test.ts'),
+      join(scriptsDir, 'seed-templates.ts'),
+      join(repoRoot, 'worker', 'scripts', 'run-long-lived-workflow.ts'),
+      join(repoRoot, 'worker', 'scripts', 'workflow-execute-inline.ts'),
+      join(repoRoot, 'worker', 'scripts', 'workflow-runner.ts'),
+    ];
+
+    for (const file of databaseScriptFiles) {
+      const source = readFileSync(file, 'utf-8');
+      expect(source, `${file} should use the shared script database resolver`).toContain(
+        'getScriptDatabaseTarget',
+      );
+      expect(source, `${file} should not read DATABASE_URL directly`).not.toContain(
+        'process.env.DATABASE_URL',
+      );
+      expect(source, `${file} should not fall back to the legacy sentris database`).not.toContain(
+        'postgresql://sentris:sentris@localhost:5433/sentris',
+      );
+    }
+  });
+
+  it('prevents local Temporal scripts from reading stale Temporal env directly', () => {
+    const temporalScriptFiles = [
+      join(repoRoot, 'worker', 'scripts', 'benchmark-scheduler.ts'),
+      join(repoRoot, 'worker', 'scripts', 'run-long-lived-workflow.ts'),
+      join(repoRoot, 'worker', 'scripts', 'workflow-runner.ts'),
+    ];
+
+    for (const file of temporalScriptFiles) {
+      const source = readFileSync(file, 'utf-8');
+      expect(source, `${file} should use the shared script Temporal resolver`).toContain(
+        'getScriptTemporalTarget',
+      );
+      expect(source, `${file} should not read TEMPORAL_NAMESPACE directly`).not.toContain(
+        'process.env.TEMPORAL_NAMESPACE',
+      );
+      expect(source, `${file} should not read TEMPORAL_TASK_QUEUE directly`).not.toContain(
+        'process.env.TEMPORAL_TASK_QUEUE',
       );
     }
   });

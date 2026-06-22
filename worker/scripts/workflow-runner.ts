@@ -8,6 +8,12 @@ import { Connection, Client } from '@temporalio/client';
 
 import type { WorkflowDefinition } from '../src/temporal/types';
 import { sentrisWorkflowRun } from '../src/temporal/workflows';
+import {
+  formatDatabaseTarget,
+  formatTemporalTarget,
+  getScriptDatabaseTarget,
+  getScriptTemporalTarget,
+} from '../../scripts/lib/local-script-runtime';
 
 interface ListEntry {
   workflowId: string;
@@ -153,9 +159,9 @@ async function runWorkflow(
   definition: WorkflowDefinition,
   workflowRecordId: string,
   fileId: string,
+  taskQueue: string,
 ): Promise<{ runId: string; result: unknown }> {
   const temporalWorkflowId = `sentris-run-${randomUUID()}`;
-  const taskQueue = process.env.TEMPORAL_TASK_QUEUE ?? 'sentris-default';
 
   const handle = await client.workflow.start(sentrisWorkflowRun, {
     workflowId: temporalWorkflowId,
@@ -182,18 +188,26 @@ async function main() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   config({ path: join(__dirname, '..', '.env') });
 
-  const pool = new Pool({
-    connectionString:
-      process.env.DATABASE_URL ?? 'postgresql://sentris:sentris@localhost:5433/sentris',
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'WORKFLOW_RUNNER_DATABASE_URL',
   });
+  const temporalTarget = getScriptTemporalTarget({
+    namespaceOverrideEnvVar: 'WORKFLOW_RUNNER_TEMPORAL_NAMESPACE',
+    taskQueueOverrideEnvVar: 'WORKFLOW_RUNNER_TEMPORAL_TASK_QUEUE',
+  });
+
+  console.log(formatDatabaseTarget(databaseTarget));
+  console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
+  console.log(formatTemporalTarget(temporalTarget));
+
+  const pool = new Pool({ connectionString: databaseTarget.connectionString });
 
   const definition = await loadDefinition(pool, workflowRecordId);
 
   const address = process.env.TEMPORAL_ADDRESS ?? 'localhost:7233';
-  const namespace = process.env.TEMPORAL_NAMESPACE ?? 'sentris-dev';
 
   const connection = await Connection.connect({ address });
-  const client = new Client({ connection, namespace });
+  const client = new Client({ connection, namespace: temporalTarget.namespace });
 
   try {
     if (list) {
@@ -211,7 +225,13 @@ async function main() {
 
     if (shouldRun && fileId) {
       console.log('Starting new workflow run...');
-      const { runId, result } = await runWorkflow(client, definition, workflowRecordId, fileId);
+      const { runId, result } = await runWorkflow(
+        client,
+        definition,
+        workflowRecordId,
+        fileId,
+        temporalTarget.taskQueue,
+      );
       console.log('--- New Run Result ---');
       console.log(JSON.stringify({ runId, result }, null, 2));
       console.log('----------------------');

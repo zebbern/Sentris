@@ -138,7 +138,9 @@ When stopping/cleaning instance 0, Docker infra is also torn down. For non-zero 
 
 ## Local Maintenance Scripts
 
-Backend maintenance scripts that mutate or inspect local Postgres data are instance-aware. They resolve their target database in this order:
+Local maintenance scripts use the shared script runtime at `scripts/lib/local-script-runtime.ts`.
+
+Scripts that mutate or inspect local Postgres data are instance-aware. They resolve their target database in this order:
 
 1. Script-specific override, such as `TEMPLATE_SEED_DATABASE_URL`, `DELETE_WORKFLOW_RUNS_DATABASE_URL`, `MIGRATION_SMOKE_DATABASE_URL`, or `SEED_STRESS_DATABASE_URL`
 2. Generic script override: `SENTRIS_SCRIPT_DATABASE_URL`
@@ -146,9 +148,19 @@ Backend maintenance scripts that mutate or inspect local Postgres data are insta
 4. `.sentris-instance`
 5. Instance `0`
 
-These scripts intentionally do **not** use plain `DATABASE_URL` by default. `DATABASE_URL` belongs to the running backend process, Drizzle CLI, and app env files; using it for local maintenance scripts can accidentally target the legacy `sentris` database instead of `sentris_instance_N`.
+These scripts intentionally do **not** use plain `DATABASE_URL` by default. `DATABASE_URL` belongs to the running app process, Drizzle CLI, and app env files; using it for local maintenance scripts can accidentally target the legacy `sentris` database instead of `sentris_instance_N`.
 
-Every maintenance script should print its target database before mutating data:
+Scripts that start or inspect Temporal workflows resolve namespace and task queue in this order:
+
+1. Script-specific override pair, such as `WORKFLOW_RUNNER_TEMPORAL_NAMESPACE` + `WORKFLOW_RUNNER_TEMPORAL_TASK_QUEUE`
+2. Generic override pair: `SENTRIS_SCRIPT_TEMPORAL_NAMESPACE` + `SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE`
+3. `SENTRIS_INSTANCE`
+4. `.sentris-instance`
+5. Instance `0`
+
+These scripts intentionally do **not** use plain `TEMPORAL_NAMESPACE` / `TEMPORAL_TASK_QUEUE` by default for the same reason: stale app env files can point a script at the wrong local instance.
+
+Every maintenance script should print its target database and/or Temporal target before mutating data or starting workflows:
 
 ```bash
 bun --cwd backend scripts/seed-templates.ts
@@ -159,6 +171,9 @@ SENTRIS_INSTANCE=2 bun --cwd backend scripts/seed-templates.ts
 
 TEMPLATE_SEED_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd backend scripts/seed-templates.ts
 # Target database: custom_db via env:TEMPLATE_SEED_DATABASE_URL
+
+bun --cwd worker scripts/workflow-runner.ts --workflow <workflow-id>
+# Target Temporal: namespace=sentris-dev-0, taskQueue=sentris-dev-0 via default:instance-0
 ```
 
 ## E2E Tests (Instance-Aware)
