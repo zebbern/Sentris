@@ -111,6 +111,12 @@ export interface TemplateAuditCliOptions {
 
 export type TemplateLiveAuditInputs = Record<string, Record<string, unknown>>;
 
+export interface TemplateAuditSecretResolution {
+  secretMappings: Record<string, string>;
+  providedSecretNames: string[];
+  missingSecretNames: string[];
+}
+
 export type TemplateValidationFreshnessStatus =
   | 'current'
   | 'missing'
@@ -174,12 +180,14 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
     },
     'Container Image CVE Triage': {
       imageRef: 'alpine:3.18',
-      deploymentContext: 'Live audit fixture: small public Linux base image for bounded CVE triage.',
+      deploymentContext:
+        'Live audit fixture: small public Linux base image for bounded CVE triage.',
       authorizationNotes: 'Live audit fixture using a public container image.',
     },
     'Exposed Service CVE Mapper': {
       targets: ['scanme.nmap.org'],
-      authorizationNotes: 'Live audit fixture: Nmap-provided scan target for bounded service checks.',
+      authorizationNotes:
+        'Live audit fixture: Nmap-provided scan target for bounded service checks.',
     },
     'GitHub Repo Dependency CVE Triage': {
       repositoryUrl: 'https://github.com/OWASP/NodeGoat',
@@ -189,7 +197,8 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
     },
     'NPM Dependency CVE Hunt': {
       packageSpecs: ['lodash@4.17.20', 'minimist@0.0.8', 'axios@0.21.1'],
-      researchNotes: 'Live audit fixture using public npm packages with known historical advisories.',
+      researchNotes:
+        'Live audit fixture using public npm packages with known historical advisories.',
     },
     'Passive OSINT Subdomain Expansion': {
       domain: 'example.com',
@@ -235,6 +244,61 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       outOfScopePaths: ['/logout', '/admin/delete'],
       scanIntensity: 'safe',
     },
+    'Security Scan Discord Report': {
+      imageRef: 'alpine:3.18',
+    },
+  };
+}
+
+function normalizeAuditSecretEnvName(secretName: string): string {
+  return `TEMPLATE_AUDIT_SECRET_${secretName.replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase()}`;
+}
+
+function parseSecretMappingsJson(value: string | undefined): Record<string, string> {
+  if (!value?.trim()) return {};
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not-object');
+    }
+
+    const mappings: Record<string, string> = {};
+    for (const [key, rawValue] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof rawValue === 'string' && rawValue.trim().length > 0) {
+        mappings[key] = rawValue;
+      }
+    }
+    return mappings;
+  } catch {
+    throw new Error('TEMPLATE_AUDIT_SECRET_MAPPINGS must be a JSON object');
+  }
+}
+
+export function resolveTemplateAuditSecretMappings(
+  requiredSecretNames: string[],
+  env: Record<string, string | undefined> = process.env,
+): TemplateAuditSecretResolution {
+  const jsonMappings = parseSecretMappingsJson(env.TEMPLATE_AUDIT_SECRET_MAPPINGS);
+  const uniqueRequiredNames = Array.from(
+    new Set(requiredSecretNames.map((name) => name.trim()).filter(Boolean)),
+  );
+  const secretMappings: Record<string, string> = {};
+
+  for (const secretName of uniqueRequiredNames) {
+    const jsonValue = jsonMappings[secretName];
+    const envValue = env[normalizeAuditSecretEnvName(secretName)];
+    const value =
+      typeof jsonValue === 'string' && jsonValue.trim().length > 0 ? jsonValue : envValue;
+    if (typeof value === 'string' && value.trim().length > 0) {
+      secretMappings[secretName] = value;
+    }
+  }
+
+  return {
+    secretMappings,
+    providedSecretNames: uniqueRequiredNames.filter((name) => Boolean(secretMappings[name])),
+    missingSecretNames: uniqueRequiredNames.filter((name) => !secretMappings[name]),
   };
 }
 

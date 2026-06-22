@@ -11,6 +11,7 @@ import {
   renderTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
+  resolveTemplateAuditSecretMappings,
   shouldSkipTemplateValidation,
   summarizeTemplateValidationLedgerFreshness,
   summarizeNodeIoNode,
@@ -312,7 +313,12 @@ function classifyTemplate(
 ): AuditResult['classification'] {
   const runtimeInputs = getRuntimeInputs(seed ?? template);
   const requiredSecrets = getRequiredSecretNames(seed ?? template);
-  if (LIVE_INPUTS[template.name] && requiredSecrets.length === 0) return 'live-run';
+  const secretResolution = resolveTemplateAuditSecretMappings(requiredSecrets);
+  const hasAllAuditSecrets =
+    requiredSecrets.length > 0 && secretResolution.missingSecretNames.length === 0;
+  const hasLiveInputs = Boolean(LIVE_INPUTS[template.name]);
+  if (hasLiveInputs && (requiredSecrets.length === 0 || hasAllAuditSecrets)) return 'live-run';
+  if (hasAllAuditSecrets && runtimeInputs.length === 0) return 'live-run';
   if (requiredSecrets.length > 0 && runtimeInputs.length > 0) return 'credential-gated';
   if (requiredSecrets.length > 0 && runtimeInputs.length === 0) return 'run-start-probe';
   return 'run-start-probe';
@@ -416,9 +422,13 @@ function analyzeRecommendation(
   }
 
   if (requiredSecrets.length > 0) {
+    const missingSecrets = resolveTemplateAuditSecretMappings(requiredSecrets).missingSecretNames;
     return {
       recommendation: 'review',
-      rationale: `Credential-gated template requires: ${requiredSecrets.join(', ')}.`,
+      rationale:
+        missingSecrets.length > 0
+          ? `Credential-gated template requires explicit audit secret mappings for: ${missingSecrets.join(', ')}.`
+          : `Credential-gated template requires: ${requiredSecrets.join(', ')}.`,
     };
   }
 
@@ -573,6 +583,7 @@ async function auditTemplate(
   const classification = classifyTemplate(template, seed);
   const components = getComponents(source);
   const requiredSecrets = getRequiredSecretNames(source);
+  const secretResolution = resolveTemplateAuditSecretMappings(requiredSecrets);
   const runtimeInputs = getRuntimeInputs(source);
   const validationFingerprint = createValidationFingerprint(template, seed, classification);
   const prefix = `${sanitizeFileName(template.name)}-${template.id.slice(0, 8)}`;
@@ -616,6 +627,9 @@ async function auditTemplate(
       method: 'POST',
       body: JSON.stringify({
         workflowName: `Template Live Audit - ${template.name} - ${new Date().toISOString()}`,
+        ...(requiredSecrets.length > 0 && secretResolution.missingSecretNames.length === 0
+          ? { secretMappings: secretResolution.secretMappings }
+          : {}),
       }),
     });
     workflowId = created.workflow?.id;

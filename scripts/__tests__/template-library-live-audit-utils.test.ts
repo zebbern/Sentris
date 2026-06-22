@@ -10,6 +10,7 @@ import {
   summarizeTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
+  resolveTemplateAuditSecretMappings,
   shouldSkipTemplateValidation,
   summarizeNodeIoNode,
   upsertTemplateValidationLedger,
@@ -26,6 +27,43 @@ describe('template library live audit helpers', () => {
       includeDevDependencies: false,
     });
     expect(inputs['GitHub Repo Dependency CVE Triage']).not.toHaveProperty('manifestPaths');
+  });
+
+  it('includes a bounded Discord report live fixture input', () => {
+    const inputs = createTemplateLiveAuditInputs();
+
+    expect(inputs['Security Scan Discord Report']).toEqual({
+      imageRef: 'alpine:3.18',
+    });
+  });
+
+  it('resolves audit secret mappings from explicit JSON and per-secret env variables', () => {
+    const resolved = resolveTemplateAuditSecretMappings(
+      ['DISCORD_WEBHOOK_URL', 'API-TOKEN', 'MISSING_SECRET'],
+      {
+        TEMPLATE_AUDIT_SECRET_MAPPINGS: JSON.stringify({
+          DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/example',
+        }),
+        TEMPLATE_AUDIT_SECRET_API_TOKEN: 'token-from-env',
+      },
+    );
+
+    expect(resolved).toEqual({
+      secretMappings: {
+        DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/example',
+        'API-TOKEN': 'token-from-env',
+      },
+      providedSecretNames: ['DISCORD_WEBHOOK_URL', 'API-TOKEN'],
+      missingSecretNames: ['MISSING_SECRET'],
+    });
+  });
+
+  it('rejects malformed audit secret JSON instead of silently skipping live validation', () => {
+    expect(() =>
+      resolveTemplateAuditSecretMappings(['DISCORD_WEBHOOK_URL'], {
+        TEMPLATE_AUDIT_SECRET_MAPPINGS: '{not-json',
+      }),
+    ).toThrow('TEMPLATE_AUDIT_SECRET_MAPPINGS must be a JSON object');
   });
 
   it('parses cross-platform targeted audit CLI flags with environment fallbacks', () => {
