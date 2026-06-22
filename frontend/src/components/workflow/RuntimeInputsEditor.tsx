@@ -12,7 +12,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string' | 'secret';
+type RuntimeInputType =
+  | 'file'
+  | 'text'
+  | 'number'
+  | 'json'
+  | 'array'
+  | 'string'
+  | 'secret'
+  | 'boolean';
 type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;
 
 const normalizeRuntimeInputType = (type: RuntimeInputType): NormalizedRuntimeInputType =>
@@ -72,7 +80,11 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
     onChange(newInputs);
   };
 
-  const updateInput = (index: number, field: keyof RuntimeInput, fieldValue: any) => {
+  const updateInput = <K extends keyof RuntimeInput>(
+    index: number,
+    field: K,
+    fieldValue: RuntimeInput[K],
+  ) => {
     const newInputs = [...inputs];
     newInputs[index] = { ...newInputs[index], [field]: fieldValue };
     onChange(newInputs);
@@ -176,6 +188,7 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
                     <SelectItem value="file">File Upload</SelectItem>
                     <SelectItem value="text">Text</SelectItem>
                     <SelectItem value="number">Number</SelectItem>
+                    <SelectItem value="boolean">Boolean</SelectItem>
                     <SelectItem value="json">JSON</SelectItem>
                     <SelectItem value="array">Array</SelectItem>
                     <SelectItem value="secret">Secret</SelectItem>
@@ -221,51 +234,69 @@ export function RuntimeInputsEditor({ value, onChange }: RuntimeInputsEditorProp
                 <Label htmlFor={`input-${index}-defaultValue`} className="text-xs">
                   Default Value
                 </Label>
-                <Input
-                  id={`input-${index}-defaultValue`}
-                  type={input.type === 'number' ? 'number' : 'text'}
-                  value={
-                    input.defaultValue === undefined || input.defaultValue === null
-                      ? ''
-                      : typeof input.defaultValue === 'string' ||
-                          typeof input.defaultValue === 'number'
-                        ? String(input.defaultValue)
-                        : JSON.stringify(input.defaultValue)
-                  }
-                  onChange={(e) => {
-                    const nextValue = e.target.value;
-                    if (nextValue === '') {
-                      updateInput(index, 'defaultValue', undefined);
-                      return;
-                    }
-                    if (input.type === 'number') {
-                      const parsed = Number(nextValue);
-                      if (!Number.isNaN(parsed)) {
-                        updateInput(index, 'defaultValue', parsed);
+                {input.type === 'boolean' ? (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`input-${index}-defaultValue`}
+                      checked={input.defaultValue === true}
+                      onCheckedChange={(checked) =>
+                        updateInput(index, 'defaultValue', checked === true)
                       }
-                    } else if (input.type === 'json' || input.type === 'array') {
-                      // Try to parse as JSON, otherwise store as string
-                      try {
-                        const parsed = JSON.parse(nextValue);
-                        updateInput(index, 'defaultValue', parsed);
-                      } catch {
+                    />
+                    <Label
+                      htmlFor={`input-${index}-defaultValue`}
+                      className="text-xs font-normal cursor-pointer"
+                    >
+                      Use true when no value is supplied
+                    </Label>
+                  </div>
+                ) : (
+                  <Input
+                    id={`input-${index}-defaultValue`}
+                    type={input.type === 'number' ? 'number' : 'text'}
+                    value={
+                      input.defaultValue === undefined || input.defaultValue === null
+                        ? ''
+                        : typeof input.defaultValue === 'string' ||
+                            typeof input.defaultValue === 'number'
+                          ? String(input.defaultValue)
+                          : JSON.stringify(input.defaultValue)
+                    }
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      if (nextValue === '') {
+                        updateInput(index, 'defaultValue', undefined);
+                        return;
+                      }
+                      if (input.type === 'number') {
+                        const parsed = Number(nextValue);
+                        if (!Number.isNaN(parsed)) {
+                          updateInput(index, 'defaultValue', parsed);
+                        }
+                      } else if (input.type === 'json' || input.type === 'array') {
+                        // Try to parse as JSON, otherwise store as string
+                        try {
+                          const parsed = JSON.parse(nextValue);
+                          updateInput(index, 'defaultValue', parsed);
+                        } catch {
+                          updateInput(index, 'defaultValue', nextValue);
+                        }
+                      } else {
                         updateInput(index, 'defaultValue', nextValue);
                       }
-                    } else {
-                      updateInput(index, 'defaultValue', nextValue);
+                    }}
+                    placeholder={
+                      input.type === 'array'
+                        ? '["item1", "item2"]'
+                        : input.type === 'json'
+                          ? '{"key": "value"}'
+                          : input.type === 'number'
+                            ? '0'
+                            : 'Enter default value'
                     }
-                  }}
-                  placeholder={
-                    input.type === 'array'
-                      ? '["item1", "item2"]'
-                      : input.type === 'json'
-                        ? '{"key": "value"}'
-                        : input.type === 'number'
-                          ? '0'
-                          : 'Enter default value'
-                  }
-                  className="h-8 text-xs"
-                />
+                    className="h-8 text-xs"
+                  />
+                )}
                 <p className="text-[10px] text-muted-foreground">
                   Value used when workflow is triggered without this input
                 </p>

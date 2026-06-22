@@ -30,7 +30,7 @@ const runtimeInputDefinitionSchema = z.preprocess(
     id: z.string().describe('Unique identifier for this input'),
     label: z.string().describe('Display label for the input field'),
     type: z
-      .enum(['file', 'text', 'number', 'json', 'array', 'secret'])
+      .enum(['file', 'text', 'number', 'boolean', 'json', 'array', 'secret'])
       .describe('Type of input data'),
     required: z.boolean().default(true).describe('Whether this input is required'),
     description: z.string().optional().describe('Help text for the input'),

@@ -12,15 +12,30 @@ import { logger } from '@/lib/logger';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Play, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 
-type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string' | 'secret';
+type RuntimeInputType =
+  | 'file'
+  | 'text'
+  | 'number'
+  | 'json'
+  | 'array'
+  | 'string'
+  | 'secret'
+  | 'boolean';
 type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;
 
 const normalizeRuntimeInputType = (type: RuntimeInputType): NormalizedRuntimeInputType =>
   type === 'string' ? 'text' : type;
+
+const hasRuntimeInputValue = (value: unknown): boolean => {
+  if (value === undefined || value === null || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+};
 
 interface RuntimeInputDefinition {
   id: string;
@@ -102,6 +117,8 @@ export function RunWorkflowDialog({
     let parsedValue = value;
     if (normalizedType === 'number') {
       parsedValue = value ? parseFloat(value as string) : undefined;
+    } else if (normalizedType === 'boolean') {
+      parsedValue = value === true;
     } else if (normalizedType === 'array') {
       const textValue = typeof value === 'string' ? value : '';
       const trimmedValue = textValue.trim();
@@ -152,7 +169,7 @@ export function RunWorkflowDialog({
     // Validate required inputs
     const newErrors: Record<string, string> = {};
     for (const input of runtimeInputs) {
-      if (input.required && !inputs[input.id]) {
+      if (input.required && !hasRuntimeInputValue(inputs[input.id])) {
         newErrors[input.id] = 'This field is required';
       }
     }
@@ -292,6 +309,29 @@ export function RunWorkflowDialog({
                   : ''
               }
             />
+            {input.description && (
+              <p className="text-xs text-muted-foreground">{input.description}</p>
+            )}
+            {hasError && <p className="text-xs text-destructive">{errors[input.id]}</p>}
+          </div>
+        );
+
+      case 'boolean':
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={input.id}
+                checked={inputs[input.id] === true}
+                onCheckedChange={(checked) =>
+                  handleInputChange(input.id, checked === true, inputType)
+                }
+              />
+              <Label htmlFor={input.id}>
+                {input.label}
+                {input.required && <span className="text-destructive ml-1">*</span>}
+              </Label>
+            </div>
             {input.description && (
               <p className="text-xs text-muted-foreground">{input.description}</p>
             )}

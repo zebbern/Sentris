@@ -24,7 +24,7 @@ export const webhookConfigurationsTable = pgTable(
       {
         id: string;
         label: string;
-        type: 'text' | 'number' | 'json' | 'array' | 'file';
+        type: 'text' | 'number' | 'boolean' | 'json' | 'array' | 'file';
         required: boolean;
         description?: string;
       }[]

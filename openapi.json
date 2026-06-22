@@ -12111,6 +12111,7 @@
                   "enum": [
                     "text",
                     "number",
+                    "boolean",
                     "json",
                     "array",
                     "file"
@@ -12218,6 +12219,7 @@
                   "enum": [
                     "text",
                     "number",
+                    "boolean",
                     "json",
                     "array",
                     "file"
@@ -12288,6 +12290,7 @@
                   "enum": [
                     "text",
                     "number",
+                    "boolean",
                     "json",
                     "array",
                     "file"

@@ -41,7 +41,7 @@ const { RunWorkflowDialog } = await import('../RunWorkflowDialog');
 interface RuntimeInputDef {
   id: string;
   label: string;
-  type: 'text' | 'file' | 'number' | 'json' | 'array' | 'string' | 'secret';
+  type: 'text' | 'file' | 'number' | 'json' | 'array' | 'string' | 'secret' | 'boolean';
   required: boolean;
   description?: string;
 }
@@ -134,6 +134,59 @@ describe('RunWorkflowDialog', () => {
 
     // onRun should not have been called
     expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('accepts false as a valid required boolean runtime input', () => {
+    const inputs: RuntimeInputDef[] = [
+      {
+        id: 'includeDevDependencies',
+        label: 'Include dev dependencies',
+        type: 'boolean',
+        required: true,
+      },
+    ];
+    const onRun = mock(() => {});
+
+    const props = createDefaultProps({
+      runtimeInputs: inputs,
+      initialValues: { includeDevDependencies: false },
+      onRun,
+    });
+    render(<RunWorkflowDialog {...props} />);
+
+    const checkbox = screen.getByRole('checkbox', { name: /Include dev dependencies/ });
+    expect(checkbox).not.toBeChecked();
+
+    const runButtons = screen.getAllByText('Run Workflow');
+    fireEvent.click(runButtons[runButtons.length - 1]);
+
+    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: false });
+  });
+
+  it('submits updated boolean runtime inputs as booleans', () => {
+    const inputs: RuntimeInputDef[] = [
+      {
+        id: 'includeDevDependencies',
+        label: 'Include dev dependencies',
+        type: 'boolean',
+        required: false,
+      },
+    ];
+    const onRun = mock(() => {});
+
+    const props = createDefaultProps({
+      runtimeInputs: inputs,
+      initialValues: { includeDevDependencies: false },
+      onRun,
+    });
+    render(<RunWorkflowDialog {...props} />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Include dev dependencies' }));
+
+    const runButtons = screen.getAllByText('Run Workflow');
+    fireEvent.click(runButtons[runButtons.length - 1]);
+
+    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: true });
   });
 
   it('renders file input for file-type inputs', () => {

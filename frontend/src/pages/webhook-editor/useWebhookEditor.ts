@@ -176,6 +176,7 @@ export function useWebhookEditor() {
       const VALID_TYPES = new Set<WebhookInputDefinition['type']>([
         'text',
         'number',
+        'boolean',
         'json',
         'array',
         'file',

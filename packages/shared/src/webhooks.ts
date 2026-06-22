@@ -4,7 +4,7 @@ import { z } from 'zod';
 export const WebhookInputDefinitionSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  type: z.enum(['text', 'number', 'json', 'array', 'file']),
+  type: z.enum(['text', 'number', 'boolean', 'json', 'array', 'file']),
   required: z.boolean().default(true),
   description: z.string().optional(),
 });
@@ -76,10 +76,14 @@ export const TestWebhookScriptResponseSchema = z.object({
   success: z.boolean(),
   parsedData: z.record(z.string(), z.unknown()).nullable(),
   errorMessage: z.string().nullable(),
-  validationErrors: z.array(z.object({
-    inputId: z.string(),
-    message: z.string(),
-  })).optional(),
+  validationErrors: z
+    .array(
+      z.object({
+        inputId: z.string(),
+        message: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 // Webhook URL response

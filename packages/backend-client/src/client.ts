@@ -3973,7 +3973,7 @@ export interface components {
                 id: string;
                 label: string;
                 /** @enum {string} */
-                type: "text" | "number" | "json" | "array" | "file";
+                type: "text" | "number" | "boolean" | "json" | "array" | "file";
                 /** @default true */
                 required: boolean;
                 description?: string;
@@ -4000,7 +4000,7 @@ export interface components {
                 id: string;
                 label: string;
                 /** @enum {string} */
-                type: "text" | "number" | "json" | "array" | "file";
+                type: "text" | "number" | "boolean" | "json" | "array" | "file";
                 /** @default true */
                 required: boolean;
                 description?: string;
@@ -4018,7 +4018,7 @@ export interface components {
                 id: string;
                 label: string;
                 /** @enum {string} */
-                type: "text" | "number" | "json" | "array" | "file";
+                type: "text" | "number" | "boolean" | "json" | "array" | "file";
                 /** @default true */
                 required: boolean;
                 description?: string;

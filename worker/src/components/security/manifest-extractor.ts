@@ -54,13 +54,11 @@ const inputSchema = inputs({
     },
   ),
   includeDevDependencies: port(
-    z.unknown().optional().describe('Whether to include top-level dev/test dependencies.'),
+    z.boolean().optional().describe('Whether to include top-level dev/test dependencies.'),
     {
       label: 'Include Dev Dependencies',
-      description: 'Optional boolean-like value. Overrides the component default.',
-      allowAny: true,
-      reason: 'Entrypoint JSON inputs can provide booleans as JSON, strings, or numbers.',
-      connectionType: { kind: 'primitive', name: 'json' },
+      description: 'Whether to include top-level dev/test dependencies.',
+      connectionType: { kind: 'primitive', name: 'boolean' },
     },
   ),
 });

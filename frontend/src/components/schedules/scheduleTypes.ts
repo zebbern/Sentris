@@ -1,6 +1,6 @@
 import type { ScheduleOverlapPolicy } from '@sentris/shared';
 
-export type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string';
+export type RuntimeInputType = 'file' | 'text' | 'number' | 'json' | 'array' | 'string' | 'boolean';
 export type NormalizedRuntimeInputType = Exclude<RuntimeInputType, 'string'>;
 
 export interface RuntimeInputDefinition {
@@ -41,6 +41,59 @@ export interface ScheduleWorkflowNode {
 
 export const normalizeRuntimeInputType = (type: RuntimeInputType): NormalizedRuntimeInputType =>
   type === 'string' ? 'text' : type;
+
+export function parseRuntimeInputValue(input: RuntimeInputDefinition, value: unknown): unknown {
+  const inputType = normalizeRuntimeInputType(input.type);
+
+  if (inputType === 'number') {
+    const numeric = value ? Number(value) : undefined;
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+
+  if (inputType === 'boolean') {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    return value === true;
+  }
+
+  if (inputType === 'array') {
+    const textValue = typeof value === 'string' ? value : '';
+    const trimmed = textValue.trim();
+    if (trimmed.length === 0) {
+      return undefined;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed)
+        ? parsed
+        : trimmed
+            .split(',')
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+    } catch {
+      return trimmed
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+  }
+
+  if (inputType === 'json') {
+    return value ? JSON.parse(String(value)) : undefined;
+  }
+
+  return value;
+}
+
+export function hasRuntimeInputValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
 
 export const OVERLAP_OPTIONS: {
   value: ScheduleOverlapPolicy;

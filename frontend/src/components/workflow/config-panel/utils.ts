@@ -7,6 +7,8 @@ export const buildSampleValueForRuntimeInput = (type?: string, id?: string) => {
   switch (type) {
     case 'number':
       return 0;
+    case 'boolean':
+      return false;
     case 'json':
       return { example: true };
     case 'array':

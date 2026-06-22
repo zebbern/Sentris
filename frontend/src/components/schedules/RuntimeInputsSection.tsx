@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RuntimeInputDefinition } from './scheduleTypes';
@@ -119,6 +120,26 @@ function RuntimeInputField({
             }
             onBlur={(event) => onRuntimeInputChange(input, event.target.value)}
           />
+          {input.description ? (
+            <p className="text-xs text-muted-foreground">{input.description}</p>
+          ) : null}
+          {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        </div>
+      );
+    case 'boolean':
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={input.id}
+              checked={currentValue === true}
+              onCheckedChange={(checked) => onRuntimeInputChange(input, checked === true)}
+            />
+            <Label htmlFor={input.id} className="text-sm font-medium">
+              {input.label}
+              {input.required ? <span className="text-destructive ml-1">*</span> : null}
+            </Label>
+          </div>
           {input.description ? (
             <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}

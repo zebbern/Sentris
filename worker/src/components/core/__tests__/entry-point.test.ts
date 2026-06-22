@@ -217,4 +217,30 @@ describe('entry-point component', () => {
     expect(ports[0].connectionType?.kind).toBe('primitive');
     expect(ports[0].connectionType?.name).toBe('secret');
   });
+
+  it('should accept boolean runtime inputs and resolve boolean ports', () => {
+    const component = componentRegistry.get<EntryPointInput, EntryPointOutput>(
+      'core.workflow.entrypoint',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const params = component.parameters!.parse({
+      runtimeInputs: [
+        {
+          id: 'includeDevDependencies',
+          label: 'Include Dev Dependencies',
+          type: 'boolean',
+          required: true,
+        },
+      ],
+    });
+
+    const resolved = component.resolvePorts?.(params as any);
+    expect(resolved).toBeDefined();
+
+    const ports = extractPorts((resolved as any).outputs);
+    expect(ports).toHaveLength(1);
+    expect(ports[0].id).toBe('includeDevDependencies');
+    expect(ports[0].connectionType).toEqual({ kind: 'primitive', name: 'boolean' });
+  });
 });

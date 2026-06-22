@@ -11,7 +11,11 @@ import type {
   ScheduleEditorMode,
   WorkflowOption,
 } from './scheduleTypes';
-import { normalizeRuntimeInputType, validateCronExpression } from './scheduleTypes';
+import {
+  hasRuntimeInputValue,
+  parseRuntimeInputValue,
+  validateCronExpression,
+} from './scheduleTypes';
 
 interface UseScheduleEditorStateOptions {
   open: boolean;
@@ -164,44 +168,17 @@ export function useScheduleEditorState({
   };
 
   const handleRuntimeInputChange = (input: RuntimeInputDefinition, value: unknown) => {
-    const inputType = normalizeRuntimeInputType(input.type);
     setRuntimeErrors((prev) => {
       const { [input.id]: _removed, ...rest } = prev;
       return rest;
     });
 
-    let parsedValue: unknown = value;
-    if (inputType === 'number') {
-      const numeric = value ? Number(value) : undefined;
-      parsedValue = Number.isFinite(numeric) ? numeric : undefined;
-    } else if (inputType === 'array') {
-      const textValue = typeof value === 'string' ? value : '';
-      const trimmed = textValue.trim();
-      if (trimmed.length === 0) {
-        parsedValue = undefined;
-      } else {
-        try {
-          const parsed = JSON.parse(trimmed);
-          parsedValue = Array.isArray(parsed)
-            ? parsed
-            : trimmed
-                .split(',')
-                .map((entry) => entry.trim())
-                .filter(Boolean);
-        } catch {
-          parsedValue = trimmed
-            .split(',')
-            .map((entry) => entry.trim())
-            .filter(Boolean);
-        }
-      }
-    } else if (inputType === 'json') {
-      try {
-        parsedValue = value ? JSON.parse(String(value)) : undefined;
-      } catch {
-        setRuntimeErrors((prev) => ({ ...prev, [input.id]: 'Invalid JSON value' }));
-        return;
-      }
+    let parsedValue: unknown;
+    try {
+      parsedValue = parseRuntimeInputValue(input, value);
+    } catch {
+      setRuntimeErrors((prev) => ({ ...prev, [input.id]: 'Invalid JSON value' }));
+      return;
     }
 
     setRuntimeValues((prev) => ({ ...prev, [input.id]: parsedValue }));
@@ -300,11 +277,7 @@ export function useScheduleEditorState({
     const missing: Record<string, string> = {};
     for (const input of runtimeInputs) {
       if (!input.required) continue;
-      const hasValue =
-        runtimeValues[input.id] !== undefined &&
-        runtimeValues[input.id] !== null &&
-        runtimeValues[input.id] !== '';
-      if (!hasValue) {
+      if (!hasRuntimeInputValue(runtimeValues[input.id])) {
         missing[input.id] = 'This field is required';
       }
     }

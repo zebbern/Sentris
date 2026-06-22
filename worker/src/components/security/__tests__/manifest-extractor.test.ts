@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'bun:test';
 import {
   componentRegistry,
   createExecutionContext,
+  extractPorts,
   type ExecutionContext,
 } from '@sentris/component-sdk';
 import '../manifest-extractor';
@@ -41,6 +42,19 @@ describe('repository manifest extractor component', () => {
     expect(component).toBeDefined();
     expect(component?.label).toBe('Repository Manifest Extractor');
     expect(component?.category).toBe('security');
+  });
+
+  it('exposes includeDevDependencies as a boolean input port', () => {
+    const component = componentRegistry.get('sentris.repository.manifest.extract');
+    if (!component) throw new Error('Manifest extractor component was not registered');
+
+    const ports = extractPorts(component.inputs);
+    const includeDevDependencies = ports.find((port) => port.id === 'includeDevDependencies');
+
+    expect(includeDevDependencies?.connectionType).toEqual({
+      kind: 'primitive',
+      name: 'boolean',
+    });
   });
 
   it('extracts exact direct npm dependencies from a GitHub package lockfile', async () => {
