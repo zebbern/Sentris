@@ -46,6 +46,7 @@
                   "label": "Known API paths",
                   "type": "array",
                   "required": false,
+                  "defaultValue": [],
                   "description": "Optional program-known API paths such as /api, /graphql, /swagger, or /api-docs."
                 },
                 {

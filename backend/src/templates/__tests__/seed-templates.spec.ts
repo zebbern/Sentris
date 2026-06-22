@@ -88,8 +88,8 @@ describe('new seed templates', () => {
     expect(unboundedSubfinderNodes).toEqual([]);
   });
 
-  it('defines string defaults for optional text runtime inputs', () => {
-    const missingDefaults: string[] = [];
+  it('defines type-appropriate defaults for optional runtime inputs', () => {
+    const invalidDefaults: string[] = [];
 
     for (const fileName of newTemplateFiles) {
       const filePath = join(seedTemplatesDir, fileName);
@@ -101,16 +101,28 @@ describe('new seed templates', () => {
 
       for (const runtimeInput of runtimeInputs) {
         const inputType = String(runtimeInput.type ?? '');
-        const isOptionalTextInput =
-          runtimeInput.required !== true && ['text', 'textarea', 'string'].includes(inputType);
+        if (runtimeInput.required === true) continue;
 
-        if (isOptionalTextInput && typeof runtimeInput.defaultValue !== 'string') {
-          missingDefaults.push(`${fileName}:${runtimeInput.id}`);
+        const defaultValue = runtimeInput.defaultValue;
+        const hasValidDefault = ['text', 'textarea', 'string'].includes(inputType)
+          ? typeof defaultValue === 'string'
+          : inputType === 'number'
+            ? typeof defaultValue === 'number'
+            : inputType === 'boolean'
+              ? typeof defaultValue === 'boolean'
+              : inputType === 'array'
+                ? Array.isArray(defaultValue)
+                : inputType === 'json'
+                  ? defaultValue !== undefined && defaultValue !== null
+                  : true;
+
+        if (!hasValidDefault) {
+          invalidDefaults.push(`${fileName}:${runtimeInput.id}:${inputType}`);
         }
       }
     }
 
-    expect(missingDefaults).toEqual([]);
+    expect(invalidDefaults).toEqual([]);
   });
 
   for (const fileName of newTemplateFiles) {

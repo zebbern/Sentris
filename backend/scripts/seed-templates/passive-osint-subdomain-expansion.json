@@ -43,6 +43,7 @@
                   "label": "Known subdomains",
                   "type": "array",
                   "required": false,
+                  "defaultValue": [],
                   "description": "Optional in-scope subdomains from prior recon, imports, or program documentation."
                 },
                 {
@@ -50,6 +51,7 @@
                   "label": "Bruteforce wordlist",
                   "type": "array",
                   "required": false,
+                  "defaultValue": [],
                   "description": "Small DNS label wordlist for bounded Shuffledns bruteforce, such as www, api, app, staging."
                 },
                 {

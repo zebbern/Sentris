@@ -46,6 +46,7 @@
                   "label": "Known subdomains",
                   "type": "array",
                   "required": false,
+                  "defaultValue": [],
                   "description": "Optional in-scope hostnames from prior recon or imports."
                 },
                 {

@@ -46,6 +46,7 @@
                   "label": "Out-of-scope paths",
                   "type": "array",
                   "required": false,
+                  "defaultValue": [],
                   "description": "Paths that should not be tested."
                 },
                 {
