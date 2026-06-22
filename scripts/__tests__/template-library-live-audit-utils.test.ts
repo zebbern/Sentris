@@ -627,6 +627,22 @@ describe('template library live audit helpers', () => {
           rationale: 'Live execution completed and produced at least one artifact.',
         },
         {
+          templateId: 'tpl-functional-copy',
+          templateName: 'Package Advisory Scanner',
+          seedFile: 'package-advisory-scanner.json',
+          category: 'cve-research',
+          components: ['sentris.osv.query'],
+          requiredSecrets: [],
+          runtimeInputs: [{ id: 'packageName' }],
+          classification: 'live-run',
+          createOk: true,
+          runAttempted: true,
+          terminalStatus: 'COMPLETED',
+          artifactsCount: 1,
+          recommendation: 'keep',
+          rationale: 'Live execution completed and produced at least one artifact.',
+        },
+        {
           templateId: 'tpl-static',
           templateName: 'Static Demo Template',
           seedFile: 'static-demo-template.json',
@@ -647,6 +663,9 @@ describe('template library live audit helpers', () => {
     expect(markdown).toContain('## Catalog Quality');
     expect(markdown).toContain(
       '- Duplicate name: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json',
+    );
+    expect(markdown).toContain(
+      '- Duplicate functionality: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json, package-advisory-scanner.json',
     );
     expect(markdown).toContain(
       '- Low-value/static candidate: static-demo-template.json has no runtime inputs or required secrets.',
@@ -702,10 +721,27 @@ describe('template library live audit helpers', () => {
         recommendation: 'review',
         rationale: 'Static demonstration workflow.',
       },
+      {
+        templateId: 'tpl-functional-copy',
+        templateName: 'Package Advisory Scanner',
+        seedFile: 'package-advisory-scanner.json',
+        category: 'cve-research',
+        components: ['sentris.osv.query'],
+        requiredSecrets: [],
+        runtimeInputs: [{ id: 'packageName' }],
+        classification: 'live-run',
+        createOk: true,
+        runAttempted: true,
+        terminalStatus: 'COMPLETED',
+        artifactsCount: 1,
+        recommendation: 'keep',
+        rationale: 'Live execution completed and produced at least one artifact.',
+      },
     ]);
 
     expect(failures).toEqual([
       'Duplicate template name: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json',
+      'Duplicate template functionality: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json, package-advisory-scanner.json',
       'Low-value/static template: static-demo-template.json has no runtime inputs or required secrets.',
     ]);
   });
@@ -759,14 +795,34 @@ describe('template library live audit helpers', () => {
         recommendation: 'review',
         rationale: 'Static demonstration workflow.',
       },
+      {
+        templateId: 'tpl-functional-copy',
+        templateName: 'Package Advisory Scanner',
+        seedFile: 'package-advisory-scanner.json',
+        category: 'cve-research',
+        components: ['sentris.osv.query'],
+        requiredSecrets: [],
+        runtimeInputs: [{ id: 'packageName' }],
+        classification: 'live-run',
+        createOk: true,
+        runAttempted: true,
+        terminalStatus: 'COMPLETED',
+        artifactsCount: 1,
+        recommendation: 'keep',
+        rationale: 'Live execution completed and produced at least one artifact.',
+      },
     ]);
 
     expect(report).toContain('# Template Catalog Quality Check');
     expect(report).toContain('Duplicate names: 1');
+    expect(report).toContain('Duplicate functionality: 1');
     expect(report).toContain('Low-value/static candidates: 1');
     expect(report).toContain('## Catalog Quality Failures');
     expect(report).toContain(
       '- Duplicate template name: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json',
+    );
+    expect(report).toContain(
+      '- Duplicate template functionality: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json, package-advisory-scanner.json',
     );
     expect(report).toContain(
       '- Low-value/static template: static-demo-template.json has no runtime inputs or required secrets.',

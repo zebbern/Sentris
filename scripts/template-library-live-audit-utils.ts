@@ -156,6 +156,11 @@ export interface TemplateCatalogDuplicateNameGroup {
   labels: string[];
 }
 
+export interface TemplateCatalogDuplicateFunctionalityGroup {
+  key: string;
+  labels: string[];
+}
+
 export interface TemplateCatalogLowValueCandidate {
   label: string;
   reason: string;
@@ -163,6 +168,7 @@ export interface TemplateCatalogLowValueCandidate {
 
 export interface TemplateCatalogQualitySummary {
   duplicateNames: TemplateCatalogDuplicateNameGroup[];
+  duplicateFunctionalities: TemplateCatalogDuplicateFunctionalityGroup[];
   lowValueCandidates: TemplateCatalogLowValueCandidate[];
 }
 
@@ -642,17 +648,70 @@ function getTemplateCatalogLabel(result: TemplateAuditMarkdownResult): string {
   return result.seedFile ?? result.templateName;
 }
 
+function getRuntimeInputSignature(value: unknown): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return normalizeCatalogName(String(value ?? ''));
+  }
+
+  const input = value as Record<string, unknown>;
+  const required =
+    input.required === false || input.optional === true || input.isRequired === false
+      ? 'optional'
+      : 'required';
+
+  return [
+    normalizeCatalogName(String(input.id ?? input.name ?? input.key ?? '')),
+    normalizeCatalogName(String(input.type ?? input.inputType ?? '')),
+    required,
+  ].join(':');
+}
+
+function shouldCheckTemplateFunctionality(result: TemplateAuditMarkdownResult): boolean {
+  return (
+    result.classification === 'live-run' &&
+    result.components.length > 0 &&
+    (result.runtimeInputs.length > 0 || result.requiredSecrets.length > 0)
+  );
+}
+
+function createTemplateFunctionalityKey(result: TemplateAuditMarkdownResult): string {
+  const category = normalizeCatalogName(result.category ?? '');
+  const classification = normalizeCatalogName(result.classification);
+  const components = [...result.components].sort().join(',');
+  const runtimeInputs = result.runtimeInputs.map(getRuntimeInputSignature).sort().join(',');
+  const requiredSecrets = result.requiredSecrets.map(normalizeCatalogName).sort().join(',');
+
+  return [category, classification, components, runtimeInputs, requiredSecrets].join('|');
+}
+
 export function summarizeTemplateCatalogQuality(
   results: TemplateAuditMarkdownResult[],
 ): TemplateCatalogQualitySummary {
   const byName = new Map<string, TemplateAuditMarkdownResult[]>();
+  const byFunctionality = new Map<string, TemplateAuditMarkdownResult[]>();
   for (const result of results) {
     const key = normalizeCatalogName(result.templateName);
-    if (!key) continue;
-    byName.set(key, [...(byName.get(key) ?? []), result]);
+    if (key) {
+      byName.set(key, [...(byName.get(key) ?? []), result]);
+    }
+
+    if (shouldCheckTemplateFunctionality(result)) {
+      const functionalityKey = createTemplateFunctionalityKey(result);
+      byFunctionality.set(functionalityKey, [
+        ...(byFunctionality.get(functionalityKey) ?? []),
+        result,
+      ]);
+    }
   }
 
   const duplicateNames = Array.from(byName.entries())
+    .filter(([, group]) => group.length > 1)
+    .map(([key, group]) => ({
+      key,
+      labels: group.map(getTemplateCatalogLabel),
+    }));
+
+  const duplicateFunctionalities = Array.from(byFunctionality.entries())
     .filter(([, group]) => group.length > 1)
     .map(([key, group]) => ({
       key,
@@ -668,6 +727,7 @@ export function summarizeTemplateCatalogQuality(
 
   return {
     duplicateNames,
+    duplicateFunctionalities,
     lowValueCandidates,
   };
 }
@@ -680,6 +740,10 @@ export function getTemplateCatalogQualityFailures(
 
   for (const group of summary.duplicateNames) {
     failures.push(`Duplicate template name: ${group.labels.join(', ')}`);
+  }
+
+  for (const group of summary.duplicateFunctionalities) {
+    failures.push(`Duplicate template functionality: ${group.labels.join(', ')}`);
   }
 
   for (const candidate of summary.lowValueCandidates) {
@@ -696,6 +760,7 @@ export function renderTemplateCatalogQualityCheck(results: TemplateAuditMarkdown
     '# Template Catalog Quality Check',
     '',
     `Duplicate names: ${summary.duplicateNames.length}`,
+    `Duplicate functionality: ${summary.duplicateFunctionalities.length}`,
     `Low-value/static candidates: ${summary.lowValueCandidates.length}`,
   ];
 
@@ -764,6 +829,14 @@ export function renderTemplateAuditMarkdown({
   } else {
     for (const group of catalogQuality.duplicateNames) {
       lines.push(`- Duplicate name: ${group.labels.join(', ')}`);
+    }
+  }
+
+  if (catalogQuality.duplicateFunctionalities.length === 0) {
+    lines.push('- Duplicate functionality: none');
+  } else {
+    for (const group of catalogQuality.duplicateFunctionalities) {
+      lines.push(`- Duplicate functionality: ${group.labels.join(', ')}`);
     }
   }
 
