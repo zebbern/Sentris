@@ -1,0 +1,205 @@
+{
+  "_metadata": {
+    "name": "YARA IOC Payload Triage",
+    "description": "Authorized payload triage workflow that scans pasted file or artifact content with YARA rules and writes a prioritized IOC match report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "yara", "ioc", "malware", "payload", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "YARA IOC Payload Triage",
+    "description": "Scan authorized payload content with YARA rules and produce an IOC triage report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "yara", "ioc", "malware", "payload", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 4,
+    "edgeCount": 10
+  },
+  "graph": {
+    "name": "YARA IOC Payload Triage",
+    "description": "YARA-based IOC triage for authorized payloads, suspicious responses, and collected artifacts.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Payload Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "targetLabel",
+                  "label": "Payload label",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "File name, URL, response label, or artifact name for the scanned content."
+                },
+                {
+                  "id": "targetContent",
+                  "label": "Payload content",
+                  "type": "text",
+                  "required": true,
+                  "description": "Authorized payload, response body, file text, or artifact content to scan with YARA."
+                },
+                {
+                  "id": "yaraRules",
+                  "label": "YARA rules",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "rule SentrisFixtureIOC { strings: $a = \"sentris-ioc-fixture\" condition: $a }",
+                  "description": "YARA rule definitions. Replace the default fixture rule with engagement-specific IOC rules."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, artifact origin, or handling constraints for the scanned payload."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "yara_scan",
+        "type": "sentris.yara.run",
+        "position": { "x": 440, "y": 260 },
+        "data": {
+          "label": "Scan Payload With YARA",
+          "config": {
+            "params": {
+              "timeout": 60
+            },
+            "inputOverrides": {
+              "customFlags": ""
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_yara_report",
+        "type": "core.logic.script",
+        "position": { "x": 780, "y": 260 },
+        "data": {
+          "label": "Assemble IOC Triage Report",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "targetLabel", "type": "string" },
+                { "name": "targetContent", "type": "string" },
+                { "name": "rules", "type": "string" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "matches", "type": "list-json" },
+                { "name": "results", "type": "list-json" },
+                { "name": "raw", "type": "string" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const matches = Array.isArray(input.matches) ? input.matches : [];\n  const analyticsResults = Array.isArray(input.results) ? input.results : [];\n  const targetLabel = typeof input.targetLabel === 'string' && input.targetLabel.trim().length > 0 ? input.targetLabel.trim() : 'payload';\n  const targetContent = typeof input.targetContent === 'string' ? input.targetContent : '';\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  const severityRank = { critical: 4, high: 3, medium: 2, low: 1, info: 0, none: 0 };\n  const normalizeTag = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\n  const severityFor = (match) => {\n    const tags = Array.isArray(match?.tags) ? match.tags.map(normalizeTag) : [];\n    if (tags.some((tag) => /credential|secret|exfiltration|ransomware|trojan|backdoor|exploit|malware/.test(tag))) return 'high';\n    if (tags.some((tag) => /ioc|suspicious|shell|encoded|webshell|loader/.test(tag))) return 'medium';\n    return 'medium';\n  };\n  const matchedStringsFor = (match) => Array.isArray(match?.strings) ? match.strings.map(String).filter(Boolean) : [];\n  const priorityFindings = matches.map((match) => {\n    const tags = Array.isArray(match?.tags) ? match.tags.map(String).filter(Boolean) : [];\n    const matchedStrings = matchedStringsFor(match);\n    const severity = severityFor(match);\n    return {\n      rule: String(match?.rule || 'unknown-rule'),\n      severity,\n      tags,\n      matchedStrings: matchedStrings.length,\n      evidence: matchedStrings.slice(0, 10).map((item) => item.slice(0, 240)),\n      priorityScore: (severityRank[severity] || 0) * 100 + Math.min(matchedStrings.length, 10) * 5 + Math.min(tags.length, 5)\n    };\n  }).sort((a, b) => b.priorityScore - a.priorityScore || String(a.rule).localeCompare(String(b.rule)));\n  const highestSeverity = priorityFindings.reduce((current, finding) => (severityRank[finding.severity] || 0) > (severityRank[current] || 0) ? finding.severity : current, 'none');\n  const analyticsByRule = analyticsResults.slice(0, 100).map((result) => ({\n    scanner: result?.scanner || 'yara',\n    finding_hash: result?.finding_hash || null,\n    severity: result?.severity || null,\n    asset_key: result?.asset_key || null,\n    rule: result?.rule || null,\n    matched_strings: result?.matched_strings || 0\n  }));\n  return {\n    report: {\n      summary: {\n        targetLabel,\n        targetBytes: targetContent.length,\n        ruleCountEstimate: String(input.rules || '').split(/\\brule\\s+/).filter((item) => item.trim().length > 0).length,\n        matchCount: matches.length,\n        reportedFindings: priorityFindings.length,\n        highestSeverity\n      },\n      authorizationNotes,\n      priorityFindings,\n      analyticsResults: analyticsByRule,\n      rawPreview: typeof input.raw === 'string' ? input.raw.slice(0, 2000) : '',\n      nextSteps: [\n        'Confirm the payload source and authorization before sharing evidence',\n        'Treat high-severity credential, exfiltration, exploit, or malware-tagged rules as priority manual review',\n        'Replace the fixture rule with engagement-specific YARA rules before real triage',\n        'Preserve only minimal matched-string evidence needed for reporting'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1120, "y": 260 },
+        "data": {
+          "label": "Save YARA IOC Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "yara-ioc-payload-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-yara_scan-targetContent",
+        "source": "trigger_1",
+        "target": "yara_scan",
+        "sourceHandle": "targetContent",
+        "targetHandle": "target"
+      },
+      {
+        "id": "trigger_1-yara_scan-yaraRules",
+        "source": "trigger_1",
+        "target": "yara_scan",
+        "sourceHandle": "yaraRules",
+        "targetHandle": "rules"
+      },
+      {
+        "id": "trigger_1-assemble_yara_report-targetLabel",
+        "source": "trigger_1",
+        "target": "assemble_yara_report",
+        "sourceHandle": "targetLabel",
+        "targetHandle": "targetLabel"
+      },
+      {
+        "id": "trigger_1-assemble_yara_report-targetContent",
+        "source": "trigger_1",
+        "target": "assemble_yara_report",
+        "sourceHandle": "targetContent",
+        "targetHandle": "targetContent"
+      },
+      {
+        "id": "trigger_1-assemble_yara_report-yaraRules",
+        "source": "trigger_1",
+        "target": "assemble_yara_report",
+        "sourceHandle": "yaraRules",
+        "targetHandle": "rules"
+      },
+      {
+        "id": "trigger_1-assemble_yara_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_yara_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "yara_scan-assemble_yara_report-matches",
+        "source": "yara_scan",
+        "target": "assemble_yara_report",
+        "sourceHandle": "matches",
+        "targetHandle": "matches"
+      },
+      {
+        "id": "yara_scan-assemble_yara_report-results",
+        "source": "yara_scan",
+        "target": "assemble_yara_report",
+        "sourceHandle": "results",
+        "targetHandle": "results"
+      },
+      {
+        "id": "yara_scan-assemble_yara_report-raw",
+        "source": "yara_scan",
+        "target": "assemble_yara_report",
+        "sourceHandle": "raw",
+        "targetHandle": "raw"
+      },
+      {
+        "id": "assemble_yara_report-artifact_report-report",
+        "source": "assemble_yara_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

@@ -71,6 +71,7 @@ const securityTemplateFiles = [
   'tech-stack-cve-hunter.json',
   'wafw00f-edge-recon-triage.json',
   'web-attack-surface-quick-win-hunt.json',
+  'yara-ioc-payload-triage.json',
 ] as const;
 
 function loadSeedTemplate(fileName: (typeof securityTemplateFiles)[number]) {

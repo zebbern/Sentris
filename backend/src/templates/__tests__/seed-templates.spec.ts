@@ -29,6 +29,7 @@ const newTemplateFiles = [
   'web-api-fuzz-triage.json',
   'wafw00f-edge-recon-triage.json',
   'web-attack-surface-quick-win-hunt.json',
+  'yara-ioc-payload-triage.json',
 ];
 
 function runTemplateScript<T>(code: string, input: unknown): T {
@@ -2180,5 +2181,69 @@ describe('new seed templates', () => {
     expect(result.report.summary.wafDetections).toBe(1);
     expect(result.report.assets[0].wafDetected).toBe(true);
     expect(result.report.assets[0].firewall).toBe('Cloudflare');
+  });
+
+  it('yara-ioc-payload-triage wires target content through YARA into a triage report', () => {
+    const filePath = join(seedTemplatesDir, 'yara-ioc-payload-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.yara.run',
+      'core.logic.script',
+      'core.artifact.writer',
+    ]);
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'trigger_1-yara_scan-targetContent',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        source: 'trigger_1',
+        target: 'yara_scan',
+        sourceHandle: 'targetContent',
+        targetHandle: 'target',
+      }),
+    );
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'yara_scan-assemble_yara_report-matches',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('yara-ioc-payload-triage report script prioritizes matched YARA rules', () => {
+    const filePath = join(seedTemplatesDir, 'yara-ioc-payload-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const reportNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_yara_report',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: { matchCount: number; highestSeverity: string };
+        priorityFindings: { rule: string; severity: string; matchedStrings: number }[];
+      };
+    }>(reportNode.data.config.params.code, {
+      targetLabel: 'sample payload',
+      targetContent: 'benign payload containing sentris-ioc-fixture',
+      rules: 'rule SentrisFixtureIOC { strings: $a = "sentris-ioc-fixture" condition: $a }',
+      matches: [
+        {
+          rule: 'SentrisFixtureIOC',
+          tags: ['credential', 'exfiltration'],
+          strings: ['0x10:$a: sentris-ioc-fixture'],
+        },
+      ],
+      results: [{ scanner: 'yara', finding_hash: 'abc', severity: 'medium' }],
+      authorizationNotes: 'Authorized fixture.',
+    });
+
+    expect(result.report.summary.matchCount).toBe(1);
+    expect(result.report.summary.highestSeverity).toBe('high');
+    expect(result.report.priorityFindings[0]).toMatchObject({
+      rule: 'SentrisFixtureIOC',
+      severity: 'high',
+      matchedStrings: 1,
+    });
   });
 });

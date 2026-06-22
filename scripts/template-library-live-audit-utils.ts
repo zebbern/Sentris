@@ -181,6 +181,14 @@ export interface TemplateCatalogQualityCheckOptions {
   componentCoverageIds?: string[];
 }
 
+const TEMPLATE_COVERAGE_EXCLUDED_COMPONENT_IDS = new Set(['sentris.security.terminal-demo']);
+
+export function getTemplateCoverageComponentIds(componentIds: string[]): string[] {
+  return [...new Set(componentIds)]
+    .filter((componentId) => !TEMPLATE_COVERAGE_EXCLUDED_COMPONENT_IDS.has(componentId))
+    .sort();
+}
+
 export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
   return {
     'Bug Bounty Recon Triage': {
@@ -301,6 +309,12 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       ref: '',
       includeDevDependencies: false,
       authorizationNotes: 'Live audit fixture.',
+    },
+    'YARA IOC Payload Triage': {
+      targetLabel: 'sentris-yara-live-fixture.txt',
+      targetContent: 'benign fixture containing sentris-ioc-fixture for YARA validation',
+      yaraRules: 'rule SentrisFixtureIOC { strings: $a = "sentris-ioc-fixture" condition: $a }',
+      authorizationNotes: 'Live audit fixture: benign payload for local YARA validation.',
     },
   };
 }

@@ -7,6 +7,7 @@ import {
   getLiveRunAuditFailures,
   getNodeIoWarningSignals,
   getTemplateCatalogQualityFailures,
+  getTemplateCoverageComponentIds,
   renderTemplateCatalogQualityCheck,
   renderTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
@@ -273,7 +274,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       if (!response.ok) {
         const message = typeof body === 'string' ? body : JSON.stringify(body);
         const error = new Error(`${response.status} ${response.statusText}: ${message}`);
-        if (![429, 502, 503, 504].includes(response.status) || attempt >= API_FETCH_RETRY_DELAYS_MS.length) {
+        if (
+          ![429, 502, 503, 504].includes(response.status) ||
+          attempt >= API_FETCH_RETRY_DELAYS_MS.length
+        ) {
           throw error;
         }
         lastError = error;
@@ -791,7 +795,9 @@ let validationLedger: TemplateValidationLedger | undefined;
 
 async function readManagedAuditSecretNames(): Promise<string[]> {
   if (DISABLE_MANAGED_SECRET_LOOKUP) {
-    console.log('Managed audit secret lookup disabled by TEMPLATE_AUDIT_DISABLE_MANAGED_SECRET_LOOKUP.');
+    console.log(
+      'Managed audit secret lookup disabled by TEMPLATE_AUDIT_DISABLE_MANAGED_SECRET_LOOKUP.',
+    );
     return [];
   }
 
@@ -838,7 +844,7 @@ async function main() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((template) => createCatalogQualityInput(template, seedTemplates.get(template.name)));
     const catalogQualityFailures = getTemplateCatalogQualityFailures(catalogQualityInputs);
-    const componentCoverageIds = readCurrentSecurityComponentIds();
+    const componentCoverageIds = getTemplateCoverageComponentIds(readCurrentSecurityComponentIds());
     const summary = summarizeTemplateValidationLedgerFreshness(
       validationLedger,
       selectedTemplates

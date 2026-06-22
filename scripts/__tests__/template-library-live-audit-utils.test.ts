@@ -4,6 +4,7 @@ import {
   createTemplateLiveAuditInputs,
   getLiveRunAuditFailures,
   getNodeIoWarningSignals,
+  getTemplateCoverageComponentIds,
   getTemplateCatalogQualityFailures,
   renderTemplateCatalogQualityCheck,
   renderTemplateValidationLedgerFreshness,
@@ -75,6 +76,12 @@ describe('template library live audit helpers', () => {
     expect(inputs['WAF Edge Recon Triage']).toEqual({
       liveUrls: ['https://scanme.nmap.org/'],
       authorizationNotes: 'Live audit fixture: bounded WAF recon target.',
+    });
+    expect(inputs['YARA IOC Payload Triage']).toEqual({
+      targetLabel: 'sentris-yara-live-fixture.txt',
+      targetContent: 'benign fixture containing sentris-ioc-fixture for YARA validation',
+      yaraRules: 'rule SentrisFixtureIOC { strings: $a = "sentris-ioc-fixture" condition: $a }',
+      authorizationNotes: 'Live audit fixture: benign payload for local YARA validation.',
     });
   });
 
@@ -846,6 +853,16 @@ describe('template library live audit helpers', () => {
       'sentris.httpx.scan': 1,
       'sentris.wafw00f.run': 0,
     });
+  });
+
+  it('excludes demo-only components from template coverage requirements', () => {
+    expect(
+      getTemplateCoverageComponentIds([
+        'sentris.security.terminal-demo',
+        'sentris.yara.run',
+        'sentris.yara.run',
+      ]),
+    ).toEqual(['sentris.yara.run']);
   });
 
   it('renders catalog quality as a concise ledger-check report', () => {
