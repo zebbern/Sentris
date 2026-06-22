@@ -1,9 +1,21 @@
 import { describe, it, expect, mock, beforeEach } from 'bun:test';
 import { extractPorts } from '@sentris/component-sdk';
-import { definition, validateDiscordWebhookUrl } from '../discord';
+import {
+  definition,
+  validateDiscordWebhookUrl,
+  normalizeDiscordAttachments,
+  buildDiscordWebhookRequest,
+} from '../discord';
 
 const VALID_WEBHOOK =
   'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz123456';
+
+const defaultParams = {
+  variables: [] as { name: string; type?: string }[],
+  attachmentFileName: 'report.txt',
+  attachmentContentFormat: 'text' as const,
+  attachmentMimeType: 'text/plain',
+};
 
 describe('Discord Webhook Component', () => {
   let httpFetchMock: ReturnType<typeof mock>;
@@ -65,7 +77,7 @@ describe('Discord Webhook Component', () => {
             },
           ],
         },
-        params: { variables: [] },
+        params: defaultParams,
       } as any,
       mockContext,
     );
@@ -88,7 +100,7 @@ describe('Discord Webhook Component', () => {
           content: 'Plain text',
           embeds: '[{"title": "Join", "description": "{{user}} joined the channel"}]',
         },
-        params: { variables: [] },
+        params: defaultParams,
       } as any,
       mockContext,
     );
@@ -106,7 +118,7 @@ describe('Discord Webhook Component', () => {
           webhookUrl: VALID_WEBHOOK,
           content: 'Hello',
         },
-        params: { username: 'Sentris Flow', variables: [] },
+        params: { ...defaultParams, username: 'Sentris Flow' },
       } as any,
       mockContext,
     );
@@ -133,7 +145,7 @@ describe('Discord Webhook Component', () => {
           webhookUrl: VALID_WEBHOOK,
           content: 'Hello',
         },
-        params: { variables: [] },
+        params: defaultParams,
       } as any,
       mockContext,
     );
@@ -149,7 +161,7 @@ describe('Discord Webhook Component', () => {
       definition.execute(
         {
           inputs: { content: 'Hello' },
-          params: { variables: [] },
+          params: defaultParams,
         } as any,
         mockContext,
       ),
@@ -166,11 +178,148 @@ describe('Discord Webhook Component', () => {
             webhookUrl: VALID_WEBHOOK,
             content: '   ',
           },
-          params: { variables: [] },
+          params: {
+            variables: [],
+            attachmentFileName: 'report.txt',
+            attachmentContentFormat: 'text',
+            attachmentMimeType: 'text/plain',
+          },
         } as any,
         mockContext,
       ),
-    ).rejects.toThrow(/content or embeds/i);
+    ).rejects.toThrow(/content, embeds, or attachments/i);
+  });
+
+  it('sends attachment-only messages via multipart form data', async () => {
+    const mockContext = createMockContext();
+
+    const result = await definition.execute(
+      {
+        inputs: {
+          webhookUrl: VALID_WEBHOOK,
+          attachmentContent: '{"findings":1}',
+        },
+        params: {
+          ...defaultParams,
+          attachmentFileName: 'report.json',
+          attachmentContentFormat: 'json',
+          attachmentMimeType: 'application/json',
+        },
+      } as any,
+      mockContext,
+    );
+
+    expect(result.ok).toBe(true);
+    const requestInit = httpFetchMock.mock.calls[0][1];
+    expect(requestInit.headers).toBeUndefined();
+    expect(requestInit.body).toBeInstanceOf(FormData);
+    const payload = JSON.parse(String(requestInit.body.get('payload_json')));
+    expect(payload.attachments).toEqual([{ id: 0, filename: 'report.json' }]);
+    expect(requestInit.body.get('files[0]')).toBeInstanceOf(Blob);
+  });
+
+  it('sends File Loader objects and embed images using attachment scheme', async () => {
+    const mockContext = createMockContext();
+    const pngBytes = Buffer.from('fake-png-bytes');
+
+    const result = await definition.execute(
+      {
+        inputs: {
+          webhookUrl: VALID_WEBHOOK,
+          content: 'Scan complete',
+          embeds: [
+            {
+              title: 'Chart',
+              image: { url: 'attachment://chart.png' },
+            },
+          ],
+          attachments: {
+            name: 'chart.png',
+            mimeType: 'image/png',
+            content: pngBytes.toString('base64'),
+          },
+        },
+        params: defaultParams,
+      } as any,
+      mockContext,
+    );
+
+    expect(result.ok).toBe(true);
+    const requestInit = httpFetchMock.mock.calls[0][1];
+    const payload = JSON.parse(String(requestInit.body.get('payload_json')));
+    expect(payload.content).toBe('Scan complete');
+    expect(payload.embeds[0].image.url).toBe('attachment://chart.png');
+    expect(payload.attachments).toEqual([{ id: 0, filename: 'chart.png' }]);
+  });
+
+  it('normalizes multiple attachment descriptors', () => {
+    const parts = normalizeDiscordAttachments({
+      attachments: [
+        {
+          fileName: 'a.txt',
+          content: 'hello',
+          contentFormat: 'text',
+          mimeType: 'text/plain',
+        },
+        {
+          name: 'b.json',
+          content: Buffer.from('{}').toString('base64'),
+          mimeType: 'application/json',
+          contentFormat: 'base64',
+        },
+      ],
+      attachmentFileName: 'ignored.txt',
+      attachmentContentFormat: 'text',
+      attachmentMimeType: 'text/plain',
+    });
+
+    expect(parts).toHaveLength(2);
+    expect(parts[0].fileName).toBe('a.txt');
+    expect(parts[1].fileName).toBe('b.json');
+  });
+
+  it('rejects invalid base64 attachment content', () => {
+    expect(() =>
+      normalizeDiscordAttachments({
+        attachments: {
+          fileName: 'bad.bin',
+          content: 'not valid base64!',
+          contentFormat: 'base64',
+          mimeType: 'application/octet-stream',
+        },
+        attachmentFileName: 'ignored.txt',
+        attachmentContentFormat: 'text',
+        attachmentMimeType: 'text/plain',
+      }),
+    ).toThrow(/base64/i);
+  });
+
+  it('builds JSON requests when no attachments are present', () => {
+    const request = buildDiscordWebhookRequest({ content: 'hello' }, []);
+    expect(request.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(String(request.body))).toEqual({ content: 'hello' });
+  });
+
+  it('throws ValidationError for un-serializable embed objects', async () => {
+    const mockContext = createMockContext();
+    const circularEmbed: Record<string, unknown> = { title: 'Loop' };
+    circularEmbed.self = circularEmbed;
+
+    await expect(
+      definition.execute(
+        {
+          inputs: {
+            webhookUrl: VALID_WEBHOOK,
+            content: 'This should not send',
+            embeds: circularEmbed,
+          },
+          params: defaultParams,
+        } as any,
+        mockContext,
+      ),
+    ).rejects.toThrow(/embeds/i);
+
+    expect(httpFetchMock).not.toHaveBeenCalled();
   });
 
   it('throws ValidationError when content exceeds Discord limit', async () => {
@@ -183,7 +332,7 @@ describe('Discord Webhook Component', () => {
             webhookUrl: VALID_WEBHOOK,
             content: 'x'.repeat(2001),
           },
-          params: { variables: [] },
+          params: defaultParams,
         } as any,
         mockContext,
       ),
@@ -192,6 +341,7 @@ describe('Discord Webhook Component', () => {
 
   it('resolves dynamic ports for template variables', () => {
     const resolved = definition.resolvePorts!({
+      ...defaultParams,
       variables: [
         { name: 'error_msg', type: 'string' },
         { name: 'timestamp', type: 'string' },
@@ -201,7 +351,8 @@ describe('Discord Webhook Component', () => {
     const ports = extractPorts(resolved.inputs!);
     expect(ports.find((portMeta) => portMeta.id === 'webhookUrl')).toBeDefined();
     expect(ports.find((portMeta) => portMeta.id === 'content')).toBeDefined();
-    expect(ports.find((portMeta) => portMeta.id === 'embeds')).toBeDefined();
+    expect(ports.find((portMeta) => portMeta.id === 'attachments')).toBeDefined();
+    expect(ports.find((portMeta) => portMeta.id === 'attachmentContent')).toBeDefined();
     expect(ports.find((portMeta) => portMeta.id === 'error_msg')).toBeDefined();
     expect(ports.find((portMeta) => portMeta.id === 'timestamp')).toBeDefined();
   });
