@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   ValidationError,
@@ -19,6 +18,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_HEAVY,
 } from './security-docker-resources';
 
@@ -54,6 +54,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   scanType: param(z.enum(['image', 'fs', 'repo']).default('image'), {
     label: 'Scan Type',
     editor: 'select',
@@ -430,10 +431,14 @@ const definition = defineComponent({
 
       const volumes = [volume.getVolumeConfig('/inputs', true)];
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes,
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...args],
+          volumes,
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

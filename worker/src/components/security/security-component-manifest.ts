@@ -1,4 +1,5 @@
 import type { CachedComponentMetadata, ComponentParameterType } from '@sentris/component-sdk';
+import { SECURITY_DOCKER_RESOURCE_PARAMETER_IDS } from './security-docker-resources';
 
 /** Canonical security palette components (28). Includes mcp.group.aws from security folder. */
 export const SECURITY_COMPONENT_IDS = [
@@ -174,6 +175,15 @@ export function getSecurityComponentInvariantFailures(
       const image = (definition.runner as { image?: string }).image;
       if (!image?.trim()) {
         failures.push({ componentId: id, message: 'Docker runner missing image' });
+      }
+
+      for (const parameterId of SECURITY_DOCKER_RESOURCE_PARAMETER_IDS) {
+        if (!parameters.some((parameter) => parameter.id === parameterId)) {
+          failures.push({
+            componentId: id,
+            message: `Docker component missing resource override parameter "${parameterId}"`,
+          });
+        }
       }
     }
 

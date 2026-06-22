@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   defineComponent,
   inputs,
@@ -17,6 +16,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -70,6 +70,7 @@ const outputSchema = outputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   timeout: param(z.number().default(60), {
     label: 'Timeout (seconds)',
     editor: 'number',
@@ -197,8 +198,9 @@ const definition = defineComponent({
     ],
   },
   async execute({ inputs, params }, context) {
+    const parsedParams = parameterSchema.parse(params);
     const { target, rules, customFlags } = inputs;
-    const { timeout } = params;
+    const { timeout } = parsedParams;
 
     if (!target || target.trim().length === 0) {
       context.logger.info('[YARA] No target content provided, returning empty results.');
@@ -255,14 +257,18 @@ const definition = defineComponent({
         `${CONTAINER_INPUT_DIR}/${TARGET_FILE_NAME}`,
       );
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        network: baseRunner.network ?? 'none',
-        timeoutSeconds: timeout ?? YARA_DEFAULT_TIMEOUT_SECONDS,
-        env: {},
-        command: yaraArgs,
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-        stdinJson: false,
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          network: baseRunner.network ?? 'none',
+          timeoutSeconds: timeout ?? YARA_DEFAULT_TIMEOUT_SECONDS,
+          env: {},
+          command: yaraArgs,
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+          stdinJson: false,
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

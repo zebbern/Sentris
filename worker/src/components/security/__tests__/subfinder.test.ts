@@ -1,4 +1,4 @@
-import { it, expect, beforeAll, afterEach, vi } from 'bun:test';
+import { it, expect, beforeAll, afterEach, vi, describe } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
@@ -168,6 +168,54 @@ dockerDescribe('subfinder component', () => {
     expect(component.runner.kind).toBe('docker');
     if (component.runner.kind === 'docker') {
       expect(component.runner.image).toBe('projectdiscovery/subfinder:latest');
+    }
+  });
+});
+
+describe('subfinder container resources', () => {
+  beforeAll(async () => {
+    await import('../../index');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('passes custom container memory limits to the docker runner', async () => {
+    const component = componentRegistry.get<SubfinderInput, SubfinderOutput>(
+      'sentris.subfinder.run',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'subfinder-resource-test',
+    });
+
+    const runnerSpy = vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({
+      subdomains: [],
+      rawOutput: '',
+      domainCount: 1,
+      subdomainCount: 0,
+    });
+
+    await component.execute(
+      {
+        inputs: { domains: ['example.com'] },
+        params: {
+          overrideContainerResources: true,
+          containerMemoryLimit: '4g',
+          containerCpuLimit: '2',
+        },
+      },
+      context,
+    );
+
+    const runnerConfig = runnerSpy.mock.calls[0]?.[0];
+    expect(runnerConfig).toBeDefined();
+    if (runnerConfig && runnerConfig.kind === 'docker') {
+      expect(runnerConfig.memoryLimit).toBe('4g');
+      expect(runnerConfig.cpuLimit).toBe('2');
     }
   });
 });

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -66,6 +66,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   recordTypes: param(z.array(recordTypeEnum).default(['A']), {
     label: 'Record Types',
     editor: 'multi-select',
@@ -650,10 +651,14 @@ const definition = defineComponent({
       const volumeName = await volume.initialize(inputFiles);
       context.logger.info(`[DNSX] Created isolated volume: ${volumeName}`);
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...dnsxArgs],
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...dnsxArgs],
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+        },
+        parsedParams,
+      );
 
       rawPayload = await runComponentWithRunner(
         runnerConfig,

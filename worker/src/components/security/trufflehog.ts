@@ -3,7 +3,6 @@ import {
   componentRegistry,
   ComponentRetryPolicy,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ValidationError,
   defineComponent,
@@ -17,7 +16,11 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
-import { SECURITY_DOCKER_RESOURCE_HEAVY } from './security-docker-resources';
+import {
+  mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
+} from './security-docker-resources';
 
 const scanTypeSchema = z.enum(['git', 'github', 'gitlab', 's3', 'gcs', 'filesystem', 'docker']);
 
@@ -38,6 +41,7 @@ const inputSchema = inputs({
 type Output = z.infer<typeof outputSchema>;
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   scanType: param(scanTypeSchema.default('git').describe('Type of scan to perform'), {
     label: 'Scan Type',
     editor: 'select',
@@ -456,11 +460,14 @@ const definition = defineComponent({
       context.logger.info(`[TruffleHog] Command: trufflehog ${commandArgs.join(' ')}`);
 
       // Configure runner with command args and optional volume
-      const runnerConfig: DockerRunnerConfig = {
-        ...baseRunner,
-        command: commandArgs,
-        volumes: volume ? [volume.getVolumeConfig('/scan', true)] : undefined,
-      };
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: commandArgs,
+          volumes: volume ? [volume.getVolumeConfig('/scan', true)] : undefined,
+        },
+        parsedParams,
+      );
 
       // Execute TruffleHog
       // Note: TruffleHog exits with code 183 when secrets are found and --fail is used

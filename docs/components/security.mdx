@@ -7,6 +7,15 @@ Security components wrap popular open-source tools for subdomain discovery, DNS 
 
 ---
 
+## Advanced: container resources
+
+Docker-based security components run with tiered default limits (light / standard / heavy). On any Docker security step, enable **Override container resources** in the config panel to set custom `Container memory limit` (e.g. `4g`, `512m`) and/or `Container CPU limit` (e.g. `2`, `0.5`) for that node only. Leave the toggle off to keep defaults.
+
+- Host Docker must have enough RAM/CPU for overrides; OOM kills typically show exit code **137**.
+- Worker caps: `SENTRIS_DOCKER_MAX_MEMORY` (default `8g`) and `SENTRIS_DOCKER_MAX_CPUS` (default `4`) in [`worker/.env`](../../worker/.env.example).
+
+---
+
 ## Subdomain Discovery
 
 ### Subfinder

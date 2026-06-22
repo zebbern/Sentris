@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -55,6 +55,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   domain: param(z.string().optional().describe('Legacy single domain input'), {
     label: 'Legacy Domain',
     editor: 'text',
@@ -430,10 +431,14 @@ const definition = defineComponent({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...subfinderArgs],
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...subfinderArgs],
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

@@ -11,12 +11,12 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
-  type DockerRunnerConfig,
   ContainerError,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -40,6 +40,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   ports: param(
     z
       .string()
@@ -359,11 +360,15 @@ const definition = defineComponent({
         ...effectiveOptions,
       });
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        stdinJson: false,
-        command: [...(baseRunner.command ?? []), ...naabuArgs],
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          stdinJson: false,
+          command: [...(baseRunner.command ?? []), ...naabuArgs],
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

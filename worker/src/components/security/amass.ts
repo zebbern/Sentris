@@ -10,7 +10,6 @@ import {
   parameters,
   port,
   param,
-  type DockerRunnerConfig,
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
@@ -20,6 +19,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_HEAVY,
 } from './security-docker-resources';
 
@@ -61,6 +61,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   passive: param(
     z.boolean().default(true).describe('Use passive mode only (no DNS queries, faster)'),
     {
@@ -637,10 +638,14 @@ const definition = (defineComponent as any)({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...amassArgs],
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...amassArgs],
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

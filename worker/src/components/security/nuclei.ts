@@ -19,6 +19,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_HEAVY,
 } from './security-docker-resources';
 import * as yaml from 'js-yaml';
@@ -84,6 +85,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   rateLimit: param(
     z.number().int().positive().max(1000).default(150).describe('Maximum requests per second'),
     {

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_STANDARD,
 } from './security-docker-resources';
 import { materializeFileBundle } from './bundle-files';
@@ -44,6 +44,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   config: param(z.string().trim().default('auto').describe('Semgrep rule config'), {
     label: 'Config / Ruleset',
     editor: 'textarea',
@@ -378,10 +379,14 @@ const definition = defineComponent({
         }
       }
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes: [volume.getVolumeConfig('/inputs', false)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...args],
+          volumes: [volume.getVolumeConfig('/inputs', false)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

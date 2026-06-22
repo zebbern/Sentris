@@ -45,6 +45,14 @@ describe('security component catalog', () => {
       expect(runner.memoryLimit).toBe(profile.memoryLimit);
       expect(runner.cpuLimit).toBe(profile.cpuLimit);
       expect(runner.pidsLimit).toBe(profile.pidsLimit);
+
+      const metadata = componentRegistry
+        .listMetadata()
+        .find((entry) => entry.definition.id === componentId);
+      const parameterIds = metadata?.parameters.map((parameter) => parameter.id) ?? [];
+      expect(parameterIds).toContain('overrideContainerResources');
+      expect(parameterIds).toContain('containerMemoryLimit');
+      expect(parameterIds).toContain('containerCpuLimit');
     }
   });
 });

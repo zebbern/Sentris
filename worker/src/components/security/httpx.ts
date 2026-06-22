@@ -13,9 +13,14 @@ import {
   generateFindingHash,
   analyticsResultSchema,
   type AnalyticsResult,
+  type DockerRunnerConfig,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
-import { SECURITY_DOCKER_RESOURCE_STANDARD } from './security-docker-resources';
+import {
+  mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
 
 const inputSchema = inputs({
   targets: port(
@@ -31,6 +36,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   ports: param(
     z
       .string()
@@ -337,12 +343,15 @@ const definition = defineComponent({
 
       const httpxArgs = buildHttpxArgs(runnerParams);
 
-      const runnerConfig = {
-        ...definition.runner,
-        entrypoint: 'httpx',
-        command: httpxArgs,
-        volumes: [volume.getVolumeConfig('/inputs', true)],
-      };
+      const runnerConfig = mergeSecurityDockerRunner(
+        definition.runner as DockerRunnerConfig,
+        {
+          entrypoint: 'httpx',
+          command: httpxArgs,
+          volumes: [volume.getVolumeConfig('/inputs', true)],
+        },
+        parsedParams,
+      );
 
       const rawRunnerResult = await runComponentWithRunner(
         runnerConfig,

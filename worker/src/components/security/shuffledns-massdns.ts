@@ -3,7 +3,6 @@ import {
   componentRegistry,
   ComponentRetryPolicy,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ValidationError,
   defineComponent,
@@ -19,6 +18,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -96,6 +96,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   mode: param(
     z
       .enum(['bruteforce', 'resolve'])
@@ -226,8 +227,9 @@ const definition = defineComponent({
     deprecated: false,
   },
   async execute({ inputs, params }, context) {
+    const parsedParams = parameterSchema.parse(params);
     const { domains, words, seeds, resolvers, trustedResolvers } = inputs;
-    const modeText = params.mode ?? 'resolve';
+    const modeText = parsedParams.mode ?? 'resolve';
     if (modeText === 'bruteforce' && (!Array.isArray(words) || words.length === 0)) {
       throw new ValidationError('Wordlist is required when using bruteforce mode', {
         fieldErrors: { words: ['Wordlist is required for bruteforce mode'] },
@@ -251,19 +253,19 @@ const definition = defineComponent({
       flags.push('-d', d);
     }
 
-    if (typeof params.threads === 'number' && params.threads > 0) {
-      flags.push('-t', String(params.threads));
+    if (typeof parsedParams.threads === 'number' && parsedParams.threads > 0) {
+      flags.push('-t', String(parsedParams.threads));
     }
-    if (typeof params.retries === 'number' && params.retries > 0) {
-      flags.push('-retries', String(params.retries));
+    if (typeof parsedParams.retries === 'number' && parsedParams.retries > 0) {
+      flags.push('-retries', String(parsedParams.retries));
     }
-    if (params.wildcardStrict) {
+    if (parsedParams.wildcardStrict) {
       flags.push('-strict-wildcard');
     }
-    if (typeof params.wildcardThreads === 'number' && params.wildcardThreads > 0) {
-      flags.push('-wt', String(params.wildcardThreads));
+    if (typeof parsedParams.wildcardThreads === 'number' && parsedParams.wildcardThreads > 0) {
+      flags.push('-wt', String(parsedParams.wildcardThreads));
     }
-    if (params.massdnsCmd && params.massdnsCmd.trim().length > 0) {
+    if (parsedParams.massdnsCmd && parsedParams.massdnsCmd.trim().length > 0) {
       throw new ValidationError(
         'MassDNS extra commands are not supported by the ProjectDiscovery shuffledns image.',
         {
@@ -330,15 +332,19 @@ const definition = defineComponent({
       });
     }
 
-    const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-      entrypoint: 'shuffledns',
-      command: flags,
-      volumes: [volume.getVolumeConfig('/input', true)],
-    });
+    const runnerConfig = mergeSecurityDockerRunner(
+      baseRunner,
+      {
+        entrypoint: 'shuffledns',
+        command: flags,
+        volumes: [volume.getVolumeConfig('/input', true)],
+      },
+      parsedParams,
+    );
 
     let resultUnknown: unknown;
     try {
-      const runnerPayload = { ...params, ...inputs };
+      const runnerPayload = { ...parsedParams, ...inputs };
       resultUnknown = (await runComponentWithRunner(
         runnerConfig,
         async () => ({}) as Output,

@@ -18,6 +18,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_STANDARD,
 } from './security-docker-resources';
 
@@ -96,6 +97,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   databaseUrl: param(z.string().min(10).optional(), {
     label: 'Database URL',
     editor: 'secret',
@@ -300,10 +302,14 @@ const definition = defineComponent({
     // Build runner with isolated volume mounts
     // Distroless image uses ENTRYPOINT directly, config path passed as command arg
     const baseRunner = definition.runner as DockerRunnerConfig;
-    const runner = mergeSecurityDockerRunner(baseRunner, {
-      command: [containerConfigPath],
-      volumes: [],
-    });
+    const runner = mergeSecurityDockerRunner(
+      baseRunner,
+      {
+        command: [containerConfigPath],
+        volumes: [],
+      },
+      parsedParams,
+    );
 
     let report: unknown = {};
     let score: number | null = null;

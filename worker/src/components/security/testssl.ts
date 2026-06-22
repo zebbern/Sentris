@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -45,6 +45,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   protocols: param(z.boolean().default(true), {
     label: 'Test Protocols',
     editor: 'boolean',
@@ -288,12 +289,16 @@ const definition = defineComponent({
       args.push(target);
 
       const effectiveTimeout = timeout ?? 300;
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        timeoutSeconds: effectiveTimeout,
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
-        stdinJson: false,
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          timeoutSeconds: effectiveTimeout,
+          command: [...(baseRunner.command ?? []), ...args],
+          volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
+          stdinJson: false,
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

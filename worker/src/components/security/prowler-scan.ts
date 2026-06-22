@@ -24,6 +24,7 @@ import { awsCredentialSchema } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_HEAVY,
 } from './security-docker-resources';
 
@@ -119,6 +120,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   scanMode: param(
     z
       .enum(['aws', 'cloud'])
@@ -581,16 +583,20 @@ const definition = defineComponent({
     context.logger.info(`[ProwlerScan] Command: ${cmd.join(' ')}`);
 
     // Prepare a one-off runner with dynamic command and volume
-    const dockerRunner = mergeSecurityDockerRunner(definition.runner as DockerRunnerConfig, {
-      network: 'bridge',
-      timeoutSeconds: 900,
-      env: {
-        HOME: '/home/prowler',
-        ...awsEnv,
+    const dockerRunner = mergeSecurityDockerRunner(
+      definition.runner as DockerRunnerConfig,
+      {
+        network: 'bridge',
+        timeoutSeconds: 900,
+        env: {
+          HOME: '/home/prowler',
+          ...awsEnv,
+        },
+        command: cmd,
+        volumes: [],
       },
-      command: cmd,
-      volumes: [],
-    });
+      parsedParams,
+    );
 
     let rawSegments: string[] = [];
     let commandForOutput: string[] = cmd;

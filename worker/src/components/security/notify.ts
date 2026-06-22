@@ -11,11 +11,11 @@ import {
   parameters,
   port,
   param,
-  type DockerRunnerConfig,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -83,6 +83,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   providerIds: param(
     z
       .array(z.string().min(1, 'Provider id cannot be empty'))
@@ -418,11 +419,15 @@ const definition = defineComponent({
         proxy: parsedParams.proxy,
       });
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        stdinJson: false,
-        command: [...(baseRunner.command ?? []), ...notifyArgs],
-        volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          stdinJson: false,
+          command: [...(baseRunner.command ?? []), ...notifyArgs],
+          volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
+        },
+        parsedParams,
+      );
 
       const result = await runComponentWithRunner<Record<string, never>, string>(
         runnerConfig,

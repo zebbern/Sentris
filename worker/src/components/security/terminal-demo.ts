@@ -10,11 +10,16 @@ import {
   port,
   param,
 } from '@sentris/component-sdk';
-import { SECURITY_DOCKER_RESOURCE_LIGHT } from './security-docker-resources';
+import {
+  mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const inputSchema = inputs({});
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   message: param(
     z
       .string()
@@ -185,13 +190,16 @@ const definition = defineComponent({
     });
 
     // Replace template variables in env vars
-    const runnerWithEnv = {
-      ...definition.runner,
-      env: {
-        MESSAGE: message,
-        DURATION_SECONDS: durationSeconds.toString(),
+    const runnerWithEnv = mergeSecurityDockerRunner(
+      runner,
+      {
+        env: {
+          MESSAGE: message,
+          DURATION_SECONDS: durationSeconds.toString(),
+        },
       },
-    };
+      parsedParams,
+    );
 
     const raw = await runComponentWithRunner<any, string | TerminalDemoOutput>(
       runnerWithEnv,

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_STANDARD,
 } from './security-docker-resources';
 
@@ -46,6 +46,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   depth: param(z.number().int().min(1).max(10).default(3), {
     label: 'Crawl Depth',
     editor: 'number',
@@ -326,10 +327,14 @@ const definition = defineComponent({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes: [volume.getVolumeConfig('/inputs', true)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          command: [...(baseRunner.command ?? []), ...args],
+          volumes: [volume.getVolumeConfig('/inputs', true)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

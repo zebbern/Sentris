@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -47,6 +47,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   sources: param(z.string().default(DEFAULT_SOURCES).describe('Comma-separated data sources'), {
     label: 'Data Sources',
     editor: 'text',
@@ -225,11 +226,15 @@ const definition = defineComponent({
         if (flag.length > 0) args.push(flag);
       }
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        entrypoint: 'theHarvester',
-        command: [...(baseRunner.command ?? []), ...args],
-        volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          entrypoint: 'theHarvester',
+          command: [...(baseRunner.command ?? []), ...args],
+          volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(

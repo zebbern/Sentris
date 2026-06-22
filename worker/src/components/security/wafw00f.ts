@@ -2,7 +2,6 @@ import { z } from 'zod';
 import {
   componentRegistry,
   runComponentWithRunner,
-  type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
   defineComponent,
@@ -18,6 +17,7 @@ import {
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
+  securityDockerResourceParameterShape,
   SECURITY_DOCKER_RESOURCE_LIGHT,
 } from './security-docker-resources';
 
@@ -51,6 +51,7 @@ const inputSchema = inputs({
 });
 
 const parameterSchema = parameters({
+  ...securityDockerResourceParameterShape(),
   findAll: param(z.boolean().default(false), {
     label: 'Find All WAFs',
     editor: 'boolean',
@@ -236,14 +237,18 @@ const definition = defineComponent({
       const escapedArgs = wafw00fArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
       const shellCmd = `pip install wafw00f -q && wafw00f ${escapedArgs}`;
 
-      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
-        entrypoint: baseRunner.entrypoint,
-        command: ['-c', shellCmd],
-        volumes: [
-          volume.getVolumeConfig(INPUT_DIR, true),
-          volume.getVolumeConfig(OUTPUT_DIR, false),
-        ],
-      });
+      const runnerConfig = mergeSecurityDockerRunner(
+        baseRunner,
+        {
+          entrypoint: baseRunner.entrypoint,
+          command: ['-c', shellCmd],
+          volumes: [
+            volume.getVolumeConfig(INPUT_DIR, true),
+            volume.getVolumeConfig(OUTPUT_DIR, false),
+          ],
+        },
+        parsedParams,
+      );
 
       try {
         const result = await runComponentWithRunner(
