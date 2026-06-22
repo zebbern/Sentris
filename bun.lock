@@ -50,6 +50,7 @@
         "@opensearch-project/opensearch": "^3.5.1",
         "@sentris/backend-client": "workspace:*",
         "@sentris/component-sdk": "workspace:*",
+        "@sentris/local-runtime": "workspace:*",
         "@sentris/shared": "workspace:*",
         "@sentris/worker": "workspace:*",
         "@temporalio/client": "^1.14.1",
@@ -258,6 +259,15 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/local-runtime": {
+      "name": "@sentris/local-runtime",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "^25.1.0",
+        "bun-types": "^1.3.6",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/shared": {
       "name": "@sentris/shared",
       "version": "0.1.0",
@@ -288,6 +298,7 @@
         "@opensearch-project/opensearch": "^3.5.1",
         "@sentris/component-sdk": "workspace:*",
         "@sentris/contracts": "workspace:*",
+        "@sentris/local-runtime": "workspace:*",
         "@sentris/shared": "workspace:*",
         "@temporalio/activity": "^1.14.1",
         "@temporalio/client": "^1.14.1",
@@ -948,6 +959,8 @@
     "@sentris/flow-backend": ["@sentris/flow-backend@workspace:backend"],
 
     "@sentris/flow-frontend": ["@sentris/flow-frontend@workspace:frontend"],
+
+    "@sentris/local-runtime": ["@sentris/local-runtime@workspace:packages/local-runtime"],
 
     "@sentris/shared": ["@sentris/shared@workspace:packages/shared"],
 

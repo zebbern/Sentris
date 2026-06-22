@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { FileStorageAdapter } from '../file-storage.adapter';
 import * as schema from '../schema';
+import { formatDatabaseTarget, getScriptDatabaseTarget } from '@sentris/local-runtime';
 
 const enableFileStorageIntegration = process.env.ENABLE_FILE_STORAGE_TESTS === 'true';
 const fileStorageDescribe = enableFileStorageIntegration ? describe : describe.skip;
@@ -18,6 +19,10 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
   const bucketName = 'test-sentris-files';
 
   beforeAll(async () => {
+    const databaseTarget = getScriptDatabaseTarget({
+      overrideEnvVar: 'FILE_STORAGE_TEST_DATABASE_URL',
+    });
+
     // Initialize MinIO client
     minioClient = new Client({
       endPoint: process.env.MINIO_ENDPOINT || 'localhost',
@@ -28,9 +33,7 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
     });
 
     // Initialize PostgreSQL connection
-    const connectionString =
-      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
-    pool = new Pool({ connectionString });
+    pool = new Pool({ connectionString: databaseTarget.connectionString });
     db = drizzle(pool, { schema });
 
     // Ensure test bucket exists
@@ -42,7 +45,9 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
     // Create adapter
     adapter = new FileStorageAdapter(minioClient, db, bucketName);
 
-    console.log('✅ Test setup complete: MinIO + PostgreSQL connected');
+    console.log(
+      `✅ Test setup complete: MinIO + PostgreSQL connected (${formatDatabaseTarget(databaseTarget)})`,
+    );
   });
 
   afterAll(async () => {

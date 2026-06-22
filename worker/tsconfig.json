@@ -32,6 +32,9 @@
       "path": "../packages/component-sdk"
     },
     {
+      "path": "../packages/local-runtime"
+    },
+    {
       "path": "../packages/backend-client"
     },
     {

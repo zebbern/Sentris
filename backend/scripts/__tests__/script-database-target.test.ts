@@ -201,4 +201,26 @@ describe('script database target resolver', () => {
       );
     }
   });
+
+  it('prevents DB-backed integration tests from falling back to the legacy local database', () => {
+    const integrationTestFiles = [
+      join(repoRoot, 'backend', 'src', '__tests__', 'backend-integration.test.ts'),
+      join(repoRoot, 'worker', 'src', '__tests__', 'worker-integration.test.ts'),
+      join(repoRoot, 'worker', 'src', 'adapters', '__tests__', 'file-storage.adapter.test.ts'),
+    ];
+
+    for (const file of integrationTestFiles) {
+      const source = readFileSync(file, 'utf-8');
+      expect(source, `${file} should use the shared script database resolver`).toContain(
+        'getScriptDatabaseTarget',
+      );
+      expect(
+        source,
+        `${file} should not read DATABASE_URL directly for its fallback`,
+      ).not.toContain('process.env.DATABASE_URL ||');
+      expect(source, `${file} should not fall back to the legacy sentris database`).not.toContain(
+        'postgresql://sentris:sentris@localhost:5433/sentris',
+      );
+    }
+  });
 });

@@ -10,6 +10,12 @@ import { eq } from 'drizzle-orm';
 import { FileStorageAdapter } from '../adapters/file-storage.adapter';
 import * as schema from '../adapters/schema';
 import '../components'; // Register all components
+import {
+  formatDatabaseTarget,
+  formatTemporalTarget,
+  getScriptDatabaseTarget,
+  getScriptTemporalTarget,
+} from '@sentris/local-runtime';
 
 const enableWorkerIntegration =
   process.env.ENABLE_WORKER_INTEGRATION_TESTS === 'true' ||
@@ -32,19 +38,29 @@ workerDescribe('Worker Integration Tests', () => {
   // Use the test task queue - tests submit workflows to the test worker (pm2: sentris-test-worker)
   // Main worker uses 'sentris-default', test worker uses 'test-worker-integration'
   const taskQueue = 'test-worker-integration';
-  const testNamespace = process.env.TEMPORAL_NAMESPACE || 'sentris-dev';
 
   beforeAll(async () => {
+    const databaseTarget = getScriptDatabaseTarget({
+      overrideEnvVar: 'WORKER_INTEGRATION_DATABASE_URL',
+    });
+    const temporalTarget = getScriptTemporalTarget({
+      namespaceOverrideEnvVar: 'WORKER_INTEGRATION_TEMPORAL_NAMESPACE',
+      taskQueueOverrideEnvVar: 'WORKER_INTEGRATION_TEMPORAL_TASK_QUEUE',
+    });
+    process.env.DATABASE_URL = databaseTarget.connectionString;
+
     console.log('🚀 Starting worker integration test setup...');
     console.log(`   Task Queue: ${taskQueue}`);
-    console.log(`   Namespace: ${testNamespace}`);
+    console.log(`   Namespace: ${temporalTarget.namespace}`);
+    console.log(`   ${formatDatabaseTarget(databaseTarget)}`);
+    console.log(`   ${formatTemporalTarget(temporalTarget)}`);
 
     // Connect to Temporal (running in docker-compose)
     temporalClient = new Client({
       connection: await NativeConnection.connect({
         address: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
       }),
-      namespace: testNamespace,
+      namespace: temporalTarget.namespace,
     });
 
     // Initialize MinIO
@@ -57,9 +73,7 @@ workerDescribe('Worker Integration Tests', () => {
     });
 
     // Initialize PostgreSQL
-    const connectionString =
-      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
-    pool = new Pool({ connectionString });
+    pool = new Pool({ connectionString: databaseTarget.connectionString });
     db = drizzle(pool, { schema });
 
     // Initialize adapters

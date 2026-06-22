@@ -10,6 +10,7 @@
     "packages/backend-client",
     "packages/component-sdk",
     "packages/contracts",
+    "packages/local-runtime",
     "packages/shared"
   ],
   "scripts": {

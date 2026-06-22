@@ -32,6 +32,7 @@
     "@opensearch-project/opensearch": "^3.5.1",
     "@sentris/component-sdk": "workspace:*",
     "@sentris/contracts": "workspace:*",
+    "@sentris/local-runtime": "workspace:*",
     "@sentris/shared": "workspace:*",
     "@temporalio/activity": "^1.14.1",
     "@temporalio/client": "^1.14.1",

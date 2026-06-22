@@ -15,14 +15,25 @@ import {
 } from '../workflows/dto/workflow-graph.dto';
 import { WorkflowDefinition } from '../dsl/types';
 import { UploadedFile } from '../storage/storage.service';
+import {
+  formatDatabaseTarget,
+  getScriptDatabaseTarget,
+  readActiveInstance,
+} from '@sentris/local-runtime';
 
 const runIntegration = process.env.RUN_BACKEND_INTEGRATION === 'true';
 
-const baseUrl =
-  process.env.BACKEND_BASE_URL ??
-  `http://localhost:${process.env.BACKEND_PORT ?? process.env.PORT ?? '3211'}`;
+function resolveBackendBaseUrl(): string {
+  if (process.env.BACKEND_BASE_URL) return process.env.BACKEND_BASE_URL;
 
-const api = (path: string) => `${baseUrl}${path}`;
+  const explicitPort = process.env.BACKEND_PORT ?? process.env.PORT;
+  if (explicitPort) return `http://localhost:${explicitPort}`;
+
+  const activeInstance = readActiveInstance();
+  return `http://localhost:${3211 + Number(activeInstance.instance) * 100}`;
+}
+
+const api = (path: string) => `${resolveBackendBaseUrl()}${path}`;
 
 const normalizeNode = (override: Partial<WorkflowNodeDto> = {}): WorkflowNodeDto => ({
   id: override.id ?? 'node-1',
@@ -140,6 +151,13 @@ interface Component {
     // eslint-disable-next-line no-console
     console.log('🚀 Starting backend integration test setup...');
 
+    const databaseTarget = getScriptDatabaseTarget({
+      overrideEnvVar: 'BACKEND_INTEGRATION_DATABASE_URL',
+    });
+    process.env.DATABASE_URL = databaseTarget.connectionString;
+    // eslint-disable-next-line no-console
+    console.log(formatDatabaseTarget(databaseTarget));
+
     const { AppModule } = await import('../app.module');
 
     // Create NestJS test application
@@ -151,9 +169,7 @@ interface Component {
     await app.init();
 
     // Initialize database connection for cleanup
-    const connectionString =
-      process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
-    pool = new Pool({ connectionString });
+    pool = new Pool({ connectionString: databaseTarget.connectionString });
     db = drizzle(pool);
 
     // Initialize MinIO client
