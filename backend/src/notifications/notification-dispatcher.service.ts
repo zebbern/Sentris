@@ -5,6 +5,7 @@ import type { RunLifecycleEvent } from '@sentris/shared';
 import { NotificationChannelRepository } from './repository/notification-channel.repository';
 import { NotificationDeliveryRepository } from './repository/notification-delivery.repository';
 import { SlackNotificationAdapter } from './adapters/slack.adapter';
+import { DiscordNotificationAdapter } from './adapters/discord.adapter';
 import type { NotificationChannelRecord } from '../database/schema';
 
 /** Maps terminal execution statuses to notification event types. */
@@ -24,6 +25,7 @@ export class NotificationDispatcherService {
     private readonly channelRepository: NotificationChannelRepository,
     private readonly deliveryRepository: NotificationDeliveryRepository,
     private readonly slackAdapter: SlackNotificationAdapter,
+    private readonly discordAdapter: DiscordNotificationAdapter,
   ) {}
 
   @OnEvent('run.status.terminal', { async: true })
@@ -87,6 +89,8 @@ export class NotificationDispatcherService {
 
       if (channel.type === 'slack') {
         result = await this.slackAdapter.send(channel, payload);
+      } else if (channel.type === 'discord') {
+        result = await this.discordAdapter.send(channel, payload);
       } else {
         result = {
           success: false,

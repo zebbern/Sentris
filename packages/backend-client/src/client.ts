@@ -4452,7 +4452,7 @@ export interface components {
             organizationId: string;
             name: string;
             /** @enum {string} */
-            type: "slack" | "email" | "pagerduty";
+            type: "slack" | "discord" | "email" | "pagerduty";
             config: {
                 [key: string]: unknown;
             };
@@ -4468,7 +4468,7 @@ export interface components {
         CreateNotificationChannelDto: {
             name: string;
             /** @enum {string} */
-            type: "slack" | "email" | "pagerduty";
+            type: "slack" | "discord" | "email" | "pagerduty";
             config: {
                 [key: string]: unknown;
             };

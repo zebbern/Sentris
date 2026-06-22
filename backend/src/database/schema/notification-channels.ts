@@ -16,7 +16,7 @@ export const notificationChannelsTable = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     organizationId: varchar('organization_id', { length: 191 }).notNull(),
     name: text('name').notNull(),
-    type: text('type').notNull().$type<'slack' | 'email' | 'pagerduty'>(),
+    type: text('type').notNull().$type<'slack' | 'discord' | 'email' | 'pagerduty'>(),
     config: jsonb('config').notNull().$type<Record<string, unknown>>(),
     status: text('status').notNull().default('active').$type<'active' | 'inactive'>(),
     events: jsonb('events').notNull().$type<string[]>(),

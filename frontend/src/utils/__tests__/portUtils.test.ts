@@ -91,6 +91,21 @@ describe('arePortTypesCompatible', () => {
       ).toBe(true);
     });
 
+    it('allows text ↔ secret coercion', () => {
+      expect(
+        arePortTypesCompatible(
+          { kind: 'primitive', name: 'text' },
+          { kind: 'primitive', name: 'secret' },
+        ),
+      ).toBe(true);
+      expect(
+        arePortTypesCompatible(
+          { kind: 'primitive', name: 'secret' },
+          { kind: 'primitive', name: 'text' },
+        ),
+      ).toBe(true);
+    });
+
     it('rejects incompatible primitives (number → boolean)', () => {
       expect(
         arePortTypesCompatible(

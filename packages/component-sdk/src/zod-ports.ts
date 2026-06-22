@@ -309,6 +309,14 @@ function canCoercePrimitive(source: string, target: string): boolean {
     return source === 'text';
   }
 
+  // Secret values resolve to strings at runtime (webhook URLs, API keys, etc.)
+  if (target === 'secret' && source === 'text') {
+    return true;
+  }
+  if (target === 'text' && source === 'secret') {
+    return true;
+  }
+
   return false;
 }
 

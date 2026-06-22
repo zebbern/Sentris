@@ -13902,6 +13902,7 @@
             "type": "string",
             "enum": [
               "slack",
+              "discord",
               "email",
               "pagerduty"
             ]
@@ -13972,6 +13973,7 @@
             "type": "string",
             "enum": [
               "slack",
+              "discord",
               "email",
               "pagerduty"
             ]

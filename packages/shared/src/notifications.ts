@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { isValidDiscordWebhookUrl } from './discord-webhook.js';
+
 // --- Enums ---
 
-export const NOTIFICATION_CHANNEL_TYPES = ['slack', 'email', 'pagerduty'] as const;
+export const NOTIFICATION_CHANNEL_TYPES = ['slack', 'discord', 'email', 'pagerduty'] as const;
 export const NotificationChannelTypeSchema = z.enum(NOTIFICATION_CHANNEL_TYPES);
 export type NotificationChannelType = z.infer<typeof NotificationChannelTypeSchema>;
 
@@ -32,6 +34,14 @@ export const SlackChannelConfigSchema = z.object({
   ),
 });
 export type SlackChannelConfig = z.infer<typeof SlackChannelConfigSchema>;
+
+export const DiscordChannelConfigSchema = z.object({
+  webhookUrl: z.string().url().refine(isValidDiscordWebhookUrl, {
+    message:
+      'Webhook URL must be a valid Discord webhook URL (https://discord.com/api/webhooks/...)',
+  }),
+});
+export type DiscordChannelConfig = z.infer<typeof DiscordChannelConfigSchema>;
 
 export const EmailChannelConfigSchema = z.object({
   recipients: z.array(z.string().email()).min(1),

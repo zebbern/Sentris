@@ -10,6 +10,7 @@ import {
   type NotificationDelivery,
   type RunLifecycleEvent,
   SlackChannelConfigSchema,
+  DiscordChannelConfigSchema,
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
@@ -19,6 +20,7 @@ import { NotificationChannelRepository } from './repository/notification-channel
 import { NotificationDeliveryRepository } from './repository/notification-delivery.repository';
 import { NotificationDispatcherService } from './notification-dispatcher.service';
 import { SlackNotificationAdapter } from './adapters/slack.adapter';
+import { DiscordNotificationAdapter } from './adapters/discord.adapter';
 import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../database/schema';
 
 @Injectable()
@@ -29,6 +31,7 @@ export class NotificationsService {
     private readonly channelRepository: NotificationChannelRepository,
     private readonly deliveryRepository: NotificationDeliveryRepository,
     private readonly slackAdapter: SlackNotificationAdapter,
+    private readonly discordAdapter: DiscordNotificationAdapter,
     private readonly auditLogService: AuditLogService,
     private readonly dispatcherService: NotificationDispatcherService,
   ) {}
@@ -52,7 +55,7 @@ export class NotificationsService {
     auth: AuthContext | null,
     dto: {
       name: string;
-      type: 'slack' | 'email' | 'pagerduty';
+      type: 'slack' | 'discord' | 'email' | 'pagerduty';
       config: Record<string, unknown>;
       events: string[];
     },
@@ -159,7 +162,7 @@ export class NotificationsService {
       throw new NotFoundException(`Notification channel ${id} not found`);
     }
 
-    if (channel.type !== 'slack') {
+    if (channel.type !== 'slack' && channel.type !== 'discord') {
       throw new NotImplementedException(
         `Testing for channel type '${channel.type}' is not implemented`,
       );
@@ -172,6 +175,10 @@ export class NotificationsService {
       status: 'COMPLETED',
       completedAt: new Date().toISOString(),
     };
+
+    if (channel.type === 'discord') {
+      return this.discordAdapter.send(channel, testPayload);
+    }
 
     return this.slackAdapter.send(channel, testPayload);
   }
@@ -256,6 +263,14 @@ export class NotificationsService {
       if (!result.success) {
         throw new BadRequestException(
           `Invalid Slack config: ${result.error.issues.map((i: { message: string }) => i.message).join(', ')}`,
+        );
+      }
+    }
+    if (type === 'discord') {
+      const result = DiscordChannelConfigSchema.safeParse(config);
+      if (!result.success) {
+        throw new BadRequestException(
+          `Invalid Discord config: ${result.error.issues.map((i: { message: string }) => i.message).join(', ')}`,
         );
       }
     }

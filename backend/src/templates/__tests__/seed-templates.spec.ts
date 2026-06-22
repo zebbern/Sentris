@@ -17,6 +17,7 @@ const newTemplateFiles = [
   'passive-osint-subdomain-expansion.json',
   'public-repo-code-iac-risk-triage.json',
   'public-repo-secret-exposure-triage.json',
+  'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
   'web-api-fuzz-triage.json',
   'web-attack-surface-quick-win-hunt.json',
@@ -1598,5 +1599,70 @@ describe('new seed templates', () => {
     expect(result.report.priorityFindings[0].priorityReasons).toEqual(
       expect.arrayContaining(['critical severity', 'fixed version available']),
     );
+  });
+
+  it('security-scan-discord-report wires Trivy, Discord, and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'security-scan-discord-report.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+
+    expect(nodeTypes).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.trivy.run',
+      'core.logic.script',
+      'core.notification.discord',
+      'core.artifact.writer',
+    ]);
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
+    ]);
+
+    const discordNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'discord_notify',
+    );
+    expect(discordNode.data.config.inputOverrides.webhookUrl).toBe('{{SECRET_PLACEHOLDER}}');
+
+    const discordEdges = template.graph.edges.filter(
+      (edge: { target: string }) => edge.target === 'discord_notify',
+    );
+    expect(discordEdges.map((edge: { targetHandle: string }) => edge.targetHandle).sort()).toEqual(
+      ['attachmentContent', 'summaryText'].sort(),
+    );
+  });
+
+  it('security-scan-discord-report script produces summaryText and report', () => {
+    const filePath = join(seedTemplatesDir, 'security-scan-discord-report.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const scriptNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_report',
+    );
+    const result = runTemplateScript<{
+      summaryText: string;
+      report: { summary: Record<string, unknown>; priorityFindings: unknown[] };
+      attachmentContent: string;
+    }>(scriptNode.data.config.params.code, {
+      imageRef: 'nginx:1.25',
+      vulnerabilityCount: 2,
+      vulnerabilities: [
+        {
+          vulnerabilityId: 'CVE-2024-0001',
+          pkgName: 'openssl',
+          severity: 'CRITICAL',
+          title: 'Critical TLS issue',
+        },
+        {
+          vulnerabilityId: 'CVE-2024-0002',
+          pkgName: 'zlib',
+          severity: 'LOW',
+          title: 'Low issue',
+        },
+      ],
+    });
+
+    expect(result.summaryText).toContain('nginx:1.25');
+    expect(result.summaryText).toContain('highest: critical');
+    expect(result.report.summary.actionableFindings).toBe(1);
+    expect(result.report.priorityFindings).toHaveLength(1);
+    expect(result.attachmentContent).toContain('"priorityFindings"');
   });
 });

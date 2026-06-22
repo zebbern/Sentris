@@ -43,6 +43,7 @@ import { logger } from '@/lib/logger';
 import { useCanvasKeyboardShortcuts } from '@/hooks/useCanvasKeyboardShortcuts';
 import {
   createNodeFromComponent as createNodeFromComponentUtil,
+  resolveDynamicPortsForNode,
   type CreateNodeContext,
 } from './canvas-node-factory';
 import { useNodeUpdater } from './canvas-node-updater';
@@ -264,7 +265,10 @@ export function Canvas({
         setNodes,
         markDirty,
       };
-      createNodeFromComponentUtil(componentId, clientX, clientY, ctx);
+      const created = createNodeFromComponentUtil(componentId, clientX, clientY, ctx);
+      if (!created) return;
+
+      void resolveDynamicPortsForNode(created.id, componentId, created.params, setNodes);
     },
     [
       reactFlowInstance,

@@ -1,0 +1,187 @@
+{
+  "_metadata": {
+    "name": "Security Scan Discord Report",
+    "description": "Scan a container image with Trivy, build a prioritized CVE summary, post results to Discord, and save a JSON report artifact.",
+    "category": "container-security",
+    "tags": ["container", "cve", "trivy", "discord", "notification"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Security Scan Discord Report",
+    "description": "Trivy image scan with Discord webhook notification and artifact report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "container-security",
+    "tags": ["container", "cve", "trivy", "discord", "notification"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 7
+  },
+  "graph": {
+    "name": "Security Scan Discord Report",
+    "description": "Authorized container image scan with Discord notification for triage teams.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Scan Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "imageRef",
+                  "label": "Container image reference",
+                  "type": "text",
+                  "required": true,
+                  "description": "Public or locally available container image reference, for example nginx:1.25 or node:18-alpine."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "trivy_image_scan",
+        "type": "sentris.trivy.run",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Scan Image CVEs",
+          "config": {
+            "params": {
+              "scanType": "image",
+              "severity": ["CRITICAL", "HIGH", "MEDIUM"],
+              "format": "json"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_report",
+        "type": "core.logic.script",
+        "position": { "x": 760, "y": 260 },
+        "data": {
+          "label": "Build Scan Report",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "imageRef", "type": "string" },
+                { "name": "vulnerabilities", "type": "list-json" },
+                { "name": "vulnerabilityCount", "type": "number" }
+              ],
+              "returns": [
+                { "name": "summaryText", "type": "string" },
+                { "name": "report", "type": "json" },
+                { "name": "attachmentContent", "type": "string" }
+              ],
+              "code": "export function script(input) {\n  const vulnerabilities = Array.isArray(input.vulnerabilities) ? input.vulnerabilities : [];\n  const severityRank = { critical: 4, high: 3, medium: 2, low: 1, info: 0, unknown: 0 };\n  const normalizeSeverity = (value) => String(value || 'unknown').toLowerCase();\n  const rankFor = (value) => severityRank[normalizeSeverity(value)] ?? 0;\n  const priorityFindings = vulnerabilities\n    .map((finding) => ({\n      vulnerabilityId: finding?.vulnerabilityId,\n      pkgName: finding?.pkgName,\n      severity: normalizeSeverity(finding?.severity),\n      title: finding?.title,\n      fixedVersion: finding?.fixedVersion || null\n    }))\n    .filter((finding) => finding.vulnerabilityId && rankFor(finding.severity) >= 2)\n    .sort((a, b) => rankFor(b.severity) - rankFor(a.severity))\n    .slice(0, 25);\n  const countsBySeverity = priorityFindings.reduce((acc, finding) => {\n    acc[finding.severity] = (acc[finding.severity] || 0) + 1;\n    return acc;\n  }, {});\n  const highestSeverity = priorityFindings[0]?.severity || 'none';\n  const imageRef = input.imageRef || 'unknown image';\n  const summaryText = `${imageRef}: ${priorityFindings.length} actionable CVEs (highest: ${highestSeverity})`;\n  const report = {\n    summary: {\n      imageRef,\n      vulnerabilityCount: Number(input.vulnerabilityCount || vulnerabilities.length),\n      actionableFindings: priorityFindings.length,\n      highestSeverity,\n      countsBySeverity\n    },\n    priorityFindings\n  };\n  return {\n    summaryText,\n    report,\n    attachmentContent: JSON.stringify(report, null, 2)\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "discord_notify",
+        "type": "core.notification.discord",
+        "position": { "x": 1100, "y": 200 },
+        "data": {
+          "label": "Post to Discord",
+          "config": {
+            "params": {
+              "attachmentFileName": "scan-report.json",
+              "attachmentContentFormat": "text",
+              "attachmentMimeType": "application/json",
+              "variables": [{ "name": "summaryText", "type": "string" }]
+            },
+            "inputOverrides": {
+              "webhookUrl": "{{SECRET_PLACEHOLDER}}",
+              "content": "**Container scan complete** — {{summaryText}}",
+              "embeds": "[{\"title\":\"CVE Scan Summary\",\"description\":\"{{summaryText}}\",\"color\":5814783}]"
+            }
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1100, "y": 340 },
+        "data": {
+          "label": "Save Scan Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "security-scan-discord-report-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-trivy_image_scan-imageRef",
+        "source": "trigger_1",
+        "target": "trivy_image_scan",
+        "sourceHandle": "imageRef",
+        "targetHandle": "target"
+      },
+      {
+        "id": "trigger_1-assemble_report-imageRef",
+        "source": "trigger_1",
+        "target": "assemble_report",
+        "sourceHandle": "imageRef",
+        "targetHandle": "imageRef"
+      },
+      {
+        "id": "trivy_image_scan-assemble_report-vulnerabilities",
+        "source": "trivy_image_scan",
+        "target": "assemble_report",
+        "sourceHandle": "vulnerabilities",
+        "targetHandle": "vulnerabilities"
+      },
+      {
+        "id": "trivy_image_scan-assemble_report-vulnerabilityCount",
+        "source": "trivy_image_scan",
+        "target": "assemble_report",
+        "sourceHandle": "vulnerabilityCount",
+        "targetHandle": "vulnerabilityCount"
+      },
+      {
+        "id": "assemble_report-discord_notify-summaryText",
+        "source": "assemble_report",
+        "target": "discord_notify",
+        "sourceHandle": "summaryText",
+        "targetHandle": "summaryText"
+      },
+      {
+        "id": "assemble_report-discord_notify-attachmentContent",
+        "source": "assemble_report",
+        "target": "discord_notify",
+        "sourceHandle": "attachmentContent",
+        "targetHandle": "attachmentContent"
+      },
+      {
+        "id": "assemble_report-artifact_report-report",
+        "source": "assemble_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "DISCORD_WEBHOOK_URL",
+      "type": "string",
+      "description": "Discord Incoming Webhook URL for scan notifications"
+    }
+  ]
+}

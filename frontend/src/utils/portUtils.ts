@@ -64,6 +64,13 @@ const canCoercePrimitive = (
   if (target.name === 'boolean' && source.name === 'text') {
     return true;
   }
+  // Secret values resolve to strings at runtime (webhook URLs, API keys, etc.)
+  if (target.name === 'secret' && source.name === 'text') {
+    return true;
+  }
+  if (target.name === 'text' && source.name === 'secret') {
+    return true;
+  }
   return false;
 };
 

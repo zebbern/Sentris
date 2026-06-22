@@ -33,6 +33,7 @@ import { ChannelDeliveryHistory } from './ChannelDeliveryHistory';
 
 const TYPE_LABELS: Record<string, string> = {
   slack: 'Slack',
+  discord: 'Discord',
   email: 'Email',
   pagerduty: 'PagerDuty',
 };

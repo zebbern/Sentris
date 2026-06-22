@@ -46,7 +46,10 @@ Examples:
   ai.llm.generate        # AI component
   notification.slack     # Notification
   notification.discord   # Notification
+  notification.run-report-discord # Run export bundles to Discord
 ```
+
+**Run inspector vs workflow outputs:** The run inspector tabs (Events, Logs, Findings, Artifacts, etc.) are post-run views over stored data. Workflow notification components only send data wired in the graph—or, for `core.notification.run-report-discord`, bundles fetched from internal run APIs at execution time. Wire **Run after** from the final upstream node so the scheduler waits for scanners; set **Webhook URL** via secret (do not wire report outputs to the webhook port).
 
 ---
 

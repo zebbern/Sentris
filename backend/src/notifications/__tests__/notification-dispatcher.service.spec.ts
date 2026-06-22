@@ -4,6 +4,7 @@ import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../.
 import type { NotificationChannelRepository } from '../repository/notification-channel.repository';
 import type { NotificationDeliveryRepository } from '../repository/notification-delivery.repository';
 import type { SlackNotificationAdapter } from '../adapters/slack.adapter';
+import type { DiscordNotificationAdapter } from '../adapters/discord.adapter';
 import { NotificationDispatcherService } from '../notification-dispatcher.service';
 
 // ---------------------------------------------------------------------------
@@ -77,7 +78,11 @@ function createMocks() {
     send: mock(() => Promise.resolve({ success: true } as { success: boolean; error?: string })),
   } as unknown as SlackNotificationAdapter;
 
-  return { channelRepo, deliveryRepo, slackAdapter, deliveryUpdates };
+  const discordAdapter = {
+    send: mock(() => Promise.resolve({ success: true } as { success: boolean; error?: string })),
+  } as unknown as DiscordNotificationAdapter;
+
+  return { channelRepo, deliveryRepo, slackAdapter, discordAdapter, deliveryUpdates };
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +119,7 @@ describe('NotificationDispatcherService', () => {
       mocks.channelRepo,
       mocks.deliveryRepo,
       mocks.slackAdapter,
+      mocks.discordAdapter,
     );
   });
 
@@ -243,6 +249,22 @@ describe('NotificationDispatcherService', () => {
     await dispatcher.handleRunTerminal(event);
 
     expect(mocks.channelRepo.findActiveByEventType).not.toHaveBeenCalled();
+  });
+
+  it('dispatches to Discord adapter for discord channels', async () => {
+    const discordChannel = makeChannelRecord({
+      id: 'ch-discord',
+      type: 'discord',
+      config: { webhookUrl: 'https://discord.com/api/webhooks/1/token' },
+    });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(
+      Promise.resolve([discordChannel]),
+    );
+
+    await dispatcher.handleRunTerminal(completedRunEvent);
+
+    expect(mocks.discordAdapter.send).toHaveBeenCalledTimes(1);
+    expect(mocks.slackAdapter.send).not.toHaveBeenCalled();
   });
 
   it('handles non-slack channel type with failure result', async () => {

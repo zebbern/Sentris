@@ -6,9 +6,11 @@ import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
 import { cn } from '@/lib/utils';
 import {
   normalizeAllFindings,
+  formatFindingsCsv,
+  formatFindingsMarkdown,
   type Finding,
   type FindingSeverity,
-} from '@/utils/normalizeFindings';
+} from '@sentris/shared';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -39,13 +41,6 @@ const FINDINGS_DISPLAY_LIMIT = 500;
 // Export helpers
 // ---------------------------------------------------------------------------
 
-function escapeCSV(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
-
 function downloadBlob(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -59,11 +54,7 @@ function downloadBlob(content: string, filename: string, type: string) {
 }
 
 function generateCSV(findings: Finding[]): string {
-  const header = 'Severity,Type,Finding,Source Node,Source Component';
-  const rows = findings.map((f) =>
-    [f.severity, f.type, f.finding, f.sourceNode, f.sourceComponent].map(escapeCSV).join(','),
-  );
-  return [header, ...rows].join('\n');
+  return formatFindingsCsv(findings);
 }
 
 function severityCounts(findings: Finding[]): Record<FindingSeverity, number> {
@@ -81,38 +72,7 @@ function severityCounts(findings: Finding[]): Record<FindingSeverity, number> {
 }
 
 function generateMarkdown(findings: Finding[], runId: string | null): string {
-  const counts = severityCounts(findings);
-  const lines: string[] = [
-    '# Findings Report',
-    '',
-    `- **Run**: ${runId ?? 'N/A'}`,
-    `- **Date**: ${new Date().toISOString()}`,
-    `- **Total Findings**: ${findings.length}`,
-    '',
-    '## Summary',
-    '',
-    '| Severity | Count |',
-    '|----------|-------|',
-    ...SEVERITY_LABELS.map((s) => `| ${s.charAt(0).toUpperCase() + s.slice(1)} | ${counts[s]} |`),
-    '',
-  ];
-
-  for (const sev of SEVERITY_LABELS) {
-    const group = findings.filter((f) => f.severity === sev);
-    if (group.length === 0) continue;
-    lines.push(
-      `## ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${group.length})`,
-      '',
-      '| Type | Finding | Source |',
-      '|------|---------|--------|',
-    );
-    for (const f of group) {
-      lines.push(`| ${f.type} | ${f.finding.replace(/\|/g, '\\|')} | ${f.sourceNode} |`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return formatFindingsMarkdown(findings, runId);
 }
 
 // ---------------------------------------------------------------------------

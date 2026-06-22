@@ -475,6 +475,8 @@ const definition = defineComponent({
     const inputShape: Record<string, z.ZodTypeAny> = {
       webhookUrl: port(z.unknown(), {
         label: 'Webhook URL',
+        description:
+          'Select a stored secret in the Value field below, or connect the Secret Loader "Secret Value" output. Do not wire JSON or report outputs here.',
         editor: 'secret',
         allowAny: true,
         reason: 'Discord webhook URLs are secrets.',

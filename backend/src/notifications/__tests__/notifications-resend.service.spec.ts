@@ -6,6 +6,7 @@ import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../.
 import type { NotificationChannelRepository } from '../repository/notification-channel.repository';
 import type { NotificationDeliveryRepository } from '../repository/notification-delivery.repository';
 import type { SlackNotificationAdapter } from '../adapters/slack.adapter';
+import type { DiscordNotificationAdapter } from '../adapters/discord.adapter';
 import type { NotificationDispatcherService } from '../notification-dispatcher.service';
 import { NotificationsService } from '../notifications.service';
 
@@ -135,11 +136,13 @@ describe('NotificationsService — resendDelivery', () => {
     };
 
     const slackAdapter = { send: mock() } as unknown as SlackNotificationAdapter;
+    const discordAdapter = { send: mock() } as unknown as DiscordNotificationAdapter;
 
     service = new NotificationsService(
       channelRepo as unknown as NotificationChannelRepository,
       deliveryRepo as unknown as NotificationDeliveryRepository,
       slackAdapter,
+      discordAdapter,
       auditLogService as any,
       dispatcherService as unknown as NotificationDispatcherService,
     );

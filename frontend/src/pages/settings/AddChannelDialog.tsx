@@ -38,7 +38,7 @@ interface AddChannelDialogProps {
   channel?: NotificationChannel;
 }
 
-type ChannelType = 'slack' | 'email' | 'pagerduty';
+type ChannelType = 'slack' | 'discord' | 'email' | 'pagerduty';
 
 const EVENT_LABELS: Record<NotificationEventType, string> = {
   'run.completed': 'Run Completed',
@@ -49,9 +49,14 @@ const EVENT_LABELS: Record<NotificationEventType, string> = {
 
 const CHANNEL_TYPE_LABELS: Record<ChannelType, string> = {
   slack: 'Slack',
+  discord: 'Discord',
   email: 'Email',
   pagerduty: 'PagerDuty',
 };
+
+function usesWebhookUrl(type: ChannelType): boolean {
+  return type === 'slack' || type === 'discord';
+}
 
 function isValidUrl(value: string): boolean {
   try {
@@ -105,7 +110,7 @@ export function AddChannelDialog({ open, onOpenChange, channel }: AddChannelDial
       newErrors.name = 'Name is required';
     }
 
-    if (type === 'slack') {
+    if (usesWebhookUrl(type)) {
       if (!isEditMode && !webhookUrl.trim()) {
         newErrors.webhookUrl = 'Webhook URL is required';
       }
@@ -132,7 +137,7 @@ export function AddChannelDialog({ open, onOpenChange, channel }: AddChannelDial
           name: name.trim(),
           events: selectedEvents,
         };
-        if (type === 'slack' && webhookUrl.trim()) {
+        if (usesWebhookUrl(type) && webhookUrl.trim()) {
           payload.config = { webhookUrl: webhookUrl.trim() };
         }
         await updateMutation.mutateAsync({
@@ -141,8 +146,9 @@ export function AddChannelDialog({ open, onOpenChange, channel }: AddChannelDial
         });
         toast({ title: 'Channel updated', description: `"${name}" has been updated.` });
       } else {
-        const config: Record<string, unknown> =
-          type === 'slack' ? { webhookUrl: webhookUrl.trim() } : {};
+        const config: Record<string, unknown> = usesWebhookUrl(type)
+          ? { webhookUrl: webhookUrl.trim() }
+          : {};
         await createMutation.mutateAsync({
           name: name.trim(),
           type,
@@ -223,12 +229,11 @@ export function AddChannelDialog({ open, onOpenChange, channel }: AddChannelDial
           {/* Coming soon notice for Email / PagerDuty */}
           {isComingSoon && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-400">
-              Coming soon — only Slack is fully supported.
+              Coming soon — Slack and Discord are fully supported.
             </div>
           )}
 
-          {/* Slack config */}
-          {type === 'slack' && (
+          {usesWebhookUrl(type) && (
             <div className="space-y-2">
               <Label htmlFor="channel-webhook-url">Webhook URL</Label>
               <Input
@@ -239,7 +244,9 @@ export function AddChannelDialog({ open, onOpenChange, channel }: AddChannelDial
                 placeholder={
                   isEditMode
                     ? 'Enter new URL to replace current'
-                    : 'https://hooks.slack.com/services/...'
+                    : type === 'discord'
+                      ? 'https://discord.com/api/webhooks/...'
+                      : 'https://hooks.slack.com/services/...'
                 }
                 aria-describedby={
                   errors.webhookUrl ? 'channel-webhook-url-error' : 'channel-webhook-url-hint'

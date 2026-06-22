@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import type { Node, Edge, ReactFlowInstance } from '@xyflow/react';
 
 import type { ToastVariant } from '@/components/ui/toast-context';
@@ -7,6 +8,7 @@ import { isEntryPointComponentRef, isEntryPointNode } from '@/utils/entryPointUt
 import { useWorkflowStore } from '@/store/workflowStore';
 import { track, Events } from '@/features/analytics/events';
 import { logger } from '@/lib/logger';
+import { api } from '@/services/api';
 
 export interface CreateNodeContext {
   reactFlowInstance: ReactFlowInstance<Node<NodeData>> | null;
@@ -30,13 +32,13 @@ export function createNodeFromComponent(
   clientX: number,
   clientY: number,
   ctx: CreateNodeContext,
-): void {
-  if (ctx.mode !== 'design') return;
+): { id: string; params: Record<string, unknown> } | null {
+  if (ctx.mode !== 'design') return null;
 
   const component = ctx.getComponent(componentId);
   if (!component) {
     logger.error('Component not found:', componentId);
-    return;
+    return null;
   }
 
   const isEntryComponent =
@@ -50,7 +52,7 @@ export function createNodeFromComponent(
         description: 'Each workflow can only have one Entry Point.',
         variant: 'destructive',
       });
-      return;
+      return null;
     }
   }
 
@@ -59,7 +61,7 @@ export function createNodeFromComponent(
     y: clientY,
   });
 
-  if (!position) return;
+  if (!position) return null;
 
   const initialParameters: Record<string, unknown> = {};
 
@@ -124,4 +126,39 @@ export function createNodeFromComponent(
 
   // Mark workflow as dirty
   ctx.markDirty();
+
+  return { id: newNode.id, params: initialParameters };
+}
+
+/** Resolve dynamic input/output ports after a node is added (Discord, Slack, Script, etc.). */
+export async function resolveDynamicPortsForNode(
+  nodeId: string,
+  componentId: string,
+  params: Record<string, unknown>,
+  setNodes: Dispatch<SetStateAction<Node<NodeData>[]>>,
+): Promise<void> {
+  try {
+    const result = await api.components.resolvePorts(componentId, params);
+    if (!result?.inputs && !result?.outputs) {
+      return;
+    }
+
+    setNodes((nodes) =>
+      nodes.map((node) => {
+        if (node.id !== nodeId) {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            ...(result.inputs ? { dynamicInputs: result.inputs } : {}),
+            ...(result.outputs ? { dynamicOutputs: result.outputs } : {}),
+          },
+        };
+      }),
+    );
+  } catch (error: unknown) {
+    logger.error('Failed to resolve dynamic ports for new node', error);
+  }
 }

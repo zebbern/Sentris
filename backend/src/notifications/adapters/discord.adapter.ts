@@ -3,26 +3,26 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import type { NotificationChannelRecord } from '../../database/schema';
 import type { RunLifecycleEvent } from '@sentris/shared';
+import { isValidDiscordWebhookUrl } from '@sentris/shared';
 import type { NotificationAdapterResult } from './notification.adapter';
 import { NotificationAdapter } from './notification.adapter';
 import { buildRunInspectorUrl } from './run-inspector-url';
 
-const ALLOWED_DOMAINS = ['hooks.slack.com', 'hooks.slack-gov.com'];
+const ALLOWED_DISCORD_HOSTS = new Set(['discord.com', 'discordapp.com']);
 const REQUEST_TIMEOUT_MS = 5_000;
 const MAX_RESPONSE_BODY_BYTES = 2048;
 
-/** Status label for human-readable Slack messages. */
-const STATUS_EMOJI: Record<string, string> = {
-  COMPLETED: ':white_check_mark:',
-  FAILED: ':x:',
-  CANCELLED: ':no_entry_sign:',
-  TERMINATED: ':skull:',
-  TIMED_OUT: ':hourglass:',
+const STATUS_COLORS: Record<string, number> = {
+  COMPLETED: 0x57_f2_87,
+  FAILED: 0xed_42_45,
+  CANCELLED: 0x95_a5_a6,
+  TERMINATED: 0x95_a5_a6,
+  TIMED_OUT: 0xf1_c4_0f,
 };
 
 @Injectable()
-export class SlackNotificationAdapter extends NotificationAdapter {
-  private readonly logger = new Logger(SlackNotificationAdapter.name);
+export class DiscordNotificationAdapter extends NotificationAdapter {
+  private readonly logger = new Logger(DiscordNotificationAdapter.name);
 
   async send(
     channel: NotificationChannelRecord,
@@ -40,7 +40,7 @@ export class SlackNotificationAdapter extends NotificationAdapter {
       return { success: false, error: ssrfError };
     }
 
-    const body = this.buildSlackPayload(channel, payload);
+    const body = this.buildDiscordPayload(channel, payload);
 
     try {
       const controller = new AbortController();
@@ -72,24 +72,22 @@ export class SlackNotificationAdapter extends NotificationAdapter {
 
       return {
         success: false,
-        error: `Slack responded with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
+        error: `Discord responded with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
         responseStatus: response.status,
         responseBody: truncatedBody,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Slack webhook delivery failed for channel ${channel.id}: ${message}`);
+      this.logger.warn(`Discord webhook delivery failed for channel ${channel.id}: ${message}`);
       return { success: false, error: message };
     }
   }
 
-  /**
-   * Validates a webhook URL for SSRF protection:
-   * 1. Must be HTTPS
-   * 2. Hostname must be in the allowed domain list
-   * 3. Resolved IP must not be private, loopback, or link-local
-   */
   private async validateUrl(url: string): Promise<string | null> {
+    if (!isValidDiscordWebhookUrl(url)) {
+      return 'Invalid Discord webhook URL format';
+    }
+
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -97,12 +95,8 @@ export class SlackNotificationAdapter extends NotificationAdapter {
       return 'Invalid URL';
     }
 
-    if (parsed.protocol !== 'https:') {
-      return 'Only HTTPS URLs are allowed';
-    }
-
-    if (!ALLOWED_DOMAINS.includes(parsed.hostname)) {
-      return `Domain ${parsed.hostname} is not in the allowed list (${ALLOWED_DOMAINS.join(', ')})`;
+    if (!ALLOWED_DISCORD_HOSTS.has(parsed.hostname)) {
+      return `Domain ${parsed.hostname} is not allowed for Discord webhooks`;
     }
 
     let hasResolved = false;
@@ -138,101 +132,64 @@ export class SlackNotificationAdapter extends NotificationAdapter {
     return null;
   }
 
-  private buildSlackPayload(
+  private buildDiscordPayload(
     channel: NotificationChannelRecord,
     payload: RunLifecycleEvent,
   ): Record<string, unknown> {
-    const emoji = STATUS_EMOJI[payload.status] ?? ':bell:';
     const statusLabel = payload.status.replace(/_/g, ' ');
     const runUrl = buildRunInspectorUrl(payload);
+    const fields = [
+      { name: 'Run ID', value: `\`${payload.runId}\``, inline: true },
+      { name: 'Status', value: statusLabel, inline: true },
+      { name: 'Workflow ID', value: `\`${payload.workflowId}\``, inline: true },
+      {
+        name: 'Completed At',
+        value: payload.completedAt ?? 'N/A',
+        inline: false,
+      },
+    ];
+
+    if (runUrl) {
+      fields.push({ name: 'Open in Sentris', value: runUrl, inline: false });
+    }
 
     return {
-      blocks: [
+      embeds: [
         {
-          type: 'header',
-          text: {
-            type: 'plain_text',
-            text: `${emoji} Workflow Run ${statusLabel}`,
-            emoji: true,
+          title: `Workflow Run ${statusLabel}`,
+          color: STATUS_COLORS[payload.status] ?? 0x58_65_f2,
+          fields,
+          footer: {
+            text: `${channel.name} • ${channel.organizationId}`,
           },
-        },
-        {
-          type: 'section',
-          fields: [
-            { type: 'mrkdwn', text: `*Run ID:*\n\`${payload.runId}\`` },
-            { type: 'mrkdwn', text: `*Status:*\n${statusLabel}` },
-            { type: 'mrkdwn', text: `*Workflow ID:*\n\`${payload.workflowId}\`` },
-            {
-              type: 'mrkdwn',
-              text: `*Completed At:*\n${payload.completedAt ?? 'N/A'}`,
-            },
-          ],
-        },
-        ...(runUrl
-          ? [
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `<${runUrl}|Open run in Sentris>`,
-                },
-              },
-            ]
-          : []),
-        {
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `Channel: ${channel.name} | Organization: ${channel.organizationId}`,
-            },
-          ],
         },
       ],
     };
   }
 }
 
-/**
- * Check if an IPv4 address is private, loopback, or link-local.
- */
 function isPrivateIp(ip: string): boolean {
   const parts = ip.split('.').map(Number);
-  if (parts.length !== 4) return true; // Malformed — reject
+  if (parts.length !== 4) return true;
 
   const [a, b] = parts;
-
-  // 127.0.0.0/8 — Loopback
   if (a === 127) return true;
-  // 10.0.0.0/8 — Private
   if (a === 10) return true;
-  // 172.16.0.0/12 — Private
   if (a === 172 && b !== undefined && b >= 16 && b <= 31) return true;
-  // 192.168.0.0/16 — Private
   if (a === 192 && b === 168) return true;
-  // 169.254.0.0/16 — Link-local
   if (a === 169 && b === 254) return true;
-  // 0.0.0.0
   if (a === 0) return true;
 
   return false;
 }
 
-/**
- * Check if an IPv6 address is private, loopback, or link-local.
- */
 function isPrivateIpv6(ip: string): boolean {
   const normalized = ip.toLowerCase();
-  // ::ffff:x.x.x.x — IPv4-mapped IPv6 address; delegate to IPv4 check
   if (normalized.startsWith('::ffff:')) {
-    const ipv4 = normalized.slice(7);
-    return isPrivateIp(ipv4);
+    return isPrivateIp(normalized.slice(7));
   }
-  // ::1 — Loopback
   if (normalized === '::1') return true;
-  // fc00::/7 — Unique local
   if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
-  // fe80::/10 — Link-local
   if (normalized.startsWith('fe80')) return true;
   return false;
 }

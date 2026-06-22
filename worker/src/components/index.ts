@@ -15,6 +15,7 @@ import './core/logic-script';
 import './core/test-error-generator';
 import './notification/slack';
 import './notification/discord';
+import './notification/run-report-discord';
 import './notification/jira';
 import './core/text-splitter';
 import './core/text-joiner';

@@ -148,14 +148,16 @@ The backend uses **EventEmitter2** (via `@nestjs/event-emitter`) to emit a `run.
 `NotificationDispatcherService` listens for `run.status.terminal` events with `@OnEvent('run.status.terminal', { async: true })`. For each event it:
 
 1. Resolves all active channels whose subscribed events match the run status.
-2. Dispatches in parallel via `Promise.allSettled`, delegating to a type-specific adapter (e.g., `SlackNotificationAdapter`).
+2. Dispatches in parallel via `Promise.allSettled`, delegating to a type-specific adapter (e.g., `SlackNotificationAdapter`, `DiscordNotificationAdapter`).
 3. Records each dispatch in the `notification_deliveries` table with status `pending`, then updates to `sent` or `failed`.
 
 New channel types (email, PagerDuty) are added by implementing the `NotificationAdapter` abstract class.
 
 ### SSRF Protection for Webhooks
 
-Slack webhook URLs are validated against a domain allowlist (`hooks.slack.com`, `hooks.slack-gov.com`). DNS resolution results are checked to reject internal network IPs, preventing SSRF through DNS rebinding.
+Slack and Discord webhook URLs are validated against domain allowlists (`hooks.slack.com`, `hooks.slack-gov.com`, `discord.com`, `discordapp.com`). DNS resolution results are checked to reject internal network IPs, preventing SSRF through DNS rebinding.
+
+Workflow graphs can also send curated reports with the **Run Report → Discord** component (`core.notification.run-report-discord`), which reads run summary, findings, and artifacts through internal service APIs and posts export bundles to Discord. This is separate from Settings notification channels, which only send lifecycle alerts.
 
 ### Delivery Tracking
 

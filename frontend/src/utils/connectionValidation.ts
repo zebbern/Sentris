@@ -142,9 +142,21 @@ export function validateConnection(
 
   if (!arePortTypesCompatible(sourceType, targetType)) {
     const targetTypeLabel = describePortType(targetType);
+    const sourceTypeLabel = describePortType(sourceType);
+    const isSecretTarget =
+      targetPort.editor === 'secret' ||
+      (targetType.kind === 'primitive' && targetType.name === 'secret');
+
+    if (isSecretTarget && sourceTypeLabel === 'json') {
+      return {
+        isValid: false,
+        error: `Type mismatch: ${sourceTypeLabel} cannot connect to ${targetTypeLabel}. Pick a secret in the config panel Value field, or connect the Secret Loader "Secret Value" output—not JSON/report outputs.`,
+      };
+    }
+
     return {
       isValid: false,
-      error: `Type mismatch: ${describePortType(sourceType)} cannot connect to ${targetTypeLabel}`,
+      error: `Type mismatch: ${sourceTypeLabel} cannot connect to ${targetTypeLabel}`,
     };
   }
 

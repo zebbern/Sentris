@@ -173,15 +173,20 @@ describe('NotificationsService', () => {
   let deliveryRepo: InMemoryDeliveryRepository;
   let service: NotificationsService;
   let slackAdapterSend: ReturnType<typeof mock>;
+  let discordAdapterSend: ReturnType<typeof mock>;
   let auditRecordCalls: unknown[][];
 
   beforeEach(() => {
     channelRepo = new InMemoryChannelRepository();
     deliveryRepo = new InMemoryDeliveryRepository();
     slackAdapterSend = mock(() => Promise.resolve({ success: true }));
+    discordAdapterSend = mock(() => Promise.resolve({ success: true }));
     auditRecordCalls = [];
 
     const slackAdapter = { send: slackAdapterSend } as unknown as SlackNotificationAdapter;
+    const discordAdapter = {
+      send: discordAdapterSend,
+    } as unknown as import('../adapters/discord.adapter').DiscordNotificationAdapter;
     const dispatcherService = {
       dispatchToChannel: mock(() => Promise.resolve('del-1')),
     } as unknown as NotificationDispatcherService;
@@ -195,6 +200,7 @@ describe('NotificationsService', () => {
       channelRepo as unknown as NotificationChannelRepository,
       deliveryRepo as unknown as NotificationDeliveryRepository,
       slackAdapter,
+      discordAdapter,
       auditLogService as any,
       dispatcherService,
     );
@@ -454,6 +460,21 @@ describe('NotificationsService', () => {
       const result = await service.testChannel(authContext, rec.id);
       expect(result.success).toBe(true);
       expect(slackAdapterSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls Discord adapter and returns result', async () => {
+      const rec = await channelRepo.create({
+        organizationId: 'org-1',
+        name: 'D',
+        type: 'discord',
+        config: {
+          webhookUrl: 'https://discord.com/api/webhooks/1234567890/abcdefghijklmnop',
+        },
+        events: ['run.completed'],
+      });
+      const result = await service.testChannel(authContext, rec.id);
+      expect(result.success).toBe(true);
+      expect(discordAdapterSend).toHaveBeenCalledTimes(1);
     });
 
     it('throws NotImplementedException for email type', async () => {

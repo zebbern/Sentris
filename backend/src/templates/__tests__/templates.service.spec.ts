@@ -60,6 +60,7 @@ const securityTemplateFiles = [
   'github-repo-dependency-cve-triage.json',
   'npm-dependency-cve-hunt.json',
   'public-repo-secret-exposure-triage.json',
+  'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
   'web-attack-surface-quick-win-hunt.json',
 ] as const;
