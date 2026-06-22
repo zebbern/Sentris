@@ -1,0 +1,345 @@
+{
+  "_metadata": {
+    "name": "Subdomain Takeover Triage",
+    "description": "Authorized bug bounty workflow that discovers subdomains, checks DNS and HTTP takeover indicators, runs safe takeover templates, and writes a prioritized candidate report.",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "takeover",
+      "subdomains",
+      "dns",
+      "httpx",
+      "nuclei"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Subdomain Takeover Triage",
+    "description": "Find and prioritize possible subdomain takeover candidates from authorized domains and imported known subdomains.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "takeover",
+      "subdomains",
+      "dns",
+      "httpx",
+      "nuclei"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 8,
+    "edgeCount": 10
+  },
+  "graph": {
+    "name": "Subdomain Takeover Triage",
+    "description": "Authorized takeover candidate triage workflow for bug bounty targets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 260
+        },
+        "data": {
+          "label": "Authorized Scope Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "domains",
+                  "label": "In-scope root domains",
+                  "type": "array",
+                  "required": true,
+                  "description": "Root domains approved by the bug bounty program."
+                },
+                {
+                  "id": "knownSubdomains",
+                  "label": "Known subdomains",
+                  "type": "array",
+                  "required": false,
+                  "description": "Optional in-scope hostnames from prior recon or imports."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, and rate-limit notes."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "subfinder_discovery",
+        "type": "sentris.subfinder.run",
+        "position": {
+          "x": 420,
+          "y": 260
+        },
+        "data": {
+          "label": "Discover Subdomains",
+          "config": {
+            "params": {
+              "threads": 10,
+              "timeout": 8,
+              "maxEnumerationTime": 1,
+              "allSources": false,
+              "recursive": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "merge_subdomains",
+        "type": "core.logic.script",
+        "position": {
+          "x": 740,
+          "y": 260
+        },
+        "data": {
+          "label": "Merge Candidate Subdomains",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "discoveredSubdomains",
+                  "type": "list-text"
+                },
+                {
+                  "name": "knownSubdomains",
+                  "type": "list-text"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "subdomains",
+                  "type": "list-text"
+                }
+              ],
+              "code": "export function script(input) {\n  function normalize(value) {\n    return String(value || '').toLowerCase().replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '').replace(/\\.$/, '').trim();\n  }\n  function validHostname(value) {\n    return /^[a-z0-9.-]+\\.[a-z]{2,}$/i.test(value);\n  }\n  const discovered = Array.isArray(input.discoveredSubdomains) ? input.discoveredSubdomains : [];\n  const known = Array.isArray(input.knownSubdomains) ? input.knownSubdomains : [];\n  const knownNormalized = Array.from(new Set(known.map(normalize).filter(validHostname)));\n  const discoveredNormalized = Array.from(new Set(discovered.map(normalize).filter(validHostname))).filter((value) => !knownNormalized.includes(value)).slice(0, 100);\n  return { subdomains: [...knownNormalized, ...discoveredNormalized] };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dnsx_resolve",
+        "type": "sentris.dnsx.run",
+        "position": {
+          "x": 1060,
+          "y": 150
+        },
+        "data": {
+          "label": "Resolve CNAME and Address Records",
+          "config": {
+            "params": {
+              "recordTypes": [
+                "A",
+                "CNAME"
+              ],
+              "outputMode": "json",
+              "includeResponses": true,
+              "threads": 100,
+              "retryCount": 2
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": {
+          "x": 1060,
+          "y": 370
+        },
+        "data": {
+          "label": "Probe Candidate Hosts",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "nuclei_takeover_checks",
+        "type": "sentris.nuclei.scan",
+        "position": {
+          "x": 1380,
+          "y": 260
+        },
+        "data": {
+          "label": "Run Safe Takeover Checks",
+          "config": {
+            "params": {
+              "rateLimit": 50,
+              "concurrency": 10,
+              "timeout": 8,
+              "retries": 1,
+              "includeRaw": false,
+              "followRedirects": true,
+              "updateTemplates": true,
+              "disableHttpx": true,
+              "severityFilter": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            "inputOverrides": {
+              "templatePaths": [
+                "http/takeovers/"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "rank_takeover_candidates",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1700,
+          "y": 260
+        },
+        "data": {
+          "label": "Rank Takeover Candidates",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "dnsResults",
+                  "type": "list-json"
+                },
+                {
+                  "name": "httpResponses",
+                  "type": "list-json"
+                },
+                {
+                  "name": "nucleiFindings",
+                  "type": "list-json"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const dnsResults = Array.isArray(input.dnsResults) ? input.dnsResults : [];\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const nucleiFindings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const servicePattern = /(github\\.io|herokuapp\\.com|azurewebsites\\.net|cloudfront\\.net|s3\\.amazonaws\\.com|pages\\.dev|netlify\\.app|vercel\\.app|surge\\.sh|bitbucket\\.io|readme\\.io|zendesk\\.com|freshdesk\\.com)/i;\n  const bodyPattern = /(no such app|repository not found|project not found|there isn't a github pages site here|bucket not found|no such bucket|domain is not configured|unknown site|there is no app configured)/i;\n  const candidates = new Map();\n  function normalizeHost(value) {\n    const text = String(value || '').trim();\n    if (!text) return '';\n    try { return new URL(text).hostname.toLowerCase(); } catch { return text.replace(/^https?:\\/\\//i, '').replace(/\\/.*$/, '').replace(/:\\d+$/, '').replace(/\\.$/, '').toLowerCase(); }\n  }\n  function ensureCandidate(host) {\n    const normalized = normalizeHost(host);\n    if (!normalized) return null;\n    if (!candidates.has(normalized)) candidates.set(normalized, { host: normalized, confidence: 'needs_manual_review', priorityScore: 0, reasons: [], dnsEvidence: [], httpEvidence: [], nucleiFindings: [] });\n    return candidates.get(normalized);\n  }\n  function addReason(candidate, reason) {\n    if (!candidate.reasons.includes(reason)) candidate.reasons.push(reason);\n  }\n  function answerValues(value) {\n    if (Array.isArray(value)) return value.flatMap(answerValues);\n    if (value && typeof value === 'object') return Object.values(value).flatMap(answerValues);\n    return value ? [String(value)] : [];\n  }\n  for (const finding of nucleiFindings) {\n    const host = normalizeHost(finding?.host || finding?.matchedAt || finding?.url || finding?.target);\n    const candidate = ensureCandidate(host);\n    if (!candidate) continue;\n    candidate.confidence = 'confirmed';\n    candidate.priorityScore += 100;\n    candidate.nucleiFindings.push({ templateId: finding?.templateId || finding?.templateID || finding?.id || null, severity: finding?.severity || null, name: finding?.name || finding?.info?.name || null, matchedAt: finding?.matchedAt || finding?.url || finding?.host || null });\n    addReason(candidate, 'Nuclei takeover template matched');\n  }\n  for (const record of dnsResults) {\n    const host = normalizeHost(record?.host || record?.input || record?.name || record?.domain);\n    const cnameValues = answerValues([record?.cname, record?.cnames, record?.CNAME, record?.answers?.cname, record?.answers?.CNAME]);\n    const matching = cnameValues.filter((value) => servicePattern.test(value));\n    if (matching.length === 0) continue;\n    const candidate = ensureCandidate(host);\n    if (!candidate) continue;\n    candidate.priorityScore += 40;\n    candidate.dnsEvidence.push({ host, cname: matching });\n    addReason(candidate, `CNAME points to takeover-prone service: ${matching.join(', ')}`);\n  }\n  for (const response of httpResponses) {\n    const host = normalizeHost(response?.input || response?.host || response?.url || response?.finalUrl);\n    const text = [response?.title, response?.body, response?.raw, response?.tech, response?.webserver].join(' ');\n    if (!bodyPattern.test(text)) continue;\n    const candidate = ensureCandidate(host);\n    if (!candidate) continue;\n    candidate.priorityScore += 30;\n    candidate.httpEvidence.push({ url: response?.url || response?.finalUrl || response?.input || host, statusCode: response?.statusCode || response?.status, title: response?.title || null });\n    addReason(candidate, 'HTTP response contains takeover-like error text');\n  }\n  const ranked = Array.from(candidates.values()).map((candidate) => ({ ...candidate, priorityScore: candidate.confidence === 'confirmed' ? candidate.priorityScore + 25 : candidate.priorityScore })).sort((a, b) => b.priorityScore - a.priorityScore || a.host.localeCompare(b.host));\n  return { report: { summary: { candidates: ranked.length, confirmed: ranked.filter((item) => item.confidence === 'confirmed').length, needsManualReview: ranked.filter((item) => item.confidence !== 'confirmed').length, dnsSignals: dnsResults.length, httpSignals: httpResponses.length, nucleiFindings: nucleiFindings.length }, candidates: ranked, dnsSignals: dnsResults.slice(0, 200), httpSignals: httpResponses.slice(0, 200), nucleiFindings, nextSteps: ['Manually verify dangling service ownership before reporting', 'Confirm the hostname is in authorized scope', 'Do not claim impact from DNS or HTTP hints alone'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 2020,
+          "y": 260
+        },
+        "data": {
+          "label": "Save Takeover Triage Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "subdomain-takeover-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-subfinder_discovery-domains",
+        "source": "trigger_1",
+        "target": "subfinder_discovery",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "trigger_1-merge_subdomains-knownSubdomains",
+        "source": "trigger_1",
+        "target": "merge_subdomains",
+        "sourceHandle": "knownSubdomains",
+        "targetHandle": "knownSubdomains"
+      },
+      {
+        "id": "subfinder_discovery-merge_subdomains-subdomains",
+        "source": "subfinder_discovery",
+        "target": "merge_subdomains",
+        "sourceHandle": "subdomains",
+        "targetHandle": "discoveredSubdomains"
+      },
+      {
+        "id": "merge_subdomains-dnsx_resolve-subdomains",
+        "source": "merge_subdomains",
+        "target": "dnsx_resolve",
+        "sourceHandle": "subdomains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "merge_subdomains-httpx_probe-subdomains",
+        "source": "merge_subdomains",
+        "target": "httpx_probe",
+        "sourceHandle": "subdomains",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "merge_subdomains-nuclei_takeover_checks-subdomains",
+        "source": "merge_subdomains",
+        "target": "nuclei_takeover_checks",
+        "sourceHandle": "subdomains",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "dnsx_resolve-rank_takeover_candidates-dnsRecords",
+        "source": "dnsx_resolve",
+        "target": "rank_takeover_candidates",
+        "sourceHandle": "dnsRecords",
+        "targetHandle": "dnsResults"
+      },
+      {
+        "id": "httpx_probe-rank_takeover_candidates-responses",
+        "source": "httpx_probe",
+        "target": "rank_takeover_candidates",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "nuclei_takeover_checks-rank_takeover_candidates-findings",
+        "source": "nuclei_takeover_checks",
+        "target": "rank_takeover_candidates",
+        "sourceHandle": "findings",
+        "targetHandle": "nucleiFindings"
+      },
+      {
+        "id": "rank_takeover_candidates-artifact_report-report",
+        "source": "rank_takeover_candidates",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

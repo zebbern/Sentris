@@ -228,7 +228,7 @@ Stores synced workflow templates.
 
 ### templates_submissions Table
 
-Tracks PR-based template submissions (for future workflow).
+Tracks validated template submissions before or alongside GitHub PR review.
 
 | Column            | Type         | Description                              |
 | ----------------- | ------------ | ---------------------------------------- |
@@ -339,7 +339,7 @@ curl -H "Authorization: Bearer {token}" http://localhost:3211/templates/submissi
 
 #### POST /templates/publish
 
-Validate a workflow for template submission.
+Sanitize a workflow, validate the sanitized graph, generate a manifest, and record a pending template submission.
 
 **Request Body:**
 
@@ -354,7 +354,11 @@ Validate a workflow for template submission.
 }
 ```
 
-**Note:** This endpoint currently validates but does not create PRs. Use GitHub web flow instead.
+**Response:** Validation details, generated manifest, sanitized graph, required secrets, removed secrets, and the pending submission record.
+
+**Failure:** Returns `422` with validation errors when the sanitized graph is not structurally usable as a template.
+
+**Note:** This endpoint does not create GitHub PRs. Use the frontend GitHub web flow for upstream publication.
 
 #### POST /templates/:id/use
 
@@ -371,7 +375,7 @@ Use a template to create a new workflow.
 }
 ```
 
-**Note:** Currently disabled.
+Creates a workflow from the selected template and increments the template popularity counter.
 
 ### Admin Endpoints
 
@@ -407,8 +411,8 @@ curl -X POST -H "Authorization: Bearer {admin_token}" \
 
 ### Required Variables
 
-| Variable               | Description                                   | Example                        |
-| ---------------------- | --------------------------------------------- | ------------------------------ |
+| Variable               | Description                                   | Example                     |
+| ---------------------- | --------------------------------------------- | --------------------------- |
 | `GITHUB_TEMPLATE_REPO` | Public GitHub repository containing templates | `zebbern/sentris-templates` |
 
 ### Optional Variables

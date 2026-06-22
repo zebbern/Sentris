@@ -1,10 +1,13 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { Pool } from 'pg';
+import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
 
 async function main() {
-  const connectionString =
-    process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'MIGRATION_SMOKE_DATABASE_URL',
+  });
+  const connectionString = databaseTarget.connectionString;
 
   const pool = new Pool({ connectionString });
   const client = await pool.connect();
@@ -14,6 +17,8 @@ async function main() {
     .sort();
 
   console.log(`🧪 Migration smoke test starting (found ${files.length} files)`);
+  console.log(formatDatabaseTarget(databaseTarget));
+  console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
 
   try {
     await client.query('BEGIN');

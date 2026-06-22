@@ -16,8 +16,12 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
 
-const FFUF_IMAGE = 'ffuf/ffuf:latest';
+const FFUF_IMAGE = 'parrotsec/ffuf:latest';
 const FFUF_TIMEOUT_SECONDS = 600; // 10 minutes default
 
 const inputSchema = inputs({
@@ -211,6 +215,7 @@ const definition = defineComponent({
   retryPolicy: ffufRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: FFUF_IMAGE,
     network: 'bridge',
     timeoutSeconds: FFUF_TIMEOUT_SECONDS,
@@ -299,7 +304,7 @@ const definition = defineComponent({
         '-w',
         '/inputs/wordlist.txt',
         '-json',
-        '-silent',
+        '-s',
         '-X',
         parsedParams.method,
         '-rate',
@@ -321,15 +326,11 @@ const definition = defineComponent({
         }
       }
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? FFUF_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
+        timeoutSeconds: parsedParams.timeout,
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig('/inputs', true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

@@ -60,7 +60,8 @@
           "config": {
             "params": {
               "threads": 10,
-              "timeout": 30,
+              "timeout": 8,
+              "maxEnumerationTime": 1,
               "allSources": false,
               "recursive": false
             },

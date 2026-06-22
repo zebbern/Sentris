@@ -7957,6 +7957,94 @@
         ]
       }
     },
+    "/api/v1/templates/revalidations": {
+      "get": {
+        "operationId": "TemplatesController_getRevalidationJobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns recent template revalidation jobs"
+          }
+        },
+        "summary": "List recent template live revalidations",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/revalidations/{auditId}/log": {
+      "get": {
+        "operationId": "TemplatesController_getRevalidationJobLog",
+        "parameters": [
+          {
+            "name": "auditId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stream",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maxBytes",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns a bounded stdout/stderr log tail"
+          }
+        },
+        "summary": "Get template live revalidation log tail",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/revalidations/{auditId}": {
+      "get": {
+        "operationId": "TemplatesController_getRevalidationJob",
+        "parameters": [
+          {
+            "name": "auditId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns template revalidation job status"
+          }
+        },
+        "summary": "Get template live revalidation status",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
     "/api/v1/templates/{id}": {
       "get": {
         "operationId": "TemplatesController_getTemplate",
@@ -8001,6 +8089,30 @@
           }
         },
         "summary": "Validate a workflow for template submission",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{id}/revalidate": {
+      "post": {
+        "operationId": "TemplatesController_revalidateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Template revalidation job started"
+          }
+        },
+        "summary": "Start template live revalidation",
         "tags": [
           "templates"
         ]

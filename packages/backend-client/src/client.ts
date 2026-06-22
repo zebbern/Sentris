@@ -2666,6 +2666,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates/revalidations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent template live revalidations */
+        get: operations["TemplatesController_getRevalidationJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/revalidations/{auditId}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get template live revalidation log tail */
+        get: operations["TemplatesController_getRevalidationJobLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/revalidations/{auditId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get template live revalidation status */
+        get: operations["TemplatesController_getRevalidationJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates/{id}": {
         parameters: {
             query?: never;
@@ -2694,6 +2745,23 @@ export interface paths {
         put?: never;
         /** Validate a workflow for template submission */
         post: operations["TemplatesController_publishTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{id}/revalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start template live revalidation */
+        post: operations["TemplatesController_revalidateTemplate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4612,7 +4680,7 @@ export interface components {
                 actorDisplay: string | null;
                 action: string;
                 /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel";
+                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage";
                 resourceId: string | null;
                 resourceName: string | null;
                 metadata: {
@@ -9428,6 +9496,69 @@ export interface operations {
             };
         };
     };
+    TemplatesController_getRevalidationJobs: {
+        parameters: {
+            query: {
+                limit: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns recent template revalidation jobs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getRevalidationJobLog: {
+        parameters: {
+            query: {
+                stream: string;
+                maxBytes: string;
+            };
+            header?: never;
+            path: {
+                auditId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns a bounded stdout/stderr log tail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_getRevalidationJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auditId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns template revalidation job status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TemplatesController_getTemplate: {
         parameters: {
             query?: never;
@@ -9462,6 +9593,26 @@ export interface operations {
         };
         responses: {
             /** @description Template validation result */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_revalidateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Template revalidation job started */
             202: {
                 headers: {
                     [name: string]: unknown;

@@ -10,6 +10,7 @@ import {
   port,
   param,
 } from '@sentris/component-sdk';
+import { SECURITY_DOCKER_RESOURCE_LIGHT } from './security-docker-resources';
 
 const inputSchema = inputs({});
 
@@ -130,6 +131,7 @@ const interval = setInterval(() => {
 
 const runner: DockerRunnerConfig = {
   kind: 'docker',
+  ...SECURITY_DOCKER_RESOURCE_LIGHT,
   image: 'node:18-alpine',
   entrypoint: 'node',
   command: ['-e', nodeScript],

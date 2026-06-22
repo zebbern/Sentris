@@ -1,9 +1,28 @@
-import { Injectable, Logger, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { WorkflowSanitizationService } from './workflow-sanitization.service';
 import { TemplatesRepository } from './templates.repository';
+import {
+  TemplateValidationLedgerService,
+  type TemplateValidationSummary,
+} from './template-validation-ledger.service';
+import {
+  TemplateRevalidationService,
+  type TemplateRevalidationJob,
+  type TemplateRevalidationJobLog,
+  type TemplateRevalidationJobStatus,
+} from './template-revalidation.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { WorkflowGraphSchema } from '../workflows/dto/workflow-graph.dto';
 import type { AuthContext } from '../auth/types';
+import type { TemplateManifest } from '../database/schema/templates';
 
 /**
  * Templates Service
@@ -20,20 +39,26 @@ export class TemplateService {
     private readonly sanitizationService: WorkflowSanitizationService,
     private readonly templatesRepository: TemplatesRepository,
     private readonly workflowsService: WorkflowsService,
+    @Optional()
+    private readonly templateValidationLedger?: TemplateValidationLedgerService,
+    @Optional()
+    private readonly templateRevalidationService?: TemplateRevalidationService,
   ) {}
 
   /**
    * List all templates with optional filters
    */
   async listTemplates(filters?: { category?: string; search?: string; tags?: string[] }) {
-    return await this.templatesRepository.findAll(filters);
+    const templates = await this.templatesRepository.findAll(filters);
+    return templates.map((template) => this.withValidation(template));
   }
 
   /**
    * Get template by ID
    */
   async getTemplateById(id: string) {
-    return await this.templatesRepository.findById(id);
+    const template = await this.templatesRepository.findById(id);
+    return template ? this.withValidation(template) : null;
   }
 
   /**
@@ -59,12 +84,13 @@ export class TemplateService {
   }
 
   /**
-   * Publish a workflow as a template
+   * Validate and record a workflow as a pending template submission.
    *
-   * Note: With GitHub web flow, this is now disabled. Users should use
-   * the frontend modal which opens GitHub directly.
+   * This does not create a GitHub PR. The frontend GitHub web flow remains
+   * responsible for upstream publication; the API keeps a durable, sanitized
+   * submission record for review and future tooling.
    */
-  async publishTemplate(_params: {
+  async publishTemplate(params: {
     workflowId: string;
     name: string;
     description: string;
@@ -74,10 +100,124 @@ export class TemplateService {
     submittedBy: string;
     organizationId?: string;
   }) {
-    throw new HttpException(
-      'Template publishing via API is disabled. Please use the GitHub web flow from the frontend.',
-      HttpStatus.NOT_IMPLEMENTED,
-    );
+    const authContext: AuthContext = {
+      userId: params.submittedBy || null,
+      organizationId: params.organizationId ?? null,
+      roles: ['ADMIN'],
+      isAuthenticated: true,
+      provider: 'template-publish',
+    };
+    const workflow = await this.workflowsService.findById(params.workflowId, authContext);
+    const { sanitizedGraph, requiredSecrets, removedSecrets } =
+      this.sanitizationService.sanitizeWorkflow(workflow.graph);
+    const validation = this.sanitizationService.validateSanitizedGraph(sanitizedGraph);
+
+    if (!validation.valid) {
+      throw new HttpException(
+        {
+          message: 'Template validation failed',
+          errors: validation.errors,
+        },
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    const manifest = this.sanitizationService.generateManifest({
+      name: params.name,
+      description: params.description,
+      category: params.category,
+      tags: params.tags,
+      author: params.author,
+      graph: sanitizedGraph,
+      requiredSecrets,
+    }) as TemplateManifest;
+    const submission = await this.templatesRepository.createSubmission({
+      templateName: params.name,
+      description: params.description,
+      category: params.category,
+      repository: resolveSubmissionRepository(),
+      branch: resolveSubmissionBranch(),
+      path: buildTemplateSubmissionPath(params.name),
+      submittedBy: params.submittedBy,
+      organizationId: params.organizationId,
+      manifest,
+      graph: sanitizedGraph,
+    });
+
+    return {
+      submission,
+      validation,
+      requiredSecrets,
+      removedSecrets,
+      manifest,
+      graph: sanitizedGraph,
+    };
+  }
+
+  /**
+   * Start a targeted live revalidation audit for a template.
+   */
+  async revalidateTemplate(
+    templateId: string,
+    params: { requestedBy?: string; organizationId?: string } = {},
+  ): Promise<TemplateRevalidationJob & { templateId: string; templateName: string }> {
+    const template = await this.templatesRepository.findById(templateId);
+    if (!template) {
+      throw new NotFoundException(`Template ${templateId} not found`);
+    }
+
+    if (!this.templateRevalidationService) {
+      throw new ServiceUnavailableException('Template revalidation is not available');
+    }
+
+    const job = await this.templateRevalidationService.start({
+      templateId,
+      templateName: template.name,
+      requestedBy: params.requestedBy,
+      organizationId: params.organizationId,
+    });
+
+    return {
+      ...job,
+      templateId,
+      templateName: template.name,
+    };
+  }
+
+  /**
+   * Get the latest known status for a targeted live revalidation audit.
+   */
+  getRevalidationJob(auditId: string): TemplateRevalidationJobStatus {
+    if (!this.templateRevalidationService) {
+      throw new ServiceUnavailableException('Template revalidation is not available');
+    }
+
+    return this.templateRevalidationService.getJob(auditId);
+  }
+
+  /**
+   * List recent targeted live revalidation audits.
+   */
+  getRevalidationJobs(params: { limit?: number } = {}): TemplateRevalidationJobStatus[] {
+    if (!this.templateRevalidationService) {
+      throw new ServiceUnavailableException('Template revalidation is not available');
+    }
+
+    return this.templateRevalidationService.listJobs(params.limit);
+  }
+
+  /**
+   * Get a bounded stdout/stderr tail for a targeted live revalidation audit.
+   */
+  getRevalidationJobLog(
+    auditId: string,
+    params: { stream: string; maxBytes?: number },
+  ): TemplateRevalidationJobLog {
+    if (!this.templateRevalidationService) {
+      throw new ServiceUnavailableException('Template revalidation is not available');
+    }
+
+    return this.templateRevalidationService.getJobLog(auditId, params.stream, params.maxBytes);
   }
 
   /**
@@ -179,6 +319,17 @@ export class TemplateService {
     return await this.templatesRepository.findSubmissionsByUser(userId);
   }
 
+  private withValidation<T extends { name: string; updatedAt?: Date | string | null }>(
+    template: T,
+  ): T & { validation?: TemplateValidationSummary } {
+    if (!this.templateValidationLedger) return template;
+
+    return {
+      ...template,
+      validation: this.templateValidationLedger.getValidationForTemplate(template),
+    };
+  }
+
   private applySecretMappings(
     graph: Record<string, unknown>,
     secretMappings: Record<string, string>,
@@ -237,4 +388,25 @@ export class TemplateService {
       }
     }
   }
+}
+
+function resolveSubmissionRepository(): string {
+  const repository = process.env.GITHUB_TEMPLATE_REPO?.trim();
+  return repository && /^[^/]+\/[^/]+$/.test(repository)
+    ? repository
+    : 'local/template-submissions';
+}
+
+function resolveSubmissionBranch(): string {
+  return process.env.GITHUB_TEMPLATE_BRANCH?.trim() || 'main';
+}
+
+function buildTemplateSubmissionPath(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `templates/${slug || 'template'}.jsonc`;
 }

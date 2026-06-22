@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 // Official theHarvester Docker image from GitHub Container Registry
 const THEHARVESTER_IMAGE = 'ghcr.io/laramies/theharvester:latest';
@@ -145,6 +149,7 @@ const definition = defineComponent({
   } satisfies ComponentRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: THEHARVESTER_IMAGE,
     network: 'bridge',
     timeoutSeconds: THEHARVESTER_TIMEOUT_SECONDS,
@@ -220,16 +225,11 @@ const definition = defineComponent({
         if (flag.length > 0) args.push(flag);
       }
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         entrypoint: 'theHarvester',
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? THEHARVESTER_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

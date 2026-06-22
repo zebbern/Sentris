@@ -1,3 +1,17 @@
+export type TemplateValidationStatus = 'live-verified' | 'needs-fix' | 'needs-review' | 'unknown';
+
+export type TemplateValidationFilter = 'all' | TemplateValidationStatus | 'stale';
+
+export interface TemplateValidation {
+  status: TemplateValidationStatus;
+  recommendation: 'keep' | 'fix' | 'consolidate' | 'delete' | 'review' | 'unknown';
+  terminalStatus?: string | null;
+  artifactsCount?: number | null;
+  verifiedAt?: string | null;
+  rationale: string;
+  isCurrent: boolean;
+}
+
 export interface Template {
   id: string;
   name: string;
@@ -16,6 +30,7 @@ export interface Template {
   isOfficial: boolean;
   isVerified: boolean;
   isActive: boolean;
+  validation?: TemplateValidation;
   createdAt: string;
   updatedAt: string;
 }

@@ -3,7 +3,7 @@ title: "Security Components"
 description: "Open source security tools for security automation workflows"
 ---
 
-Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **24 security components**.
+Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **28 security components**.
 
 ---
 
@@ -474,9 +474,98 @@ Sends alerts to Slack, Discord, Telegram, or email.
 
 | Input | Type | Description |
 |-------|------|-------------|
-| `message` | String | Alert message |
-| `provider` | Select | slack, discord, telegram, email |
-| `config` | Secret | Provider configuration |
+| `messages` | Array | Alert messages to send |
+| `providerConfig` | Secret | Provider configuration YAML |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `providerIds` | Multi-select | Restrict delivery to configured providers |
+| `bulk` | Boolean | Send all messages as one payload |
+| `silent` | Boolean | Suppress notify CLI output |
+
+---
+
+## Vulnerability Intelligence
+
+### OSV
+
+Query the OSV.dev API for known vulnerabilities affecting package versions.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `packageSpecs` | Array | Package names with optional versions (for example `lodash@4.17.20`) |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ecosystem` | Text | OSV ecosystem (`npm`, `PyPI`, `Go`, etc.) |
+| `severityFloor` | Select | Minimum severity to include in results |
+| `hydrateAdvisories` | Boolean | Fetch full advisory records for returned IDs |
+
+---
+
+### NVD
+
+Query the NVD CVE API for vulnerability metadata and CVSS details.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `cveIds` | Array | CVE identifiers (for example `CVE-2021-44228`) |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `keywordSearch` | Text | Optional keyword search when no CVE IDs are supplied |
+| `resultsPerPage` | Number | Page size for NVD responses |
+
+---
+
+## Repository Helpers
+
+### Repo Files Extractor
+
+Fetches source and IaC files from a public GitHub repository for downstream scanners.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `repositoryUrl` | String | Public GitHub repository URL |
+| `ref` | String | Optional git ref (branch, tag, or commit) |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ref` | Text | Default git ref when the input port is not connected |
+| `maxFiles` | Number | Maximum number of files to extract |
+
+---
+
+### Manifest Extractor
+
+Extracts dependency manifests from a public GitHub repository for CVE and SBOM workflows.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `repositoryUrl` | String | Public GitHub repository URL |
+| `manifestPaths` | Array | Optional explicit manifest paths |
+| `includeDevDependencies` | Boolean | Include dev dependencies when parsing manifests |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ref` | Text | Default git ref when the input port is not connected |
+| `maxPackages` | Number | Maximum packages to emit per manifest |
+
+---
+
+## Cloud Integrations
+
+### AWS MCP Group
+
+Exposes curated AWS MCP servers (CloudTrail, IAM, CloudWatch, Lambda, DynamoDB, and more) to AI agent nodes.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `credentials` | Contract | AWS credential bundle (`accessKeyId`, `secretAccessKey`, optional `sessionToken`) |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `enabledServers` | Multi-select | AWS MCP servers to register as tools |
 
 ---
 

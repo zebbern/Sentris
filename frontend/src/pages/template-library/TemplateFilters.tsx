@@ -7,9 +7,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, RefreshCw, Search, Tag, X, ExternalLink } from 'lucide-react';
+import { Filter, RefreshCw, Search, Tag, X, ExternalLink, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCategoryStyle } from './types';
+import type { TemplateValidationFilter } from '@/types/templates';
 
 // ---------------------------------------------------------------------------
 // Template filters
@@ -25,6 +26,9 @@ export interface TemplateFiltersProps {
   onSearchChange: (value: string) => void;
   selectedCategory: string | null;
   onCategoryChange: (category: string) => void;
+  selectedValidation: TemplateValidationFilter;
+  onValidationChange: (validation: TemplateValidationFilter) => void;
+  validationCounts: Record<TemplateValidationFilter, number>;
   categories: TemplateCategoryInfo[];
   tags: string[];
   selectedTags: string[];
@@ -41,6 +45,9 @@ export function TemplateFilters({
   onSearchChange,
   selectedCategory,
   onCategoryChange,
+  selectedValidation,
+  onValidationChange,
+  validationCounts,
   categories,
   tags,
   selectedTags,
@@ -88,6 +95,28 @@ export function TemplateFilters({
                 </SelectItem>
               );
             })}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={selectedValidation}
+          onValueChange={(value) => onValidationChange(value as TemplateValidationFilter)}
+        >
+          <SelectTrigger className="w-full sm:w-[190px] h-9" aria-label="Filter by validation">
+            <ShieldCheck className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Validation" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All validation ({validationCounts.all})</SelectItem>
+            <SelectItem value="live-verified">
+              Live verified ({validationCounts['live-verified']})
+            </SelectItem>
+            <SelectItem value="stale">Validation stale ({validationCounts.stale})</SelectItem>
+            <SelectItem value="needs-fix">Needs fix ({validationCounts['needs-fix']})</SelectItem>
+            <SelectItem value="needs-review">
+              Needs review ({validationCounts['needs-review']})
+            </SelectItem>
+            <SelectItem value="unknown">Unknown validation ({validationCounts.unknown})</SelectItem>
           </SelectContent>
         </Select>
 

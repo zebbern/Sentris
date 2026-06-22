@@ -46,6 +46,8 @@ You can share your workflows with the community by publishing them as templates.
 4. Wait for the PR to be reviewed and merged by a maintainer.
 5. After merge, the template appears in the library once an admin runs a sync.
 
+The backend `POST /templates/publish` endpoint can also sanitize the workflow, validate the generated template graph, and store a pending submission record. It does not create GitHub pull requests; the GitHub web flow remains the publication path.
+
 ### Secret Sanitization
 
 When you publish, Sentris automatically:
@@ -53,6 +55,7 @@ When you publish, Sentris automatically:
 - Removes all secret values from the workflow graph.
 - Creates placeholder entries documenting each required secret (name, type, description).
 - Validates the sanitized graph to ensure it is still structurally valid.
+- Rejects invalid sanitized graphs before a pending submission record is created.
 
 This means your credentials are never exposed in the template repository.
 
@@ -64,6 +67,38 @@ Templates are stored in an external GitHub repository. To update the library wit
 2. Sentris fetches all template files from the configured GitHub repository and updates the local database.
 
 Syncing is idempotent — running it multiple times is safe and only adds or updates changed templates.
+
+## Maintainer Validation
+
+Before changing official seed templates, run the fast local preflight:
+
+```bash
+bun run template-library:check
+```
+
+This checks the live-validation ledger and catalog-quality guardrails. It should report:
+
+- `Live-run validation current: 12/12` for the current official seed catalog.
+- `Duplicate names: 0`.
+- `Low-value/static candidates: 0`.
+
+Do not rerun templates that are already current in the ledger. If the preflight reports a missing, stale, or degraded template, run only the affected workflow with the targeted audit flags:
+
+```bash
+bun run template-library:audit -- --name "Template Name"
+```
+
+Add `--force` only when you intentionally want to rerun a template that the ledger already reports as current.
+
+Use a forced audit only when the template, its live inputs, or the audit harness changed and you need fresh evidence. New templates should be practical, non-duplicative, accept runtime inputs, produce a useful artifact, and avoid secret requirements unless the use case truly needs credentials.
+
+For template-library pull requests, run the scoped verification command before handoff:
+
+```bash
+bun run template-library:verify
+```
+
+This runs the fast preflight, seed-template graph tests, and live-audit utility tests without running unrelated backend, worker, frontend, or E2E suites.
 
 ## Template Types
 

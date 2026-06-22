@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export interface NodeIoEvidenceResponse {
   runId?: string;
   nodes?: Record<string, unknown>[];
@@ -57,8 +59,407 @@ export interface WaitForNodeIoEvidenceOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+export interface TemplateValidationLedgerEntry {
+  templateName: string;
+  seedFile: string | null;
+  fingerprint: string;
+  terminalStatus?: string;
+  recommendation: string;
+  rationale: string;
+  artifactsCount?: number;
+  verifiedAt: string;
+  outputRoot?: string;
+}
+
+export interface TemplateValidationLedger {
+  version: 1;
+  entries: Record<string, TemplateValidationLedgerEntry>;
+}
+
+export interface TemplateValidationLedgerInput {
+  templateName: string;
+  seedFile: string | null;
+  fingerprint: string;
+  terminalStatus?: string;
+  recommendation: string;
+  rationale: string;
+  artifactsCount?: number;
+  outputRoot?: string;
+}
+
+export interface TemplateValidationSkipOptions {
+  ledger: TemplateValidationLedger | undefined;
+  templateName: string;
+  classification: string;
+  fingerprint: string;
+  force: boolean;
+}
+
+export interface TemplateValidationSkipResult {
+  terminalStatus: 'SKIPPED';
+  recommendation: 'keep';
+  rationale: string;
+  artifactsCount?: number;
+}
+
+export interface TemplateAuditCliOptions {
+  force: boolean;
+  ledgerCheckOnly: boolean;
+  organizationId?: string;
+  templateNames: Set<string>;
+}
+
+export type TemplateLiveAuditInputs = Record<string, Record<string, unknown>>;
+
+export type TemplateValidationFreshnessStatus =
+  | 'current'
+  | 'missing'
+  | 'stale'
+  | 'degraded'
+  | 'not-live-run';
+
+export interface TemplateValidationFreshnessInput {
+  templateName: string;
+  seedFile: string | null;
+  fingerprint: string;
+  classification: string;
+}
+
+export interface TemplateValidationFreshnessItem extends TemplateValidationFreshnessInput {
+  status: TemplateValidationFreshnessStatus;
+  rationale: string;
+  verifiedAt?: string;
+}
+
+export interface TemplateValidationFreshnessCounts {
+  current: number;
+  missing: number;
+  stale: number;
+  degraded: number;
+  notLiveRun: number;
+}
+
+export interface TemplateValidationFreshnessSummary {
+  allLiveRunsCurrent: boolean;
+  counts: TemplateValidationFreshnessCounts;
+  items: TemplateValidationFreshnessItem[];
+}
+
+export interface TemplateCatalogDuplicateNameGroup {
+  key: string;
+  labels: string[];
+}
+
+export interface TemplateCatalogLowValueCandidate {
+  label: string;
+  reason: string;
+}
+
+export interface TemplateCatalogQualitySummary {
+  duplicateNames: TemplateCatalogDuplicateNameGroup[];
+  lowValueCandidates: TemplateCatalogLowValueCandidate[];
+}
+
+export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
+  return {
+    'Bug Bounty Recon Triage': {
+      domains: ['example.com'],
+      authorizationNotes: 'Live audit fixture: public example domain, passive/bounded recon.',
+    },
+    'CVE Impact Research Brief': {
+      cveId: 'CVE-2024-3094',
+      product: 'xz utils',
+      version: '5.6.1',
+      deploymentNotes: 'Live audit fixture for known public CVE research.',
+    },
+    'Exposed Service CVE Mapper': {
+      targets: ['scanme.nmap.org'],
+      authorizationNotes: 'Live audit fixture: Nmap-provided scan target for bounded service checks.',
+    },
+    'GitHub Repo Dependency CVE Triage': {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      ref: '',
+      includeDevDependencies: false,
+      researchNotes: 'Live audit fixture: intentionally vulnerable public Node.js training app.',
+    },
+    'NPM Dependency CVE Hunt': {
+      packageSpecs: ['lodash@4.17.20', 'minimist@0.0.8', 'axios@0.21.1'],
+      researchNotes: 'Live audit fixture using public npm packages with known historical advisories.',
+    },
+    'Passive OSINT Subdomain Expansion': {
+      domain: 'example.com',
+      knownSubdomains: ['www.example.com'],
+      wordlist: ['www', 'api'],
+      scanIntensity: 'safe',
+      authorizationNotes:
+        'Live audit fixture: bounded public example.com passive recon and DNS validation.',
+    },
+    'Public Repo Secret Exposure Triage': {
+      repositoryUrl: 'https://github.com/octocat/Hello-World',
+      authorizationNotes:
+        'Live audit fixture: small public GitHub repository for non-destructive verified-secret scan.',
+    },
+    'Public Repo Code & IaC Risk Triage': {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      ref: '',
+      authorizationNotes:
+        'Live audit fixture: intentionally vulnerable public Node.js training app with source and Dockerfile signals.',
+    },
+    'API Surface Exposure Triage': {
+      seedUrls: ['https://petstore.swagger.io/'],
+      knownApiPaths: ['/v2/swagger.json', '/swagger.json', '/'],
+      scanIntensity: 'safe',
+      authorizationNotes:
+        'Live audit fixture: public Swagger sample application for safe API surface exposure checks.',
+    },
+    'Web/API Fuzz Triage': {
+      targetUrl: 'https://host.docker.internal:18443/FUZZ',
+      wordlist: ['api/health', 'robots.txt', 'definitely-not-present'],
+      scanIntensity: 'safe',
+      authorizationNotes:
+        'Live audit fixture: local HTTPS fixture with a tiny ffuf wordlist for bounded path discovery.',
+    },
+    'Subdomain Takeover Triage': {
+      domains: ['example.com'],
+      knownSubdomains: ['www.example.com'],
+      authorizationNotes:
+        'Live audit fixture: bounded public example domain with imported known subdomain.',
+    },
+    'Web Attack Surface Quick Win Hunt': {
+      liveUrls: ['https://host.docker.internal:18443/api/health'],
+      outOfScopePaths: ['/logout', '/admin/delete'],
+      scanIntensity: 'safe',
+    },
+  };
+}
+
+function splitTemplateNameList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function readFlagValue(argv: string[], index: number, flagName: string): string | undefined {
+  const current = argv[index];
+  const prefix = `${flagName}=`;
+  if (current.startsWith(prefix)) {
+    return current.slice(prefix.length).trim();
+  }
+
+  const next = argv[index + 1];
+  if (current === flagName && next && !next.startsWith('--')) {
+    return next.trim();
+  }
+
+  return undefined;
+}
+
+export function parseTemplateAuditCliOptions(
+  argv: string[],
+  env: Record<string, string | undefined> = process.env,
+): TemplateAuditCliOptions {
+  const templateNames = new Set(splitTemplateNameList(env.TEMPLATE_AUDIT_NAMES));
+  let organizationId = env.SENTRIS_ORG_ID;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const templateName = readFlagValue(argv, index, '--name');
+    if (templateName) {
+      for (const name of splitTemplateNameList(templateName)) {
+        templateNames.add(name);
+      }
+      if (arg === '--name') index += 1;
+      continue;
+    }
+
+    const orgId = readFlagValue(argv, index, '--org-id');
+    if (orgId) {
+      organizationId = orgId;
+      if (arg === '--org-id') index += 1;
+    }
+  }
+
+  return {
+    force: env.TEMPLATE_AUDIT_FORCE === 'true' || argv.includes('--force'),
+    ledgerCheckOnly: env.TEMPLATE_AUDIT_LEDGER_CHECK === 'true' || argv.includes('--ledger-check'),
+    ...(organizationId ? { organizationId } : {}),
+    templateNames,
+  };
+}
+
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const entries = Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`);
+    return `{${entries.join(',')}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
+export function createTemplateValidationFingerprint(value: unknown): string {
+  return `sha256:${createHash('sha256').update(stableStringify(value)).digest('hex')}`;
+}
+
+export function upsertTemplateValidationLedger(
+  ledger: TemplateValidationLedger | undefined,
+  entry: TemplateValidationLedgerInput,
+  verifiedAt = new Date().toISOString(),
+): TemplateValidationLedger {
+  const next: TemplateValidationLedger = {
+    version: 1,
+    entries: { ...(ledger?.entries ?? {}) },
+  };
+  next.entries[entry.templateName] = {
+    ...entry,
+    verifiedAt,
+  };
+  return next;
+}
+
+export function shouldSkipTemplateValidation({
+  ledger,
+  templateName,
+  classification,
+  fingerprint,
+  force,
+}: TemplateValidationSkipOptions): TemplateValidationSkipResult | null {
+  if (force || classification !== 'live-run') return null;
+
+  const entry = ledger?.entries?.[templateName];
+  if (!entry) return null;
+  if (entry.fingerprint !== fingerprint) return null;
+  if (entry.terminalStatus !== 'COMPLETED' || entry.recommendation !== 'keep') return null;
+
+  return {
+    terminalStatus: 'SKIPPED',
+    recommendation: 'keep',
+    rationale: `Skipped unchanged template; last live validation passed at ${entry.verifiedAt}.`,
+    artifactsCount: entry.artifactsCount,
+  };
+}
+
+export function summarizeTemplateValidationLedgerFreshness(
+  ledger: TemplateValidationLedger | undefined,
+  templates: TemplateValidationFreshnessInput[],
+): TemplateValidationFreshnessSummary {
+  const counts: TemplateValidationFreshnessCounts = {
+    current: 0,
+    missing: 0,
+    stale: 0,
+    degraded: 0,
+    notLiveRun: 0,
+  };
+  const items = templates.map<TemplateValidationFreshnessItem>((template) => {
+    if (template.classification !== 'live-run') {
+      counts.notLiveRun += 1;
+      return {
+        ...template,
+        status: 'not-live-run',
+        rationale: `${template.classification} templates are not eligible for cached live-run validation.`,
+      };
+    }
+
+    const entry = ledger?.entries?.[template.templateName];
+    if (!entry) {
+      counts.missing += 1;
+      return {
+        ...template,
+        status: 'missing',
+        rationale: 'No successful live-validation ledger entry exists for this template.',
+      };
+    }
+
+    if (entry.fingerprint !== template.fingerprint) {
+      counts.stale += 1;
+      return {
+        ...template,
+        status: 'stale',
+        verifiedAt: entry.verifiedAt,
+        rationale: 'Template, live input, or classification changed after the last validation.',
+      };
+    }
+
+    if (entry.terminalStatus !== 'COMPLETED' || entry.recommendation !== 'keep') {
+      counts.degraded += 1;
+      return {
+        ...template,
+        status: 'degraded',
+        verifiedAt: entry.verifiedAt,
+        rationale: `Last validation was ${entry.terminalStatus ?? 'unknown'} / ${entry.recommendation}.`,
+      };
+    }
+
+    counts.current += 1;
+    return {
+      ...template,
+      status: 'current',
+      verifiedAt: entry.verifiedAt,
+      rationale: `Current live validation passed at ${entry.verifiedAt}.`,
+    };
+  });
+
+  return {
+    allLiveRunsCurrent: counts.missing === 0 && counts.stale === 0 && counts.degraded === 0,
+    counts,
+    items,
+  };
+}
+
+function renderFreshnessProblemLines(
+  summary: TemplateValidationFreshnessSummary,
+  status: 'missing' | 'stale' | 'degraded',
+): string[] {
+  return summary.items
+    .filter((item) => item.status === status)
+    .map((item) => `- ${item.seedFile ?? item.templateName}: ${item.rationale}`);
+}
+
+export function renderTemplateValidationLedgerFreshness(
+  summary: TemplateValidationFreshnessSummary,
+): string {
+  const liveRunTotal =
+    summary.counts.current +
+    summary.counts.missing +
+    summary.counts.stale +
+    summary.counts.degraded;
+  const lines = [
+    '# Template Validation Ledger Check',
+    '',
+    `Live-run validation current: ${summary.counts.current}/${liveRunTotal}`,
+    `Missing: ${summary.counts.missing}`,
+    `Stale: ${summary.counts.stale}`,
+    `Degraded: ${summary.counts.degraded}`,
+    `Non-live-run templates: ${summary.counts.notLiveRun}`,
+  ];
+
+  const missing = renderFreshnessProblemLines(summary, 'missing');
+  if (missing.length > 0) {
+    lines.push('', '## Missing Live Validation', '', ...missing);
+  }
+
+  const stale = renderFreshnessProblemLines(summary, 'stale');
+  if (stale.length > 0) {
+    lines.push('', '## Stale Live Validation', '', ...stale);
+  }
+
+  const degraded = renderFreshnessProblemLines(summary, 'degraded');
+  if (degraded.length > 0) {
+    lines.push('', '## Degraded Live Validation', '', ...degraded);
+  }
+
+  return `${lines.join('\n')}\n`;
 }
 
 function hasEnoughNodeEvidence(
@@ -91,7 +492,10 @@ function getBoolean(value: unknown): boolean {
 
 function getStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.map(String).map((item) => item.trim()).filter(Boolean);
+  return value
+    .map(String)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function addWarnings(target: Set<string>, value: unknown): void {
@@ -146,6 +550,93 @@ export function getNodeIoWarningSignals(nodes: NodeIoNodeSummary[]): string[] {
   return Array.from(signals);
 }
 
+export function getLiveRunAuditFailures(
+  results: TemplateAuditMarkdownResult[],
+): TemplateAuditMarkdownResult[] {
+  return results.filter(
+    (result) =>
+      result.classification === 'live-run' &&
+      (!['COMPLETED', 'SKIPPED'].includes(result.terminalStatus ?? '') ||
+        result.recommendation !== 'keep'),
+  );
+}
+
+function normalizeCatalogName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function getTemplateCatalogLabel(result: TemplateAuditMarkdownResult): string {
+  return result.seedFile ?? result.templateName;
+}
+
+export function summarizeTemplateCatalogQuality(
+  results: TemplateAuditMarkdownResult[],
+): TemplateCatalogQualitySummary {
+  const byName = new Map<string, TemplateAuditMarkdownResult[]>();
+  for (const result of results) {
+    const key = normalizeCatalogName(result.templateName);
+    if (!key) continue;
+    byName.set(key, [...(byName.get(key) ?? []), result]);
+  }
+
+  const duplicateNames = Array.from(byName.entries())
+    .filter(([, group]) => group.length > 1)
+    .map(([key, group]) => ({
+      key,
+      labels: group.map(getTemplateCatalogLabel),
+    }));
+
+  const lowValueCandidates = results
+    .filter((result) => result.runtimeInputs.length === 0 && result.requiredSecrets.length === 0)
+    .map((result) => ({
+      label: getTemplateCatalogLabel(result),
+      reason: 'has no runtime inputs or required secrets.',
+    }));
+
+  return {
+    duplicateNames,
+    lowValueCandidates,
+  };
+}
+
+export function getTemplateCatalogQualityFailures(
+  results: TemplateAuditMarkdownResult[],
+): string[] {
+  const summary = summarizeTemplateCatalogQuality(results);
+  const failures: string[] = [];
+
+  for (const group of summary.duplicateNames) {
+    failures.push(`Duplicate template name: ${group.labels.join(', ')}`);
+  }
+
+  for (const candidate of summary.lowValueCandidates) {
+    failures.push(`Low-value/static template: ${candidate.label} ${candidate.reason}`);
+  }
+
+  return failures;
+}
+
+export function renderTemplateCatalogQualityCheck(results: TemplateAuditMarkdownResult[]): string {
+  const summary = summarizeTemplateCatalogQuality(results);
+  const failures = getTemplateCatalogQualityFailures(results);
+  const lines = [
+    '# Template Catalog Quality Check',
+    '',
+    `Duplicate names: ${summary.duplicateNames.length}`,
+    `Low-value/static candidates: ${summary.lowValueCandidates.length}`,
+  ];
+
+  if (failures.length > 0) {
+    lines.push('', '## Catalog Quality Failures', '', ...failures.map((failure) => `- ${failure}`));
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 function escapeMarkdownTable(value: unknown): string {
   return String(value ?? '').replace(/\|/g, '\\|');
 }
@@ -177,6 +668,7 @@ export function renderTemplateAuditMarkdown({
     acc[result.recommendation] = (acc[result.recommendation] ?? 0) + 1;
     return acc;
   }, {});
+  const catalogQuality = summarizeTemplateCatalogQuality(results);
 
   const lines: string[] = [
     '# Template Library Live Audit',
@@ -194,11 +686,33 @@ export function renderTemplateAuditMarkdown({
     `- Delete: ${counts.delete ?? 0}`,
     `- Review: ${counts.review ?? 0}`,
     '',
+    '## Catalog Quality',
+    '',
+  ];
+
+  if (catalogQuality.duplicateNames.length === 0) {
+    lines.push('- Duplicate names: none');
+  } else {
+    for (const group of catalogQuality.duplicateNames) {
+      lines.push(`- Duplicate name: ${group.labels.join(', ')}`);
+    }
+  }
+
+  if (catalogQuality.lowValueCandidates.length === 0) {
+    lines.push('- Low-value/static candidates: none');
+  } else {
+    for (const candidate of catalogQuality.lowValueCandidates) {
+      lines.push(`- Low-value/static candidate: ${candidate.label} ${candidate.reason}`);
+    }
+  }
+
+  lines.push(
+    '',
     '## Results',
     '',
     '| Template | Class | Run | Artifacts | Recommendation | Rationale |',
     '| --- | --- | --- | ---: | --- | --- |',
-  ];
+  );
 
   for (const result of results) {
     const run =
@@ -254,6 +768,11 @@ export function renderTemplateAuditMarkdown({
 
   lines.push('', '## Fix Candidates', '');
   for (const result of results.filter((item) => item.recommendation === 'fix')) {
+    lines.push(`- ${result.seedFile ?? result.templateName}: ${result.rationale}`);
+  }
+
+  lines.push('', '## Review Candidates', '');
+  for (const result of results.filter((item) => item.recommendation === 'review')) {
     lines.push(`- ${result.seedFile ?? result.templateName}: ${result.rationale}`);
   }
 

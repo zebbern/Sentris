@@ -164,6 +164,111 @@ describe('trufflehog component', () => {
     expect(result.results).toHaveLength(0);
   });
 
+  it('should ignore TruffleHog JSON status logs when no secrets are found', async () => {
+    const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
+      'sentris.trufflehog.scan',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'trufflehog-test',
+    });
+
+    const rawOutput = [
+      JSON.stringify({
+        level: 'info-0',
+        logger: 'trufflehog',
+        msg: 'running source',
+        source_manager_worker_id: 'abc123',
+      }),
+      JSON.stringify({
+        level: 'info-0',
+        logger: 'trufflehog',
+        msg: 'scanning repo',
+        repo: 'https://github.com/octocat/Hello-World',
+      }),
+      JSON.stringify({
+        level: 'info-0',
+        logger: 'trufflehog',
+        msg: 'finished scanning',
+        verified_secrets: 0,
+        unverified_secrets: 0,
+      }),
+    ].join('\n');
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(rawOutput);
+
+    const result = await component.execute(
+      {
+        inputs: {
+          scanTarget: 'https://github.com/octocat/Hello-World',
+        },
+        params: {
+          scanType: 'git' as const,
+        },
+      },
+      context,
+    );
+
+    expect(result.secretCount).toBe(0);
+    expect(result.verifiedCount).toBe(0);
+    expect(result.hasVerifiedSecrets).toBe(false);
+    expect(result.secrets).toHaveLength(0);
+    expect(result.results).toHaveLength(0);
+  });
+
+  it('should parse TruffleHog secret lines while ignoring JSON status logs', async () => {
+    const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
+      'sentris.trufflehog.scan',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'trufflehog-test',
+    });
+
+    const rawOutput = [
+      JSON.stringify({ level: 'info-0', logger: 'trufflehog', msg: 'running source' }),
+      JSON.stringify({
+        DetectorType: 'AWS',
+        DetectorName: 'AWS Access Key',
+        Verified: true,
+        Redacted: 'AKIA...',
+        SourceMetadata: {
+          Data: {
+            Git: {
+              file: 'config.yml',
+              repository: 'example/repo',
+            },
+          },
+        },
+      }),
+    ].join('\n');
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(rawOutput);
+
+    const result = await component.execute(
+      {
+        inputs: {
+          scanTarget: 'https://github.com/example/repo',
+        },
+        params: {
+          scanType: 'git' as const,
+        },
+      },
+      context,
+    );
+
+    expect(result.secretCount).toBe(1);
+    expect(result.verifiedCount).toBe(1);
+    expect(result.hasVerifiedSecrets).toBe(true);
+    expect(result.secrets).toHaveLength(1);
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].finding_hash).toBeString();
+  });
+
   it('should support different scan types', () => {
     const component = componentRegistry.get<TruffleHogInput, TruffleHogOutput>(
       'sentris.trufflehog.scan',

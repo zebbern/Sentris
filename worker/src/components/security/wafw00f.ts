@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const WAFW00F_IMAGE = 'python:3.11-slim';
 const WAFW00F_TIMEOUT_SECONDS = 300;
@@ -147,6 +151,7 @@ const definition = defineComponent({
   } satisfies ComponentRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: WAFW00F_IMAGE,
     entrypoint: 'sh',
     network: 'bridge',
@@ -231,19 +236,14 @@ const definition = defineComponent({
       const escapedArgs = wafw00fArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
       const shellCmd = `pip install wafw00f -q && wafw00f ${escapedArgs}`;
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         entrypoint: baseRunner.entrypoint,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? WAFW00F_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
         command: ['-c', shellCmd],
         volumes: [
           volume.getVolumeConfig(INPUT_DIR, true),
           volume.getVolumeConfig(OUTPUT_DIR, false),
         ],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

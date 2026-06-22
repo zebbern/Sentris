@@ -9,6 +9,7 @@
  */
 
 import { templatesApi } from './templates';
+import { agentsApi } from './agents';
 import { workflowsApi } from './workflows';
 import { executionsApi } from './executions';
 import { componentsApi } from './components';
@@ -31,6 +32,7 @@ import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
   templates: templatesApi,
+  agents: agentsApi,
   workflows: workflowsApi,
   executions: executionsApi,
   components: componentsApi,

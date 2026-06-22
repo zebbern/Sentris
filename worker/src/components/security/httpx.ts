@@ -15,6 +15,7 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import { SECURITY_DOCKER_RESOURCE_STANDARD } from './security-docker-resources';
 
 const inputSchema = inputs({
   targets: port(
@@ -221,6 +222,7 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: 'projectdiscovery/httpx:latest',
     entrypoint: 'httpx',
     network: 'bridge',
@@ -386,7 +388,9 @@ const definition = defineComponent({
         runnerOutput = rawRunnerResult;
       }
 
-      const findings = parseHttpxOutput(runnerOutput);
+      const findings = runnerParams.preferHttps
+        ? preferHttpsFindings(parseHttpxOutput(runnerOutput))
+        : parseHttpxOutput(runnerOutput);
 
       context.logger.info(
         `[httpx] Completed probe with ${findings.length} result(s) from ${runnerParams.targets.length} target(s)`,
@@ -531,6 +535,63 @@ function parseHttpxOutput(raw: string): Finding[] {
   return findings;
 }
 
+function preferHttpsFindings(findings: Finding[]): Finding[] {
+  const byEndpoint = new Map<string, Finding>();
+  const order: string[] = [];
+
+  for (const finding of findings) {
+    const key = httpSchemePreferenceKey(finding);
+    const existing = byEndpoint.get(key);
+
+    if (!existing) {
+      byEndpoint.set(key, finding);
+      order.push(key);
+      continue;
+    }
+
+    if (!isHttpsFinding(existing) && isHttpsFinding(finding)) {
+      byEndpoint.set(key, finding);
+    }
+  }
+
+  return order.map((key) => byEndpoint.get(key)).filter((finding): finding is Finding => !!finding);
+}
+
+function httpSchemePreferenceKey(finding: Finding): string {
+  const value = finding.url || finding.finalUrl || finding.input || finding.host || '';
+  const parsed = parseEndpointUrl(value);
+
+  if (!parsed) {
+    return value.toLowerCase();
+  }
+
+  const port = parsed.port ? `:${parsed.port}` : '';
+  return `${parsed.hostname.toLowerCase()}${port}${parsed.pathname || '/'}${parsed.search}`;
+}
+
+function parseEndpointUrl(value: string): URL | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed);
+  } catch {
+    try {
+      return new URL(`http://${trimmed}`);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function isHttpsFinding(finding: Finding): boolean {
+  if (finding.scheme?.toLowerCase() === 'https') {
+    return true;
+  }
+
+  return /^https:\/\//i.test(finding.url) || /^https:\/\//i.test(finding.finalUrl ?? '');
+}
+
 export function buildHttpxArgs(options: HttpxArgOptions): string[] {
   const httpxArgs: string[] = ['-json', '-silent', '-l', '/inputs/targets.txt', '-stream'];
 
@@ -538,7 +599,7 @@ export function buildHttpxArgs(options: HttpxArgOptions): string[] {
     httpxArgs.push('-ports', options.ports);
   }
   if (options.statusCodes) {
-    httpxArgs.push('-status-code', options.statusCodes);
+    httpxArgs.push('-match-code', options.statusCodes);
   }
   if (typeof options.threads === 'number') {
     httpxArgs.push('-threads', String(options.threads));

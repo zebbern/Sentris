@@ -11,6 +11,8 @@ import { WorkflowSanitizationService } from './workflow-sanitization.service';
 import { TemplatesRepository } from './templates.repository';
 import { GitHubSyncService } from './github-sync.service';
 import { TemplateSeedService } from './template-seed.service';
+import { TemplateRevalidationService } from './template-revalidation.service';
+import { TemplateValidationLedgerService } from './template-validation-ledger.service';
 import { EtagCacheService } from './etag-cache.service';
 import { TEMPLATE_CACHE_REDIS } from './templates.tokens';
 
@@ -44,6 +46,8 @@ import { TEMPLATE_CACHE_REDIS } from './templates.tokens';
       inject: [ConfigService],
     },
     TemplateSeedService,
+    TemplateRevalidationService,
+    TemplateValidationLedgerService,
     TemplateService,
     WorkflowSanitizationService,
     TemplatesRepository,

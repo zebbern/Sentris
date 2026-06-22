@@ -102,6 +102,40 @@ describe('entry-point component', () => {
     expect(result).toEqual({});
   });
 
+  it('should default omitted optional text runtime inputs to empty string', async () => {
+    const component = componentRegistry.get<EntryPointInput, EntryPointOutput>(
+      'core.workflow.entrypoint',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'trigger-test',
+    });
+
+    const result = (await component.execute(
+      {
+        inputs: {
+          __runtimeData: {
+            packageSpecs: ['lodash@4.17.20'],
+          },
+        },
+        params: {
+          runtimeInputs: [
+            { id: 'packageSpecs', label: 'Packages', type: 'array', required: true },
+            { id: 'researchNotes', label: 'Research notes', type: 'text', required: false },
+          ],
+        },
+      },
+      context,
+    )) as Record<string, unknown>;
+
+    expect(result).toEqual({
+      packageSpecs: ['lodash@4.17.20'],
+      researchNotes: '',
+    });
+  });
+
   it('should throw when required runtime input is missing', async () => {
     const component = componentRegistry.get<EntryPointInput, EntryPointOutput>(
       'core.workflow.entrypoint',

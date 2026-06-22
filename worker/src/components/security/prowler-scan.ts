@@ -22,6 +22,10 @@ import {
 import type { DockerRunnerConfig } from '@sentris/component-sdk';
 import { awsCredentialSchema } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
+} from './security-docker-resources';
 
 const recommendedFlagOptions = [
   {
@@ -407,6 +411,7 @@ const definition = defineComponent({
   retryPolicy: prowlerRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: 'prowlercloud/prowler:latest',
     platform: 'linux/amd64',
     command: [], // Placeholder - actual command built dynamically in execute()
@@ -576,10 +581,7 @@ const definition = defineComponent({
     context.logger.info(`[ProwlerScan] Command: ${cmd.join(' ')}`);
 
     // Prepare a one-off runner with dynamic command and volume
-    const dockerRunner: DockerRunnerConfig = {
-      kind: 'docker',
-      image: 'prowlercloud/prowler:latest',
-      platform: 'linux/amd64',
+    const dockerRunner = mergeSecurityDockerRunner(definition.runner as DockerRunnerConfig, {
       network: 'bridge',
       timeoutSeconds: 900,
       env: {
@@ -588,7 +590,7 @@ const definition = defineComponent({
       },
       command: cmd,
       volumes: [],
-    };
+    });
 
     let rawSegments: string[] = [];
     let commandForOutput: string[] = cmd;

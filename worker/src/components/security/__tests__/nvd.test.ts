@@ -77,7 +77,10 @@ describe('NVD CVE query component', () => {
 
     const fetchMock = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       expect(init?.method).toBe('GET');
-      expect((init?.headers as Record<string, string>).apiKey).toBe('nvd-test-key');
+      const headers = init?.headers as Record<string, string>;
+      expect(headers.Accept).toBe('application/json');
+      expect(headers['User-Agent']).toBe('SentrisFlow/1.0');
+      expect(headers.apiKey).toBe('nvd-test-key');
       return new Response(JSON.stringify(sampleNvdResponse), {
         status: 200,
         statusText: 'OK',
@@ -125,6 +128,71 @@ describe('NVD CVE query component', () => {
       statusText: 'OK',
     });
     expect(result.data).toEqual(sampleNvdResponse);
+  });
+
+  it('retries transient NVD 503 responses before returning fallback data', async () => {
+    const component = componentRegistry.get<NvdCveInput, NvdCveOutput>('sentris.nvd.cve.query');
+    if (!component) throw new Error('NVD CVE component was not registered');
+
+    const previousRetryDelay = process.env.NVD_RETRY_DELAY_MS;
+    process.env.NVD_RETRY_DELAY_MS = '0';
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('temporary unavailable', {
+          status: 503,
+          statusText: 'Service Unavailable',
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(sampleNvdResponse), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+    const context = createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'nvd-retry-test',
+    });
+    context.http.fetch = fetchMock as unknown as ExecutionContext['http']['fetch'];
+
+    try {
+      const result = await component.execute(
+        {
+          inputs: {
+            cveIds: [],
+            keywordSearch: 'Apache HTTP Server',
+            apiKey: '',
+          },
+          params: {
+            resultsPerPage: 5,
+            includeRejected: false,
+            timeoutMs: 30000,
+            failOnUnavailable: false,
+          },
+        },
+        context,
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result).toMatchObject({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        warnings: [],
+        totalResults: 1,
+        returnedResults: 1,
+      });
+    } finally {
+      if (previousRetryDelay === undefined) {
+        delete process.env.NVD_RETRY_DELAY_MS;
+      } else {
+        process.env.NVD_RETRY_DELAY_MS = previousRetryDelay;
+      }
+    }
   });
 
   it('returns a non-fatal timeout result when failOnUnavailable is false', async () => {

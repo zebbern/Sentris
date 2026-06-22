@@ -1,14 +1,19 @@
 import { Pool } from 'pg';
+import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
 
 async function main() {
-  const connectionString =
-    process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'DELETE_WORKFLOW_RUNS_DATABASE_URL',
+  });
+  const connectionString = databaseTarget.connectionString;
 
   const pool = new Pool({ connectionString });
   const client = await pool.connect();
 
   try {
     console.log('🗑️  Starting deletion of all workflow runs and related data...\n');
+    console.log(formatDatabaseTarget(databaseTarget));
+    console.log(`Connection: ${databaseTarget.redactedConnectionString}\n`);
 
     // Delete in order: related tables first, then workflow_runs
     const tables = [

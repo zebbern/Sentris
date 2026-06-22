@@ -1,0 +1,458 @@
+{
+  "_metadata": {
+    "name": "Public Repo Code & IaC Risk Triage",
+    "description": "Authorized bug bounty workflow that extracts bounded source and IaC files from a public GitHub repository, runs Semgrep, Checkov, and Trivy repo checks, and writes a prioritized code risk report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "github", "sast", "iac", "semgrep", "checkov", "trivy"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Public Repo Code & IaC Risk Triage",
+    "description": "Review authorized public GitHub repositories for source-code, IaC, and dependency/container risk signals with bounded extraction and scanner triage.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "github", "sast", "iac", "semgrep", "checkov", "trivy"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 10,
+    "edgeCount": 23
+  },
+  "graph": {
+    "name": "Public Repo Code & IaC Risk Triage",
+    "description": "Bounded public repository source and IaC risk workflow for authorized bug bounty targets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 360
+        },
+        "data": {
+          "label": "Authorized Repository Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "repositoryUrl",
+                  "label": "GitHub repository URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "Public GitHub repository URL explicitly authorized for code and IaC review."
+                },
+                {
+                  "id": "ref",
+                  "label": "Branch, tag, or commit",
+                  "type": "text",
+                  "required": false,
+                  "description": "Git ref to inspect. Uses the repository default branch when omitted."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, and rate-limit notes to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_repo_files",
+        "type": "sentris.repository.files.extract",
+        "position": {
+          "x": 420,
+          "y": 360
+        },
+        "data": {
+          "label": "Extract Source and IaC Files",
+          "config": {
+            "params": {
+              "ref": "main",
+              "maxFiles": 80,
+              "maxTotalBytes": 250000,
+              "maxFileBytes": 50000
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "semgrep_scan",
+        "type": "sentris.semgrep.run",
+        "position": {
+          "x": 760,
+          "y": 80
+        },
+        "data": {
+          "label": "Run Semgrep Source Checks",
+          "config": {
+            "params": {
+              "config": "p/owasp-top-ten",
+              "severity": ["ERROR", "WARNING"]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "checkov_terraform",
+        "type": "sentris.checkov.run",
+        "position": {
+          "x": 760,
+          "y": 240
+        },
+        "data": {
+          "label": "Check Terraform IaC",
+          "config": {
+            "params": {
+              "framework": "terraform",
+              "compact": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "checkov_kubernetes",
+        "type": "sentris.checkov.run",
+        "position": {
+          "x": 760,
+          "y": 400
+        },
+        "data": {
+          "label": "Check Kubernetes IaC",
+          "config": {
+            "params": {
+              "framework": "kubernetes",
+              "compact": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "checkov_dockerfile",
+        "type": "sentris.checkov.run",
+        "position": {
+          "x": 760,
+          "y": 560
+        },
+        "data": {
+          "label": "Check Dockerfiles",
+          "config": {
+            "params": {
+              "framework": "dockerfile",
+              "compact": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "checkov_cloudformation",
+        "type": "sentris.checkov.run",
+        "position": {
+          "x": 760,
+          "y": 720
+        },
+        "data": {
+          "label": "Check CloudFormation IaC",
+          "config": {
+            "params": {
+              "framework": "cloudformation",
+              "compact": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "trivy_repo_scan",
+        "type": "sentris.trivy.run",
+        "position": {
+          "x": 760,
+          "y": 880
+        },
+        "data": {
+          "label": "Run Trivy Repository Scan",
+          "config": {
+            "params": {
+              "scanType": "repo",
+              "severity": ["CRITICAL", "HIGH", "MEDIUM"],
+              "format": "json"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_code_risk_report",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1120,
+          "y": 360
+        },
+        "data": {
+          "label": "Assemble Code Risk Report",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "repositoryUrl",
+                  "type": "string"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "fileSummary",
+                  "type": "json"
+                },
+                {
+                  "name": "files",
+                  "type": "list-json"
+                },
+                {
+                  "name": "skippedFiles",
+                  "type": "list-json"
+                },
+                {
+                  "name": "semgrepFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "semgrepCount",
+                  "type": "number"
+                },
+                {
+                  "name": "terraformViolations",
+                  "type": "list-json"
+                },
+                {
+                  "name": "kubernetesViolations",
+                  "type": "list-json"
+                },
+                {
+                  "name": "dockerfileViolations",
+                  "type": "list-json"
+                },
+                {
+                  "name": "cloudformationViolations",
+                  "type": "list-json"
+                },
+                {
+                  "name": "trivyVulnerabilities",
+                  "type": "list-json"
+                },
+                {
+                  "name": "trivyCount",
+                  "type": "number"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const severityRank = { critical: 5, high: 4, error: 4, medium: 3, warning: 3, low: 2, info: 1, unknown: 0 };\n  const list = (value) => Array.isArray(value) ? value : [];\n  const normalizeSeverity = (value) => String(value || 'unknown').toLowerCase();\n  const rank = (value) => severityRank[normalizeSeverity(value)] || 0;\n  const fileSummary = input.fileSummary && typeof input.fileSummary === 'object' ? input.fileSummary : {};\n  const semgrep = list(input.semgrepFindings).map((item) => ({\n    source: 'semgrep',\n    severity: normalizeSeverity(item.severity),\n    title: item.message || item.checkId || 'Semgrep finding',\n    ruleId: item.checkId || null,\n    location: item.path ? item.path + ':' + (item.startLine || 0) : null,\n    cwe: Array.isArray(item.cwe) ? item.cwe : [],\n    raw: item\n  }));\n  const checkovSource = (items, framework) => list(items).map((item) => ({\n    source: 'checkov',\n    framework,\n    severity: normalizeSeverity(item.severity || 'medium'),\n    title: item.description || item.checkId || 'Checkov violation',\n    ruleId: item.checkId || null,\n    location: item.filePath || item.resource || null,\n    guideline: item.guideline || null,\n    raw: item\n  }));\n  const trivy = list(input.trivyVulnerabilities).map((item) => ({\n    source: 'trivy',\n    severity: normalizeSeverity(item.severity),\n    title: item.title || item.vulnerabilityId || 'Trivy vulnerability',\n    vulnerabilityId: item.vulnerabilityId || null,\n    packageName: item.pkgName || null,\n    installedVersion: item.installedVersion || null,\n    fixedVersion: item.fixedVersion || null,\n    primaryUrl: item.primaryUrl || null,\n    raw: item\n  }));\n  const findings = [\n    ...semgrep,\n    ...checkovSource(input.terraformViolations, 'terraform'),\n    ...checkovSource(input.kubernetesViolations, 'kubernetes'),\n    ...checkovSource(input.dockerfileViolations, 'dockerfile'),\n    ...checkovSource(input.cloudformationViolations, 'cloudformation'),\n    ...trivy\n  ].sort((a, b) => rank(b.severity) - rank(a.severity) || String(a.title).localeCompare(String(b.title)));\n  const countsBySource = findings.reduce((acc, item) => { acc[item.source] = (acc[item.source] || 0) + 1; return acc; }, {});\n  const countsBySeverity = findings.reduce((acc, item) => { acc[item.severity] = (acc[item.severity] || 0) + 1; return acc; }, {});\n  return {\n    report: {\n      summary: {\n        repository: input.repositoryUrl || fileSummary.repository || null,\n        ref: fileSummary.ref || null,\n        selectedFiles: Number(fileSummary.selectedFiles || 0),\n        skippedFiles: Array.isArray(input.skippedFiles) ? input.skippedFiles.length : Number(fileSummary.skippedFiles || 0),\n        findings: findings.length,\n        semgrepFindings: Number(input.semgrepCount || semgrep.length),\n        checkovViolations: checkovSource(input.terraformViolations, 'terraform').length + checkovSource(input.kubernetesViolations, 'kubernetes').length + checkovSource(input.dockerfileViolations, 'dockerfile').length + checkovSource(input.cloudformationViolations, 'cloudformation').length,\n        trivyVulnerabilities: Number(input.trivyCount || trivy.length),\n        highestSeverity: findings[0]?.severity || null,\n        countsBySource,\n        countsBySeverity\n      },\n      authorizationNotes: input.authorizationNotes || null,\n      extraction: {\n        summary: fileSummary,\n        files: list(input.files).slice(0, 120),\n        skippedFiles: list(input.skippedFiles).slice(0, 120)\n      },\n      priorityFindings: findings.slice(0, 100),\n      nextSteps: [\n        'Confirm findings manually against the exact repository revision and program scope',\n        'Prioritize high-severity Trivy vulnerabilities with fixed versions and reachable code paths',\n        'Review Semgrep findings for exploitability before filing a report',\n        'Validate IaC violations against deployment context before reporting impact'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1460,
+          "y": 360
+        },
+        "data": {
+          "label": "Save Code Risk Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "public-repo-code-iac-risk-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-extract_repo_files-repositoryUrl",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-extract_repo_files-ref",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "extract_repo_files-semgrep_scan-sourceBundle",
+        "source": "extract_repo_files",
+        "target": "semgrep_scan",
+        "sourceHandle": "sourceBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_files-checkov_terraform-terraformBundle",
+        "source": "extract_repo_files",
+        "target": "checkov_terraform",
+        "sourceHandle": "terraformBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_files-checkov_kubernetes-kubernetesBundle",
+        "source": "extract_repo_files",
+        "target": "checkov_kubernetes",
+        "sourceHandle": "kubernetesBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_files-checkov_dockerfile-dockerfileBundle",
+        "source": "extract_repo_files",
+        "target": "checkov_dockerfile",
+        "sourceHandle": "dockerfileBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_files-checkov_cloudformation-cloudformationBundle",
+        "source": "extract_repo_files",
+        "target": "checkov_cloudformation",
+        "sourceHandle": "cloudformationBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "trigger_1-trivy_repo_scan-repositoryUrl",
+        "source": "trigger_1",
+        "target": "trivy_repo_scan",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_files-trivy_repo_scan-ref",
+        "source": "extract_repo_files",
+        "target": "trivy_repo_scan",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "trigger_1-assemble_code_risk_report-repositoryUrl",
+        "source": "trigger_1",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-assemble_code_risk_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "extract_repo_files-assemble_code_risk_report-summary",
+        "source": "extract_repo_files",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "summary",
+        "targetHandle": "fileSummary"
+      },
+      {
+        "id": "extract_repo_files-assemble_code_risk_report-files",
+        "source": "extract_repo_files",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "files",
+        "targetHandle": "files"
+      },
+      {
+        "id": "extract_repo_files-assemble_code_risk_report-skippedFiles",
+        "source": "extract_repo_files",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "skippedFiles",
+        "targetHandle": "skippedFiles"
+      },
+      {
+        "id": "semgrep_scan-assemble_code_risk_report-findings",
+        "source": "semgrep_scan",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "findings",
+        "targetHandle": "semgrepFindings"
+      },
+      {
+        "id": "semgrep_scan-assemble_code_risk_report-findingCount",
+        "source": "semgrep_scan",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "findingCount",
+        "targetHandle": "semgrepCount"
+      },
+      {
+        "id": "checkov_terraform-assemble_code_risk_report-violations",
+        "source": "checkov_terraform",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "violations",
+        "targetHandle": "terraformViolations"
+      },
+      {
+        "id": "checkov_kubernetes-assemble_code_risk_report-violations",
+        "source": "checkov_kubernetes",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "violations",
+        "targetHandle": "kubernetesViolations"
+      },
+      {
+        "id": "checkov_dockerfile-assemble_code_risk_report-violations",
+        "source": "checkov_dockerfile",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "violations",
+        "targetHandle": "dockerfileViolations"
+      },
+      {
+        "id": "checkov_cloudformation-assemble_code_risk_report-violations",
+        "source": "checkov_cloudformation",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "violations",
+        "targetHandle": "cloudformationViolations"
+      },
+      {
+        "id": "trivy_repo_scan-assemble_code_risk_report-vulnerabilities",
+        "source": "trivy_repo_scan",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "vulnerabilities",
+        "targetHandle": "trivyVulnerabilities"
+      },
+      {
+        "id": "trivy_repo_scan-assemble_code_risk_report-vulnerabilityCount",
+        "source": "trivy_repo_scan",
+        "target": "assemble_code_risk_report",
+        "sourceHandle": "vulnerabilityCount",
+        "targetHandle": "trivyCount"
+      },
+      {
+        "id": "assemble_code_risk_report-artifact_report-report",
+        "source": "assemble_code_risk_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

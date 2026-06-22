@@ -126,6 +126,54 @@ export class TemplatesController {
   }
 
   /**
+   * GET /templates/revalidations - List recent targeted live validation jobs
+   * IMPORTANT: Must come before :id route to avoid route conflict
+   */
+  @Get('revalidations')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'List recent template live revalidations' })
+  @ApiOkResponse({ description: 'Returns recent template revalidation jobs' })
+  async getRevalidationJobs(@Query('limit') limit?: string) {
+    return this.templateService.getRevalidationJobs({
+      limit: limit ? Number.parseInt(limit, 10) : undefined,
+    });
+  }
+
+  /**
+   * GET /templates/revalidations/:auditId/log - Get bounded stdout/stderr log tail
+   * IMPORTANT: Must come before :auditId route to avoid route conflict
+   */
+  @Get('revalidations/:auditId/log')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get template live revalidation log tail' })
+  @ApiOkResponse({ description: 'Returns a bounded stdout/stderr log tail' })
+  async getRevalidationJobLog(
+    @Param('auditId') auditId: string,
+    @Query('stream') stream?: string,
+    @Query('maxBytes') maxBytes?: string,
+  ) {
+    return this.templateService.getRevalidationJobLog(auditId, {
+      stream: stream ?? 'stderr',
+      maxBytes: maxBytes ? Number.parseInt(maxBytes, 10) : undefined,
+    });
+  }
+
+  /**
+   * GET /templates/revalidations/:auditId - Get targeted live validation status
+   * IMPORTANT: Must come before :id route to avoid route conflict
+   */
+  @Get('revalidations/:auditId')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Get template live revalidation status' })
+  @ApiOkResponse({ description: 'Returns template revalidation job status' })
+  async getRevalidationJob(@Param('auditId') auditId: string) {
+    return this.templateService.getRevalidationJob(auditId);
+  }
+
+  /**
    * GET /templates/:id - Get template details by ID (public)
    * IMPORTANT: Must be last to avoid conflicting with specific routes
    */
@@ -161,6 +209,25 @@ export class TemplatesController {
     return await this.templateService.publishTemplate({
       ...dto,
       submittedBy: auth.userId || auth.organizationId || 'unknown',
+      organizationId: auth.organizationId,
+    });
+  }
+
+  /**
+   * POST /templates/:id/revalidate - Start targeted live template validation
+   */
+  @Post(':id/revalidate')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Start template live revalidation' })
+  @ApiResponse({ status: 202, description: 'Template revalidation job started' })
+  async revalidateTemplate(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentAuth() auth: { userId?: string; organizationId?: string },
+  ) {
+    return await this.templateService.revalidateTemplate(id, {
+      requestedBy: auth.userId || auth.organizationId,
       organizationId: auth.organizationId,
     });
   }

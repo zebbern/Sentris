@@ -1,4 +1,24 @@
-import type { WorkflowResponse, TemplateMetadata, TemplateJson } from './publish-template-types';
+import type {
+  WorkflowTemplatePreviewSource,
+  TemplateMetadata,
+  TemplateJson,
+} from './publish-template-types';
+
+const SECRET_REFERENCE_KEYS = new Set([
+  'secretId',
+  'secret_name',
+  'secretName',
+  'secret_ref',
+  'secretRef',
+  'apiKey',
+]);
+
+const SECRET_VALUE_PATTERNS = [
+  /\$\{secrets\.([^}]+)\}/g,
+  /\$\{secret\.([^}]+)\}/g,
+  /\{\{secret\.([^}]+)\}\}/g,
+  /\{\{secret:([^}]+)\}\}/g,
+];
 
 /**
  * Format byte size of a JSON string for display.
@@ -25,27 +45,11 @@ export function sanitizeGraphForTemplate(graph: Record<string, unknown>): Record
       const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         // Check for secret reference patterns
-        if (
-          key === 'secretId' ||
-          key === 'secret_name' ||
-          key === 'secretName' ||
-          key === 'secret_ref' ||
-          key === 'secretRef'
-        ) {
+        if (SECRET_REFERENCE_KEYS.has(key)) {
           result[key] = '{{SECRET_PLACEHOLDER}}';
-        } else if (
-          typeof value === 'string' &&
-          (value.includes('${secrets.') ||
-            value.includes('${secret.') ||
-            value.includes('{{secret.') ||
-            value.includes('{{secret:'))
-        ) {
+        } else if (typeof value === 'string' && containsSecretInterpolation(value)) {
           // Replace secret interpolation expressions with placeholder
-          result[key] = value
-            .replace(/\$\{secrets\.[^}]+\}/g, '{{SECRET_PLACEHOLDER}}')
-            .replace(/\$\{secret\.[^}]+\}/g, '{{SECRET_PLACEHOLDER}}')
-            .replace(/\{\{secret\.[^}]+\}\}/g, '{{SECRET_PLACEHOLDER}}')
-            .replace(/\{\{secret:[a-f0-9-]+\}\}/gi, '{{SECRET_PLACEHOLDER}}');
+          result[key] = replaceSecretInterpolations(value);
         } else {
           result[key] = traverseAndSanitize(value);
         }
@@ -74,18 +78,18 @@ export function extractRequiredSecrets(
       }
 
       for (const [key, value] of Object.entries(obj)) {
-        if (key === 'secretId' || key === 'secret_name' || key === 'secretName') {
-          if (typeof value === 'string') {
-            // Infer type from context
-            const context = path[path.length - 2] || 'generic';
-            const type = context.toLowerCase().includes('api')
-              ? 'api_key'
-              : context.toLowerCase().includes('token')
-                ? 'token'
-                : context.toLowerCase().includes('password')
-                  ? 'password'
-                  : 'generic';
-            secrets.set(value, { type, description: `Secret for ${context}` });
+        if (SECRET_REFERENCE_KEYS.has(key)) {
+          const name = deriveSecretName(key, value);
+          secrets.set(name, {
+            type: inferSecretType(key),
+            description: `Secret for ${key}`,
+          });
+        } else if (typeof value === 'string' && containsSecretInterpolation(value)) {
+          for (const name of extractSecretNamesFromInterpolations(value)) {
+            secrets.set(name, {
+              type: inferSecretType(name),
+              description: `Secret for ${name}`,
+            });
           }
         } else if (typeof value === 'object' && value !== null) {
           traverseAndExtract(value, [...path, key]);
@@ -117,7 +121,7 @@ export function stripLayoutData(graph: Record<string, unknown>): Record<string, 
  * Generate the template JSON structure with metadata
  */
 export function generateTemplateJson(
-  workflow: WorkflowResponse,
+  workflow: WorkflowTemplatePreviewSource,
   metadata: TemplateMetadata,
 ): string {
   const sanitizedGraph = sanitizeGraphForTemplate(workflow.graph);
@@ -131,6 +135,51 @@ export function generateTemplateJson(
   };
 
   return JSON.stringify(template, null, 2);
+}
+
+function containsSecretInterpolation(value: string): boolean {
+  return SECRET_VALUE_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0;
+    return pattern.test(value);
+  });
+}
+
+function replaceSecretInterpolations(value: string): string {
+  return SECRET_VALUE_PATTERNS.reduce((current, pattern) => {
+    pattern.lastIndex = 0;
+    return current.replace(pattern, '{{SECRET_PLACEHOLDER}}');
+  }, value);
+}
+
+function extractSecretNamesFromInterpolations(value: string): string[] {
+  return SECRET_VALUE_PATTERNS.flatMap((pattern) => {
+    const names: string[] = [];
+    pattern.lastIndex = 0;
+    for (const match of value.matchAll(pattern)) {
+      const name = match[1]?.trim();
+      if (name) names.push(name);
+    }
+    return names;
+  });
+}
+
+function deriveSecretName(key: string, value: unknown): string {
+  if (
+    (key === 'secret_name' || key === 'secretName') &&
+    typeof value === 'string' &&
+    value.trim().length > 0
+  ) {
+    return value.trim();
+  }
+  return `secret_${key}`;
+}
+
+function inferSecretType(nameOrKey: string): string {
+  const normalized = nameOrKey.toLowerCase();
+  if (normalized.includes('token')) return 'token';
+  if (normalized.includes('password')) return 'password';
+  if (normalized.includes('api')) return 'api_key';
+  return 'string';
 }
 
 /**

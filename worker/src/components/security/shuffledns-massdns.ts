@@ -17,6 +17,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const DEFAULT_RESOLVERS = ['1.1.1.1', '8.8.8.8'] as const;
 
@@ -126,10 +130,13 @@ const parameterSchema = parameters({
       max: 20,
     },
   ),
-  wildcardStrict: param(z.boolean().default(false).describe('Strict wildcard checking (-sw)'), {
-    label: 'Strict Wildcard (-sw)',
-    editor: 'boolean',
-  }),
+  wildcardStrict: param(
+    z.boolean().default(false).describe('Strict wildcard checking (-strict-wildcard)'),
+    {
+      label: 'Strict Wildcard (-strict-wildcard)',
+      editor: 'boolean',
+    },
+  ),
   wildcardThreads: param(
     z.number().int().positive().max(2000).optional().describe('Concurrent wildcard checks (-wt)'),
     {
@@ -140,9 +147,12 @@ const parameterSchema = parameters({
     },
   ),
   massdnsCmd: param(
-    z.string().optional().describe("Optional massdns commands passed via '-mcmd' (e.g. '-i 10')"),
+    z
+      .string()
+      .optional()
+      .describe('Deprecated: custom MassDNS commands are not supported by the bundled runner'),
     {
-      label: 'MassDNS Extra Cmd (-mcmd)',
+      label: 'MassDNS Extra Cmd (unsupported)',
       editor: 'text',
     },
   ),
@@ -178,7 +188,8 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
-    image: 'ghcr.io/zebbern/shuffledns-massdns:latest',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
+    image: 'projectdiscovery/shuffledns:latest',
     // Do not depend on a shell in the image; we'll run the binary directly
     network: 'bridge',
     timeoutSeconds: 300,
@@ -240,35 +251,6 @@ const definition = defineComponent({
       flags.push('-d', d);
     }
 
-    // Prepare optional list contents via env to keep shell minimal
-    const env: Record<string, string> = {};
-    const mkB64 = (lines?: string[]) =>
-      Array.isArray(lines) && lines.length > 0
-        ? Buffer.from(
-            lines
-              .map((s) => s.trim())
-              .filter(Boolean)
-              .join('\n'),
-            'utf8',
-          ).toString('base64')
-        : '';
-
-    // Always specify execution mode explicitly for the image
-    flags.push('-mode', modeText);
-
-    if (modeText === 'bruteforce') {
-      const wordsB64 = mkB64(words);
-      if (wordsB64) env['WORDS_B64'] = wordsB64;
-    } else if (modeText === 'resolve') {
-      const seedsB64 = mkB64(seeds);
-      if (seedsB64) env['SEEDS_B64'] = seedsB64;
-    }
-
-    const resolversB64 = mkB64(resolvers);
-    const trustedB64 = mkB64(trustedResolvers);
-    if (resolversB64) env['RESOLVERS_B64'] = resolversB64;
-    if (trustedB64) env['TRUSTED_B64'] = trustedB64;
-
     if (typeof params.threads === 'number' && params.threads > 0) {
       flags.push('-t', String(params.threads));
     }
@@ -276,14 +258,20 @@ const definition = defineComponent({
       flags.push('-retries', String(params.retries));
     }
     if (params.wildcardStrict) {
-      flags.push('-sw');
+      flags.push('-strict-wildcard');
     }
     if (typeof params.wildcardThreads === 'number' && params.wildcardThreads > 0) {
       flags.push('-wt', String(params.wildcardThreads));
     }
     if (params.massdnsCmd && params.massdnsCmd.trim().length > 0) {
-      // Keep quotes around the value when passing to CLI
-      flags.push('-mcmd', params.massdnsCmd.trim());
+      throw new ValidationError(
+        'MassDNS extra commands are not supported by the ProjectDiscovery shuffledns image.',
+        {
+          fieldErrors: {
+            massdnsCmd: ['Remove MassDNS extra commands or use a custom shuffledns image.'],
+          },
+        },
+      );
     }
 
     // Write lists to an isolated volume and mount into the container
@@ -292,7 +280,6 @@ const definition = defineComponent({
     const WORDS = 'words.txt';
     const SEEDS = 'seeds.txt';
     const RESOLVERS = 'resolvers.txt';
-    const TRUSTED = 'trusted.txt';
 
     const writeIfAny = (values: string[] | undefined, filename: string) => {
       if (Array.isArray(values) && values.length > 0) {
@@ -310,10 +297,13 @@ const definition = defineComponent({
     const filesToWrite: Record<string, string> = {};
     const wroteWords = writeIfAny(words, WORDS);
     const wroteSeeds = writeIfAny(seeds, SEEDS);
-    const wroteResolvers = writeIfAny(resolvers, RESOLVERS);
-    const wroteTrusted = writeIfAny(trustedResolvers, TRUSTED);
+    const effectiveResolvers = [
+      ...(resolvers ?? [...DEFAULT_RESOLVERS]),
+      ...(trustedResolvers ?? []),
+    ];
+    const wroteResolvers = writeIfAny(effectiveResolvers, RESOLVERS);
 
-    [wroteWords, wroteSeeds, wroteResolvers, wroteTrusted].forEach((file) => {
+    [wroteWords, wroteSeeds, wroteResolvers].forEach((file) => {
       if (file) {
         filesToWrite[file.filename] = file.contents;
       }
@@ -332,9 +322,6 @@ const definition = defineComponent({
     if (wroteResolvers) {
       flags.push('-r', `/input/${RESOLVERS}`);
     }
-    if (wroteTrusted) {
-      flags.push('-tr', `/input/${TRUSTED}`);
-    }
 
     const baseRunner = definition.runner;
     if (baseRunner.kind !== 'docker') {
@@ -343,17 +330,11 @@ const definition = defineComponent({
       });
     }
 
-    const runnerConfig: DockerRunnerConfig = {
-      kind: 'docker',
-      image: baseRunner.image,
-      network: baseRunner.network,
-      timeoutSeconds: baseRunner.timeoutSeconds,
-      env: { ...(baseRunner.env ?? {}), ...env },
-      // Run the binary directly; pass flags as the command args
+    const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
       entrypoint: 'shuffledns',
       command: flags,
       volumes: [volume.getVolumeConfig('/input', true)],
-    };
+    });
 
     let resultUnknown: unknown;
     try {

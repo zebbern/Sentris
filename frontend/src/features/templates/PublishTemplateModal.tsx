@@ -1,6 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
-import { useTemplates } from '@/hooks/queries/useTemplateQueries';
+import {
+  templateRepoInfoQueryOptions,
+  usePublishTemplate,
+  useTemplates,
+} from '@/hooks/queries/useTemplateQueries';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   Dialog,
   DialogContent,
@@ -9,13 +15,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { GitPullRequest, Info } from 'lucide-react';
-import { API_BASE_URL, getApiAuthHeaders } from '@/services/api';
+import { api } from '@/services/api';
 import {
   DEFAULT_GITHUB_TEMPLATE_REPO,
   DEFAULT_GITHUB_BRANCH,
   type PublishTemplateModalProps,
   type PublishStep,
-  type WorkflowResponse,
   type TemplateMetadata,
 } from './publish-template-types';
 import {
@@ -56,6 +61,8 @@ export function PublishTemplateModal({
   );
 
   const { data: templates = [] } = useTemplates();
+  const { mutateAsync: publishTemplate } = usePublishTemplate();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open && templates.length > 0 && name.trim()) {
@@ -108,15 +115,11 @@ export function PublishTemplateModal({
       setIsLoading(true);
       (async () => {
         try {
-          const headers = await getApiAuthHeaders();
-          const response = await fetch(`${API_BASE_URL}/api/v1/workflows/${workflowId}`, {
-            headers,
+          const workflow = await queryClient.fetchQuery({
+            queryKey: queryKeys.workflows.detail(workflowId),
+            queryFn: () => api.workflows.get(workflowId),
+            staleTime: 60_000,
           });
-          if (!response.ok) {
-            throw new Error('Failed to fetch workflow data');
-          }
-
-          const workflow: WorkflowResponse = await response.json();
 
           const metadata: TemplateMetadata = {
             name: name.trim(),
@@ -139,7 +142,7 @@ export function PublishTemplateModal({
         }
       })();
     },
-    [workflowId, name, description, category, tags, author],
+    [workflowId, name, description, category, tags, author, queryClient],
   );
 
   const handlePublish = useCallback(async () => {
@@ -147,23 +150,36 @@ export function PublishTemplateModal({
     setIsLoading(true);
 
     try {
+      const publishResult = await publishTemplate({
+        workflowId,
+        name: name.trim(),
+        description: description.trim(),
+        category,
+        tags,
+        author: author.trim(),
+      });
+      const acceptedTemplateJson = buildAcceptedTemplateJson({
+        name: name.trim(),
+        description: description.trim(),
+        category,
+        tags,
+        author: author.trim(),
+        manifest: publishResult.manifest,
+        graph: publishResult.graph,
+        requiredSecrets: publishResult.requiredSecrets,
+      });
+      setGeneratedTemplateJson(acceptedTemplateJson);
       const filename = `templates/${sanitizeFilename(name.trim())}`;
-      const copied = await copyToClipboard(generatedTemplateJson, { showToast: false });
+      const copied = await copyToClipboard(acceptedTemplateJson, { showToast: false });
       if (copied) setHasCopiedOnSubmit(true);
       let owner: string;
       let repo: string;
       let branch: string;
       try {
-        const repoInfoRes = await fetch(`${API_BASE_URL}/api/v1/templates/repo-info`);
-        if (repoInfoRes.ok) {
-          const repoInfo = await repoInfoRes.json();
-          owner = repoInfo.owner;
-          repo = repoInfo.repo;
-          branch = repoInfo.branch;
-        } else {
-          [owner, repo] = DEFAULT_GITHUB_TEMPLATE_REPO.split('/');
-          branch = DEFAULT_GITHUB_BRANCH;
-        }
+        const repoInfo = await queryClient.fetchQuery(templateRepoInfoQueryOptions());
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        branch = repoInfo.branch;
       } catch {
         [owner, repo] = DEFAULT_GITHUB_TEMPLATE_REPO.split('/');
         branch = DEFAULT_GITHUB_BRANCH;
@@ -181,7 +197,18 @@ export function PublishTemplateModal({
     } finally {
       setIsLoading(false);
     }
-  }, [name, generatedTemplateJson, copyToClipboard, onSuccess]);
+  }, [
+    workflowId,
+    name,
+    description,
+    category,
+    tags,
+    author,
+    copyToClipboard,
+    onSuccess,
+    publishTemplate,
+    queryClient,
+  ]);
 
   const handleAddTag = () => {
     const tag = tagInput.trim().toLowerCase();
@@ -304,5 +331,39 @@ export function PublishTemplateModal({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function buildAcceptedTemplateJson(params: {
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  author: string;
+  manifest: Record<string, unknown>;
+  graph: Record<string, unknown>;
+  requiredSecrets: { name: string; type: string; description?: string; placeholder?: string }[];
+}): string {
+  const metadata: TemplateMetadata = {
+    name: params.name,
+    category: params.category,
+    tags: params.tags,
+    author: params.author,
+    version: '1.0.0',
+  };
+
+  if (params.description) {
+    metadata.description = params.description;
+  }
+
+  return JSON.stringify(
+    {
+      _metadata: metadata,
+      manifest: params.manifest,
+      graph: params.graph,
+      requiredSecrets: params.requiredSecrets,
+    },
+    null,
+    2,
   );
 }

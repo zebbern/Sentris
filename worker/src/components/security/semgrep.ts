@@ -16,20 +16,23 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
+import { materializeFileBundle } from './bundle-files';
 
 const SEMGREP_IMAGE = 'semgrep/semgrep:latest';
 const SEMGREP_TIMEOUT_SECONDS = 600; // 10 minutes default
+const SEMGREP_RESULTS_FILE = 'semgrep-results.json';
 
 const inputSchema = inputs({
-  target: port(
-    z.string().min(1, 'Target code content is required').describe('Source code content to scan'),
-    {
-      label: 'Target Code',
-      description:
-        'Source code content or file content to scan. Will be written to a file in the container for analysis.',
-      connectionType: { kind: 'primitive', name: 'text' },
-    },
-  ),
+  target: port(z.string().describe('Source code content to scan'), {
+    label: 'Target Code',
+    description:
+      'Source code content or file content to scan. Will be written to a file in the container for analysis.',
+    connectionType: { kind: 'primitive', name: 'text' },
+  }),
   customFlags: port(
     z.string().optional().describe('Raw CLI flags to append to the semgrep command'),
     {
@@ -189,6 +192,60 @@ const runnerOutputSchema = z.object({
   exitCode: z.number().optional().default(0),
 });
 
+function parseSemgrepJsonOutput(rawOutput: string): unknown | null {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Some Semgrep images emit progress/banner text around JSON even with
+    // --json. Fall through and extract the first balanced JSON object.
+  }
+
+  let start = trimmed.indexOf('{');
+  while (start >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < trimmed.length; index += 1) {
+      const char = trimmed[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = trimmed.slice(start, index + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+
+    start = trimmed.indexOf('{', start + 1);
+  }
+
+  return null;
+}
+
 const definition = defineComponent({
   id: 'sentris.semgrep.run',
   label: 'Semgrep SAST Scanner',
@@ -196,6 +253,7 @@ const definition = defineComponent({
   retryPolicy: semgrepRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: SEMGREP_IMAGE,
     network: 'bridge',
     timeoutSeconds: SEMGREP_TIMEOUT_SECONDS,
@@ -203,6 +261,8 @@ const definition = defineComponent({
       HOME: '/tmp',
       // Disable Semgrep telemetry in container
       SEMGREP_SEND_METRICS: 'off',
+      NO_COLOR: '1',
+      TERM: 'dumb',
     },
     command: [],
   },
@@ -250,6 +310,20 @@ const definition = defineComponent({
 
     const target = inputs.target;
 
+    if (target.trim().length === 0) {
+      context.logger.info('[Semgrep] No source content provided, returning empty results');
+      context.emitProgress({
+        message: 'No source content provided to Semgrep',
+        level: 'info',
+      });
+      return {
+        findings: [],
+        rawOutput: '',
+        findingCount: 0,
+        results: [],
+      };
+    }
+
     context.logger.info(`[Semgrep] Starting SAST scan with config: ${parsedParams.config}`);
     context.emitProgress({
       message: `Launching Semgrep scan with config: ${parsedParams.config}`,
@@ -268,11 +342,8 @@ const definition = defineComponent({
 
     let rawOutput: string;
     try {
-      // Write target code into the volume root for scanning
-      // (IsolatedContainerVolume does not create subdirectories)
-      await volume.initialize({
-        'target-code.txt': target,
-      });
+      const inputFiles = materializeFileBundle(target, 'target-code.txt');
+      await volume.initialize(inputFiles);
       context.logger.info(`[Semgrep] Created isolated volume: ${volume.getVolumeName()}`);
 
       // Build Semgrep CLI args
@@ -283,7 +354,8 @@ const definition = defineComponent({
         '--config',
         parsedParams.config,
         '--json',
-        '--no-git',
+        '--quiet',
+        `--json-output=/inputs/${SEMGREP_RESULTS_FILE}`,
       ];
 
       if (parsedParams.severity && parsedParams.severity.length > 0) {
@@ -306,15 +378,10 @@ const definition = defineComponent({
         }
       }
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? SEMGREP_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...args],
-        volumes: [volume.getVolumeConfig('/inputs', true)],
-      };
+        volumes: [volume.getVolumeConfig('/inputs', false)],
+      });
 
       try {
         const result = await runComponentWithRunner(
@@ -359,6 +426,20 @@ const definition = defineComponent({
           throw error;
         }
       }
+
+      try {
+        const outputFiles = await volume.readFiles([SEMGREP_RESULTS_FILE]);
+        const fileOutput = outputFiles[SEMGREP_RESULTS_FILE];
+        if (typeof fileOutput === 'string' && fileOutput.trim().length > 0) {
+          rawOutput = fileOutput;
+        }
+      } catch (readError: unknown) {
+        context.logger.warn(
+          `[Semgrep] Could not read JSON result file: ${
+            readError instanceof Error ? readError.message : String(readError)
+          }. Falling back to runner output.`,
+        );
+      }
     } finally {
       await volume.cleanup();
       context.logger.info('[Semgrep] Cleaned up isolated volume');
@@ -371,9 +452,13 @@ const definition = defineComponent({
     const trimmed = rawOutput.trim();
     if (trimmed.length > 0) {
       try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.results)) {
-          for (const result of parsed.results) {
+        const parsed = parseSemgrepJsonOutput(trimmed);
+        const semgrepResults =
+          parsed && typeof parsed === 'object'
+            ? (parsed as { results?: unknown }).results
+            : undefined;
+        if (Array.isArray(semgrepResults)) {
+          for (const result of semgrepResults) {
             const cweList: string[] = [];
             const owaspList: string[] = [];
 

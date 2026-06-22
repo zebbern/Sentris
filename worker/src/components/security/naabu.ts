@@ -15,6 +15,10 @@ import {
   ContainerError,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const NAABU_IMAGE = 'projectdiscovery/naabu:latest';
 const INPUT_MOUNT_NAME = 'inputs';
@@ -257,6 +261,7 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: NAABU_IMAGE,
     // The naabu image is distroless (no shell available).
     // Use the image's default entrypoint directly and pass args via command.
@@ -354,17 +359,11 @@ const definition = defineComponent({
         ...effectiveOptions,
       });
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? dockerTimeoutSeconds,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         stdinJson: false,
-        // Pass naabu CLI args directly (image default entrypoint is naabu)
         command: [...(baseRunner.command ?? []), ...naabuArgs],
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

@@ -23,6 +23,59 @@ describe('httpx argument builder', () => {
     expect(args).toContain('-tls-probe');
     expect(args).not.toContain('-prefer-https');
   });
+
+  test('uses status code matchers when filtering responses by status', () => {
+    const args = buildHttpxArgs({
+      ports: undefined,
+      statusCodes: '200,301,403',
+      threads: undefined,
+      path: undefined,
+      followRedirects: false,
+      tlsProbe: false,
+      preferHttps: false,
+    });
+
+    expect(args).toContain('-match-code');
+    expect(args).toContain('200,301,403');
+    expect(args).not.toContain('-status-code');
+  });
+});
+
+describe('httpx component output normalization', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test('preferHttps keeps the HTTPS response when both schemes match the same endpoint', async () => {
+    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'httpx-prefer-https-test',
+    });
+
+    const raw = [
+      '{"url":"http://example.com/login","input":"example.com/login","host":"example.com","status-code":200,"scheme":"http","title":"HTTP Login"}',
+      '{"url":"https://example.com/login","input":"example.com/login","host":"example.com","status-code":200,"scheme":"https","title":"HTTPS Login"}',
+      '{"url":"http://example.com:8080/login","input":"example.com:8080/login","host":"example.com","port":8080,"status-code":200,"scheme":"http","title":"HTTP Admin"}',
+    ].join('\n');
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(raw);
+
+    const inputs = component.inputs.parse({
+      targets: ['example.com'],
+    });
+
+    const result = await component.execute({ inputs, params: { preferHttps: true } }, context);
+
+    expect(result.responses.map((response) => response.url)).toEqual([
+      'https://example.com/login',
+      'http://example.com:8080/login',
+    ]);
+    expect(result.resultCount).toBe(2);
+    expect(result.results).toHaveLength(2);
+  });
 });
 
 describeHttpx('httpx component', () => {

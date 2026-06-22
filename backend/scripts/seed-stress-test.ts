@@ -2,6 +2,7 @@ import { Pool, PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
 import { SecretEncryption, parseMasterKey } from '@sentris/shared';
 import * as bcrypt from 'bcryptjs';
+import { formatDatabaseTarget, getScriptDatabaseTarget } from './lib/script-database-target';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -2071,22 +2072,26 @@ async function main() {
   const { tier, clean } = parseArgs();
   const config = TIERS[tier];
 
-  const connectionString =
-    process.env.DATABASE_URL || 'postgresql://sentris:sentris@localhost:5433/sentris';
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'SEED_STRESS_DATABASE_URL',
+  });
+  const connectionString = databaseTarget.connectionString;
 
   const pool = new Pool({ connectionString });
   const client = await pool.connect();
 
   try {
+    console.log(`\nStress Test Seed - Tier: ${tier.toUpperCase()}`);
+    console.log('='.repeat(50));
+    console.log(formatDatabaseTarget(databaseTarget));
+    console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
+
     if (clean) {
       await client.query('BEGIN');
       await cleanup(client);
       await client.query('COMMIT');
       return;
     }
-
-    console.log(`\nStress Test Seed - Tier: ${tier.toUpperCase()}`);
-    console.log('='.repeat(50));
 
     // Auto-clean existing seed data before re-seeding to prevent accumulation
     await client.query('BEGIN');

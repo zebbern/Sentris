@@ -3,7 +3,14 @@
     "name": "Web Attack Surface Quick Win Hunt",
     "description": "Authorized bug bounty workflow that refreshes live web metadata, crawls endpoints, runs safe exposure checks, reviews TLS posture, and writes a prioritized quick-win lead report.",
     "category": "bug-bounty",
-    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
+    "tags": [
+      "bug-bounty",
+      "web",
+      "nuclei",
+      "katana",
+      "tls",
+      "quick-wins"
+    ],
     "author": "sentris-team",
     "version": "1.0.0"
   },
@@ -13,10 +20,17 @@
     "version": "1.0.0",
     "author": "sentris-team",
     "category": "bug-bounty",
-    "tags": ["bug-bounty", "web", "nuclei", "katana", "tls", "quick-wins"],
+    "tags": [
+      "bug-bounty",
+      "web",
+      "nuclei",
+      "katana",
+      "tls",
+      "quick-wins"
+    ],
     "entryPoint": "trigger_1",
-    "nodeCount": 9,
-    "edgeCount": 11
+    "nodeCount": 10,
+    "edgeCount": 15
   },
   "graph": {
     "name": "Web Attack Surface Quick Win Hunt",
@@ -25,7 +39,10 @@
       {
         "id": "trigger_1",
         "type": "core.workflow.entrypoint",
-        "position": { "x": 100, "y": 300 },
+        "position": {
+          "x": 100,
+          "y": 300
+        },
         "data": {
           "label": "Live Web Assets Input",
           "config": {
@@ -61,7 +78,10 @@
       {
         "id": "httpx_refresh",
         "type": "sentris.httpx.scan",
-        "position": { "x": 420, "y": 300 },
+        "position": {
+          "x": 420,
+          "y": 300
+        },
         "data": {
           "label": "Refresh Live Metadata",
           "config": {
@@ -78,15 +98,29 @@
       {
         "id": "extract_live_urls",
         "type": "core.logic.script",
-        "position": { "x": 740, "y": 300 },
+        "position": {
+          "x": 740,
+          "y": 300
+        },
         "data": {
           "label": "Extract Live and TLS Targets",
           "config": {
             "params": {
-              "variables": [{ "name": "httpResponses", "type": "list-json" }],
+              "variables": [
+                {
+                  "name": "httpResponses",
+                  "type": "list-json"
+                }
+              ],
               "returns": [
-                { "name": "liveUrls", "type": "list-text" },
-                { "name": "tlsTargets", "type": "list-text" }
+                {
+                  "name": "liveUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "tlsTargets",
+                  "type": "list-text"
+                }
               ],
               "code": "export function script(input) {\n  const responses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const liveUrls = responses.map((item) => item?.url || item?.finalUrl || item?.input).filter((value) => typeof value === 'string' && value.length > 0);\n  const tlsTargets = liveUrls.filter((url) => url.startsWith('https://')).map((url) => { try { const parsed = new URL(url); return `${parsed.hostname}:${parsed.port || '443'}`; } catch { return null; } }).filter((value) => typeof value === 'string' && value.length > 0);\n  return { liveUrls: Array.from(new Set(liveUrls)), tlsTargets: Array.from(new Set(tlsTargets)) };\n}"
             },
@@ -95,9 +129,53 @@
         }
       },
       {
+        "id": "apply_scope_controls",
+        "type": "core.logic.script",
+        "position": {
+          "x": 900,
+          "y": 300
+        },
+        "data": {
+          "label": "Apply Scope and Intensity Controls",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "liveUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "outOfScopePaths",
+                  "type": "list-text"
+                },
+                {
+                  "name": "scanIntensity",
+                  "type": "string"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "scopedLiveUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "scanProfile",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const asList = (value) => Array.isArray(value) ? value.map((item) => String(item || '').trim()).filter(Boolean) : [];\n  const normalizePath = (value) => {\n    const text = String(value || '').trim();\n    if (!text) return '';\n    try {\n      const parsed = new URL(text);\n      return parsed.pathname || '/';\n    } catch {\n      const pathOnly = text.split(/[?#]/)[0] || '/';\n      return pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;\n    }\n  };\n  const outOfScopePaths = Array.from(new Set(asList(input.outOfScopePaths).map(normalizePath).filter(Boolean)));\n  const isOutOfScope = (value) => {\n    const path = normalizePath(value);\n    return outOfScopePaths.some((scopePath) => path === scopePath || path.startsWith(scopePath.endsWith('/') ? scopePath : `${scopePath}/`));\n  };\n  const requestedIntensity = String(input.scanIntensity || 'safe').trim().toLowerCase();\n  const intensity = ['safe', 'normal', 'thorough'].includes(requestedIntensity) ? requestedIntensity : 'safe';\n  const targetLimit = { safe: 10, normal: 30, thorough: 75 }[intensity];\n  const liveUrls = Array.from(new Set(asList(input.liveUrls)));\n  const scopedLiveUrls = [];\n  let excludedByScope = 0;\n  let eligibleTargets = 0;\n  for (const url of liveUrls) {\n    if (isOutOfScope(url)) {\n      excludedByScope++;\n      continue;\n    }\n    eligibleTargets++;\n    if (scopedLiveUrls.length < targetLimit) scopedLiveUrls.push(url);\n  }\n  return {\n    scopedLiveUrls,\n    scanProfile: {\n      intensity,\n      targetLimit,\n      originalTargets: liveUrls.length,\n      eligibleTargets,\n      scopedTargets: scopedLiveUrls.length,\n      excludedByScope,\n      truncatedByIntensity: Math.max(0, eligibleTargets - scopedLiveUrls.length),\n      outOfScopePaths,\n    },\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
         "id": "katana_crawl",
         "type": "sentris.katana.run",
-        "position": { "x": 1060, "y": 120 },
+        "position": {
+          "x": 1060,
+          "y": 120
+        },
         "data": {
           "label": "Crawl Endpoints",
           "config": {
@@ -114,7 +192,10 @@
       {
         "id": "nuclei_quick_checks",
         "type": "sentris.nuclei.scan",
-        "position": { "x": 1060, "y": 300 },
+        "position": {
+          "x": 1060,
+          "y": 300
+        },
         "data": {
           "label": "Run Safe Quick Checks",
           "config": {
@@ -127,7 +208,13 @@
               "followRedirects": true,
               "updateTemplates": true,
               "disableHttpx": true,
-              "severityFilter": ["info", "low", "medium", "high", "critical"]
+              "severityFilter": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
             },
             "inputOverrides": {
               "templateIds": [
@@ -145,13 +232,26 @@
       {
         "id": "select_tls_target",
         "type": "core.logic.script",
-        "position": { "x": 1060, "y": 500 },
+        "position": {
+          "x": 1060,
+          "y": 500
+        },
         "data": {
           "label": "Select TLS Target",
           "config": {
             "params": {
-              "variables": [{ "name": "tlsTargets", "type": "list-text" }],
-              "returns": [{ "name": "tlsTarget", "type": "string" }],
+              "variables": [
+                {
+                  "name": "tlsTargets",
+                  "type": "list-text"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "tlsTarget",
+                  "type": "string"
+                }
+              ],
               "code": "export function script(input) {\n  const targets = Array.isArray(input.tlsTargets) ? input.tlsTargets : [];\n  return { tlsTarget: targets[0] || 'no-https-target-provided.invalid:443' };\n}"
             },
             "inputOverrides": {}
@@ -161,7 +261,10 @@
       {
         "id": "testssl_review",
         "type": "sentris.testssl.run",
-        "position": { "x": 1380, "y": 500 },
+        "position": {
+          "x": 1380,
+          "y": 500
+        },
         "data": {
           "label": "Review TLS Posture",
           "config": {
@@ -178,19 +281,43 @@
       {
         "id": "rank_quick_wins",
         "type": "core.logic.script",
-        "position": { "x": 1700, "y": 300 },
+        "position": {
+          "x": 1700,
+          "y": 300
+        },
         "data": {
           "label": "Rank Quick-Win Leads",
           "config": {
             "params": {
               "variables": [
-                { "name": "httpResponses", "type": "list-json" },
-                { "name": "endpoints", "type": "list-text" },
-                { "name": "nucleiFindings", "type": "list-json" },
-                { "name": "tlsFindings", "type": "list-json" }
+                {
+                  "name": "httpResponses",
+                  "type": "list-json"
+                },
+                {
+                  "name": "endpoints",
+                  "type": "list-text"
+                },
+                {
+                  "name": "nucleiFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "tlsFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "scanProfile",
+                  "type": "json"
+                }
               ],
-              "returns": [{ "name": "report", "type": "json" }],
-              "code": "export function script(input) {\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const endpoints = Array.isArray(input.endpoints) ? input.endpoints : [];\n  const nucleiFindings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const tlsFindings = Array.isArray(input.tlsFindings) ? input.tlsFindings : [];\n  const quickWins = nucleiFindings.filter((item) => ['medium', 'high', 'critical'].includes(String(item?.severity || '').toLowerCase())).map((item) => ({ source: 'nuclei', templateId: item.templateId, name: item.name, severity: item.severity, matchedAt: item.matchedAt }));\n  return { report: { summary: { liveAssets: httpResponses.length, crawledEndpoints: endpoints.length, nucleiFindings: nucleiFindings.length, tlsFindings: tlsFindings.length, quickWins: quickWins.length }, quickWins: quickWins.slice(0, 100), needsReview: nucleiFindings.slice(0, 100), tlsFindings: tlsFindings.slice(0, 50), interestingEndpoints: endpoints.filter((url) => /admin|debug|api|graphql|swagger|login|backup/i.test(url)).slice(0, 100), nextSteps: ['Validate findings manually before submitting reports', 'Confirm each lead is in scope', 'Avoid destructive checks and respect program rate limits'] } };\n}"
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const endpoints = Array.isArray(input.endpoints) ? input.endpoints : [];\n  const nucleiFindings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const tlsFindings = Array.isArray(input.tlsFindings) ? input.tlsFindings : [];\n  const scanProfile = input.scanProfile && typeof input.scanProfile === 'object' ? input.scanProfile : {};\n  const outOfScopePaths = Array.isArray(scanProfile.outOfScopePaths) ? scanProfile.outOfScopePaths.map((item) => String(item || '').trim()).filter(Boolean) : [];\n  const normalizePath = (value) => {\n    const text = String(value || '').trim();\n    if (!text) return '';\n    try {\n      const parsed = new URL(text);\n      return parsed.pathname || '/';\n    } catch {\n      const pathOnly = text.split(/[?#]/)[0] || '/';\n      return pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;\n    }\n  };\n  const isOutOfScope = (value) => {\n    const path = normalizePath(value);\n    return outOfScopePaths.some((scopePath) => path === scopePath || path.startsWith(scopePath.endsWith('/') ? scopePath : `${scopePath}/`));\n  };\n  const findingTarget = (item) => item?.matchedAt || item?.url || item?.host || item?.target || item?.input || '';\n  const scopedEndpoints = endpoints.filter((url) => !isOutOfScope(url));\n  const scopedNucleiFindings = nucleiFindings.filter((item) => !isOutOfScope(findingTarget(item)));\n  const excludedFromReport = (endpoints.length - scopedEndpoints.length) + (nucleiFindings.length - scopedNucleiFindings.length);\n  const quickWins = scopedNucleiFindings.filter((item) => ['medium', 'high', 'critical'].includes(String(item?.severity || '').toLowerCase())).map((item) => ({ source: 'nuclei', templateId: item.templateId, name: item.name, severity: item.severity, matchedAt: item.matchedAt }));\n  return { report: { summary: { liveAssets: httpResponses.length, crawledEndpoints: scopedEndpoints.length, nucleiFindings: scopedNucleiFindings.length, tlsFindings: tlsFindings.length, quickWins: quickWins.length, scanIntensity: scanProfile.intensity || 'safe', scopedTargets: scanProfile.scopedTargets || 0, targetLimit: scanProfile.targetLimit || null, excludedByScope: Number(scanProfile.excludedByScope || 0) + excludedFromReport }, scope: { outOfScopePaths, originalTargets: scanProfile.originalTargets || 0, eligibleTargets: scanProfile.eligibleTargets || 0, truncatedByIntensity: scanProfile.truncatedByIntensity || 0 }, quickWins: quickWins.slice(0, 100), needsReview: scopedNucleiFindings.slice(0, 100), tlsFindings: tlsFindings.slice(0, 50), interestingEndpoints: scopedEndpoints.filter((url) => /admin|debug|api|graphql|swagger|login|backup/i.test(url)).slice(0, 100), nextSteps: ['Validate findings manually before submitting reports', 'Confirm each lead is in scope', 'Avoid destructive checks and respect program rate limits'] } };\n}"
             },
             "inputOverrides": {}
           }
@@ -199,7 +326,10 @@
       {
         "id": "artifact_report",
         "type": "core.artifact.writer",
-        "position": { "x": 2020, "y": 300 },
+        "position": {
+          "x": 2020,
+          "y": 300
+        },
         "data": {
           "label": "Save Quick-Win Report",
           "config": {
@@ -230,20 +360,6 @@
         "target": "extract_live_urls",
         "sourceHandle": "responses",
         "targetHandle": "httpResponses"
-      },
-      {
-        "id": "extract_live_urls-katana_crawl-liveUrls",
-        "source": "extract_live_urls",
-        "target": "katana_crawl",
-        "sourceHandle": "liveUrls",
-        "targetHandle": "targets"
-      },
-      {
-        "id": "extract_live_urls-nuclei_quick_checks-liveUrls",
-        "source": "extract_live_urls",
-        "target": "nuclei_quick_checks",
-        "sourceHandle": "liveUrls",
-        "targetHandle": "targets"
       },
       {
         "id": "extract_live_urls-select_tls_target-tlsTargets",
@@ -293,6 +409,48 @@
         "target": "artifact_report",
         "sourceHandle": "report",
         "targetHandle": "content"
+      },
+      {
+        "id": "extract_live_urls-apply_scope_controls-liveUrls",
+        "source": "extract_live_urls",
+        "target": "apply_scope_controls",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "liveUrls"
+      },
+      {
+        "id": "trigger_1-apply_scope_controls-outOfScopePaths",
+        "source": "trigger_1",
+        "target": "apply_scope_controls",
+        "sourceHandle": "outOfScopePaths",
+        "targetHandle": "outOfScopePaths"
+      },
+      {
+        "id": "trigger_1-apply_scope_controls-scanIntensity",
+        "source": "trigger_1",
+        "target": "apply_scope_controls",
+        "sourceHandle": "scanIntensity",
+        "targetHandle": "scanIntensity"
+      },
+      {
+        "id": "apply_scope_controls-katana_crawl-scopedLiveUrls",
+        "source": "apply_scope_controls",
+        "target": "katana_crawl",
+        "sourceHandle": "scopedLiveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "apply_scope_controls-nuclei_quick_checks-scopedLiveUrls",
+        "source": "apply_scope_controls",
+        "target": "nuclei_quick_checks",
+        "sourceHandle": "scopedLiveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "apply_scope_controls-rank_quick_wins-scanProfile",
+        "source": "apply_scope_controls",
+        "target": "rank_quick_wins",
+        "sourceHandle": "scanProfile",
+        "targetHandle": "scanProfile"
       }
     ]
   },

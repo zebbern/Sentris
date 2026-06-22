@@ -15,6 +15,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const YARA_IMAGE = 'blacktop/yara:latest';
 const YARA_DEFAULT_TIMEOUT_SECONDS = 120;
@@ -163,6 +167,7 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: YARA_IMAGE,
     network: 'none',
     timeoutSeconds: YARA_DEFAULT_TIMEOUT_SECONDS,
@@ -250,16 +255,14 @@ const definition = defineComponent({
         `${CONTAINER_INPUT_DIR}/${TARGET_FILE_NAME}`,
       );
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         network: baseRunner.network ?? 'none',
         timeoutSeconds: timeout ?? YARA_DEFAULT_TIMEOUT_SECONDS,
         env: {},
         command: yaraArgs,
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
         stdinJson: false,
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

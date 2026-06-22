@@ -17,6 +17,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
+} from './security-docker-resources';
 import * as yaml from 'js-yaml';
 
 const inputSchema = inputs({
@@ -277,11 +281,11 @@ const definition = defineComponent({
   retryPolicy: nucleiRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: 'projectdiscovery/nuclei:latest',
     entrypoint: 'sh',
     network: 'bridge',
     timeoutSeconds: dockerTimeoutSeconds,
-    memoryLimit: '1g',
     command: [],
     env: {
       HOME: '/root',
@@ -492,22 +496,13 @@ const definition = defineComponent({
 
       // ===== Build runner config =====
       const baseRunner = definition.runner as DockerRunnerConfig;
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        entrypoint: baseRunner.entrypoint,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds,
-        memoryLimit: baseRunner.memoryLimit,
-        cpuLimit: baseRunner.cpuLimit,
-        pidsLimit: baseRunner.pidsLimit,
-        env: baseRunner.env,
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: buildNucleiDockerCommand(
           [...(baseRunner.command ?? []), ...args],
           parsedParams.updateTemplates,
         ),
         volumes: [volume.getVolumeConfig('/inputs', true)],
-      };
+      });
 
       // ===== Execute nuclei =====
       const rawRunnerResult = await runComponentWithRunner(

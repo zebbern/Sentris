@@ -5,6 +5,7 @@ import {
   type DockerRunnerConfig,
   ContainerError,
   ComponentRetryPolicy,
+  ValidationError,
   defineComponent,
   inputs,
   outputs,
@@ -16,6 +17,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
+} from './security-docker-resources';
 
 const TRIVY_IMAGE = 'aquasec/trivy:latest';
 const TRIVY_TIMEOUT_SECONDS = 600; // 10 minutes default
@@ -41,6 +46,11 @@ const inputSchema = inputs({
       connectionType: { kind: 'primitive', name: 'text' },
     },
   ),
+  ref: port(z.string().trim().optional().describe('Git ref to scan for repository targets'), {
+    label: 'Git Ref',
+    description: 'Optional branch, tag, or commit to scan when Scan Type is Repository.',
+    connectionType: { kind: 'primitive', name: 'text' },
+  }),
 });
 
 const parameterSchema = parameters({
@@ -72,15 +82,11 @@ const parameterSchema = parameters({
       description: 'Only report vulnerabilities matching these severity levels.',
     },
   ),
-  format: param(z.enum(['json', 'table', 'sarif']).default('json'), {
+  format: param(z.literal('json').default('json'), {
     label: 'Output Format',
     editor: 'select',
-    options: [
-      { label: 'JSON', value: 'json' },
-      { label: 'Table', value: 'table' },
-      { label: 'SARIF', value: 'sarif' },
-    ],
-    description: 'Output format for scan results.',
+    options: [{ label: 'JSON', value: 'json' }],
+    description: 'Structured JSON output required for vulnerability parsing.',
   }),
 });
 
@@ -169,6 +175,23 @@ const splitCliArgs = (input: string): string[] => {
   return args;
 };
 
+function assertNoOutputFormatOverride(args: string[]): void {
+  const hasFormatOverride = args.some(
+    (arg) =>
+      arg === '--format' ||
+      arg.startsWith('--format=') ||
+      arg === '-f' ||
+      arg.startsWith('-f=') ||
+      /^-f[^\s=]+$/.test(arg),
+  );
+
+  if (hasFormatOverride) {
+    throw new ValidationError(
+      'Trivy output format is fixed to JSON because this component parses vulnerability results.',
+    );
+  }
+}
+
 /**
  * Map Trivy severity string to analytics severity.
  */
@@ -201,6 +224,91 @@ const runnerOutputSchema = z.object({
   exitCode: z.number().optional().default(0),
 });
 
+function parseTrivyJsonOutput(rawOutput: string): unknown | null {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Trivy normally writes JSON to stdout, but some runners merge log
+    // text around stdout. Extract the first balanced JSON object.
+  }
+
+  let start = trimmed.indexOf('{');
+  while (start >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < trimmed.length; index += 1) {
+      const char = trimmed[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = trimmed.slice(start, index + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+
+    start = trimmed.indexOf('{', start + 1);
+  }
+
+  return null;
+}
+
+function cleanRepoRef(value: string): string {
+  const text = value.trim();
+  if (!text) return '';
+  if (/^https?:\/\//i.test(text) || text.includes('..') || text.startsWith('-')) {
+    throw new ValidationError('Invalid Trivy repository ref', {
+      fieldErrors: { ref: ['Ref cannot be a URL, flag, or contain path traversal'] },
+    });
+  }
+  return text.replace(/^\/+|\/+$/g, '');
+}
+
+function buildTrivyRepoRefArgs(value: string | undefined): string[] {
+  const ref = cleanRepoRef(value ?? '');
+  if (!ref) return [];
+
+  if (ref.startsWith('refs/heads/')) {
+    return ['--branch', ref.slice('refs/heads/'.length)];
+  }
+  if (ref.startsWith('refs/tags/')) {
+    return ['--tag', ref.slice('refs/tags/'.length)];
+  }
+  if (/^[a-f0-9]{7,40}$/i.test(ref)) {
+    return ['--commit', ref];
+  }
+  if (/^v?\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?$/.test(ref)) {
+    return ['--tag', ref];
+  }
+
+  return ['--branch', ref];
+}
+
 const definition = defineComponent({
   id: 'sentris.trivy.run',
   label: 'Trivy Vulnerability Scanner',
@@ -208,6 +316,7 @@ const definition = defineComponent({
   retryPolicy: trivyRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: TRIVY_IMAGE,
     network: 'bridge',
     timeoutSeconds: TRIVY_TIMEOUT_SECONDS,
@@ -256,6 +365,7 @@ const definition = defineComponent({
         ? inputs.customFlags
         : null;
     const customFlagArgs = customFlags ? splitCliArgs(customFlags) : [];
+    assertNoOutputFormatOverride(customFlagArgs);
 
     const target = inputs.target.trim();
 
@@ -307,6 +417,10 @@ const definition = defineComponent({
         args.push('--severity', parsedParams.severity.join(','));
       }
 
+      if (parsedParams.scanType === 'repo') {
+        args.push(...buildTrivyRepoRefArgs(inputs.ref));
+      }
+
       // Append custom flags last
       for (const flag of customFlagArgs) {
         if (flag.length > 0) {
@@ -316,15 +430,10 @@ const definition = defineComponent({
 
       const volumes = [volume.getVolumeConfig('/inputs', true)];
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? TRIVY_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...args],
         volumes,
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(
@@ -381,9 +490,13 @@ const definition = defineComponent({
     const trimmed = rawOutput.trim();
     if (trimmed.length > 0) {
       try {
-        const parsed = JSON.parse(trimmed);
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.Results)) {
-          for (const resultGroup of parsed.Results) {
+        const parsed = parseTrivyJsonOutput(trimmed);
+        const trivyResults =
+          parsed && typeof parsed === 'object'
+            ? (parsed as { Results?: unknown }).Results
+            : undefined;
+        if (Array.isArray(trivyResults)) {
+          for (const resultGroup of trivyResults) {
             if (Array.isArray(resultGroup.Vulnerabilities)) {
               for (const vuln of resultGroup.Vulnerabilities) {
                 const candidate: Vulnerability = {

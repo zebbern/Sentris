@@ -1,9 +1,3 @@
-<p align="center">
-  <img src="https://img.shields.io/github/v/release/zebbern/Sentris?color=blue&label=version" alt="Version">
-  <a href="https://github.com/zebbern/Sentris/tree/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License"></a>
-  <a href="https://discord.gg/fmMA4BtNXC"><img src="https://img.shields.io/discord/1175402031123447818?color=5865F2&label=discord&logo=discord&logoColor=white" alt="Discord"></a>
-</p>
-
 # Sentris Flow
 
 **Open-Source Security Workflow Orchestration Platform.**
@@ -98,9 +92,10 @@ pm2 status         # Check process status
 
 ### Template Library
 
-- **35 ready-to-use workflow templates** covering vulnerability scanning, cloud compliance, incident response, OSINT, AI triage, IaC security, IT automation, and more.
+- **10 live-validated security workflow templates** focused on bug bounty recon, takeover triage, exposed services, repository risk, secrets, and CVE/dependency research.
 - **One-click deployment**: Browse, preview, and create workflows from templates instantly.
 - **Community publishing**: Share your workflows as templates via GitHub PR with automatic secret sanitization.
+- **Maintainer preflight**: Run `bun run template-library:check` before changing templates, then `bun run template-library:verify` before handoff. These use the validation ledger and focused template tests, so unchanged templates are not rerun.
 
 ### Advanced Orchestration
 

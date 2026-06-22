@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const TESTSSL_IMAGE = 'drwetter/testssl.sh:latest';
 const TESTSSL_TIMEOUT_SECONDS = 900; // 15 minutes — testssl full scans can take 3+ minutes
@@ -183,6 +187,7 @@ const definition = defineComponent({
   retryPolicy: testsslRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: TESTSSL_IMAGE,
     network: 'bridge',
     timeoutSeconds: TESTSSL_TIMEOUT_SECONDS,
@@ -283,19 +288,12 @@ const definition = defineComponent({
       args.push(target);
 
       const effectiveTimeout = timeout ?? 300;
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: Math.max(
-          effectiveTimeout,
-          baseRunner.timeoutSeconds ?? TESTSSL_TIMEOUT_SECONDS,
-        ),
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
+        timeoutSeconds: effectiveTimeout,
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig(OUTPUT_DIR, false)],
-        stdinJson: false, // testssl.sh doesn't read stdin; prevent JSON injection
-      };
+        stdinJson: false,
+      });
 
       try {
         const result = await runComponentWithRunner(
@@ -358,14 +356,15 @@ const definition = defineComponent({
         context.logger.warn(
           `[testssl] Could not read results file: ${readError instanceof Error ? readError.message : String(readError)}`,
         );
-        // Try parsing stdout as fallback
-        if (rawOutput.trim().length > 0) {
-          try {
-            findings = parseTestsslOutput(rawOutput, context);
-          } catch {
-            context.logger.warn('[testssl] Could not parse stdout as JSON either.');
-          }
-        }
+      }
+
+      const trimmedRawOutput = rawOutput.trim();
+      if (
+        findings.length === 0 &&
+        trimmedRawOutput.length > 0 &&
+        (trimmedRawOutput.startsWith('[') || trimmedRawOutput.startsWith('{'))
+      ) {
+        findings = parseTestsslOutput(trimmedRawOutput, context);
       }
 
       context.logger.info(`[testssl] Audit complete: ${findings.length} finding(s) for ${target}`);

@@ -1,0 +1,226 @@
+{
+  "_metadata": {
+    "name": "Web/API Fuzz Triage",
+    "description": "Authorized bug bounty workflow that runs bounded ffuf path and API route discovery, ranks actionable responses, and writes a focused triage report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "api", "ffuf", "fuzzing", "quick-wins"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Web/API Fuzz Triage",
+    "description": "Discover hidden web and API paths from an authorized target URL using a bounded ffuf wordlist and prioritized triage report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "api", "ffuf", "fuzzing", "quick-wins"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 10
+  },
+  "graph": {
+    "name": "Web/API Fuzz Triage",
+    "description": "Bounded ffuf discovery workflow for authorized bug bounty web and API targets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Fuzz Target Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "targetUrl",
+                  "label": "Target URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "Authorized base URL or explicit FUZZ URL, for example https://example.com or https://example.com/FUZZ."
+                },
+                {
+                  "id": "wordlist",
+                  "label": "Wordlist",
+                  "type": "array",
+                  "required": true,
+                  "description": "Small in-scope path or API route wordlist such as api/health, swagger.json, graphql, admin."
+                },
+                {
+                  "id": "scanIntensity",
+                  "label": "Scan intensity",
+                  "type": "text",
+                  "required": false,
+                  "description": "Use safe, normal, or thorough. Safe caps the wordlist for live triage."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, rate limits, and validation notes to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "prepare_ffuf_inputs",
+        "type": "core.logic.script",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Prepare Bounded Fuzz Inputs",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "targetUrl", "type": "string" },
+                { "name": "wordlist", "type": "list-text" },
+                { "name": "scanIntensity", "type": "string" }
+              ],
+              "returns": [
+                { "name": "ffufTarget", "type": "string" },
+                { "name": "wordlistText", "type": "string" },
+                { "name": "scanProfile", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const defaultWords = ['robots.txt', 'sitemap.xml', 'api', 'api/health', 'health', 'status', 'swagger.json', 'openapi.json', 'graphql', 'admin', 'login', 'debug', 'metrics'];\n  const intensityLimits = { safe: 25, normal: 60, thorough: 120 };\n  const requestedIntensity = String(input.scanIntensity || 'safe').trim().toLowerCase();\n  const intensity = Object.prototype.hasOwnProperty.call(intensityLimits, requestedIntensity) ? requestedIntensity : 'safe';\n  const limit = intensityLimits[intensity];\n  function asWords(value) {\n    if (Array.isArray(value)) return value;\n    if (typeof value === 'string' && value.trim()) return value.split(/[\\n,]+/);\n    return [];\n  }\n  function cleanWord(value) {\n    return String(value || '').trim().replace(/^\\/+/, '').replace(/[?#].*$/, '');\n  }\n  const requestedWords = asWords(input.wordlist);\n  const sourceWords = requestedWords.length > 0 ? requestedWords : defaultWords;\n  const selectedWords = [];\n  const seen = new Set();\n  for (const word of sourceWords) {\n    const cleaned = cleanWord(word);\n    if (!cleaned || cleaned.includes('..') || /^https?:\\/\\//i.test(cleaned) || cleaned.includes('FUZZ')) continue;\n    if (seen.has(cleaned)) continue;\n    seen.add(cleaned);\n    selectedWords.push(cleaned);\n    if (selectedWords.length >= limit) break;\n  }\n  if (selectedWords.length === 0) selectedWords.push('robots.txt');\n  function normalizeTarget(value) {\n    const raw = String(value || '').trim();\n    const withScheme = /^[a-z][a-z0-9+.-]*:\\/\\//i.test(raw) ? raw : `https://${raw}`;\n    try {\n      const parsed = new URL(withScheme);\n      parsed.hash = '';\n      if (parsed.pathname.includes('FUZZ')) return parsed.toString();\n      if (!parsed.pathname || parsed.pathname === '/') {\n        parsed.pathname = '/FUZZ';\n      } else {\n        parsed.pathname = parsed.pathname.replace(/\\/?$/, '/FUZZ');\n      }\n      return parsed.toString();\n    } catch {\n      return raw.includes('FUZZ') ? raw : `${raw.replace(/\\/+$/, '')}/FUZZ`;\n    }\n  }\n  const ffufTarget = normalizeTarget(input.targetUrl);\n  return {\n    ffufTarget,\n    wordlistText: selectedWords.join(String.fromCharCode(10)),\n    scanProfile: {\n      intensity,\n      wordCount: selectedWords.length,\n      requestedWordCount: requestedWords.length,\n      wordLimit: limit,\n      truncatedByIntensity: Math.max(0, sourceWords.length - selectedWords.length),\n      targetInput: String(input.targetUrl || '').trim(),\n      ffufTarget,\n    },\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "ffuf_discovery",
+        "type": "sentris.ffuf.run",
+        "position": { "x": 740, "y": 260 },
+        "data": {
+          "label": "Run Bounded ffuf Discovery",
+          "config": {
+            "params": {
+              "method": "GET",
+              "rate": 20,
+              "filterStatus": "404",
+              "timeout": 90
+            },
+            "inputOverrides": {
+              "customFlags": "-k"
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_fuzz_report",
+        "type": "core.logic.script",
+        "position": { "x": 1060, "y": 260 },
+        "data": {
+          "label": "Rank Fuzz Discoveries",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "targetUrl", "type": "string" },
+                { "name": "scanProfile", "type": "json" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "discoveries", "type": "list-json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const list = (value) => Array.isArray(value) ? value : [];\n  const scanProfile = input.scanProfile && typeof input.scanProfile === 'object' ? input.scanProfile : {};\n  const severityRank = { high: 4, medium: 3, low: 2, info: 1 };\n  function classify(entry) {\n    const status = Number(entry?.status || 0);\n    if (status >= 500) return { severity: 'high', reason: 'Server error from fuzzed path' };\n    if (status === 401 || status === 403) return { severity: 'medium', reason: 'Auth-protected path discovered' };\n    if (status >= 300 && status < 400) return { severity: 'low', reason: 'Redirecting path discovered' };\n    if (status >= 200 && status < 300) return { severity: 'info', reason: 'Responsive path discovered' };\n    return null;\n  }\n  const priorityFindings = list(input.discoveries).map((entry) => {\n    const classification = classify(entry);\n    if (!classification) return null;\n    return {\n      source: 'ffuf',\n      url: String(entry?.url || ''),\n      status: Number(entry?.status || 0),\n      length: Number(entry?.length || 0),\n      words: Number(entry?.words || 0),\n      lines: typeof entry?.lines === 'number' ? entry.lines : null,\n      redirectLocation: entry?.redirectlocation || null,\n      severity: classification.severity,\n      reason: classification.reason,\n    };\n  }).filter(Boolean).filter((item) => item.url.length > 0).sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.status - a.status || a.url.localeCompare(b.url));\n  const countsBySeverity = priorityFindings.reduce((acc, item) => { acc[item.severity] = (acc[item.severity] || 0) + 1; return acc; }, {});\n  const serverErrors = priorityFindings.filter((item) => item.status >= 500).length;\n  const authProtected = priorityFindings.filter((item) => item.status === 401 || item.status === 403).length;\n  const redirects = priorityFindings.filter((item) => item.status >= 300 && item.status < 400).length;\n  const responsive = priorityFindings.filter((item) => item.status >= 200 && item.status < 300).length;\n  return {\n    report: {\n      summary: {\n        targetUrl: input.targetUrl || scanProfile.ffufTarget || null,\n        discoveries: priorityFindings.length,\n        serverErrors,\n        authProtected,\n        redirects,\n        responsive,\n        highestSeverity: priorityFindings[0]?.severity || null,\n        countsBySeverity,\n        intensity: scanProfile.intensity || 'safe',\n        wordCount: Number(scanProfile.wordCount || 0),\n      },\n      authorizationNotes: input.authorizationNotes || null,\n      scanProfile,\n      priorityFindings: priorityFindings.slice(0, 100),\n      rawDiscoveries: list(input.discoveries).slice(0, 100),\n      nextSteps: ['Manually validate every discovered path inside the authorized scope', 'Review 401/403 paths for access-control bypass opportunities', 'Inspect 5xx responses for reproducible low-impact error handling issues', 'Avoid destructive requests or state-changing fuzzing without explicit program permission'],\n    },\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1380, "y": 260 },
+        "data": {
+          "label": "Save Fuzz Triage Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "web-api-fuzz-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-prepare_ffuf_inputs-targetUrl",
+        "source": "trigger_1",
+        "target": "prepare_ffuf_inputs",
+        "sourceHandle": "targetUrl",
+        "targetHandle": "targetUrl"
+      },
+      {
+        "id": "trigger_1-prepare_ffuf_inputs-wordlist",
+        "source": "trigger_1",
+        "target": "prepare_ffuf_inputs",
+        "sourceHandle": "wordlist",
+        "targetHandle": "wordlist"
+      },
+      {
+        "id": "trigger_1-prepare_ffuf_inputs-scanIntensity",
+        "source": "trigger_1",
+        "target": "prepare_ffuf_inputs",
+        "sourceHandle": "scanIntensity",
+        "targetHandle": "scanIntensity"
+      },
+      {
+        "id": "prepare_ffuf_inputs-ffuf_discovery-ffufTarget",
+        "source": "prepare_ffuf_inputs",
+        "target": "ffuf_discovery",
+        "sourceHandle": "ffufTarget",
+        "targetHandle": "target"
+      },
+      {
+        "id": "prepare_ffuf_inputs-ffuf_discovery-wordlistText",
+        "source": "prepare_ffuf_inputs",
+        "target": "ffuf_discovery",
+        "sourceHandle": "wordlistText",
+        "targetHandle": "wordlist"
+      },
+      {
+        "id": "prepare_ffuf_inputs-assemble_fuzz_report-ffufTarget",
+        "source": "prepare_ffuf_inputs",
+        "target": "assemble_fuzz_report",
+        "sourceHandle": "ffufTarget",
+        "targetHandle": "targetUrl"
+      },
+      {
+        "id": "prepare_ffuf_inputs-assemble_fuzz_report-scanProfile",
+        "source": "prepare_ffuf_inputs",
+        "target": "assemble_fuzz_report",
+        "sourceHandle": "scanProfile",
+        "targetHandle": "scanProfile"
+      },
+      {
+        "id": "trigger_1-assemble_fuzz_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_fuzz_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "ffuf_discovery-assemble_fuzz_report-discovered",
+        "source": "ffuf_discovery",
+        "target": "assemble_fuzz_report",
+        "sourceHandle": "discovered",
+        "targetHandle": "discoveries"
+      },
+      {
+        "id": "assemble_fuzz_report-artifact_report-report",
+        "source": "assemble_fuzz_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

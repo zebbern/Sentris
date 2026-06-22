@@ -72,9 +72,28 @@ export const queryKeys = {
       ['executionTerminal', getOrgScope(), runId, nodeRef, stream] as const,
   },
   templates: {
-    all: (filters?: Record<string, unknown>) => ['templates', getOrgScope(), filters] as const,
+    root: () => ['templates', getOrgScope()] as const,
+    all: (filters?: Record<string, unknown>) => [...queryKeys.templates.root(), filters] as const,
     categories: () => ['templateCategories', getOrgScope()] as const,
     tags: () => ['templateTags', getOrgScope()] as const,
+    repoInfo: () => ['templateRepoInfo', getOrgScope()] as const,
+    revalidationJobsRoot: () => ['templateRevalidationJobs', getOrgScope()] as const,
+    revalidationJobs: (limit?: number) =>
+      [...queryKeys.templates.revalidationJobsRoot(), limit ?? '__default__'] as const,
+    revalidationJob: (auditId: string) =>
+      ['templateRevalidationJob', getOrgScope(), auditId] as const,
+    revalidationJobLog: (auditId: string, stream: string, maxBytes?: number) =>
+      [
+        'templateRevalidationJobLog',
+        getOrgScope(),
+        auditId,
+        stream,
+        maxBytes ?? '__default__',
+      ] as const,
+    submissions: () => ['templateSubmissions', getOrgScope()] as const,
+  },
+  agents: {
+    transcript: (agentRunId: string) => ['agentTranscript', getOrgScope(), agentRunId] as const,
   },
   workflows: {
     list: () => ['workflows', getOrgScope()] as const,

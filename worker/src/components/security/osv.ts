@@ -10,7 +10,6 @@ import {
   parameters,
   param,
   port,
-  ValidationError,
   analyticsResultSchema,
   type AnalyticsResult,
   type ExecutionContext,
@@ -69,7 +68,6 @@ const inputSchema = inputs({
   packageSpecs: port(
     z
       .array(z.string().min(1))
-      .min(1, 'At least one package spec is required')
       .describe('Package names with optional versions, for example lodash@4.17.20.'),
     {
       label: 'Package Specs',
@@ -204,6 +202,17 @@ function normalizeSeverity(value: unknown): OsvSeverity {
 function severityFromCvssVector(value: unknown): OsvSeverity {
   const vector = String(value ?? '').toUpperCase();
   if (!vector.startsWith('CVSS:')) return 'unknown';
+  if (
+    vector.includes('/AV:N') &&
+    vector.includes('/AC:L') &&
+    vector.includes('/PR:N') &&
+    vector.includes('/UI:N') &&
+    vector.includes('/C:H') &&
+    vector.includes('/I:H') &&
+    vector.includes('/A:H')
+  ) {
+    return 'critical';
+  }
   if (
     vector.includes('/AV:N') &&
     vector.includes('/AC:L') &&
@@ -396,9 +405,20 @@ const definition = defineComponent({
       .filter((pkg): pkg is NormalizedPackage => Boolean(pkg));
 
     if (packages.length === 0) {
-      throw new ValidationError('At least one valid package spec is required', {
-        fieldErrors: { packageSpecs: ['At least one valid package spec is required'] },
-      });
+      context.logger.info('[OSV] No package specs provided, returning empty advisory results');
+      return {
+        findings: [],
+        summary: {
+          packagesChecked: 0,
+          vulnerablePackages: 0,
+          findings: 0,
+          maliciousPackageRecords: 0,
+          countsBySeverity: {},
+        },
+        packages: [],
+        rawResults: { results: [] },
+        results: [],
+      };
     }
 
     context.logger.info(`[OSV] Querying ${packages.length} package(s)`);

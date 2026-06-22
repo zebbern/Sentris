@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/components/index.ts",
     "./components": "./src/components/index.ts",
+    "./components/security/security-component-manifest": "./src/components/security/security-component-manifest.ts",
     "./workflows": "./src/temporal/workflows/index.ts"
   },
   "scripts": {

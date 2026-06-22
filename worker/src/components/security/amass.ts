@@ -18,6 +18,10 @@ import {
   type ExecutionPayload,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
+} from './security-docker-resources';
 
 const AMASS_IMAGE = 'caffix/amass:latest';
 const AMASS_TIMEOUT_SECONDS = (() => {
@@ -469,6 +473,7 @@ const definition = (defineComponent as any)({
   retryPolicy: amassRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: AMASS_IMAGE,
     // The amass image is distroless (no shell available).
     // Use the image's default entrypoint directly and pass args via command.
@@ -632,16 +637,10 @@ const definition = (defineComponent as any)({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? AMASS_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
-        // Pass amass CLI args directly (image default entrypoint is amass)
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...amassArgs],
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

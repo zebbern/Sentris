@@ -16,6 +16,10 @@ import {
   type DockerRunnerConfig,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
 
 // Extract Supabase project ref from a standard URL like https://<project-ref>.supabase.co
 function inferProjectRef(supabaseUrl: string): string | null {
@@ -192,6 +196,7 @@ const definition = defineComponent({
   // Base runner; volumes and command are finalised dynamically in execute()
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: 'ghcr.io/zebbern/supabase-scanner:latest',
     network: 'bridge',
     // Distroless image (no shell) - use image's ENTRYPOINT directly
@@ -295,16 +300,10 @@ const definition = defineComponent({
     // Build runner with isolated volume mounts
     // Distroless image uses ENTRYPOINT directly, config path passed as command arg
     const baseRunner = definition.runner as DockerRunnerConfig;
-    const runner: DockerRunnerConfig = {
-      kind: 'docker',
-      image: baseRunner.image,
-      network: baseRunner.network,
-      timeoutSeconds: baseRunner.timeoutSeconds,
-      env: { ...(baseRunner.env ?? {}) },
-      // Pass config path as command argument to image's ENTRYPOINT
+    const runner = mergeSecurityDockerRunner(baseRunner, {
       command: [containerConfigPath],
       volumes: [],
-    };
+    });
 
     let report: unknown = {};
     let score: number | null = null;

@@ -15,6 +15,9 @@ import {
 
 const NVD_CVE_API_URL = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
 const NVD_DOCS_URL = 'https://nvd.nist.gov/developers/vulnerabilities';
+const NVD_USER_AGENT = 'SentrisFlow/1.0';
+const NVD_MAX_HTTP_ATTEMPTS = 3;
+const NVD_TRANSIENT_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 
 const cveIdPattern = /^CVE-\d{4}-\d{4,}$/i;
 
@@ -230,6 +233,17 @@ function classifyFetchError(error: unknown): string {
   return 'Network Error';
 }
 
+function nvdRetryDelayMs(attempt: number): number {
+  const configured = Number(process.env.NVD_RETRY_DELAY_MS ?? 1000);
+  return Number.isFinite(configured) ? Math.max(0, configured * attempt) : 1000 * attempt;
+}
+
+async function waitForNvdRetry(attempt: number): Promise<void> {
+  const delayMs = nvdRetryDelayMs(attempt);
+  if (delayMs <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 function fallbackResult({
   url,
   query,
@@ -352,7 +366,10 @@ const definition = defineComponent({
       includeRejected: parsedParams.includeRejected,
     };
     const url = buildNvdCveUrl(query);
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': NVD_USER_AGENT,
+    };
     const apiKey = parsedInputs.apiKey.trim();
     if (apiKey.length > 0) headers.apiKey = apiKey;
 
@@ -365,7 +382,27 @@ const definition = defineComponent({
     });
 
     try {
-      const response = await fetchNvdJson(context, url, headers, parsedParams.timeoutMs);
+      let response: Response | null = null;
+      for (let attempt = 1; attempt <= NVD_MAX_HTTP_ATTEMPTS; attempt++) {
+        response = await fetchNvdJson(context, url, headers, parsedParams.timeoutMs);
+        if (
+          response.ok ||
+          !NVD_TRANSIENT_STATUS_CODES.has(response.status) ||
+          attempt === NVD_MAX_HTTP_ATTEMPTS
+        ) {
+          break;
+        }
+
+        context.logger.warn(
+          `[NVD] Transient HTTP ${response.status}; retrying attempt ${attempt + 1}/${NVD_MAX_HTTP_ATTEMPTS}`,
+        );
+        await waitForNvdRetry(attempt);
+      }
+
+      if (!response) {
+        throw new Error('NVD request did not return a response');
+      }
+
       const statusText = response.statusText || `HTTP ${response.status}`;
       if (!response.ok) {
         const text = await response.text();

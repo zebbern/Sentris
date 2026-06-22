@@ -84,6 +84,19 @@ describe('OSV dependency query component', () => {
     expect(extractFixedVersions(sampleAdvisory)).toEqual(['4.17.21']);
   });
 
+  it('infers critical severity from critical CVSS vectors', () => {
+    expect(
+      inferOsvSeverity({
+        severity: [
+          {
+            type: 'CVSS_V3',
+            score: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+          },
+        ],
+      }),
+    ).toBe('critical');
+  });
+
   it('queries OSV, hydrates advisories, and emits analytics-ready results', async () => {
     const component = componentRegistry.get<OsvInput, OsvOutput>('sentris.osv.query');
     if (!component) throw new Error('OSV component was not registered');
@@ -156,5 +169,45 @@ describe('OSV dependency query component', () => {
       installed_version: '4.17.20',
       fixed_versions: ['4.17.21'],
     });
+  });
+
+  it('returns empty outputs when upstream package specs are empty', async () => {
+    const component = componentRegistry.get<OsvInput, OsvOutput>('sentris.osv.query');
+    if (!component) throw new Error('OSV component was not registered');
+
+    const fetchMock = vi.fn();
+    const context = createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'osv-empty',
+    });
+    context.http.fetch = fetchMock as unknown as ExecutionContext['http']['fetch'];
+
+    const result = await component.execute(
+      {
+        inputs: {
+          packageSpecs: [],
+        },
+        params: {
+          ecosystem: 'PyPI',
+          severityFloor: 'medium',
+          hydrateAdvisories: true,
+          maxAdvisoriesPerPackage: 50,
+          includeUnknownSeverity: true,
+        },
+      },
+      context,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.summary).toEqual({
+      packagesChecked: 0,
+      vulnerablePackages: 0,
+      findings: 0,
+      maliciousPackageRecords: 0,
+      countsBySeverity: {},
+    });
+    expect(result.findings).toEqual([]);
+    expect(result.packages).toEqual([]);
+    expect(result.results).toEqual([]);
   });
 });

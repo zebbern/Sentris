@@ -152,7 +152,17 @@ const definition = defineComponent({
           },
         );
       }
-      outputs[inputDef.id] = value;
+      // Optional text inputs default to empty string so downstream script ports receive
+      // a defined value instead of failing input validation / retrying indefinitely.
+      if (
+        (value === undefined || value === null) &&
+        !inputDef.required &&
+        inputDef.type === 'text'
+      ) {
+        outputs[inputDef.id] = '';
+      } else {
+        outputs[inputDef.id] = value;
+      }
       // Mask secret values in logs
       const logValue =
         inputDef.type === 'secret'

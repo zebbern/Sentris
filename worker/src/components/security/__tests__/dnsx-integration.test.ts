@@ -8,7 +8,9 @@ import { componentRegistry, createExecutionContext } from '@sentris/component-sd
 import type { DnsxInput, DnsxOutput } from '../dnsx';
 import '../dnsx';
 
-const enableDockerIntegration = process.env.ENABLE_DOCKER_TESTS === 'true';
+import { shouldRunDockerTests } from './docker-test-env';
+
+const enableDockerIntegration = shouldRunDockerTests();
 const dockerDescribe = enableDockerIntegration ? describe : describe.skip;
 
 dockerDescribe('DNSX Integration (Docker)', () => {

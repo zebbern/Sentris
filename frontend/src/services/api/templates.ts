@@ -1,4 +1,75 @@
 import { getAuthHeaders, API_V1_URL } from './client';
+import type { TemplateSubmission } from '@/types/templates';
+
+export interface PublishTemplateInput {
+  workflowId: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  author: string;
+}
+
+export interface PublishTemplateResponse {
+  submission: TemplateSubmission;
+  validation: {
+    valid: boolean;
+    errors: string[];
+  };
+  requiredSecrets: { name: string; type: string; description?: string; placeholder?: string }[];
+  removedSecrets: string[];
+  manifest: Record<string, unknown>;
+  graph: Record<string, unknown>;
+}
+
+export interface TemplateRepoInfo {
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
+export interface TemplateRevalidationResponse {
+  auditId: string;
+  templateId: string;
+  templateName: string;
+  status: 'started';
+  command: string;
+  outputDir: string;
+}
+
+export interface TemplateRevalidationJobStatus extends Omit<
+  TemplateRevalidationResponse,
+  'status'
+> {
+  requestedBy: string | null;
+  organizationId: string | null;
+  status: 'started' | 'completed';
+  startedAt: string;
+  outputFiles: {
+    marker: string;
+    stdout: string;
+    stderr: string;
+    reportJson: string;
+    reportMarkdown: string;
+  };
+  report: {
+    generatedAt?: string;
+    resultCount: number;
+    recommendations: string[];
+    terminalStatuses: string[];
+  } | null;
+}
+
+export type TemplateRevalidationLogStream = 'stdout' | 'stderr';
+
+export interface TemplateRevalidationJobLog {
+  auditId: string;
+  stream: TemplateRevalidationLogStream;
+  content: string;
+  bytes: number;
+  maxBytes: number;
+  truncated: boolean;
+}
 
 export const templatesApi = {
   list: async (params?: { category?: string; search?: string; tags?: string[] }) => {
@@ -38,14 +109,14 @@ export const templatesApi = {
     return response.json();
   },
 
-  publish: async (data: {
-    workflowId: string;
-    name: string;
-    description: string;
-    category: string;
-    tags: string[];
-    author: string;
-  }) => {
+  getRepoInfo: async (): Promise<TemplateRepoInfo> => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}/templates/repo-info`, { headers });
+    if (!response.ok) throw new Error('Failed to fetch template repository info');
+    return response.json();
+  },
+
+  publish: async (data: PublishTemplateInput): Promise<PublishTemplateResponse> => {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/templates/publish`, {
       method: 'POST',
@@ -96,6 +167,81 @@ export const templatesApi = {
     });
 
     if (!response.ok) throw new Error('Failed to sync templates');
+    return response.json();
+  },
+
+  revalidate: async (templateId: string): Promise<TemplateRevalidationResponse> => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}/templates/${templateId}/revalidate`, {
+      method: 'POST',
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'Failed to revalidate template' }));
+      throw new Error(errorData.message || 'Failed to revalidate template');
+    }
+
+    return response.json();
+  },
+
+  getRevalidationJob: async (auditId: string): Promise<TemplateRevalidationJobStatus> => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}/templates/revalidations/${auditId}`, { headers });
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'Failed to fetch template revalidation status' }));
+      throw new Error(errorData.message || 'Failed to fetch template revalidation status');
+    }
+
+    return response.json();
+  },
+
+  listRevalidationJobs: async (limit = 5): Promise<TemplateRevalidationJobStatus[]> => {
+    const headers = await getAuthHeaders();
+    const searchParams = new URLSearchParams({ limit: String(limit) });
+    const response = await fetch(
+      `${API_V1_URL}/templates/revalidations?${searchParams.toString()}`,
+      { headers },
+    );
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'Failed to fetch template revalidation history' }));
+      throw new Error(errorData.message || 'Failed to fetch template revalidation history');
+    }
+
+    return response.json();
+  },
+
+  getRevalidationJobLog: async (
+    auditId: string,
+    params: { stream?: TemplateRevalidationLogStream; maxBytes?: number } = {},
+  ): Promise<TemplateRevalidationJobLog> => {
+    const headers = await getAuthHeaders();
+    const searchParams = new URLSearchParams();
+    searchParams.set('stream', params.stream ?? 'stderr');
+    if (params.maxBytes !== undefined) {
+      searchParams.set('maxBytes', String(params.maxBytes));
+    }
+
+    const response = await fetch(
+      `${API_V1_URL}/templates/revalidations/${auditId}/log?${searchParams.toString()}`,
+      { headers },
+    );
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'Failed to fetch template revalidation log' }));
+      throw new Error(errorData.message || 'Failed to fetch template revalidation log');
+    }
+
     return response.json();
   },
 

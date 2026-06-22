@@ -438,7 +438,7 @@ describe('Nuclei Integration', () => {
     if (component!.runner.kind === 'docker') {
       expect(component!.runner.image).toBe('projectdiscovery/nuclei:latest');
       expect(component!.runner.entrypoint).toBe('sh');
-      expect(component!.runner.memoryLimit).toBe('1g');
+      expect(component!.runner.memoryLimit).toBe('2g');
     }
   });
 

@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const SUBFINDER_IMAGE = 'projectdiscovery/subfinder:latest';
 const SUBFINDER_TIMEOUT_SECONDS = 1800; // 30 minutes
@@ -270,6 +274,7 @@ const definition = defineComponent({
   retryPolicy: subfinderRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: SUBFINDER_IMAGE,
     // The subfinder image is distroless (no shell available).
     // Use the image's default entrypoint directly and pass args via command.
@@ -425,16 +430,10 @@ const definition = defineComponent({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? SUBFINDER_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
-        // Pass subfinder CLI args directly (image default entrypoint is subfinder)
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...subfinderArgs],
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

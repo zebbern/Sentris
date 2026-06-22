@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
 
 const KATANA_IMAGE = 'projectdiscovery/katana:latest';
 const KATANA_TIMEOUT_SECONDS = 600; // 10 minutes default
@@ -216,6 +220,7 @@ const definition = defineComponent({
   retryPolicy: katanaRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: KATANA_IMAGE,
     network: 'bridge',
     timeoutSeconds: KATANA_TIMEOUT_SECONDS,
@@ -321,15 +326,10 @@ const definition = defineComponent({
         customFlags: customFlagArgs,
       });
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? KATANA_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig('/inputs', true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(

@@ -14,6 +14,10 @@ import {
   type DockerRunnerConfig,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const NOTIFY_IMAGE = 'projectdiscovery/notify:latest';
 const INPUT_MOUNT_NAME = 'inputs';
@@ -237,7 +241,7 @@ interface BuildNotifyArgsOptions {
  * Build Notify CLI arguments in TypeScript.
  * Follows the Dynamic Args Pattern from component-development.mdx
  */
-const buildNotifyArgs = (options: BuildNotifyArgsOptions): string[] => {
+export const buildNotifyArgs = (options: BuildNotifyArgsOptions): string[] => {
   const args: string[] = [];
 
   // Input file (messages) — uses -i flag instead of stdin piping
@@ -299,6 +303,7 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: NOTIFY_IMAGE,
     // The notify image is distroless (no shell available).
     // Use the image's default entrypoint directly and pass args via command.
@@ -413,17 +418,11 @@ const definition = defineComponent({
         proxy: parsedParams.proxy,
       });
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? dockerTimeoutSeconds,
-        env: { ...(baseRunner.env ?? {}) },
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         stdinJson: false,
-        // Pass notify CLI args directly (image default entrypoint is notify)
         command: [...(baseRunner.command ?? []), ...notifyArgs],
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      };
+      });
 
       const result = await runComponentWithRunner<Record<string, never>, string>(
         runnerConfig,

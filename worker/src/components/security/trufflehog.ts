@@ -17,6 +17,7 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import { SECURITY_DOCKER_RESOURCE_HEAVY } from './security-docker-resources';
 
 const scanTypeSchema = z.enum(['git', 'github', 'gitlab', 's3', 'gcs', 'filesystem', 'docker']);
 
@@ -165,6 +166,23 @@ interface Secret {
   StructuredData?: Record<string, any>;
 }
 
+function isTruffleHogSecretRecord(value: unknown): value is Secret {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.DetectorType === 'string' ||
+    typeof candidate.DetectorName === 'string' ||
+    typeof candidate.DecoderName === 'string' ||
+    typeof candidate.Raw === 'string' ||
+    typeof candidate.RawV2 === 'string' ||
+    typeof candidate.Redacted === 'string' ||
+    typeof candidate.Verified === 'boolean' ||
+    (candidate.SourceMetadata !== undefined && candidate.SourceMetadata !== null) ||
+    (candidate.StructuredData !== undefined && candidate.StructuredData !== null)
+  );
+}
+
 const outputSchema = outputs({
   secrets: port(z.array(z.any()), {
     label: 'Secrets',
@@ -287,6 +305,9 @@ function parseRawOutput(rawOutput: string): Output {
   for (const line of lines) {
     try {
       const secret = JSON.parse(line);
+      if (!isTruffleHogSecretRecord(secret)) {
+        continue;
+      }
       secrets.push(secret);
       if (secret.Verified === true) {
         verifiedCount++;
@@ -313,6 +334,7 @@ const definition = defineComponent({
   category: 'security',
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: 'ghcr.io/trufflesecurity/trufflehog:latest',
     entrypoint: 'trufflehog',
     network: 'bridge',
@@ -475,8 +497,12 @@ const definition = defineComponent({
       }
 
       // Parse the raw output
-      const output =
-        typeof rawResult === 'string' ? parseRawOutput(rawResult) : (rawResult as Output);
+      const output: Output =
+        typeof rawResult === 'string'
+          ? parseRawOutput(rawResult)
+          : rawResult && typeof rawResult === 'object' && 'secrets' in rawResult
+            ? outputSchema.parse(rawResult)
+            : parseRawOutput('');
 
       // Log and emit progress
       context.logger.info(

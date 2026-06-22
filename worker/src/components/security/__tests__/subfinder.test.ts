@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from 'bun:test';
+import { it, expect, beforeAll, afterEach, vi } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
 import type { SubfinderInput, SubfinderOutput } from '../subfinder';
 
-const shouldRunDockerTests = process.env.RUN_DOCKER_TESTS === 'true';
-const dockerDescribe = shouldRunDockerTests ? describe : describe.skip;
+import { dockerDescribe } from './docker-test-env';
 
 dockerDescribe('subfinder component', () => {
   beforeAll(async () => {

@@ -8,6 +8,16 @@
 
 **Tech Stack:** TypeScript, Bun test, Sentris component SDK, OSV REST API, existing seed-template compiler tests and template live-audit harness.
 
+**Current status:** Complete. The component is implemented and registered, the NPM dependency template uses `sentris.osv.query`, the broader GitHub dependency template routes npm/PyPI/Go/Maven package specs through OSV query nodes, and the live-validation ledger currently proves the relevant templates are fresh without rerunning them.
+
+**Latest verification:**
+
+- `bun --cwd worker test src/components/security/__tests__/osv.test.ts src/components/security/__tests__/manifest-extractor.test.ts` -> 11 pass.
+- `bun --cwd backend test src/templates/__tests__/seed-templates.spec.ts` -> 27 pass.
+- `bun run template-library:check` -> live-run validation current: 10/10; missing/stale/degraded: 0; duplicate names: 0; low-value/static candidates: 0.
+- `bun run typecheck` -> pass.
+- `bun run lint:backend` / `bun run lint:frontend` -> 0 errors with existing warning baselines.
+
 ---
 
 ### Task 1: Add OSV Component Tests
@@ -16,7 +26,7 @@
 
 - Create: `worker/src/components/security/__tests__/osv.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create tests that import `../osv`, retrieve `sentris.osv.query`, and verify:
 
@@ -63,7 +73,7 @@ const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (url) => {
 
 Assert execute returns one finding with `id`, `cves`, `fixedVersions`, `severity`, and one analytics result whose `scanner` is `osv`.
 
-- [ ] **Step 2: Verify tests fail**
+- [x] **Step 2: Verify tests fail**
 
 Run: `bun --cwd worker test src/components/security/__tests__/osv.test.ts`
 
@@ -76,7 +86,7 @@ Expected: FAIL because `worker/src/components/security/osv.ts` does not exist.
 - Create: `worker/src/components/security/osv.ts`
 - Modify: `worker/src/components/index.ts`
 
-- [ ] **Step 1: Add component implementation**
+- [x] **Step 1: Add component implementation**
 
 Implement:
 
@@ -89,11 +99,11 @@ export const definition = defineComponent({ id: 'sentris.osv.query', ... });
 
 The component inputs are `packageSpecs`; parameters are `ecosystem`, `severityFloor`, `hydrateAdvisories`, `maxAdvisoriesPerPackage`, and `includeUnknownSeverity`. Execution posts `{ queries }` to `https://api.osv.dev/v1/querybatch`, hydrates advisories when configured, builds `findings`, `summary`, `rawResults`, and `results`, and maps analytics severity to `critical | high | medium | low | info`.
 
-- [ ] **Step 2: Register component**
+- [x] **Step 2: Register component**
 
 Add `import './security/osv';` near the other security component imports in `worker/src/components/index.ts`.
 
-- [ ] **Step 3: Verify component tests pass**
+- [x] **Step 3: Verify component tests pass**
 
 Run: `bun --cwd worker test src/components/security/__tests__/osv.test.ts`
 
@@ -106,7 +116,7 @@ Expected: PASS.
 - Modify: `backend/scripts/seed-templates/npm-dependency-cve-hunt.json`
 - Test: `backend/src/templates/__tests__/seed-templates.spec.ts`
 
-- [ ] **Step 1: Replace embedded OSV scripts**
+- [x] **Step 1: Replace embedded OSV scripts**
 
 Make the graph:
 
@@ -128,7 +138,7 @@ trigger_1 -> osv_query -> assemble_dependency_report -> artifact_report
 
 The assemble script only packages `findings`, `summary`, `packages`, and `researchNotes` into the existing report shape.
 
-- [ ] **Step 2: Verify seed graph compiles**
+- [x] **Step 2: Verify seed graph compiles**
 
 Run: `bun --cwd backend test src/templates/__tests__/seed-templates.spec.ts`
 
@@ -140,19 +150,19 @@ Expected: PASS.
 
 - Use existing: `scripts/template-library-live-audit.ts`
 
-- [ ] **Step 1: Upsert active local template row**
+- [x] **Step 1: Upsert active local template row**
 
 Run: `$env:DATABASE_URL='postgresql://sentris:sentris@localhost:5433/sentris_instance_0'; bun --cwd backend scripts/seed-templates.ts`
 
 Expected: existing templates skipped. If this script only skips existing template rows, update the active DB row for `NPM Dependency CVE Hunt` from the seed file before live audit.
 
-- [ ] **Step 2: Run focused live audit**
+- [x] **Step 2: Run focused live audit**
 
 Run: `$env:TEMPLATE_AUDIT_NAMES='NPM Dependency CVE Hunt'; bun scripts/template-library-live-audit.ts`
 
 Expected: `KEEP COMPLETED` and one JSON artifact with nonzero findings.
 
-- [ ] **Step 3: Run verification suite**
+- [x] **Step 3: Run verification suite**
 
 Run:
 

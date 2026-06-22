@@ -58,6 +58,7 @@ describe('queryKeys', () => {
     expect(domains).toContain('workflowTags');
     expect(domains).toContain('analyticsSettings');
     expect(domains).toContain('dashboard');
+    expect(domains).toContain('agents');
   });
 
   // --- Org scope ---
@@ -223,15 +224,34 @@ describe('queryKeys', () => {
 
   // --- Templates ---
 
-  it('templates.all without filters returns [templates, org, undefined]', () => {
+  it('templates.root returns the invalidation root for every template list', () => {
+    expect(queryKeys.templates.root()).toEqual(['templates', TEST_ORG]);
+  });
+
+  it('templates.all without filters extends the template root with the filter slot', () => {
     const key = queryKeys.templates.all();
     expect(key[0]).toBe('templates');
     expect(key[1]).toBe(TEST_ORG);
+    expect(key).toHaveLength(3);
   });
 
   it('templates.categories returns array', () => {
     const key = queryKeys.templates.categories();
     expect(key[0]).toBe('templateCategories');
+  });
+
+  it('templates.repoInfo returns the org-scoped template repository info key', () => {
+    expect(queryKeys.templates.repoInfo()).toEqual(['templateRepoInfo', TEST_ORG]);
+  });
+
+  // --- Agents ---
+
+  it('agents.transcript includes agent run id', () => {
+    expect(queryKeys.agents.transcript('agent-run-1')).toEqual([
+      'agentTranscript',
+      TEST_ORG,
+      'agent-run-1',
+    ]);
   });
 
   // --- Dashboard ---

@@ -1,0 +1,472 @@
+{
+  "_metadata": {
+    "name": "Passive OSINT Subdomain Expansion",
+    "description": "Authorized bug bounty workflow that combines theHarvester, Amass, and Shuffledns to expand a single root domain into validated subdomains and live HTTP assets.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "osint", "subdomains", "amass", "theharvester", "shuffledns", "httpx"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Passive OSINT Subdomain Expansion",
+    "description": "Expand one authorized root domain with passive OSINT sources, bounded Shuffledns validation/bruteforce, and live HTTP probing.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "osint", "subdomains", "amass", "theharvester", "shuffledns", "httpx"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 11,
+    "edgeCount": 26
+  },
+  "graph": {
+    "name": "Passive OSINT Subdomain Expansion",
+    "description": "Bounded passive recon expansion workflow for one authorized root domain.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 320 },
+        "data": {
+          "label": "Authorized Root Domain Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "domain",
+                  "label": "Root domain",
+                  "type": "text",
+                  "required": true,
+                  "description": "Single authorized root domain such as example.com."
+                },
+                {
+                  "id": "knownSubdomains",
+                  "label": "Known subdomains",
+                  "type": "array",
+                  "required": false,
+                  "description": "Optional in-scope subdomains from prior recon, imports, or program documentation."
+                },
+                {
+                  "id": "wordlist",
+                  "label": "Bruteforce wordlist",
+                  "type": "array",
+                  "required": false,
+                  "description": "Small DNS label wordlist for bounded Shuffledns bruteforce, such as www, api, app, staging."
+                },
+                {
+                  "id": "scanIntensity",
+                  "label": "Scan intensity",
+                  "type": "text",
+                  "required": false,
+                  "description": "Use safe, normal, or thorough. Safe keeps passive expansion and DNS queries tightly bounded."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, rate limits, and validation notes to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "prepare_recon_inputs",
+        "type": "core.logic.script",
+        "position": { "x": 420, "y": 320 },
+        "data": {
+          "label": "Normalize Scope and Wordlist",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domain", "type": "string" },
+                { "name": "knownSubdomains", "type": "list-text" },
+                { "name": "wordlist", "type": "list-text" },
+                { "name": "scanIntensity", "type": "string" }
+              ],
+              "returns": [
+                { "name": "domain", "type": "string" },
+                { "name": "domains", "type": "list-text" },
+                { "name": "knownSubdomains", "type": "list-text" },
+                { "name": "wordlist", "type": "list-text" },
+                { "name": "scanProfile", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const defaultWords = ['www', 'api', 'app', 'dev', 'staging', 'test', 'admin', 'portal', 'cdn', 'beta'];\n  const intensityLimits = { safe: 10, normal: 30, thorough: 75 };\n  const requestedIntensity = String(input.scanIntensity || 'safe').trim().toLowerCase();\n  const intensity = Object.prototype.hasOwnProperty.call(intensityLimits, requestedIntensity) ? requestedIntensity : 'safe';\n  const wordLimit = intensityLimits[intensity];\n  function normalizeDomain(value) {\n    const raw = String(value || '').trim().toLowerCase();\n    const stripped = raw.replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '').replace(/\\.$/, '');\n    return stripped.replace(/[^a-z0-9.-]/g, '');\n  }\n  const domain = normalizeDomain(input.domain);\n  function asList(value) {\n    if (Array.isArray(value)) return value;\n    if (typeof value === 'string' && value.trim()) return value.split(/[\\n,]+/);\n    return [];\n  }\n  function cleanSubdomain(value) {\n    const subdomain = normalizeDomain(value);\n    if (!subdomain || !subdomain.endsWith(`.${domain}`)) return null;\n    return subdomain;\n  }\n  function cleanWord(value) {\n    const raw = String(value || '').trim().toLowerCase();\n    if (!raw || raw.includes('..') || raw.includes('/') || /^https?:\\/\\//i.test(raw)) return '';\n    return raw.replace(/^\\.+/, '').replace(/\\.+$/, '').replace(/[^a-z0-9-]/g, '');\n  }\n  const knownSubdomains = Array.from(new Set(asList(input.knownSubdomains).map(cleanSubdomain).filter(Boolean)));\n  const requestedWords = asList(input.wordlist);\n  const sourceWords = requestedWords.length > 0 ? requestedWords : defaultWords;\n  const wordlist = [];\n  const seenWords = new Set();\n  for (const word of sourceWords) {\n    const cleaned = cleanWord(word);\n    if (!cleaned || seenWords.has(cleaned)) continue;\n    seenWords.add(cleaned);\n    wordlist.push(cleaned);\n    if (wordlist.length >= wordLimit) break;\n  }\n  if (wordlist.length === 0) wordlist.push('www');\n  return {\n    domain,\n    domains: domain ? [domain] : [],\n    knownSubdomains,\n    wordlist,\n    scanProfile: {\n      intensity,\n      rootDomain: domain,\n      knownSubdomains: knownSubdomains.length,\n      requestedWordCount: requestedWords.length,\n      wordCount: wordlist.length,\n      wordLimit,\n      truncatedByIntensity: Math.max(0, sourceWords.length - wordlist.length),\n    },\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "harvest_osint",
+        "type": "sentris.theharvester.run",
+        "position": { "x": 740, "y": 140 },
+        "data": {
+          "label": "Gather Passive OSINT",
+          "config": {
+            "params": {
+              "sources": "crtsh,hackertarget",
+              "limit": 50
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "amass_passive",
+        "type": "sentris.amass.enum",
+        "position": { "x": 740, "y": 320 },
+        "data": {
+          "label": "Run Bounded Passive Amass",
+          "config": {
+            "params": {
+              "passive": true,
+              "active": false,
+              "bruteForce": false,
+              "enableAlterations": false,
+              "recursive": false,
+              "includeIps": false,
+              "verbose": false,
+              "demoMode": false,
+              "timeoutMinutes": 1,
+              "dnsQueryRate": 50,
+              "resolvers": "1.1.1.1,8.8.8.8",
+              "dataSources": "crtsh,hackertarget"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "merge_osint_candidates",
+        "type": "core.logic.script",
+        "position": { "x": 1060, "y": 240 },
+        "data": {
+          "label": "Merge OSINT Candidates",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domain", "type": "string" },
+                { "name": "knownSubdomains", "type": "list-text" },
+                { "name": "harvesterSubdomains", "type": "list-text" },
+                { "name": "amassSubdomains", "type": "list-text" }
+              ],
+              "returns": [
+                { "name": "candidateSubdomains", "type": "list-text" },
+                { "name": "candidateSummary", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const domain = String(input.domain || '').trim().toLowerCase();\n  const asList = (value) => Array.isArray(value) ? value : [];\n  function normalize(value) {\n    return String(value || '').trim().toLowerCase().replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '').replace(/\\.$/, '');\n  }\n  function inScope(value) {\n    const normalized = normalize(value);\n    return normalized && normalized.endsWith(`.${domain}`) ? normalized : null;\n  }\n  function uniqueScoped(items) {\n    return Array.from(new Set(asList(items).map(inScope).filter(Boolean)));\n  }\n  const known = uniqueScoped(input.knownSubdomains);\n  const harvester = uniqueScoped(input.harvesterSubdomains);\n  const amass = uniqueScoped(input.amassSubdomains);\n  const candidateSubdomains = Array.from(new Set([...known, ...harvester, ...amass]));\n  return {\n    candidateSubdomains,\n    candidateSummary: {\n      knownSubdomains: known.length,\n      harvesterSubdomains: harvester.length,\n      amassSubdomains: amass.length,\n      candidateSubdomains: candidateSubdomains.length,\n    },\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "shuffledns_resolve_candidates",
+        "type": "sentris.shuffledns.massdns",
+        "position": { "x": 1380, "y": 160 },
+        "data": {
+          "label": "Validate OSINT Candidates",
+          "config": {
+            "params": {
+              "mode": "resolve",
+              "threads": 100,
+              "retries": 1,
+              "wildcardStrict": false,
+              "wildcardThreads": 25
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "shuffledns_bruteforce_words",
+        "type": "sentris.shuffledns.massdns",
+        "position": { "x": 1380, "y": 360 },
+        "data": {
+          "label": "Bounded DNS Wordlist Expansion",
+          "config": {
+            "params": {
+              "mode": "bruteforce",
+              "threads": 100,
+              "retries": 1,
+              "wildcardStrict": false,
+              "wildcardThreads": 25
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "merge_validated_subdomains",
+        "type": "core.logic.script",
+        "position": { "x": 1700, "y": 260 },
+        "data": {
+          "label": "Merge Validated Subdomains",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domain", "type": "string" },
+                { "name": "resolvedSubdomains", "type": "list-text" },
+                { "name": "bruteForcedSubdomains", "type": "list-text" }
+              ],
+              "returns": [
+                { "name": "subdomains", "type": "list-text" },
+                { "name": "validationSummary", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const domain = String(input.domain || '').trim().toLowerCase();\n  const asList = (value) => Array.isArray(value) ? value : [];\n  function normalize(value) {\n    return String(value || '').trim().toLowerCase().replace(/^https?:\\/\\//, '').replace(/\\/.*$/, '').replace(/\\.$/, '');\n  }\n  function inScope(value) {\n    const normalized = normalize(value);\n    return normalized && normalized.endsWith(`.${domain}`) ? normalized : null;\n  }\n  const resolved = Array.from(new Set(asList(input.resolvedSubdomains).map(inScope).filter(Boolean)));\n  const bruteForced = Array.from(new Set(asList(input.bruteForcedSubdomains).map(inScope).filter(Boolean)));\n  const subdomains = Array.from(new Set([...resolved, ...bruteForced]));\n  return { subdomains, validationSummary: { resolvedCandidates: resolved.length, bruteForcedSubdomains: bruteForced.length, totalValidated: subdomains.length } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 2020, "y": 260 },
+        "data": {
+          "label": "Probe Live HTTP Assets",
+          "config": {
+            "params": {
+              "threads": 30,
+              "followRedirects": true,
+              "tlsProbe": false,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_passive_recon_report",
+        "type": "core.logic.script",
+        "position": { "x": 2340, "y": 260 },
+        "data": {
+          "label": "Assemble Passive Recon Report",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "domain", "type": "string" },
+                { "name": "scanProfile", "type": "json" },
+                { "name": "candidateSummary", "type": "json" },
+                { "name": "validationSummary", "type": "json" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "subdomains", "type": "list-text" },
+                { "name": "httpResponses", "type": "list-json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const asList = (value) => Array.isArray(value) ? value : [];\n  const scanProfile = input.scanProfile && typeof input.scanProfile === 'object' ? input.scanProfile : {};\n  const candidateSummary = input.candidateSummary && typeof input.candidateSummary === 'object' ? input.candidateSummary : {};\n  const validationSummary = input.validationSummary && typeof input.validationSummary === 'object' ? input.validationSummary : {};\n  const severityRank = { medium: 3, low: 2, info: 1 };\n  function responseUrl(item) { return item?.url || item?.finalUrl || item?.input || item?.host || ''; }\n  function classify(item) {\n    const status = Number(item?.statusCode ?? item?.status ?? 0);\n    if (status === 401 || status === 403) return { severity: 'medium', reason: 'Auth-protected live subdomain' };\n    if (status >= 500) return { severity: 'medium', reason: 'Server error on live subdomain' };\n    if (status >= 300 && status < 400) return { severity: 'low', reason: 'Redirecting live subdomain' };\n    if (status >= 200 && status < 300) return { severity: 'info', reason: 'Responsive live subdomain' };\n    return null;\n  }\n  const priorityAssets = asList(input.httpResponses).map((item) => {\n    const classification = classify(item);\n    if (!classification) return null;\n    return { url: responseUrl(item), statusCode: Number(item?.statusCode ?? item?.status ?? 0), title: item?.title || null, technologies: Array.isArray(item?.technologies) ? item.technologies : [], severity: classification.severity, reason: classification.reason };\n  }).filter(Boolean).filter((item) => item.url.length > 0).sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.statusCode - a.statusCode || a.url.localeCompare(b.url));\n  const countsBySeverity = priorityAssets.reduce((acc, item) => { acc[item.severity] = (acc[item.severity] || 0) + 1; return acc; }, {});\n  return { report: { summary: { rootDomain: input.domain || scanProfile.rootDomain || null, totalSubdomains: asList(input.subdomains).length, liveHttpAssets: priorityAssets.length, highestSeverity: priorityAssets[0]?.severity || null, countsBySeverity, candidateSubdomains: Number(candidateSummary.candidateSubdomains || 0), resolvedCandidates: Number(validationSummary.resolvedCandidates || 0), bruteForcedSubdomains: Number(validationSummary.bruteForcedSubdomains || 0), intensity: scanProfile.intensity || 'safe' }, authorizationNotes: input.authorizationNotes || null, scanProfile, candidateSummary, validationSummary, subdomains: asList(input.subdomains).slice(0, 500), priorityAssets: priorityAssets.slice(0, 150), nextSteps: ['Validate interesting live subdomains manually inside the authorized scope', 'Review 401/403 hosts for access-control bypass opportunities', 'Feed newly validated hosts into focused web/API quick-win workflows', 'Keep high-volume brute forcing disabled unless the program explicitly allows it'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 2660, "y": 260 },
+        "data": {
+          "label": "Save Passive Recon Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "passive-osint-subdomain-expansion-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-prepare_recon_inputs-domain",
+        "source": "trigger_1",
+        "target": "prepare_recon_inputs",
+        "sourceHandle": "domain",
+        "targetHandle": "domain"
+      },
+      {
+        "id": "trigger_1-prepare_recon_inputs-knownSubdomains",
+        "source": "trigger_1",
+        "target": "prepare_recon_inputs",
+        "sourceHandle": "knownSubdomains",
+        "targetHandle": "knownSubdomains"
+      },
+      {
+        "id": "trigger_1-prepare_recon_inputs-wordlist",
+        "source": "trigger_1",
+        "target": "prepare_recon_inputs",
+        "sourceHandle": "wordlist",
+        "targetHandle": "wordlist"
+      },
+      {
+        "id": "trigger_1-prepare_recon_inputs-scanIntensity",
+        "source": "trigger_1",
+        "target": "prepare_recon_inputs",
+        "sourceHandle": "scanIntensity",
+        "targetHandle": "scanIntensity"
+      },
+      {
+        "id": "prepare_recon_inputs-harvest_osint-domain",
+        "source": "prepare_recon_inputs",
+        "target": "harvest_osint",
+        "sourceHandle": "domain",
+        "targetHandle": "domain"
+      },
+      {
+        "id": "prepare_recon_inputs-amass_passive-domains",
+        "source": "prepare_recon_inputs",
+        "target": "amass_passive",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "prepare_recon_inputs-merge_osint_candidates-domain",
+        "source": "prepare_recon_inputs",
+        "target": "merge_osint_candidates",
+        "sourceHandle": "domain",
+        "targetHandle": "domain"
+      },
+      {
+        "id": "prepare_recon_inputs-merge_osint_candidates-knownSubdomains",
+        "source": "prepare_recon_inputs",
+        "target": "merge_osint_candidates",
+        "sourceHandle": "knownSubdomains",
+        "targetHandle": "knownSubdomains"
+      },
+      {
+        "id": "harvest_osint-merge_osint_candidates-subdomains",
+        "source": "harvest_osint",
+        "target": "merge_osint_candidates",
+        "sourceHandle": "subdomains",
+        "targetHandle": "harvesterSubdomains"
+      },
+      {
+        "id": "amass_passive-merge_osint_candidates-subdomains",
+        "source": "amass_passive",
+        "target": "merge_osint_candidates",
+        "sourceHandle": "subdomains",
+        "targetHandle": "amassSubdomains"
+      },
+      {
+        "id": "merge_osint_candidates-shuffledns_resolve_candidates-candidateSubdomains",
+        "source": "merge_osint_candidates",
+        "target": "shuffledns_resolve_candidates",
+        "sourceHandle": "candidateSubdomains",
+        "targetHandle": "seeds"
+      },
+      {
+        "id": "prepare_recon_inputs-shuffledns_resolve_candidates-domains",
+        "source": "prepare_recon_inputs",
+        "target": "shuffledns_resolve_candidates",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "prepare_recon_inputs-shuffledns_bruteforce_words-domains",
+        "source": "prepare_recon_inputs",
+        "target": "shuffledns_bruteforce_words",
+        "sourceHandle": "domains",
+        "targetHandle": "domains"
+      },
+      {
+        "id": "prepare_recon_inputs-shuffledns_bruteforce_words-wordlist",
+        "source": "prepare_recon_inputs",
+        "target": "shuffledns_bruteforce_words",
+        "sourceHandle": "wordlist",
+        "targetHandle": "words"
+      },
+      {
+        "id": "shuffledns_resolve_candidates-merge_validated_subdomains-subdomains",
+        "source": "shuffledns_resolve_candidates",
+        "target": "merge_validated_subdomains",
+        "sourceHandle": "subdomains",
+        "targetHandle": "resolvedSubdomains"
+      },
+      {
+        "id": "shuffledns_bruteforce_words-merge_validated_subdomains-subdomains",
+        "source": "shuffledns_bruteforce_words",
+        "target": "merge_validated_subdomains",
+        "sourceHandle": "subdomains",
+        "targetHandle": "bruteForcedSubdomains"
+      },
+      {
+        "id": "prepare_recon_inputs-merge_validated_subdomains-domain",
+        "source": "prepare_recon_inputs",
+        "target": "merge_validated_subdomains",
+        "sourceHandle": "domain",
+        "targetHandle": "domain"
+      },
+      {
+        "id": "merge_validated_subdomains-httpx_probe-subdomains",
+        "source": "merge_validated_subdomains",
+        "target": "httpx_probe",
+        "sourceHandle": "subdomains",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "prepare_recon_inputs-assemble_passive_recon_report-domain",
+        "source": "prepare_recon_inputs",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "domain",
+        "targetHandle": "domain"
+      },
+      {
+        "id": "prepare_recon_inputs-assemble_passive_recon_report-scanProfile",
+        "source": "prepare_recon_inputs",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "scanProfile",
+        "targetHandle": "scanProfile"
+      },
+      {
+        "id": "merge_osint_candidates-assemble_passive_recon_report-candidateSummary",
+        "source": "merge_osint_candidates",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "candidateSummary",
+        "targetHandle": "candidateSummary"
+      },
+      {
+        "id": "merge_validated_subdomains-assemble_passive_recon_report-subdomains",
+        "source": "merge_validated_subdomains",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "subdomains",
+        "targetHandle": "subdomains"
+      },
+      {
+        "id": "merge_validated_subdomains-assemble_passive_recon_report-validationSummary",
+        "source": "merge_validated_subdomains",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "validationSummary",
+        "targetHandle": "validationSummary"
+      },
+      {
+        "id": "trigger_1-assemble_passive_recon_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "httpx_probe-assemble_passive_recon_report-responses",
+        "source": "httpx_probe",
+        "target": "assemble_passive_recon_report",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "assemble_passive_recon_report-artifact_report-report",
+        "source": "assemble_passive_recon_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

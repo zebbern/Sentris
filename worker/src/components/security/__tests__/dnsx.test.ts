@@ -18,8 +18,70 @@ mock.module('../../utils/isolated-volume', () => ({
 
 let componentRegistry: typeof import('@sentris/component-sdk').componentRegistry;
 
-const shouldRunDockerTests = process.env.RUN_DOCKER_TESTS === 'true';
-const dockerDescribe = shouldRunDockerTests ? describe : describe.skip;
+import { dockerDescribe } from './docker-test-env';
+
+describe('dnsx component output normalization', () => {
+  beforeAll(async () => {
+    await import('../dnsx');
+    componentRegistry = sdk.componentRegistry;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('exposes CNAME answers in a template-friendly top-level field', async () => {
+    const component = componentRegistry.get<DnsxInput, DnsxOutput>('sentris.dnsx.run');
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'dnsx-test',
+    });
+
+    const ndjson = JSON.stringify({
+      host: 'blog.example.com',
+      status_code: 'NOERROR',
+      ttl: 300,
+      resolver: ['8.8.8.8:53'],
+      cname: ['orphan.s3.amazonaws.com'],
+      a: ['192.0.2.10'],
+      timestamp: '2026-06-21T00:00:00Z',
+    });
+
+    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(ndjson);
+
+    const result = component.outputs.parse(
+      await component.execute(
+        {
+          inputs: {
+            domains: ['blog.example.com'],
+          },
+          params: {
+            recordTypes: ['CNAME' as const, 'A' as const],
+            resolvers: [],
+            outputMode: 'json' as const,
+          },
+        },
+        context,
+      ),
+    );
+
+    expect(result.dnsRecords[0]).toMatchObject({
+      host: 'blog.example.com',
+      cname: ['orphan.s3.amazonaws.com'],
+      answers: {
+        cname: ['orphan.s3.amazonaws.com'],
+        a: ['192.0.2.10'],
+      },
+    });
+    expect(result.results[0]).toMatchObject({
+      scanner: 'dnsx',
+      host: 'blog.example.com',
+      cname: ['orphan.s3.amazonaws.com'],
+    });
+  });
+});
 
 dockerDescribe('dnsx component', () => {
   beforeAll(async () => {

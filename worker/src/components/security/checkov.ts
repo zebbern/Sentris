@@ -16,13 +16,18 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_STANDARD,
+} from './security-docker-resources';
+import { materializeFileBundle } from './bundle-files';
 
 const CHECKOV_IMAGE = 'bridgecrew/checkov:latest';
 const CHECKOV_TIMEOUT_SECONDS = 600;
 const INPUT_DIR = '/input';
 
 const inputSchema = inputs({
-  target: port(z.string().min(1, 'Target cannot be empty').describe('IaC file content to scan'), {
+  target: port(z.string().describe('IaC file content to scan'), {
     label: 'Target',
     description:
       'Infrastructure-as-Code content to scan (Terraform, CloudFormation, Kubernetes YAML, Dockerfile, etc.).',
@@ -199,6 +204,63 @@ const runnerOutputSchema = z.object({
   exitCode: z.number().optional().default(0),
 });
 
+function parseCheckovJsonOutput(rawOutput: string): unknown | null {
+  const trimmed = rawOutput.trim();
+  if (trimmed.length === 0) return null;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // Checkov should emit JSON, but runner logs can sometimes be merged
+    // around stdout. Extract the first balanced JSON object or array.
+  }
+
+  const starts = [trimmed.indexOf('{'), trimmed.indexOf('[')]
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b);
+
+  for (const start of starts) {
+    const opener = trimmed[start];
+    const closer = opener === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < trimmed.length; index += 1) {
+      const char = trimmed[index];
+
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+      } else if (char === opener) {
+        depth += 1;
+      } else if (char === closer) {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = trimmed.slice(start, index + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 const definition = defineComponent({
   id: 'sentris.checkov.run',
   label: 'Checkov — IaC Security Scanner',
@@ -212,6 +274,7 @@ const definition = defineComponent({
   } satisfies ComponentRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_STANDARD,
     image: CHECKOV_IMAGE,
     entrypoint: 'checkov',
     network: 'none',
@@ -245,6 +308,21 @@ const definition = defineComponent({
     const parsedParams = parameterSchema.parse(params);
     const { framework, severity, compact } = parsedParams;
     const target = inputs.target.trim();
+    if (target.length === 0) {
+      context.logger.info(`[Checkov] No ${framework} content provided, returning empty results`);
+      context.emitProgress({
+        message: `No ${framework} content provided to Checkov`,
+        level: 'info',
+        data: { framework },
+      });
+      return {
+        violations: [],
+        rawOutput: '',
+        results: [],
+        passedCount: 0,
+        failedCount: 0,
+      };
+    }
     const customFlags =
       typeof inputs.customFlags === 'string' && inputs.customFlags.trim().length > 0
         ? inputs.customFlags.trim()
@@ -270,8 +348,8 @@ const definition = defineComponent({
     let rawOutput = '';
     try {
       const filename = getFilenameForFramework(framework);
-      // Write file at volume root — IsolatedContainerVolume does not create subdirectories
-      await volume.initialize({ [filename]: target });
+      const inputFiles = materializeFileBundle(target, filename);
+      await volume.initialize(inputFiles);
       context.logger.info(`[Checkov] Created isolated volume: ${volume.getVolumeName()}`);
 
       const args: string[] = ['-d', INPUT_DIR, '--output', 'json', '--framework', framework];
@@ -281,16 +359,11 @@ const definition = defineComponent({
         if (flag.length > 0) args.push(flag);
       }
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         entrypoint: baseRunner.entrypoint,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? CHECKOV_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
         command: [...(baseRunner.command ?? []), ...args],
         volumes: [volume.getVolumeConfig(INPUT_DIR, true)],
-      };
+      });
 
       try {
         const result = await runComponentWithRunner(
@@ -370,8 +443,12 @@ function parseCheckovOutput(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseCheckovJsonOutput(raw);
   } catch {
+    context.logger.warn('[Checkov] Failed to parse JSON output');
+    return { violations: [], passedCount: 0, failedCount: 0 };
+  }
+  if (!parsed) {
     context.logger.warn('[Checkov] Failed to parse JSON output');
     return { violations: [], passedCount: 0, failedCount: 0 };
   }

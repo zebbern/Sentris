@@ -1,11 +1,24 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
+  createTemplateValidationFingerprint,
+  createTemplateLiveAuditInputs,
+  getLiveRunAuditFailures,
   getNodeIoWarningSignals,
+  getTemplateCatalogQualityFailures,
+  renderTemplateCatalogQualityCheck,
+  renderTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
+  parseTemplateAuditCliOptions,
+  shouldSkipTemplateValidation,
+  summarizeTemplateValidationLedgerFreshness,
   summarizeNodeIoNode,
+  upsertTemplateValidationLedger,
   waitForNodeIoEvidence,
+  type TemplateAuditMarkdownResult,
+  type TemplateValidationLedger,
+  type TemplateValidationFreshnessInput,
 } from './template-library-live-audit-utils';
 
 type JsonObject = Record<string, unknown>;
@@ -129,6 +142,7 @@ interface AuditResult {
   rationale: string;
 }
 
+const CLI_OPTIONS = parseTemplateAuditCliOptions(process.argv.slice(2));
 const DEFAULT_INSTANCE = Number.parseInt(
   process.env.SENTRIS_INSTANCE ?? process.env.E2E_INSTANCE ?? '0',
   10,
@@ -138,7 +152,7 @@ const API_BASE =
   process.env.API_BASE ??
   `http://127.0.0.1:${3211 + (Number.isFinite(DEFAULT_INSTANCE) ? DEFAULT_INSTANCE : 0) * 100}/api/v1`;
 const INTERNAL_TOKEN = process.env.SENTRIS_INTERNAL_TOKEN ?? 'local-internal-token';
-const ORG_ID = process.env.SENTRIS_ORG_ID ?? 'org_dev';
+const ORG_ID = CLI_OPTIONS.organizationId ?? 'org_dev';
 const RUN_TIMEOUT_MS = Number.parseInt(process.env.TEMPLATE_AUDIT_TIMEOUT_MS ?? '420000', 10);
 const NODE_IO_CAPTURE_TIMEOUT_MS = Number.parseInt(
   process.env.TEMPLATE_AUDIT_NODE_IO_TIMEOUT_MS ?? '30000',
@@ -149,15 +163,15 @@ const NODE_IO_CAPTURE_POLL_MS = Number.parseInt(
   10,
 );
 const KEEP_WORKFLOWS = process.env.KEEP_AUDIT_WORKFLOWS === 'true';
+const FORCE_AUDIT = CLI_OPTIONS.force;
+const LEDGER_CHECK_ONLY = CLI_OPTIONS.ledgerCheckOnly;
 const OUTPUT_ROOT =
   process.env.TEMPLATE_AUDIT_OUTPUT_DIR ??
   join(tmpdir(), `sentris-template-live-audit-${new Date().toISOString().replace(/[:.]/g, '-')}`);
-const AUDIT_TEMPLATE_NAMES = new Set(
-  (process.env.TEMPLATE_AUDIT_NAMES ?? '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean),
-);
+const LEDGER_PATH =
+  process.env.TEMPLATE_AUDIT_LEDGER_PATH ??
+  join(process.cwd(), '.cache', 'template-live-audit-ledger.json');
+const AUDIT_TEMPLATE_NAMES = CLI_OPTIONS.templateNames;
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -175,34 +189,34 @@ const TERMINAL_STATUSES = new Set([
   'UNKNOWN',
 ]);
 
-const LIVE_INPUTS: Record<string, JsonObject> = {
-  'Bug Bounty Recon Triage': {
-    domains: ['example.com'],
-    authorizationNotes: 'Live audit fixture: public example domain, passive/bounded recon.',
-  },
-  'CVE Impact Research Brief': {
-    cveId: 'CVE-2024-3094',
-    product: 'xz utils',
-    version: '5.6.1',
-    deploymentNotes: 'Live audit fixture for known public CVE research.',
-  },
-  'Exposed Service CVE Mapper': {
-    targets: ['scanme.nmap.org'],
-    authorizationNotes: 'Live audit fixture: Nmap-provided scan target for bounded service checks.',
-  },
-  'NPM Dependency CVE Hunt': {
-    packageSpecs: ['lodash@4.17.20', 'minimist@0.0.8', 'axios@0.21.1'],
-    researchNotes: 'Live audit fixture using public npm packages with known historical advisories.',
-  },
-  'Web Attack Surface Quick Win Hunt': {
-    liveUrls: ['https://host.docker.internal:18443/api/health'],
-    outOfScopePaths: ['/logout', '/admin/delete'],
-    scanIntensity: 'safe',
-  },
-};
+const LIVE_INPUTS = createTemplateLiveAuditInputs();
 
 function ensureOutputDir() {
   mkdirSync(OUTPUT_ROOT, { recursive: true });
+}
+
+function readValidationLedger(): TemplateValidationLedger | undefined {
+  if (!existsSync(LEDGER_PATH)) return undefined;
+
+  try {
+    const parsed = JSON.parse(readFileSync(LEDGER_PATH, 'utf8')) as TemplateValidationLedger;
+    if (parsed?.version === 1 && parsed.entries && typeof parsed.entries === 'object') {
+      return parsed;
+    }
+  } catch (error) {
+    console.warn(
+      `Ignoring unreadable template audit ledger ${LEDGER_PATH}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return undefined;
+}
+
+function writeValidationLedger(ledger: TemplateValidationLedger): void {
+  mkdirSync(dirname(LEDGER_PATH), { recursive: true });
+  writeFileSync(LEDGER_PATH, `${JSON.stringify(ledger, null, 2)}\n`);
 }
 
 function sanitizeFileName(value: string): string {
@@ -304,6 +318,58 @@ function classifyTemplate(
   return 'run-start-probe';
 }
 
+function createValidationFingerprint(
+  template: ApiTemplate,
+  seed: SeedTemplate | undefined,
+  classification: AuditResult['classification'],
+): string {
+  return createTemplateValidationFingerprint({
+    apiTemplate: {
+      name: template.name,
+      category: template.category,
+      graph: template.graph,
+      requiredSecrets: template.requiredSecrets,
+    },
+    seedTemplate: seed ?? null,
+    liveInputs: LIVE_INPUTS[template.name] ?? {},
+    classification,
+  });
+}
+
+function createValidationFreshnessInput(
+  template: ApiTemplate,
+  seedRecord: { file: string; template: SeedTemplate } | undefined,
+): TemplateValidationFreshnessInput {
+  const classification = classifyTemplate(template, seedRecord?.template);
+  return {
+    templateName: template.name,
+    seedFile: seedRecord?.file ?? null,
+    fingerprint: createValidationFingerprint(template, seedRecord?.template, classification),
+    classification,
+  };
+}
+
+function createCatalogQualityInput(
+  template: ApiTemplate,
+  seedRecord: { file: string; template: SeedTemplate } | undefined,
+): TemplateAuditMarkdownResult {
+  const source = seedRecord?.template ?? template;
+  return {
+    templateId: template.id,
+    templateName: template.name,
+    seedFile: seedRecord?.file ?? null,
+    category: template.category ?? source.manifest?.category ?? source._metadata?.category ?? null,
+    components: getComponents(source),
+    requiredSecrets: getRequiredSecretNames(source),
+    runtimeInputs: getRuntimeInputs(source),
+    classification: classifyTemplate(template, seedRecord?.template),
+    createOk: true,
+    runAttempted: false,
+    recommendation: 'keep',
+    rationale: 'Catalog quality preflight input.',
+  };
+}
+
 function analyzeRecommendation(
   template: ApiTemplate,
   seed: SeedTemplate | undefined,
@@ -399,6 +465,13 @@ async function maybeUseExistingHttpsFixture(): Promise<void> {
       outOfScopePaths: ['/logout', '/admin/delete'],
       scanIntensity: 'safe',
     };
+    LIVE_INPUTS['Web/API Fuzz Triage'] = {
+      targetUrl: 'https://httpbin.org/FUZZ',
+      wordlist: ['status/200', 'status/403', 'status/500', 'definitely-not-present'],
+      scanIntensity: 'safe',
+      authorizationNotes:
+        'Live audit fallback: public httpbin status endpoints with a tiny ffuf wordlist.',
+    };
     console.log(
       'No local HTTPS fixture detected; Web quick-win audit will use https://example.com.',
     );
@@ -493,6 +566,7 @@ async function captureRunEvidence(
 async function auditTemplate(
   template: ApiTemplate,
   seedRecord: { file: string; template: SeedTemplate } | undefined,
+  ledger: TemplateValidationLedger | undefined,
 ): Promise<AuditResult> {
   const seed = seedRecord?.template;
   const source = seed ?? template;
@@ -500,6 +574,7 @@ async function auditTemplate(
   const components = getComponents(source);
   const requiredSecrets = getRequiredSecretNames(source);
   const runtimeInputs = getRuntimeInputs(source);
+  const validationFingerprint = createValidationFingerprint(template, seed, classification);
   const prefix = `${sanitizeFileName(template.name)}-${template.id.slice(0, 8)}`;
 
   const base: AuditResult = {
@@ -516,6 +591,23 @@ async function auditTemplate(
     recommendation: 'review',
     rationale: 'Audit did not reach recommendation step.',
   };
+
+  const cachedSkip = shouldSkipTemplateValidation({
+    ledger,
+    templateName: template.name,
+    classification,
+    fingerprint: validationFingerprint,
+    force: FORCE_AUDIT,
+  });
+  if (cachedSkip) {
+    return {
+      ...base,
+      terminalStatus: cachedSkip.terminalStatus,
+      artifactsCount: cachedSkip.artifactsCount,
+      recommendation: cachedSkip.recommendation,
+      rationale: cachedSkip.rationale,
+    };
+  }
 
   let workflowId: string | undefined;
 
@@ -586,19 +678,33 @@ async function auditTemplate(
   }
 
   const recommendation = analyzeRecommendation(template, seed, base);
-  return { ...base, ...recommendation };
+  const result = { ...base, ...recommendation };
+  if (classification === 'live-run' && result.terminalStatus === 'COMPLETED') {
+    validationLedger = upsertTemplateValidationLedger(validationLedger, {
+      templateName: result.templateName,
+      seedFile: result.seedFile,
+      fingerprint: validationFingerprint,
+      terminalStatus: result.terminalStatus,
+      recommendation: result.recommendation,
+      rationale: result.rationale,
+      artifactsCount: result.artifactsCount,
+      outputRoot: OUTPUT_ROOT,
+    });
+  }
+  return result;
 }
 
+let validationLedger: TemplateValidationLedger | undefined;
+
 async function main() {
-  ensureOutputDir();
   await maybeUseExistingHttpsFixture();
 
-  console.log(`Template audit output: ${OUTPUT_ROOT}`);
   console.log(`API base: ${API_BASE}`);
 
   await apiFetch('/health');
   await apiFetch('/health/ready');
 
+  validationLedger = readValidationLedger();
   const seedTemplates = readSeedTemplates();
   const templates = await apiFetch<ApiTemplate[]>('/templates');
   const selectedTemplates =
@@ -612,16 +718,47 @@ async function main() {
     throw new Error(`Requested template(s) not found: ${missingTemplateNames.join(', ')}`);
   }
 
+  if (LEDGER_CHECK_ONLY) {
+    const catalogQualityInputs = selectedTemplates
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((template) => createCatalogQualityInput(template, seedTemplates.get(template.name)));
+    const catalogQualityFailures = getTemplateCatalogQualityFailures(catalogQualityInputs);
+    const summary = summarizeTemplateValidationLedgerFreshness(
+      validationLedger,
+      selectedTemplates
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((template) =>
+          createValidationFreshnessInput(template, seedTemplates.get(template.name)),
+        ),
+    );
+    console.log(renderTemplateValidationLedgerFreshness(summary));
+    console.log(renderTemplateCatalogQualityCheck(catalogQualityInputs));
+    if (catalogQualityFailures.length > 0) {
+      console.error(`Template catalog quality failed:\n- ${catalogQualityFailures.join('\n- ')}`);
+    }
+    if (!summary.allLiveRunsCurrent || catalogQualityFailures.length > 0) {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  ensureOutputDir();
+  console.log(`Template audit output: ${OUTPUT_ROOT}`);
+
   const results: AuditResult[] = [];
 
   for (const template of selectedTemplates.sort((a, b) => a.name.localeCompare(b.name))) {
     console.log(`\nAuditing: ${template.name}`);
     const seedRecord = seedTemplates.get(template.name);
-    const result = await auditTemplate(template, seedRecord);
+    const result = await auditTemplate(template, seedRecord, validationLedger);
     results.push(result);
     console.log(
       `  ${result.recommendation.toUpperCase()} ${result.terminalStatus ?? result.runStartError ?? result.createError ?? 'created'}`,
     );
+  }
+
+  if (validationLedger) {
+    writeValidationLedger(validationLedger);
   }
 
   const jsonPath = join(OUTPUT_ROOT, 'template-live-audit.json');
@@ -644,14 +781,20 @@ async function main() {
   console.log(`JSON: ${jsonPath}`);
   console.log(`Markdown: ${mdPath}`);
 
-  const failingLiveRuns = results.filter(
-    (result) => result.classification === 'live-run' && result.terminalStatus !== 'COMPLETED',
-  );
+  const failingLiveRuns = getLiveRunAuditFailures(results);
   if (failingLiveRuns.length > 0) {
     process.exitCode = 1;
     console.error(
-      `Live-run templates failed: ${failingLiveRuns.map((result) => result.templateName).join(', ')}`,
+      `Live-run templates failed validation: ${failingLiveRuns
+        .map((result) => `${result.templateName} (${result.recommendation}: ${result.rationale})`)
+        .join(', ')}`,
     );
+  }
+
+  const catalogQualityFailures = getTemplateCatalogQualityFailures(results);
+  if (catalogQualityFailures.length > 0) {
+    process.exitCode = 1;
+    console.error(`Template catalog quality failed:\n- ${catalogQualityFailures.join('\n- ')}`);
   }
 }
 

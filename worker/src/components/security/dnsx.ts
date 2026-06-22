@@ -16,6 +16,10 @@ import {
   type AnalyticsResult,
 } from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
+import {
+  mergeSecurityDockerRunner,
+  SECURITY_DOCKER_RESOURCE_LIGHT,
+} from './security-docker-resources';
 
 const recordTypeEnum = z.enum([
   'A',
@@ -224,6 +228,7 @@ interface DnsxRecord {
   resolver?: string[];
   answers: Record<string, string[]>;
   timestamp?: string;
+  [recordType: string]: unknown;
 }
 
 const dnsxLineSchema = z
@@ -482,6 +487,7 @@ const definition = defineComponent({
   retryPolicy: dnsxRetryPolicy,
   runner: {
     kind: 'docker',
+    ...SECURITY_DOCKER_RESOURCE_LIGHT,
     image: DNSX_IMAGE,
     // The dnsx image is distroless (no shell available).
     // Use the image's default entrypoint directly and pass args via command.
@@ -644,16 +650,10 @@ const definition = defineComponent({
       const volumeName = await volume.initialize(inputFiles);
       context.logger.info(`[DNSX] Created isolated volume: ${volumeName}`);
 
-      const runnerConfig: DockerRunnerConfig = {
-        kind: 'docker',
-        image: baseRunner.image,
-        network: baseRunner.network,
-        timeoutSeconds: baseRunner.timeoutSeconds ?? DNSX_TIMEOUT_SECONDS,
-        env: { ...(baseRunner.env ?? {}) },
-        // Pass dnsx CLI args directly (image default entrypoint is dnsx)
+      const runnerConfig = mergeSecurityDockerRunner(baseRunner, {
         command: [...(baseRunner.command ?? []), ...dnsxArgs],
         volumes: [volume.getVolumeConfig(CONTAINER_INPUT_DIR, true)],
-      };
+      });
 
       rawPayload = await runComponentWithRunner(
         runnerConfig,
@@ -719,6 +719,7 @@ const definition = defineComponent({
           resolver: Array.isArray(record.resolver)
             ? record.resolver.map((entry: unknown) => String(entry))
             : undefined,
+          ...answers,
           answers,
           timestamp: record.timestamp,
         };
@@ -784,6 +785,7 @@ const definition = defineComponent({
         host: record.host,
         record_types: Object.keys(record.answers),
         answers: record.answers,
+        ...record.answers,
       }));
 
       return {

@@ -41,11 +41,7 @@ export const COMMON_TAGS = [
   'detection',
 ];
 
-export interface WorkflowResponse {
-  id: string;
-  name: string;
-  description?: string;
-  manifest: Record<string, unknown>;
+export interface WorkflowTemplatePreviewSource {
   graph: Record<string, unknown>;
 }
 

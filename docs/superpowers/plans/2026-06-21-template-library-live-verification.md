@@ -8,6 +8,18 @@
 
 **Tech Stack:** Bun/Node, NestJS API at `http://localhost:3211/api/v1`, Temporal-backed workflow runs, seed templates in `backend/scripts/seed-templates/*.json`.
 
+**Current status:** Complete for the current seed catalog. The harness exists at `scripts/template-library-live-audit.ts`, package aliases exist at `bun run template-library:check` and `bun run template-library:audit`, stale static/demo templates were removed or consolidated into the 10 current high-value security templates, and `.cache/template-live-audit-ledger.json` records `COMPLETED` / `keep` evidence for all 10 active live-run templates. Use `bun run template-library:check` before starting any new live run; rerun only templates reported as missing, stale, degraded, duplicated, or low-value/static.
+
+**Latest verification:**
+
+- `bun run template-library:verify` -> fast preflight plus focused template tests pass.
+- `bun run template-library:check` -> live-run validation current: 10/10; missing/stale/degraded: 0; duplicate names: 0; low-value/static candidates: 0.
+- `bun run template-library:audit` -> 10 keep; 0 fix/consolidate/delete/review; unchanged templates skipped from rerun.
+- `bun --cwd backend test src/templates/__tests__/seed-templates.spec.ts` -> 27 pass.
+- `bun test scripts/__tests__/template-library-live-audit-utils.test.ts` -> 15 pass.
+- `bun run typecheck` -> pass.
+- `bun run lint:backend` / `bun run lint:frontend` -> 0 errors with existing warning baselines.
+
 ---
 
 ### Task 1: Build The Live Audit Harness
@@ -16,11 +28,11 @@
 
 - Create: `scripts/template-library-live-audit.ts`
 
-- [ ] **Step 1: Add API helpers**
+- [x] **Step 1: Add API helpers**
 
 Create helpers for `GET /templates`, `POST /templates/:id/use`, `POST /workflows/:id/run`, `GET /workflows/runs/:runId/status`, `GET /workflows/runs/:runId/artifacts`, `GET /workflows/runs/:runId/node-io`, and workflow cleanup.
 
-- [ ] **Step 2: Add template classification**
+- [x] **Step 2: Add template classification**
 
 Classify templates as:
 
@@ -28,7 +40,7 @@ Classify templates as:
 - `structure-only`: no runtime inputs or cannot accept target/user data.
 - `credential-gated`: requires real third-party credentials or Slack delivery.
 
-- [ ] **Step 3: Add controlled fixtures**
+- [x] **Step 3: Add controlled fixtures**
 
 Use safe public/controlled targets:
 
@@ -37,7 +49,7 @@ Use safe public/controlled targets:
 - `example.com` for DNS/recon flows.
 - `scanme.nmap.org` for bounded port/service checks.
 
-- [ ] **Step 4: Write audit output**
+- [x] **Step 4: Write audit output**
 
 Write output under a timestamped temp directory:
 
@@ -51,7 +63,7 @@ Write output under a timestamped temp directory:
 
 - Execute: `scripts/template-library-live-audit.ts`
 
-- [ ] **Step 1: Confirm services**
+- [x] **Step 1: Confirm services**
 
 Run:
 
@@ -62,17 +74,17 @@ Invoke-RestMethod http://localhost:3211/api/v1/health/ready
 
 Expected: both return `status: "ok"`.
 
-- [ ] **Step 2: Run harness**
+- [x] **Step 2: Run harness**
 
 Run:
 
 ```powershell
-bun scripts/template-library-live-audit.ts
+bun run template-library:audit
 ```
 
-Expected: harness audits all active templates and completes with a report path.
+Expected: harness audits all active templates, skips unchanged templates with current ledger entries, and completes with a report path.
 
-- [ ] **Step 3: Inspect failures**
+- [x] **Step 3: Inspect failures**
 
 For each failed live-run template, read trace/node I/O, identify root cause, and decide whether to fix or prune.
 
@@ -83,15 +95,15 @@ For each failed live-run template, read trace/node I/O, identify root cause, and
 - Modify/delete: `backend/scripts/seed-templates/*.json`
 - Possibly add: `backend/scripts/seed-templates/_retired.json` only if the existing seeding system needs retirement metadata.
 
-- [ ] **Step 1: Remove templates that are static demos**
+- [x] **Step 1: Remove templates that are static demos**
 
 Delete templates that cannot be used without hard-coded assumptions and do not expose runtime inputs, unless they represent a high-value credential-backed workflow.
 
-- [ ] **Step 2: Consolidate duplicates**
+- [x] **Step 2: Consolidate duplicates**
 
 Prefer one useful version when multiple templates cover the same flow with only superficial differences, for example generic web scan vs bug bounty web quick-win scan.
 
-- [ ] **Step 3: Update active DB rows**
+- [x] **Step 3: Update active DB rows**
 
 Because the local seed service skips existing rows, apply equivalent changes to the active instance database so `/templates` matches the edited seed files.
 
@@ -102,9 +114,15 @@ Because the local seed service skips existing rows, apply equivalent changes to 
 - Test: `backend/src/templates/__tests__/seed-templates.spec.ts`
 - Test: affected worker/component tests if runner behavior changes
 
-- [ ] **Step 1: Validate seed templates**
+- [x] **Step 1: Validate seed templates**
 
-Run:
+Run the scoped verification command:
+
+```powershell
+bun run template-library:verify
+```
+
+Or run the seed-template test directly:
 
 ```powershell
 bun --cwd backend test src/templates/__tests__/seed-templates.spec.ts
@@ -112,7 +130,7 @@ bun --cwd backend test src/templates/__tests__/seed-templates.spec.ts
 
 Expected: all template validation tests pass.
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run:
 
@@ -122,7 +140,7 @@ bun run typecheck
 
 Expected: exit code 0.
 
-- [ ] **Step 3: Lint**
+- [x] **Step 3: Lint**
 
 Run:
 
@@ -132,12 +150,12 @@ bun run lint
 
 Expected: exit code 0. Existing warnings may remain; no new errors.
 
-- [ ] **Step 4: Re-run live audit**
+- [x] **Step 4: Re-run live audit**
 
 Run:
 
 ```powershell
-bun scripts/template-library-live-audit.ts
+bun run template-library:audit
 ```
 
 Expected: remaining live-run templates complete, credential-gated templates are explicitly classified, and no active template is left in a broken/static-demo state.

@@ -1,0 +1,358 @@
+{
+  "_metadata": {
+    "name": "API Surface Exposure Triage",
+    "description": "Authorized bug bounty workflow that crawls seed URLs, probes likely API documentation and GraphQL surfaces, runs focused Nuclei exposure checks, and writes a prioritized API exposure report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "api", "graphql", "swagger", "openapi", "nuclei", "httpx"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "API Surface Exposure Triage",
+    "description": "Find exposed API documentation, GraphQL consoles, debug/admin paths, and API-related exposure signals from authorized seed URLs.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "api", "graphql", "swagger", "openapi", "nuclei", "httpx"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 14
+  },
+  "graph": {
+    "name": "API Surface Exposure Triage",
+    "description": "Focused API surface workflow for authorized bug bounty assets.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 320
+        },
+        "data": {
+          "label": "Authorized API Scope Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "seedUrls",
+                  "label": "Seed URLs",
+                  "type": "array",
+                  "required": true,
+                  "description": "Authorized HTTP/HTTPS URLs to inspect for API exposure."
+                },
+                {
+                  "id": "knownApiPaths",
+                  "label": "Known API paths",
+                  "type": "array",
+                  "required": false,
+                  "description": "Optional program-known API paths such as /api, /graphql, /swagger, or /api-docs."
+                },
+                {
+                  "id": "scanIntensity",
+                  "label": "Scan intensity",
+                  "type": "text",
+                  "required": false,
+                  "description": "Use safe or thorough. Safe keeps candidate generation tightly bounded."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "description": "Program scope, exclusions, and rate-limit notes to copy into the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "crawl_seed_urls",
+        "type": "sentris.katana.run",
+        "position": {
+          "x": 420,
+          "y": 160
+        },
+        "data": {
+          "label": "Bounded Crawl",
+          "config": {
+            "params": {
+              "depth": 2,
+              "headless": false,
+              "timeout": 45,
+              "scope": "strict"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_api_candidates",
+        "type": "core.logic.script",
+        "position": {
+          "x": 740,
+          "y": 320
+        },
+        "data": {
+          "label": "Build API Candidate URLs",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "seedUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "knownApiPaths",
+                  "type": "list-text"
+                },
+                {
+                  "name": "scanIntensity",
+                  "type": "string"
+                },
+                {
+                  "name": "crawlEndpoints",
+                  "type": "list-text"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "candidateUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "candidateSummary",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const asList = (value) => Array.isArray(value) ? value : (typeof value === 'string' && value.trim() ? value.split(/[\\n,]+/) : []);\n  const seeds = asList(input.seedUrls).map(String).map((value) => value.trim()).filter(Boolean);\n  const crawlEndpoints = asList(input.crawlEndpoints).map(String).map((value) => value.trim()).filter(Boolean);\n  const knownApiPaths = asList(input.knownApiPaths).map(String).map((value) => value.trim()).filter(Boolean);\n  const intensity = String(input.scanIntensity || 'safe').toLowerCase();\n  const safePaths = ['/api', '/api/', '/api-docs', '/api/docs', '/docs', '/swagger', '/swagger/', '/swagger-ui/', '/swagger.json', '/swagger/v1/swagger.json', '/openapi.json', '/openapi.yaml', '/redoc', '/graphql', '/graphiql', '/playground', '/admin', '/actuator', '/actuator/health', '/metrics', '/debug'];\n  const thoroughPaths = ['/v1', '/v2', '/v3', '/rest', '/rest/products/search', '/api/v1', '/api/v2', '/api/swagger.json', '/api/openapi.json', '/swagger-resources', '/swagger-resources/configuration/ui', '/_debug_toolbar/', '/console', '/explorer', '/api/explorer'];\n  const interestingPath = /(api|graphql|graphiql|swagger|openapi|redoc|docs|admin|actuator|metrics|debug|explorer|playground)/i;\n  const candidates = new Map();\n  const counters = { generatedFromSeeds: 0, generatedFromCrawl: 0, generatedFromKnownPaths: 0 };\n  function add(url, source) {\n    if (!url || candidates.size >= (intensity === 'thorough' ? 240 : 140)) return;\n    try {\n      const parsed = new URL(url);\n      if (!['http:', 'https:'].includes(parsed.protocol)) return;\n      parsed.hash = '';\n      const normalized = parsed.toString();\n      if (!candidates.has(normalized)) {\n        candidates.set(normalized, { url: normalized, source });\n        if (source === 'seed') counters.generatedFromSeeds += 1;\n        if (source === 'crawl') counters.generatedFromCrawl += 1;\n        if (source === 'known') counters.generatedFromKnownPaths += 1;\n      }\n    } catch {}\n  }\n  function addPath(seed, path, source) {\n    try {\n      const base = new URL(seed);\n      const normalizedPath = String(path || '').startsWith('/') ? String(path) : '/' + String(path || '');\n      add(base.origin + normalizedPath, source);\n    } catch {}\n  }\n  for (const seed of seeds) {\n    add(seed, 'seed');\n    for (const path of safePaths) addPath(seed, path, 'seed');\n    if (intensity === 'thorough') for (const path of thoroughPaths) addPath(seed, path, 'seed');\n    for (const path of knownApiPaths) addPath(seed, path, 'known');\n  }\n  for (const endpoint of crawlEndpoints) {\n    if (interestingPath.test(endpoint)) add(endpoint, 'crawl');\n  }\n  const candidateUrls = Array.from(candidates.keys());\n  return { candidateUrls, candidateSummary: { candidateCount: candidateUrls.length, seedCount: seeds.length, crawlEndpointCount: crawlEndpoints.length, knownApiPathCount: knownApiPaths.length, scanIntensity: intensity, ...counters } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "probe_api_candidates",
+        "type": "sentris.httpx.scan",
+        "position": {
+          "x": 1060,
+          "y": 220
+        },
+        "data": {
+          "label": "Probe API Candidates",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": false,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "nuclei_api_exposure_scan",
+        "type": "sentris.nuclei.scan",
+        "position": {
+          "x": 1060,
+          "y": 440
+        },
+        "data": {
+          "label": "Run Focused API Exposure Checks",
+          "config": {
+            "params": {
+              "rateLimit": 25,
+              "concurrency": 6,
+              "timeout": 8,
+              "retries": 0,
+              "includeRaw": false,
+              "followRedirects": true,
+              "updateTemplates": true,
+              "disableHttpx": true,
+              "severityFilter": ["info", "low", "medium", "high", "critical"]
+            },
+            "inputOverrides": {
+              "templateIds": ["swagger-api", "openapi", "graphql-detect"],
+              "templatePaths": ["http/exposures/", "http/misconfigurations/", "http/panels/"]
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_api_surface_report",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1400,
+          "y": 320
+        },
+        "data": {
+          "label": "Assemble API Exposure Report",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "seedUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "candidateUrls",
+                  "type": "list-text"
+                },
+                {
+                  "name": "candidateSummary",
+                  "type": "json"
+                },
+                {
+                  "name": "httpResponses",
+                  "type": "list-json"
+                },
+                {
+                  "name": "nucleiFindings",
+                  "type": "list-json"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const list = (value) => Array.isArray(value) ? value : [];\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1, unknown: 0 };\n  const normalizeSeverity = (value) => String(value || 'unknown').toLowerCase();\n  const rank = (value) => severityRank[normalizeSeverity(value)] || 0;\n  const candidateSummary = input.candidateSummary && typeof input.candidateSummary === 'object' ? input.candidateSummary : {};\n  const httpResponses = list(input.httpResponses);\n  const nucleiFindings = list(input.nucleiFindings);\n  function responseUrl(item) { return item?.url || item?.finalUrl || item?.input || item?.host || ''; }\n  function responseText(item) { return [responseUrl(item), item?.title, item?.webserver, ...(Array.isArray(item?.technologies) ? item.technologies : [])].join(' '); }\n  function classifyResponse(item) {\n    const status = Number(item?.statusCode ?? item?.status ?? 0);\n    if (!(status >= 200 && status < 400)) return null;\n    const text = responseText(item);\n    const url = responseUrl(item);\n    if (/graphql|graphiql|playground/i.test(text)) return { category: 'graphql', severity: 'high', title: 'Potential exposed GraphQL surface', url, evidence: { statusCode: status, title: item?.title || null, technologies: item?.technologies || [] } };\n    if (/swagger|openapi|redoc|api-docs|api docs|swagger ui/i.test(text)) return { category: 'api-docs', severity: 'medium', title: 'Potential exposed API documentation', url, evidence: { statusCode: status, title: item?.title || null, technologies: item?.technologies || [] } };\n    if (/actuator|metrics|debug|admin|console|explorer/i.test(text)) return { category: 'debug-admin', severity: 'medium', title: 'Potential exposed API admin or debug surface', url, evidence: { statusCode: status, title: item?.title || null, technologies: item?.technologies || [] } };\n    return null;\n  }\n  const httpFindings = httpResponses.map(classifyResponse).filter(Boolean).map((item) => ({ source: 'httpx', severity: item.severity, title: item.title, url: item.url, category: item.category, evidence: item.evidence }));\n  function nucleiCategory(finding) {\n    const tags = Array.isArray(finding?.tags) ? finding.tags.map(String).join(' ') : '';\n    const text = [finding?.templateId, finding?.name, finding?.matchedAt, finding?.host, finding?.url, tags].join(' ');\n    if (/graphql|graphiql|playground/i.test(text)) return 'graphql';\n    if (/swagger|openapi|redoc|api-docs|api docs|swagger ui/i.test(text)) return 'api-docs';\n    if (/actuator|metrics|debug|admin|console|explorer/i.test(text)) return 'debug-admin';\n    return null;\n  }\n  const nuclei = nucleiFindings.map((finding) => ({ source: 'nuclei', severity: normalizeSeverity(finding?.severity), title: finding?.name || finding?.templateId || 'Nuclei API exposure finding', url: finding?.matchedAt || finding?.host || finding?.url || '', templateId: finding?.templateId || null, tags: Array.isArray(finding?.tags) ? finding.tags : [], category: nucleiCategory(finding), raw: finding }));\n  const priorityFindings = [...nuclei, ...httpFindings].sort((a, b) => rank(b.severity) - rank(a.severity) || (a.source === 'nuclei' ? -1 : b.source === 'nuclei' ? 1 : String(a.url).localeCompare(String(b.url))));\n  const countsBySource = priorityFindings.reduce((acc, item) => { acc[item.source] = (acc[item.source] || 0) + 1; return acc; }, {});\n  const countsBySeverity = priorityFindings.reduce((acc, item) => { acc[item.severity] = (acc[item.severity] || 0) + 1; return acc; }, {});\n  return { report: { summary: { seedUrls: list(input.seedUrls).length, candidatesGenerated: Number(candidateSummary.candidateCount || list(input.candidateUrls).length), candidatesResponsive: httpResponses.length, findings: priorityFindings.length, nucleiFindings: nucleiFindings.length, graphqlSignals: priorityFindings.filter((item) => item.category === 'graphql').length, apiDocSignals: priorityFindings.filter((item) => item.category === 'api-docs').length, highestSeverity: priorityFindings[0]?.severity || null, countsBySource, countsBySeverity }, authorizationNotes: input.authorizationNotes || null, candidateSummary, candidates: list(input.candidateUrls).slice(0, 200), httpEvidence: httpResponses.slice(0, 200), nucleiFindings: nucleiFindings.slice(0, 100), priorityFindings: priorityFindings.slice(0, 100), nextSteps: ['Manually validate every exposed API surface against program scope', 'Confirm whether documentation or GraphQL access leaks sensitive schema, auth, or environment details', 'Avoid destructive GraphQL or API mutations during validation', 'Respect published rate limits and authentication requirements'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1740,
+          "y": 320
+        },
+        "data": {
+          "label": "Save API Surface Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "api-surface-exposure-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-crawl_seed_urls-seedUrls",
+        "source": "trigger_1",
+        "target": "crawl_seed_urls",
+        "sourceHandle": "seedUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-build_api_candidates-seedUrls",
+        "source": "trigger_1",
+        "target": "build_api_candidates",
+        "sourceHandle": "seedUrls",
+        "targetHandle": "seedUrls"
+      },
+      {
+        "id": "trigger_1-build_api_candidates-knownApiPaths",
+        "source": "trigger_1",
+        "target": "build_api_candidates",
+        "sourceHandle": "knownApiPaths",
+        "targetHandle": "knownApiPaths"
+      },
+      {
+        "id": "trigger_1-build_api_candidates-scanIntensity",
+        "source": "trigger_1",
+        "target": "build_api_candidates",
+        "sourceHandle": "scanIntensity",
+        "targetHandle": "scanIntensity"
+      },
+      {
+        "id": "crawl_seed_urls-build_api_candidates-endpoints",
+        "source": "crawl_seed_urls",
+        "target": "build_api_candidates",
+        "sourceHandle": "endpoints",
+        "targetHandle": "crawlEndpoints"
+      },
+      {
+        "id": "build_api_candidates-probe_api_candidates-candidateUrls",
+        "source": "build_api_candidates",
+        "target": "probe_api_candidates",
+        "sourceHandle": "candidateUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "build_api_candidates-nuclei_api_exposure_scan-candidateUrls",
+        "source": "build_api_candidates",
+        "target": "nuclei_api_exposure_scan",
+        "sourceHandle": "candidateUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-assemble_api_surface_report-seedUrls",
+        "source": "trigger_1",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "seedUrls",
+        "targetHandle": "seedUrls"
+      },
+      {
+        "id": "trigger_1-assemble_api_surface_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "build_api_candidates-assemble_api_surface_report-candidateUrls",
+        "source": "build_api_candidates",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "candidateUrls",
+        "targetHandle": "candidateUrls"
+      },
+      {
+        "id": "build_api_candidates-assemble_api_surface_report-candidateSummary",
+        "source": "build_api_candidates",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "candidateSummary",
+        "targetHandle": "candidateSummary"
+      },
+      {
+        "id": "probe_api_candidates-assemble_api_surface_report-responses",
+        "source": "probe_api_candidates",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "nuclei_api_exposure_scan-assemble_api_surface_report-findings",
+        "source": "nuclei_api_exposure_scan",
+        "target": "assemble_api_surface_report",
+        "sourceHandle": "findings",
+        "targetHandle": "nucleiFindings"
+      },
+      {
+        "id": "assemble_api_surface_report-artifact_report-report",
+        "source": "assemble_api_surface_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}
