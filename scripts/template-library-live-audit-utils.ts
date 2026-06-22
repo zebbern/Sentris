@@ -166,10 +166,19 @@ export interface TemplateCatalogLowValueCandidate {
   reason: string;
 }
 
+export interface TemplateComponentCoverageSummary {
+  componentTemplateCounts: Record<string, number>;
+  unusedComponents: string[];
+}
+
 export interface TemplateCatalogQualitySummary {
   duplicateNames: TemplateCatalogDuplicateNameGroup[];
   duplicateFunctionalities: TemplateCatalogDuplicateFunctionalityGroup[];
   lowValueCandidates: TemplateCatalogLowValueCandidate[];
+}
+
+export interface TemplateCatalogQualityCheckOptions {
+  componentCoverageIds?: string[];
 }
 
 export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
@@ -275,8 +284,23 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       authorizationNotes: 'Live audit fixture.',
     },
     'Attack Surface Recon Analytics': {
-      domains: ['example.com'],
-      authorizationNotes: 'Live audit fixture: passive bounded recon.',
+      domains: ['scanme.nmap.org'],
+      authorizationNotes: 'Live audit fixture: bounded Nmap scanme target.',
+    },
+    'WAF Edge Recon Triage': {
+      liveUrls: ['https://scanme.nmap.org/'],
+      authorizationNotes: 'Live audit fixture: bounded WAF recon target.',
+    },
+    'Exposure to CVE Brief': {
+      targets: ['scanme.nmap.org'],
+      deploymentNotes: 'Live audit fixture: bounded service discovery target.',
+      authorizationNotes: 'Live audit fixture.',
+    },
+    'Public Repo Full Code Security → Discord': {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      ref: '',
+      includeDevDependencies: false,
+      authorizationNotes: 'Live audit fixture.',
     },
   };
 }
@@ -837,6 +861,31 @@ export function summarizeTemplateCatalogQuality(
   };
 }
 
+export function summarizeTemplateComponentCoverage(
+  results: TemplateAuditMarkdownResult[],
+  componentIds: string[],
+): TemplateComponentCoverageSummary {
+  const componentTemplateCounts = Object.fromEntries(
+    [...new Set(componentIds)].sort().map((componentId) => [componentId, 0]),
+  );
+
+  for (const result of results) {
+    const uniqueComponents = new Set(result.components);
+    for (const componentId of Object.keys(componentTemplateCounts)) {
+      if (uniqueComponents.has(componentId)) {
+        componentTemplateCounts[componentId] += 1;
+      }
+    }
+  }
+
+  return {
+    componentTemplateCounts,
+    unusedComponents: Object.entries(componentTemplateCounts)
+      .filter(([, count]) => count === 0)
+      .map(([componentId]) => componentId),
+  };
+}
+
 export function getTemplateCatalogQualityFailures(
   results: TemplateAuditMarkdownResult[],
 ): string[] {
@@ -858,9 +907,16 @@ export function getTemplateCatalogQualityFailures(
   return failures;
 }
 
-export function renderTemplateCatalogQualityCheck(results: TemplateAuditMarkdownResult[]): string {
+export function renderTemplateCatalogQualityCheck(
+  results: TemplateAuditMarkdownResult[],
+  options: TemplateCatalogQualityCheckOptions = {},
+): string {
   const summary = summarizeTemplateCatalogQuality(results);
   const failures = getTemplateCatalogQualityFailures(results);
+  const componentCoverage =
+    options.componentCoverageIds && options.componentCoverageIds.length > 0
+      ? summarizeTemplateComponentCoverage(results, options.componentCoverageIds)
+      : null;
   const lines = [
     '# Template Catalog Quality Check',
     '',
@@ -869,8 +925,24 @@ export function renderTemplateCatalogQualityCheck(results: TemplateAuditMarkdown
     `Low-value/static candidates: ${summary.lowValueCandidates.length}`,
   ];
 
+  if (componentCoverage) {
+    lines.push(`Component coverage gaps: ${componentCoverage.unusedComponents.length}`);
+  }
+
   if (failures.length > 0) {
     lines.push('', '## Catalog Quality Failures', '', ...failures.map((failure) => `- ${failure}`));
+  }
+
+  if (componentCoverage && componentCoverage.unusedComponents.length > 0) {
+    lines.push(
+      '',
+      '## Component Coverage Gaps',
+      '',
+      ...componentCoverage.unusedComponents.map(
+        (componentId) =>
+          `- ${componentId}: no live-validated template currently uses this component.`,
+      ),
+    );
   }
 
   return `${lines.join('\n')}\n`;

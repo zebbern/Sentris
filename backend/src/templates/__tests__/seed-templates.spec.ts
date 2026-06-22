@@ -13,18 +13,21 @@ const newTemplateFiles = [
   'container-image-cve-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
+  'exposure-to-cve-brief.json',
   'github-dependency-cve-hunt-discord-report.json',
   'github-repo-dependency-cve-triage.json',
   'kev-fresh-cve-watch-brief.json',
   'npm-dependency-cve-hunt.json',
   'passive-osint-subdomain-expansion.json',
   'public-repo-code-iac-risk-triage.json',
+  'public-repo-full-code-security-discord-report.json',
   'public-repo-full-code-security.json',
   'public-repo-secret-exposure-triage.json',
   'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
   'tech-stack-cve-hunter.json',
   'web-api-fuzz-triage.json',
+  'wafw00f-edge-recon-triage.json',
   'web-attack-surface-quick-win-hunt.json',
 ];
 
@@ -2036,5 +2039,146 @@ describe('new seed templates', () => {
     expect(result.report.assets[0].host).toBe('www.example.com');
     expect(result.report.assets[0].url).toBe('https://www.example.com');
     expect(result.report.assets[0].statusCode).toBe(200);
+  });
+
+  it('public-repo-full-code-security-discord-report wires Run Report Discord after artifact save', () => {
+    const filePath = join(seedTemplatesDir, 'public-repo-full-code-security-discord-report.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+
+    expect(template.manifest.nodeCount).toBe(14);
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
+    ]);
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'artifact_report-run_report_discord-after',
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        source: 'artifact_report',
+        target: 'run_report_discord',
+        sourceHandle: 'saved',
+        targetHandle: 'after',
+      }),
+    );
+  });
+
+  it('exposure-to-cve-brief chains exposure mapping into CVE impact brief assembly', () => {
+    const filePath = join(seedTemplatesDir, 'exposure-to-cve-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+
+    expect(nodeTypes).toEqual(
+      expect.arrayContaining([
+        'sentris.naabu.scan',
+        'sentris.httpx.scan',
+        'sentris.nvd.cve.query',
+        'core.http.request',
+        'core.logic.script',
+        'core.artifact.writer',
+      ]),
+    );
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'rank_cve_candidates-pick_top_cve-report',
+      ),
+    ).toBeTruthy();
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'pick_top_cve-query_nvd_detail-cveId',
+      ),
+    ).toBeTruthy();
+    expect(
+      template.graph.edges.find(
+        (edge: { id: string }) => edge.id === 'pick_top_cve-query_nvd_detail-lookupKeyword',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('exposure-to-cve-brief pick script selects the top ranked CVE candidate', () => {
+    const filePath = join(seedTemplatesDir, 'exposure-to-cve-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const pickNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'pick_top_cve',
+    );
+    const result = runTemplateScript<{ cveId: string; product: string; cveLookupKeyword: string }>(
+      pickNode.data.config.params.code,
+      {
+        report: {
+          summary: { topCandidate: 'CVE-2024-0001', fingerprintKeyword: 'nginx' },
+          candidates: [{ id: 'CVE-2024-0001' }, { id: 'CVE-2023-9999' }],
+        },
+      },
+    );
+
+    expect(result.cveId).toBe('CVE-2024-0001');
+    expect(result.product).toBe('nginx');
+    expect(result.cveLookupKeyword).toBe('CVE-2024-0001');
+  });
+
+  it('exposure-to-cve-brief pick script falls back to product keyword when no CVE is ranked', () => {
+    const filePath = join(seedTemplatesDir, 'exposure-to-cve-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const pickNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'pick_top_cve',
+    );
+    const result = runTemplateScript<{ cveId: string; product: string; cveLookupKeyword: string }>(
+      pickNode.data.config.params.code,
+      {
+        report: {
+          summary: { topCandidate: null, fingerprintKeyword: 'nginx' },
+          candidates: [],
+        },
+      },
+    );
+
+    expect(result.cveId).toBe('');
+    expect(result.product).toBe('nginx');
+    expect(result.cveLookupKeyword).toBe('nginx');
+  });
+
+  it('wafw00f-edge-recon-triage wires httpx and wafw00f into a ranked report', () => {
+    const filePath = join(seedTemplatesDir, 'wafw00f-edge-recon-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.httpx.scan',
+      'sentris.wafw00f.run',
+      'core.logic.script',
+      'core.artifact.writer',
+    ]);
+  });
+
+  it('wafw00f-edge-recon-triage rank script merges HTTP and WAF detections by URL', () => {
+    const filePath = join(seedTemplatesDir, 'wafw00f-edge-recon-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const rankNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'rank_waf_recon',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: Record<string, unknown>;
+        assets: { url: string; wafDetected: boolean; firewall?: string }[];
+      };
+    }>(rankNode.data.config.params.code, {
+      liveUrls: ['https://app.example.com'],
+      httpResponses: [
+        { url: 'https://app.example.com', statusCode: 200, title: 'App', technologies: ['nginx'] },
+      ],
+      wafDetections: [
+        {
+          url: 'https://app.example.com',
+          detected: true,
+          firewall: 'Cloudflare',
+          manufacturer: 'Cloudflare',
+        },
+      ],
+      detectionCount: 1,
+    });
+
+    expect(result.report.summary.wafDetections).toBe(1);
+    expect(result.report.assets[0].wafDetected).toBe(true);
+    expect(result.report.assets[0].firewall).toBe('Cloudflare');
   });
 });

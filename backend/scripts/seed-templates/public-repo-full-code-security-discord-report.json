@@ -1,0 +1,697 @@
+{
+  "_metadata": {
+    "name": "Public Repo Full Code Security → Discord",
+    "description": "Multi-scanner public repository audit with TruffleHog, Semgrep, and OSV dependency checks, cross-scanner deduplication, analytics indexing, and Run Report Discord notification.",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "github",
+      "trufflehog",
+      "semgrep",
+      "osv",
+      "secrets",
+      "sast",
+      "dependency",
+      "dedupe",
+      "analytics",
+      "discord",
+      "notification"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Public Repo Full Code Security → Discord",
+    "description": "Full public repository security scan with deduped findings, analytics indexing, and Discord run report notification.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "github",
+      "trufflehog",
+      "semgrep",
+      "osv",
+      "secrets",
+      "sast",
+      "dependency",
+      "dedupe",
+      "analytics",
+      "discord",
+      "notification"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 14,
+    "edgeCount": 47
+  },
+  "graph": {
+    "name": "Public Repo Full Code Security → Discord",
+    "description": "Parallel secrets, SAST, and dependency scanning workflow for authorized public Git repositories.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 400 },
+        "data": {
+          "label": "Authorized Repository Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "repositoryUrl",
+                  "label": "Repository URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "Public Git repository URL explicitly authorized for testing."
+                },
+                {
+                  "id": "ref",
+                  "label": "Branch, tag, or commit",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Git ref to inspect. Uses the repository default branch when omitted."
+                },
+                {
+                  "id": "includeDevDependencies",
+                  "label": "Include dev dependencies",
+                  "type": "boolean",
+                  "required": false,
+                  "defaultValue": false,
+                  "description": "Include top-level dev/test dependencies in manifest extraction."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and reporting constraints."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "trufflehog_scan",
+        "type": "sentris.trufflehog.scan",
+        "position": { "x": 420, "y": 80 },
+        "data": {
+          "label": "Scan Git History For Verified Secrets",
+          "config": {
+            "params": {
+              "scanType": "git",
+              "onlyVerified": true,
+              "jsonOutput": true,
+              "includeIssueComments": false,
+              "includePRComments": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_repo_files",
+        "type": "sentris.repository.files.extract",
+        "position": { "x": 420, "y": 280 },
+        "data": {
+          "label": "Extract Source Files",
+          "config": {
+            "params": {
+              "ref": "main",
+              "maxFiles": 80,
+              "maxTotalBytes": 250000,
+              "maxFileBytes": 50000
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_repo_manifests",
+        "type": "sentris.repository.manifest.extract",
+        "position": { "x": 420, "y": 520 },
+        "data": {
+          "label": "Extract Repository Manifests",
+          "config": {
+            "params": {
+              "ref": "main",
+              "manifestPaths": [
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "yarn.lock",
+                "package.json",
+                "requirements.txt",
+                "pyproject.toml",
+                "poetry.lock",
+                "Pipfile",
+                "Pipfile.lock",
+                "composer.json",
+                "composer.lock",
+                "go.mod",
+                "pom.xml",
+                "build.gradle",
+                "build.gradle.kts"
+              ],
+              "includeDevDependencies": false,
+              "maxPackages": 100
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "semgrep_scan",
+        "type": "sentris.semgrep.run",
+        "position": { "x": 760, "y": 280 },
+        "data": {
+          "label": "Run Semgrep Source Checks",
+          "config": {
+            "params": {
+              "config": "p/owasp-top-ten",
+              "severity": ["ERROR", "WARNING"]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_npm_query",
+        "type": "sentris.osv.query",
+        "position": { "x": 760, "y": 420 },
+        "data": {
+          "label": "Query NPM Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "npm",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_pypi_query",
+        "type": "sentris.osv.query",
+        "position": { "x": 760, "y": 520 },
+        "data": {
+          "label": "Query PyPI Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "PyPI",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_go_query",
+        "type": "sentris.osv.query",
+        "position": { "x": 760, "y": 620 },
+        "data": {
+          "label": "Query Go Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "Go",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_maven_query",
+        "type": "sentris.osv.query",
+        "position": { "x": 760, "y": 720 },
+        "data": {
+          "label": "Query Maven Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "Maven",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_packagist_query",
+        "type": "sentris.osv.query",
+        "position": { "x": 760, "y": 820 },
+        "data": {
+          "label": "Query Packagist Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "Packagist",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "dedupe_findings",
+        "type": "core.logic.script",
+        "position": { "x": 1100, "y": 400 },
+        "data": {
+          "label": "Dedupe Cross-Scanner Findings",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "repositoryUrl", "type": "string" },
+                { "name": "ref", "type": "string" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "secrets", "type": "list-json" },
+                { "name": "secretCount", "type": "number" },
+                { "name": "verifiedCount", "type": "number" },
+                { "name": "hasVerifiedSecrets", "type": "boolean" },
+                { "name": "semgrepFindings", "type": "list-json" },
+                { "name": "semgrepCount", "type": "number" },
+                { "name": "npmFindings", "type": "list-json" },
+                { "name": "pypiFindings", "type": "list-json" },
+                { "name": "goFindings", "type": "list-json" },
+                { "name": "mavenFindings", "type": "list-json" },
+                { "name": "packagistFindings", "type": "list-json" },
+                { "name": "npmSummary", "type": "json" },
+                { "name": "pypiSummary", "type": "json" },
+                { "name": "goSummary", "type": "json" },
+                { "name": "mavenSummary", "type": "json" },
+                { "name": "packagistSummary", "type": "json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const severityRank = { critical: 5, high: 4, error: 4, medium: 3, warning: 3, low: 2, info: 1, unknown: 0 };\n  const list = (value) => Array.isArray(value) ? value : [];\n  const normalizeSeverity = (value) => String(value || 'unknown').toLowerCase();\n  const rank = (value) => severityRank[normalizeSeverity(value)] || 0;\n  const repositoryUrl = typeof input.repositoryUrl === 'string' ? input.repositoryUrl.trim() : '';\n  const ref = typeof input.ref === 'string' && input.ref.trim().length > 0 ? input.ref.trim() : null;\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  function firstText(...values) {\n    for (const value of values) {\n      if (typeof value === 'string' && value.trim().length > 0) return value.trim();\n    }\n    return null;\n  }\n  function gitData(secret) {\n    const data = secret?.SourceMetadata?.Data || {};\n    return data.Git || data.Github || data.Gitlab || data.Filesystem || {};\n  }\n  function redactedValue(secret) {\n    return firstText(secret?.Redacted, secret?.StructuredData?.redacted, secret?.StructuredData?.Redacted) || '[redacted]';\n  }\n  const secretFindings = list(input.secrets).map((secret) => {\n    const source = gitData(secret);\n    const detector = firstText(secret?.DetectorName, secret?.DetectorType, 'Unknown secret') || 'Unknown secret';\n    const file = firstText(source.file, source.path, secret?.SourceMetadata?.Data?.Filesystem?.file);\n    const location = file || repositoryUrl;\n    const severity = secret?.Verified === true ? 'high' : 'medium';\n    const ruleId = firstText(secret?.DetectorType, secret?.DetectorName);\n    return {\n      source: 'trufflehog',\n      severity: normalizeSeverity(severity),\n      title: detector + (secret?.Verified === true ? ' (verified)' : ''),\n      ruleId,\n      location,\n      dedupeKey: 'trufflehog|' + (ruleId || detector) + '|' + location,\n      verified: secret?.Verified === true,\n      redacted: redactedValue(secret),\n      raw: { detector, file, redacted: redactedValue(secret), verified: secret?.Verified === true }\n    };\n  });\n  const semgrepFindings = list(input.semgrepFindings).map((item) => {\n    const location = item.path ? item.path + ':' + (item.startLine || 0) : null;\n    const ruleId = item.checkId || null;\n    return {\n      source: 'semgrep',\n      severity: normalizeSeverity(item.severity),\n      title: item.message || item.checkId || 'Semgrep finding',\n      ruleId,\n      location,\n      dedupeKey: 'semgrep|' + (ruleId || item.message || '') + '|' + (location || ''),\n      raw: item\n    };\n  });\n  const osvEcosystems = ['npm', 'pypi', 'go', 'maven', 'packagist'];\n  const osvFindings = osvEcosystems.flatMap((eco) => list(input[eco + 'Findings']).map((finding) => {\n    const location = finding.packageSpec || finding.packageName || null;\n    const ruleId = finding.id || null;\n    return {\n      source: 'osv-' + eco,\n      severity: normalizeSeverity(finding.severity),\n      title: String(finding.summary || finding.id || 'Dependency advisory').slice(0, 200),\n      ruleId,\n      location,\n      dedupeKey: 'osv|' + (ruleId || '') + '|' + (location || ''),\n      raw: finding\n    };\n  }));\n  const dedupeMap = new Map();\n  for (const finding of [...secretFindings, ...semgrepFindings, ...osvFindings]) {\n    if (!dedupeMap.has(finding.dedupeKey)) dedupeMap.set(finding.dedupeKey, finding);\n  }\n  const findings = Array.from(dedupeMap.values()).sort((a, b) => rank(b.severity) - rank(a.severity) || String(a.title).localeCompare(String(b.title)));\n  const countsBySource = findings.reduce((acc, item) => { acc[item.source] = (acc[item.source] || 0) + 1; return acc; }, {});\n  const countsBySeverity = findings.reduce((acc, item) => { acc[item.severity] = (acc[item.severity] || 0) + 1; return acc; }, {});\n  const secretCount = Number.isFinite(Number(input.secretCount)) ? Number(input.secretCount) : list(input.secrets).length;\n  const verifiedCount = Number.isFinite(Number(input.verifiedCount)) ? Number(input.verifiedCount) : secretFindings.filter((item) => item.verified).length;\n  return {\n    report: {\n      summary: {\n        repositoryUrl,\n        ref,\n        findings: findings.length,\n        secretCount,\n        verifiedSecretCount: verifiedCount,\n        semgrepFindings: Number(input.semgrepCount || list(input.semgrepFindings).length),\n        dependencyFindings: osvFindings.length,\n        highestSeverity: findings[0]?.severity || null,\n        countsBySource,\n        countsBySeverity\n      },\n      authorizationNotes,\n      scannerSummaries: {\n        trufflehog: {\n          secretCount,\n          verifiedCount,\n          hasVerifiedSecrets: input.hasVerifiedSecrets === true || verifiedCount > 0\n        },\n        semgrep: { findingCount: Number(input.semgrepCount || list(input.semgrepFindings).length) },\n        osv: {\n          npm: input.npmSummary && typeof input.npmSummary === 'object' ? input.npmSummary : {},\n          pypi: input.pypiSummary && typeof input.pypiSummary === 'object' ? input.pypiSummary : {},\n          go: input.goSummary && typeof input.goSummary === 'object' ? input.goSummary : {},\n          maven: input.mavenSummary && typeof input.mavenSummary === 'object' ? input.mavenSummary : {},\n          packagist: input.packagistSummary && typeof input.packagistSummary === 'object' ? input.packagistSummary : {}\n        }\n      },\n      priorityFindings: findings.slice(0, 100),\n      nextSteps: [\n        'Rotate any verified exposed credentials immediately',\n        'Prioritize critical and high Semgrep and dependency findings for manual validation',\n        'Confirm all findings are in authorized program scope before reporting',\n        'Use redacted secret evidence only in submissions'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1460, "y": 400 },
+        "data": {
+          "label": "Save Full Code Security Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "public-repo-full-code-security-discord-{{date}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "run_report_discord",
+        "type": "core.notification.run-report-discord",
+        "position": { "x": 1820, "y": 400 },
+        "data": {
+          "label": "Run Report → Discord",
+          "config": {
+            "params": {
+              "includeSummary": true,
+              "includeFindings": true,
+              "includeArtifacts": false,
+              "attachFindingsJson": true,
+              "attachFirstArtifact": false,
+              "findingsLimit": 25
+            },
+            "inputOverrides": {
+              "webhookUrl": "{{SECRET_PLACEHOLDER}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "analytics_sink",
+        "type": "core.analytics.sink",
+        "position": { "x": 1100, "y": 80 },
+        "data": {
+          "label": "Index Scanner Results",
+          "config": {
+            "params": {
+              "dataInputs": [
+                { "id": "trufflehog", "label": "TruffleHog", "sourceTag": "trufflehog" },
+                { "id": "semgrep", "label": "Semgrep", "sourceTag": "semgrep" },
+                { "id": "osv_npm", "label": "OSV NPM", "sourceTag": "osv_npm" },
+                { "id": "osv_pypi", "label": "OSV PyPI", "sourceTag": "osv_pypi" },
+                { "id": "osv_go", "label": "OSV Go", "sourceTag": "osv_go" },
+                { "id": "osv_maven", "label": "OSV Maven", "sourceTag": "osv_maven" },
+                { "id": "osv_packagist", "label": "OSV Packagist", "sourceTag": "osv_packagist" }
+              ],
+              "indexSuffix": "repo-full-scan",
+              "assetKeyField": "auto",
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-trufflehog_scan-repositoryUrl",
+        "source": "trigger_1",
+        "target": "trufflehog_scan",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "scanTarget"
+      },
+      {
+        "id": "trigger_1-extract_repo_files-repositoryUrl",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-extract_repo_files-ref",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "trigger_1-extract_repo_manifests-repositoryUrl",
+        "source": "trigger_1",
+        "target": "extract_repo_manifests",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-extract_repo_manifests-ref",
+        "source": "trigger_1",
+        "target": "extract_repo_manifests",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "trigger_1-extract_repo_manifests-includeDevDependencies",
+        "source": "trigger_1",
+        "target": "extract_repo_manifests",
+        "sourceHandle": "includeDevDependencies",
+        "targetHandle": "includeDevDependencies"
+      },
+      {
+        "id": "extract_repo_files-semgrep_scan-sourceBundle",
+        "source": "extract_repo_files",
+        "target": "semgrep_scan",
+        "sourceHandle": "sourceBundle",
+        "targetHandle": "target"
+      },
+      {
+        "id": "extract_repo_manifests-osv_npm_query-npmPackageSpecs",
+        "source": "extract_repo_manifests",
+        "target": "osv_npm_query",
+        "sourceHandle": "npmPackageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "extract_repo_manifests-osv_pypi_query-pypiPackageSpecs",
+        "source": "extract_repo_manifests",
+        "target": "osv_pypi_query",
+        "sourceHandle": "pypiPackageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "extract_repo_manifests-osv_go_query-goPackageSpecs",
+        "source": "extract_repo_manifests",
+        "target": "osv_go_query",
+        "sourceHandle": "goPackageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "extract_repo_manifests-osv_maven_query-mavenPackageSpecs",
+        "source": "extract_repo_manifests",
+        "target": "osv_maven_query",
+        "sourceHandle": "mavenPackageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "extract_repo_manifests-osv_packagist_query-packagistPackageSpecs",
+        "source": "extract_repo_manifests",
+        "target": "osv_packagist_query",
+        "sourceHandle": "packagistPackageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "trigger_1-dedupe_findings-repositoryUrl",
+        "source": "trigger_1",
+        "target": "dedupe_findings",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-dedupe_findings-ref",
+        "source": "trigger_1",
+        "target": "dedupe_findings",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "trigger_1-dedupe_findings-authorizationNotes",
+        "source": "trigger_1",
+        "target": "dedupe_findings",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "trufflehog_scan-dedupe_findings-secrets",
+        "source": "trufflehog_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "secrets",
+        "targetHandle": "secrets"
+      },
+      {
+        "id": "trufflehog_scan-dedupe_findings-secretCount",
+        "source": "trufflehog_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "secretCount",
+        "targetHandle": "secretCount"
+      },
+      {
+        "id": "trufflehog_scan-dedupe_findings-verifiedCount",
+        "source": "trufflehog_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "verifiedCount",
+        "targetHandle": "verifiedCount"
+      },
+      {
+        "id": "trufflehog_scan-dedupe_findings-hasVerifiedSecrets",
+        "source": "trufflehog_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "hasVerifiedSecrets",
+        "targetHandle": "hasVerifiedSecrets"
+      },
+      {
+        "id": "semgrep_scan-dedupe_findings-findings",
+        "source": "semgrep_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "semgrepFindings"
+      },
+      {
+        "id": "semgrep_scan-dedupe_findings-findingCount",
+        "source": "semgrep_scan",
+        "target": "dedupe_findings",
+        "sourceHandle": "findingCount",
+        "targetHandle": "semgrepCount"
+      },
+      {
+        "id": "osv_npm_query-dedupe_findings-findings",
+        "source": "osv_npm_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "npmFindings"
+      },
+      {
+        "id": "osv_npm_query-dedupe_findings-summary",
+        "source": "osv_npm_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "summary",
+        "targetHandle": "npmSummary"
+      },
+      {
+        "id": "osv_pypi_query-dedupe_findings-findings",
+        "source": "osv_pypi_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "pypiFindings"
+      },
+      {
+        "id": "osv_pypi_query-dedupe_findings-summary",
+        "source": "osv_pypi_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "summary",
+        "targetHandle": "pypiSummary"
+      },
+      {
+        "id": "osv_go_query-dedupe_findings-findings",
+        "source": "osv_go_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "goFindings"
+      },
+      {
+        "id": "osv_go_query-dedupe_findings-summary",
+        "source": "osv_go_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "summary",
+        "targetHandle": "goSummary"
+      },
+      {
+        "id": "osv_maven_query-dedupe_findings-findings",
+        "source": "osv_maven_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "mavenFindings"
+      },
+      {
+        "id": "osv_maven_query-dedupe_findings-summary",
+        "source": "osv_maven_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "summary",
+        "targetHandle": "mavenSummary"
+      },
+      {
+        "id": "osv_packagist_query-dedupe_findings-findings",
+        "source": "osv_packagist_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "findings",
+        "targetHandle": "packagistFindings"
+      },
+      {
+        "id": "osv_packagist_query-dedupe_findings-summary",
+        "source": "osv_packagist_query",
+        "target": "dedupe_findings",
+        "sourceHandle": "summary",
+        "targetHandle": "packagistSummary"
+      },
+      {
+        "id": "dedupe_findings-artifact_report-report",
+        "source": "dedupe_findings",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      },
+      {
+        "id": "trufflehog_scan-analytics_sink",
+        "source": "trufflehog_scan",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "semgrep_scan-analytics_sink",
+        "source": "semgrep_scan",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "osv_npm_query-analytics_sink",
+        "source": "osv_npm_query",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "osv_pypi_query-analytics_sink",
+        "source": "osv_pypi_query",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "osv_go_query-analytics_sink",
+        "source": "osv_go_query",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "osv_maven_query-analytics_sink",
+        "source": "osv_maven_query",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "osv_packagist_query-analytics_sink",
+        "source": "osv_packagist_query",
+        "target": "analytics_sink"
+      },
+      {
+        "id": "trufflehog_scan-analytics_sink-results",
+        "source": "trufflehog_scan",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "trufflehog"
+      },
+      {
+        "id": "semgrep_scan-analytics_sink-results",
+        "source": "semgrep_scan",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "semgrep"
+      },
+      {
+        "id": "osv_npm_query-analytics_sink-results",
+        "source": "osv_npm_query",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "osv_npm"
+      },
+      {
+        "id": "osv_pypi_query-analytics_sink-results",
+        "source": "osv_pypi_query",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "osv_pypi"
+      },
+      {
+        "id": "osv_go_query-analytics_sink-results",
+        "source": "osv_go_query",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "osv_go"
+      },
+      {
+        "id": "osv_maven_query-analytics_sink-results",
+        "source": "osv_maven_query",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "osv_maven"
+      },
+      {
+        "id": "osv_packagist_query-analytics_sink-results",
+        "source": "osv_packagist_query",
+        "target": "analytics_sink",
+        "sourceHandle": "results",
+        "targetHandle": "osv_packagist"
+      },
+      {
+        "id": "artifact_report-run_report_discord-after",
+        "source": "artifact_report",
+        "target": "run_report_discord",
+        "sourceHandle": "saved",
+        "targetHandle": "after"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "DISCORD_WEBHOOK_URL",
+      "type": "string",
+      "description": "Discord Incoming Webhook URL for full code security run notifications"
+    }
+  ]
+}

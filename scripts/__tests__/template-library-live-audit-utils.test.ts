@@ -7,6 +7,7 @@ import {
   getTemplateCatalogQualityFailures,
   renderTemplateCatalogQualityCheck,
   renderTemplateValidationLedgerFreshness,
+  summarizeTemplateComponentCoverage,
   summarizeTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
@@ -59,8 +60,21 @@ describe('template library live audit helpers', () => {
       includeDevDependencies: false,
     });
     expect(inputs['Attack Surface Recon Analytics']).toEqual({
-      domains: ['example.com'],
-      authorizationNotes: 'Live audit fixture: passive bounded recon.',
+      domains: ['scanme.nmap.org'],
+      authorizationNotes: 'Live audit fixture: bounded Nmap scanme target.',
+    });
+    expect(inputs['Public Repo Full Code Security → Discord']).toMatchObject({
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      includeDevDependencies: false,
+    });
+    expect(inputs['Exposure to CVE Brief']).toEqual({
+      targets: ['scanme.nmap.org'],
+      deploymentNotes: 'Live audit fixture: bounded service discovery target.',
+      authorizationNotes: 'Live audit fixture.',
+    });
+    expect(inputs['WAF Edge Recon Triage']).toEqual({
+      liveUrls: ['https://scanme.nmap.org/'],
+      authorizationNotes: 'Live audit fixture: bounded WAF recon target.',
     });
   });
 
@@ -804,77 +818,114 @@ describe('template library live audit helpers', () => {
     ]);
   });
 
+  it('reports validated security components that have no template coverage', () => {
+    const coverage = summarizeTemplateComponentCoverage(
+      [
+        {
+          templateId: 'tpl-recon',
+          templateName: 'Bug Bounty Recon Triage',
+          seedFile: 'bug-bounty-recon-triage.json',
+          category: 'bug-bounty',
+          components: ['core.workflow.entrypoint', 'sentris.httpx.scan'],
+          requiredSecrets: [],
+          runtimeInputs: [{ id: 'targetUrls' }],
+          classification: 'live-run',
+          createOk: true,
+          runAttempted: true,
+          terminalStatus: 'COMPLETED',
+          artifactsCount: 1,
+          recommendation: 'keep',
+          rationale: 'Live execution completed and produced at least one artifact.',
+        },
+      ],
+      ['sentris.httpx.scan', 'sentris.wafw00f.run'],
+    );
+
+    expect(coverage.unusedComponents).toEqual(['sentris.wafw00f.run']);
+    expect(coverage.componentTemplateCounts).toEqual({
+      'sentris.httpx.scan': 1,
+      'sentris.wafw00f.run': 0,
+    });
+  });
+
   it('renders catalog quality as a concise ledger-check report', () => {
-    const report = renderTemplateCatalogQualityCheck([
-      {
-        templateId: 'tpl-primary',
-        templateName: 'NPM Dependency CVE Hunt',
-        seedFile: 'npm-dependency-cve-hunt.json',
-        category: 'cve-research',
-        components: ['sentris.osv.query'],
-        requiredSecrets: [],
-        runtimeInputs: [{ id: 'packageName' }],
-        classification: 'live-run',
-        createOk: true,
-        runAttempted: true,
-        terminalStatus: 'COMPLETED',
-        artifactsCount: 1,
-        recommendation: 'keep',
-        rationale: 'Live execution completed and produced at least one artifact.',
-      },
-      {
-        templateId: 'tpl-duplicate',
-        templateName: 'npm dependency cve hunt',
-        seedFile: 'npm-dependency-cve-hunt-copy.json',
-        category: 'cve-research',
-        components: ['sentris.osv.query'],
-        requiredSecrets: [],
-        runtimeInputs: [{ id: 'packageName' }],
-        classification: 'live-run',
-        createOk: true,
-        runAttempted: true,
-        terminalStatus: 'COMPLETED',
-        artifactsCount: 1,
-        recommendation: 'keep',
-        rationale: 'Live execution completed and produced at least one artifact.',
-      },
-      {
-        templateId: 'tpl-static',
-        templateName: 'Static Demo Template',
-        seedFile: 'static-demo-template.json',
-        category: 'demo',
-        components: ['core.logic.script'],
-        requiredSecrets: [],
-        runtimeInputs: [],
-        classification: 'create-only',
-        createOk: true,
-        runAttempted: false,
-        artifactsCount: 0,
-        recommendation: 'review',
-        rationale: 'Static demonstration workflow.',
-      },
-      {
-        templateId: 'tpl-functional-copy',
-        templateName: 'Package Advisory Scanner',
-        seedFile: 'package-advisory-scanner.json',
-        category: 'cve-research',
-        components: ['sentris.osv.query'],
-        requiredSecrets: [],
-        runtimeInputs: [{ id: 'packageName' }],
-        classification: 'live-run',
-        createOk: true,
-        runAttempted: true,
-        terminalStatus: 'COMPLETED',
-        artifactsCount: 1,
-        recommendation: 'keep',
-        rationale: 'Live execution completed and produced at least one artifact.',
-      },
-    ]);
+    const report = renderTemplateCatalogQualityCheck(
+      [
+        {
+          templateId: 'tpl-primary',
+          templateName: 'NPM Dependency CVE Hunt',
+          seedFile: 'npm-dependency-cve-hunt.json',
+          category: 'cve-research',
+          components: ['sentris.osv.query'],
+          requiredSecrets: [],
+          runtimeInputs: [{ id: 'packageName' }],
+          classification: 'live-run',
+          createOk: true,
+          runAttempted: true,
+          terminalStatus: 'COMPLETED',
+          artifactsCount: 1,
+          recommendation: 'keep',
+          rationale: 'Live execution completed and produced at least one artifact.',
+        },
+        {
+          templateId: 'tpl-duplicate',
+          templateName: 'npm dependency cve hunt',
+          seedFile: 'npm-dependency-cve-hunt-copy.json',
+          category: 'cve-research',
+          components: ['sentris.osv.query'],
+          requiredSecrets: [],
+          runtimeInputs: [{ id: 'packageName' }],
+          classification: 'live-run',
+          createOk: true,
+          runAttempted: true,
+          terminalStatus: 'COMPLETED',
+          artifactsCount: 1,
+          recommendation: 'keep',
+          rationale: 'Live execution completed and produced at least one artifact.',
+        },
+        {
+          templateId: 'tpl-static',
+          templateName: 'Static Demo Template',
+          seedFile: 'static-demo-template.json',
+          category: 'demo',
+          components: ['core.logic.script'],
+          requiredSecrets: [],
+          runtimeInputs: [],
+          classification: 'create-only',
+          createOk: true,
+          runAttempted: false,
+          artifactsCount: 0,
+          recommendation: 'review',
+          rationale: 'Static demonstration workflow.',
+        },
+        {
+          templateId: 'tpl-functional-copy',
+          templateName: 'Package Advisory Scanner',
+          seedFile: 'package-advisory-scanner.json',
+          category: 'cve-research',
+          components: ['sentris.osv.query'],
+          requiredSecrets: [],
+          runtimeInputs: [{ id: 'packageName' }],
+          classification: 'live-run',
+          createOk: true,
+          runAttempted: true,
+          terminalStatus: 'COMPLETED',
+          artifactsCount: 1,
+          recommendation: 'keep',
+          rationale: 'Live execution completed and produced at least one artifact.',
+        },
+      ],
+      { componentCoverageIds: ['sentris.osv.query', 'sentris.wafw00f.run'] },
+    );
 
     expect(report).toContain('# Template Catalog Quality Check');
     expect(report).toContain('Duplicate names: 1');
     expect(report).toContain('Duplicate functionality: 1');
     expect(report).toContain('Low-value/static candidates: 1');
+    expect(report).toContain('Component coverage gaps: 1');
+    expect(report).toContain(
+      '- sentris.wafw00f.run: no live-validated template currently uses this component.',
+    );
     expect(report).toContain('## Catalog Quality Failures');
     expect(report).toContain(
       '- Duplicate template name: npm-dependency-cve-hunt.json, npm-dependency-cve-hunt-copy.json',

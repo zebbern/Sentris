@@ -22,6 +22,10 @@ import {
   type TemplateValidationLedger,
   type TemplateValidationFreshnessInput,
 } from './template-library-live-audit-utils';
+import {
+  readSecurityComponentLedger,
+  summarizeSecurityComponentLedgerFreshness,
+} from './security-component-audit-utils';
 
 type JsonObject = Record<string, unknown>;
 
@@ -218,6 +222,16 @@ function readValidationLedger(): TemplateValidationLedger | undefined {
   }
 
   return undefined;
+}
+
+function readCurrentSecurityComponentIds(): string[] {
+  const securityComponentLedger = readSecurityComponentLedger();
+  if (!securityComponentLedger) return [];
+
+  return summarizeSecurityComponentLedgerFreshness(securityComponentLedger)
+    .items.filter((item) => item.status === 'current')
+    .map((item) => item.componentId)
+    .sort();
 }
 
 function writeValidationLedger(ledger: TemplateValidationLedger): void {
@@ -446,6 +460,7 @@ function analyzeRecommendation(
 ): Pick<AuditResult, 'recommendation' | 'rationale'> {
   const source = seed ?? template;
   const runtimeState = getEntryRuntimeInputState(source);
+  const runtimeInputs = getRuntimeInputs(source);
   const requiredSecrets = getRequiredSecretNames(source);
   const components = getComponents(source);
   const unmappedSlack = hasUnmappedSlackNode(source);
@@ -823,6 +838,7 @@ async function main() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((template) => createCatalogQualityInput(template, seedTemplates.get(template.name)));
     const catalogQualityFailures = getTemplateCatalogQualityFailures(catalogQualityInputs);
+    const componentCoverageIds = readCurrentSecurityComponentIds();
     const summary = summarizeTemplateValidationLedgerFreshness(
       validationLedger,
       selectedTemplates
@@ -832,7 +848,7 @@ async function main() {
         ),
     );
     console.log(renderTemplateValidationLedgerFreshness(summary));
-    console.log(renderTemplateCatalogQualityCheck(catalogQualityInputs));
+    console.log(renderTemplateCatalogQualityCheck(catalogQualityInputs, { componentCoverageIds }));
     if (catalogQualityFailures.length > 0) {
       console.error(`Template catalog quality failed:\n- ${catalogQualityFailures.join('\n- ')}`);
     }

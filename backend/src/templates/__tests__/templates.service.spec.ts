@@ -58,15 +58,18 @@ const securityTemplateFiles = [
   'bug-bounty-recon-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
+  'exposure-to-cve-brief.json',
   'github-dependency-cve-hunt-discord-report.json',
   'github-repo-dependency-cve-triage.json',
   'kev-fresh-cve-watch-brief.json',
   'npm-dependency-cve-hunt.json',
+  'public-repo-full-code-security-discord-report.json',
   'public-repo-full-code-security.json',
   'public-repo-secret-exposure-triage.json',
   'security-scan-discord-report.json',
   'subdomain-takeover-triage.json',
   'tech-stack-cve-hunter.json',
+  'wafw00f-edge-recon-triage.json',
   'web-attack-surface-quick-win-hunt.json',
 ] as const;
 

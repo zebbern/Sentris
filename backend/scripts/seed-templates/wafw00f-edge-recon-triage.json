@@ -1,0 +1,184 @@
+{
+  "_metadata": {
+    "name": "WAF Edge Recon Triage",
+    "description": "Authorized bug bounty workflow that probes live URLs with HTTPx, detects Web Application Firewalls with wafw00f, and writes a prioritized edge-defense recon report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "recon", "httpx", "wafw00f", "waf", "edge-defense", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "WAF Edge Recon Triage",
+    "description": "Fingerprint live web assets and detect WAF presence for authorized bug bounty targets.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "recon", "httpx", "wafw00f", "waf", "edge-defense", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 8
+  },
+  "graph": {
+    "name": "WAF Edge Recon Triage",
+    "description": "HTTP probing plus WAF detection for authorized live URLs.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Live URL Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "liveUrls",
+                  "label": "Live URLs",
+                  "type": "array",
+                  "required": true,
+                  "description": "Authorized HTTP or HTTPS URLs to probe for WAF and service fingerprinting."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and rate-limit notes."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Probe Live HTTP Services",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "wafw00f_scan",
+        "type": "sentris.wafw00f.run",
+        "position": { "x": 740, "y": 260 },
+        "data": {
+          "label": "Detect Web Application Firewalls",
+          "config": {
+            "params": { "findAll": false, "verbose": false },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "rank_waf_recon",
+        "type": "core.logic.script",
+        "position": { "x": 1060, "y": 260 },
+        "data": {
+          "label": "Rank WAF and HTTP Signals",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "liveUrls", "type": "list-text" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "httpResponses", "type": "list-json" },
+                { "name": "wafDetections", "type": "list-json" },
+                { "name": "detectionCount", "type": "number" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const liveUrls = Array.isArray(input.liveUrls) ? input.liveUrls : [];\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const wafDetections = Array.isArray(input.wafDetections) ? input.wafDetections : [];\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  const wafByUrl = new Map();\n  for (const item of wafDetections) {\n    const url = typeof item?.url === 'string' ? item.url : '';\n    if (url) wafByUrl.set(url, item);\n  }\n  const assets = httpResponses.map((resp) => {\n    const url = resp?.url || resp?.finalUrl || resp?.input || '';\n    const waf = wafByUrl.get(url) || null;\n    return {\n      url,\n      statusCode: resp?.statusCode ?? null,\n      title: resp?.title ?? null,\n      technologies: Array.isArray(resp?.technologies) ? resp.technologies : [],\n      wafDetected: waf?.detected === true,\n      firewall: waf?.firewall || null,\n      manufacturer: waf?.manufacturer || null\n    };\n  }).sort((a, b) => Number(b.wafDetected) - Number(a.wafDetected) || Number(b.technologies?.length || 0) - Number(a.technologies?.length || 0));\n  const wafBrands = Array.from(new Set(assets.filter((item) => item.wafDetected).map((item) => item.firewall).filter(Boolean)));\n  return {\n    report: {\n      summary: {\n        liveUrls: liveUrls.length,\n        probedEndpoints: httpResponses.length,\n        wafDetections: Number(input.detectionCount || assets.filter((item) => item.wafDetected).length),\n        wafBrands,\n        interestingWithoutWaf: assets.filter((item) => !item.wafDetected && [200, 401, 403, 500].includes(Number(item.statusCode))).length\n      },\n      authorizationNotes,\n      assets: assets.slice(0, 100),\n      nextSteps: [\n        'Treat WAF-detected endpoints as edge-protected before active testing',\n        'Review 401/403 endpoints without WAF signals for auth bypass opportunities',\n        'Stay within authorized scope and rate limits for follow-up testing'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1380, "y": 260 },
+        "data": {
+          "label": "Save WAF Recon Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": { "artifactName": "waf-edge-recon-triage-{{date}}" }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-httpx_probe-targets",
+        "source": "trigger_1",
+        "target": "httpx_probe",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-wafw00f_scan-targets",
+        "source": "trigger_1",
+        "target": "wafw00f_scan",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-rank_waf_recon-liveUrls",
+        "source": "trigger_1",
+        "target": "rank_waf_recon",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "liveUrls"
+      },
+      {
+        "id": "trigger_1-rank_waf_recon-authorizationNotes",
+        "source": "trigger_1",
+        "target": "rank_waf_recon",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "httpx_probe-rank_waf_recon-responses",
+        "source": "httpx_probe",
+        "target": "rank_waf_recon",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "wafw00f_scan-rank_waf_recon-detections",
+        "source": "wafw00f_scan",
+        "target": "rank_waf_recon",
+        "sourceHandle": "wafDetections",
+        "targetHandle": "wafDetections"
+      },
+      {
+        "id": "wafw00f_scan-rank_waf_recon-detectionCount",
+        "source": "wafw00f_scan",
+        "target": "rank_waf_recon",
+        "sourceHandle": "detectionCount",
+        "targetHandle": "detectionCount"
+      },
+      {
+        "id": "rank_waf_recon-artifact_report-report",
+        "source": "rank_waf_recon",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}
