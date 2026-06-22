@@ -172,6 +172,11 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       version: '5.6.1',
       deploymentNotes: 'Live audit fixture for known public CVE research.',
     },
+    'Container Image CVE Triage': {
+      imageRef: 'alpine:3.18',
+      deploymentContext: 'Live audit fixture: small public Linux base image for bounded CVE triage.',
+      authorizationNotes: 'Live audit fixture using a public container image.',
+    },
     'Exposed Service CVE Mapper': {
       targets: ['scanme.nmap.org'],
       authorizationNotes: 'Live audit fixture: Nmap-provided scan target for bounded service checks.',

@@ -9,6 +9,7 @@ const seedTemplatesDir = join(import.meta.dir, '../../../scripts/seed-templates'
 const newTemplateFiles = [
   'api-surface-exposure-triage.json',
   'bug-bounty-recon-triage.json',
+  'container-image-cve-triage.json',
   'cve-impact-research-brief.json',
   'exposed-service-cve-mapper.json',
   'github-repo-dependency-cve-triage.json',
@@ -1486,5 +1487,116 @@ describe('new seed templates', () => {
       severity: 'medium',
       reason: 'Auth-protected live subdomain',
     });
+  });
+
+  it('container-image-cve-triage uses Trivy image scanning with bounded severity', () => {
+    const filePath = join(seedTemplatesDir, 'container-image-cve-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const trivyNode = graph.nodes.find((node: { id: string }) => node.id === 'trivy_image_scan');
+    const assembleNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_image_cve_report',
+    );
+    const entrypoint = graph.nodes.find((node: { id: string }) => node.id === 'trigger_1');
+    const runtimeInputs = entrypoint.data.config.params.runtimeInputs;
+    const edges = graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(template._metadata.category).toBe('container-security');
+    expect(template._metadata.tags).toEqual(
+      expect.arrayContaining(['container', 'image', 'cve', 'trivy', 'supply-chain']),
+    );
+    expect(runtimeInputs.find((input: { id: string }) => input.id === 'imageRef')).toMatchObject({
+      required: true,
+      type: 'text',
+    });
+    expect(
+      runtimeInputs.find((input: { id: string }) => input.id === 'deploymentContext'),
+    ).toMatchObject({
+      required: false,
+      defaultValue: '',
+    });
+    expect(trivyNode?.type).toBe('sentris.trivy.run');
+    expect(trivyNode.data.config.params).toMatchObject({
+      scanType: 'image',
+      severity: ['CRITICAL', 'HIGH', 'MEDIUM'],
+      format: 'json',
+    });
+    expect(assembleNode?.type).toBe('core.logic.script');
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:imageRef->trivy_image_scan:target',
+        'trivy_image_scan:vulnerabilities->assemble_image_cve_report:vulnerabilities',
+        'trivy_image_scan:vulnerabilityCount->assemble_image_cve_report:vulnerabilityCount',
+        'trigger_1:deploymentContext->assemble_image_cve_report:deploymentContext',
+        'assemble_image_cve_report:report->artifact_report:content',
+      ]),
+    );
+  });
+
+  it('container-image-cve-triage prioritizes fixable critical and high image CVEs', () => {
+    const filePath = join(seedTemplatesDir, 'container-image-cve-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_image_cve_report',
+    );
+
+    const result = runTemplateScript<{ report: { summary: any; priorityFindings: any[] } }>(
+      assembleNode.data.config.params.code,
+      {
+        imageRef: 'nginx:1.25',
+        deploymentContext: 'Internet-facing reverse proxy in a bug bounty target.',
+        vulnerabilityCount: 4,
+        vulnerabilities: [
+          {
+            vulnerabilityId: 'CVE-2024-0001',
+            pkgName: 'openssl',
+            installedVersion: '3.0.0',
+            fixedVersion: '3.0.8',
+            severity: 'CRITICAL',
+            title: 'Critical TLS issue',
+            primaryUrl: 'https://example.test/CVE-2024-0001',
+          },
+          {
+            vulnerabilityId: 'CVE-2024-0002',
+            pkgName: 'zlib',
+            installedVersion: '1.2.11',
+            severity: 'HIGH',
+            title: 'No fix yet',
+          },
+          {
+            vulnerabilityId: 'CVE-2024-0003',
+            pkgName: 'bash',
+            installedVersion: '5.1',
+            fixedVersion: '5.2',
+            severity: 'MEDIUM',
+            title: 'Medium fixable issue',
+          },
+        ],
+      },
+    );
+
+    expect(result.report.summary).toMatchObject({
+      imageRef: 'nginx:1.25',
+      vulnerabilityCount: 4,
+      actionableFindings: 3,
+      fixableFindings: 2,
+      highestSeverity: 'critical',
+    });
+    expect(result.report.priorityFindings.map((finding) => finding.vulnerabilityId)).toEqual([
+      'CVE-2024-0001',
+      'CVE-2024-0002',
+      'CVE-2024-0003',
+    ]);
+    expect(result.report.priorityFindings[0]).toMatchObject({
+      pkgName: 'openssl',
+      fixedVersion: '3.0.8',
+      priorityBand: 'immediate',
+    });
+    expect(result.report.priorityFindings[0].priorityReasons).toEqual(
+      expect.arrayContaining(['critical severity', 'fixed version available']),
+    );
   });
 });
