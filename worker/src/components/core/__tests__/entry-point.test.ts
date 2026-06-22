@@ -136,6 +136,68 @@ describe('entry-point component', () => {
     });
   });
 
+  it('should preserve and apply runtime input default values after parameter parsing', async () => {
+    const component = componentRegistry.get<EntryPointInput, EntryPointOutput>(
+      'core.workflow.entrypoint',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'trigger-test',
+    });
+
+    const parsedParams = component.parameters!.parse({
+      runtimeInputs: [
+        {
+          id: 'outOfScopePaths',
+          label: 'Out-of-scope paths',
+          type: 'array',
+          required: false,
+          defaultValue: [],
+        },
+        {
+          id: 'previousSnapshot',
+          label: 'Previous snapshot',
+          type: 'json',
+          required: false,
+          defaultValue: { hosts: [], endpoints: [], findings: [] },
+        },
+        {
+          id: 'includeLowSeverity',
+          label: 'Include low severity',
+          type: 'boolean',
+          required: false,
+          defaultValue: false,
+        },
+        {
+          id: 'targetLimit',
+          label: 'Target limit',
+          type: 'number',
+          required: false,
+          defaultValue: 10,
+        },
+      ],
+    });
+
+    const result = (await component.execute(
+      {
+        inputs: {
+          __runtimeData: {},
+        },
+        params: parsedParams,
+      },
+      context,
+    )) as Record<string, unknown>;
+
+    expect(result).toEqual({
+      outOfScopePaths: [],
+      previousSnapshot: { hosts: [], endpoints: [], findings: [] },
+      includeLowSeverity: false,
+      targetLimit: 10,
+    });
+  });
+
   it('should throw when required runtime input is missing', async () => {
     const component = componentRegistry.get<EntryPointInput, EntryPointOutput>(
       'core.workflow.entrypoint',

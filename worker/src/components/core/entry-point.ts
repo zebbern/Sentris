@@ -34,6 +34,7 @@ const runtimeInputDefinitionSchema = z.preprocess(
       .describe('Type of input data'),
     required: z.boolean().default(true).describe('Whether this input is required'),
     description: z.string().optional().describe('Help text for the input'),
+    defaultValue: z.unknown().optional().describe('Default value to use when input is omitted'),
   }),
 );
 
@@ -143,8 +144,18 @@ const definition = defineComponent({
 
     for (const inputDef of runtimeInputs) {
       const value = __runtimeData?.[inputDef.id];
+      const hasValue = value !== undefined && value !== null;
+      const hasDefaultValue =
+        Object.prototype.hasOwnProperty.call(inputDef, 'defaultValue') &&
+        inputDef.defaultValue !== undefined &&
+        inputDef.defaultValue !== null;
+      let outputValue = value;
 
-      if (inputDef.required && (value === undefined || value === null)) {
+      if (!hasValue && hasDefaultValue) {
+        outputValue = inputDef.defaultValue;
+      }
+
+      if (inputDef.required && outputValue === undefined) {
         throw new ValidationError(
           `Required runtime input '${inputDef.label}' (${inputDef.id}) was not provided`,
           {
@@ -152,24 +163,23 @@ const definition = defineComponent({
           },
         );
       }
-      // Optional text inputs default to empty string so downstream script ports receive
-      // a defined value instead of failing input validation / retrying indefinitely.
-      if (
-        (value === undefined || value === null) &&
-        !inputDef.required &&
-        inputDef.type === 'text'
-      ) {
-        outputs[inputDef.id] = '';
-      } else {
-        outputs[inputDef.id] = value;
+
+      if (outputValue === undefined && !inputDef.required) {
+        if (inputDef.type === 'text') {
+          // Optional text inputs default to empty string so downstream script ports receive
+          // a defined value instead of failing input validation / retrying indefinitely.
+          outputValue = '';
+        }
       }
+
+      outputs[inputDef.id] = outputValue;
       // Mask secret values in logs
       const logValue =
         inputDef.type === 'secret'
           ? '***'
-          : typeof value === 'object'
-            ? JSON.stringify(value)
-            : value;
+          : typeof outputValue === 'object'
+            ? JSON.stringify(outputValue)
+            : outputValue;
       context.logger.info(`[EntryPoint] Output '${inputDef.id}' = ${logValue}`);
     }
 
