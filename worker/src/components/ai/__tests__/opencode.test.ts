@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'bun:test';
 import { componentRegistry } from '@sentris/component-sdk';
-import * as SDK from '@sentris/component-sdk'; // Import for spying
+import * as SDK from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../../utils/isolated-volume';
 import * as utils from '../utils';
-import '../opencode'; // Register the component
+import * as agentUtils from '../agent-runner-utils';
+import '../opencode';
 
-// Mock IsolatedContainerVolume
 vi.mock('../../../utils/isolated-volume', () => {
   return {
     IsolatedContainerVolume: vi.fn().mockImplementation(() => ({
@@ -19,24 +19,20 @@ vi.mock('../../../utils/isolated-volume', () => {
   };
 });
 
-describe('sentris.opencode.agent', () => {
-  let runSpy: any;
+describe('core.ai.opencode', () => {
+  let runSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock getGatewaySessionToken
-    // We use spyOn so we can restore it later if needed, but here we just want to ensure it's mocked for this suite.
     vi.spyOn(utils, 'getGatewaySessionToken').mockResolvedValue('mock-session-token');
-
-    // Spy on runComponentWithRunner
+    vi.spyOn(agentUtils, 'fetchAgentSkills').mockResolvedValue([]);
     runSpy = vi.spyOn(SDK, 'runComponentWithRunner').mockResolvedValue({
       stdout: '# Report\n\nInvestigation complete.',
       stderr: '',
       exitCode: 0,
       results: [],
       raw: '',
-    } as any);
+    } as never);
   });
 
   afterAll(() => {
@@ -73,23 +69,28 @@ describe('sentris.opencode.agent', () => {
       task: 'Find the bug',
       context: { alertId: '123' },
       model: { provider: 'openai', modelId: 'gpt-4o', apiKey: 'sk-test' },
+      supplementaryInputA: 'scanner output',
     };
 
     const params = {
       systemPrompt: 'You are a detective.',
-      autoApprove: true,
+      autoApprove: false,
     };
 
-    const result = await component.execute({ inputs, params }, context as any);
+    const result = await component.execute({ inputs, params }, context as never);
 
     expect(result.report).toContain('# Report');
 
-    expect(IsolatedContainerVolume).toHaveBeenCalled();
-    const volumeInstance = (IsolatedContainerVolume as any).mock.results[0].value;
+    const volumeInstance = (IsolatedContainerVolume as unknown as { mock: { results: Array<{ value: { initialize: { mock: { calls: Array<[Record<string, string>]> } } } }> } }).mock
+      .results[0].value;
     const initCall = volumeInstance.initialize.mock.calls[0][0];
 
     expect(initCall['context.json']).toContain('"alertId": "123"');
     expect(initCall['opencode.jsonc']).toContain('sentris-gateway');
+    expect(initCall['supplementary-a.txt']).toBe('scanner output');
+
+    const config = JSON.parse(initCall['opencode.jsonc']);
+    expect(config.permission).toBe('ask');
 
     expect(runSpy).toHaveBeenCalled();
     const runnerCall = runSpy.mock.calls[0][0];
@@ -98,7 +99,11 @@ describe('sentris.opencode.agent', () => {
     expect(runnerCall.env.OPENAI_API_KEY).toBe('sk-test');
   });
 
-  it('should merge providerConfig into opencode.jsonc', async () => {
+  it('should merge providerConfig and skills into workspace', async () => {
+    vi.spyOn(agentUtils, 'fetchAgentSkills').mockResolvedValue([
+      { id: 'skill-1', slug: 'investigate', content: '# Investigate' },
+    ]);
+
     const component = componentRegistry.get('core.ai.opencode');
     if (!component) throw new Error('Component not found');
 
@@ -118,25 +123,29 @@ describe('sentris.opencode.agent', () => {
       emitProgress: vi.fn(),
     };
 
-    const inputs = {
-      task: 'Test config merge',
-    };
-
-    const params = {
-      providerConfig: {
-        githubToken: 'gh-token',
-        extraSetting: 123,
+    await component.execute(
+      {
+        inputs: { task: 'Test config merge' },
+        params: {
+          providerConfig: {
+            githubToken: 'gh-token',
+            extraSetting: 123,
+          },
+          skillIds: ['skill-1'],
+          enablePlugins: ['superpowers'],
+        },
       },
-    };
+      context as never,
+    );
 
-    await component.execute({ inputs, params }, context as any);
-
-    expect(IsolatedContainerVolume).toHaveBeenCalled();
-    const volumeInstance = (IsolatedContainerVolume as any).mock.results[0].value;
+    const volumeInstance = (IsolatedContainerVolume as unknown as { mock: { results: Array<{ value: { initialize: { mock: { calls: Array<[Record<string, string>]> } } } }> } }).mock
+      .results[0].value;
     const initCall = volumeInstance.initialize.mock.calls[0][0];
 
     const config = JSON.parse(initCall['opencode.jsonc']);
     expect(config.githubToken).toBe('gh-token');
     expect(config.extraSetting).toBe(123);
+    expect(config.plugin).toEqual(['superpowers']);
+    expect(initCall['.opencode/skills/investigate/SKILL.md']).toContain('# Investigate');
   });
 });

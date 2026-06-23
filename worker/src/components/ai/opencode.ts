@@ -9,10 +9,28 @@ import {
   parameters,
   port,
   param,
+  coerceJsonFromText,
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
-import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from './utils';
+import { getGatewaySessionToken } from './utils';
+import {
+  assertSkillsResolved,
+  buildAgentPrompt,
+  buildProviderEnv,
+  buildSupplementaryFiles,
+  fetchAgentSkills,
+  getOpenCodeModelString,
+  mapAutoApprove,
+  materializeSkillsToVolume,
+  mergeOpenCodePlugins,
+  resolveGatewayMcpConfig,
+} from './agent-runner-utils';
+
+const AGENT_PLUGIN_OPTIONS = [
+  { label: 'Oh My ClaudeCode', value: 'oh-my-claudecode' },
+  { label: 'Superpowers', value: 'superpowers' },
+] as const;
 
 const inputSchema = inputs({
   task: port(
@@ -52,6 +70,22 @@ const inputSchema = inputs({
     reason: 'Tool-mode port acts as a graph anchor; payloads are not consumed directly.',
     connectionType: { kind: 'contract', name: 'mcp.tool' },
   }),
+  supplementaryInputA: port(
+    z.string().optional().describe('Optional supplementary text written to supplementary-a.txt.'),
+    {
+      label: 'Supplementary Input A',
+      description:
+        'Optional text or data written to /workspace/supplementary-a.txt for the agent to read (e.g. scanner JSON).',
+    },
+  ),
+  supplementaryInputB: port(
+    z.string().optional().describe('Optional supplementary text written to supplementary-b.txt.'),
+    {
+      label: 'Supplementary Input B',
+      description:
+        'Optional text or data written to /workspace/supplementary-b.txt for the agent to read.',
+    },
+  ),
 });
 
 const parameterSchema = parameters({
@@ -70,14 +104,31 @@ const parameterSchema = parameters({
     description: 'If true, the agent runs without user intervention.',
   }),
   providerConfig: param(
-    z
-      .record(z.string(), z.unknown())
-      .default({})
-      .describe('Additional OpenCode provider configuration.'),
+    coerceJsonFromText(z.record(z.string(), z.unknown()).default({})).describe(
+      'Additional OpenCode provider configuration.',
+    ),
     {
       label: 'Provider Config',
       editor: 'json',
       description: 'Additional configuration merged into opencode.jsonc.',
+    },
+  ),
+  skillIds: param(z.array(z.string().uuid()).default([]).describe('Agent skill IDs to inject.'), {
+    label: 'Agent Skills',
+    editor: 'multi-select',
+    options: [],
+    description: 'Select org Agent Skills to materialize under .opencode/skills/.',
+  }),
+  enablePlugins: param(
+    z
+      .array(z.enum(['oh-my-claudecode', 'superpowers']))
+      .default([])
+      .describe('Optional OpenCode plugins to enable.'),
+    {
+      label: 'Plugins',
+      editor: 'multi-select',
+      options: [...AGENT_PLUGIN_OPTIONS],
+      description: 'Enable pre-installed OpenCode plugins (when available in the image).',
     },
   ),
 });
@@ -93,6 +144,11 @@ const outputSchema = outputs({
   }),
 });
 
+const OPENCODE_TIMEOUT_SECONDS = Number.parseInt(
+  process.env.OPENCODE_TIMEOUT_SECONDS ?? '1800',
+  10,
+);
+
 const definition = defineComponent({
   id: 'core.ai.opencode',
   label: 'OpenCode Agent',
@@ -100,16 +156,17 @@ const definition = defineComponent({
   runner: {
     kind: 'docker',
     image: 'ghcr.io/zebbern/opencode:latest',
-    entrypoint: 'opencode', // We will override this in execution
-    network: 'bridge' as const, // Use bridge network; containers can reach host via host.docker.internal
+    entrypoint: 'opencode',
+    network: 'bridge' as const,
     command: ['help'],
+    timeoutSeconds: OPENCODE_TIMEOUT_SECONDS,
   },
   inputs: inputSchema,
   outputs: outputSchema,
   parameters: parameterSchema,
   docs: 'Runs the OpenCode agent to perform autonomous investigations using connected tools.',
   retryPolicy: {
-    maxAttempts: 1, // Agents are expensive/impotent, normally don't retry automatically
+    maxAttempts: 1,
     initialIntervalSeconds: 2,
     maximumIntervalSeconds: 10,
     backoffCoefficient: 2,
@@ -128,19 +185,25 @@ const definition = defineComponent({
     },
   },
   async execute({ inputs, params }, context) {
-    const { task, context: taskContext, model } = inputs;
-    const { systemPrompt, providerConfig } = params;
+    const {
+      task,
+      context: taskContext,
+      model,
+      supplementaryInputA,
+      supplementaryInputB,
+    } = inputs;
+    const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins } = params;
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
+    const orgId = organizationId ?? context.organizationId ?? null;
 
-    // 1. Resolve Gateway Token for MCP
     let gatewayToken = '';
     const connectedToolIds = connectedToolNodeIds ?? [];
     if (connectedToolIds.length > 0) {
       try {
         gatewayToken = await getGatewaySessionToken(
           context.runId,
-          organizationId ?? null,
+          orgId,
           connectedToolIds,
         );
       } catch (error: unknown) {
@@ -148,43 +211,11 @@ const definition = defineComponent({
       }
     }
 
-    // Helper to map provider to OpenCode model string format
-    const getOpenCodeModelString = (
-      model: { provider: string; modelId: string } | undefined,
-    ): string => {
-      if (!model) return 'gpt-4o';
-      // OpenCode expects models in format: provider/modelId
-      // Most providers follow this pattern
-      return `${model.provider}/${model.modelId}`;
-    };
+    const skills = await fetchAgentSkills(orgId, skillIds ?? []);
+    assertSkillsResolved(skillIds ?? [], skills);
 
-    // 2. Prepare opencode.json config
-    // Note: We use bridge networking; container reaches host via host.docker.internal
-    // Correct format from https://opencode.ai/docs/mcp-servers/
-    // CRITICAL: oauth: false is required for custom headers (OAuth is auto-detected as default in v1.0.137+)
-    // See: https://github.com/anomalyco/opencode/issues/5278
-    // Always add MCP config (even if token is empty, so OpenCode can attempt connection)
-    const mcpConfig = {
-      mcp: {
-        'sentris-gateway': {
-          type: 'remote' as const,
-          url: DEFAULT_GATEWAY_URL,
-          oauth: false,
-          headers: gatewayToken
-            ? {
-                Authorization: `Bearer ${gatewayToken}`,
-                Accept: 'application/json, text/event-stream',
-              }
-            : {
-                Accept: 'application/json, text/event-stream',
-              },
-          enabled: true,
-        },
-      },
-    };
+    const { opencodePermission } = mapAutoApprove(autoApprove ?? true);
 
-    // Build provider config for OpenCode
-    // Z.AI requires the API key to be in provider.options.apiKey
     const providerConfigForOpenCode: Record<string, unknown> = {
       ...(model?.provider === 'zai-coding-plan' && model.apiKey
         ? {
@@ -198,56 +229,30 @@ const definition = defineComponent({
     };
 
     const opencodeConfig = {
-      ...mcpConfig,
+      ...resolveGatewayMcpConfig(gatewayToken),
       provider: providerConfigForOpenCode,
       model: getOpenCodeModelString(model),
-      permission: 'allow',
-      // Merge in any additional provider config from parameters
-      ...providerConfig,
+      permission: opencodePermission,
+      ...mergeOpenCodePlugins(providerConfig ?? {}, enablePlugins ?? []),
     };
 
     const providerEnv = buildProviderEnv(model);
-
-    // 3. Prepare Context and Prompt
     const contextJson = JSON.stringify(taskContext ?? {}, null, 2);
+    const supplementaryFiles = buildSupplementaryFiles({
+      supplementaryInputA,
+      supplementaryInputB,
+    });
+    const finalPrompt = buildAgentPrompt({
+      task,
+      systemPrompt,
+      taskContext,
+      supplementaryFiles: Object.keys(supplementaryFiles),
+    });
 
-    // Default investigator prompt if none provided
-    const defaultPrompt = `
-# Investigation Task
-{{TASK}}
-
-# Context
-The following context is available in /workspace/context.json.
-Please investigate the issue and generate a detailed report.
-`;
-
-    // Build final prompt: use systemPrompt if provided, otherwise use default template
-    // Always append the task to ensure it's included
-    let finalPrompt: string;
-    if (systemPrompt?.trim()) {
-      finalPrompt = `${systemPrompt}\n\n# Task\n${task}`;
-      if (taskContext && Object.keys(taskContext).length > 0) {
-        finalPrompt +=
-          '\n\n# Context\nThe following context is available in /workspace/context.json.';
-      }
-    } else {
-      finalPrompt = defaultPrompt.replace('{{TASK}}', task);
-    }
-
-    // Ask the agent to list available MCP tools first (best-effort).
-    finalPrompt =
-      `${finalPrompt}\n\n# MCP Tools\n` +
-      `Before you start, list the MCP tools you can see. If none are available, say so explicitly.`;
-
-    // 4. Setup Isolated Volume
     const tenantId = context.organizationId ?? 'default-tenant';
     const volume = new IsolatedContainerVolume(tenantId, context.runId);
 
     try {
-      // 5. Execute Docker Container
-      // Write a wrapper script to properly execute opencode with file reading
-      // The script runs inside the container, so $(cat /workspace/prompt.txt) works correctly
-      // Note: --quiet flag doesn't exist in opencode 1.1.34, use --log-level ERROR instead
       const wrapperScript = [
         '#!/bin/sh',
         'set -e',
@@ -262,32 +267,25 @@ Please investigate the issue and generate a detailed report.
       ].join('\n');
 
       const opencodeConfigJson = JSON.stringify(opencodeConfig, null, 2);
-      // Initialize workspace with config, context, prompt, and wrapper script
       await volume.initialize({
         'context.json': contextJson,
-        // Opencode prefers opencode.jsonc in cwd; keep opencode.json for backwards compat.
         'opencode.jsonc': opencodeConfigJson,
         'opencode.json': opencodeConfigJson,
         'prompt.txt': finalPrompt,
         'run.sh': wrapperScript,
+        ...supplementaryFiles,
+        ...materializeSkillsToVolume(skills, 'opencode'),
       });
 
       const runnerConfig = {
         ...definition.runner,
-        // Override entrypoint to /bin/sh to avoid the image's default 'opencode' entrypoint
-        // The command will be executed as: /bin/sh /workspace/run.sh
         entrypoint: '/bin/sh',
         command: ['/workspace/run.sh'],
-        // Use bridge network; container reaches host via host.docker.internal
         network: 'bridge' as const,
         env: providerEnv,
-        volumes: [
-          volume.getVolumeConfig('/workspace', false), // Read-write, mounted at /workspace
-        ],
+        volumes: [volume.getVolumeConfig('/workspace', false)],
         workingDir: '/workspace',
       };
-
-      // Bridge networking is used — the container can reach the host via host.docker.internal.
 
       context.emitProgress({
         message: 'Running OpenCode agent...',
@@ -296,32 +294,10 @@ Please investigate the issue and generate a detailed report.
 
       const runnerResult = await runComponentWithRunner(
         runnerConfig,
-        async (raw) => raw, // Pass through raw result
+        async (raw) => raw,
         {},
         context,
       );
-
-      // Parse output
-      // The runner result handling in runComponentWithRunner usually involves parsing JSON
-      // if the entrypoint returns JSON.
-      // But here we are using a custom command that prints markdown to stdout.
-
-      // We expect the result to be in the 'raw' or 'stdout' property of the result object
-      // depending on how runComponentWithRunner captures it.
-      // Based on httpx.ts it seems we get an object with { exitCode, stdout, stderr, raw } or similar
-      // if using a standard docker runner adaptor.
-
-      // Let's assume the raw output from the runner wrapper is what we get.
-      // In httpx.ts:
-      // const httpxRunnerOutputSchema = z.object({
-      //   results: z.array(z.unknown()).optional().default([]),
-      //   raw: z.string().optional().default(''),
-      //   stderr: z.string().optional().default(''),
-      //   exitCode: z.number().optional().default(0),
-      // });
-
-      // We should inspect what the runner returns.
-      // Assuming a generic docker runner returns { stdout, stderr, exitCode }
 
       let stdout = '';
       let stderr = '';
@@ -334,7 +310,7 @@ Please investigate the issue and generate a detailed report.
       }
 
       return outputSchema.parse({
-        report: stdout, // The markdown report is expected in stdout
+        report: stdout,
         rawOutput: `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
       });
     } finally {
@@ -345,29 +321,6 @@ Please investigate the issue and generate a detailed report.
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function buildProviderEnv(model?: { provider: string; apiKey?: string }): Record<string, string> {
-  if (!model?.apiKey) {
-    return {};
-  }
-
-  switch (model.provider) {
-    case 'openai':
-      return { OPENAI_API_KEY: model.apiKey };
-    case 'openrouter':
-      return { OPENROUTER_API_KEY: model.apiKey };
-    case 'anthropic':
-      return { ANTHROPIC_API_KEY: model.apiKey };
-    case 'groq':
-      return { GROQ_API_KEY: model.apiKey };
-    case 'xai':
-      return { XAI_API_KEY: model.apiKey };
-    case 'deepseek':
-      return { DEEPSEEK_API_KEY: model.apiKey };
-    default:
-      return {};
-  }
 }
 
 componentRegistry.register(definition);

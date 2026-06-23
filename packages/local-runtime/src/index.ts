@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,7 @@ const DEFAULT_TEMPORAL_PREFIX = 'sentris-dev';
 const SCRIPT_DATABASE_URL_ENV = 'SENTRIS_SCRIPT_DATABASE_URL';
 const SCRIPT_TEMPORAL_NAMESPACE_ENV = 'SENTRIS_SCRIPT_TEMPORAL_NAMESPACE';
 const SCRIPT_TEMPORAL_TASK_QUEUE_ENV = 'SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE';
+const DRIZZLE_DATABASE_URL_ENV = 'DRIZZLE_DATABASE_URL';
 
 export interface ActiveInstance {
   instance: string;
@@ -47,6 +48,10 @@ export interface ScriptTemporalTargetOptions {
   taskQueueOverrideEnvVar?: string;
 }
 
+export interface DrizzleDatabaseTargetOptions extends ScriptDatabaseTargetOptions {
+  production?: boolean;
+}
+
 function validateInstance(value: string, source: string): string {
   if (!/^\d+$/.test(value) || Number(value) < 0 || Number(value) > 9) {
     throw new Error(`${source} must be an integer from 0 to 9`);
@@ -54,12 +59,20 @@ function validateInstance(value: string, source: string): string {
   return value;
 }
 
-function readMarkerInstance(repoRoot: string): string | null {
-  const markerPath = join(repoRoot, '.sentris-instance');
-  if (!existsSync(markerPath)) return null;
+function markerPath(repoRoot: string): string {
+  return join(repoRoot, '.sentris-instance');
+}
 
-  const value = readFileSync(markerPath, 'utf-8').trim();
+function readMarkerInstance(repoRoot: string): string | null {
+  const activeInstancePath = markerPath(repoRoot);
+  if (!existsSync(activeInstancePath)) return null;
+
+  const value = readFileSync(activeInstancePath, 'utf-8').trim();
   return value.length > 0 ? value : null;
+}
+
+function writeMarkerInstance(repoRoot: string, instance: string): void {
+  writeFileSync(markerPath(repoRoot), `${validateInstance(instance, 'instance')}\n`);
 }
 
 export function readActiveInstance({
@@ -90,7 +103,8 @@ export function readActiveInstance({
     };
   }
 
-  return { instance: '0', source: 'default:instance-0' };
+  writeMarkerInstance(repoRoot, '0');
+  return { instance: '0', source: 'file:.sentris-instance' };
 }
 
 function buildInstanceDatabaseUrl(instance: string): string {
@@ -134,6 +148,24 @@ function readDatabaseOverride(
   }
 
   return null;
+}
+
+function createDatabaseTarget(
+  connectionString: string,
+  source: string,
+  ignoredDatabaseUrl: boolean,
+): ScriptDatabaseTarget {
+  return {
+    connectionString,
+    redactedConnectionString: redactConnectionString(connectionString),
+    databaseName: getDatabaseName(connectionString),
+    source,
+    ignoredDatabaseUrl,
+  };
+}
+
+function isProductionLikeEnv(env: ScriptEnv): boolean {
+  return env.NODE_ENV === 'production' || env.SENTRIS_ENV === 'production';
 }
 
 function readTemporalOverride(
@@ -193,13 +225,29 @@ export function getScriptDatabaseTarget({
     : buildInstanceDatabaseUrl(activeInstance?.instance ?? '0');
   const source = override ? override.source : (activeInstance?.source ?? 'default:instance-0');
 
-  return {
-    connectionString,
-    redactedConnectionString: redactConnectionString(connectionString),
-    databaseName: getDatabaseName(connectionString),
-    source,
-    ignoredDatabaseUrl: Boolean(env.DATABASE_URL?.trim()),
-  };
+  return createDatabaseTarget(connectionString, source, Boolean(env.DATABASE_URL?.trim()));
+}
+
+export function getDrizzleDatabaseTarget({
+  env = process.env,
+  repoRoot = DEFAULT_REPO_ROOT,
+  overrideEnvVar = DRIZZLE_DATABASE_URL_ENV,
+  production,
+}: DrizzleDatabaseTargetOptions = {}): ScriptDatabaseTarget {
+  const override = readDatabaseOverride(env, overrideEnvVar);
+  if (override) {
+    return createDatabaseTarget(override.value, override.source, Boolean(env.DATABASE_URL?.trim()));
+  }
+
+  if (production ?? isProductionLikeEnv(env)) {
+    const databaseUrl = env.DATABASE_URL?.trim();
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL is required for production Drizzle migrations');
+    }
+    return createDatabaseTarget(databaseUrl, 'env:DATABASE_URL', false);
+  }
+
+  return getScriptDatabaseTarget({ env, repoRoot, overrideEnvVar });
 }
 
 export function getScriptTemporalTarget({

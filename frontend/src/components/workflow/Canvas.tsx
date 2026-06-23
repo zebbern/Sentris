@@ -33,6 +33,7 @@ import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import type { NodeData } from '@/schemas/node';
 import { useToast } from '@/components/ui/use-toast';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
@@ -124,6 +125,7 @@ export function Canvas({
   const toggleSmartRouting = useWorkflowUiStore((state) => state.toggleSmartRouting);
   const edgeBundling = useWorkflowUiStore((state) => state.edgeBundling);
   const toggleEdgeBundling = useWorkflowUiStore((state) => state.toggleEdgeBundling);
+  const showCanvasMinimap = useUserPreferencesStore((state) => state.showCanvasMinimap);
 
   // --- Edge context menu state ---
   const [edgeContextMenu, setEdgeContextMenu] = useState<{
@@ -561,14 +563,16 @@ export function Canvas({
                     )}
                   </div>
                 </Panel>
-                <MiniMap
-                  position="bottom-right"
-                  pannable
-                  zoomable
-                  className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
-                  maskColor="hsl(var(--background) / 0.7)"
-                  nodeColor={getNodeStatusColor}
-                />
+                {showCanvasMinimap && (
+                  <MiniMap
+                    position="bottom-right"
+                    pannable
+                    zoomable
+                    className="cursor-grab active:cursor-grabbing !bg-card !border !border-border !rounded-md"
+                    maskColor="hsl(var(--background) / 0.7)"
+                    nodeColor={getNodeStatusColor}
+                  />
+                )}
                 <EdgeBundleLayer />
               </ReactFlow>
             </ConnectionPreviewContext.Provider>

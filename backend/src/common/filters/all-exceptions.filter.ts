@@ -100,20 +100,42 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   private logException(exception: unknown, status: number, request: Request): void {
     const context = `${request.method} ${request.url}`;
+    const message = this.getLogMessage(exception);
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         `[${status}] ${context}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    } else if (this.isExpectedAuthValidationMiss(exception, status, request, message)) {
+      this.logger.debug(`[${status}] ${context} - ${message}`);
     } else {
-      const message =
-        exception instanceof HttpException
-          ? exception.message
-          : exception instanceof Error
-            ? exception.message
-            : String(exception);
       this.logger.warn(`[${status}] ${context} — ${message}`);
     }
+  }
+
+  private getLogMessage(exception: unknown): string {
+    if (exception instanceof HttpException || exception instanceof Error) {
+      return exception.message;
+    }
+
+    return String(exception);
+  }
+
+  private isExpectedAuthValidationMiss(
+    exception: unknown,
+    status: number,
+    request: Request,
+    message: string,
+  ): boolean {
+    const path = request.path ?? request.url;
+
+    return (
+      status === HttpStatus.UNAUTHORIZED &&
+      request.method === 'GET' &&
+      path.split('?')[0].endsWith('/auth/validate') &&
+      exception instanceof HttpException &&
+      message.startsWith('Missing authentication')
+    );
   }
 }

@@ -14,13 +14,14 @@ import { useComponents } from '@/hooks/queries/useComponentQueries';
 interface ToolFilterProps {
   value: string | undefined;
   onChange: (componentId: string | undefined) => void;
+  triggerClassName?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function ToolFilter({ value, onChange }: ToolFilterProps) {
+export function ToolFilter({ value, onChange, triggerClassName }: ToolFilterProps) {
   const { data: componentIndex } = useComponents();
 
   const handleChange = (val: string) => {
@@ -35,7 +36,7 @@ export function ToolFilter({ value, onChange }: ToolFilterProps) {
 
   return (
     <Select value={value ?? 'all'} onValueChange={handleChange}>
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className={triggerClassName ?? 'w-[180px]'}>
         <SelectValue placeholder="Tool" />
       </SelectTrigger>
       <SelectContent>

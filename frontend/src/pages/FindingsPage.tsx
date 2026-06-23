@@ -1,8 +1,9 @@
 import { useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldAlert, ChevronLeft, ChevronRight, LayoutList, Columns3 } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, ChevronRight, LayoutList, Columns3, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +23,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useFindingsQuery, type FindingItem } from '@/hooks/queries/useFindingsQueries';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -67,6 +67,8 @@ const STATUS_FILTER_OPTIONS = [
     label: TRIAGE_STATUS_META[s].label,
   })),
 ];
+
+const FILTER_TRIGGER_CLASS = 'w-full';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -244,64 +246,88 @@ export function FindingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageToolbar
-        searchValue={search}
-        onSearchChange={handleSearchChange}
-        searchPlaceholder="Search findings by name, asset, workflow…"
-        actions={
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 flex-1" data-testid="page-toolbar-search">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search findings by name, asset, workflow…"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9"
+              autoComplete="off"
+              aria-label="Search findings by name, asset, workflow…"
+            />
+          </div>
           <Tabs value={activeView} onValueChange={handleViewChange}>
-            <TabsList className="h-9">
+            <TabsList className="h-9 shrink-0">
               <TabsTrigger value="table" className="gap-1.5 px-3">
                 <LayoutList className="h-4 w-4" />
-                <span className="hidden sm:inline">Table</span>
+                Table
               </TabsTrigger>
               <TabsTrigger value="kanban" className="gap-1.5 px-3">
                 <Columns3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Kanban</span>
+                Kanban
               </TabsTrigger>
             </TabsList>
           </Tabs>
-        }
-        filters={
-          <>
-            <Select value={severity} onValueChange={handleSeverityChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Severity" />
-              </SelectTrigger>
-              <SelectContent>
-                {SEVERITY_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={triageStatus} onValueChange={handleTriageStatusChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_FILTER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <WorkflowFilter value={workflowId} onChange={handleWorkflowChange} />
-            <ToolFilter value={componentId} onChange={handleComponentChange} />
-            <DateRangeFilter value={dateRange} onChange={handleDateRangeChange} />
-            <ExportButton
-              severity={queryParams.severity}
-              search={queryParams.search}
-              workflowId={queryParams.workflowId}
-              componentId={queryParams.componentId}
-              dateFrom={queryParams.dateFrom}
-              dateTo={queryParams.dateTo}
-            />
-          </>
-        }
-      />
+        </div>
+
+        <div
+          data-testid="page-toolbar-filters"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+        >
+          <Select value={severity} onValueChange={handleSeverityChange}>
+            <SelectTrigger className={FILTER_TRIGGER_CLASS}>
+              <SelectValue placeholder="Severity" />
+            </SelectTrigger>
+            <SelectContent>
+              {SEVERITY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={triageStatus} onValueChange={handleTriageStatusChange}>
+            <SelectTrigger className={FILTER_TRIGGER_CLASS}>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <WorkflowFilter
+            value={workflowId}
+            onChange={handleWorkflowChange}
+            triggerClassName={FILTER_TRIGGER_CLASS}
+          />
+          <ToolFilter
+            value={componentId}
+            onChange={handleComponentChange}
+            triggerClassName={FILTER_TRIGGER_CLASS}
+          />
+          <DateRangeFilter
+            value={dateRange}
+            onChange={handleDateRangeChange}
+            triggerClassName={FILTER_TRIGGER_CLASS}
+          />
+          <ExportButton
+            severity={queryParams.severity}
+            search={queryParams.search}
+            workflowId={queryParams.workflowId}
+            componentId={queryParams.componentId}
+            dateFrom={queryParams.dateFrom}
+            dateTo={queryParams.dateTo}
+            className="w-full"
+          />
+        </div>
+      </div>
 
       {/* Severity Chart */}
       <SeverityChart

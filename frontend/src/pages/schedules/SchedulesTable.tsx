@@ -117,13 +117,17 @@ export function SchedulesTable({
                     />
                   </TableHead>
                   <TableHead className="w-10" />
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Workflow</TableHead>
-                  <TableHead className="hidden lg:table-cell">Cadence</TableHead>
-                  <TableHead className="hidden sm:table-cell">Next run</TableHead>
-                  <TableHead className="hidden lg:table-cell">Last run</TableHead>
-                  <TableHead className="hidden sm:table-cell">Status</TableHead>
-                  <TableHead className="text-right w-[100px]">Actions</TableHead>
+                  <TableHead className="text-xs uppercase">Status</TableHead>
+                  <TableHead className="text-xs uppercase">Workflow</TableHead>
+                  <TableHead className="text-xs uppercase">Name</TableHead>
+                  <TableHead className="hidden lg:table-cell text-xs uppercase">Cadence</TableHead>
+                  <TableHead className="hidden sm:table-cell text-xs uppercase whitespace-nowrap">
+                    Next run
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell text-xs uppercase whitespace-nowrap">
+                    Last run
+                  </TableHead>
+                  <TableHead className="text-right w-[100px] text-xs uppercase">Actions</TableHead>
                 </TableRow>
               </TableHeader>
             )}

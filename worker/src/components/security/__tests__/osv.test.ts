@@ -79,6 +79,42 @@ describe('OSV dependency query component', () => {
     expect(parsePackageSpec('', 'npm')).toBeNull();
   });
 
+  it('parses per-spec OSV ecosystem prefixes for mixed dependency evidence', () => {
+    expect(parsePackageSpec('PyPI:django@4.2.7', 'npm')).toEqual({
+      spec: 'PyPI:django@4.2.7',
+      name: 'django',
+      version: '4.2.7',
+      ecosystem: 'PyPI',
+    });
+    expect(parsePackageSpec('Go:golang.org/x/net@v0.17.0', 'npm')).toEqual({
+      spec: 'Go:golang.org/x/net@v0.17.0',
+      name: 'golang.org/x/net',
+      version: 'v0.17.0',
+      ecosystem: 'Go',
+    });
+    expect(parsePackageSpec('Maven:org.apache.logging.log4j:log4j-core@2.14.1', 'npm')).toEqual({
+      spec: 'Maven:org.apache.logging.log4j:log4j-core@2.14.1',
+      name: 'org.apache.logging.log4j:log4j-core',
+      version: '2.14.1',
+      ecosystem: 'Maven',
+    });
+    expect(parsePackageSpec('npm:@scope/pkg@1.2.3', 'PyPI')).toEqual({
+      spec: 'npm:@scope/pkg@1.2.3',
+      name: '@scope/pkg',
+      version: '1.2.3',
+      ecosystem: 'npm',
+    });
+  });
+
+  it('keeps Maven coordinates intact when no explicit ecosystem prefix is present', () => {
+    expect(parsePackageSpec('org.apache.logging.log4j:log4j-core@2.14.1', 'Maven')).toEqual({
+      spec: 'org.apache.logging.log4j:log4j-core@2.14.1',
+      name: 'org.apache.logging.log4j:log4j-core',
+      version: '2.14.1',
+      ecosystem: 'Maven',
+    });
+  });
+
   it('infers severity and fixed versions from hydrated OSV advisories', () => {
     expect(inferOsvSeverity(sampleAdvisory)).toBe('high');
     expect(extractFixedVersions(sampleAdvisory)).toEqual(['4.17.21']);
@@ -169,6 +205,69 @@ describe('OSV dependency query component', () => {
       installed_version: '4.17.20',
       fixed_versions: ['4.17.21'],
     });
+  });
+
+  it('sends per-spec ecosystems in one OSV query batch', async () => {
+    const component = componentRegistry.get<OsvInput, OsvOutput>('sentris.osv.query');
+    if (!component) throw new Error('OSV component was not registered');
+
+    let queryBody: unknown;
+    const fetchMock = vi.fn(
+      async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+        queryBody = JSON.parse(String(init?.body ?? '{}'));
+        return new Response(
+          JSON.stringify({ results: [{ vulns: [] }, { vulns: [] }, { vulns: [] }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      },
+    );
+
+    const context = createExecutionContext({
+      runId: 'test-run',
+      componentRef: 'osv-mixed',
+    });
+    context.http.fetch = fetchMock as unknown as ExecutionContext['http']['fetch'];
+
+    const result = await component.execute(
+      {
+        inputs: {
+          packageSpecs: [
+            'npm:lodash@4.17.20',
+            'PyPI:django@4.2.7',
+            'Maven:org.apache.logging.log4j:log4j-core@2.14.1',
+          ],
+        },
+        params: {
+          ecosystem: 'npm',
+          severityFloor: 'unknown',
+          hydrateAdvisories: false,
+          maxAdvisoriesPerPackage: 50,
+          includeUnknownSeverity: true,
+        },
+      },
+      context,
+    );
+
+    expect(queryBody).toEqual({
+      queries: [
+        { package: { name: 'lodash', ecosystem: 'npm' }, version: '4.17.20' },
+        { package: { name: 'django', ecosystem: 'PyPI' }, version: '4.2.7' },
+        {
+          package: { name: 'org.apache.logging.log4j:log4j-core', ecosystem: 'Maven' },
+          version: '2.14.1',
+        },
+      ],
+    });
+    expect(result.packages).toEqual([
+      { spec: 'npm:lodash@4.17.20', name: 'lodash', version: '4.17.20', ecosystem: 'npm' },
+      { spec: 'PyPI:django@4.2.7', name: 'django', version: '4.2.7', ecosystem: 'PyPI' },
+      {
+        spec: 'Maven:org.apache.logging.log4j:log4j-core@2.14.1',
+        name: 'org.apache.logging.log4j:log4j-core',
+        version: '2.14.1',
+        ecosystem: 'Maven',
+      },
+    ]);
   });
 
   it('returns empty outputs when upstream package specs are empty', async () => {

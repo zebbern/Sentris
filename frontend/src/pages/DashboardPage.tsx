@@ -85,19 +85,21 @@ function StatCard({
 
   return (
     <Card className="transition-colors hover:bg-muted/30">
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </div>
         <div className="mt-2">
           {isLoading ? (
             <Skeleton className="h-8 w-16" />
           ) : (
-            <p className="text-3xl font-bold tracking-tight">{value}</p>
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight">{value}</p>
           )}
         </div>
-        {subtitle && !isLoading && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
+        {subtitle && !isLoading && (
+          <p className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</p>
+        )}
         {isLoading && <Skeleton className="mt-1 h-3 w-24" />}
       </CardContent>
     </Card>
@@ -266,7 +268,7 @@ export function DashboardPage() {
       />
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-busy={isLoading}>
+      <div className="grid grid-cols-4 gap-3 sm:gap-4" aria-busy={isLoading}>
         <StatCard
           title="Workflows"
           value={stats.totalWorkflows}
@@ -301,6 +303,12 @@ export function DashboardPage() {
           onRetry={refetch}
         />
       </div>
+
+      {/* Quick actions */}
+      <section aria-label="Quick actions">
+        <h2 className="text-lg font-semibold tracking-tight mb-4">Quick Actions</h2>
+        <QuickActions />
+      </section>
 
       {/* Recent runs */}
       <section aria-label="Recent runs" aria-busy={isLoading && !errors.runs}>
@@ -361,12 +369,6 @@ export function DashboardPage() {
           error={errors.runs}
           onRetry={refetch}
         />
-      </section>
-
-      {/* Quick actions */}
-      <section aria-label="Quick actions">
-        <h2 className="text-lg font-semibold tracking-tight mb-4">Quick Actions</h2>
-        <QuickActions />
       </section>
     </div>
   );

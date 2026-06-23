@@ -74,7 +74,7 @@ const inputSchema = inputs({
       .array(z.string())
       .optional()
       .describe(
-        'Specific built-in template paths to include (e.g., ["cves/2024/", "http/exposures/"])',
+        'Specific built-in template paths to include (e.g., ["http/cves/2024/", "http/exposures/"])',
       ),
     {
       label: 'Template Paths',
@@ -268,9 +268,27 @@ const nucleiRetryPolicy: ComponentRetryPolicy = {
   nonRetryableErrorTypes: ['ContainerError', 'ValidationError', 'ConfigurationError'],
 };
 
+const NUCLEI_TEMPLATES_DIR = '/root/nuclei-templates';
+const NUCLEI_TEMPLATES_ARCHIVE_URL =
+  'https://github.com/projectdiscovery/nuclei-templates/archive/refs/heads/main.zip';
+
+function buildNucleiTemplateBootstrapScript(): string {
+  return [
+    `if [ ! -d ${NUCLEI_TEMPLATES_DIR}/http ] || [ -z "$(ls -A ${NUCLEI_TEMPLATES_DIR}/http 2>/dev/null)" ]; then`,
+    `  rm -rf ${NUCLEI_TEMPLATES_DIR};`,
+    `  wget -q -O /tmp/nuclei-templates.zip ${NUCLEI_TEMPLATES_ARCHIVE_URL};`,
+    '  unzip -q -o /tmp/nuclei-templates.zip -d /tmp;',
+    `  mkdir -p ${NUCLEI_TEMPLATES_DIR};`,
+    `  mv /tmp/nuclei-templates-main/* ${NUCLEI_TEMPLATES_DIR}/;`,
+    '  rm -rf /tmp/nuclei-templates-main /tmp/nuclei-templates.zip;',
+    'fi;',
+    `test -d ${NUCLEI_TEMPLATES_DIR}/http || exit 1;`,
+  ].join(' ');
+}
+
 export function buildNucleiDockerCommand(scanArgs: string[], updateTemplates: boolean): string[] {
   const launcher = updateTemplates
-    ? 'nuclei -update-templates -silent || nuclei -update-templates || exit $?; exec nuclei "$@"'
+    ? `${buildNucleiTemplateBootstrapScript()} exec nuclei "$@"`
     : 'exec nuclei "$@"';
 
   return ['-lc', launcher, 'nuclei', ...scanArgs];

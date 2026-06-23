@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { afterEach, describe, expect, it } from 'bun:test';
 import {
+  getDrizzleDatabaseTarget,
   formatTemporalTarget,
   getScriptDatabaseTarget,
   getScriptTemporalTarget,
@@ -18,6 +19,12 @@ const repoRoot = resolve(scriptsDir, '..', '..');
 function createRootWithInstance(instance: string): string {
   const root = mkdtempSync(join(tmpdir(), 'sentris-script-db-target-'));
   writeFileSync(join(root, '.sentris-instance'), `${instance}\n`);
+  cleanupDirs.push(root);
+  return root;
+}
+
+function createRootWithoutInstance(): string {
+  const root = mkdtempSync(join(tmpdir(), 'sentris-script-db-target-'));
   cleanupDirs.push(root);
   return root;
 }
@@ -78,14 +85,64 @@ describe('script database target resolver', () => {
     expect(target.source).toBe('env:TEMPLATE_SEED_DATABASE_URL');
   });
 
-  it('falls back to instance 0 when no instance is configured', () => {
-    const target = getScriptDatabaseTarget({ env: {}, repoRoot: createRootWithInstance('') });
+  it('initializes the active instance marker to 0 when no instance is configured', () => {
+    const root = createRootWithoutInstance();
+    const target = getScriptDatabaseTarget({ env: {}, repoRoot: root });
 
     expect(target.connectionString).toBe(
       'postgresql://sentris:sentris@localhost:5433/sentris_instance_0',
     );
     expect(target.databaseName).toBe('sentris_instance_0');
-    expect(target.source).toBe('default:instance-0');
+    expect(target.source).toBe('file:.sentris-instance');
+    expect(readFileSync(join(root, '.sentris-instance'), 'utf8')).toBe('0\n');
+  });
+
+  it('uses the active instance for local Drizzle migrations instead of stale DATABASE_URL', () => {
+    const target = getDrizzleDatabaseTarget({
+      env: {
+        DATABASE_URL: 'postgresql://sentris:sentris@localhost:5433/sentris',
+      },
+      repoRoot: createRootWithInstance('6'),
+    });
+
+    expect(target.connectionString).toBe(
+      'postgresql://sentris:sentris@localhost:5433/sentris_instance_6',
+    );
+    expect(target.databaseName).toBe('sentris_instance_6');
+    expect(target.source).toBe('file:.sentris-instance');
+    expect(target.ignoredDatabaseUrl).toBe(true);
+  });
+
+  it('allows an explicit Drizzle database override for intentional local targeting', () => {
+    const target = getDrizzleDatabaseTarget({
+      env: {
+        DATABASE_URL: 'postgresql://sentris:sentris@localhost:5433/sentris',
+        DRIZZLE_DATABASE_URL: 'postgresql://sentris:sentris@localhost:5433/manual_drizzle',
+      },
+      repoRoot: createRootWithInstance('6'),
+    });
+
+    expect(target.connectionString).toBe(
+      'postgresql://sentris:sentris@localhost:5433/manual_drizzle',
+    );
+    expect(target.databaseName).toBe('manual_drizzle');
+    expect(target.source).toBe('env:DRIZZLE_DATABASE_URL');
+    expect(target.ignoredDatabaseUrl).toBe(true);
+  });
+
+  it('uses DATABASE_URL for production Drizzle migrations', () => {
+    const target = getDrizzleDatabaseTarget({
+      env: {
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://sentris:sentris@db:5432/prod_sentris',
+      },
+      repoRoot: createRootWithInstance('6'),
+    });
+
+    expect(target.connectionString).toBe('postgresql://sentris:sentris@db:5432/prod_sentris');
+    expect(target.databaseName).toBe('prod_sentris');
+    expect(target.source).toBe('env:DATABASE_URL');
+    expect(target.ignoredDatabaseUrl).toBe(false);
   });
 
   it('rejects invalid instance values before building a database URL', () => {
@@ -154,6 +211,14 @@ describe('script database target resolver', () => {
         'postgresql://sentris:sentris@localhost:5433/sentris',
       );
     }
+  });
+
+  it('keeps Drizzle CLI database targeting on the shared resolver', () => {
+    const source = readFileSync(join(repoRoot, 'backend', 'drizzle.config.ts'), 'utf-8');
+
+    expect(source).toContain('getDrizzleDatabaseTarget');
+    expect(source).toContain('DRIZZLE_DATABASE_URL');
+    expect(source).not.toContain('process.env.DATABASE_URL');
   });
 
   it('prevents all local database maintenance scripts from reading DATABASE_URL directly', () => {

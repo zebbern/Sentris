@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
-import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Logger, UnauthorizedException } from '@nestjs/common';
 
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
 
@@ -210,6 +210,28 @@ describe('AllExceptionsFilter', () => {
       expect(firstArg).toContain('403');
       expect(firstArg).toContain('DELETE');
       expect(firstArg).toContain('/api/items/1');
+    });
+
+    it('logs missing-auth auth validation probes below warn/error while preserving the 401', () => {
+      const filter = createFilter();
+      const request = makeMockRequest({ method: 'GET', url: '/api/v1/auth/validate' });
+      const response = makeMockResponse();
+      const host = makeMockHost(request, response);
+      const exception = new UnauthorizedException(
+        'Missing authentication - provide session cookie or Basic Auth',
+      );
+      const errorSpy = vi.spyOn(Logger.prototype, 'error');
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+      const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+
+      filter.catch(exception, host as any);
+
+      expect(response.status).toHaveBeenCalledWith(HttpStatus.UNAUTHORIZED);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[401] GET /api/v1/auth/validate - Missing authentication - provide session cookie or Basic Auth',
+      );
     });
 
     it('logs non-Error, non-HttpException unknown values via logger.error as 500', () => {

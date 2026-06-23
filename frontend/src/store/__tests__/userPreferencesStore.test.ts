@@ -14,6 +14,7 @@ describe('userPreferencesStore', () => {
     useUserPreferencesStore.setState({
       defaultLandingPage: '/',
       sidebarDensity: 'comfortable',
+      showCanvasMinimap: false,
     });
     localStorage.clear();
   });
@@ -22,6 +23,7 @@ describe('userPreferencesStore', () => {
     const state = useUserPreferencesStore.getState();
     expect(state.defaultLandingPage).toBe('/');
     expect(state.sidebarDensity).toBe('comfortable');
+    expect(state.showCanvasMinimap).toBe(false);
   });
 
   it('updates defaultLandingPage', () => {
@@ -46,5 +48,10 @@ describe('userPreferencesStore', () => {
       useUserPreferencesStore.getState().setDefaultLandingPage(page);
       expect(useUserPreferencesStore.getState().defaultLandingPage).toBe(page);
     }
+  });
+
+  it('updates showCanvasMinimap', () => {
+    useUserPreferencesStore.getState().setShowCanvasMinimap(true);
+    expect(useUserPreferencesStore.getState().showCanvasMinimap).toBe(true);
   });
 });

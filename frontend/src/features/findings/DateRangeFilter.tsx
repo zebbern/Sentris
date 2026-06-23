@@ -15,13 +15,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 interface DateRangeFilterProps {
   value: { from?: Date; to?: Date } | undefined;
   onChange: (range: { from?: Date; to?: Date } | undefined) => void;
+  triggerClassName?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
+export function DateRangeFilter({ value, onChange, triggerClassName }: DateRangeFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const hasRange = value?.from || value?.to;
@@ -47,7 +48,8 @@ export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
           variant="outline"
           size="sm"
           className={cn(
-            'w-[200px] justify-start text-left font-normal',
+            'justify-start text-left font-normal',
+            triggerClassName ?? 'w-[200px]',
             !hasRange && 'text-muted-foreground',
           )}
         >

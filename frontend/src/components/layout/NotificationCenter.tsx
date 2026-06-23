@@ -11,7 +11,15 @@ import {
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
-export function NotificationCenter() {
+interface NotificationCenterProps {
+  className?: string;
+  popoverSide?: 'top' | 'bottom' | 'left' | 'right';
+}
+
+export function NotificationCenter({
+  className,
+  popoverSide = 'bottom',
+}: NotificationCenterProps = {}) {
   const notifications = useNotificationStore((s) => s.notifications);
   const unreadCount = useNotificationStore(selectUnreadCount);
   const markRead = useNotificationStore((s) => s.markRead);
@@ -35,10 +43,10 @@ export function NotificationCenter() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-9 w-9"
+          className={cn('relative shrink-0', className ?? 'h-9 w-9')}
           aria-label={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : 'Notifications'}
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span
               className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground"
@@ -50,7 +58,7 @@ export function NotificationCenter() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" sideOffset={8} className="w-80 p-0">
+      <PopoverContent align="end" side={popoverSide} sideOffset={8} className="w-80 p-0">
         {/* Panel header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h3 className="text-sm font-semibold">Notifications</h3>

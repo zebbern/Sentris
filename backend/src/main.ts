@@ -12,6 +12,7 @@ import { isVersionCheckDisabled, performVersionCheck } from './version-check';
 import type { AppConfig } from './config/app.config';
 
 import { AppModule } from './app.module';
+import { registerRootHealthRoutes } from './health/health-routes';
 
 /**
  * Build CORS allowed origins based on environment.
@@ -115,6 +116,7 @@ async function bootstrap() {
       'X-Forwarded-Proto',
     ],
   });
+  registerRootHealthRoutes(app);
   const port = appCfg.port;
   const host = appCfg.host;
 

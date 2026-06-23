@@ -8,11 +8,15 @@ import { createSelectMock } from '@/test/mocks/radix-select';
 
 let mockDefaultLandingPage = '/';
 let mockSidebarDensity: 'compact' | 'comfortable' = 'comfortable';
+let mockShowCanvasMinimap = false;
 const mockSetDefaultLandingPage = mock((page: string) => {
   mockDefaultLandingPage = page;
 });
 const mockSetSidebarDensity = mock((density: 'compact' | 'comfortable') => {
   mockSidebarDensity = density;
+});
+const mockSetShowCanvasMinimap = mock((value: boolean) => {
+  mockShowCanvasMinimap = value;
 });
 
 mock.module('@/components/ui/select', createSelectMock);
@@ -24,8 +28,10 @@ mock.module('@/store/userPreferencesStore', () => {
     notifyOnRunComplete: false,
     notifyOnRunFailed: false,
     notifyOnScheduleTriggered: false,
+    showCanvasMinimap: false,
     setDefaultLandingPage: mockSetDefaultLandingPage,
     setSidebarDensity: mockSetSidebarDensity,
+    setShowCanvasMinimap: mockSetShowCanvasMinimap,
     setNotifyOnRunComplete: mock(),
     setNotifyOnRunFailed: mock(),
     setNotifyOnScheduleTriggered: mock(),
@@ -35,6 +41,7 @@ mock.module('@/store/userPreferencesStore', () => {
       ..._state,
       defaultLandingPage: mockDefaultLandingPage,
       sidebarDensity: mockSidebarDensity,
+      showCanvasMinimap: mockShowCanvasMinimap,
     };
     return selector ? selector(state) : state;
   }) as any;
@@ -48,6 +55,7 @@ mock.module('@/store/userPreferencesStore', () => {
     ..._state,
     defaultLandingPage: mockDefaultLandingPage,
     sidebarDensity: mockSidebarDensity,
+    showCanvasMinimap: mockShowCanvasMinimap,
   });
   useUserPreferencesStore.subscribe = () => () => {};
   useUserPreferencesStore.destroy = () => {};
@@ -63,8 +71,10 @@ import { GeneralSettings } from '../GeneralSettings';
 function resetMocks() {
   mockDefaultLandingPage = '/';
   mockSidebarDensity = 'comfortable';
+  mockShowCanvasMinimap = false;
   mockSetDefaultLandingPage.mockClear();
   mockSetSidebarDensity.mockClear();
+  mockSetShowCanvasMinimap.mockClear();
 }
 
 // ---------------------------------------------------------------------------
@@ -141,5 +151,20 @@ describe('GeneralSettings', () => {
 
     const trigger = screen.getByRole('combobox', { name: /default landing page/i });
     expect(trigger).toBeTruthy();
+  });
+
+  it('renders workflow canvas minimap toggle', () => {
+    render(<GeneralSettings />);
+
+    expect(screen.getByText('Workflow canvas minimap')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: /show workflow canvas minimap/i })).toBeTruthy();
+  });
+
+  it('calls setShowCanvasMinimap when minimap switch is toggled', () => {
+    render(<GeneralSettings />);
+
+    fireEvent.click(screen.getByRole('switch', { name: /show workflow canvas minimap/i }));
+
+    expect(mockSetShowCanvasMinimap).toHaveBeenCalledWith(true);
   });
 });

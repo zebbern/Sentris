@@ -28,6 +28,7 @@ export function createUserPreferencesStoreMock() {
     notifyOnRunComplete: true,
     notifyOnRunFailed: true,
     notifyOnScheduleTriggered: true,
+    showCanvasMinimap: false,
 
     setDefaultLandingPage: (page: string) => _setState({ defaultLandingPage: page }),
     setSidebarDensity: (density: string) => _setState({ sidebarDensity: density }),
@@ -35,6 +36,7 @@ export function createUserPreferencesStoreMock() {
     setNotifyOnRunFailed: (value: boolean) => _setState({ notifyOnRunFailed: value }),
     setNotifyOnScheduleTriggered: (value: boolean) =>
       _setState({ notifyOnScheduleTriggered: value }),
+    setShowCanvasMinimap: (value: boolean) => _setState({ showCanvasMinimap: value }),
   };
 
   const useUserPreferencesStore = ((selector?: any) => {

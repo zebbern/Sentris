@@ -113,13 +113,20 @@ describe('ExecutionTimeline', () => {
     timelineState = { ...defaultTimelineState };
   });
 
-  it('renders PlaybackControls, TimelineTrack, and TimelineOverview when visible', () => {
+  it('renders PlaybackControls and TimelineTrack when visible', () => {
     render(<ExecutionTimeline />);
 
     expect(screen.getByTestId('playback-controls')).toBeTruthy();
     expect(screen.getByTestId('timeline-track')).toBeTruthy();
-    expect(screen.getByTestId('timeline-overview')).toBeTruthy();
+    expect(screen.queryByTestId('timeline-overview')).toBeNull();
     expect(screen.getByTestId('timeline-status-bar')).toBeTruthy();
+  });
+
+  it('renders TimelineOverview when zoomed in', () => {
+    timelineState = { ...defaultTimelineState, timelineZoom: 2 };
+    render(<ExecutionTimeline />);
+
+    expect(screen.getByTestId('timeline-overview')).toBeTruthy();
   });
 
   it('returns null when showTimeline is false', () => {

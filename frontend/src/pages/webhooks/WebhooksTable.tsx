@@ -121,7 +121,7 @@ export function WebhooksTable({
                   <TableHead className="hidden sm:table-cell">Webhook URL</TableHead>
                   <TableHead className="hidden lg:table-cell whitespace-nowrap">Created</TableHead>
                   <TableHead className="hidden sm:table-cell whitespace-nowrap">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right w-[180px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
             )}

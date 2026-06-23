@@ -15,6 +15,7 @@ import {
   Webhook,
   ServerCog,
   BarChart3,
+  Sparkles,
   Settings,
   Package,
   X,
@@ -32,7 +33,6 @@ import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes } from '@/lib/prefetch-routes';
 import { useNotifications } from '@/hooks/useNotifications';
-import { NotificationCenter } from '@/components/layout/NotificationCenter';
 import { SidebarContext, type SidebarContextValue } from './sidebar-context';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSidebarState } from '@/hooks/useSidebarState';
@@ -46,6 +46,7 @@ const settingsItems: NavItem[] = [
   { name: 'Secrets', href: '/secrets', icon: KeyRound },
   { name: 'API Keys', href: '/api-keys', icon: Shield },
   { name: 'MCP Servers', href: '/mcp-library', icon: ServerCog },
+  { name: 'Agent Skills', href: '/agent-skills', icon: Sparkles },
   ...(env.VITE_OPENSEARCH_DASHBOARDS_URL
     ? [{ name: 'Analytics Settings', href: '/analytics-settings', icon: Settings }]
     : []),
@@ -110,13 +111,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   } = useSidebarState({ isMobile, isTablet, settingsHrefs: SETTINGS_HREFS });
 
   const [faviconError, setFaviconError] = useState(false);
-  const gitSha = env.VITE_GIT_SHA;
-  const displayVersion =
-    gitSha && gitSha !== '' && gitSha !== 'unknown'
-      ? gitSha.startsWith('v')
-        ? gitSha
-        : gitSha.slice(0, 7)
-      : 'dev';
 
   const isActive = useCallback(
     (path: string) => {
@@ -191,7 +185,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           className={cn(
             'h-full transition-all duration-300 z-[110]',
             isMobile ? 'fixed left-0 top-0' : 'relative',
-            sidebarOpen ? 'w-72' : isMobile ? 'w-0 -translate-x-full' : 'w-16',
+            sidebarOpen ? 'w-56' : isMobile ? 'w-0 -translate-x-full' : 'w-14',
             isMobile && sidebarOpen && 'translate-x-0',
             !sidebarOpen && isMobile && 'pointer-events-none',
             sidebarOpen && isMobile && 'pointer-events-auto',
@@ -199,7 +193,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <SidebarHeader className="flex items-center justify-between p-4 border-b">
+          <SidebarHeader className="flex items-center justify-between p-3 border-b">
             <Link
               to="/"
               className="flex items-center gap-2 min-w-0 flex-1"
@@ -212,7 +206,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     alt="Sentris Flow"
                     width={24}
                     height={24}
-                    className="w-6 h-6"
+                    className="w-5 h-5"
                     onError={() => setFaviconError(true)}
                   />
                 ) : (
@@ -221,8 +215,8 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
               <span
                 className={cn(
-                  'font-bold text-xl transition-all duration-300 whitespace-nowrap overflow-hidden',
-                  sidebarOpen ? 'opacity-100 max-w-48' : 'opacity-0 max-w-0',
+                  'font-bold text-lg transition-all duration-300 whitespace-nowrap overflow-hidden',
+                  sidebarOpen ? 'opacity-100 max-w-36' : 'opacity-0 max-w-0',
                 )}
                 style={{
                   transitionDelay: sidebarOpen ? '150ms' : '0ms',
@@ -252,7 +246,6 @@ export function AppLayout({ children }: AppLayoutProps) {
             settingsOpen={settingsOpen}
             onSettingsToggle={() => setSettingsOpen(!settingsOpen)}
             onOpenCommandPalette={openCommandPalette}
-            displayVersion={displayVersion}
             isActive={isActive}
             onMobileClose={closeMobileSidebar}
             onDesktopNavClick={handleDesktopNavClick}
@@ -272,20 +265,10 @@ export function AppLayout({ children }: AppLayoutProps) {
               <AppTopBar
                 sidebarOpen={sidebarOpen}
                 onSidebarToggle={handleToggle}
-                actions={
-                  <>
-                    <NotificationCenter />
-                    {getPageActions()}
-                  </>
-                }
+                actions={getPageActions()}
                 isMobile={isMobile}
               />
             )}
-          {location.pathname.startsWith('/webhooks/') && (
-            <div className="absolute top-2 right-4 z-40">
-              <NotificationCenter />
-            </div>
-          )}
           <div className="flex-1 overflow-auto">{children}</div>
         </main>
       </div>

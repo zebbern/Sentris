@@ -7,6 +7,7 @@ import type { Parameter } from '@/schemas/component';
 import type { InputMapping } from '@/schemas/node';
 import { LeanSelect, type SelectOption } from '@/components/inputs/LeanSelect';
 import { McpLibraryConfig } from './McpLibraryConfig';
+import { AgentSkillsConfig } from './AgentSkillsConfig';
 import { McpGroupConfig } from './McpGroupConfig';
 import { ArtifactSelector } from './parameter-field/ArtifactSelector';
 import { WorkflowSelector } from './parameter-field/WorkflowSelector';
@@ -108,6 +109,16 @@ export function ParameterField({
         onChange={onChange}
         disabled={isReceivingInput}
       />
+    );
+  }
+
+  if (
+    (componentId === 'core.ai.opencode' || componentId === 'core.ai.claude-code') &&
+    parameter.id === 'skillIds'
+  ) {
+    const selectedSkills = Array.isArray(currentValue) ? currentValue : [];
+    return (
+      <AgentSkillsConfig value={selectedSkills} onChange={onChange} disabled={isReceivingInput} />
     );
   }
 

@@ -17,6 +17,29 @@ import {
 
 const OSV_API_BASE = 'https://api.osv.dev/v1';
 
+const OSV_ECOSYSTEM_PREFIX_ALIASES = new Map<string, string>([
+  ['npm', 'npm'],
+  ['pypi', 'PyPI'],
+  ['go', 'Go'],
+  ['maven', 'Maven'],
+  ['packagist', 'Packagist'],
+  ['crates.io', 'crates.io'],
+  ['cargo', 'crates.io'],
+  ['nuget', 'NuGet'],
+  ['rubygems', 'RubyGems'],
+  ['gem', 'RubyGems'],
+  ['hex', 'Hex'],
+  ['pub', 'Pub'],
+  ['debian', 'Debian'],
+  ['alpine', 'Alpine'],
+  ['ubuntu', 'Ubuntu'],
+  ['android', 'Android'],
+  ['linux', 'Linux'],
+  ['oss-fuzz', 'OSS-Fuzz'],
+  ['conan', 'Conan'],
+  ['bitnami', 'Bitnami'],
+]);
+
 const severityRank = {
   unknown: 0,
   low: 1,
@@ -72,7 +95,7 @@ const inputSchema = inputs({
     {
       label: 'Package Specs',
       description:
-        'Package names with optional versions. Scoped npm packages are supported, for example @scope/pkg@1.2.3.',
+        'Package names with optional versions. Scoped npm packages are supported, for example @scope/pkg@1.2.3. Prefix a spec with an OSV ecosystem, such as PyPI:django@4.2.7, to mix ecosystems in one batch.',
       connectionType: { kind: 'list', element: { kind: 'primitive', name: 'text' } },
     },
   ),
@@ -236,11 +259,18 @@ function toAnalyticsSeverity(severity: OsvSeverity): AnalyticsSeverity {
 export function parsePackageSpec(spec: string, defaultEcosystem: string): NormalizedPackage | null {
   const trimmed = spec.trim();
   if (!trimmed) return null;
+  const prefixMatch = trimmed.match(/^([A-Za-z][A-Za-z0-9_.-]*):(.+)$/);
+  const explicitEcosystem = prefixMatch
+    ? OSV_ECOSYSTEM_PREFIX_ALIASES.get(prefixMatch[1].trim().toLowerCase())
+    : undefined;
+  const ecosystem = explicitEcosystem || defaultEcosystem.trim() || 'npm';
+  const packageSpec = explicitEcosystem ? prefixMatch?.[2]?.trim() || '' : trimmed;
+  if (!packageSpec) return null;
 
-  const versionAt = trimmed.lastIndexOf('@');
+  const versionAt = packageSpec.lastIndexOf('@');
   const hasVersion = versionAt > 0;
-  const name = hasVersion ? trimmed.slice(0, versionAt) : trimmed;
-  const version = hasVersion ? trimmed.slice(versionAt + 1) : null;
+  const name = hasVersion ? packageSpec.slice(0, versionAt) : packageSpec;
+  const version = hasVersion ? packageSpec.slice(versionAt + 1) : null;
 
   if (!name.trim()) return null;
 
@@ -248,7 +278,7 @@ export function parsePackageSpec(spec: string, defaultEcosystem: string): Normal
     spec: trimmed,
     name: name.trim(),
     version: version?.trim() || null,
-    ecosystem: defaultEcosystem.trim() || 'npm',
+    ecosystem,
   };
 }
 
@@ -372,7 +402,7 @@ const definition = defineComponent({
   inputs: inputSchema,
   outputs: outputSchema,
   parameters: parameterSchema,
-  docs: 'Query OSV.dev for known package vulnerabilities and malicious-package advisories. Supports package/version specs, advisory hydration, severity filtering, and analytics-ready output.',
+  docs: 'Query OSV.dev for known package vulnerabilities and malicious-package advisories. Supports package/version specs, per-spec ecosystem prefixes, advisory hydration, severity filtering, and analytics-ready output.',
   toolProvider: {
     kind: 'component',
     name: 'osv_dependency_query',
@@ -395,6 +425,7 @@ const definition = defineComponent({
     deprecated: false,
     examples: [
       'Check npm package versions such as lodash@4.17.20 and minimist@0.0.8.',
+      'Mix ecosystems in one batch with specs such as npm:lodash@4.17.20 and PyPI:django@4.2.7.',
       'Look up malicious-package advisories for dependency triage.',
     ],
   },

@@ -25,6 +25,12 @@ export const queryKeys = {
     all: () => ['mcpServers', getOrgScope()] as const,
     tools: () => ['mcpServers', getOrgScope(), 'tools'] as const,
   },
+  agentSkills: {
+    all: (enabledOnly = false) =>
+      ['agentSkills', getOrgScope(), enabledOnly ? 'enabled' : 'all'] as const,
+    discovered: () => ['agentSkills', getOrgScope(), 'discovered'] as const,
+    detail: (id: string) => ['agentSkills', getOrgScope(), id] as const,
+  },
   mcpGroups: {
     all: () => ['mcpGroups', getOrgScope()] as const,
     serversRoot: () => ['mcpGroupServers', getOrgScope()] as const,
@@ -41,6 +47,10 @@ export const queryKeys = {
   },
   apiKeys: {
     all: () => ['apiKeys', getOrgScope()] as const,
+  },
+  ai: {
+    anthropicModels: (apiKeySecretId: string) =>
+      ['aiAnthropicModels', getOrgScope(), apiKeySecretId] as const,
   },
   auditLogs: {
     all: (filters?: Record<string, unknown>) => ['auditLogs', getOrgScope(), filters] as const,

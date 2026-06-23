@@ -125,11 +125,11 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
       role="button"
       tabIndex={disabled || component.deprecated ? -1 : 0}
       className={cn(
-        'group relative flex flex-col p-3 border border-border/50 rounded-lg cursor-pointer transition-all',
+        'group relative flex flex-col p-2 border border-border/50 rounded-md cursor-pointer transition-all',
         'bg-background/50 hover:bg-background hover:border-border',
-        'text-foreground aspect-[4/3]',
+        'text-foreground min-h-[4.5rem]',
         'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
-        'md:cursor-move', // Desktop: show move cursor
+        'md:cursor-move',
         disabled ? 'cursor-not-allowed opacity-50' : 'hover:shadow-sm hover:scale-[1.02]',
         component.deprecated && 'opacity-50',
         isSelected && 'bg-primary/20 border-primary scale-95',
@@ -146,14 +146,14 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
       aria-label={`Add ${component.name} component`}
     >
       {/* Default: Centered icon and name */}
-      <div className="flex flex-col items-center justify-center gap-2 flex-1 group-hover:hidden transition-all">
+      <div className="flex flex-col items-center justify-center gap-1 flex-1 group-hover:hidden transition-all">
         {component.logo ? (
           <img
             src={component.logo}
             alt={component.name}
-            width={32}
-            height={32}
-            className="h-8 w-8 flex-shrink-0 object-contain"
+            width={20}
+            height={20}
+            className="h-5 w-5 flex-shrink-0 object-contain"
             onError={(e) => {
               // Fallback to icon if image fails to load
               e.currentTarget.style.display = 'none';
@@ -163,23 +163,23 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
         ) : null}
         <DynamicIcon
           name={component.icon || 'Box'}
-          className={cn('h-8 w-8 flex-shrink-0 text-muted-foreground', component.logo && 'hidden')}
+          className={cn('h-5 w-5 flex-shrink-0 text-muted-foreground', component.logo && 'hidden')}
         />
-        <span className="text-[13px] font-semibold leading-tight text-center line-clamp-2">
+        <span className="text-[11px] font-medium leading-tight text-center line-clamp-2">
           {component.name}
         </span>
       </div>
 
       {/* Hover: Icon left, name right, description below */}
-      <div className="hidden group-hover:flex flex-col gap-2 flex-1">
-        <div className="flex items-start gap-2.5">
+      <div className="hidden group-hover:flex flex-col gap-1 flex-1">
+        <div className="flex items-start gap-1.5">
           {component.logo ? (
             <img
               src={component.logo}
               alt={component.name}
-              width={24}
-              height={24}
-              className="h-6 w-6 flex-shrink-0 object-contain"
+              width={16}
+              height={16}
+              className="h-4 w-4 flex-shrink-0 object-contain"
               onError={(e) => {
                 // Fallback to icon if image fails to load
                 e.currentTarget.style.display = 'none';
@@ -190,15 +190,15 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
           <DynamicIcon
             name={component.icon || 'Box'}
             className={cn(
-              'h-6 w-6 flex-shrink-0 text-muted-foreground',
+              'h-4 w-4 flex-shrink-0 text-muted-foreground',
               component.logo && 'hidden',
             )}
           />
-          <span className="text-[13px] font-semibold leading-[1.3] line-clamp-2 flex-1 -mt-0.5">
+          <span className="text-[11px] font-medium leading-[1.25] line-clamp-2 flex-1">
             {component.name}
           </span>
         </div>
-        <p className="text-[10px] text-muted-foreground line-clamp-3 leading-snug">{description}</p>
+        <p className="text-[10px] text-muted-foreground line-clamp-2 leading-snug">{description}</p>
       </div>
     </div>
   );

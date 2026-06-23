@@ -67,7 +67,7 @@ export const WorkflowNodeMetadataSchema = z.object({
 
 export type WorkflowNodeMetadata = z.infer<typeof WorkflowNodeMetadataSchema>;
 
-export const WorkflowDefinitionSchema = z.object({
+const WorkflowDefinitionCoreSchema = z.object({
   version: z.number().int().positive().default(2),
   title: z.string(),
   description: z.string().optional(),
@@ -80,6 +80,29 @@ export const WorkflowDefinitionSchema = z.object({
     environment: z.string().default('default'),
     timeoutSeconds: z.number().default(0),
   }),
+});
+
+export const LoopBodyDefinitionSchema = z.object({
+  forEachRef: z.string(),
+  bodyEntryRef: z.string(),
+  exitRefs: z.array(z.string()),
+  iterationCapture: z.object({
+    sourceRef: z.string(),
+    sourceHandle: z.string(),
+  }),
+  itemBinding: z
+    .object({
+      targetRef: z.string(),
+      targetHandle: z.string(),
+    })
+    .optional(),
+  definition: WorkflowDefinitionCoreSchema,
+});
+
+export type LoopBodyDefinition = z.infer<typeof LoopBodyDefinitionSchema>;
+
+export const WorkflowDefinitionSchema = WorkflowDefinitionCoreSchema.extend({
+  loopBodies: z.record(z.string(), LoopBodyDefinitionSchema).optional().default({}),
 });
 
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

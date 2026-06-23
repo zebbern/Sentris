@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 import { findingsApi, type FindingsExportParams } from '@/services/api/findings';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +23,7 @@ interface ExportButtonProps {
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
+  className?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,7 @@ export function ExportButton({
   componentId,
   dateFrom,
   dateTo,
+  className,
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
@@ -84,7 +87,7 @@ export function ExportButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isExporting}>
+        <Button variant="outline" size="sm" disabled={isExporting} className={cn(className)}>
           {isExporting ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (

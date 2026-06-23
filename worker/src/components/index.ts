@@ -31,6 +31,7 @@ import './core/text-block';
 import './core/conditional-router';
 import './core/deduplicator';
 import './core/workflow-call';
+import './core/for-each';
 import './core/mcp-library';
 import './core/analytics-sink';
 // Manual Action components
@@ -44,6 +45,7 @@ import './ai/openrouter-provider';
 import './ai/ai-agent';
 import './ai/llm-generate-text';
 import './ai/opencode';
+import './ai/claude-code-agent';
 
 // Security components
 import './security/subfinder';
@@ -77,6 +79,7 @@ import './security/semgrep';
 import './security/repo-files-extractor';
 import './security/manifest-extractor';
 import './security/osv';
+import './security/npm-registry-intel';
 import './security/nvd';
 import './security/yara';
 

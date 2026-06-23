@@ -3,6 +3,7 @@ import {
   componentRegistry,
   ContainerError,
   runComponentWithRunner,
+  analyticsResultSchema,
   type DockerRunnerConfig,
   withPortMeta,
   coerceBooleanFromText,
@@ -28,8 +29,10 @@ const variableConfigSchema = z.object({
       'list-number',
       'list-boolean',
       'list-json',
+      'analytics-results',
     ])
     .default('json'),
+  required: z.boolean().optional().default(true),
 });
 
 const parameterSchema = parameters({
@@ -62,16 +65,20 @@ const parameterSchema = parameters({
 const inputSchema = inputs({});
 const baseOutputSchema = outputs({});
 
-const mapTypeToSchema = (type: string, label: string) => {
+function withRequiredFlag<T extends z.ZodTypeAny>(schema: T, required: boolean): z.ZodTypeAny {
+  return required ? schema : schema.optional();
+}
+
+const mapTypeToSchema = (type: string, label: string, required = true) => {
   switch (type) {
     case 'string':
-      return withPortMeta(z.string(), { label });
+      return withPortMeta(withRequiredFlag(z.string(), required), { label });
     case 'number':
-      return withPortMeta(coerceNumberFromText(), { label });
+      return withPortMeta(withRequiredFlag(coerceNumberFromText(), required), { label });
     case 'boolean':
-      return withPortMeta(coerceBooleanFromText(), { label });
+      return withPortMeta(withRequiredFlag(coerceBooleanFromText(), required), { label });
     case 'secret':
-      return withPortMeta(z.unknown(), {
+      return withPortMeta(withRequiredFlag(z.unknown(), required), {
         label,
         editor: 'secret',
         allowAny: true,
@@ -80,29 +87,31 @@ const mapTypeToSchema = (type: string, label: string) => {
       });
     case 'list':
     case 'list-text':
-      return withPortMeta(z.array(z.string()), {
+      return withPortMeta(withRequiredFlag(z.array(z.string()), required), {
         label,
         connectionType: { kind: 'list', element: { kind: 'primitive', name: 'text' } },
       });
     case 'list-number':
-      return withPortMeta(z.array(z.number()), {
+      return withPortMeta(withRequiredFlag(z.array(z.number()), required), {
         label,
         connectionType: { kind: 'list', element: { kind: 'primitive', name: 'number' } },
       });
     case 'list-boolean':
-      return withPortMeta(z.array(z.boolean()), {
+      return withPortMeta(withRequiredFlag(z.array(z.boolean()), required), {
         label,
         connectionType: { kind: 'list', element: { kind: 'primitive', name: 'boolean' } },
       });
     case 'list-json':
-      return withPortMeta(z.array(z.unknown()), {
+      return withPortMeta(withRequiredFlag(z.array(z.unknown()), required), {
         label,
         allowAny: true,
         reason: 'Script inputs can accept arrays of arbitrary JSON objects.',
         connectionType: { kind: 'list', element: { kind: 'primitive', name: 'json' } },
       });
+    case 'analytics-results':
+      return withPortMeta(withRequiredFlag(z.array(analyticsResultSchema()), required), { label });
     default:
-      return withPortMeta(z.unknown(), {
+      return withPortMeta(withRequiredFlag(z.unknown(), required), {
         label,
         allowAny: true,
         reason: 'Script inputs can accept arbitrary JSON payloads.',
@@ -270,7 +279,7 @@ const definition = defineComponent({
     if (Array.isArray(params.variables)) {
       params.variables.forEach((v: any) => {
         if (!v?.name) return;
-        inputShape[v.name] = mapTypeToSchema(v.type || 'json', v.name);
+        inputShape[v.name] = mapTypeToSchema(v.type || 'json', v.name, v.required !== false);
       });
     }
     if (Array.isArray(params.returns)) {

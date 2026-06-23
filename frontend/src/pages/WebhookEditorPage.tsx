@@ -90,6 +90,7 @@ export function WebhookEditorPage() {
         isNew={isNew}
         isSaving={isSaving}
         isDirty={isDirty}
+        activeTab={activeTab}
         onNameChange={(name) => setForm((prev) => ({ ...prev, name }))}
         onSave={handleSave}
         onDelete={handleDelete}

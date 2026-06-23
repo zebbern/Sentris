@@ -1,0 +1,276 @@
+{
+  "_metadata": {
+    "name": "GitHub Actions Supply Chain Triage",
+    "description": "Authorized bug bounty workflow that reviews GitHub Actions workflow YAML for privileged pull request execution, broad token permissions, mutable action refs, self-hosted runners, and risky secret handling.",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "github",
+      "github-actions",
+      "ci-cd",
+      "supply-chain",
+      "workflow-security"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "GitHub Actions Supply Chain Triage",
+    "description": "Review authorized public GitHub repositories for actionable GitHub Actions CI/CD supply-chain risk signals.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "github",
+      "github-actions",
+      "ci-cd",
+      "supply-chain",
+      "workflow-security"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 10
+  },
+  "graph": {
+    "name": "GitHub Actions Supply Chain Triage",
+    "description": "Focused GitHub Actions workflow-risk triage for authorized bug bounty and supply-chain research.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "data": {
+          "label": "Authorized Repository Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "repositoryUrl",
+                  "label": "GitHub repository URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "Public GitHub repository URL explicitly authorized for GitHub Actions workflow review."
+                },
+                {
+                  "id": "ref",
+                  "label": "Branch, tag, or commit",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Git ref to inspect. Uses the repository default branch when omitted."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and reporting constraints to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_repo_files",
+        "type": "sentris.repository.files.extract",
+        "position": {
+          "x": 420,
+          "y": 300
+        },
+        "data": {
+          "label": "Extract GitHub Actions Workflows",
+          "config": {
+            "params": {
+              "ref": "main",
+              "maxFiles": 80,
+              "maxTotalBytes": 250000,
+              "maxFileBytes": 50000
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "analyze_github_actions",
+        "type": "core.logic.script",
+        "position": {
+          "x": 760,
+          "y": 300
+        },
+        "data": {
+          "label": "Rank GitHub Actions Risks",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "repositoryUrl",
+                  "type": "string"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "githubActionsBundle",
+                  "type": "string"
+                },
+                {
+                  "name": "fileSummary",
+                  "type": "json"
+                },
+                {
+                  "name": "files",
+                  "type": "list-json"
+                },
+                {
+                  "name": "skippedFiles",
+                  "type": "list-json"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                },
+                {
+                  "name": "analyticsResults",
+                  "type": "analytics-results"
+                }
+              ],
+              "code": "export function script(input) {\n  const bundle = typeof input.githubActionsBundle === 'string' ? input.githubActionsBundle : '';\n  const repositoryUrl = typeof input.repositoryUrl === 'string' ? input.repositoryUrl.trim() : '';\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  const fileSummary = input.fileSummary && typeof input.fileSummary === 'object' ? input.fileSummary : {};\n  const files = Array.isArray(input.files) ? input.files : [];\n  const skippedFiles = Array.isArray(input.skippedFiles) ? input.skippedFiles : [];\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1, unknown: 0 };\n  const rankFor = (value) => severityRank[String(value || 'unknown').toLowerCase()] || 0;\n  function splitBundle(value) {\n    const chunks = [];\n    const marker = /^# FILE: (.+)$/gm;\n    const matches = [...String(value || '').matchAll(marker)];\n    if (matches.length === 0 && String(value || '').trim().length > 0) {\n      return [{ path: 'github-actions-workflow.yml', content: String(value) }];\n    }\n    for (let index = 0; index < matches.length; index++) {\n      const current = matches[index];\n      const next = matches[index + 1];\n      chunks.push({\n        path: String(current[1] || '').trim(),\n        content: String(value).slice((current.index || 0) + current[0].length, next?.index ?? String(value).length).trim()\n      });\n    }\n    return chunks.filter((chunk) => chunk.path && chunk.content);\n  }\n  function evidenceLines(content, patterns) {\n    const lines = String(content || '').split(/\\r?\\n/);\n    const matches = [];\n    for (let index = 0; index < lines.length; index++) {\n      const line = lines[index];\n      if (patterns.some((pattern) => pattern.test(line))) {\n        matches.push(`L${index + 1}: ${line.trim()}`);\n      }\n      if (matches.length >= 4) break;\n    }\n    return matches;\n  }\n  function priorityBand(severity) {\n    if (severity === 'critical') return 'immediate';\n    if (severity === 'high') return 'high-review';\n    if (severity === 'medium') return 'watchlist';\n    return 'backlog';\n  }\n  const findings = [];\n  function addFinding(file, ruleId, severity, title, priorityReasons, evidence, remediation) {\n    findings.push({\n      ruleId,\n      severity,\n      title,\n      filePath: file.path,\n      priorityBand: priorityBand(severity),\n      priorityScore: rankFor(severity) * 100 + priorityReasons.length * 10 + evidence.length,\n      priorityReasons,\n      evidence,\n      remediation\n    });\n  }\n  for (const file of splitBundle(bundle)) {\n    const content = file.content;\n    const hasPullRequestTarget = /(^|\\n)\\s*on\\s*:\\s*pull_request_target\\b/i.test(content) || /(^|\\n)\\s*pull_request_target\\s*:/i.test(content);\n    const hasWriteAll = /(^|\\n)\\s*permissions\\s*:\\s*write-all\\b/i.test(content);\n    const hasBroadWritePermission = hasWriteAll || /(^|\\n)\\s*(contents|pull-requests|issues|actions|deployments|packages|security-events|id-token)\\s*:\\s*write\\b/i.test(content);\n    if (hasPullRequestTarget && hasBroadWritePermission) {\n      addFinding(\n        file,\n        'pull-request-target-write-token',\n        'critical',\n        'pull_request_target workflow grants write-capable token permissions',\n        [\n          'pull_request_target can run attacker-controlled changes with privileged token context',\n          'workflow grants broad write permissions'\n        ],\n        evidenceLines(content, [/pull_request_target/i, /permissions\\s*:/i, /write-all|:\\s*write\\b/i]),\n        'Prefer pull_request for untrusted code paths, split privileged follow-up jobs, and reduce GITHUB_TOKEN permissions to read-only by default.'\n      );\n    } else if (hasPullRequestTarget) {\n      addFinding(\n        file,\n        'pull-request-target-review',\n        'high',\n        'pull_request_target workflow requires manual privilege review',\n        ['pull_request_target executes in the base repository security context'],\n        evidenceLines(content, [/pull_request_target/i]),\n        'Confirm the workflow never checks out or executes attacker-controlled pull request code before privileged steps run.'\n      );\n    }\n    const usesMatches = [...content.matchAll(/uses\\s*:\\s*([^\\s#]+)@([^\\s#]+)/gi)];\n    for (const match of usesMatches) {\n      const actionName = String(match[1] || '').trim();\n      const ref = String(match[2] || '').replace(/[\"']/g, '').trim();\n      if (!actionName || actionName.startsWith('./') || actionName.startsWith('docker://')) continue;\n      const isGitHubOwned = /^actions\\//i.test(actionName) || /^github\\//i.test(actionName);\n      const isPinnedSha = /^[a-f0-9]{40}$/i.test(ref) || /^sha256:/i.test(ref);\n      if (!isPinnedSha) {\n        if (isGitHubOwned) {\n          addFinding(\n            file,\n            'mutable-github-owned-action-ref',\n            'low',\n            'GitHub-owned Action uses a mutable version tag',\n            ['GitHub-owned action is trusted but still resolves through a mutable tag', `action reference uses ${ref || 'an unpinned ref'}`],\n            [`uses: ${actionName}@${ref}`],\n            'Pin sensitive workflows to a full commit SHA, or document why the GitHub-owned action tag is accepted for this program.'\n          );\n        } else {\n          const severity = /^(main|master|head|latest|develop|dev|stable)$/i.test(ref) ? 'high' : 'medium';\n          addFinding(\n            file,\n            'unpinned-third-party-action',\n            severity,\n            'Third-party GitHub Action is not pinned to an immutable digest',\n            ['third-party action can change without a repository code change', `action reference uses ${ref || 'an unpinned ref'}`],\n            [`uses: ${actionName}@${ref}`],\n            'Pin third-party actions to a full commit SHA and review update diffs before bumping the pin.'\n          );\n        }\n      }\n    }\n    if (/(^|\\n)\\s*runs-on\\s*:\\s*(\\[[^\\]]*self-hosted[^\\]]*\\]|self-hosted\\b)/i.test(content)) {\n      addFinding(\n        file,\n        'self-hosted-runner',\n        'high',\n        'Workflow can run on a self-hosted runner',\n        ['self-hosted runners can expose internal network, workspace, and cached secrets to workflow code'],\n        evidenceLines(content, [/runs-on\\s*:/i, /self-hosted/i]),\n        'Restrict self-hosted runners to trusted branches or isolated runner groups and avoid running untrusted pull request code on them.'\n      );\n    }\n    const hasRiskyInstaller = /\\b(curl|wget)\\b[^\\n|]*(\\|\\s*(bash|sh)|\\s+-O\\s+|\\s+-o\\s+)/i.test(content);\n    if (hasRiskyInstaller) {\n      addFinding(\n        file,\n        'remote-installer-execution',\n        hasPullRequestTarget ? 'high' : 'medium',\n        'Workflow executes remote installer content during CI',\n        ['remote installer execution expands supply-chain trust to an external network response'],\n        evidenceLines(content, [/curl\\b|wget\\b/i, /bash|sh/i]),\n        'Replace remote installer piping with pinned package versions, checksum verification, or a reviewed setup action pinned to a commit SHA.'\n      );\n    }\n    const referencesSecrets = /secrets\\.[A-Za-z0-9_]+/i.test(content);\n    if (referencesSecrets && (hasPullRequestTarget || hasRiskyInstaller || hasBroadWritePermission)) {\n      addFinding(\n        file,\n        'secret-context-in-risky-workflow',\n        'high',\n        'Workflow references secrets in a risky execution context',\n        ['workflow references repository secrets near privileged or externally influenced execution'],\n        evidenceLines(content, [/secrets\\.[A-Za-z0-9_]+/i, /pull_request_target|curl\\b|wget\\b|permissions\\s*:/i]),\n        'Move secret-dependent steps behind trusted-branch checks and avoid exposing secrets to pull request influenced code paths.'\n      );\n    }\n  }\n  const priorityFindings = findings\n    .sort((a, b) => b.priorityScore - a.priorityScore || String(a.filePath).localeCompare(String(b.filePath)) || a.ruleId.localeCompare(b.ruleId))\n    .slice(0, 100);\n  const countsBySeverity = priorityFindings.reduce((acc, finding) => {\n    acc[finding.severity] = (acc[finding.severity] || 0) + 1;\n    return acc;\n  }, {});\n  const highestSeverity = priorityFindings.reduce((current, finding) => rankFor(finding.severity) > rankFor(current) ? finding.severity : current, 'none');\n  const analyticsResults = priorityFindings.map((finding) => ({\n    scanner: 'github-actions-supply-chain',\n    severity: finding.severity,\n    finding_hash: [repositoryUrl || fileSummary.repository || 'repository', finding.filePath, finding.ruleId, finding.evidence?.[0] || finding.title].join(':'),\n    asset_key: repositoryUrl || fileSummary.repository || null,\n    file_path: finding.filePath,\n    rule_id: finding.ruleId,\n    title: finding.title,\n    priority_band: finding.priorityBand\n  }));\n  return {\n    report: {\n      summary: {\n        repository: repositoryUrl || fileSummary.repository || null,\n        ref: fileSummary.ref || null,\n        workflowFiles: Number(fileSummary.githubActionsFiles || splitBundle(bundle).length),\n        selectedFiles: Number(fileSummary.selectedFiles || files.length),\n        skippedFiles: skippedFiles.length || Number(fileSummary.skippedFiles || 0),\n        truncated: Boolean(fileSummary.truncated),\n        actionableFindings: priorityFindings.length,\n        highestSeverity,\n        countsBySeverity\n      },\n      authorizationNotes,\n      extraction: {\n        summary: fileSummary,\n        files: files.filter((file) => file && file.category === 'github-actions').slice(0, 120),\n        skippedFiles: skippedFiles.slice(0, 120)\n      },\n      priorityFindings,\n      analyticsResults,\n      nextSteps: [\n        'Confirm the repository and workflow paths are in authorized bug bounty scope',\n        'Manually inspect pull_request_target workflows before filing because exploitability depends on attacker-controlled checkout or script paths',\n        'Pin third-party actions to full commit SHAs and reduce GITHUB_TOKEN permissions to least privilege',\n        'Re-run after workflow hardening to confirm privileged CI/CD risk signals are removed'\n      ]\n    },\n    analyticsResults\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1100,
+          "y": 300
+        },
+        "data": {
+          "label": "Save GitHub Actions Risk Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "github-actions-supply-chain-triage-{{date}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "analytics_sink",
+        "type": "core.analytics.sink",
+        "position": {
+          "x": 1100,
+          "y": 120
+        },
+        "data": {
+          "label": "Index GitHub Actions Findings",
+          "config": {
+            "params": {
+              "dataInputs": [
+                {
+                  "id": "github_actions",
+                  "label": "GitHub Actions",
+                  "sourceTag": "github_actions"
+                }
+              ],
+              "indexSuffix": "github-actions-supply-chain",
+              "assetKeyField": "auto",
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-extract_repo_files-repositoryUrl",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-extract_repo_files-ref",
+        "source": "trigger_1",
+        "target": "extract_repo_files",
+        "sourceHandle": "ref",
+        "targetHandle": "ref"
+      },
+      {
+        "id": "trigger_1-analyze_github_actions-repositoryUrl",
+        "source": "trigger_1",
+        "target": "analyze_github_actions",
+        "sourceHandle": "repositoryUrl",
+        "targetHandle": "repositoryUrl"
+      },
+      {
+        "id": "trigger_1-analyze_github_actions-authorizationNotes",
+        "source": "trigger_1",
+        "target": "analyze_github_actions",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "extract_repo_files-analyze_github_actions-githubActionsBundle",
+        "source": "extract_repo_files",
+        "target": "analyze_github_actions",
+        "sourceHandle": "githubActionsBundle",
+        "targetHandle": "githubActionsBundle"
+      },
+      {
+        "id": "extract_repo_files-analyze_github_actions-summary",
+        "source": "extract_repo_files",
+        "target": "analyze_github_actions",
+        "sourceHandle": "summary",
+        "targetHandle": "fileSummary"
+      },
+      {
+        "id": "extract_repo_files-analyze_github_actions-files",
+        "source": "extract_repo_files",
+        "target": "analyze_github_actions",
+        "sourceHandle": "files",
+        "targetHandle": "files"
+      },
+      {
+        "id": "extract_repo_files-analyze_github_actions-skippedFiles",
+        "source": "extract_repo_files",
+        "target": "analyze_github_actions",
+        "sourceHandle": "skippedFiles",
+        "targetHandle": "skippedFiles"
+      },
+      {
+        "id": "analyze_github_actions-artifact_report-report",
+        "source": "analyze_github_actions",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      },
+      {
+        "id": "analyze_github_actions-analytics_sink-analyticsResults",
+        "source": "analyze_github_actions",
+        "target": "analytics_sink",
+        "sourceHandle": "analyticsResults",
+        "targetHandle": "github_actions"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

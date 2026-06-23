@@ -143,11 +143,11 @@ exec:
     test('should scan with template paths', async () => {
       const input = {
         targets: ['https://example.com'],
-        templatePaths: ['cves/2024/', 'http/exposures/'],
+        templatePaths: ['http/cves/2024/', 'http/exposures/'],
       };
 
       const parsed = nucleiComponent!.inputs.parse(input);
-      expect(parsed.templatePaths).toEqual(['cves/2024/', 'http/exposures/']);
+      expect(parsed.templatePaths).toEqual(['http/cves/2024/', 'http/exposures/']);
     });
   });
 

@@ -1,0 +1,167 @@
+{
+  "_metadata": {
+    "name": "CORS Auth Edge Misconfig Triage",
+    "description": "Authorized bug bounty workflow that probes live web/API URLs for reflected CORS origins, credentialed cross-origin access, permissive preflight methods, and sensitive exposed headers.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "api", "cors", "auth", "edge", "misconfiguration", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "CORS Auth Edge Misconfig Triage",
+    "description": "Probe authorized live URLs for actionable CORS and auth-edge misconfiguration signals.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "web", "api", "cors", "auth", "edge", "misconfiguration", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 4,
+    "edgeCount": 6
+  },
+  "graph": {
+    "name": "CORS Auth Edge Misconfig Triage",
+    "description": "Focused CORS/auth-edge probe for authorized live web and API URLs.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Live URL Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "liveUrls",
+                  "label": "Live URLs",
+                  "type": "array",
+                  "required": true,
+                  "description": "Authorized HTTP or HTTPS URLs to probe for CORS and auth-edge behavior."
+                },
+                {
+                  "id": "testOrigins",
+                  "label": "Test origins",
+                  "type": "array",
+                  "required": false,
+                  "defaultValue": [],
+                  "description": "Optional attacker-controlled Origin values. Defaults to safe synthetic origins when omitted."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and rate-limit notes to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Confirm Live HTTP Services",
+          "config": {
+            "params": {
+              "threads": 25,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "probe_cors_edges",
+        "type": "core.logic.script",
+        "position": { "x": 740, "y": 260 },
+        "data": {
+          "label": "Probe and Rank CORS Edges",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "liveUrls", "type": "list-text" },
+                { "name": "testOrigins", "type": "list-text" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "httpResponses", "type": "list-json" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export async function script(input) {\n  const asList = (value) => Array.isArray(value) ? value.map((item) => String(item || '').trim()).filter(Boolean) : [];\n  const normalizeUrl = (value) => {\n    const text = String(value || '').trim();\n    if (!text) return '';\n    try {\n      const parsed = new URL(text);\n      if (!['http:', 'https:'].includes(parsed.protocol)) return '';\n      parsed.hash = '';\n      return parsed.toString();\n    } catch {\n      return '';\n    }\n  };\n  const headerValue = (headers, name) => {\n    if (!headers || typeof headers !== 'object') return null;\n    const expected = name.toLowerCase();\n    for (const [key, value] of Object.entries(headers)) {\n      if (String(key).toLowerCase() === expected) return value == null ? null : String(value);\n    }\n    return null;\n  };\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const responseUrls = httpResponses.map((item) => item?.url || item?.finalUrl || item?.input).map(normalizeUrl).filter(Boolean);\n  const requestedUrls = asList(input.liveUrls).map(normalizeUrl).filter(Boolean);\n  const targets = Array.from(new Set([...responseUrls, ...requestedUrls])).slice(0, 25);\n  const suppliedOrigins = asList(input.testOrigins).filter((origin) => /^https?:\\/\\//i.test(origin));\n  const origins = (suppliedOrigins.length > 0 ? suppliedOrigins : ['https://attacker.example', 'https://evil.invalid']).slice(0, 5);\n  const probeErrors = [];\n  let probeResults = Array.isArray(input.corsProbeResults) ? input.corsProbeResults : [];\n  async function fetchProbe(url, origin, method) {\n    const controller = new AbortController();\n    const timer = setTimeout(() => controller.abort(), 10000);\n    try {\n      const headers = { Origin: origin, Accept: '*/*', 'User-Agent': 'SentrisFlow-CORS-Audit/1.0' };\n      if (method === 'OPTIONS') {\n        headers['Access-Control-Request-Method'] = 'POST';\n        headers['Access-Control-Request-Headers'] = 'authorization, content-type';\n      }\n      const response = await fetch(url, { method, headers, redirect: 'manual', signal: controller.signal });\n      return {\n        url,\n        origin,\n        method,\n        status: response.status,\n        accessControlAllowOrigin: response.headers.get('access-control-allow-origin'),\n        accessControlAllowCredentials: response.headers.get('access-control-allow-credentials'),\n        accessControlAllowMethods: response.headers.get('access-control-allow-methods'),\n        accessControlAllowHeaders: response.headers.get('access-control-allow-headers'),\n        accessControlExposeHeaders: response.headers.get('access-control-expose-headers'),\n        vary: response.headers.get('vary')\n      };\n    } catch (error) {\n      probeErrors.push({ url, origin, method, error: error instanceof Error ? error.message : String(error) });\n      return null;\n    } finally {\n      clearTimeout(timer);\n    }\n  }\n  if (probeResults.length === 0) {\n    const collected = [];\n    for (const url of targets) {\n      for (const origin of origins) {\n        for (const method of ['GET', 'OPTIONS']) {\n          const result = await fetchProbe(url, origin, method);\n          if (result) collected.push(result);\n        }\n      }\n    }\n    probeResults = collected;\n  }\n  const sensitiveHeaderPattern = /authorization|cookie|token|secret|api[-_]?key|session|csrf/i;\n  const scoreProbe = (probe) => {\n    const allowOrigin = String(probe?.accessControlAllowOrigin || '').trim();\n    const allowCredentials = /^true$/i.test(String(probe?.accessControlAllowCredentials || '').trim());\n    const allowMethods = String(probe?.accessControlAllowMethods || '');\n    const allowHeaders = String(probe?.accessControlAllowHeaders || '');\n    const exposedHeaders = String(probe?.accessControlExposeHeaders || probe?.exposedHeaders || '');\n    const origin = String(probe?.origin || '').trim();\n    const reflectedOrigin = allowOrigin.toLowerCase() === origin.toLowerCase() && origin.length > 0;\n    const wildcardOrigin = allowOrigin === '*';\n    const nullOrigin = allowOrigin.toLowerCase() === 'null';\n    const broadMethods = /\\b(PUT|PATCH|DELETE|POST)\\b/i.test(allowMethods);\n    const authHeadersAllowed = /authorization|cookie|x-api-key|content-type/i.test(allowHeaders);\n    const sensitiveHeadersExposed = sensitiveHeaderPattern.test(exposedHeaders);\n    let priorityScore = 0;\n    const reasons = [];\n    if (reflectedOrigin) { priorityScore += 45; reasons.push('reflects arbitrary Origin'); }\n    if (allowCredentials && reflectedOrigin) { priorityScore += 40; reasons.push('allows credentials for reflected Origin'); }\n    if (wildcardOrigin) { priorityScore += 20; reasons.push('wildcard Access-Control-Allow-Origin'); }\n    if (nullOrigin) { priorityScore += 30; reasons.push('allows null Origin'); }\n    if (broadMethods) { priorityScore += 10; reasons.push('preflight allows state-changing methods'); }\n    if (authHeadersAllowed) { priorityScore += 10; reasons.push('preflight allows auth/content headers'); }\n    if (sensitiveHeadersExposed) { priorityScore += 10; reasons.push('exposes sensitive-looking headers'); }\n    const severity = priorityScore >= 85 ? 'critical' : priorityScore >= 70 ? 'high' : priorityScore >= 40 ? 'medium' : priorityScore >= 20 ? 'low' : 'info';\n    return { priorityScore, severity, reasons, reflectedOrigin, wildcardOrigin, nullOrigin, allowCredentials };\n  };\n  const findings = probeResults.map((probe) => {\n    const scored = scoreProbe(probe);\n    return {\n      url: probe?.url || '',\n      origin: probe?.origin || null,\n      method: probe?.method || null,\n      status: probe?.status ?? null,\n      severity: scored.severity,\n      priorityScore: scored.priorityScore,\n      priorityReasons: scored.reasons,\n      evidence: {\n        accessControlAllowOrigin: probe?.accessControlAllowOrigin || null,\n        accessControlAllowCredentials: probe?.accessControlAllowCredentials || null,\n        accessControlAllowMethods: probe?.accessControlAllowMethods || null,\n        accessControlAllowHeaders: probe?.accessControlAllowHeaders || null,\n        accessControlExposeHeaders: probe?.accessControlExposeHeaders || probe?.exposedHeaders || null,\n        vary: probe?.vary || null,\n        reflectedOrigin: scored.reflectedOrigin,\n        wildcardOrigin: scored.wildcardOrigin,\n        nullOrigin: scored.nullOrigin,\n        allowCredentials: scored.allowCredentials\n      }\n    };\n  }).filter((finding) => finding.priorityScore >= 20).sort((a, b) => b.priorityScore - a.priorityScore || String(a.url).localeCompare(String(b.url))).slice(0, 100);\n  const dangerousFindings = findings.filter((finding) => finding.evidence.reflectedOrigin && finding.evidence.allowCredentials).length;\n  const highRiskCorsFindings = findings.filter((finding) => ['critical', 'high'].includes(finding.severity)).length;\n  return {\n    report: {\n      summary: {\n        targetsChecked: targets.length,\n        originsTested: origins.length,\n        probesAttempted: probeResults.length + probeErrors.length,\n        probesSucceeded: probeResults.length,\n        probeErrors: probeErrors.length,\n        findings: findings.length,\n        highRiskCorsFindings,\n        dangerousFindings,\n        topFinding: findings[0]?.url || null\n      },\n      authorizationNotes: typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null,\n      targets,\n      origins,\n      httpBaseline: httpResponses.slice(0, 50).map((item) => ({ url: item?.url || item?.finalUrl || item?.input || null, statusCode: item?.statusCode ?? null, title: item?.title || null, technologies: Array.isArray(item?.technologies) ? item.technologies : [] })),\n      findings,\n      probeErrors,\n      nextSteps: ['Manually verify high-risk reflected-Origin plus credentials cases with a same browser model', 'Confirm affected endpoints expose sensitive authenticated data before submitting', 'Keep follow-up requests non-destructive and inside authorized scope']\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1060, "y": 260 },
+        "data": {
+          "label": "Save CORS Auth Edge Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "cors-auth-edge-misconfig-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-httpx_probe-liveUrls",
+        "source": "trigger_1",
+        "target": "httpx_probe",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "trigger_1-probe_cors_edges-liveUrls",
+        "source": "trigger_1",
+        "target": "probe_cors_edges",
+        "sourceHandle": "liveUrls",
+        "targetHandle": "liveUrls"
+      },
+      {
+        "id": "trigger_1-probe_cors_edges-testOrigins",
+        "source": "trigger_1",
+        "target": "probe_cors_edges",
+        "sourceHandle": "testOrigins",
+        "targetHandle": "testOrigins"
+      },
+      {
+        "id": "trigger_1-probe_cors_edges-authorizationNotes",
+        "source": "trigger_1",
+        "target": "probe_cors_edges",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "httpx_probe-probe_cors_edges-responses",
+        "source": "httpx_probe",
+        "target": "probe_cors_edges",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "probe_cors_edges-artifact_report-report",
+        "source": "probe_cors_edges",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

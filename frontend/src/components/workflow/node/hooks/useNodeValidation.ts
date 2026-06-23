@@ -1,6 +1,7 @@
 import type { FrontendNodeData } from '@/schemas/node';
 import type { InputPort, Parameter } from '@/schemas/component';
 import { inputSupportsManualValue } from '@/utils/portUtils';
+import { isManualAgentModelValue } from '@/components/workflow/config-panel/agentModelUtils';
 
 interface UseNodeValidationOptions {
   componentParameters: Parameter[];
@@ -20,6 +21,7 @@ const manualValueProvidedForInput = (
   if (hasConnection && !manualOverridesPort(input)) return false;
   const manualCandidate = inputOverrides[input.id];
   if (manualCandidate === undefined || manualCandidate === null) return false;
+  if (input.id === 'model' && isManualAgentModelValue(manualCandidate)) return true;
   if (typeof manualCandidate === 'string') return manualCandidate.trim().length > 0;
   return true;
 };

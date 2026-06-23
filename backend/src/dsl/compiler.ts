@@ -16,6 +16,7 @@ import {
   WorkflowNodeMetadata,
 } from './types';
 import { validateWorkflowGraph } from './validator';
+import { extractLoopBodies, topoSortWithoutLoopBackCycles } from './loop-body';
 
 const compilerLogger = new Logger('WorkflowCompiler');
 

@@ -5,6 +5,12 @@ description: "Complete reference for just commands and development utilities"
 
 Sentris Flow uses [just](https://github.com/casey/just) as its command runner. Run `just` or `just help` to see all available commands.
 
+If `just` is unavailable, the cross-platform `bun run instance`, `bun run dev [start|stop|logs|status|clean]`, and `bun run dev:stop` scripts cover the common local lifecycle commands and respect `SENTRIS_INSTANCE` / `.sentris-instance`. When no active instance has been selected, these tools initialize `.sentris-instance` to `0` before resolving ports, app names, or local databases. `bun run dev` also initializes or repairs the active instance env files before PM2 starts.
+The legacy `bun run dev:infra`, `bun run dev:stack`, and `bun run dev:stack:stop` aliases delegate to those same scripts.
+The root `bun run test:e2e*` scripts also use a cross-platform Node runner and resolve `SENTRIS_INSTANCE`, legacy `E2E_INSTANCE`, then `.sentris-instance` without Bash.
+The root `bun run test` script uses the same cross-platform runner style for cleanup and sequencing, so it does not depend on `rm -rf` or shell chaining. It preserves the normal gated E2E behavior; use `bun run test:e2e*` when you intentionally want live E2E execution.
+The `bun run template-library:verify` and `bun run security-components:verify` scripts also use Node command-plan runners so verification stops on the first failure without relying on shell `&&`.
+
 ---
 
 ## Getting Started
@@ -209,6 +215,7 @@ just status
 Comprehensive status check showing:
 - PM2 services
 - Infrastructure containers
+- Runtime health endpoints for the active instance
 - Production containers
 
 ### Reset Database
@@ -217,7 +224,7 @@ Comprehensive status check showing:
 just db-reset
 ```
 
-Drops and recreates the database, then runs migrations. **This deletes all data.**
+Drops and recreates the active instance database (`sentris_instance_N`), then runs migrations. The instance is resolved from `SENTRIS_INSTANCE`, then `.sentris-instance`, initializing `.sentris-instance` to `0` if missing. **This deletes all data for that instance.**
 
 <Warning>
   This command requires PostgreSQL to be running (`just dev` or `just infra up`).
@@ -300,17 +307,19 @@ Generates a BCrypt hash for OpenSearch internal user passwords.
 
 ```bash
 just instance show
+bun run instance show
 ```
 
-Prints the currently active instance number (stored in `.sentris-instance`).
+Prints the currently active instance number. If neither `SENTRIS_INSTANCE` nor `.sentris-instance` exists, this initializes `.sentris-instance` to `0` and prints `0`.
 
 ### Set Active Instance
 
 ```bash
 just instance use <0-9>
+bun run instance use <0-9>
 ```
 
-Sets the active instance for the current workspace. All subsequent `just dev` commands target this instance.
+Sets the active instance for the current workspace. All subsequent `just dev` and `bun run dev` commands target this instance.
 
 ### Initialize Instance Environment
 
@@ -328,6 +337,8 @@ just instance-env update [N]           # Patch instance-specific vars
 just instance-env copy SRC DEST        # Copy env between instances
 just instance-env show [N]             # Show instance config
 ```
+
+For `init`, `update`, and `show`, omitting `N` uses `SENTRIS_INSTANCE`, then `.sentris-instance`, initializing it to `0` if missing. `copy` always requires explicit source and destination instances.
 
 ---
 
@@ -358,10 +369,12 @@ just instance-env show [N]             # Show instance config
 | `just infra clean` | Clean infrastructure data |
 | `just instance show` | Show active instance |
 | `just instance use N` | Set active instance |
+| `bun run instance show` | Show active instance without `just` |
+| `bun run instance use N` | Set active instance without `just` |
 | `just instance-init [N]` | Init instance env files |
 | `just instance-env ...` | Manage instance env files |
 | `just status` | Show all status |
-| `just db-reset` | Reset database |
+| `just db-reset` | Reset active instance database |
 | `just build` | Build images |
 | `just help` | Show help |
 

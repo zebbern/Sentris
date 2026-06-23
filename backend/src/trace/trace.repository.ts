@@ -9,6 +9,9 @@ import type { TraceEventType } from './types';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const WORKFLOW_RUN_ID_PATTERN = new RegExp(`^(?:sentris-run-)?${UUID_PATTERN}$`, 'i');
+
 export interface PersistedTraceEvent {
   runId: string;
   workflowId?: string;
@@ -54,10 +57,7 @@ export class TraceRepository implements OnModuleDestroy {
     runId: string,
     callback: (payload: string) => void,
   ): Promise<() => Promise<void>> {
-    // Validate runId to prevent SQL injection via LISTEN channel name
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
-      throw new Error(`Invalid runId format: expected UUID, got "${runId}"`);
-    }
+    this.assertValidRunId(runId);
     const client = await this.pool.connect();
     const channel = `trace_events_${runId}`;
 
@@ -88,10 +88,7 @@ export class TraceRepository implements OnModuleDestroy {
    * Notify subscribers of new trace events
    */
   async notifyRun(runId: string, payload: string): Promise<void> {
-    // Validate runId to prevent SQL injection via channel name
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(runId)) {
-      throw new Error(`Invalid runId format: expected UUID, got "${runId}"`);
-    }
+    this.assertValidRunId(runId);
     const channel = `trace_events_${runId}`;
     await this.pool.query('SELECT pg_notify($1, $2)', [channel, payload]);
   }
@@ -293,5 +290,13 @@ export class TraceRepository implements OnModuleDestroy {
       return base;
     }
     return and(base, eq(workflowTracesTable.organizationId, organizationId));
+  }
+
+  private assertValidRunId(runId: string): void {
+    // Validate runId to prevent SQL injection via LISTEN/NOTIFY channel names.
+    // Current workflow runs use sentris-run-<uuid>; bare UUIDs remain supported for legacy runs.
+    if (!WORKFLOW_RUN_ID_PATTERN.test(runId)) {
+      throw new Error(`Invalid runId format: expected sentris-run UUID, got "${runId}"`);
+    }
   }
 }

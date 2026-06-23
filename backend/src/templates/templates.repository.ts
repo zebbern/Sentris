@@ -92,6 +92,7 @@ export class TemplatesRepository {
     requiredSecrets?: { name: string; type: string; description?: string }[];
     isOfficial?: boolean;
     isVerified?: boolean;
+    isActive?: boolean;
   }) {
     // Check if template already exists
     const existing = await this.findByRepoAndPath(template.repository, template.path);
@@ -102,6 +103,7 @@ export class TemplatesRepository {
         .update(templatesTable)
         .set({
           ...template,
+          isActive: template.isActive ?? true,
           updatedAt: new Date(),
         })
         .where(eq(templatesTable.id, existing.id))
@@ -111,7 +113,14 @@ export class TemplatesRepository {
       return results[0];
     } else {
       // Create new template
-      const results = await this.db.insert(templatesTable).values(template).returning().execute();
+      const results = await this.db
+        .insert(templatesTable)
+        .values({
+          ...template,
+          isActive: template.isActive ?? true,
+        })
+        .returning()
+        .execute();
 
       return results[0];
     }

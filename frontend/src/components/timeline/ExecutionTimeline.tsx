@@ -270,8 +270,8 @@ export function ExecutionTimeline() {
   }
 
   return (
-    <div className="border-t bg-background">
-      <div className="p-4 space-y-4">
+    <div className="border-t bg-background min-w-0">
+      <div className="min-w-0 space-y-2 px-3 py-2">
         <PlaybackControls
           currentTime={currentTime}
           totalDuration={totalDuration}
@@ -305,16 +305,18 @@ export function ExecutionTimeline() {
           onPlayheadMouseDown={handlePlayheadMouseDown}
         />
 
-        <TimelineOverview
-          markerData={markerData}
-          clampedStart={clampedStart}
-          viewportWidth={viewportWidth}
-          normalizedProgress={normalizedProgress}
-          isLiveMode={isLiveMode}
-          timelineZoom={timelineZoom}
-          overviewDuration={overviewDuration}
-          onPreviewPointer={handlePreviewPointer}
-        />
+        {timelineZoom > 1 && (
+          <TimelineOverview
+            markerData={markerData}
+            clampedStart={clampedStart}
+            viewportWidth={viewportWidth}
+            normalizedProgress={normalizedProgress}
+            isLiveMode={isLiveMode}
+            timelineZoom={timelineZoom}
+            overviewDuration={overviewDuration}
+            onPreviewPointer={handlePreviewPointer}
+          />
+        )}
 
         <TimelineStatusBar
           eventCount={events.length}

@@ -64,6 +64,18 @@ function SidebarContent({
   );
 }
 
+function getSidebarItemClassName(isActive?: boolean, className?: string) {
+  return cn(
+    'flex w-full items-center gap-2.5 px-3 py-2 md:py-1.5 text-left rounded-lg text-xs font-medium',
+    'transition-colors duration-150',
+    'hover:bg-accent hover:text-accent-foreground',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+    'min-h-[44px] md:min-h-0',
+    isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
+    className,
+  );
+}
+
 function SidebarItem({
   className,
   isActive,
@@ -76,19 +88,18 @@ function SidebarItem({
   return (
     <button
       ref={ref}
-      className={cn(
-        'flex w-full items-center gap-3 px-3 py-2.5 md:py-2 text-left rounded-lg text-sm font-medium',
-        'transition-colors duration-150',
-        'hover:bg-accent hover:text-accent-foreground',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        // Touch-friendly sizing on mobile
-        'min-h-[44px] md:min-h-0',
-        isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
-        className,
-      )}
+      type="button"
+      className={getSidebarItemClassName(isActive, className)}
       {...props}
     />
   );
 }
 
-export { Sidebar, SidebarHeader, SidebarFooter, SidebarContent, SidebarItem };
+export {
+  Sidebar,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarContent,
+  SidebarItem,
+  getSidebarItemClassName,
+};

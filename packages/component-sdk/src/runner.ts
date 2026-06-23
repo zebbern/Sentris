@@ -79,6 +79,13 @@ function formatArgs(args: string[]): string {
       if (!part) {
         return '';
       }
+      const previous = index > 0 ? args[index - 1] : undefined;
+      if (previous === '-e' && part.includes('=')) {
+        const separatorIndex = part.indexOf('=');
+        if (separatorIndex > 0) {
+          return `${part.slice(0, separatorIndex + 1)}***`;
+        }
+      }
       const hasNewlines = part.includes('\n');
       const isLong = part.length > 120;
       if (hasNewlines || isLong) {
@@ -87,6 +94,27 @@ function formatArgs(args: string[]): string {
       return part;
     })
     .join(' ');
+}
+
+/**
+ * Inject container env vars via the Docker spawn process environment (`-e KEY` without inline values).
+ * Avoids shell/docker CLI parsing issues for secrets containing `#`, spaces, or quotes.
+ */
+export function applyDockerContainerEnv(
+  dockerArgs: string[],
+  containerEnv: Record<string, string | undefined>,
+): NodeJS.ProcessEnv {
+  const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
+
+  for (const [key, rawValue] of Object.entries(containerEnv)) {
+    if (rawValue === undefined || rawValue === null) {
+      continue;
+    }
+    spawnEnv[key] = String(rawValue);
+    dockerArgs.push('-e', key);
+  }
+
+  return spawnEnv;
 }
 
 async function loadPtySpawn(): Promise<PtySpawn | null> {
@@ -290,13 +318,11 @@ async function runComponentInDocker<I, O>(
       }
     }
 
-    for (const [key, value] of Object.entries(env)) {
-      dockerArgs.push('-e', `${key}=${value}`);
-    }
-
-    // Tell the container where to read input and write output
-    dockerArgs.push('-e', `SENTRIS_INPUT_PATH=${CONTAINER_OUTPUT_PATH}/input.json`);
-    dockerArgs.push('-e', `SENTRIS_OUTPUT_PATH=${CONTAINER_OUTPUT_PATH}/${OUTPUT_FILENAME}`);
+    const spawnEnv = applyDockerContainerEnv(dockerArgs, {
+      ...env,
+      SENTRIS_INPUT_PATH: `${CONTAINER_OUTPUT_PATH}/input.json`,
+      SENTRIS_OUTPUT_PATH: `${CONTAINER_OUTPUT_PATH}/${OUTPUT_FILENAME}`,
+    });
 
     if (entrypoint) {
       dockerArgs.push('--entrypoint', entrypoint);
@@ -326,6 +352,7 @@ async function runComponentInDocker<I, O>(
         timeoutSeconds,
         runner.stdinJson,
         true,
+        spawnEnv,
       );
 
       // In detached mode, we return the container ID as part of a specialized output
@@ -343,7 +370,13 @@ async function runComponentInDocker<I, O>(
         argsWithoutStdin.splice(2, 0, '-t');
       }
       // NEVER write JSON to stdin in PTY mode - it pollutes the terminal output
-      capturedStdout = await runDockerWithPty(argsWithoutStdin, params, context, timeoutSeconds);
+      capturedStdout = await runDockerWithPty(
+        argsWithoutStdin,
+        params,
+        context,
+        timeoutSeconds,
+        spawnEnv,
+      );
     } else {
       capturedStdout = await runDockerWithStandardIO(
         dockerArgs,
@@ -351,6 +384,8 @@ async function runComponentInDocker<I, O>(
         context,
         timeoutSeconds,
         runner.stdinJson,
+        false,
+        spawnEnv,
       );
     }
 
@@ -435,6 +470,7 @@ async function runDockerWithStandardIO<I, O>(
   timeoutSeconds: number,
   stdinJson?: boolean,
   detached?: boolean,
+  spawnEnv: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
   const dockerPath = await resolveDockerPath(context);
   return new Promise<string>((resolve, reject) => {
@@ -456,7 +492,7 @@ async function runDockerWithStandardIO<I, O>(
 
     const proc = spawn(dockerPath, dockerArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: process.env,
+      env: spawnEnv,
     });
 
     let stdout = '';
@@ -586,13 +622,14 @@ async function runDockerWithPty<I, O>(
   params: I,
   context: ExecutionContext,
   timeoutSeconds: number,
+  spawnEnv: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
   const spawnPty = await loadPtySpawn();
   if (!spawnPty) {
     context.logger.warn('[Docker][PTY] node-pty unavailable; falling back to standard IO');
     // Remove -t flag before falling back to standard IO (stdin is not a TTY)
     const argsWithoutTty = dockerArgs.filter((arg) => arg !== '-t');
-    return runDockerWithStandardIO(argsWithoutTty, params, context, timeoutSeconds);
+    return runDockerWithStandardIO(argsWithoutTty, params, context, timeoutSeconds, undefined, false, spawnEnv);
   }
 
   const dockerPath = await resolveDockerPath(context);
@@ -609,7 +646,7 @@ async function runDockerWithPty<I, O>(
         name: 'xterm-color',
         cols: 120,
         rows: 40,
-        env: process.env as Record<string, string>,
+        env: spawnEnv as Record<string, string>,
       });
     } catch (error) {
       const diag = {
@@ -638,7 +675,17 @@ async function runDockerWithPty<I, O>(
       if (!argsForStandardIO.includes('-i')) {
         argsForStandardIO.splice(2, 0, '-i');
       }
-      resolve(runDockerWithStandardIO(argsForStandardIO, params, context, timeoutSeconds));
+      resolve(
+        runDockerWithStandardIO(
+          argsForStandardIO,
+          params,
+          context,
+          timeoutSeconds,
+          undefined,
+          false,
+          spawnEnv,
+        ),
+      );
       return;
     }
 

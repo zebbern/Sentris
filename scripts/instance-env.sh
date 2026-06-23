@@ -35,6 +35,10 @@ validate_instance() {
   [ "$instance" -ge 0 ] && [ "$instance" -le 9 ] || fail "Instance must be 0-9. Got: $instance"
 }
 
+resolve_default_instance() {
+  (cd "$ROOT_DIR" && ./scripts/active-instance.sh get)
+}
+
 instance_dir() {
   echo "$INSTANCES_DIR/instance-$1"
 }
@@ -151,7 +155,7 @@ parse_init_args() {
   done
 
   if [ -z "$instance" ]; then
-    instance="0"
+    instance="$(resolve_default_instance)"
   fi
 
   printf '%s %s\n' "$instance" "$force"
@@ -202,8 +206,11 @@ cmd_init() {
 }
 
 cmd_update() {
-  local instance="${1:-0}"
+  local instance="${1:-}"
   [ "$#" -le 1 ] || fail "Usage: ./scripts/instance-env.sh update [N]"
+  if [ -z "$instance" ]; then
+    instance="$(resolve_default_instance)"
+  fi
   validate_instance "$instance"
 
   local dir
@@ -269,8 +276,11 @@ cmd_copy() {
 }
 
 cmd_show() {
-  local instance="${1:-0}"
+  local instance="${1:-}"
   [ "$#" -le 1 ] || fail "Usage: ./scripts/instance-env.sh show [N]"
+  if [ -z "$instance" ]; then
+    instance="$(resolve_default_instance)"
+  fi
   validate_instance "$instance"
 
   local dir
@@ -298,7 +308,7 @@ Commands:
   show [N]                   Show file presence and effective instance values
 
 Notes:
-  - Instance defaults to 0.
+  - Missing N defaults to SENTRIS_INSTANCE, then .sentris-instance, then 0.
   - Source templates are app/.env (preferred) or app/.env.example.
 USAGE
 }

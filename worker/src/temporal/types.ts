@@ -56,6 +56,21 @@ export interface WorkflowFailureMetadata {
   };
 }
 
+export interface LoopBodyDefinition {
+  forEachRef: string;
+  bodyEntryRef: string;
+  exitRefs: string[];
+  iterationCapture: {
+    sourceRef: string;
+    sourceHandle: string;
+  };
+  itemBinding?: {
+    targetRef: string;
+    targetHandle: string;
+  };
+  definition: WorkflowDefinition;
+}
+
 export interface WorkflowDefinition {
   version: number;
   title: string;
@@ -65,6 +80,7 @@ export interface WorkflowDefinition {
   edges: WorkflowEdge[];
   dependencyCounts: Record<string, number>;
   actions: WorkflowAction[];
+  loopBodies?: Record<string, LoopBodyDefinition>;
   config: {
     environment: string;
     timeoutSeconds: number;

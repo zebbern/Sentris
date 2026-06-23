@@ -84,6 +84,43 @@ describe('LLMProviderSchema', () => {
       expect(schema.parse(input)).toMatchObject(input);
     });
 
+    it('accepts subscription oauth auth fields', () => {
+      const input = {
+        provider: 'anthropic' as const,
+        modelId: 'claude-sonnet-4-6',
+        authMode: 'subscription_oauth' as const,
+        oauthTokenSecretId: 'secret-uuid',
+      };
+      const result = schema.parse(input);
+      expect(result.provider).toBe('anthropic');
+      if (result.provider === 'anthropic') {
+        expect(result.authMode).toBe('subscription_oauth');
+        expect(result.oauthTokenSecretId).toBe('secret-uuid');
+      }
+    });
+
+    it('accepts effort', () => {
+      const input = {
+        provider: 'anthropic' as const,
+        modelId: 'claude-sonnet-4-6',
+        effort: 'max' as const,
+      };
+      const result = schema.parse(input);
+      if (result.provider === 'anthropic') {
+        expect(result.effort).toBe('max');
+      }
+    });
+
+    it('rejects invalid effort', () => {
+      expect(() =>
+        schema.parse({
+          provider: 'anthropic',
+          modelId: 'claude-sonnet-4-6',
+          effort: 'ultra',
+        }),
+      ).toThrow();
+    });
+
     it('does not accept headers field', () => {
       const input = {
         provider: 'anthropic',

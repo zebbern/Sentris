@@ -86,6 +86,98 @@ export async function resolveSecretInputOverrides(
   }
 }
 
+const AGENT_MODEL_COMPONENT_IDS = new Set(['core.ai.opencode', 'core.ai.claude-code']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Resolve `apiKeySecretId` / `oauthTokenSecretId` on inline LLM provider model overrides for agent nodes.
+ */
+export async function resolveLlmProviderModelOverrides(
+  inputs: Record<string, unknown>,
+  options: {
+    secrets: ISecretsService | undefined;
+    componentId: string;
+  },
+): Promise<void> {
+  const { secrets, componentId } = options;
+  if (!secrets || !AGENT_MODEL_COMPONENT_IDS.has(componentId)) {
+    return;
+  }
+
+  const model = inputs.model;
+  if (!isRecord(model)) {
+    return;
+  }
+
+  const authMode = model.authMode === 'subscription_oauth' ? 'subscription_oauth' : 'api_key';
+
+  if (authMode === 'subscription_oauth') {
+    const oauthSecretId = model.oauthTokenSecretId;
+    if (typeof oauthSecretId !== 'string' || oauthSecretId.trim().length === 0) {
+      return;
+    }
+
+    const existingOauthToken = model.oauthToken;
+    if (typeof existingOauthToken === 'string' && existingOauthToken.trim().length > 0) {
+      return;
+    }
+
+    try {
+      workflowDiagnosticLog(
+        '[Activity] Resolving LLM provider oauthTokenSecretId for model input...',
+      );
+      const resolved = await secrets.get(oauthSecretId.trim());
+      if (resolved?.value) {
+        inputs.model = {
+          ...model,
+          oauthToken: resolved.value,
+        };
+        workflowDiagnosticLog('[Activity] Successfully resolved LLM provider oauthTokenSecretId');
+      } else {
+        console.warn(
+          '[Activity] Secret reference not found in store for model.oauthTokenSecretId',
+        );
+      }
+    } catch (err: unknown) {
+      console.warn(
+        `[Activity] Error resolving model.oauthTokenSecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
+    }
+    return;
+  }
+
+  const secretId = model.apiKeySecretId;
+  if (typeof secretId !== 'string' || secretId.trim().length === 0) {
+    return;
+  }
+
+  const existingApiKey = model.apiKey;
+  if (typeof existingApiKey === 'string' && existingApiKey.trim().length > 0) {
+    return;
+  }
+
+  try {
+    workflowDiagnosticLog('[Activity] Resolving LLM provider apiKeySecretId for model input...');
+    const resolved = await secrets.get(secretId.trim());
+    if (resolved?.value) {
+      inputs.model = {
+        ...model,
+        apiKey: resolved.value,
+      };
+      workflowDiagnosticLog('[Activity] Successfully resolved LLM provider apiKeySecretId');
+    } else {
+      console.warn('[Activity] Secret reference not found in store for model.apiKeySecretId');
+    }
+  } catch (err: unknown) {
+    console.warn(
+      `[Activity] Error resolving model.apiKeySecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
+    );
+  }
+}
+
 /**
  * Resolve secret references in component parameters.
  *

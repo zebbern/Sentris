@@ -1,17 +1,29 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   createTemplateValidationFingerprint,
   createTemplateLiveAuditInputs,
+  analyzeTemplateAuditRecommendation,
+  getTemplateComponentValidationFingerprints,
+  getTemplateComponentValidationVerifiedAt,
+  getTemplateAuditRequestRetryDelays,
+  getTemplateAuditRuntimeRestartDecision,
+  getTemplateAuditRuntimeStabilityDecision,
   getLiveRunAuditFailures,
-  getNodeIoWarningSignals,
   getTemplateCatalogQualityFailures,
   getTemplateCoverageComponentIds,
+  getTemplateOutputHandleCoverageFailures,
+  getTemplateSeedCatalogCoverageFailures,
   renderTemplateCatalogQualityCheck,
   renderTemplateValidationLedgerFreshness,
   renderTemplateAuditMarkdown,
   parseTemplateAuditCliOptions,
+  pruneTemplateValidationLedger,
+  resolveTemplateAuditApiBase,
+  retryTransientAuditRequest,
   resolveTemplateAuditManagedSecretMappings,
   resolveTemplateAuditSecretMappings,
   shouldSkipTemplateValidation,
@@ -19,6 +31,7 @@ import {
   summarizeNodeIoNode,
   upsertTemplateValidationLedger,
   waitForNodeIoEvidence,
+  type TemplateAuditRuntimeSnapshot,
   type TemplateAuditMarkdownResult,
   type TemplateValidationLedger,
   type TemplateValidationFreshnessInput,
@@ -27,6 +40,13 @@ import {
   readSecurityComponentLedger,
   summarizeSecurityComponentLedgerFreshness,
 } from './security-component-audit-utils';
+import { readActiveInstance } from './lib/local-script-runtime';
+
+const require = createRequire(import.meta.url);
+const { createPm2AppNames, resolvePm2Command } = require('./lib/dev-instance-runtime.js') as {
+  createPm2AppNames: (instance: string | number) => string[];
+  resolvePm2Command: () => { command: string; argsPrefix: string[]; displayName: string };
+};
 
 type JsonObject = Record<string, unknown>;
 
@@ -150,17 +170,12 @@ interface AuditResult {
 }
 
 const CLI_OPTIONS = parseTemplateAuditCliOptions(process.argv.slice(2));
-const DEFAULT_INSTANCE = Number.parseInt(
-  process.env.SENTRIS_INSTANCE ?? process.env.E2E_INSTANCE ?? '0',
-  10,
-);
-const API_BASE =
-  process.env.SENTRIS_API_BASE_URL ??
-  process.env.API_BASE ??
-  `http://127.0.0.1:${3211 + (Number.isFinite(DEFAULT_INSTANCE) ? DEFAULT_INSTANCE : 0) * 100}/api/v1`;
+const API_BASE_RESOLUTION = resolveTemplateAuditApiBase();
+const API_BASE = API_BASE_RESOLUTION.apiBase;
 const INTERNAL_TOKEN = process.env.SENTRIS_INTERNAL_TOKEN ?? 'local-internal-token';
 const ORG_ID = CLI_OPTIONS.organizationId ?? 'local-dev';
-const RUN_TIMEOUT_MS = Number.parseInt(process.env.TEMPLATE_AUDIT_TIMEOUT_MS ?? '420000', 10);
+// Nuclei-heavy templates (KEV, Web Logic) can run ~8–10 min including zip bootstrap + 600s docker cap.
+const RUN_TIMEOUT_MS = Number.parseInt(process.env.TEMPLATE_AUDIT_TIMEOUT_MS ?? '900000', 10);
 const NODE_IO_CAPTURE_TIMEOUT_MS = Number.parseInt(
   process.env.TEMPLATE_AUDIT_NODE_IO_TIMEOUT_MS ?? '30000',
   10,
@@ -169,7 +184,6 @@ const NODE_IO_CAPTURE_POLL_MS = Number.parseInt(
   process.env.TEMPLATE_AUDIT_NODE_IO_POLL_MS ?? '1000',
   10,
 );
-const API_FETCH_RETRY_DELAYS_MS = [250, 1000, 3000];
 const KEEP_WORKFLOWS = process.env.KEEP_AUDIT_WORKFLOWS === 'true';
 const FORCE_AUDIT = CLI_OPTIONS.force;
 const LEDGER_CHECK_ONLY = CLI_OPTIONS.ledgerCheckOnly;
@@ -182,6 +196,29 @@ const LEDGER_PATH =
 const AUDIT_TEMPLATE_NAMES = CLI_OPTIONS.templateNames;
 const DISABLE_MANAGED_SECRET_LOOKUP =
   process.env.TEMPLATE_AUDIT_DISABLE_MANAGED_SECRET_LOOKUP === 'true';
+const REQUIRED_TEMPLATE_OUTPUT_HANDLES = [
+  {
+    componentId: 'sentris.repository.files.extract',
+    outputHandle: 'githubActionsBundle',
+    reason: 'GitHub Actions supply-chain templates need the workflow YAML bundle.',
+  },
+];
+const AUDIT_ACTIVE_INSTANCE = readActiveInstance();
+const AUDIT_INSTANCE = AUDIT_ACTIVE_INSTANCE.instance;
+const DISABLE_RUNTIME_RESTART_DETECTION =
+  process.env.TEMPLATE_AUDIT_DISABLE_RUNTIME_RESTART_DETECTION === 'true';
+const RUNTIME_RESTART_RETRY_LIMIT = Number.parseInt(
+  process.env.TEMPLATE_AUDIT_RUNTIME_RESTART_RETRIES ?? '2',
+  10,
+);
+const RUNTIME_STABILITY_ATTEMPTS = Number.parseInt(
+  process.env.TEMPLATE_AUDIT_RUNTIME_STABILITY_ATTEMPTS ?? '4',
+  10,
+);
+const RUNTIME_STABILITY_SETTLE_MS = Number.parseInt(
+  process.env.TEMPLATE_AUDIT_RUNTIME_STABILITY_MS ?? '2500',
+  10,
+);
 
 const HEADERS = {
   'Content-Type': 'application/json',
@@ -249,10 +286,10 @@ function sanitizeFileName(value: string): string {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  let lastError: unknown;
+  const method = String(init?.method ?? 'GET').toUpperCase();
 
-  for (let attempt = 0; attempt <= API_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
-    try {
+  return retryTransientAuditRequest(
+    async () => {
       const response = await fetch(`${API_BASE}${path}`, {
         ...init,
         headers: {
@@ -273,28 +310,150 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
       if (!response.ok) {
         const message = typeof body === 'string' ? body : JSON.stringify(body);
-        const error = new Error(`${response.status} ${response.statusText}: ${message}`);
-        if (
-          ![429, 502, 503, 504].includes(response.status) ||
-          attempt >= API_FETCH_RETRY_DELAYS_MS.length
-        ) {
-          throw error;
-        }
-        lastError = error;
-      } else {
-        return body as T;
+        throw Object.assign(new Error(`${response.status} ${response.statusText}: ${message}`), {
+          status: response.status,
+          statusText: response.statusText,
+          retryAfter: response.headers.get('retry-after') ?? undefined,
+        });
       }
-    } catch (error) {
-      lastError = error;
-      if (attempt >= API_FETCH_RETRY_DELAYS_MS.length) {
-        throw error;
-      }
-    }
 
-    await Bun.sleep(API_FETCH_RETRY_DELAYS_MS[attempt]);
+      return body as T;
+    },
+    {
+      delaysMs: getTemplateAuditRequestRetryDelays({ method, path }),
+      sleep: (ms) => Bun.sleep(ms),
+    },
+  );
+}
+
+function parseOptionalNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function captureAuditRuntimeSnapshot(): TemplateAuditRuntimeSnapshot | null {
+  if (DISABLE_RUNTIME_RESTART_DETECTION) {
+    return null;
   }
 
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  const expectedAppNames = createPm2AppNames(AUDIT_INSTANCE).filter(
+    (name) => name.includes('-backend-') || name.includes('-worker-'),
+  );
+  const pm2Command = resolvePm2Command();
+
+  try {
+    const result = spawnSync(pm2Command.command, [...pm2Command.argsPrefix, 'jlist'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+
+    if (result.status !== 0) {
+      return {
+        available: false,
+        processes: [],
+        unavailableReason: (result.stderr || result.stdout || 'pm2 jlist failed').trim(),
+      };
+    }
+
+    const rawApps = JSON.parse(result.stdout || '[]') as Array<{
+      name?: unknown;
+      pid?: unknown;
+      pm2_env?: {
+        restart_time?: unknown;
+        status?: unknown;
+      };
+    }>;
+    const appsByName = new Map(
+      rawApps
+        .filter((app) => typeof app.name === 'string')
+        .map((app) => [String(app.name), app]),
+    );
+
+    return {
+      available: true,
+      processes: expectedAppNames.map((name) => {
+        const app = appsByName.get(name);
+        if (!app) {
+          return { name, pid: null, restartCount: null, status: 'missing' };
+        }
+
+        return {
+          name,
+          pid: parseOptionalNumber(app.pid),
+          restartCount: parseOptionalNumber(app.pm2_env?.restart_time),
+          status: parseOptionalString(app.pm2_env?.status),
+        };
+      }),
+    };
+  } catch (error) {
+    return {
+      available: false,
+      processes: [],
+      unavailableReason: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function waitForUrlHealth(url: string): Promise<void> {
+  await retryTransientAuditRequest(
+    async () => {
+      const response = await fetch(url, { signal: AbortSignal.timeout(2500) });
+      if (!response.ok) {
+        throw Object.assign(new Error(`${response.status} ${response.statusText}`), {
+          status: response.status,
+          statusText: response.statusText,
+          retryAfter: response.headers.get('retry-after') ?? undefined,
+        });
+      }
+    },
+    {
+      delaysMs: getTemplateAuditRequestRetryDelays({ method: 'GET', path: '/health' }),
+      sleep: (ms) => Bun.sleep(ms),
+    },
+  );
+}
+
+async function waitForAuditRuntimeHealth(): Promise<void> {
+  await apiFetch('/health');
+  await apiFetch('/health/ready');
+
+  const workerHealthPort = 9100 + Number(AUDIT_INSTANCE) * 100;
+  await waitForUrlHealth(`http://127.0.0.1:${workerHealthPort}/health`);
+}
+
+async function waitForAuditRuntimeStability(label: string): Promise<void> {
+  if (DISABLE_RUNTIME_RESTART_DETECTION) {
+    return;
+  }
+
+  const attempts = Math.max(1, RUNTIME_STABILITY_ATTEMPTS);
+  let lastRationale = 'runtime stability could not be confirmed';
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await waitForAuditRuntimeHealth();
+    const before = captureAuditRuntimeSnapshot();
+    await Bun.sleep(Math.max(0, RUNTIME_STABILITY_SETTLE_MS));
+    await waitForAuditRuntimeHealth();
+    const after = captureAuditRuntimeSnapshot();
+    const decision = getTemplateAuditRuntimeStabilityDecision({ before, after });
+
+    if (decision.stable) {
+      return;
+    }
+
+    lastRationale = decision.rationale ?? lastRationale;
+    console.warn(
+      `  Waiting for stable backend/worker before auditing ${label}: ${lastRationale} (${attempt}/${attempts})`,
+    );
+  }
+
+  throw new Error(
+    `Local audit runtime did not stay stable before auditing ${label}: ${lastRationale}`,
+  );
 }
 
 function readSeedTemplates(): Map<string, { file: string; template: SeedTemplate }> {
@@ -319,40 +478,29 @@ function getComponents(template: SeedTemplate | ApiTemplate): string[] {
   return Array.from(new Set(nodes.map((node) => node.type).filter(Boolean) as string[])).sort();
 }
 
+function getOutputHandleUsages(template: SeedTemplate | ApiTemplate): string[] {
+  const graph = template.graph;
+  const nodesById = new Map((graph?.nodes ?? []).map((node) => [node.id, node.type]));
+  const usages = new Set<string>();
+
+  for (const rawEdge of graph?.edges ?? []) {
+    if (!rawEdge || typeof rawEdge !== 'object') continue;
+    const edge = rawEdge as { source?: unknown; sourceHandle?: unknown };
+    if (typeof edge.source !== 'string' || typeof edge.sourceHandle !== 'string') continue;
+
+    const sourceType = nodesById.get(edge.source);
+    if (typeof sourceType === 'string' && sourceType.trim().length > 0) {
+      usages.add(`${sourceType}:${edge.sourceHandle}`);
+    }
+  }
+
+  return Array.from(usages).sort();
+}
+
 function getRuntimeInputs(template: SeedTemplate | ApiTemplate): RuntimeInput[] {
   const entry = template.graph?.nodes?.find((node) => node.type === 'core.workflow.entrypoint');
   const raw = entry?.data?.config?.params?.runtimeInputs;
   return Array.isArray(raw) ? (raw as RuntimeInput[]) : [];
-}
-
-function hasScannerRuntimeTarget(runtimeInputs: RuntimeInput[]): boolean {
-  const targetTerms = [
-    'code',
-    'cpe',
-    'domain',
-    'domains',
-    'iac',
-    'image',
-    'package',
-    'repo',
-    'repository',
-    'repositoryurl',
-    'target',
-    'url',
-    'urls',
-    'website',
-    'wordlist',
-  ];
-
-  return runtimeInputs.some((input) => {
-    const haystack = [input.id, input.label, input.description]
-      .filter((value): value is string => typeof value === 'string')
-      .join(' ')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '');
-
-    return targetTerms.some((term) => haystack.includes(term));
-  });
 }
 
 function getEntryRuntimeInputState(
@@ -409,7 +557,13 @@ function createValidationFingerprint(
   template: ApiTemplate,
   seed: SeedTemplate | undefined,
   classification: AuditResult['classification'],
+  options: { includeComponentValidationFingerprints?: boolean } = {},
 ): string {
+  const source = seed ?? template;
+  const securityComponentLedger = readSecurityComponentLedger();
+  const includeComponentValidationFingerprints =
+    options.includeComponentValidationFingerprints ?? true;
+
   return createTemplateValidationFingerprint({
     apiTemplate: {
       name: template.name,
@@ -420,7 +574,22 @@ function createValidationFingerprint(
     seedTemplate: seed ?? null,
     liveInputs: LIVE_INPUTS[template.name] ?? {},
     classification,
+    ...(includeComponentValidationFingerprints
+      ? {
+          componentValidationFingerprints: getTemplateComponentValidationFingerprints(
+            source,
+            securityComponentLedger,
+          ),
+        }
+      : {}),
   });
+}
+
+function createValidationComponentVerifiedAt(
+  template: ApiTemplate,
+  seed: SeedTemplate | undefined,
+): Record<string, string> {
+  return getTemplateComponentValidationVerifiedAt(seed ?? template, readSecurityComponentLedger());
 }
 
 function createValidationFreshnessInput(
@@ -428,10 +597,15 @@ function createValidationFreshnessInput(
   seedRecord: { file: string; template: SeedTemplate } | undefined,
 ): TemplateValidationFreshnessInput {
   const classification = classifyTemplate(template, seedRecord?.template);
+  const seed = seedRecord?.template;
   return {
     templateName: template.name,
     seedFile: seedRecord?.file ?? null,
-    fingerprint: createValidationFingerprint(template, seedRecord?.template, classification),
+    fingerprint: createValidationFingerprint(template, seed, classification),
+    legacyFingerprint: createValidationFingerprint(template, seed, classification, {
+      includeComponentValidationFingerprints: false,
+    }),
+    componentValidationVerifiedAt: createValidationComponentVerifiedAt(template, seed),
     classification,
   };
 }
@@ -447,6 +621,7 @@ function createCatalogQualityInput(
     seedFile: seedRecord?.file ?? null,
     category: template.category ?? source.manifest?.category ?? source._metadata?.category ?? null,
     components: getComponents(source),
+    outputHandles: getOutputHandleUsages(source),
     requiredSecrets: getRequiredSecretNames(source),
     runtimeInputs: getRuntimeInputs(source),
     classification: classifyTemplate(template, seedRecord?.template),
@@ -468,77 +643,16 @@ function analyzeRecommendation(
   const requiredSecrets = getRequiredSecretNames(source);
   const components = getComponents(source);
   const unmappedSlack = hasUnmappedSlackNode(source);
-  const nodeWarningSignals = getNodeIoWarningSignals(result.nodeIo ?? []);
 
-  if (result.terminalStatus === 'COMPLETED' && (result.artifactsCount ?? 0) > 0) {
-    if (nodeWarningSignals.length > 0) {
-      return {
-        recommendation: 'review',
-        rationale: `Live execution completed with artifact but emitted warnings: ${nodeWarningSignals
-          .slice(0, 3)
-          .join('; ')
-          .slice(0, 240)}`,
-      };
-    }
-
-    return {
-      recommendation: 'keep',
-      rationale: 'Live execution completed and produced at least one artifact.',
-    };
-  }
-
-  if (runtimeState === 'missing') {
-    return {
-      recommendation: 'delete',
-      rationale:
-        'Entry point has no runtimeInputs configuration, so a user-created workflow cannot compile/run from the template.',
-    };
-  }
-
-  if (unmappedSlack) {
-    return {
-      recommendation: 'fix',
-      rationale:
-        'Template has a Slack node with no connected/mapped Slack token or webhook input; remove optional notification or add real secret plumbing.',
-    };
-  }
-
-  if (requiredSecrets.length > 0) {
-    const missingSecrets = resolveAuditSecretMappings(requiredSecrets).missingSecretNames;
-    return {
-      recommendation: 'review',
-      rationale:
-        missingSecrets.length > 0
-          ? `Credential-gated template requires explicit audit secret mappings for: ${missingSecrets.join(', ')}.`
-          : `Credential-gated template requires: ${requiredSecrets.join(', ')}.`,
-    };
-  }
-
-  if (
-    !hasScannerRuntimeTarget(runtimeInputs) &&
-    (components.includes('sentris.trivy.run') ||
-      components.includes('sentris.semgrep.run') ||
-      components.includes('sentris.ffuf.run') ||
-      components.includes('sentris.checkov.run'))
-  ) {
-    return {
-      recommendation: 'fix',
-      rationale:
-        'Scanner template needs user-facing runtime inputs for target code, repo, image, URL, wordlist, or IaC content.',
-    };
-  }
-
-  if (result.runStartError) {
-    return {
-      recommendation: 'fix',
-      rationale: result.runStartError.split('\n')[0].slice(0, 240),
-    };
-  }
-
-  return {
-    recommendation: 'review',
-    rationale: 'No terminal live result; review trace and template shape before retaining.',
-  };
+  return analyzeTemplateAuditRecommendation({
+    result,
+    runtimeInputState: runtimeState,
+    runtimeInputs,
+    requiredSecrets,
+    missingSecretNames: resolveAuditSecretMappings(requiredSecrets).missingSecretNames,
+    components,
+    hasUnmappedSlackNode: unmappedSlack,
+  });
 }
 
 async function maybeUseExistingHttpsFixture(): Promise<void> {
@@ -669,6 +783,10 @@ async function auditTemplate(
   const secretResolution = resolveAuditSecretMappings(requiredSecrets);
   const runtimeInputs = getRuntimeInputs(source);
   const validationFingerprint = createValidationFingerprint(template, seed, classification);
+  const legacyValidationFingerprint = createValidationFingerprint(template, seed, classification, {
+    includeComponentValidationFingerprints: false,
+  });
+  const componentValidationVerifiedAt = createValidationComponentVerifiedAt(template, seed);
   const prefix = `${sanitizeFileName(template.name)}-${template.id.slice(0, 8)}`;
 
   const base: AuditResult = {
@@ -677,6 +795,7 @@ async function auditTemplate(
     seedFile: seedRecord?.file ?? null,
     category: template.category ?? seed?._metadata?.category ?? null,
     components,
+    outputHandles: getOutputHandleUsages(source),
     requiredSecrets,
     runtimeInputs,
     classification,
@@ -691,6 +810,8 @@ async function auditTemplate(
     templateName: template.name,
     classification,
     fingerprint: validationFingerprint,
+    legacyFingerprint: legacyValidationFingerprint,
+    componentValidationVerifiedAt,
     force: FORCE_AUDIT,
   });
   if (cachedSkip) {
@@ -702,6 +823,8 @@ async function auditTemplate(
       rationale: cachedSkip.rationale,
     };
   }
+
+  await waitForAuditRuntimeStability(template.name);
 
   let workflowId: string | undefined;
 
@@ -781,6 +904,8 @@ async function auditTemplate(
       templateName: result.templateName,
       seedFile: result.seedFile,
       fingerprint: validationFingerprint,
+      liveInputs: inputs,
+      classification,
       terminalStatus: result.terminalStatus,
       recommendation: result.recommendation,
       rationale: result.rationale,
@@ -789,6 +914,37 @@ async function auditTemplate(
     });
   }
   return result;
+}
+
+async function auditTemplateWithRuntimeRestartRetries(
+  template: ApiTemplate,
+  seedRecord: { file: string; template: SeedTemplate } | undefined,
+  ledger: TemplateValidationLedger | undefined,
+): Promise<AuditResult> {
+  const maxRetries = Math.max(0, RUNTIME_RESTART_RETRY_LIMIT);
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const beforeRuntime = captureAuditRuntimeSnapshot();
+    const result = await auditTemplate(template, seedRecord, ledger);
+    const afterRuntime = captureAuditRuntimeSnapshot();
+    const restartDecision = getTemplateAuditRuntimeRestartDecision({
+      result,
+      before: beforeRuntime,
+      after: afterRuntime,
+    });
+
+    if (!restartDecision.retryable || attempt >= maxRetries) {
+      return result;
+    }
+
+    console.warn(
+      `  Runtime restart detected while auditing ${template.name}: ${restartDecision.rationale}`,
+    );
+    console.warn(`  Retrying ${template.name} after runtime health recovers (${attempt + 1}/${maxRetries}).`);
+    await waitForAuditRuntimeHealth();
+  }
+
+  throw new Error('unreachable audit retry state');
 }
 
 let validationLedger: TemplateValidationLedger | undefined;
@@ -819,7 +975,7 @@ async function readManagedAuditSecretNames(): Promise<string[]> {
 async function main() {
   await maybeUseExistingHttpsFixture();
 
-  console.log(`API base: ${API_BASE}`);
+  console.log(`API base: ${API_BASE} (${API_BASE_RESOLUTION.source})`);
 
   await apiFetch('/health');
   await apiFetch('/health/ready');
@@ -832,18 +988,46 @@ async function main() {
     AUDIT_TEMPLATE_NAMES.size > 0
       ? templates.filter((template) => AUDIT_TEMPLATE_NAMES.has(template.name))
       : templates;
+  if (AUDIT_TEMPLATE_NAMES.size === 0) {
+    validationLedger = pruneTemplateValidationLedger(
+      validationLedger,
+      templates.map((template) => template.name),
+    );
+  }
   const missingTemplateNames = Array.from(AUDIT_TEMPLATE_NAMES).filter(
     (name) => !selectedTemplates.some((template) => template.name === name),
   );
   if (missingTemplateNames.length > 0) {
     throw new Error(`Requested template(s) not found: ${missingTemplateNames.join(', ')}`);
   }
+  const seedCatalogCoverageFailures =
+    AUDIT_TEMPLATE_NAMES.size === 0
+      ? getTemplateSeedCatalogCoverageFailures({
+          apiTemplateNames: templates.map((template) => template.name),
+          seedTemplates: Array.from(seedTemplates.values()).map((seedRecord) => ({
+            name:
+              seedRecord.template._metadata?.name ??
+              seedRecord.template.manifest?.name ??
+              seedRecord.file,
+            file: seedRecord.file,
+          })),
+        })
+      : [];
+  if (seedCatalogCoverageFailures.length > 0 && !LEDGER_CHECK_ONLY) {
+    throw new Error(`Template catalog seed/API mismatch:\n- ${seedCatalogCoverageFailures.join('\n- ')}`);
+  }
 
   if (LEDGER_CHECK_ONLY) {
     const catalogQualityInputs = selectedTemplates
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((template) => createCatalogQualityInput(template, seedTemplates.get(template.name)));
-    const catalogQualityFailures = getTemplateCatalogQualityFailures(catalogQualityInputs);
+    const requiredOutputHandles =
+      AUDIT_TEMPLATE_NAMES.size === 0 ? REQUIRED_TEMPLATE_OUTPUT_HANDLES : [];
+    const catalogQualityFailures = [
+      ...getTemplateCatalogQualityFailures(catalogQualityInputs),
+      ...getTemplateOutputHandleCoverageFailures(catalogQualityInputs, requiredOutputHandles),
+      ...seedCatalogCoverageFailures,
+    ];
     const componentCoverageIds = getTemplateCoverageComponentIds(readCurrentSecurityComponentIds());
     const summary = summarizeTemplateValidationLedgerFreshness(
       validationLedger,
@@ -854,7 +1038,13 @@ async function main() {
         ),
     );
     console.log(renderTemplateValidationLedgerFreshness(summary));
-    console.log(renderTemplateCatalogQualityCheck(catalogQualityInputs, { componentCoverageIds }));
+    console.log(
+      renderTemplateCatalogQualityCheck(catalogQualityInputs, {
+        componentCoverageIds,
+        requiredOutputHandles,
+        seedCatalogCoverageFailures,
+      }),
+    );
     if (catalogQualityFailures.length > 0) {
       console.error(`Template catalog quality failed:\n- ${catalogQualityFailures.join('\n- ')}`);
     }
@@ -872,7 +1062,11 @@ async function main() {
   for (const template of selectedTemplates.sort((a, b) => a.name.localeCompare(b.name))) {
     console.log(`\nAuditing: ${template.name}`);
     const seedRecord = seedTemplates.get(template.name);
-    const result = await auditTemplate(template, seedRecord, validationLedger);
+    const result = await auditTemplateWithRuntimeRestartRetries(
+      template,
+      seedRecord,
+      validationLedger,
+    );
     results.push(result);
     console.log(
       `  ${result.recommendation.toUpperCase()} ${result.terminalStatus ?? result.runStartError ?? result.createError ?? 'created'}`,
@@ -913,7 +1107,12 @@ async function main() {
     );
   }
 
-  const catalogQualityFailures = getTemplateCatalogQualityFailures(results);
+  const requiredOutputHandles =
+    AUDIT_TEMPLATE_NAMES.size === 0 ? REQUIRED_TEMPLATE_OUTPUT_HANDLES : [];
+  const catalogQualityFailures = [
+    ...getTemplateCatalogQualityFailures(results),
+    ...getTemplateOutputHandleCoverageFailures(results, requiredOutputHandles),
+  ];
   if (catalogQualityFailures.length > 0) {
     process.exitCode = 1;
     console.error(`Template catalog quality failed:\n- ${catalogQualityFailures.join('\n- ')}`);

@@ -24,6 +24,7 @@ import {
 import type { InputPort } from '@/schemas/component';
 import type { FrontendNodeData, InputMapping } from '@/schemas/node';
 import type { Edge, Node as RFNode } from '@xyflow/react';
+import { supportsInlineAgentModelConfig } from './AgentModelConfig';
 
 export interface ConfigPanelInputsProps {
   componentInputs: InputPort[];
@@ -50,19 +51,25 @@ export function ConfigPanelInputs({
   getNodes,
   onInputOverrideChange,
 }: ConfigPanelInputsProps) {
-  // Hide for Entry Point if only __runtimeData exists
-  if (
-    componentInputs.length === 0 ||
-    (isEntryPointComponent && componentInputs.every((i) => i.id === '__runtimeData'))
-  ) {
+  const visibleInputs = componentInputs.filter((input) => {
+    if (isEntryPointComponent && input.id === '__runtimeData') {
+      return false;
+    }
+    if (supportsInlineAgentModelConfig(componentId) && input.id === 'model') {
+      return false;
+    }
+    if (isToolMode && !isCredentialInput(input)) {
+      return false;
+    }
+    return true;
+  });
+
+  // Hide when no visible inputs remain (e.g. model-only agent nodes use AgentModelConfig)
+  if (visibleInputs.length === 0) {
     return null;
   }
 
-  const inputCount = isToolMode
-    ? componentInputs.filter(isCredentialInput).length
-    : isEntryPointComponent
-      ? componentInputs.filter((i) => i.id !== '__runtimeData').length
-      : componentInputs.length;
+  const inputCount = visibleInputs.length;
 
   return (
     <CollapsibleSection title="Inputs" count={inputCount} defaultOpen={true}>
@@ -70,6 +77,10 @@ export function ConfigPanelInputs({
         {componentInputs.map((input, index) => {
           // Skip __runtimeData input for Entry Point
           if (isEntryPointComponent && input.id === '__runtimeData') {
+            return null;
+          }
+
+          if (supportsInlineAgentModelConfig(componentId) && input.id === 'model') {
             return null;
           }
 

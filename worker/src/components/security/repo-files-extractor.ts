@@ -124,6 +124,7 @@ const summarySchema = z.object({
   selectedFiles: z.number(),
   skippedFiles: z.number(),
   sourceFiles: z.number(),
+  githubActionsFiles: z.number(),
   terraformFiles: z.number(),
   kubernetesFiles: z.number(),
   dockerfileFiles: z.number(),
@@ -141,6 +142,11 @@ const outputSchema = outputs({
   sourceBundle: port(z.string(), {
     label: 'Source Bundle',
     description: 'Bounded source-code bundle suitable for Semgrep content scans.',
+    connectionType: { kind: 'primitive', name: 'text' },
+  }),
+  githubActionsBundle: port(z.string(), {
+    label: 'GitHub Actions Bundle',
+    description: 'Bounded GitHub Actions workflow YAML bundle for CI/CD supply-chain review.',
     connectionType: { kind: 'primitive', name: 'text' },
   }),
   terraformBundle: port(z.string(), {
@@ -317,6 +323,18 @@ function isLikelyCloudFormationJsonPath(lowerPath: string, lowerName: string): b
   );
 }
 
+function isGitHubActionsWorkflowPath(path: string): boolean {
+  const segments = pathSegments(path);
+  if (segments.length !== 3) return false;
+  const [root, directory, fileName] = segments;
+  const lowerName = fileName.toLowerCase();
+  return (
+    root === '.github' &&
+    directory === 'workflows' &&
+    (lowerName.endsWith('.yml') || lowerName.endsWith('.yaml'))
+  );
+}
+
 function classifyByPath(path: string): { category: string; language?: string } | null {
   const segments = pathSegments(path);
   const name = segments[segments.length - 1] ?? path;
@@ -324,6 +342,9 @@ function classifyByPath(path: string): { category: string; language?: string } |
   const lowerPath = path.toLowerCase();
   const extension = extensionFor(path);
 
+  if (isGitHubActionsWorkflowPath(path)) {
+    return { category: 'github-actions', language: 'yaml' };
+  }
   if (lowerName === 'dockerfile' || lowerName.endsWith('.dockerfile')) {
     return { category: 'dockerfile' };
   }
@@ -345,6 +366,7 @@ function classifyByPath(path: string): { category: string; language?: string } |
 }
 
 function refineCategory(candidate: Candidate, content: string): Candidate {
+  if (candidate.category === 'github-actions') return candidate;
   if (candidate.category === 'json') {
     try {
       const parsed = JSON.parse(content) as unknown;
@@ -488,6 +510,7 @@ const definition = defineComponent({
     }
 
     let sourceBundle = '';
+    let githubActionsBundle = '';
     let terraformBundle = '';
     let kubernetesBundle = '';
     let dockerfileBundle = '';
@@ -502,6 +525,9 @@ const definition = defineComponent({
 
         if (refined.category === 'source') {
           sourceBundle = appendBundle(sourceBundle, refined.path, content);
+        } else if (refined.category === 'github-actions') {
+          sourceBundle = appendBundle(sourceBundle, refined.path, content);
+          githubActionsBundle = appendBundle(githubActionsBundle, refined.path, content);
         } else if (refined.category === 'terraform') {
           terraformBundle = appendBundle(terraformBundle, refined.path, content);
         } else if (refined.category === 'kubernetes') {
@@ -526,6 +552,7 @@ const definition = defineComponent({
     return {
       ref: repo.ref,
       sourceBundle,
+      githubActionsBundle,
       terraformBundle,
       kubernetesBundle,
       dockerfileBundle,
@@ -540,6 +567,7 @@ const definition = defineComponent({
         selectedFiles: files.length,
         skippedFiles: skippedFiles.length,
         sourceFiles: countByCategory('source'),
+        githubActionsFiles: countByCategory('github-actions'),
         terraformFiles: countByCategory('terraform'),
         kubernetesFiles: countByCategory('kubernetes'),
         dockerfileFiles: countByCategory('dockerfile'),

@@ -125,7 +125,19 @@ export class IsolatedContainerVolume {
    * @param filename - Filename to validate
    * @throws Error if filename is invalid
    */
+  private isAllowedAgentWorkspacePath(filename: string): boolean {
+    return (
+      filename === '.mcp.json' ||
+      filename.startsWith('.opencode/') ||
+      filename.startsWith('.claude/')
+    );
+  }
+
   private validateFilename(filename: string): void {
+    if (this.isAllowedAgentWorkspacePath(filename)) {
+      return;
+    }
+
     // Prevent path traversal
     if (filename.includes('..') || filename.startsWith('/')) {
       throw new ValidationError(`Invalid filename (path traversal): ${filename}`, {
@@ -246,6 +258,9 @@ export class IsolatedContainerVolume {
     // Escape single quotes in filename to prevent shell injection
     // Replace ' with '\'' (close quote, escaped quote, open quote)
     const safeFilename = filename.replace(/'/g, "'\\''");
+    const writeCommand = safeFilename.includes('/')
+      ? `mkdir -p "$(dirname '/data/${safeFilename}')" && cat > '/data/${safeFilename}'`
+      : `cat > '/data/${safeFilename}'`;
 
     return new Promise((resolve, reject) => {
       const proc = spawn('docker', [
@@ -258,7 +273,7 @@ export class IsolatedContainerVolume {
         'sh',
         'alpine:latest',
         '-c',
-        `cat > '/data/${safeFilename}'`, // Single quotes prevent shell injection
+        writeCommand,
       ]);
 
       let stderr = '';

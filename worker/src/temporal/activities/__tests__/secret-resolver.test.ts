@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'bun:test';
 import { z } from 'zod';
 import { withPortMeta } from '@sentris/component-sdk';
 import type { ComponentDefinition, ISecretsService } from '@sentris/component-sdk';
-import { resolveSecretInputOverrides, resolveSecretParams } from '../secret-resolver';
+import { resolveSecretInputOverrides, resolveSecretParams, resolveLlmProviderModelOverrides } from '../secret-resolver';
 
 interface PortSpec {
   id: string;
@@ -276,6 +276,116 @@ describe('resolveSecretInputOverrides', () => {
     );
 
     expect(inputs.token).toBe('ct-value');
+  });
+});
+
+describe('resolveLlmProviderModelOverrides', () => {
+  it('resolves apiKeySecretId on model input for agent components', async () => {
+    const secrets = createMockSecrets({ 'anthropic-key': 'sk-ant-test' });
+    const inputs: Record<string, unknown> = {
+      model: {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        apiKeySecretId: 'anthropic-key',
+      },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      componentId: 'core.ai.claude-code',
+    });
+
+    expect(inputs.model).toEqual({
+      provider: 'anthropic',
+      modelId: 'claude-sonnet-4-6',
+      apiKeySecretId: 'anthropic-key',
+      apiKey: 'sk-ant-test',
+    });
+    expect(secrets.get).toHaveBeenCalledWith('anthropic-key');
+  });
+
+  it('skips non-agent components', async () => {
+    const secrets = createMockSecrets({ key: 'value' });
+    const inputs: Record<string, unknown> = {
+      model: { provider: 'anthropic', modelId: 'x', apiKeySecretId: 'key' },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      componentId: 'core.transform.echo',
+    });
+
+    expect((inputs.model as Record<string, unknown>).apiKey).toBeUndefined();
+    expect(secrets.get).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite an existing inline apiKey', async () => {
+    const secrets = createMockSecrets({ key: 'from-store' });
+    const inputs: Record<string, unknown> = {
+      model: {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        apiKey: 'inline-key',
+        apiKeySecretId: 'key',
+      },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      componentId: 'core.ai.opencode',
+    });
+
+    expect((inputs.model as Record<string, unknown>).apiKey).toBe('inline-key');
+    expect(secrets.get).not.toHaveBeenCalled();
+  });
+
+  it('resolves oauthTokenSecretId for subscription auth mode', async () => {
+    const secrets = createMockSecrets({ 'claude-oauth': 'oauth-token-value' });
+    const inputs: Record<string, unknown> = {
+      model: {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        authMode: 'subscription_oauth',
+        oauthTokenSecretId: 'claude-oauth',
+      },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      componentId: 'core.ai.claude-code',
+    });
+
+    expect(inputs.model).toEqual({
+      provider: 'anthropic',
+      modelId: 'claude-sonnet-4-6',
+      authMode: 'subscription_oauth',
+      oauthTokenSecretId: 'claude-oauth',
+      oauthToken: 'oauth-token-value',
+    });
+    expect((inputs.model as Record<string, unknown>).apiKey).toBeUndefined();
+    expect(secrets.get).toHaveBeenCalledWith('claude-oauth');
+  });
+
+  it('does not resolve apiKeySecretId when subscription auth mode is active', async () => {
+    const secrets = createMockSecrets({ key: 'sk-ant-test' });
+    const inputs: Record<string, unknown> = {
+      model: {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        authMode: 'subscription_oauth',
+        apiKeySecretId: 'key',
+        oauthTokenSecretId: 'missing-oauth',
+      },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      componentId: 'core.ai.claude-code',
+    });
+
+    expect(secrets.get).toHaveBeenCalledWith('missing-oauth');
+    expect(secrets.get).not.toHaveBeenCalledWith('key');
+    expect((inputs.model as Record<string, unknown>).apiKey).toBeUndefined();
   });
 });
 

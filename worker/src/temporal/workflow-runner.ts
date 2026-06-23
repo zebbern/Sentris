@@ -29,6 +29,8 @@ import { buildActionPayload } from './input-resolver';
 import { isComponentFailure, extractFailureMessage } from './workflows/workflow-helpers';
 import type { ArtifactServiceFactory } from './artifact-factory';
 import { workflowDiagnosticLog } from './workflow-diagnostics';
+import { getForEachLoopBody } from './workflows/for-each-handler';
+import { resolveInputValue } from './input-resolver';
 
 export interface ExecuteWorkflowOptions {
   runId?: string;
@@ -41,6 +43,7 @@ export interface ExecuteWorkflowOptions {
   organizationId?: string | null;
   workflowId?: string;
   workflowVersionId?: string | null;
+  initialResults?: Map<string, unknown>;
 }
 
 /**
@@ -57,7 +60,7 @@ export async function executeWorkflow(
   workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Definition has ${definition.actions.length} actions`);
   workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Entrypoint ref: ${definition.entrypoint.ref}`);
 
-  const results = new Map<string, unknown>();
+  const results = new Map<string, unknown>(options.initialResults ?? []);
   const actionsByRef = new Map<string, (typeof definition.actions)[number]>(
     definition.actions.map((action) => [action.ref, action]),
   );
@@ -276,6 +279,98 @@ export async function executeWorkflow(
 
       const parsedInputs = component.inputs.parse(inputs);
       const parsedParams = component.parameters ? component.parameters.parse(params) : params;
+
+      if (action.componentId === 'core.workflow.for-each') {
+        const loopBody = getForEachLoopBody(definition, action.ref);
+        if (!loopBody) {
+          throw new WorkflowSchedulerError(
+            `For Each node '${action.ref}' is missing compiled loop body metadata.`,
+          );
+        }
+
+        const items = Array.isArray(parsedInputs.items) ? parsedInputs.items : [];
+        const maxIterations =
+          typeof (parsedParams as { maxIterations?: number }).maxIterations === 'number'
+            ? (parsedParams as { maxIterations: number }).maxIterations
+            : undefined;
+        const cappedItems =
+          typeof maxIterations === 'number' && maxIterations > 0
+            ? items.slice(0, maxIterations)
+            : items;
+
+        const iterationOutputs: unknown[] = [];
+        for (let index = 0; index < cappedItems.length; index += 1) {
+          const currentItem = cappedItems[index];
+          const iterationSeed = new Map<string, unknown>(results);
+          iterationSeed.set(action.ref, {
+            currentItem,
+            body: currentItem,
+            index,
+            total: cappedItems.length,
+          });
+
+          const iterationRun = await executeWorkflow(
+            loopBody.definition,
+            {},
+            {
+              ...options,
+              runId: `${runId}:${action.ref}:${index}`,
+              initialResults: iterationSeed,
+            },
+          );
+
+          if (!iterationRun.success) {
+            throw new WorkflowSchedulerError(
+              iterationRun.error ??
+                `For Each iteration ${index + 1}/${cappedItems.length} failed at node '${action.ref}'.`,
+            );
+          }
+
+          const captureSource = iterationRun.outputs?.[loopBody.iterationCapture.sourceRef];
+          const captured = resolveInputValue(
+            captureSource,
+            loopBody.iterationCapture.sourceHandle,
+          );
+          iterationOutputs.push(captured ?? captureSource ?? null);
+        }
+
+        const forEachOutput = {
+          currentItem: null,
+          body: null,
+          index: cappedItems.length,
+          total: cappedItems.length,
+          results: iterationOutputs,
+          iterations: cappedItems.length,
+        };
+        results.set(action.ref, forEachOutput);
+
+        await options.nodeIO?.recordCompletion({
+          runId,
+          nodeRef: action.ref,
+          componentId: action.componentId,
+          outputs: forEachOutput as Record<string, unknown>,
+          status: 'completed',
+        });
+
+        options.trace?.record({
+          type: 'NODE_COMPLETED',
+          runId,
+          nodeRef: action.ref,
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          context: {
+            runId,
+            componentRef: action.ref,
+            streamId,
+            joinStrategy,
+            triggeredBy,
+            failure,
+            iterations: cappedItems.length,
+          },
+        });
+
+        return { activePorts: ['results', 'iterations', 'done'] };
+      }
 
       // Create execution context with SDK interfaces
       const scopedArtifacts = options.artifacts

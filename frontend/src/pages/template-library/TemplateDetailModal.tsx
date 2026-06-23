@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +38,10 @@ export function TemplateDetailModal({
   const catStyle = getCategoryStyle(template.category);
   const CategoryIcon = catStyle.icon;
   const hasGraph = hasGraphNodes(template.graph);
+  const filteredTags = useMemo(() => {
+    const categoryLower = (template.category || '').toLowerCase();
+    return (template.tags || []).filter((t) => t.toLowerCase() !== categoryLower);
+  }, [template.category, template.tags]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -73,7 +78,7 @@ export function TemplateDetailModal({
         {/* Content */}
         <div className="px-6 pb-6 space-y-4">
           <DialogHeader>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
               <Badge
                 variant="outline"
                 className={cn(
@@ -85,7 +90,12 @@ export function TemplateDetailModal({
                 {template.category || 'Automation'}
               </Badge>
               {template.author && (
-                <span className="text-xs text-muted-foreground">by {template.author}</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-[10px] font-bold text-white flex-shrink-0">
+                    {template.author.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm text-muted-foreground">{template.author}</span>
+                </div>
               )}
             </div>
             <DialogTitle className="text-2xl font-semibold">
@@ -95,6 +105,22 @@ export function TemplateDetailModal({
               <DialogDescription className="text-sm mt-2">{template.description}</DialogDescription>
             )}
           </DialogHeader>
+
+          {filteredTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {filteredTags.map((tag) => (
+                <span
+                  key={tag}
+                  className={cn(
+                    'inline-flex items-center px-3 py-1 rounded-full text-xs',
+                    'bg-muted text-muted-foreground border border-border',
+                  )}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           <Button
             className={cn(

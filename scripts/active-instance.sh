@@ -23,28 +23,38 @@ is_digit() {
   [[ "$1" =~ ^[0-9]+$ ]]
 }
 
+validate_instance() {
+  local val="$1"
+  local source="${2:-instance}"
+
+  is_digit "$val" || die "$source must be an integer from 0 to 9. Got: $val"
+  if [ "$val" -lt 0 ] || [ "$val" -gt 9 ]; then
+    die "$source must be an integer from 0 to 9. Got: $val"
+  fi
+}
+
 case "$CMD" in
   get)
     if [ -n "${SENTRIS_INSTANCE:-}" ]; then
+      validate_instance "${SENTRIS_INSTANCE}" "SENTRIS_INSTANCE"
       echo "${SENTRIS_INSTANCE}"
       exit 0
     fi
     if [ -f "$FILE" ]; then
       val="$(tr -d '[:space:]' < "$FILE" || true)"
       if [ -n "$val" ]; then
+        validate_instance "$val" ".sentris-instance"
         echo "$val"
         exit 0
       fi
     fi
+    echo "0" > "$FILE"
     echo "0"
     ;;
   set)
     val="${2:-}"
     [ -n "$val" ] || die "Missing instance number. Example: ./scripts/active-instance.sh set 5"
-    is_digit "$val" || die "Instance must be a number (0-9). Got: $val"
-    if [ "$val" -lt 0 ] || [ "$val" -gt 9 ]; then
-      die "Instance must be 0-9. Got: $val"
-    fi
+    validate_instance "$val"
     echo "$val" > "$FILE"
     echo "✅ Active instance set to $val"
     ;;

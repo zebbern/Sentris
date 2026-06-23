@@ -1,17 +1,16 @@
 import { defineConfig } from 'drizzle-kit';
 import 'dotenv/config';
+import { getDrizzleDatabaseTarget } from '../scripts/lib/local-script-runtime';
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not set');
-}
+const databaseTarget = getDrizzleDatabaseTarget({
+  overrideEnvVar: 'DRIZZLE_DATABASE_URL',
+});
 
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/database/schema',
   out: './drizzle',
   dbCredentials: {
-    url: connectionString,
+    url: databaseTarget.connectionString,
   },
 });

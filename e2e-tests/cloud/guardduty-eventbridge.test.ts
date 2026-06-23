@@ -216,7 +216,7 @@ e2eDescribe('GuardDuty -> EventBridge -> Webhook -> Investigation E2E', () => {
       if (!requiredSecretsReady) {
         throw new Error(
           'Missing required ENV vars (ZAI_API_KEY, ABUSEIPDB_API_KEY, VIRUSTOTAL_API_KEY). ' +
-            'Copy e2e-tests/.env.e2e.example to .env.e2e and fill secrets.',
+            'Copy e2e-tests/.env.e2e.example to e2e-tests/.env.e2e and fill secrets.',
         );
       }
 

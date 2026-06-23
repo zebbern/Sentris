@@ -1,0 +1,299 @@
+{
+  "_metadata": {
+    "name": "Supply Chain Takeover Precursor Hunt",
+    "description": "Dependency-security workflow that checks npm package specs against OSV, fetches npm registry metadata, flags takeover precursors (malicious advisories, install scripts, typosquat signals), and writes CNA/GHSA-ready precursor briefs.",
+    "category": "dependency-security",
+    "tags": [
+      "dependency-security",
+      "cve-research",
+      "supply-chain",
+      "npm",
+      "osv",
+      "malicious-packages"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Supply Chain Takeover Precursor Hunt",
+    "description": "Find npm supply-chain takeover precursors using OSV advisories and npm registry metadata heuristics.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "dependency-security",
+    "tags": [
+      "dependency-security",
+      "cve-research",
+      "supply-chain",
+      "npm",
+      "osv",
+      "malicious-packages"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 13
+  },
+  "graph": {
+    "name": "Supply Chain Takeover Precursor Hunt",
+    "description": "npm OSV plus registry metadata precursor hunt for ecosystem CVE/GHSA reporting.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 260
+        },
+        "data": {
+          "label": "npm Package Specs Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "packageSpecs",
+                  "label": "npm package specs",
+                  "type": "array",
+                  "required": true,
+                  "description": "Package names with optional versions, for example lodash@4.17.20 or @scope/pkg@1.0.0."
+                },
+                {
+                  "id": "researchNotes",
+                  "label": "Research notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Optional program or triage context to include in the report."
+                },
+                {
+                  "id": "typosquatCandidates",
+                  "label": "Typosquat comparison names",
+                  "type": "array",
+                  "required": false,
+                  "defaultValue": [],
+                  "description": "Optional trusted package names to compare against for typosquat precursor heuristics."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_query",
+        "type": "sentris.osv.query",
+        "position": {
+          "x": 420,
+          "y": 260
+        },
+        "data": {
+          "label": "Query OSV npm Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "npm",
+              "severityFloor": "low",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 50,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "npm_registry_intel",
+        "type": "sentris.npm.registry.intel",
+        "position": {
+          "x": 740,
+          "y": 120
+        },
+        "data": {
+          "label": "Fetch NPM Registry Intelligence",
+          "config": {
+            "params": {
+              "maxPackages": 25,
+              "recentPublishDays": 30,
+              "includeRawMetadata": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_precursor_brief",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1060,
+          "y": 260
+        },
+        "data": {
+          "label": "Fetch Registry Metadata and Rank Precursors",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "packageSpecs",
+                  "type": "list-text"
+                },
+                {
+                  "name": "findings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "summary",
+                  "type": "json"
+                },
+                {
+                  "name": "packages",
+                  "type": "list-json"
+                },
+                {
+                  "name": "researchNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "registryRecords",
+                  "type": "list-json"
+                },
+                {
+                  "name": "registryRiskSignals",
+                  "type": "list-json"
+                },
+                {
+                  "name": "registrySummary",
+                  "type": "json"
+                },
+                {
+                  "name": "registryWarnings",
+                  "type": "list-text"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "brief",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const packageSpecs = Array.isArray(input.packageSpecs) ? input.packageSpecs.map(String) : [];\n  const osvFindings = Array.isArray(input.findings) ? input.findings : [];\n  const packages = Array.isArray(input.packages) ? input.packages : [];\n  const summary = input.summary && typeof input.summary === 'object' ? input.summary : {};\n  const registryRecords = Array.isArray(input.registryRecords) ? input.registryRecords : [];\n  const registryRiskSignals = Array.isArray(input.registryRiskSignals) ? input.registryRiskSignals : [];\n  const registrySummary = input.registrySummary && typeof input.registrySummary === 'object' ? input.registrySummary : {};\n  const registryWarnings = Array.isArray(input.registryWarnings) ? input.registryWarnings.map(String) : [];\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, unknown: 1 };\n  const signalSeverityToCwe = { 'install-script': 'CWE-506', deprecated: 'CWE-review-required', 'missing-repository': 'CWE-review-required', 'recent-publish': 'CWE-review-required', 'typosquat-similarity': 'CWE-506' };\n  const candidates = [];\n  for (const finding of osvFindings) {\n    if (finding?.isMaliciousPackageRecord === true || String(finding?.id || '').startsWith('MAL-') || /malicious/i.test(String(finding?.summary || ''))) {\n      candidates.push({\n        title: `Malicious npm advisory: ${finding.packageName || finding.id}`,\n        severity: 'critical',\n        cweGuess: 'CWE-506',\n        product: finding.packageName || null,\n        affectedVersions: finding.version ? [finding.version] : [],\n        impactSummary: finding.summary || 'OSV malicious-package record - immediate escalation.',\n        evidence: { source: 'osv', id: finding.id, aliases: finding.aliases || [], references: (finding.references || []).slice(0, 5) },\n        reproOutline: ['Confirm package is not installed in authorized environments', 'Review OSV/GHSA references', 'Report via npm/GitHub Security Advisory process if novel'],\n        suggestedCnaPath: 'GitHub Security Advisory or npm security contact for malicious package records',\n        mitreCveRequestNotes: 'Malicious package - may map to GHSA rather than traditional CVE',\n        priorityScore: 120,\n        priorityReasons: ['OSV malicious-package record']\n      });\n    }\n  }\n  const signalsByPackage = new Map();\n  for (const signal of registryRiskSignals) {\n    const packageName = String(signal?.packageName || '').trim();\n    if (!packageName) continue;\n    const list = signalsByPackage.get(packageName) || [];\n    list.push(signal);\n    signalsByPackage.set(packageName, list);\n  }\n  for (const [packageName, signals] of signalsByPackage.entries()) {\n    const record = registryRecords.find((item) => item?.name === packageName) || {};\n    const severity = signals.some((item) => item.severity === 'high') ? 'high' : signals.some((item) => item.severity === 'medium') ? 'medium' : 'low';\n    const priorityScore = Math.round(signals.reduce((total, item) => total + Number(item.score || 0), 0) * 10) / 10;\n    const signalNames = signals.map((item) => item.signal).filter(Boolean);\n    candidates.push({\n      title: `Registry precursor signals for ${packageName}`,\n      severity,\n      cweGuess: signalNames.includes('install-script') || signalNames.includes('typosquat-similarity') ? 'CWE-506' : (signalSeverityToCwe[signalNames[0]] || 'CWE-review-required'),\n      product: packageName,\n      affectedVersions: record.analyzedVersion ? [record.analyzedVersion] : record.latest ? [record.latest] : [],\n      impactSummary: 'npm registry metadata shows supply-chain precursor signals requiring manual validation.',\n      evidence: { source: 'npm-registry', latest: record.latest || null, analyzedVersion: record.analyzedVersion || null, repository: record.repositoryUrl || null, maintainers: (record.maintainers || []).slice(0, 5), signals: signals.map((item) => ({ signal: item.signal, severity: item.severity, rationale: item.rationale, evidence: item.evidence || {} })) },\n      reproOutline: ['Inspect package tarball and lifecycle scripts in an isolated environment', 'Compare maintainer history and publication timeline', 'Check for dependency confusion or typosquat against internal package names'],\n      suggestedCnaPath: 'Report suspicious packages via npm security or GitHub Security Advisory',\n      mitreCveRequestNotes: 'Supply-chain precursor - confirm malicious intent before CVE/GHSA submission',\n      priorityScore,\n      priorityReasons: signals.map((item) => item.rationale || item.signal).filter(Boolean)\n    });\n  }\n  const ranked = candidates.sort((a, b) => b.priorityScore - a.priorityScore || (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0)).slice(0, 50);\n  const highestSeverity = ranked.reduce((current, item) => (severityRank[item.severity] || 0) > (severityRank[current] || 0) ? item.severity : current, null);\n  return {\n    brief: {\n      summary: {\n        candidateCount: ranked.length,\n        highestSeverity,\n        topCandidate: ranked[0]?.title || null,\n        packagesChecked: Number(summary.packagesChecked || registrySummary.packagesChecked || packageSpecs.length),\n        osvFindings: osvFindings.length,\n        maliciousPackageRecords: Number(summary.maliciousPackageRecords || 0),\n        registryRecordsFetched: Number(registrySummary.recordsFetched || registryRecords.length),\n        registryRiskSignals: Number(registrySummary.riskSignals || registryRiskSignals.length)\n      },\n      authorizationNotes: input.researchNotes || null,\n      packages: packages.slice(0, 100),\n      registryRecords: registryRecords.slice(0, 100),\n      registryWarnings,\n      candidates: ranked,\n      nextSteps: ['Confirm novelty', 'Contact vendor CNA or npm/GitHub security for malicious-package reports', 'Prepare MITRE CVE form if no CNA and issue qualifies as a vulnerability']\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1380,
+          "y": 260
+        },
+        "data": {
+          "label": "Save Supply Chain Precursor Brief",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "supply-chain-takeover-precursor-hunt-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-osv_query-packageSpecs",
+        "source": "trigger_1",
+        "target": "osv_query",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "trigger_1-assemble_precursor_brief-packageSpecs",
+        "source": "trigger_1",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "osv_query-assemble_precursor_brief-findings",
+        "source": "osv_query",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "findings",
+        "targetHandle": "findings"
+      },
+      {
+        "id": "osv_query-assemble_precursor_brief-summary",
+        "source": "osv_query",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "summary",
+        "targetHandle": "summary"
+      },
+      {
+        "id": "osv_query-assemble_precursor_brief-packages",
+        "source": "osv_query",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "packages",
+        "targetHandle": "packages"
+      },
+      {
+        "id": "trigger_1-assemble_precursor_brief-researchNotes",
+        "source": "trigger_1",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "researchNotes",
+        "targetHandle": "researchNotes"
+      },
+      {
+        "id": "assemble_precursor_brief-artifact_report-brief",
+        "source": "assemble_precursor_brief",
+        "target": "artifact_report",
+        "sourceHandle": "brief",
+        "targetHandle": "content"
+      },
+      {
+        "id": "trigger_1-npm_registry_intel-packageSpecs",
+        "source": "trigger_1",
+        "target": "npm_registry_intel",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "trigger_1-npm_registry_intel-typosquatCandidates",
+        "source": "trigger_1",
+        "target": "npm_registry_intel",
+        "sourceHandle": "typosquatCandidates",
+        "targetHandle": "typosquatCandidates"
+      },
+      {
+        "id": "npm_registry_intel-assemble_precursor_brief-records",
+        "source": "npm_registry_intel",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "records",
+        "targetHandle": "registryRecords"
+      },
+      {
+        "id": "npm_registry_intel-assemble_precursor_brief-riskSignals",
+        "source": "npm_registry_intel",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "riskSignals",
+        "targetHandle": "registryRiskSignals"
+      },
+      {
+        "id": "npm_registry_intel-assemble_precursor_brief-summary",
+        "source": "npm_registry_intel",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "summary",
+        "targetHandle": "registrySummary"
+      },
+      {
+        "id": "npm_registry_intel-assemble_precursor_brief-warnings",
+        "source": "npm_registry_intel",
+        "target": "assemble_precursor_brief",
+        "sourceHandle": "warnings",
+        "targetHandle": "registryWarnings"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

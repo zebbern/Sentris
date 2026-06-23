@@ -1,0 +1,348 @@
+{
+  "_metadata": {
+    "name": "GraphQL Exposure Triage",
+    "description": "Authorized bug bounty workflow that probes a GraphQL endpoint for exposed IDEs, unauthenticated introspection, sample query access, risky mutations, and sensitive schema signals.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "graphql", "api", "introspection", "schema", "misconfiguration", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "GraphQL Exposure Triage",
+    "description": "Probe an authorized GraphQL endpoint for actionable exposure and schema risk signals.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "graphql", "api", "introspection", "schema", "misconfiguration", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 7,
+    "edgeCount": 22
+  },
+  "graph": {
+    "name": "GraphQL Exposure Triage",
+    "description": "Focused GraphQL endpoint exposure probe for authorized bug bounty and application security triage.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 280 },
+        "data": {
+          "label": "GraphQL Endpoint Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "graphqlEndpoint",
+                  "label": "GraphQL endpoint",
+                  "type": "text",
+                  "required": true,
+                  "description": "Authorized GraphQL HTTP endpoint to probe."
+                },
+                {
+                  "id": "sampleQuery",
+                  "label": "Sample query",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "{ __typename }",
+                  "description": "Benign GraphQL query used to confirm unauthenticated query behavior."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, exclusions, and rate-limit notes to include in the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_graphql_probe",
+        "type": "core.logic.script",
+        "position": { "x": 420, "y": 280 },
+        "data": {
+          "label": "Build GraphQL Probe Requests",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "graphqlEndpoint", "type": "string" },
+                { "name": "sampleQuery", "type": "string" }
+              ],
+              "returns": [
+                { "name": "endpoint", "type": "string" },
+                { "name": "introspectionBody", "type": "string" },
+                { "name": "sampleQueryBody", "type": "string" },
+                { "name": "jsonHeaders", "type": "json" },
+                { "name": "htmlHeaders", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const normalizeEndpoint = (value) => {\n    const text = String(value || '').trim();\n    try {\n      const parsed = new URL(text);\n      if (!['http:', 'https:'].includes(parsed.protocol)) return 'https://invalid.invalid/graphql';\n      parsed.hash = '';\n      return parsed.toString();\n    } catch {\n      return 'https://invalid.invalid/graphql';\n    }\n  };\n  const endpoint = normalizeEndpoint(input.graphqlEndpoint);\n  const suppliedSampleQuery = String(input.sampleQuery || '').trim();\n  const sampleQuery = suppliedSampleQuery || '{ __typename }';\n  const introspectionQuery = 'query SentrisIntrospectionProbe { __schema { queryType { name } mutationType { name } subscriptionType { name } directives { name } types { kind name fields { name args { name } } } } }';\n  return {\n    endpoint,\n    introspectionBody: JSON.stringify({ query: introspectionQuery }),\n    sampleQueryBody: JSON.stringify({ query: sampleQuery }),\n    jsonHeaders: {\n      Accept: 'application/json',\n      'Content-Type': 'application/json',\n      'User-Agent': 'SentrisFlow-GraphQL-Audit/1.0'\n    },\n    htmlHeaders: {\n      Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',\n      'User-Agent': 'SentrisFlow-GraphQL-Audit/1.0'\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_landing",
+        "type": "core.http.request",
+        "position": { "x": 740, "y": 120 },
+        "data": {
+          "label": "Check Endpoint Landing",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "custom",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "post_introspection",
+        "type": "core.http.request",
+        "position": { "x": 740, "y": 280 },
+        "data": {
+          "label": "POST Introspection Query",
+          "config": {
+            "params": {
+              "method": "POST",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "post_sample_query",
+        "type": "core.http.request",
+        "position": { "x": 740, "y": 440 },
+        "data": {
+          "label": "POST Benign Sample Query",
+          "config": {
+            "params": {
+              "method": "POST",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_graphql_report",
+        "type": "core.logic.script",
+        "position": { "x": 1060, "y": 280 },
+        "data": {
+          "label": "Rank GraphQL Exposure",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "endpoint", "type": "string" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "landingStatus", "type": "number" },
+                { "name": "landingRawBody", "type": "string" },
+                { "name": "landingHeaders", "type": "json" },
+                { "name": "introspectionStatus", "type": "number" },
+                { "name": "introspectionStatusText", "type": "string" },
+                { "name": "introspectionData", "type": "json" },
+                { "name": "sampleQueryStatus", "type": "number" },
+                { "name": "sampleQueryData", "type": "json" },
+                { "name": "sampleQueryRawBody", "type": "string" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const statusOk = (status) => Number(status || 0) >= 200 && Number(status || 0) < 300;\n  const asArray = (value) => Array.isArray(value) ? value : [];\n  const endpoint = String(input.endpoint || '').trim();\n  const schema = input.introspectionData?.data?.__schema;\n  const introspectionErrors = asArray(input.introspectionData?.errors);\n  const sampleErrors = asArray(input.sampleQueryData?.errors);\n  const hasAuthError = [...introspectionErrors, ...sampleErrors].some((error) => /unauth|forbidden|permission|login|token|credential/i.test(String(error?.message || error || '')));\n  const types = asArray(schema?.types);\n  const introspectionEnabled = statusOk(input.introspectionStatus) && schema && types.length > 0;\n  const mutationTypeName = schema?.mutationType?.name || 'Mutation';\n  const mutationType = types.find((type) => type?.name === mutationTypeName);\n  const mutationFields = asArray(mutationType?.fields);\n  const riskyMutationPattern = /delete|remove|update|create|set|reset|login|register|token|password|admin|role|invite|upload|payment|billing/i;\n  const sensitivePattern = /password|passwd|token|secret|api[-_]?key|session|cookie|email|phone|address|role|admin|payment|billing|ssn|mfa|totp|oauth/i;\n  const riskyMutations = mutationFields.filter((field) => riskyMutationPattern.test(String(field?.name || ''))).map((field) => ({ name: field.name, args: asArray(field.args).map((arg) => arg?.name).filter(Boolean) }));\n  const sensitiveSchemaSignals = [];\n  for (const type of types) {\n    const typeName = String(type?.name || '');\n    if (!typeName || typeName.startsWith('__')) continue;\n    if (sensitivePattern.test(typeName)) sensitiveSchemaSignals.push({ type: typeName, field: null, reason: 'sensitive type name' });\n    for (const field of asArray(type?.fields)) {\n      const fieldName = String(field?.name || '');\n      if (sensitivePattern.test(fieldName)) {\n        sensitiveSchemaSignals.push({ type: typeName, field: fieldName, reason: 'sensitive field name' });\n      }\n    }\n  }\n  const landingRawBody = String(input.landingRawBody || '');\n  const graphqlIdeExposed = statusOk(input.landingStatus) && /graphiql|graphql playground|apollo sandbox|graphql voyager|__schema|introspection/i.test(landingRawBody);\n  const sampleQuerySucceeded = statusOk(input.sampleQueryStatus) && Boolean(input.sampleQueryData?.data) && sampleErrors.length === 0;\n  const findings = [];\n  if (introspectionEnabled) {\n    let priorityScore = 70;\n    const priorityReasons = ['GraphQL introspection succeeded without authentication'];\n    if (sampleQuerySucceeded) { priorityScore += 10; priorityReasons.push('benign unauthenticated sample query succeeded'); }\n    if (riskyMutations.length > 0) { priorityScore += Math.min(20, riskyMutations.length * 10); priorityReasons.push('schema exposes risky mutation names'); }\n    if (sensitiveSchemaSignals.length > 0) { priorityScore += Math.min(15, sensitiveSchemaSignals.length * 3); priorityReasons.push('schema exposes sensitive-looking types or fields'); }\n    findings.push({\n      ruleId: 'unauthenticated-graphql-introspection',\n      title: 'Unauthenticated GraphQL introspection exposes schema details',\n      severity: priorityScore >= 90 ? 'critical' : 'high',\n      priorityScore,\n      priorityReasons,\n      evidence: {\n        endpoint,\n        status: input.introspectionStatus,\n        queryType: schema?.queryType?.name || null,\n        mutationType: schema?.mutationType?.name || null,\n        subscriptionType: schema?.subscriptionType?.name || null,\n        typeCount: types.length,\n        riskyMutations: riskyMutations.slice(0, 20),\n        sensitiveSchemaSignals: sensitiveSchemaSignals.slice(0, 30)\n      },\n      nextSteps: ['Verify whether introspection is intended in production', 'Review exposed mutation authorization with an authenticated and unauthenticated browser model', 'Use schema field names only as leads; do not submit sensitive data or perform destructive mutations']\n    });\n  }\n  if (graphqlIdeExposed) {\n    findings.push({\n      ruleId: 'graphql-ide-exposed',\n      title: 'GraphQL IDE or explorer appears exposed at the endpoint',\n      severity: introspectionEnabled ? 'medium' : 'low',\n      priorityScore: introspectionEnabled ? 55 : 30,\n      priorityReasons: ['endpoint landing page contains GraphQL IDE/explorer markers'],\n      evidence: { endpoint, landingStatus: input.landingStatus, contentType: input.landingHeaders?.['content-type'] || input.landingHeaders?.['Content-Type'] || null },\n      nextSteps: ['Confirm whether the IDE is available in production', 'Check whether authentication is enforced before query execution']\n    });\n  }\n  if (sampleQuerySucceeded && !introspectionEnabled) {\n    findings.push({\n      ruleId: 'unauthenticated-graphql-query',\n      title: 'Benign unauthenticated GraphQL query succeeded',\n      severity: 'medium',\n      priorityScore: 45,\n      priorityReasons: ['sample query returned data without authentication'],\n      evidence: { endpoint, sampleQueryStatus: input.sampleQueryStatus },\n      nextSteps: ['Verify intended public API scope', 'Test only non-destructive read queries authorized by the program']\n    });\n  }\n  if (!introspectionEnabled && !sampleQuerySucceeded && hasAuthError) {\n    findings.push({\n      ruleId: 'graphql-auth-enforced',\n      title: 'GraphQL endpoint appears to enforce authentication',\n      severity: 'info',\n      priorityScore: 5,\n      priorityReasons: ['introspection or sample query returned authentication-related errors'],\n      evidence: { endpoint, introspectionStatus: input.introspectionStatus, sampleQueryStatus: input.sampleQueryStatus },\n      nextSteps: ['Use authorized credentials only if the program scope permits authenticated testing']\n    });\n  }\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };\n  findings.sort((a, b) => b.priorityScore - a.priorityScore || String(a.ruleId).localeCompare(String(b.ruleId)));\n  const highestSeverity = findings.reduce((current, finding) => severityRank[finding.severity] > severityRank[current || 'info'] ? finding.severity : current, findings.length ? 'info' : null);\n  return {\n    report: {\n      summary: {\n        endpoint,\n        introspectionEnabled: Boolean(introspectionEnabled),\n        unauthenticatedQuerySucceeded: Boolean(sampleQuerySucceeded),\n        graphqlIdeExposed: Boolean(graphqlIdeExposed),\n        authErrorObserved: Boolean(hasAuthError),\n        riskyMutations: riskyMutations.length,\n        sensitiveSchemaSignals: sensitiveSchemaSignals.length,\n        findings: findings.filter((finding) => finding.severity !== 'info').length,\n        highestSeverity,\n        topFinding: findings[0]?.title || null\n      },\n      authorizationNotes: typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null,\n      dataSources: {\n        endpointLanding: { status: input.landingStatus, ok: statusOk(input.landingStatus) },\n        introspection: { status: input.introspectionStatus, statusText: input.introspectionStatusText || null, ok: statusOk(input.introspectionStatus) },\n        sampleQuery: { status: input.sampleQueryStatus, ok: statusOk(input.sampleQueryStatus) }\n      },\n      findings,\n      schemaPreview: introspectionEnabled ? {\n        queryType: schema?.queryType?.name || null,\n        mutationType: schema?.mutationType?.name || null,\n        subscriptionType: schema?.subscriptionType?.name || null,\n        typeNames: types.map((type) => type?.name).filter(Boolean).slice(0, 80)\n      } : null,\n      nextSteps: ['Manually verify findings in a browser or GraphQL client inside the authorized scope', 'Prioritize introspection plus risky mutations over IDE exposure alone', 'Do not execute destructive mutations during triage']\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1380, "y": 280 },
+        "data": {
+          "label": "Save GraphQL Exposure Report",
+          "config": {
+            "params": {
+              "mimeType": "application/json",
+              "fileExtension": ".json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "graphql-exposure-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-build_graphql_probe-graphqlEndpoint",
+        "source": "trigger_1",
+        "target": "build_graphql_probe",
+        "sourceHandle": "graphqlEndpoint",
+        "targetHandle": "graphqlEndpoint"
+      },
+      {
+        "id": "trigger_1-build_graphql_probe-sampleQuery",
+        "source": "trigger_1",
+        "target": "build_graphql_probe",
+        "sourceHandle": "sampleQuery",
+        "targetHandle": "sampleQuery"
+      },
+      {
+        "id": "build_graphql_probe-fetch_landing-endpoint",
+        "source": "build_graphql_probe",
+        "target": "fetch_landing",
+        "sourceHandle": "endpoint",
+        "targetHandle": "url"
+      },
+      {
+        "id": "build_graphql_probe-fetch_landing-htmlHeaders",
+        "source": "build_graphql_probe",
+        "target": "fetch_landing",
+        "sourceHandle": "htmlHeaders",
+        "targetHandle": "headers"
+      },
+      {
+        "id": "build_graphql_probe-post_introspection-endpoint",
+        "source": "build_graphql_probe",
+        "target": "post_introspection",
+        "sourceHandle": "endpoint",
+        "targetHandle": "url"
+      },
+      {
+        "id": "build_graphql_probe-post_introspection-introspectionBody",
+        "source": "build_graphql_probe",
+        "target": "post_introspection",
+        "sourceHandle": "introspectionBody",
+        "targetHandle": "body"
+      },
+      {
+        "id": "build_graphql_probe-post_introspection-jsonHeaders",
+        "source": "build_graphql_probe",
+        "target": "post_introspection",
+        "sourceHandle": "jsonHeaders",
+        "targetHandle": "headers"
+      },
+      {
+        "id": "build_graphql_probe-post_sample_query-endpoint",
+        "source": "build_graphql_probe",
+        "target": "post_sample_query",
+        "sourceHandle": "endpoint",
+        "targetHandle": "url"
+      },
+      {
+        "id": "build_graphql_probe-post_sample_query-sampleQueryBody",
+        "source": "build_graphql_probe",
+        "target": "post_sample_query",
+        "sourceHandle": "sampleQueryBody",
+        "targetHandle": "body"
+      },
+      {
+        "id": "build_graphql_probe-post_sample_query-jsonHeaders",
+        "source": "build_graphql_probe",
+        "target": "post_sample_query",
+        "sourceHandle": "jsonHeaders",
+        "targetHandle": "headers"
+      },
+      {
+        "id": "build_graphql_probe-assemble_graphql_report-endpoint",
+        "source": "build_graphql_probe",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "endpoint",
+        "targetHandle": "endpoint"
+      },
+      {
+        "id": "trigger_1-assemble_graphql_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "fetch_landing-assemble_graphql_report-status",
+        "source": "fetch_landing",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "status",
+        "targetHandle": "landingStatus"
+      },
+      {
+        "id": "fetch_landing-assemble_graphql_report-rawBody",
+        "source": "fetch_landing",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "rawBody",
+        "targetHandle": "landingRawBody"
+      },
+      {
+        "id": "fetch_landing-assemble_graphql_report-headers",
+        "source": "fetch_landing",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "headers",
+        "targetHandle": "landingHeaders"
+      },
+      {
+        "id": "post_introspection-assemble_graphql_report-status",
+        "source": "post_introspection",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "status",
+        "targetHandle": "introspectionStatus"
+      },
+      {
+        "id": "post_introspection-assemble_graphql_report-statusText",
+        "source": "post_introspection",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "statusText",
+        "targetHandle": "introspectionStatusText"
+      },
+      {
+        "id": "post_introspection-assemble_graphql_report-data",
+        "source": "post_introspection",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "data",
+        "targetHandle": "introspectionData"
+      },
+      {
+        "id": "post_sample_query-assemble_graphql_report-status",
+        "source": "post_sample_query",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "status",
+        "targetHandle": "sampleQueryStatus"
+      },
+      {
+        "id": "post_sample_query-assemble_graphql_report-data",
+        "source": "post_sample_query",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "data",
+        "targetHandle": "sampleQueryData"
+      },
+      {
+        "id": "post_sample_query-assemble_graphql_report-rawBody",
+        "source": "post_sample_query",
+        "target": "assemble_graphql_report",
+        "sourceHandle": "rawBody",
+        "targetHandle": "sampleQueryRawBody"
+      },
+      {
+        "id": "assemble_graphql_report-artifact_report-report",
+        "source": "assemble_graphql_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

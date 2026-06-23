@@ -66,7 +66,7 @@ export class AuthGuard implements CanActivate {
     }
 
     // Fall back to user authentication (Clerk/Local)
-    this.logger.log(
+    this.logger.debug(
       `[AUTH] Guard activating for ${request.method} ${request.path} - Provider: ${this.authService.providerName}`,
     );
 
@@ -76,9 +76,16 @@ export class AuthGuard implements CanActivate {
         `[AUTH] Guard result - User: ${request.auth.userId}, Org: ${request.auth.organizationId}, Roles: [${request.auth.roles.join(', ')}], Authenticated: ${request.auth.isAuthenticated}`,
       );
     } catch (error) {
-      this.logger.error(
-        `[AUTH] Authentication failed for ${request.method} ${request.path}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      const context = `${request.method} ${request.path}`;
+
+      if (this.isMissingAuthProbe(error, message)) {
+        this.logger.debug(`[AUTH] Missing authentication for ${context}`);
+      } else if (error instanceof UnauthorizedException) {
+        this.logger.warn(`[AUTH] Authentication failed for ${context}: ${message}`);
+      } else {
+        this.logger.error(`[AUTH] Authentication failed for ${context}: ${message}`);
+      }
       throw error;
     }
 
@@ -177,5 +184,9 @@ export class AuthGuard implements CanActivate {
       provider: 'api-key',
       apiKeyPermissions: normalizedPermissions,
     };
+  }
+
+  private isMissingAuthProbe(error: unknown, message: string): boolean {
+    return error instanceof UnauthorizedException && message.startsWith('Missing authentication');
   }
 }

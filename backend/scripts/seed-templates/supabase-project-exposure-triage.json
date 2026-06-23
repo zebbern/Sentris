@@ -1,0 +1,188 @@
+{
+  "_metadata": {
+    "name": "Supabase Project Exposure Triage",
+    "description": "Authorized bug bounty workflow that audits a Supabase project for RLS, storage, API, and database misconfigurations, then writes a prioritized exposure triage report.",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "supabase", "exposure", "misconfiguration", "rls", "storage", "triage"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Supabase Project Exposure Triage",
+    "description": "Scan an authorized Supabase project for security posture issues and produce a submission-ready exposure triage report.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": ["bug-bounty", "supabase", "exposure", "misconfiguration", "rls", "storage", "triage"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 4,
+    "edgeCount": 9
+  },
+  "graph": {
+    "name": "Supabase Project Exposure Triage",
+    "description": "Authorized Supabase project exposure workflow for bug bounty and security research triage.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "Authorized Supabase Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "supabaseUrl",
+                  "label": "Supabase project URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "Project URL or 20-character project ref, for example https://abcdefghijklmno12345.supabase.co."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Program scope, ownership confirmation, and reporting constraints for this Supabase project."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "supabase_security_scan",
+        "type": "sentris.supabase.scanner",
+        "position": { "x": 420, "y": 260 },
+        "data": {
+          "label": "Audit Supabase Security Posture",
+          "config": {
+            "params": {
+              "failOnCritical": false
+            },
+            "inputOverrides": {
+              "databaseConnectionString": "{{SECRET_PLACEHOLDER}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_exposure_report",
+        "type": "core.logic.script",
+        "position": { "x": 760, "y": 260 },
+        "data": {
+          "label": "Rank Supabase Exposure Findings",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "supabaseUrl", "type": "string" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "projectRef", "type": "string" },
+                { "name": "score", "type": "number" },
+                { "name": "summary", "type": "json" },
+                { "name": "issues", "type": "list-json" },
+                { "name": "errors", "type": "list-text", "required": false }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const issues = Array.isArray(input.issues) ? input.issues : [];\n  const errors = Array.isArray(input.errors) ? input.errors : [];\n  const supabaseUrl = typeof input.supabaseUrl === 'string' ? input.supabaseUrl.trim() : '';\n  const authorizationNotes = typeof input.authorizationNotes === 'string' && input.authorizationNotes.trim().length > 0 ? input.authorizationNotes.trim() : null;\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1, none: 0, unknown: 0 };\n  const normalizeSeverity = (value) => String(value || 'medium').toLowerCase();\n  const rankFor = (value) => severityRank[normalizeSeverity(value)] ?? 3;\n  function firstText(...values) {\n    for (const value of values) {\n      if (typeof value === 'string' && value.trim().length > 0) return value.trim();\n    }\n    return null;\n  }\n  function issueRecord(issue) {\n    const record = typeof issue === 'object' && issue !== null ? issue : { raw: issue };\n    const checkId = firstText(record.check_id, record.checkId, record.id, record.title) || 'unknown-check';\n    const resource = firstText(record.resource, record.table, record.bucket, record.schema) || null;\n    const severity = normalizeSeverity(record.severity);\n    const category = firstText(record.category, record.check_type, record.type) || null;\n    const message = firstText(record.message, record.description, record.detail, record.remediation) || null;\n    const priorityBand = rankFor(severity) >= 4 ? 'immediate' : rankFor(severity) >= 3 ? 'high-review' : rankFor(severity) >= 2 ? 'watchlist' : 'backlog';\n    return { checkId, resource, severity, category, message, priorityBand, priorityScore: rankFor(severity) * 100 };\n  }\n  const priorityFindings = issues.map(issueRecord).sort((a, b) => b.priorityScore - a.priorityScore || a.checkId.localeCompare(b.checkId)).slice(0, 100);\n  const countsBySeverity = priorityFindings.reduce((acc, finding) => {\n    acc[finding.severity] = (acc[finding.severity] || 0) + 1;\n    return acc;\n  }, {});\n  const highestSeverity = priorityFindings.reduce((current, finding) => rankFor(finding.severity) > rankFor(current) ? finding.severity : current, 'none');\n  const scoreValue = Number.isFinite(Number(input.score)) ? Number(input.score) : null;\n  const summary = typeof input.summary === 'object' && input.summary !== null ? input.summary : {};\n  const assetKey = input.projectRef || supabaseUrl;\n  return {\n    report: {\n      summary: {\n        supabaseUrl,\n        projectRef: input.projectRef || null,\n        securityScore: scoreValue,\n        issueCount: issues.length,\n        actionableFindings: priorityFindings.length,\n        highestSeverity,\n        countsBySeverity,\n        scannerSummary: summary,\n        scannerErrors: errors\n      },\n      authorizationNotes,\n      priorityFindings,\n      analyticsResults: priorityFindings.slice(0, 100).map((finding) => ({\n        scanner: 'supabase-scanner',\n        severity: finding.severity,\n        finding_hash: [finding.checkId, assetKey, finding.resource || ''].join(':'),\n        asset_key: assetKey,\n        check_id: finding.checkId,\n        resource: finding.resource\n      })),\n      nextSteps: [\n        'Confirm the Supabase project is explicitly authorized before reporting',\n        'Prioritize critical and high findings related to RLS, storage bucket policies, and exposed API keys',\n        'Wire a Service Role key on the scanner node for deeper API and storage checks when authorized',\n        'Re-run after remediation to validate score improvements'\n      ]\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1100, "y": 260 },
+        "data": {
+          "label": "Save Supabase Exposure Report",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "supabase-project-exposure-triage-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-supabase_security_scan-supabaseUrl",
+        "source": "trigger_1",
+        "target": "supabase_security_scan",
+        "sourceHandle": "supabaseUrl",
+        "targetHandle": "supabaseUrl"
+      },
+      {
+        "id": "trigger_1-assemble_exposure_report-supabaseUrl",
+        "source": "trigger_1",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "supabaseUrl",
+        "targetHandle": "supabaseUrl"
+      },
+      {
+        "id": "trigger_1-assemble_exposure_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "supabase_security_scan-assemble_exposure_report-projectRef",
+        "source": "supabase_security_scan",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "projectRef",
+        "targetHandle": "projectRef"
+      },
+      {
+        "id": "supabase_security_scan-assemble_exposure_report-score",
+        "source": "supabase_security_scan",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "score",
+        "targetHandle": "score"
+      },
+      {
+        "id": "supabase_security_scan-assemble_exposure_report-summary",
+        "source": "supabase_security_scan",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "summary",
+        "targetHandle": "summary"
+      },
+      {
+        "id": "supabase_security_scan-assemble_exposure_report-issues",
+        "source": "supabase_security_scan",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "issues",
+        "targetHandle": "issues"
+      },
+      {
+        "id": "supabase_security_scan-assemble_exposure_report-errors",
+        "source": "supabase_security_scan",
+        "target": "assemble_exposure_report",
+        "sourceHandle": "errors",
+        "targetHandle": "errors"
+      },
+      {
+        "id": "assemble_exposure_report-artifact_report-report",
+        "source": "assemble_exposure_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "SUPABASE_DATABASE_URL",
+      "type": "string",
+      "description": "Postgres connection string from Supabase Project Settings → Database (URI format with sslmode=require)."
+    }
+  ]
+}

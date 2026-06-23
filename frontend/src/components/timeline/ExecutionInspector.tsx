@@ -435,8 +435,8 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         <div className="border-b" />
 
         {/* Tabs */}
-        <div className="border-b px-3 py-2 flex items-center justify-between gap-2 bg-muted/20">
-          <div className="inline-flex rounded-md border bg-background p-0.5 text-xs">
+        <div className="border-b px-3 py-2 flex min-w-0 items-center justify-between gap-2 bg-muted/20 overflow-x-auto">
+          <div className="inline-flex shrink-0 rounded-md border bg-background p-0.5 text-xs">
             <Button
               variant={inspectorTab === 'events' ? 'default' : 'ghost'}
               size="sm"

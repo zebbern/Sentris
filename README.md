@@ -54,7 +54,7 @@ Get the dev environment running in 3 steps:
 git clone https://github.com/zebbern/Sentris.git
 cd Sentris
 bun run setup   # Install deps + create .env files
-bun run dev     # Start Docker infra + all apps
+bun run dev     # Start Docker infra + all apps for the active instance
 ```
 
 Once running:
@@ -66,13 +66,14 @@ Once running:
 | Temporal UI | <http://localhost:8081> |
 
 ```bash
-bun run dev:stop   # Stop everything (PM2 + Docker)
-bun run dev:fe     # Frontend-only dev (no Docker needed)
-pm2 logs           # View application logs
-pm2 status         # Check process status
+bun run dev status  # PM2 + Docker + runtime health for the active instance
+bun run dev logs    # View application logs for the active instance
+bun run dev stop    # Stop the active instance apps; instance 0 also stops Docker infra
+bun run dev:stop    # Compatibility alias for bun run dev stop
+bun run dev:fe      # Frontend-only dev (no Docker needed)
 ```
 
-> **Advanced:** `just dev` remains available for multi-instance development, Clerk auth auto-detection, and TLS certificate generation. See the [Multi-Instance Guide](docs/MULTI-INSTANCE-DEV.mdx) for details.
+> **Advanced:** `bun run dev` and `just dev` both support multi-instance development and active instance env files. `just dev` also handles Clerk auth auto-detection and TLS certificate generation. See the [Multi-Instance Guide](docs/MULTI-INSTANCE-DEV.mdx) for details.
 
 ---
 
@@ -80,19 +81,19 @@ pm2 status         # Check process status
 
 ### Integrated Tooling
 
-25 security components wrapping industry-standard open-source tools:
+29 security components wrapping industry-standard open-source tools:
 
 - **Discovery & Recon**: `Subfinder`, `Amass`, `DNSX`, `Naabu`, `HTTPx`, `Katana`, `theHarvester`, `ShuffleDNS`
 - **Vulnerability Scanning**: `Nuclei`, `Trivy`, `Semgrep`, `Checkov`, `TestSSL`
 - **Secret Detection**: `TruffleHog`
-- **Threat Intelligence**: `AbuseIPDB`, `VirusTotal`, `YARA`
+- **Threat Intelligence**: `AbuseIPDB`, `VirusTotal`, `YARA`, `NPM Registry Intel`
 - **Web Security**: `Ffuf`, `Wafw00f`, `Prowler`, `Supabase Scanner`
 - **Notifications**: `Notify` (Slack, Discord, Telegram, Email)
 - **Utility**: `JSON Transform`, `Logic Scripts`, `HTTP Requests`
 
 ### Template Library
 
-- **10 live-validated security workflow templates** focused on bug bounty recon, takeover triage, exposed services, repository risk, secrets, and CVE/dependency research.
+- **30 live-validated security workflow templates** focused on bug bounty recon, takeover triage, exposed services, repository risk, secrets, and CVE/dependency research.
 - **One-click deployment**: Browse, preview, and create workflows from templates instantly.
 - **Community publishing**: Share your workflows as templates via GitHub PR with automatic secret sanitization.
 - **Maintainer preflight**: Run `bun run template-library:check` before changing templates, then `bun run template-library:verify` before handoff. These use the validation ledger and focused template tests, so unchanged templates are not rerun.
@@ -133,11 +134,16 @@ Run multiple isolated dev instances on one machine for parallel feature work:
 
 ```bash
 # Instance 0 (default)
+just instance show
+bun run instance show
 just dev
+bun run dev
 
 # Switch active workspace instance
 just instance use 1
+bun run instance use 1
 just dev
+bun run dev
 
 # Manage per-instance env files
 just instance-env init 1

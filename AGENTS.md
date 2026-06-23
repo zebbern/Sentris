@@ -30,23 +30,27 @@ bun install && cp backend/.env.example backend/.env && cp worker/.env.example wo
 # Start dev environment (Docker infra + PM2 apps)
 just dev                           # Recommended (Linux/macOS/WSL)
 # OR:
-bun run dev                        # Cross-platform (requires bash)
+bun run dev                        # Cross-platform; respects SENTRIS_INSTANCE/.sentris-instance
 # OR (manual):
 docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml up -d
-pm2 startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
+bun run pm2 -- startOrReload pm2.config.cjs --only sentris-frontend-0,sentris-backend-0,sentris-worker-0
 
 # Status & logs
-just dev status                    # PM2 + Docker status
+just dev status                    # PM2 + Docker + runtime health status
 just dev logs                      # Tail app logs
-pm2 status                         # PM2 only
+bun run dev status                 # Cross-platform PM2 + Docker + runtime health status
+bun run dev logs                   # Cross-platform PM2 app logs
+bun run pm2 -- status              # PM2 only via repo-local binary
 docker ps --filter name=sentris    # Docker only
 
 # Stop
 just dev stop                      # Stop PM2 + Docker
 # OR:
+bun run dev stop
+# OR:
 bun run dev:stop
 # OR (manual):
-pm2 delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml down
+bun run pm2 -- delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.dev-ports.yml down
 
 # Health checks
 curl -sf http://localhost:3211/health        # Backend liveness
@@ -61,7 +65,9 @@ just help                          # All commands
 
 ```bash
 just instance show     # Print active instance number
+bun run instance show  # Cross-platform fallback; initializes .sentris-instance to 0 if missing
 just instance use 5    # Set active instance for this workspace
+bun run instance use 5 # Cross-platform fallback
 ```
 
 **Instance env files**:
@@ -86,20 +92,23 @@ Full details: `docs/MULTI-INSTANCE-DEV.mdx`
 
 Local development runs as **multiple app instances** (PM2) on top of **one shared Docker infra stack**.
 
-- Shared infra (Docker Compose project `sentris-infra`): Postgres/Temporal/Redpanda/Redis/MinIO/Loki on fixed ports.
+- Shared infra (Docker Compose project `sentris`): Postgres/Temporal/Redpanda/Redis/MinIO/Loki on fixed ports.
 - Per-instance apps: `sentris-{frontend,backend,worker}-N`.
 - Isolation is via per-instance DB + Temporal namespace/task queue + Kafka topic suffixing + instance-scoped Kafka consumer groups/client IDs (not per-instance infra containers).
-- The workspace can have an **active instance** (stored in `.sentris-instance`, gitignored).
+- The workspace has an **active instance** (stored in `.sentris-instance`, gitignored). If neither `SENTRIS_INSTANCE` nor `.sentris-instance` exists, cross-platform tooling initializes `.sentris-instance` to `0` instead of silently guessing.
 - Instance env files are stored at `.instances/instance-N/{backend,worker,frontend}.env` and can be managed with `just instance-env ...`.
+- `bun run dev` initializes or repairs the active instance env files before PM2 starts, so PowerShell and Bash dev startup use the same instance-scoped env behavior.
+- `just dev`, `bun run dev`, `just dev clean`, and `bun run dev clean` prune oversized PM2 logs for the selected instance. The default cap is 64MB per app log file; override with `SENTRIS_PM2_LOG_MAX_BYTES`.
+- Backend PM2 dev watch includes `backend/src`, `backend/scripts/seed-templates`, and `packages/shared/src`; worker PM2 dev watch includes worker source plus shared runtime package sources. Keep this in sync when template validation inputs, seed catalogs, or shared execution contracts move.
 
 **Agent rule:** before running any dev commands, ensure you’re targeting the intended instance.
 
-- Always check: `just instance show`
+- Always check: `just instance show`; if `just` is unavailable, run `bun run instance show`. Either command initializes `.sentris-instance` to `0` when no active instance has been selected.
 - If the task is ambiguous (logs, curl, E2E, “run locally”, etc.), ask the user which instance to use.
 - If the user says “use instance N”, prefer either:
   - `just instance use N` then run `just dev` / `bun run test:e2e`, or
-  - explicit env override (`SENTRIS_INSTANCE=N just dev ...`) for one-off commands.
-- Local maintenance scripts that mutate or inspect local Postgres data must use the shared script runtime (`scripts/lib/local-script-runtime.ts`) instead of reading `DATABASE_URL` directly. `DATABASE_URL` is for the running app process, Drizzle CLI, and explicit app env files; local scripts should target `SENTRIS_INSTANCE` / `.sentris-instance` by default and only use script-specific overrides such as `TEMPLATE_SEED_DATABASE_URL` or the generic `SENTRIS_SCRIPT_DATABASE_URL`.
+  - explicit env override (`SENTRIS_INSTANCE=N just dev ...` or `SENTRIS_INSTANCE=N bun run dev`) for one-off commands.
+- Local maintenance scripts that mutate or inspect local Postgres data must use the shared script runtime (`scripts/lib/local-script-runtime.ts`) instead of reading `DATABASE_URL` directly. `DATABASE_URL` is for the running app process, production Drizzle runs, and explicit app env files; local scripts should target `SENTRIS_INSTANCE` / `.sentris-instance` by default and only use script-specific overrides such as `TEMPLATE_SEED_DATABASE_URL`, `DRIZZLE_DATABASE_URL`, or the generic `SENTRIS_SCRIPT_DATABASE_URL`.
 - Local scripts that start or inspect Temporal workflows must also use `getScriptTemporalTarget()` from the shared script runtime instead of reading `TEMPORAL_NAMESPACE` / `TEMPORAL_TASK_QUEUE` directly. Use script-specific `*_TEMPORAL_NAMESPACE` + `*_TEMPORAL_TASK_QUEUE` variables or `SENTRIS_SCRIPT_TEMPORAL_NAMESPACE` + `SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE` when intentionally targeting another namespace.
 - Maintenance scripts must print the target database and/or Temporal target before mutating data or starting workflows.
 
@@ -111,8 +120,9 @@ Local development runs as **multiple app instances** (PM2) on top of **one share
 
 #### E2E tests
 
-- E2E targets the backend for `SENTRIS_INSTANCE` (or the active instance).
-- When asked to run E2E, confirm the instance and ensure that instance is running: `SENTRIS_INSTANCE=N just dev start` (or `just instance use N` then `just dev start`).
+- E2E targets the backend for `SENTRIS_INSTANCE`, then legacy `E2E_INSTANCE`, then the active instance.
+- `bun run test:e2e*` uses the cross-platform Node runner at `scripts/e2e-test.js`; do not reintroduce Bash-only active instance lookup in package scripts.
+- When asked to run E2E, confirm the instance and ensure that instance is running: `SENTRIS_INSTANCE=N just dev start`, `SENTRIS_INSTANCE=N bun run dev`, or `just instance use N` then `just dev start`.
 
 #### Keep docs in sync
 
@@ -136,7 +146,7 @@ bun run lint           # Lint
 ### Database
 
 ```bash
-just db-reset                              # Reset database
+just db-reset                              # Reset active instance database
 bun --cwd backend run migration:push       # Push schema
 bun --cwd backend run db:studio            # View data
 ```

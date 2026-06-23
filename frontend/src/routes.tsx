@@ -44,6 +44,9 @@ const ArtifactLibrary = lazyWithRetry(() =>
 const McpLibraryPage = lazyWithRetry(() =>
   import('@/pages/McpLibraryPage').then((m) => ({ default: m.McpLibraryPage })),
 );
+const AgentSkillsPage = lazyWithRetry(() =>
+  import('@/pages/AgentSkillsPage').then((m) => ({ default: m.AgentSkillsPage })),
+);
 const IntegrationCallback = lazyWithRetry(() =>
   import('@/pages/IntegrationCallback').then((m) => ({ default: m.IntegrationCallback })),
 );
@@ -276,6 +279,14 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <McpLibraryPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/agent-skills"
+          element={
+            <ErrorBoundary>
+              <AgentSkillsPage />
             </ErrorBoundary>
           }
         />

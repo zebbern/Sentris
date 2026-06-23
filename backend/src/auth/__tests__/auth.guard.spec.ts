@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 import type { ExecutionContext } from '@nestjs/common';
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
@@ -436,6 +436,34 @@ describe('AuthGuard', () => {
       mockAuthService.authenticate.mockRejectedValue(authError);
 
       await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(UnauthorizedException);
+      expect(mockRequest.auth).toBeUndefined();
+    });
+
+    it('logs missing-auth probes below error level while preserving the 401', async () => {
+      const authError = new UnauthorizedException(
+        'Missing authentication - provide session cookie or Basic Auth',
+      );
+      const logSpy = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+      const debugSpy = vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+
+      (mockRequest.header as ReturnType<typeof vi.fn>).mockImplementation(() => undefined);
+      mockRequest.method = 'GET';
+      Object.defineProperty(mockRequest, 'path', {
+        value: '/api/v1/auth/validate',
+        configurable: true,
+      });
+      mockAuthService.authenticate.mockRejectedValue(authError);
+
+      await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(UnauthorizedException);
+
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[AUTH] Missing authentication for GET /api/v1/auth/validate',
+      );
       expect(mockRequest.auth).toBeUndefined();
     });
 

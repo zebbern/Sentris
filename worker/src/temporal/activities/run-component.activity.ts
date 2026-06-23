@@ -19,7 +19,11 @@ import {
   createLightweightSummary,
 } from '../utils/component-output';
 import { unspill } from './spill-resolver';
-import { resolveSecretInputOverrides, resolveSecretParams } from './secret-resolver';
+import {
+  resolveLlmProviderModelOverrides,
+  resolveSecretInputOverrides,
+  resolveSecretParams,
+} from './secret-resolver';
 import { validateRequiredInputs } from './input-validator';
 import { handleComponentError } from './error-handler';
 import { RedisTerminalStreamAdapter } from '../../adapters';
@@ -221,6 +225,11 @@ export async function runComponentActivity(
     secrets: svc.secrets,
     component,
     resolvedParams,
+  });
+
+  await resolveLlmProviderModelOverrides(resolvedInputs, {
+    secrets: svc.secrets,
+    componentId: action.componentId,
   });
 
   // Also resolve secret references in params (for params with editor: 'secret')

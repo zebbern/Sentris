@@ -12,6 +12,7 @@ import {
   Webhook,
   Zap,
   ServerCog,
+  Sparkles,
 } from 'lucide-react';
 import { env } from '@/config/env';
 import type { Command } from './command-palette-types';
@@ -138,6 +139,16 @@ export function useStaticCommands({
         icon: ServerCog,
         keywords: ['mcp', 'servers', 'tools', 'configurations'],
         href: '/mcp-library',
+      },
+      {
+        id: 'nav-agent-skills',
+        type: 'navigation',
+        label: 'Agent Skills',
+        description: 'Manage reusable agent SKILL.md playbooks',
+        category: 'navigation',
+        icon: Sparkles,
+        keywords: ['agent', 'skills', 'playbooks', 'claude', 'opencode'],
+        href: '/agent-skills',
       },
     ];
 

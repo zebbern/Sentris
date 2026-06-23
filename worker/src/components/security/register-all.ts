@@ -25,5 +25,6 @@ import './semgrep';
 import './repo-files-extractor';
 import './manifest-extractor';
 import './osv';
+import './npm-registry-intel';
 import './nvd';
 import './yara';

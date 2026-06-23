@@ -2868,6 +2868,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List agent skills for the current organization */
+        get: operations["AgentSkillsController_listSkills"];
+        put?: never;
+        /** Create an agent skill */
+        post: operations["AgentSkillsController_createSkill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-skills/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover skill folders under .agents/skills, .claude/skills, .github/skills, .codex/skills, .kimi/skills, and .opencode/skills */
+        get: operations["AgentSkillsController_discoverSkills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-skills/import-discovered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import discovered workspace skill folders into the org library */
+        post: operations["AgentSkillsController_importDiscoveredSkills"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-skills/import-zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import one or more skill folders from a zip archive */
+        post: operations["AgentSkillsController_importSkillZip"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent-skills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an agent skill by id */
+        get: operations["AgentSkillsController_getSkill"];
+        put?: never;
+        post?: never;
+        /** Delete an agent skill */
+        delete: operations["AgentSkillsController_deleteSkill"];
+        options?: never;
+        head?: never;
+        /** Update an agent skill */
+        patch: operations["AgentSkillsController_updateSkill"];
+        trace?: never;
+    };
+    "/api/v1/ai/anthropic/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** List Anthropic models accessible to a stored API key secret */
+        post: operations["AiController_listAnthropicModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4692,6 +4797,103 @@ export interface components {
                 createdAt: string;
             }[];
             nextCursor: string | null;
+        };
+        AgentSkillResponse: {
+            /** Format: uuid */
+            id: string;
+            organizationId: string;
+            name: string;
+            slug: string;
+            description: string | null;
+            content: string;
+            files: {
+                [key: string]: string;
+            };
+            fileCount: number;
+            tags: string[];
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DiscoveredAgentSkillResponse: {
+            slug: string;
+            name: string;
+            description: string | null;
+            sourceRoot: string;
+            relativePath: string;
+            fileCount: number;
+            imported: boolean;
+            /** Format: uuid */
+            existingSkillId?: string;
+        };
+        ImportDiscoveredAgentSkillsDto: {
+            items: {
+                slug: string;
+                sourceRoot: string;
+            }[];
+            overwrite?: boolean;
+        };
+        ImportAgentSkillsResultResponse: {
+            imported: {
+                /** Format: uuid */
+                id: string;
+                organizationId: string;
+                name: string;
+                slug: string;
+                description: string | null;
+                content: string;
+                files: {
+                    [key: string]: string;
+                };
+                fileCount: number;
+                tags: string[];
+                enabled: boolean;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            skipped: {
+                slug: string;
+                reason: string;
+            }[];
+        };
+        CreateAgentSkillDto: {
+            name: string;
+            slug: string;
+            description?: string;
+            content?: string;
+            files?: {
+                [key: string]: string;
+            };
+            tags?: string[];
+            enabled?: boolean;
+        };
+        UpdateAgentSkillDto: {
+            name?: string;
+            slug?: string;
+            description?: string | null;
+            content?: string;
+            files?: {
+                [key: string]: string;
+            };
+            tags?: string[];
+            enabled?: boolean;
+        };
+        ListAnthropicModelsDto: {
+            apiKeySecretId: string;
+        };
+        AnthropicModelOption: {
+            id: string;
+            label: string;
+        };
+        ListAnthropicModelsResponse: {
+            models: components["schemas"]["AnthropicModelOption"][];
+            /** @enum {string} */
+            source: "live" | "error";
+            error?: string | null;
         };
     };
     responses: never;
@@ -9832,6 +10034,201 @@ export interface operations {
                             };
                         };
                     };
+                };
+            };
+        };
+    };
+    AgentSkillsController_listSkills: {
+        parameters: {
+            query: {
+                enabledOnly: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponse"][];
+                };
+            };
+        };
+    };
+    AgentSkillsController_createSkill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentSkillDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponse"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_discoverSkills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveredAgentSkillResponse"][];
+                };
+            };
+        };
+    };
+    AgentSkillsController_importDiscoveredSkills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportDiscoveredAgentSkillsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportAgentSkillsResultResponse"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_importSkillZip: {
+        parameters: {
+            query: {
+                overwrite: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportAgentSkillsResultResponse"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_getSkill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponse"];
+                };
+            };
+        };
+    };
+    AgentSkillsController_deleteSkill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgentSkillsController_updateSkill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAgentSkillDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSkillResponse"];
+                };
+            };
+        };
+    };
+    AiController_listAnthropicModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListAnthropicModelsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAnthropicModelsResponse"];
                 };
             };
         };

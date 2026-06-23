@@ -78,11 +78,13 @@ bun run template-library:check
 
 This checks the live-validation ledger and catalog-quality guardrails. It should report:
 
-- `Live-run validation current: 12/12` for the current official seed catalog.
+- `Live-run validation current: 29/29` for the current live-run seed catalog.
+- `Non-live-run templates: 0`.
 - `Duplicate names: 0`.
 - `Low-value/static candidates: 0`.
+- `Seed/API catalog gaps: 0`.
 
-Do not rerun templates that are already current in the ledger. If the preflight reports a missing, stale, or degraded template, run only the affected workflow with the targeted audit flags:
+If `Seed/API catalog gaps` is non-zero, run the seed step for the active instance before validation; the harness cannot validate templates that are present on disk but absent from the API catalog. Use `bun --cwd backend scripts/seed-templates.ts --dry-run` first when you only need to confirm the target database and seed file count without writing. Do not rerun templates that are already current in the ledger. If the preflight reports a missing, stale, or degraded template, run only the affected workflow with the targeted audit flags:
 
 ```bash
 bun run template-library:audit -- --name "Template Name"
@@ -92,13 +94,17 @@ Add `--force` only when you intentionally want to rerun a template that the ledg
 
 Use a forced audit only when the template, its live inputs, or the audit harness changed and you need fresh evidence. New templates should be practical, non-duplicative, accept runtime inputs, produce a useful artifact, and avoid secret requirements unless the use case truly needs credentials.
 
+Optional runtime inputs must define a safe `defaultValue` that matches the input type (`""` for text, `[]` for arrays, `false` for booleans, and a finite number for numeric fields). The preflight fails missing or mismatched defaults because blank optional fields can otherwise arrive downstream as `undefined` and stall script nodes during real runs.
+
+The audit harness retries transient read-side API failures (`GET`/`HEAD` only), including local backend restarts, short connection refusals, rate limiting, and temporary 5xx responses. It does not replay workflow creation, run start, cancel, or delete calls. If a targeted audit still fails with repeated `ConnectionRefused`, `429`, `502`, `503`, or `504` errors, treat that as a local dev load/health issue first: wait for the active backend and worker to settle, then rerun only the affected template.
+
 For template-library pull requests, run the scoped verification command before handoff:
 
 ```bash
 bun run template-library:verify
 ```
 
-This runs the fast preflight, seed-template graph tests, and live-audit utility tests without running unrelated backend, worker, frontend, or E2E suites.
+This syncs the disk seed templates into the active local instance, deactivates explicitly retired official seed rows, then runs the fast preflight, seed-template graph tests, repository sync/reactivation tests, seed-sync maintenance tests, and live-audit utility tests without running unrelated backend, worker, frontend, or E2E suites.
 
 ## Template Types
 

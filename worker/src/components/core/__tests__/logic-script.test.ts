@@ -47,7 +47,7 @@ describe('Logic/Script Component', () => {
         params: {
           code: 'export async function script() { return { sum: 1 + 2 }; }',
           variables: [],
-          returns: [{ name: 'sum', type: 'number' }],
+          returns: [{ name: 'sum', type: 'number', required: true }],
         },
       },
       mockContext,
@@ -66,7 +66,7 @@ describe('Logic/Script Component', () => {
         params: {
           code: 'export async function script() { return { sum: 1 + 2 }; }',
           variables: [],
-          returns: [{ name: 'sum', type: 'number' }],
+          returns: [{ name: 'sum', type: 'number', required: true }],
         },
       },
       mockContext,
@@ -88,7 +88,7 @@ describe('Logic/Script Component', () => {
           params: {
             code: 'export async function script() { return { sum: 1 + 2 }; }',
             variables: [],
-            returns: [{ name: 'sum', type: 'number' }],
+            returns: [{ name: 'sum', type: 'number', required: true }],
           },
         },
         mockContext,
@@ -138,7 +138,7 @@ describe('Logic/Script Component', () => {
         params: {
           code: tsCode,
           variables: [],
-          returns: [{ name: 'msg', type: 'string' }],
+          returns: [{ name: 'msg', type: 'string', required: true }],
         },
       },
       mockContext,
@@ -195,7 +195,7 @@ describe('Logic/Script Component', () => {
         params: {
           code,
           variables: [],
-          returns: [{ name: 'status', type: 'number' }],
+          returns: [{ name: 'status', type: 'number', required: true }],
         },
       },
       mockContext,
@@ -207,8 +207,8 @@ describe('Logic/Script Component', () => {
   it('correctly resolves ports', () => {
     const params = {
       code: '',
-      variables: [{ name: 'in1', type: 'string' as const }],
-      returns: [{ name: 'out1', type: 'boolean' as const }],
+      variables: [{ name: 'in1', type: 'string' as const, required: true }],
+      returns: [{ name: 'out1', type: 'boolean' as const, required: true }],
     };
     const ports = definition.resolvePorts!(params)!;
 
@@ -222,5 +222,43 @@ describe('Logic/Script Component', () => {
     expect(outputPorts).toHaveLength(1);
     expect(outputPorts[0].id).toBe('out1');
     expect(outputPorts[0].connectionType).toEqual({ kind: 'primitive', name: 'boolean' });
+  });
+
+  it('marks variables with required false as optional input ports', () => {
+    const ports = definition.resolvePorts!({
+      code: '',
+      variables: [
+        { name: 'requiredIssues', type: 'list-json' as const, required: true },
+        { name: 'optionalErrors', type: 'list-text' as const, required: false },
+      ],
+      returns: [],
+    })!;
+
+    const inputPorts = extractPorts(ports.inputs!);
+
+    expect(inputPorts.find((port) => port.id === 'requiredIssues')?.required).toBe(true);
+    expect(inputPorts.find((port) => port.id === 'optionalErrors')?.required).toBe(false);
+    expect(inputPorts.find((port) => port.id === 'optionalErrors')?.connectionType).toEqual({
+      kind: 'list',
+      element: { kind: 'primitive', name: 'text' },
+    });
+  });
+
+  it('resolves analytics result outputs for analytics sink wiring', () => {
+    const params = {
+      code: '',
+      variables: [],
+      returns: [{ name: 'results', type: 'analytics-results' as const, required: true }],
+    };
+    const ports = definition.resolvePorts!(params as never)!;
+
+    const outputPorts = extractPorts(ports.outputs!);
+
+    expect(outputPorts).toHaveLength(1);
+    expect(outputPorts[0].id).toBe('results');
+    expect(outputPorts[0].connectionType).toEqual({
+      kind: 'list',
+      element: { kind: 'contract', name: 'core.analytics.result.v1' },
+    });
   });
 });

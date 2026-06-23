@@ -217,16 +217,17 @@ describe('Nuclei Component', () => {
 });
 
 describe('Nuclei Docker launcher', () => {
-  test('updates built-in templates before forwarding scanner arguments', () => {
+  test('installs built-in templates from archive before forwarding scanner arguments', () => {
     const scanArgs = ['-jsonl', '-l', '/inputs/targets.txt', '-t', 'http/exposures/'];
 
     const command = buildNucleiDockerCommand(scanArgs, true);
 
     expect(command[0]).toBe('-lc');
-    expect(command[1]).toContain('nuclei -update-templates');
+    expect(command[1]).toContain('nuclei-templates/archive/refs/heads/main.zip');
+    expect(command[1]).toContain('wget -q');
     expect(command[1]).toContain('exec nuclei "$@"');
+    expect(command[1]).not.toContain('-update-templates');
     expect(command.slice(2)).toEqual(['nuclei', ...scanArgs]);
-    expect(command).not.toContain('-update-templates');
   });
 });
 

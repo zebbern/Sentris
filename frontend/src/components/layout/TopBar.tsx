@@ -7,13 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft,
-  Save,
   Play,
   PencilLine,
   MonitorPlay,
   Upload,
   Download,
-  CheckCircle2,
   Loader2,
   Pencil,
   MoreVertical,
@@ -21,7 +19,6 @@ import {
   Redo2,
   ExternalLink,
   Package,
-  ChevronDown,
   History,
 } from 'lucide-react';
 import {
@@ -40,9 +37,19 @@ import { useAuthStore, DEFAULT_ORG_ID } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { env } from '@/config/env';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-import { NotificationCenter } from '@/components/layout/NotificationCenter';
+const TOOLBAR_BUTTON_CLASS = 'h-8 shrink-0 px-2.5 text-xs';
+const TOOLBAR_ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0';
 
 interface TopBarProps {
   workflowId?: string;
@@ -89,6 +96,7 @@ export function TopBar({
   const isMac = useIsMac();
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [saveBeforeRunOpen, setSaveBeforeRunOpen] = useState(false);
   const [tempWorkflowName, setTempWorkflowName] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [showPencil, setShowPencil] = useState(false);
@@ -144,24 +152,31 @@ export function TopBar({
     }
   };
 
-  const handleSave = async () => {
-    if (!canEdit) {
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await Promise.resolve(onSave());
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const needsSaveBeforeRun = mode === 'design' && (isDirty || !workflowId || workflowId === 'new');
 
   const handleRun = () => {
     if (!canEdit) {
       return;
     }
-    if (onRun) {
-      onRun();
+    if (needsSaveBeforeRun) {
+      setSaveBeforeRunOpen(true);
+      return;
+    }
+    onRun?.();
+  };
+
+  const handleSaveFromDialog = async (andRun: boolean) => {
+    setIsSaving(true);
+    try {
+      await Promise.resolve(onSave());
+      if (!useWorkflowStore.getState().isDirty) {
+        setSaveBeforeRunOpen(false);
+        if (andRun) {
+          onRun?.();
+        }
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -204,41 +219,48 @@ export function TopBar({
     }
   }, [metadata.name]);
 
+  const showAnalyticsOption = Boolean(
+    env.VITE_OPENSEARCH_DASHBOARDS_URL &&
+    workflowId &&
+    (!selectedRunId || (selectedRunStatus && selectedRunStatus !== 'RUNNING')),
+  );
+
+  const handleViewAnalytics = () => {
+    if (!showAnalyticsOption || !isOrgReady || !hasAnalyticsSink || !workflowId) return;
+    const url = buildOpenSearchUrl({
+      baseUrl: env.VITE_OPENSEARCH_DASHBOARDS_URL!,
+      workflowId,
+      runId: selectedRunId,
+      orgId: selectedRunOrgId || organizationId,
+    });
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const showOverflowMenu =
+    mode === 'design' || showAnalyticsOption || (onPublishTemplate && isInWorkflowBuilder);
+
   const modeToggle = (
-    <div className="flex rounded-lg border bg-muted/40 overflow-hidden text-xs font-medium shadow-sm flex-shrink-0">
+    <div className="inline-flex shrink-0 items-center rounded-md border bg-muted/40 p-0.5 text-xs font-medium shadow-sm">
       <Button
         variant={mode === 'design' ? 'default' : 'ghost'}
         size="sm"
-        className="h-8 md:h-9 px-2 md:px-3 gap-1.5 md:gap-2 rounded-none"
+        className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5 rounded-sm px-2 sm:px-2.5')}
         onClick={() => {
           if (!canEdit || !workflowId) return;
-          // Navigate to design URL - this triggers mode update via useLayoutEffect
           navigate(`/workflows/${workflowId}`);
         }}
         disabled={!canEdit}
         aria-pressed={mode === 'design'}
       >
-        <PencilLine className="h-4 w-4 flex-shrink-0" />
-        <span className="flex flex-col leading-tight text-left">
-          <span className="text-xs font-semibold hidden sm:inline">Design</span>
-          <span
-            className={cn(
-              'text-xs hidden xl:inline',
-              mode === 'design' ? 'text-primary-foreground/80' : 'text-muted-foreground',
-            )}
-          >
-            Edit workflow
-          </span>
-        </span>
+        <PencilLine className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden sm:inline">Design</span>
       </Button>
       <Button
         variant={mode === 'execution' ? 'default' : 'ghost'}
         size="sm"
-        className="h-8 md:h-9 px-2 md:px-3 gap-1.5 md:gap-2 rounded-none border-l border-border/50"
+        className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5 rounded-sm px-2 sm:px-2.5')}
         onClick={() => {
           if (!workflowId) return;
-          // Navigate to execution URL - this triggers mode update via useLayoutEffect
-          // If a run is selected, navigate to that specific run
           const executionPath = selectedRunId
             ? `/workflows/${workflowId}/runs/${selectedRunId}`
             : `/workflows/${workflowId}/runs`;
@@ -246,77 +268,37 @@ export function TopBar({
         }}
         aria-pressed={mode === 'execution'}
       >
-        <MonitorPlay className="h-4 w-4 flex-shrink-0" />
-        <span className="flex flex-col leading-tight text-left">
-          <span className="text-xs font-semibold hidden sm:inline">Execute</span>
-          <span
-            className={cn(
-              'text-xs hidden xl:inline',
-              mode === 'execution' ? 'text-primary-foreground/80' : 'text-muted-foreground',
-            )}
-          >
-            Inspect executions
-          </span>
-        </span>
+        <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden sm:inline">Execute</span>
       </Button>
     </div>
   );
 
-  const saveState = isSaving ? 'saving' : isDirty ? 'dirty' : 'clean';
-
-  const saveLabel = saveState === 'clean' ? 'Saved' : saveState === 'saving' ? 'Saving…' : 'Save';
-  const saveBadgeText =
-    saveState === 'clean' ? 'Synced' : saveState === 'saving' ? 'Syncing' : 'Pending';
-  const saveBadgeTone =
-    saveState === 'clean'
-      ? '!bg-emerald-50 !text-emerald-700 !border-emerald-300 dark:!bg-emerald-900 dark:!text-emerald-100 dark:!border-emerald-500'
-      : saveState === 'saving'
-        ? '!bg-blue-50 !text-blue-700 !border-blue-300 dark:!bg-blue-900 dark:!text-blue-100 dark:!border-blue-500'
-        : '!bg-amber-50 !text-amber-700 !border-amber-300 dark:!bg-amber-900 dark:!text-amber-100 dark:!border-amber-500';
-
-  const saveButtonClasses = cn(
-    'gap-2 min-w-0 transition-all duration-200',
-    saveState === 'clean' && 'border-emerald-200 dark:border-emerald-700',
-    saveState === 'dirty' && 'border-border',
-    saveState === 'saving' && 'border-blue-300 dark:border-blue-700',
-  );
-
-  const saveIcon =
-    saveState === 'clean' ? (
-      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-    ) : saveState === 'saving' ? (
-      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-    ) : (
-      <Save className="h-4 w-4" />
-    );
-
   return (
-    <div className="min-h-[56px] md:min-h-[60px] border-b bg-background flex flex-nowrap items-center px-2 md:px-4 gap-1.5 md:gap-3 py-0">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => navigate('/')}
-        aria-label="Back to workflows"
-        className="h-9 w-9 flex-shrink-0"
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </Button>
+    <>
+      <div className="min-h-[52px] border-b bg-background flex flex-nowrap items-center gap-2 px-2 md:px-4 py-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/')}
+          aria-label="Back to workflows"
+          className={TOOLBAR_ICON_BUTTON_CLASS}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex w-full gap-2 md:gap-4 items-center">
-          {/* Workflow name - fixed width left section for consistent centering */}
-          <div className="flex items-center justify-start gap-2 min-w-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px] flex-shrink-0">
+        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 justify-self-start">
             <div
               className={cn(
-                'flex items-center gap-2 min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[280px] lg:max-w-[360px]',
+                'flex min-w-0 max-w-full items-center gap-2',
                 isEditingTitle
-                  ? 'rounded-lg border border-border/60 bg-muted/40 px-2 md:px-3 py-1 md:py-1.5 shadow-sm'
+                  ? 'rounded-lg border border-border/60 bg-muted/40 px-2 py-1 shadow-sm'
                   : 'group relative cursor-pointer',
               )}
               onMouseEnter={() => canEdit && !isEditingTitle && setShowPencil(true)}
               onMouseLeave={() => setShowPencil(false)}
               onClick={() => {
-                // Allow tap to edit on mobile
                 if (canEdit && !isEditingTitle) {
                   handleStartEditing();
                 }
@@ -329,20 +311,20 @@ export function TopBar({
                   onChange={(e) => setTempWorkflowName(e.target.value)}
                   onBlur={handleChangeWorkflowName}
                   onKeyDown={handleKeyDown}
-                  className="font-semibold bg-transparent border-none shadow-none h-7 px-0 py-0 text-xs sm:text-sm md:text-base focus-visible:ring-0 focus-visible:ring-offset-0 w-full min-w-[80px]"
+                  className="h-7 min-w-[80px] w-full border-none bg-transparent px-0 py-0 text-xs font-semibold shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-sm"
                   placeholder="Workflow name"
                   maxLength={100}
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
                 <>
-                  <h1 className="font-semibold text-xs sm:text-sm md:text-base text-foreground pr-0 sm:pr-6 truncate">
+                  <h1 className="truncate text-xs font-semibold text-foreground sm:text-sm md:max-w-[280px] lg:max-w-[360px]">
                     {metadata.name || DEFAULT_WORKFLOW_NAME}
                   </h1>
                   {canEdit && (
                     <Pencil
                       className={cn(
-                        'h-3 w-3 sm:h-3.5 sm:w-3.5 text-muted-foreground flex-shrink-0 transition-opacity',
+                        'h-3 w-3 shrink-0 text-muted-foreground transition-opacity sm:h-3.5 sm:w-3.5',
                         showPencil ? 'opacity-100' : 'opacity-50 sm:opacity-0',
                       )}
                     />
@@ -351,209 +333,172 @@ export function TopBar({
               )}
             </div>
             {metadata.currentVersion !== null && metadata.currentVersion !== undefined && (
-              <span className="hidden lg:inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border/60 flex-shrink-0">
+              <span className="hidden shrink-0 items-center rounded-md border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground lg:inline-flex">
                 v{metadata.currentVersion}
               </span>
             )}
           </div>
-          {/* Mode toggle - flex-centered, pointer-events-none prevents the flex-1 area from blocking adjacent buttons */}
-          <div className="flex-1 flex justify-center min-w-0 relative pointer-events-none">
-            <div className="flex-shrink-0 pointer-events-auto">{modeToggle}</div>
-          </div>
-          {/* Actions on the right - fixed width to match left section for consistent centering */}
-          <div className="flex items-center justify-end gap-1 md:gap-2 flex-shrink-0 w-[140px] sm:w-[200px] md:w-[280px] lg:w-[360px] relative z-10 overflow-hidden">
-            <div className="flex items-center gap-1 md:gap-2">
-              {mode === 'design' && (
-                <>
-                  <Button
-                    onClick={handleSave}
-                    disabled={!canEdit || isSaving || saveState === 'clean'}
-                    variant="outline"
-                    className={saveButtonClasses}
-                    size="sm"
-                    title={
-                      saveState === 'dirty'
-                        ? 'Changes pending sync'
-                        : saveState === 'saving'
-                          ? 'Syncing now…'
-                          : 'No pending edits'
-                    }
-                  >
-                    {saveIcon}
-                    <span className="hidden xl:inline">{saveLabel}</span>
-                    <span
-                      className={cn(
-                        'text-xs font-medium px-1.5 py-0.5 rounded border ml-0 xl:ml-1',
-                        saveBadgeTone,
-                        'hidden 2xl:inline-block',
-                      )}
+
+          <div className="justify-self-center">{modeToggle}</div>
+
+          <div className="flex min-w-0 flex-wrap items-center justify-end justify-self-end gap-1 md:gap-1.5">
+            <Button
+              onClick={handleRun}
+              disabled={!canEdit}
+              size="sm"
+              aria-label="Run"
+              className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5')}
+            >
+              <Play className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Run</span>
+            </Button>
+
+            {showOverflowMenu && (
+              <>
+                {mode === 'design' && onImport && (
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json,.json,.yaml,.yml"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={TOOLBAR_ICON_BUTTON_CLASS}
+                      aria-label="More options"
                     >
-                      {saveBadgeText}
-                    </span>
-                  </Button>
-                </>
-              )}
-
-              {env.VITE_OPENSEARCH_DASHBOARDS_URL &&
-                workflowId &&
-                (!selectedRunId || (selectedRunStatus && selectedRunStatus !== 'RUNNING')) && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 md:gap-2 min-w-0"
-                            disabled={!isOrgReady || !hasAnalyticsSink}
-                            onClick={() => {
-                              if (!isOrgReady || !hasAnalyticsSink) return;
-                              // Use the run's backend-resolved org ID when available (matches indexed data),
-                              // fall back to auth store org ID for workflow-level queries
-                              const url = buildOpenSearchUrl({
-                                baseUrl: env.VITE_OPENSEARCH_DASHBOARDS_URL,
-                                workflowId,
-                                runId: selectedRunId,
-                                orgId: selectedRunOrgId || organizationId,
-                              });
-                              window.open(url, '_blank', 'noopener,noreferrer');
-                            }}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="hidden lg:inline">View Analytics</span>
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {!hasAnalyticsSink
-                          ? 'Connect analytics sink to view analytics'
-                          : !isOrgReady
-                            ? 'Loading organization context...'
-                            : selectedRunId
-                              ? 'View analytics for this run in OpenSearch Dashboards'
-                              : 'View analytics for this workflow in OpenSearch Dashboards'}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-
-              {/* Run button with dropdown for Publish */}
-              <div className="flex items-center">
-                <Button
-                  onClick={handleRun}
-                  disabled={!canEdit}
-                  size="sm"
-                  className="gap-1.5 md:gap-2 min-w-0 rounded-r-none"
-                >
-                  <Play className="h-4 w-4" />
-                  <span className="hidden sm:inline">Run</span>
-                </Button>
-                {onPublishTemplate && isInWorkflowBuilder && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size="sm"
-                        className="px-1.5 rounded-l-none border-l border-primary-foreground/20"
-                        disabled={!canEdit}
-                        aria-label="More actions"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-[180px]">
-                      <DropdownMenuItem onClick={onPublishTemplate} disabled={!canEdit}>
-                        <Package className="mr-2 h-4 w-4" />
-                        <span>Publish as Template</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-
-              {/* Notification bell - integrated here instead of floating absolute */}
-              <NotificationCenter />
-
-              {/* Vertical three-dots menu: Undo, Redo, Import, Export */}
-              {mode === 'design' && (
-                <>
-                  {onImport && (
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="application/json,.json,.yaml,.yml"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label="More options"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={onUndo} disabled={!canEdit || !canUndo}>
-                        <Undo2 className="mr-2 h-4 w-4" />
-                        <span>Undo</span>
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                          {isMac ? '⌘Z' : 'Ctrl+Z'}
-                        </span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={onRedo} disabled={!canEdit || !canRedo}>
-                        <Redo2 className="mr-2 h-4 w-4" />
-                        <span>Redo</span>
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                          {isMac ? '⌘⇧Z' : 'Ctrl+Shift+Z'}
-                        </span>
-                      </DropdownMenuItem>
-                      {(onImport || onExport) && <DropdownMenuSeparator />}
-                      {onImport && (
-                        <DropdownMenuItem
-                          onClick={handleImportClick}
-                          disabled={!canEdit || isImporting}
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          <span>Import</span>
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {mode === 'design' && (
+                      <>
+                        <DropdownMenuItem onClick={onUndo} disabled={!canEdit || !canUndo}>
+                          <Undo2 className="mr-2 h-4 w-4" />
+                          <span>Undo</span>
+                          <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                            {isMac ? '⌘Z' : 'Ctrl+Z'}
+                          </span>
                         </DropdownMenuItem>
-                      )}
-                      {onExport && (
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger disabled={!canEdit}>
-                            <Download className="mr-2 h-4 w-4" />
-                            <span>Export</span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            <DropdownMenuItem onClick={() => onExport('json')}>
-                              <span>JSON (.json)</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onExport('yaml')}>
-                              <span>YAML (.yaml)</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      )}
-                      {onToggleVersionHistory && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={onToggleVersionHistory}>
-                            <History className="mr-2 h-4 w-4" />
-                            <span>Version History</span>
+                        <DropdownMenuItem onClick={onRedo} disabled={!canEdit || !canRedo}>
+                          <Redo2 className="mr-2 h-4 w-4" />
+                          <span>Redo</span>
+                          <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                            {isMac ? '⌘⇧Z' : 'Ctrl+Shift+Z'}
+                          </span>
+                        </DropdownMenuItem>
+                        {(onImport || onExport || showAnalyticsOption) && <DropdownMenuSeparator />}
+                      </>
+                    )}
+                    {showAnalyticsOption && (
+                      <DropdownMenuItem
+                        onClick={handleViewAnalytics}
+                        disabled={!isOrgReady || !hasAnalyticsSink}
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        <span>View Analytics</span>
+                      </DropdownMenuItem>
+                    )}
+                    {mode === 'design' && onImport && (
+                      <DropdownMenuItem
+                        onClick={handleImportClick}
+                        disabled={!canEdit || isImporting}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        <span>Import</span>
+                      </DropdownMenuItem>
+                    )}
+                    {mode === 'design' && onExport && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger disabled={!canEdit}>
+                          <Download className="mr-2 h-4 w-4" />
+                          <span>Export</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem onClick={() => onExport('json')}>
+                            <span>JSON (.json)</span>
                           </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-            </div>
+                          <DropdownMenuItem onClick={() => onExport('yaml')}>
+                            <span>YAML (.yaml)</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    )}
+                    {onPublishTemplate && isInWorkflowBuilder && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={onPublishTemplate} disabled={!canEdit}>
+                          <Package className="mr-2 h-4 w-4" />
+                          <span>Publish as Template</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {mode === 'design' && onToggleVersionHistory && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={onToggleVersionHistory}>
+                          <History className="mr-2 h-4 w-4" />
+                          <span>Version History</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         </div>
       </div>
-    </div>
+
+      <AlertDialog open={saveBeforeRunOpen} onOpenChange={setSaveBeforeRunOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Want to save current state?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Save your workflow before running, or cancel to keep
+              editing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={isSaving}
+              onClick={() => void handleSaveFromDialog(false)}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+            <AlertDialogAction
+              disabled={isSaving}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleSaveFromDialog(true);
+              }}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save & Run'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

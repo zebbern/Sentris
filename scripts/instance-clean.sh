@@ -9,8 +9,6 @@
 set -euo pipefail
 
 INSTANCE="${1:-0}"
-INFRA_PROJECT_NAME="sentris-infra"
-DB_NAME="sentris_instance_${INSTANCE}"
 NAMESPACE="sentris-dev-${INSTANCE}"
 TEMPORAL_ADDRESS="127.0.0.1:7233"
 
@@ -23,12 +21,17 @@ log_info() { echo -e "${BLUE}ℹ${NC} $*"; }
 log_success() { echo -e "${GREEN}✅${NC} $*"; }
 log_error() { echo -e "${RED}❌${NC} $*"; }
 
-POSTGRES_CONTAINER="$(
-  docker compose -f docker/docker-compose.infra.yml --project-name="$INFRA_PROJECT_NAME" ps -q postgres 2>/dev/null || true
-)"
+validate_instance() {
+  if [[ ! "$1" =~ ^[0-9]+$ ]] || [ "$1" -lt 0 ] || [ "$1" -gt 9 ]; then
+    log_error "Instance must be an integer from 0 to 9. Got: $1"
+    exit 1
+  fi
+}
 
-if [ -z "$POSTGRES_CONTAINER" ]; then
-  log_error "Postgres container not found (infra project: $INFRA_PROJECT_NAME). Is infra running?"
+validate_instance "$INSTANCE"
+
+if ! docker ps --filter "name=sentris-postgres" --format "{{.Names}}" | grep -q "^sentris-postgres$"; then
+  log_error "Postgres container not found. Is shared infra running?"
   exit 1
 fi
 
@@ -44,14 +47,11 @@ if command -v temporal >/dev/null 2>&1; then
   temporal operator namespace delete --address "$TEMPORAL_ADDRESS" --namespace "$NAMESPACE" --yes >/dev/null 2>&1 || true
 fi
 
-REDPANDA_CONTAINER="$(
-  docker compose -f docker/docker-compose.infra.yml --project-name="$INFRA_PROJECT_NAME" ps -q redpanda 2>/dev/null || true
-)"
-if [ -n "$REDPANDA_CONTAINER" ]; then
+if docker ps --filter "name=sentris-redpanda" --format "{{.Names}}" | grep -q "^sentris-redpanda$"; then
   log_info "Deleting Kafka topics for instance $INSTANCE (best-effort)..."
   for base in telemetry.logs telemetry.events telemetry.agent-trace telemetry.node-io; do
     topic="${base}.instance-${INSTANCE}"
-    docker exec "$REDPANDA_CONTAINER" rpk topic delete "$topic" --brokers redpanda:9092 >/dev/null 2>&1 || true
+    docker exec sentris-redpanda rpk topic delete "$topic" --brokers redpanda:9092 >/dev/null 2>&1 || true
   done
 fi
 

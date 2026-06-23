@@ -1,5 +1,9 @@
 import type { WebhookInputDefinition } from '@sentris/shared';
 
+export const WEBHOOK_EDITOR_TABS = ['editor', 'deliveries', 'settings'] as const;
+
+export type WebhookEditorTab = (typeof WEBHOOK_EDITOR_TABS)[number];
+
 /** Runtime input definition returned by the workflow runtime-inputs endpoint. */
 export interface RuntimeInput {
   id: string;

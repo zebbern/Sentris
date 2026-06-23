@@ -11,6 +11,7 @@ import { ConfigPanelToolSection } from './config-panel/ConfigPanelToolSection';
 import { ConfigPanelMcpServer } from './config-panel/ConfigPanelMcpServer';
 import { ConfigPanelParameters } from './config-panel/ConfigPanelParameters';
 import { ConfigPanelInputs } from './config-panel/ConfigPanelInputs';
+import { AgentModelConfig } from './config-panel/AgentModelConfig';
 import { ConfigPanelOutputs } from './config-panel/ConfigPanelOutputs';
 import { ConfigPanelSchedules } from './config-panel/ConfigPanelSchedules';
 import { ConfigPanelExamples } from './config-panel/ConfigPanelExamples';
@@ -216,6 +217,15 @@ export function ConfigPanel({
     (value): value is string => Boolean(value && value.trim().length > 0),
   );
 
+  const modelConnection = nodeData.inputs?.model;
+  const modelHasConnection = Boolean(modelConnection);
+  const modelConnectedSummary = modelConnection
+    ? (() => {
+        const sourceNode = getNodes().find((n) => n.id === modelConnection.source);
+        return (sourceNode?.data as FrontendNodeData)?.label || modelConnection.source;
+      })()
+    : undefined;
+
   return (
     <div
       className="config-panel border-l bg-background flex flex-col h-full overflow-hidden relative"
@@ -265,6 +275,14 @@ export function ConfigPanel({
             nodeInputs={nodeData.inputs}
             isToolMode={isToolMode}
             onParamValueChange={handleParamValueChange}
+          />
+
+          <AgentModelConfig
+            componentId={component.id}
+            modelValue={inputOverrides.model}
+            hasConnection={modelHasConnection}
+            connectedSummary={modelConnectedSummary}
+            onChange={(value) => handleInputOverrideChange('model', value)}
           />
 
           <ConfigPanelInputs

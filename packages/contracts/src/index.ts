@@ -55,8 +55,12 @@ const buildLlmProviderSchema = () =>
     z.object({
       provider: z.literal('anthropic'),
       modelId: z.string(),
+      authMode: z.enum(['api_key', 'subscription_oauth']).optional(),
       apiKey: z.string().optional(),
       apiKeySecretId: z.string().optional(),
+      oauthToken: z.string().optional(),
+      oauthTokenSecretId: z.string().optional(),
+      effort: z.enum(['default', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
       baseUrl: z.string().optional(),
     }),
   ]);

@@ -104,29 +104,24 @@ export function WebhookRow({
         <Badge variant={statusBadgeProps.variant}>{statusBadgeProps.label}</Badge>
       </TableCell>
       <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-1 md:gap-2">
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 h-8 shrink-0 px-3"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewHistory(webhook);
+            }}
+            aria-label="View delivery history"
+          >
+            <ExternalLink className="h-4 w-4" />
+            History
+          </Button>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 h-8 px-2 md:px-3"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewHistory(webhook);
-                }}
-                aria-label="View delivery history"
-              >
-                <ExternalLink className="h-4 w-4" />
-                <span className="hidden md:inline">History</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>View delivery history</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
                 aria-label="Regenerate URL"
                 onClick={(e) => {
@@ -134,7 +129,7 @@ export function WebhookRow({
                   onRegeneratePath(webhook);
                 }}
                 disabled={isActionBusy}
-                className="h-8 w-8"
+                className="h-8 w-8 shrink-0"
               >
                 <RotateCw className={cn('h-4 w-4', isActionBusy && 'animate-spin')} />
               </Button>
@@ -152,7 +147,7 @@ export function WebhookRow({
                   onDelete(webhook);
                 }}
                 disabled={isActionBusy}
-                className="h-8 w-8"
+                className="h-8 w-8 shrink-0"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

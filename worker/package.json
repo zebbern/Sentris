@@ -16,7 +16,7 @@
     "start": "bun run dist/temporal/workers/dev.worker.js",
     "build": "tsc",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --build",
     "test": "bun test"
   },
   "dependencies": {

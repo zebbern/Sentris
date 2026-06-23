@@ -43,7 +43,7 @@ const API_BASE = getApiBaseUrl();
 e2eDescribe('Alert Investigation: End-to-End Workflow', () => {
   beforeAll(() => {
     if (!requiredSecretsReady) {
-      throw new Error('Missing required ENV vars. Copy e2e-tests/.env.e2e.example to .env.e2e and fill secrets.');
+      throw new Error('Missing required ENV vars. Copy e2e-tests/.env.e2e.example to e2e-tests/.env.e2e and fill secrets.');
     }
   });
 

@@ -87,6 +87,12 @@ const ROUTE_CONFIG: RouteEntry[] = [
     subtitle: 'Discover and manage MCP server configurations',
   },
   {
+    path: '/agent-skills',
+    title: 'Agent Skills',
+    shortTitle: 'Agent Skills',
+    subtitle: 'Import skill folders for OpenCode and Claude Code agents',
+  },
+  {
     path: '/analytics-settings',
     title: 'Analytics Settings',
     shortTitle: 'Analytics Settings',

@@ -1,10 +1,14 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createExecutionContext, componentRegistry } from '../packages/component-sdk/src/index.ts';
 import {
+  createSecurityComponentDockerBuildPlan,
   createSecurityComponentFingerprint,
+  createSecurityComponentContractSnapshot,
   getDefaultLedgerPath,
+  materializeSecurityComponentAuditFixture,
   parseSecurityComponentAuditCliOptions,
+  pruneSecurityComponentLedger,
   readSecurityComponentLedger,
   renderSecurityComponentLedgerFreshness,
   SECURITY_COMPONENT_IDS,
@@ -18,21 +22,32 @@ import {
 } from './security-component-audit-utils';
 
 await import('../worker/src/components/security/register-all.ts');
+const { createExecutionContext, componentRegistry } = await import(
+  '../worker/node_modules/@sentris/component-sdk'
+);
 
 const cli = parseSecurityComponentAuditCliOptions(process.argv.slice(2));
 const selectedIds =
   cli.componentIds.size > 0
     ? SECURITY_COMPONENT_IDS.filter((id) => cli.componentIds.has(id))
     : [...SECURITY_COMPONENT_IDS];
+const componentMetadata = componentRegistry.listMetadata();
+const componentMetadataById = new Map(
+  componentMetadata.map((entry) => [entry.definition.id, entry]),
+);
 
 if (selectedIds.length === 0) {
   throw new Error('No matching security components selected for audit');
 }
 
 let ledger: SecurityComponentLedger = readSecurityComponentLedger() ?? { version: 1, entries: {} };
+if (cli.componentIds.size === 0) {
+  ledger =
+    pruneSecurityComponentLedger(ledger, SECURITY_COMPONENT_IDS) ?? { version: 1, entries: {} };
+}
 
 if (cli.ledgerCheckOnly) {
-  const summary = summarizeSecurityComponentLedgerFreshness(ledger, selectedIds);
+  const summary = summarizeSecurityComponentLedgerFreshness(ledger, selectedIds, componentMetadata);
   console.log(renderSecurityComponentLedgerFreshness(summary));
   if (!summary.allCurrent) {
     process.exitCode = 1;
@@ -57,19 +72,43 @@ interface AuditResult {
 
 const results: AuditResult[] = [];
 
+function dockerImageExists(image: string): boolean {
+  try {
+    execFileSync('docker', ['image', 'inspect', image], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureFixtureDockerImage(fixture: (typeof SECURITY_COMPONENT_LIVE_FIXTURES)[SecurityComponentId]): void {
+  const buildPlan = createSecurityComponentDockerBuildPlan(fixture, dockerImageExists);
+  if (!buildPlan) return;
+
+  console.log(`BUILD ${buildPlan.image} from ${buildPlan.context}`);
+  execFileSync('docker', buildPlan.args, { cwd: process.cwd(), stdio: 'inherit' });
+}
+
 for (const componentId of selectedIds) {
   const fixture = SECURITY_COMPONENT_LIVE_FIXTURES[componentId];
-  const fingerprint = createSecurityComponentFingerprint(componentId, fixture);
+  const contract = createSecurityComponentContractSnapshot(componentMetadataById.get(componentId));
+  const fingerprint = createSecurityComponentFingerprint(
+    componentId,
+    fixture,
+    contract,
+  );
   const skipped = shouldSkipSecurityComponentLiveAudit({
     ledger,
     componentId,
     fingerprint,
     force: cli.force,
     fixture,
+    contract,
   });
 
   if (skipped) {
-    console.log(`SKIP ${componentId}: ${skipped.error ?? 'ledger current'}`);
+    const statusLabel = skipped.status === 'passed' ? 'CURRENT' : 'SKIP';
+    console.log(`${statusLabel} ${componentId}: ${skipped.error ?? 'ledger current'}`);
     results.push({
       componentId,
       status: skipped.status === 'passed' ? 'passed' : 'skipped',
@@ -99,10 +138,12 @@ for (const componentId of selectedIds) {
 
   const started = Date.now();
   try {
+    ensureFixtureDockerImage(fixture);
+    const liveFixture = materializeSecurityComponentAuditFixture(fixture);
     console.log(`AUDIT ${componentId} (tier ${fixture.tier})`);
     const runId = `security-audit-${componentId.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     await component.execute(
-      { inputs: fixture.inputs, params: fixture.params },
+      { inputs: liveFixture.inputs, params: liveFixture.params },
       createExecutionContext({ runId, componentRef: componentId }),
     );
     const durationMs = Date.now() - started;

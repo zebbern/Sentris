@@ -28,3 +28,4 @@ export * from './workflow-tags';
 export * from './finding-triage';
 export * from './sla-policies';
 export * from './ticketing';
+export * from './agent-skills';

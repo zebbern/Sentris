@@ -23,13 +23,38 @@ function maskSecretPorts(secretPorts: { id: string }[], data: unknown): unknown 
     const clone = { ...(data as Record<string, unknown>) };
     for (const port of secretPorts) {
       if (Object.prototype.hasOwnProperty.call(clone, port.id)) {
-        clone[port.id] = '***';
+        clone[port.id] = maskCredentialValue(clone[port.id]);
       }
     }
     return clone;
   }
 
   return '***';
+}
+
+const LLM_CREDENTIAL_KEYS = ['apiKey', 'oauthToken', 'apiKeySecretId', 'oauthTokenSecretId'];
+
+function maskCredentialValue(value: unknown): unknown {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return '***';
+  }
+
+  const record = value as Record<string, unknown>;
+  const clone = { ...record };
+  let maskedAny = false;
+
+  for (const key of LLM_CREDENTIAL_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(clone, key)) {
+      clone[key] = '***';
+      maskedAny = true;
+    }
+  }
+
+  return maskedAny ? clone : '***';
 }
 
 /**

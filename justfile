@@ -45,15 +45,8 @@ dev action="start":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Resolve active instance: env var → .sentris-instance file → default 0
-    if [ -n "${SENTRIS_INSTANCE:-}" ]; then
-        INST="${SENTRIS_INSTANCE}"
-    elif [ -f ".sentris-instance" ]; then
-        INST="$(tr -d '[:space:]' < .sentris-instance || true)"
-        INST="${INST:-0}"
-    else
-        INST="0"
-    fi
+    # Resolve active instance through the shared helper so env/file values are validated.
+    INST="$(./scripts/active-instance.sh get)"
     export SENTRIS_INSTANCE="$INST"
 
     # Instance-aware PM2 app names and ports
@@ -116,6 +109,7 @@ dev action="start":
 
                 # Update git SHA and start PM2 with security enabled
                 ./scripts/set-git-sha.sh || true
+                SENTRIS_INSTANCE="$INST" node scripts/prune-pm2-dev-logs.js || true
                 SENTRIS_INSTANCE="$INST" SENTRIS_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=true NODE_TLS_REJECT_UNAUTHORIZED=0 \
                     pm2 startOrReload pm2.config.cjs --only "$PM2_APPS" --update-env
 
@@ -144,6 +138,7 @@ dev action="start":
 
                 # Update git SHA and start PM2
                 ./scripts/set-git-sha.sh || true
+                SENTRIS_INSTANCE="$INST" node scripts/prune-pm2-dev-logs.js || true
                 SENTRIS_INSTANCE="$INST" SENTRIS_ENV=development NODE_ENV=development OPENSEARCH_SECURITY_ENABLED=false \
                     OPENSEARCH_URL=http://localhost:9200 \
                     pm2 startOrReload pm2.config.cjs --only "$PM2_APPS" --update-env
@@ -203,6 +198,7 @@ dev action="start":
         clean)
             echo "🧹  Cleaning development environment (instance ${INST})..."
             pm2 delete sentris-frontend-${INST} sentris-backend-${INST} sentris-worker-${INST} 2>/dev/null || true
+            SENTRIS_INSTANCE="$INST" node scripts/prune-pm2-dev-logs.js || true
             # Only tear down infra if instance 0
             if [ "$INST" = "0" ]; then
                 if [ "$SECURE_MODE" = "true" ]; then
@@ -533,13 +529,8 @@ status:
 db-reset:
     #!/usr/bin/env bash
     set -euo pipefail
-    if ! docker ps --filter "name=sentris-postgres" --format "{{{{.Names}}}}" | grep -q "sentris-postgres"; then
-        echo "❌  PostgreSQL not running. Run: just dev" && exit 1
-    fi
-    docker exec sentris-postgres psql -U sentris -d postgres -c "DROP DATABASE IF EXISTS sentris;"
-    docker exec sentris-postgres psql -U sentris -d postgres -c "CREATE DATABASE sentris;"
-    bun --cwd=backend run migration:push
-    echo "✅  Database reset"
+    INST="$(./scripts/active-instance.sh get)"
+    ./scripts/db-reset-instance.sh "$INST"
 
 # Build production images without starting
 build:

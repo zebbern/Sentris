@@ -21,15 +21,20 @@ import type {
 } from '@sentris/shared';
 import { loader } from '@monaco-editor/react';
 import type {
+  WebhookEditorTab,
   WebhookFormState,
   WorkflowOption,
   RuntimeInput,
   WebhookTestResult,
 } from './webhookEditorTypes';
-import { DEFAULT_PARSING_SCRIPT } from './webhookEditorTypes';
+import { DEFAULT_PARSING_SCRIPT, WEBHOOK_EDITOR_TABS } from './webhookEditorTypes';
 
 // Configure Monaco
 loader.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs' } });
+
+function isWebhookEditorTab(value: string): value is WebhookEditorTab {
+  return WEBHOOK_EDITOR_TABS.includes(value as WebhookEditorTab);
+}
 
 export function useWebhookEditor() {
   const { id } = useParams<{ id: string }>();
@@ -49,7 +54,7 @@ export function useWebhookEditor() {
   const openWebhooksSidebarOnReturn = navigationState?.returnTo?.openWebhooksSidebar;
 
   // Derive active tab from URL
-  const activeTab = useMemo(() => {
+  const activeTab = useMemo<WebhookEditorTab>(() => {
     if (location.pathname.endsWith('/deliveries')) return 'deliveries';
     if (location.pathname.endsWith('/settings')) return 'settings';
     return 'editor';
@@ -57,6 +62,7 @@ export function useWebhookEditor() {
 
   const navigateToTab = useCallback(
     (tab: string) => {
+      if (!isWebhookEditorTab(tab)) return;
       if (isNew) return;
       const basePath = `/webhooks/${id}`;
       if (tab === 'editor') {

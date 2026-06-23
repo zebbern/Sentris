@@ -6,6 +6,7 @@
  *
  * Usage:
  *   cd backend && bun scripts/seed-templates.ts
+ *   cd backend && bun scripts/seed-templates.ts --dry-run
  *   TEMPLATE_SEED_DATABASE_URL=postgresql://... bun scripts/seed-templates.ts
  */
 
@@ -18,9 +19,27 @@ import {
   formatDatabaseTarget,
   getScriptDatabaseTarget,
 } from '../../scripts/lib/local-script-runtime';
+import {
+  REMOVED_OFFICIAL_SEED_TEMPLATES,
+  type RemovedOfficialSeedTemplate,
+} from '../src/templates/retired-official-seed-templates';
+
+export { REMOVED_OFFICIAL_SEED_TEMPLATES };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+interface SeedTemplatesCliOptions {
+  help: boolean;
+  dryRun: boolean;
+}
+
+interface SeedTemplatesCliDependencies {
+  seedTemplates?: () => Promise<void>;
+  dryRunSeedTemplates?: () => Promise<void>;
+  stdout?: (message: string) => void;
+  stderr?: (message: string) => void;
+}
 
 interface TemplateJson {
   _metadata: {
@@ -36,7 +55,125 @@ interface TemplateJson {
   requiredSecrets: { name: string; type: string; description: string }[];
 }
 
-async function seedTemplates(): Promise<void> {
+interface TemplateSeedDbClient {
+  query(sql: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+export async function pruneRemovedOfficialSeedTemplates(
+  client: TemplateSeedDbClient,
+  removedTemplates: RemovedOfficialSeedTemplate[],
+  updatedAt = new Date(),
+): Promise<number> {
+  const names = Array.from(
+    new Set(removedTemplates.map((template) => template.name.trim()).filter(Boolean)),
+  );
+  const paths = Array.from(
+    new Set(removedTemplates.map((template) => template.path.trim()).filter(Boolean)),
+  );
+
+  if (names.length === 0 && paths.length === 0) return 0;
+
+  const result = await client.query(
+    `UPDATE templates
+      SET is_active = false,
+          updated_at = $1
+      WHERE repository = $2
+        AND is_official = true
+        AND is_active = true
+        AND (name = ANY($3::text[]) OR path = ANY($4::text[]))
+      RETURNING name`,
+    [updatedAt, 'sentris/templates', names, paths],
+  );
+
+  return result.rows.length;
+}
+
+export function createSeedTemplatesUsage(): string {
+  return [
+    'Usage:',
+    '  bun scripts/seed-templates.ts [--dry-run]',
+    '',
+    'Options:',
+    '  --dry-run   Print the active target and seed file summary without writing to the database.',
+    '  --help, -h  Show this help text.',
+  ].join('\n');
+}
+
+export function parseSeedTemplatesCliOptions(argv: string[]): SeedTemplatesCliOptions {
+  const options: SeedTemplatesCliOptions = { help: false, dryRun: false };
+
+  for (const arg of argv) {
+    switch (arg) {
+      case '--help':
+      case '-h':
+        options.help = true;
+        break;
+      case '--dry-run':
+        options.dryRun = true;
+        break;
+      default:
+        throw new Error(`Unknown seed template option: ${arg}`);
+    }
+  }
+
+  return options;
+}
+
+function readSeedTemplateFiles(): string[] {
+  const seedDir = join(__dirname, 'seed-templates');
+  return readdirSync(seedDir)
+    .filter((file) => file.endsWith('.json'))
+    .sort();
+}
+
+export async function dryRunSeedTemplates(): Promise<void> {
+  const databaseTarget = getScriptDatabaseTarget({
+    overrideEnvVar: 'TEMPLATE_SEED_DATABASE_URL',
+  });
+  const files = readSeedTemplateFiles();
+
+  console.log(`\nSeed templates dry run: no database writes will be performed.`);
+  console.log(formatDatabaseTarget(databaseTarget));
+  console.log(`Connection: ${databaseTarget.redactedConnectionString}`);
+  console.log(`Found ${files.length} template files to seed`);
+  console.log(
+    `Would keep ${REMOVED_OFFICIAL_SEED_TEMPLATES.length} retired official template rule(s) available for deactivation during a real seed.\n`,
+  );
+}
+
+export async function runSeedTemplatesCli(
+  argv = process.argv.slice(2),
+  {
+    seedTemplates: runSeed = seedTemplates,
+    dryRunSeedTemplates: runDryRun = dryRunSeedTemplates,
+    stdout = console.log,
+    stderr = console.error,
+  }: SeedTemplatesCliDependencies = {},
+): Promise<number> {
+  let options: SeedTemplatesCliOptions;
+  try {
+    options = parseSeedTemplatesCliOptions(argv);
+  } catch (error) {
+    stderr(error instanceof Error ? error.message : String(error));
+    stderr(createSeedTemplatesUsage());
+    return 1;
+  }
+
+  if (options.help) {
+    stdout(createSeedTemplatesUsage());
+    return 0;
+  }
+
+  if (options.dryRun) {
+    await runDryRun();
+    return 0;
+  }
+
+  await runSeed();
+  return 0;
+}
+
+export async function seedTemplates(): Promise<void> {
   const databaseTarget = getScriptDatabaseTarget({
     overrideEnvVar: 'TEMPLATE_SEED_DATABASE_URL',
   });
@@ -45,9 +182,8 @@ async function seedTemplates(): Promise<void> {
   const pool = new Pool({ connectionString });
   const client = await pool.connect();
 
-  // Read all JSON files from the seed-templates directory
   const seedDir = join(__dirname, 'seed-templates');
-  const files = readdirSync(seedDir).filter((f) => f.endsWith('.json'));
+  const files = readSeedTemplateFiles();
 
   console.log(`\nConnecting to database...`);
   console.log(formatDatabaseTarget(databaseTarget));
@@ -162,7 +298,17 @@ async function seedTemplates(): Promise<void> {
       inserted++;
     }
 
-    console.log(`\nDone: ${inserted} inserted, ${updated} updated\n`);
+    const deactivated = await pruneRemovedOfficialSeedTemplates(
+      client,
+      REMOVED_OFFICIAL_SEED_TEMPLATES,
+    );
+    if (deactivated > 0) {
+      console.log(
+        `\n  Deactivated ${deactivated} retired official seed template(s)`,
+      );
+    }
+
+    console.log(`\nDone: ${inserted} inserted, ${updated} updated, ${deactivated} deactivated\n`);
   } catch (err) {
     console.error('Failed to seed templates:', err);
     process.exit(1);
@@ -172,4 +318,7 @@ async function seedTemplates(): Promise<void> {
   }
 }
 
-seedTemplates();
+if (import.meta.main) {
+  const exitCode = await runSeedTemplatesCli();
+  process.exitCode = exitCode;
+}

@@ -7,16 +7,21 @@ Sentris Flow supports running multiple isolated dev instances (0-9) on one machi
 ```bash
 # Instance 0 (default) — works exactly as before
 just dev
+bun run dev
 
 # Check active instance for this workspace
 just instance show
+bun run instance show
 
 # Persist instance 1 for this workspace
 just instance use 1
+bun run instance use 1
 just dev          # now starts instance 1
+bun run dev       # also starts instance 1
 
 # Stop your instance
 just dev stop
+bun run dev:stop
 ```
 
 ## How It Works
@@ -34,16 +39,21 @@ The instance is resolved in this order:
 
 1. `SENTRIS_INSTANCE` environment variable (highest priority)
 2. `.sentris-instance` file in repo root (gitignored)
-3. Defaults to `0`
+3. Initialize `.sentris-instance` to `0` and use instance `0`
 
 ```bash
 # Per-command
 SENTRIS_INSTANCE=2 just dev
+SENTRIS_INSTANCE=2 bun run dev
 
 # Per-workspace (persistent)
 just instance use 2
+bun run instance use 2
 just dev
+bun run dev
 ```
+
+If `just` is not available, use `bun run instance show` and `bun run instance use N` for the same workspace-scoped selector. `bun run instance show` creates `.sentris-instance` with `0` when no active instance has been selected, so later scripts have an explicit target. The value must be an integer from `0` to `9`; malformed values fail fast before ports, PM2 app names, or databases are computed. The cross-platform `bun run dev [start|stop|logs|status|clean]` and `bun run dev:stop` scripts use the same resolution order as the rest of local tooling, and `bun run dev` initializes or repairs `.instances/instance-N/{backend,worker,frontend}.env` before PM2 starts.
 
 ## Instance Env Files
 
@@ -56,6 +66,9 @@ PM2 can read per-instance env files from:
 Use `just instance-env` to manage them:
 
 ```bash
+# Omit N to use SENTRIS_INSTANCE, then .sentris-instance, initializing it to 0 if missing
+just instance-env show
+
 # Create env files for an instance (uses app/.env, or falls back to app/.env.example)
 just instance-env init 2
 
@@ -109,30 +122,44 @@ The Vite dev server proxies `/api` calls to the correct backend port automatical
 
 ## Commands
 
-All commands respect `SENTRIS_INSTANCE` (or the active instance selected by `just instance use N`):
+All commands respect `SENTRIS_INSTANCE` (or the active instance selected by `just instance use N` / `bun run instance use N`):
 
 ```bash
 # Select instance once per workspace
 just instance use 1
+bun run instance use 1
 
 # Start
 just dev
 
 # Stop (only stops PM2 apps; infra stays running for other instances)
 just dev stop
+bun run dev:stop
 
 # Logs (filtered to your instance's PM2 apps)
 just dev logs
 
 # Status
 just dev status
+bun run dev status
 
 # Clean (stops PM2 apps; only tears down infra if instance 0)
 just dev clean
 
+# Reset the active instance database, then rerun migrations
+just db-reset
+
 # One-off override without changing active workspace instance
 SENTRIS_INSTANCE=3 just dev
+SENTRIS_INSTANCE=3 bun run dev
+SENTRIS_INSTANCE=3 just db-reset
 ```
+
+`just dev status` and `bun run dev status` show PM2 app state, shared Docker infrastructure state, and live runtime probes for the selected instance's frontend, backend liveness, backend readiness, and worker health endpoints. This catches the case where PM2 is already `online` but the app has not opened its HTTP port yet.
+
+`just dev`, `bun run dev`, `just dev clean`, and `bun run dev clean` prune oversized PM2 logs for the selected instance before or after PM2 lifecycle actions. The default cap is 64MB per app log file (`sentris-{frontend,backend,worker}-N-{out,error}.log`). Override it for a local session with `SENTRIS_PM2_LOG_MAX_BYTES`.
+
+The backend PM2 app watches `backend/src`, `backend/scripts/seed-templates`, and `packages/shared/src` so template catalog and validation metadata changes are reflected in the running API. The worker PM2 app watches its own source plus shared runtime package sources used during execution.
 
 When stopping/cleaning instance 0, Docker infra is also torn down. For non-zero instances, only the PM2 apps are stopped (since other instances may still need the shared infra).
 
@@ -146,9 +173,11 @@ Scripts that mutate or inspect local Postgres data are instance-aware. They reso
 2. Generic script override: `SENTRIS_SCRIPT_DATABASE_URL`
 3. `SENTRIS_INSTANCE`
 4. `.sentris-instance`
-5. Instance `0`
+5. Initialize `.sentris-instance` to `0` and use instance `0`
 
-These scripts intentionally do **not** use plain `DATABASE_URL` by default. `DATABASE_URL` belongs to the running app process, Drizzle CLI, and app env files; using it for local maintenance scripts can accidentally target the legacy `sentris` database instead of `sentris_instance_N`.
+These scripts intentionally do **not** use plain `DATABASE_URL` by default. `DATABASE_URL` belongs to the running app process, production Drizzle runs, and app env files; using it for local maintenance scripts can accidentally target the legacy `sentris` database instead of `sentris_instance_N`.
+
+Local Drizzle migrations are covered by the same rule. `bun --cwd backend run migration:push` targets the active instance by default, ignores stale `backend/.env` `DATABASE_URL` values, and initializes `.sentris-instance` to `0` if needed. Use `DRIZZLE_DATABASE_URL` only when intentionally migrating a different database. In production (`NODE_ENV=production` or `SENTRIS_ENV=production`), Drizzle uses `DATABASE_URL`.
 
 Scripts that start or inspect Temporal workflows resolve namespace and task queue in this order:
 
@@ -156,15 +185,19 @@ Scripts that start or inspect Temporal workflows resolve namespace and task queu
 2. Generic override pair: `SENTRIS_SCRIPT_TEMPORAL_NAMESPACE` + `SENTRIS_SCRIPT_TEMPORAL_TASK_QUEUE`
 3. `SENTRIS_INSTANCE`
 4. `.sentris-instance`
-5. Instance `0`
+5. Initialize `.sentris-instance` to `0` and use instance `0`
 
 These scripts intentionally do **not** use plain `TEMPORAL_NAMESPACE` / `TEMPORAL_TASK_QUEUE` by default for the same reason: stale app env files can point a script at the wrong local instance.
 
 Every maintenance script should print its target database and/or Temporal target before mutating data or starting workflows:
 
 ```bash
+bun --cwd backend scripts/seed-templates.ts --dry-run
+# Seed templates dry run: no database writes will be performed.
+# Target database: sentris_instance_0 via file:.sentris-instance
+
 bun --cwd backend scripts/seed-templates.ts
-# Target database: sentris_instance_0 via default:instance-0
+# Target database: sentris_instance_0 via file:.sentris-instance
 
 SENTRIS_INSTANCE=2 bun --cwd backend scripts/seed-templates.ts
 # Target database: sentris_instance_2 via env:SENTRIS_INSTANCE
@@ -172,13 +205,19 @@ SENTRIS_INSTANCE=2 bun --cwd backend scripts/seed-templates.ts
 TEMPLATE_SEED_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd backend scripts/seed-templates.ts
 # Target database: custom_db via env:TEMPLATE_SEED_DATABASE_URL
 
+bun --cwd backend run migration:push
+# Drizzle targets the active instance database
+
+DRIZZLE_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd backend run migration:push
+# Drizzle targets custom_db intentionally
+
 bun --cwd worker scripts/workflow-runner.ts --workflow <workflow-id>
-# Target Temporal: namespace=sentris-dev-0, taskQueue=sentris-dev-0 via default:instance-0
+# Target Temporal: namespace=sentris-dev-0, taskQueue=sentris-dev-0 via file:.sentris-instance
 ```
 
 ## E2E Tests (Instance-Aware)
 
-E2E tests use the same instance resolution to pick the right backend port:
+E2E tests use `SENTRIS_INSTANCE`, then legacy `E2E_INSTANCE`, then `.sentris-instance`, initializing it to `0` if missing, to pick the right backend port. The `bun run test:e2e*` scripts call a Node runner, so they work from PowerShell, cmd, Bash, and WSL without requiring `bash` to be installed.
 
 ```bash
 # Against the active instance
@@ -186,6 +225,9 @@ bun run test:e2e
 
 # Against a specific instance
 SENTRIS_INSTANCE=2 bun run test:e2e
+
+# Run a scoped E2E folder
+bun run test:e2e:core
 ```
 
 ## Troubleshooting

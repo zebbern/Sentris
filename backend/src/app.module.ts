@@ -55,6 +55,8 @@ import { TemplatesModule } from './templates/templates.module';
 import { FindingTriageModule } from './findings/finding-triage.module';
 import { OrgMembersModule } from './org/org-members.module';
 import { TicketingModule } from './ticketing/ticketing.module';
+import { AgentSkillsModule } from './agent-skills/agent-skills.module';
+import { AiModule } from './ai/ai.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
 import { CorrelationIdMiddleware } from './common/middleware';
@@ -90,6 +92,8 @@ const coreModules = [
   FindingTriageModule,
   OrgMembersModule,
   TicketingModule,
+  AgentSkillsModule,
+  AiModule,
 ];
 
 const testingModules = process.env.NODE_ENV === 'production' ? [] : [TestingSupportModule];

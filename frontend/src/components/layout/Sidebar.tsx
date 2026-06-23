@@ -291,19 +291,12 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                       ))}
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {Array.from({ length: 4 }).map((_, idx) => (
-                        <div key={idx} className="rounded-lg p-3 bg-background/50">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <Skeleton className="h-5 w-5 rounded" />
-                                <Skeleton className="h-3 w-16" />
-                              </div>
-                              <Skeleton className="h-3 w-6" />
-                            </div>
-                            <Skeleton className="h-3 w-full" />
-                            <Skeleton className="h-3 w-3/4" />
+                        <div key={idx} className="rounded-md p-2 bg-background/50">
+                          <div className="flex flex-col items-center gap-1">
+                            <Skeleton className="h-4 w-4 rounded" />
+                            <Skeleton className="h-3 w-14" />
                           </div>
                         </div>
                       ))}
@@ -407,7 +400,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                               ))}
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-1.5">
                               {components.map((component) => (
                                 <ComponentItem
                                   key={component.id}

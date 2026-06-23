@@ -126,6 +126,26 @@ OPENSEARCH_URL=http://opensearch:9200
 
 This is pre-configured in `docker-compose.full.yml`. For detailed analytics documentation, see [docs/analytics-pipeline.mdx](../docs/analytics-pipeline.mdx).
 
+## Agent Runner Images
+
+| Image | Dockerfile | Purpose |
+| ----- | ---------- | ------- |
+| `ghcr.io/zebbern/opencode:latest` | `docker/opencode/` | OpenCode autonomous investigation agent |
+| `ghcr.io/zebbern/claude-code:latest` | `docker/claude-code/` | Claude Code CLI headless agent |
+
+Build locally:
+
+```bash
+docker build -t ghcr.io/zebbern/opencode:latest docker/opencode/
+docker build -t ghcr.io/zebbern/claude-code:latest docker/claude-code/
+```
+
+Smoke test Claude Code CLI:
+
+```bash
+docker run --rm ghcr.io/zebbern/claude-code:latest --version
+```
+
 ## Directory Structure
 
 ```

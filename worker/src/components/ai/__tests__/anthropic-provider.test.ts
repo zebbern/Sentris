@@ -32,7 +32,7 @@ describe('core.provider.anthropic component', () => {
     const result = await component.execute(
       {
         inputs: { apiKey: 'sk-ant-test-key-123' },
-        params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+        params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
       },
       context,
     );
@@ -40,7 +40,7 @@ describe('core.provider.anthropic component', () => {
     expect(result).toEqual({
       chatModel: {
         provider: 'anthropic',
-        modelId: 'claude-sonnet-4-20250514',
+        modelId: 'claude-sonnet-4-6',
         apiKey: 'sk-ant-test-key-123',
       },
     });
@@ -56,7 +56,7 @@ describe('core.provider.anthropic component', () => {
       component.execute(
         {
           inputs: { apiKey: '' },
-          params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+          params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
         },
         context,
       ),
@@ -73,7 +73,7 @@ describe('core.provider.anthropic component', () => {
       component.execute(
         {
           inputs: { apiKey: '   ' },
-          params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+          params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
         },
         context,
       ),
@@ -88,12 +88,12 @@ describe('core.provider.anthropic component', () => {
     const result = (await component.execute(
       {
         inputs: { apiKey: 'sk-ant-key' },
-        params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+        params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
       },
       context,
     )) as unknown as AnthropicProviderOutput;
 
-    expect(result.chatModel.modelId).toBe('claude-sonnet-4-20250514');
+    expect(result.chatModel.modelId).toBe('claude-sonnet-4-6');
   });
 
   it('should include baseUrl when provided', async () => {
@@ -105,7 +105,7 @@ describe('core.provider.anthropic component', () => {
       {
         inputs: { apiKey: 'sk-ant-key' },
         params: {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           apiBaseUrl: 'https://custom-api.example.com',
         },
       },
@@ -114,7 +114,7 @@ describe('core.provider.anthropic component', () => {
 
     expect(result.chatModel).toEqual({
       provider: 'anthropic',
-      modelId: 'claude-sonnet-4-20250514',
+      modelId: 'claude-sonnet-4-6',
       apiKey: 'sk-ant-key',
       baseUrl: 'https://custom-api.example.com',
     });
@@ -128,7 +128,7 @@ describe('core.provider.anthropic component', () => {
     const result = (await component.execute(
       {
         inputs: { apiKey: 'sk-ant-key' },
-        params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+        params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
       },
       context,
     )) as unknown as AnthropicProviderOutput;
@@ -144,12 +144,12 @@ describe('core.provider.anthropic component', () => {
     const result = (await component.execute(
       {
         inputs: { apiKey: 'sk-ant-key' },
-        params: { model: 'claude-3-5-haiku-20241022', apiBaseUrl: '' },
+        params: { model: 'claude-haiku-4-5', apiBaseUrl: '' },
       },
       context,
     )) as unknown as AnthropicProviderOutput;
 
-    expect(result.chatModel.modelId).toBe('claude-3-5-haiku-20241022');
+    expect(result.chatModel.modelId).toBe('claude-haiku-4-5');
     expect(result.chatModel.provider).toBe('anthropic');
   });
 
@@ -161,7 +161,7 @@ describe('core.provider.anthropic component', () => {
     const result = (await component.execute(
       {
         inputs: { apiKey: '  sk-ant-key  ' },
-        params: { model: 'claude-sonnet-4-20250514', apiBaseUrl: '' },
+        params: { model: 'claude-sonnet-4-6', apiBaseUrl: '' },
       },
       context,
     )) as unknown as AnthropicProviderOutput;
@@ -178,7 +178,7 @@ describe('core.provider.anthropic component', () => {
       {
         inputs: { apiKey: 'sk-ant-key' },
         params: {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           apiBaseUrl: '  https://custom.example.com  ',
         },
       },

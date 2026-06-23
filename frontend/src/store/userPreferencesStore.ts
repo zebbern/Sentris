@@ -9,11 +9,13 @@ interface UserPreferencesState {
   notifyOnRunComplete: boolean;
   notifyOnRunFailed: boolean;
   notifyOnScheduleTriggered: boolean;
+  showCanvasMinimap: boolean;
   setDefaultLandingPage: (page: string) => void;
   setSidebarDensity: (density: SidebarDensity) => void;
   setNotifyOnRunComplete: (value: boolean) => void;
   setNotifyOnRunFailed: (value: boolean) => void;
   setNotifyOnScheduleTriggered: (value: boolean) => void;
+  setShowCanvasMinimap: (value: boolean) => void;
 }
 
 export const useUserPreferencesStore = create<UserPreferencesState>()(
@@ -24,11 +26,13 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
       notifyOnRunComplete: true,
       notifyOnRunFailed: true,
       notifyOnScheduleTriggered: true,
+      showCanvasMinimap: false,
       setDefaultLandingPage: (page) => set({ defaultLandingPage: page }),
       setSidebarDensity: (density) => set({ sidebarDensity: density }),
       setNotifyOnRunComplete: (value) => set({ notifyOnRunComplete: value }),
       setNotifyOnRunFailed: (value) => set({ notifyOnRunFailed: value }),
       setNotifyOnScheduleTriggered: (value) => set({ notifyOnScheduleTriggered: value }),
+      setShowCanvasMinimap: (value) => set({ showCanvasMinimap: value }),
     }),
     {
       name: 'sentris:user-preferences',
@@ -38,6 +42,7 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
         notifyOnRunComplete: state.notifyOnRunComplete,
         notifyOnRunFailed: state.notifyOnRunFailed,
         notifyOnScheduleTriggered: state.notifyOnScheduleTriggered,
+        showCanvasMinimap: state.showCanvasMinimap,
       }),
     },
   ),

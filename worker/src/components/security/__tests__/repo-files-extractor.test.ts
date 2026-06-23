@@ -8,6 +8,7 @@ import '../repo-files-extractor';
 
 interface RepoFilesExtractorResult {
   sourceBundle: string;
+  githubActionsBundle: string;
   terraformBundle: string;
   kubernetesBundle: string;
   dockerfileBundle: string;
@@ -29,6 +30,7 @@ interface RepoFilesExtractorResult {
     selectedFiles: number;
     skippedFiles: number;
     sourceFiles: number;
+    githubActionsFiles: number;
     terraformFiles: number;
     kubernetesFiles: number;
     dockerfileFiles: number;
@@ -150,6 +152,51 @@ describe('repository files extractor component', () => {
         expect.objectContaining({ path: 'assets/logo.png', reason: 'unsupported_type' }),
       ]),
     );
+  });
+
+  it('extracts GitHub Actions workflows into a dedicated bundle', async () => {
+    const component = componentRegistry.get<any, any>('sentris.repository.files.extract');
+    if (!component) throw new Error('Repository files extractor component was not registered');
+
+    const treeUrl = 'https://api.github.com/repos/example/project/git/trees/main?recursive=1';
+    const rawBase = 'https://raw.githubusercontent.com/example/project/main';
+    const { context } = createContext({
+      [treeUrl]: {
+        tree: [
+          { path: '.github/workflows/ci.yml', type: 'blob', size: 132 },
+          { path: 'src/server.js', type: 'blob', size: 42 },
+        ],
+      },
+      [`${rawBase}/.github/workflows/ci.yml`]:
+        'name: ci\non: pull_request_target\npermissions:\n  contents: write\n',
+      [`${rawBase}/src/server.js`]: 'console.log("app");\n',
+    });
+
+    const result = (await component.execute(
+      {
+        inputs: {
+          repositoryUrl: 'https://github.com/example/project',
+          ref: 'main',
+        },
+        params: {},
+      },
+      context,
+    )) as RepoFilesExtractorResult;
+
+    expect(result.githubActionsBundle).toContain('FILE: .github/workflows/ci.yml');
+    expect(result.githubActionsBundle).toContain('pull_request_target');
+    expect(result.sourceBundle).toContain('FILE: src/server.js');
+    expect(result.sourceBundle).toContain('FILE: .github/workflows/ci.yml');
+    expect(result.files).toContainEqual(
+      expect.objectContaining({
+        path: '.github/workflows/ci.yml',
+        category: 'github-actions',
+      }),
+    );
+    expect(result.summary).toMatchObject({
+      githubActionsFiles: 1,
+      sourceFiles: 1,
+    });
   });
 
   it('enforces file and byte bounds before fetching raw content', async () => {

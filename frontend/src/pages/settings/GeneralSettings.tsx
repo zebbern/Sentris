@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
@@ -52,6 +53,8 @@ export function GeneralSettings() {
   const sidebarDensity = useUserPreferencesStore((s) => s.sidebarDensity);
   const setDefaultLandingPage = useUserPreferencesStore((s) => s.setDefaultLandingPage);
   const setSidebarDensity = useUserPreferencesStore((s) => s.setSidebarDensity);
+  const showCanvasMinimap = useUserPreferencesStore((s) => s.showCanvasMinimap);
+  const setShowCanvasMinimap = useUserPreferencesStore((s) => s.setShowCanvasMinimap);
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -108,6 +111,26 @@ export function GeneralSettings() {
               <span className="text-xs text-muted-foreground">{option.description}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Workflow canvas minimap */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+          <div className="space-y-1">
+            <Label htmlFor="canvas-minimap" className="text-sm font-medium">
+              Workflow canvas minimap
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Show a small overview map in the bottom-right corner of the workflow builder.
+            </p>
+          </div>
+          <Switch
+            id="canvas-minimap"
+            checked={showCanvasMinimap}
+            onCheckedChange={setShowCanvasMinimap}
+            aria-label="Show workflow canvas minimap"
+          />
         </div>
       </div>
     </div>

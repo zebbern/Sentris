@@ -8,10 +8,17 @@ import {
   RedisHealthIndicator,
   TemporalHealthIndicator,
 } from './indicators';
+import { HealthProbeService } from './health-probe.service';
 
 @Module({
   imports: [TerminusModule, ConfigModule],
   controllers: [HealthController],
-  providers: [PostgresHealthIndicator, RedisHealthIndicator, TemporalHealthIndicator],
+  providers: [
+    HealthProbeService,
+    PostgresHealthIndicator,
+    RedisHealthIndicator,
+    TemporalHealthIndicator,
+  ],
+  exports: [HealthProbeService],
 })
 export class HealthModule {}

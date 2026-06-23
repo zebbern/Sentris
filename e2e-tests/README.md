@@ -49,21 +49,24 @@ pm2 start pm2.config.cjs
 
 ```bash
 # All tiers
-source e2e-tests/.env.e2e && bun run test:e2e
+bun run test:e2e
 
 # Core only (fast, no keys needed)
 bun run test:e2e:core
 
 # Pipeline only (needs API keys in env)
-source e2e-tests/.env.e2e && bun run test:e2e:pipeline
+bun run test:e2e:pipeline
 
 # Cloud only (needs AWS + ngrok)
-source e2e-tests/.env.e2e && RUN_CLOUD_E2E=true bun run test:e2e:cloud
+bun run test:e2e:cloud
 ```
 
 ## Environment Variables
 
 Copy `e2e-tests/.env.e2e.example` to `e2e-tests/.env.e2e` and fill in:
+
+The `bun run test:e2e*` Node runner loads `e2e-tests/.env.e2e` automatically. Set `SENTRIS_E2E_ENV_FILE=/path/to/custom.env` to use a different file.
+It targets the backend for `SENTRIS_INSTANCE`, then legacy `E2E_INSTANCE`, then `.sentris-instance`, defaulting to instance `0`.
 
 | Variable                | Required by     | Description                             |
 | ----------------------- | --------------- | --------------------------------------- |

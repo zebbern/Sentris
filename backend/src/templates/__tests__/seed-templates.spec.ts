@@ -9,33 +9,56 @@ const seedTemplatesDir = join(import.meta.dir, '../../../scripts/seed-templates'
 const newTemplateFiles = [
   'api-surface-exposure-triage.json',
   'attack-surface-recon-analytics.json',
+  'bug-bounty-evidence-router.json',
   'bug-bounty-recon-triage.json',
+  'claude-code-bug-bounty-evidence-analyst.json',
+  'cna-routing-resolver.json',
   'container-image-cve-triage.json',
+  'cors-auth-edge-misconfig-triage.json',
   'cve-impact-research-brief.json',
+  'cve-novelty-duplicate-gate.json',
   'exposed-service-cve-mapper.json',
   'exposure-to-cve-brief.json',
-  'github-dependency-cve-hunt-discord-report.json',
+  'github-actions-supply-chain-triage.json',
   'github-repo-dependency-cve-triage.json',
+  'graphql-exposure-triage.json',
   'kev-fresh-cve-watch-brief.json',
+  'kev-reachability-validation-brief.json',
+  'mitre-cve-record-builder.json',
   'npm-dependency-cve-hunt.json',
+  'oss-sast-cve-candidate-hunt.json',
   'passive-osint-subdomain-expansion.json',
   'public-repo-code-iac-risk-triage.json',
-  'public-repo-full-code-security-discord-report.json',
   'public-repo-full-code-security.json',
   'public-repo-secret-exposure-triage.json',
-  'security-scan-discord-report.json',
+  'security-fix-without-cve-watch.json',
   'subdomain-takeover-triage.json',
+  'supabase-project-exposure-triage.json',
+  'supply-chain-takeover-precursor-hunt.json',
   'tech-stack-cve-hunter.json',
   'web-api-fuzz-triage.json',
   'wafw00f-edge-recon-triage.json',
   'web-attack-surface-quick-win-hunt.json',
+  'web-logic-cve-candidate-hunt.json',
   'yara-ioc-payload-triage.json',
 ];
 
 function runTemplateScript<T>(code: string, input: unknown): T {
-  const executable = code.replace('export function script', 'function script');
+  const executable = code
+    .replace(/^export async function script/m, 'async function script')
+    .replace(/^export function script/m, 'function script');
   const script = new Function(`${executable}; return script;`)() as (input: unknown) => T;
   return script(input);
+}
+
+async function runTemplateScriptAsync<T>(code: string, input: unknown): Promise<T> {
+  const executable = code
+    .replace(/^export async function script/m, 'async function script')
+    .replace(/^export function script/m, 'function script');
+  const script = new Function(`${executable}; return script;`)() as (
+    input: unknown,
+  ) => T | Promise<T>;
+  return await script(input);
 }
 
 function normalizeCatalogName(value: string): string {
@@ -180,6 +203,226 @@ describe('new seed templates', () => {
       expect((runtimeInputs as unknown[]).length).toBeGreaterThan(0);
     });
   }
+
+  it('cve-novelty-duplicate-gate flags known related CVEs as likely duplicates', () => {
+    const filePath = join(seedTemplatesDir, 'cve-novelty-duplicate-gate.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_novelty',
+    );
+    const result = runTemplateScript<{ report: Record<string, unknown> & { priorArt: { nvd: Array<{ cveId: string }> } } }>(
+      assembleNode.data.config.params.code,
+      {
+        candidateSummary: 'Prototype pollution in lodash',
+        productName: 'lodash',
+        affectedVersion: '4.17.20',
+        authorizationNotes: 'test',
+        searchContext: {
+          productName: 'lodash',
+          affectedVersion: '4.17.20',
+          knownRelatedCveIds: ['CVE-2020-8203'],
+        },
+        nvdData: {
+          vulnerabilities: [
+            {
+              cve: {
+                id: 'CVE-2020-8203',
+                descriptions: [{ lang: 'en', value: 'Prototype pollution in lodash' }],
+                metrics: { cvssMetricV31: [{ cvssData: { baseSeverity: 'HIGH', baseScore: 7.4 } }] },
+              },
+            },
+          ],
+        },
+        nvdStatus: 200,
+        osvFindings: [],
+        osvSummary: {},
+        kevData: { vulnerabilities: [] },
+        kevStatus: 200,
+      },
+    );
+
+    expect(result.report.verdict).toBe('likely-duplicate');
+    expect(result.report.priorArt.nvd[0].cveId).toBe('CVE-2020-8203');
+  });
+
+  it('cve-novelty-duplicate-gate reports likely-novel when no prior art is found', () => {
+    const filePath = join(seedTemplatesDir, 'cve-novelty-duplicate-gate.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_novelty',
+    );
+    const result = runTemplateScript<{ report: { verdict: string } }>(
+      assembleNode.data.config.params.code,
+      {
+        candidateSummary: 'Novel issue',
+        productName: 'acme-widget',
+        affectedVersion: '1.0.0',
+        authorizationNotes: '',
+        searchContext: { productName: 'acme-widget', knownRelatedCveIds: [] },
+        nvdData: { vulnerabilities: [] },
+        nvdStatus: 200,
+        osvFindings: [],
+        osvSummary: {},
+        kevData: { vulnerabilities: [] },
+        kevStatus: 200,
+      },
+    );
+
+    expect(result.report.verdict).toBe('likely-novel');
+  });
+
+  it('cna-routing-resolver routes to a dedicated CNA when the product matches', () => {
+    const filePath = join(seedTemplatesDir, 'cna-routing-resolver.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const resolveNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'resolve_cna',
+    );
+    const result = runTemplateScript<{ report: { routing: string; matchedCnas: Array<{ organization: string }> } }>(
+      resolveNode.data.config.params.code,
+      {
+        vendorOrProduct: 'Apache',
+        productUrlOrRepo: 'https://github.com/apache/httpd',
+        keywords: ['httpd'],
+        authorizationNotes: '',
+        cnaListData: [
+          {
+            organizationName: 'Apache Software Foundation',
+            scope: 'All Apache projects',
+            securityAdvisories: { url: 'https://apache.org/security' },
+          },
+        ],
+        cnaStatus: 200,
+      },
+    );
+
+    expect(result.report.routing).toBe('dedicated-cna');
+    expect(result.report.matchedCnas[0].organization).toContain('Apache');
+  });
+
+  it('cna-routing-resolver falls back to MITRE when no CNA matches', () => {
+    const filePath = join(seedTemplatesDir, 'cna-routing-resolver.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const resolveNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'resolve_cna',
+    );
+    const result = runTemplateScript<{ report: { routing: string } }>(
+      resolveNode.data.config.params.code,
+      {
+        vendorOrProduct: 'totally-unknown-vendor-xyz',
+        productUrlOrRepo: '',
+        keywords: [],
+        authorizationNotes: '',
+        cnaListData: [{ organizationName: 'Apache Software Foundation', scope: 'Apache' }],
+        cnaStatus: 200,
+      },
+    );
+
+    expect(result.report.routing).toBe('mitre-cna-of-last-resort');
+  });
+
+  it('mitre-cve-record-builder skeleton maps vulnerability type to a CWE', () => {
+    const filePath = join(seedTemplatesDir, 'mitre-cve-record-builder.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const buildNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_skeleton',
+    );
+    const result = runTemplateScript<{
+      skeleton: { cweGuess: string; cveRecordV5: { dataVersion: string } };
+      agentContext: { deterministicSkeleton: { cweGuess: string } };
+    }>(buildNode.data.config.params.code, {
+      findingTitle: 'Reflected XSS in search',
+      productName: 'Example App',
+      affectedVersions: '< 1.2.3',
+      vulnerabilityType: 'Cross-site scripting',
+      attackVector: 'network',
+      impactSummary: 'JS execution',
+      reproductionSteps: 'open /search?q=...',
+      references: ['https://example.com/a'],
+      discovererCredit: 'Researcher',
+      authorizationNotes: '',
+    });
+
+    expect(result.skeleton.cweGuess).toBe('CWE-79');
+    expect(result.skeleton.cveRecordV5.dataVersion).toBe('5.1');
+    expect(result.agentContext.deterministicSkeleton.cweGuess).toBe('CWE-79');
+  });
+
+  it('mitre-cve-record-builder merges Claude JSON and falls back on invalid output', () => {
+    const filePath = join(seedTemplatesDir, 'mitre-cve-record-builder.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const mergeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_record',
+    );
+    const skeleton = {
+      mitreFormFields: {
+        product: 'Example App',
+        suggestedDescription: 'fallback desc',
+        reproductionSteps: 'steps',
+      },
+      cveRecordV5: { dataVersion: '5.1' },
+      missingRequiredFields: [],
+      cweGuess: 'CWE-79',
+    };
+
+    const refined = runTemplateScript<{
+      report: { verdict: string; mitreDescription: string; cvss: { score: number } };
+    }>(mergeNode.data.config.params.code, {
+      skeleton,
+      claudeReport:
+        '```json\n{"verdict":"ready","confidence":"high","suggestedCwe":"CWE-79","cvssV31Score":6.1,"mitreDescription":"refined desc","gaps":[],"submissionChecklist":["done"]}\n```',
+      findingTitle: 'x',
+      productName: 'Example App',
+      impactSummary: 'y',
+    });
+
+    expect(refined.report.verdict).toBe('ready');
+    expect(refined.report.mitreDescription).toBe('refined desc');
+    expect(refined.report.cvss.score).toBe(6.1);
+
+    const withPreamble = runTemplateScript<{
+      report: { verdict: string; cvss: { score: number }; aiParseError: string | null };
+    }>(mergeNode.data.config.params.code, {
+      skeleton,
+      claudeReport:
+        '[ClaudeCode] Starting agent run...\nProceeding with analysis of `/workspace/context.json`.```json\n{"verdict":"needs-more-evidence","confidence":"medium","suggestedCwe":"CWE-79","cvssV31Score":6.1,"mitreDescription":"refined","gaps":["x"],"submissionChecklist":["y"]}\n```\nThat completes the analysis.',
+      findingTitle: 'x',
+      productName: 'Example App',
+      impactSummary: 'y',
+    });
+
+    expect(withPreamble.report.verdict).toBe('needs-more-evidence');
+    expect(withPreamble.report.cvss.score).toBe(6.1);
+    expect(withPreamble.report.aiParseError).toBeNull();
+
+    const withRawNewlines = runTemplateScript<{
+      report: { verdict: string; mitreDescription: string; aiParseError: string | null };
+    }>(mergeNode.data.config.params.code, {
+      skeleton,
+      claudeReport:
+        '{"verdict":"ready","confidence":"high","mitreDescription":"line1\nline2","cvssV31Score":7,"gaps":[],"submissionChecklist":[]}',
+      findingTitle: 'x',
+      productName: 'Example App',
+      impactSummary: 'y',
+    });
+
+    expect(withRawNewlines.report.verdict).toBe('ready');
+    expect(withRawNewlines.report.aiParseError).toBeNull();
+    expect(withRawNewlines.report.mitreDescription).toContain('line1');
+
+    const fallback = runTemplateScript<{
+      report: { verdict: string; aiParseError: string | null; mitreDescription: string };
+    }>(mergeNode.data.config.params.code, {
+      skeleton,
+      claudeReport: 'no json here',
+      findingTitle: 'x',
+      productName: 'Example App',
+      impactSummary: 'y',
+    });
+
+    expect(fallback.report.verdict).toBe('needs-human-review');
+    expect(fallback.report.aiParseError).toBeTruthy();
+    expect(fallback.report.mitreDescription).toBe('fallback desc');
+  });
 
   it('cve-impact-research-brief includes source status in the report assembly inputs', () => {
     const filePath = join(seedTemplatesDir, 'cve-impact-research-brief.json');
@@ -1622,71 +1865,6 @@ describe('new seed templates', () => {
     );
   });
 
-  it('security-scan-discord-report wires Trivy, Discord, and artifact nodes', () => {
-    const filePath = join(seedTemplatesDir, 'security-scan-discord-report.json');
-    const template = JSON.parse(readFileSync(filePath, 'utf8'));
-    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
-
-    expect(nodeTypes).toEqual([
-      'core.workflow.entrypoint',
-      'sentris.trivy.run',
-      'core.logic.script',
-      'core.notification.discord',
-      'core.artifact.writer',
-    ]);
-    expect(template.requiredSecrets).toEqual([
-      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
-    ]);
-
-    const discordNode = template.graph.nodes.find(
-      (node: { id: string }) => node.id === 'discord_notify',
-    );
-    expect(discordNode.data.config.inputOverrides.webhookUrl).toBe('{{SECRET_PLACEHOLDER}}');
-
-    const discordEdges = template.graph.edges.filter(
-      (edge: { target: string }) => edge.target === 'discord_notify',
-    );
-    expect(discordEdges.map((edge: { targetHandle: string }) => edge.targetHandle).sort()).toEqual(
-      ['attachmentContent', 'summaryText'].sort(),
-    );
-  });
-
-  it('security-scan-discord-report script produces summaryText and report', () => {
-    const filePath = join(seedTemplatesDir, 'security-scan-discord-report.json');
-    const template = JSON.parse(readFileSync(filePath, 'utf8'));
-    const scriptNode = template.graph.nodes.find(
-      (node: { id: string }) => node.id === 'assemble_report',
-    );
-    const result = runTemplateScript<{
-      summaryText: string;
-      report: { summary: Record<string, unknown>; priorityFindings: unknown[] };
-      attachmentContent: string;
-    }>(scriptNode.data.config.params.code, {
-      imageRef: 'nginx:1.25',
-      vulnerabilityCount: 2,
-      vulnerabilities: [
-        {
-          vulnerabilityId: 'CVE-2024-0001',
-          pkgName: 'openssl',
-          severity: 'CRITICAL',
-          title: 'Critical TLS issue',
-        },
-        {
-          vulnerabilityId: 'CVE-2024-0002',
-          pkgName: 'zlib',
-          severity: 'LOW',
-          title: 'Low issue',
-        },
-      ],
-    });
-
-    expect(result.summaryText).toContain('nginx:1.25');
-    expect(result.summaryText).toContain('highest: critical');
-    expect(result.report.summary.actionableFindings).toBe(1);
-    expect(result.report.priorityFindings).toHaveLength(1);
-    expect(result.attachmentContent).toContain('"priorityFindings"');
-  });
-
   it('tech-stack-cve-hunter wires httpx, NVD, artifact, and Run Report Discord with Run after', () => {
     const filePath = join(seedTemplatesDir, 'tech-stack-cve-hunter.json');
     const template = JSON.parse(readFileSync(filePath, 'utf8'));
@@ -1750,25 +1928,6 @@ describe('new seed templates', () => {
 
     expect(result.keywordSearch).toBe('nginx');
     expect(result.fingerprints.sourceUrls).toEqual(['https://app.example.com']);
-  });
-
-  it('github-dependency-cve-hunt-discord-report wires Run Report Discord after artifact save', () => {
-    const filePath = join(seedTemplatesDir, 'github-dependency-cve-hunt-discord-report.json');
-    const template = JSON.parse(readFileSync(filePath, 'utf8'));
-    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
-
-    expect(nodeTypes).toContain('core.notification.run-report-discord');
-    expect(template.manifest.nodeCount).toBe(10);
-    expect(template.manifest.edgeCount).toBe(29);
-    expect(template.requiredSecrets).toEqual([
-      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
-    ]);
-
-    const runAfterEdge = template.graph.edges.find(
-      (edge: { id: string }) => edge.id === 'artifact_report-run_report_discord-after',
-    );
-    expect(runAfterEdge?.targetHandle).toBe('after');
-    expect(runAfterEdge?.sourceHandle).toBe('saved');
   });
 
   it('kev-fresh-cve-watch-brief wires keyword NVD lookup and KEV enrichment', () => {
@@ -1974,6 +2133,107 @@ describe('new seed templates', () => {
     expect(new Set(result.report.priorityFindings.map((item) => item.dedupeKey)).size).toBe(3);
   });
 
+  it('github-actions-supply-chain-triage wires extraction, analysis, artifact, and analytics sink', () => {
+    const filePath = join(seedTemplatesDir, 'github-actions-supply-chain-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle ?? '*'}->${edge.target}:${edge.targetHandle ?? '*'}`,
+    );
+
+    expect(nodeTypes).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.repository.files.extract',
+      'core.logic.script',
+      'core.artifact.writer',
+      'core.analytics.sink',
+    ]);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:repositoryUrl->extract_repo_files:repositoryUrl',
+        'trigger_1:ref->extract_repo_files:ref',
+        'extract_repo_files:githubActionsBundle->analyze_github_actions:githubActionsBundle',
+        'extract_repo_files:summary->analyze_github_actions:fileSummary',
+        'analyze_github_actions:report->artifact_report:content',
+        'analyze_github_actions:analyticsResults->analytics_sink:github_actions',
+      ]),
+    );
+    expect(template.requiredSecrets).toEqual([]);
+
+    const analyticsNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'analytics_sink',
+    );
+    expect(analyticsNode.data.config.params.failOnError).toBe(false);
+    expect(analyticsNode.data.config.params.indexSuffix).toBe('github-actions-supply-chain');
+  });
+
+  it('github-actions-supply-chain-triage prioritizes exploitable workflow patterns', () => {
+    const filePath = join(seedTemplatesDir, 'github-actions-supply-chain-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const analyzeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'analyze_github_actions',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: Record<string, unknown>;
+        priorityFindings: {
+          ruleId: string;
+          severity: string;
+          priorityReasons: string[];
+          evidence: string[];
+        }[];
+      };
+      analyticsResults: { scanner: string; severity: string; finding_hash: string }[];
+    }>(analyzeNode.data.config.params.code, {
+      repositoryUrl: 'https://github.com/example/project',
+      authorizationNotes: '',
+      githubActionsBundle:
+        '# FILE: .github/workflows/pr.yml\nname: pr\non: pull_request_target\npermissions: write-all\njobs:\n  test:\n    runs-on: self-hosted\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v1\n      - uses: acme/build-action@main\n      - run: curl https://example.com/install.sh | bash\n        env:\n          TOKEN: ${{ secrets.GITHUB_TOKEN }}\n',
+      fileSummary: {
+        repository: 'https://github.com/example/project',
+        ref: 'main',
+        githubActionsFiles: 1,
+        truncated: false,
+      },
+      files: [{ path: '.github/workflows/pr.yml', category: 'github-actions' }],
+      skippedFiles: [],
+    });
+
+    expect(result.report.summary.actionableFindings).toBeGreaterThanOrEqual(4);
+    expect(result.report.summary.highestSeverity).toBe('critical');
+    expect(result.report.priorityFindings[0].ruleId).toBe('pull-request-target-write-token');
+    expect(result.report.priorityFindings[0].priorityReasons).toEqual(
+      expect.arrayContaining([
+        'pull_request_target can run attacker-controlled changes with privileged token context',
+        'workflow grants broad write permissions',
+      ]),
+    );
+    expect(result.report.priorityFindings.map((finding) => finding.ruleId)).toEqual(
+      expect.arrayContaining([
+        'mutable-github-owned-action-ref',
+        'unpinned-third-party-action',
+        'self-hosted-runner',
+      ]),
+    );
+    expect(
+      result.report.priorityFindings.find(
+        (finding) => finding.ruleId === 'mutable-github-owned-action-ref',
+      ),
+    ).toMatchObject({
+      severity: 'low',
+    });
+    expect(result.analyticsResults).toContainEqual(
+      expect.objectContaining({
+        scanner: 'github-actions-supply-chain',
+        severity: 'critical',
+      }),
+    );
+    expect(new Set(result.analyticsResults.map((finding) => finding.finding_hash)).size).toBe(
+      result.analyticsResults.length,
+    );
+  });
+
   it('attack-surface-recon-analytics wires subfinder, dnsx, httpx, dedupe, artifact, and analytics sink', () => {
     const filePath = join(seedTemplatesDir, 'attack-surface-recon-analytics.json');
     const template = JSON.parse(readFileSync(filePath, 'utf8'));
@@ -2040,28 +2300,6 @@ describe('new seed templates', () => {
     expect(result.report.assets[0].host).toBe('www.example.com');
     expect(result.report.assets[0].url).toBe('https://www.example.com');
     expect(result.report.assets[0].statusCode).toBe(200);
-  });
-
-  it('public-repo-full-code-security-discord-report wires Run Report Discord after artifact save', () => {
-    const filePath = join(seedTemplatesDir, 'public-repo-full-code-security-discord-report.json');
-    const template = JSON.parse(readFileSync(filePath, 'utf8'));
-
-    expect(template.manifest.nodeCount).toBe(14);
-    expect(template.requiredSecrets).toEqual([
-      expect.objectContaining({ name: 'DISCORD_WEBHOOK_URL', type: 'string' }),
-    ]);
-    expect(
-      template.graph.edges.find(
-        (edge: { id: string }) => edge.id === 'artifact_report-run_report_discord-after',
-      ),
-    ).toEqual(
-      expect.objectContaining({
-        source: 'artifact_report',
-        target: 'run_report_discord',
-        sourceHandle: 'saved',
-        targetHandle: 'after',
-      }),
-    );
   });
 
   it('exposure-to-cve-brief chains exposure mapping into CVE impact brief assembly', () => {
@@ -2245,5 +2483,823 @@ describe('new seed templates', () => {
       severity: 'high',
       matchedStrings: 1,
     });
+  });
+
+  it('supabase-project-exposure-triage wires scanner credentials and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'supabase-project-exposure-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual([
+      'core.workflow.entrypoint',
+      'sentris.supabase.scanner',
+      'core.logic.script',
+      'core.artifact.writer',
+    ]);
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'SUPABASE_DATABASE_URL', type: 'string' }),
+    ]);
+
+    const scannerNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'supabase_security_scan',
+    );
+    expect(scannerNode.data.config.inputOverrides.databaseConnectionString).toBe(
+      '{{SECRET_PLACEHOLDER}}',
+    );
+    expect(scannerNode.data.config.params.failOnCritical).toBe(false);
+
+    const reportNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_exposure_report',
+    );
+    const errorsVariable = reportNode.data.config.params.variables.find(
+      (variable: { name: string }) => variable.name === 'errors',
+    );
+    expect(errorsVariable).toEqual(
+      expect.objectContaining({ name: 'errors', type: 'list-text', required: false }),
+    );
+  });
+
+  it('supabase-project-exposure-triage report script prioritizes critical RLS and storage findings', () => {
+    const filePath = join(seedTemplatesDir, 'supabase-project-exposure-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const reportNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_exposure_report',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: {
+          securityScore: number;
+          highestSeverity: string;
+          actionableFindings: number;
+        };
+        priorityFindings: { checkId: string; severity: string; priorityBand: string }[];
+      };
+    }>(reportNode.data.config.params.code, {
+      supabaseUrl: 'https://abcdefghijklmnopqrst.supabase.co',
+      authorizationNotes: 'Authorized project owner.',
+      projectRef: 'abcdefghijklmnopqrst',
+      score: 42,
+      summary: { total_checks: 10, failed: 2 },
+      issues: [
+        {
+          check_id: 'rls_disabled',
+          resource: 'public.users',
+          severity: 'critical',
+          message: 'Row level security disabled on public table',
+        },
+        {
+          check_id: 'storage_public_bucket',
+          resource: 'avatars',
+          severity: 'high',
+          message: 'Storage bucket allows public read access',
+        },
+        {
+          check_id: 'extension_present',
+          resource: 'pgcrypto',
+          severity: 'info',
+          message: 'Extension installed',
+        },
+      ],
+      errors: [],
+    });
+
+    expect(result.report.summary.securityScore).toBe(42);
+    expect(result.report.summary.highestSeverity).toBe('critical');
+    expect(result.report.summary.actionableFindings).toBe(3);
+    expect(result.report.priorityFindings[0]).toMatchObject({
+      checkId: 'rls_disabled',
+      severity: 'critical',
+      priorityBand: 'immediate',
+    });
+    expect(result.report.priorityFindings[1].checkId).toBe('storage_public_bucket');
+  });
+
+  it('oss-sast-cve-candidate-hunt wires semgrep, manifest, osv, and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'oss-sast-cve-candidate-hunt.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(nodeTypes).toEqual(
+      expect.arrayContaining([
+        'sentris.repository.files.extract',
+        'sentris.repository.manifest.extract',
+        'sentris.semgrep.run',
+        'sentris.osv.query',
+        'core.logic.script',
+        'core.artifact.writer',
+      ]),
+    );
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'extract_repo_files:sourceBundle->semgrep_scan:target',
+        'extract_repo_manifests:npmPackageSpecs->osv_npm_query:packageSpecs',
+        'assemble_cna_brief:brief->artifact_report:content',
+      ]),
+    );
+  });
+
+  it('oss-sast-cve-candidate-hunt ranks unmapped Semgrep finding above info noise', () => {
+    const filePath = join(seedTemplatesDir, 'oss-sast-cve-candidate-hunt.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_cna_brief',
+    );
+    const result = runTemplateScript<{
+      brief: {
+        summary: { candidateCount: number };
+        candidates: { title: string; severity: string; priorityScore: number }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      productName: 'NodeGoat',
+      authorizationNotes: 'audit fixture',
+      manifestSummary: { repo: 'NodeGoat', ref: 'main' },
+      npmPackages: [],
+      semgrepCount: 2,
+      osvFindings: [{ packageName: 'lodash', id: 'GHSA-test' }],
+      semgrepFindings: [
+        {
+          checkId: 'javascript.lang.security.audit.sqli',
+          severity: 'ERROR',
+          path: 'app/routes/user.js',
+          startLine: 42,
+          message: 'Possible SQL injection',
+          cwe: ['CWE-89'],
+        },
+        {
+          checkId: 'javascript.lang.best-practice',
+          severity: 'INFO',
+          path: 'app/server.js',
+          message: 'Style finding',
+        },
+      ],
+    });
+
+    expect(result.brief.summary.candidateCount).toBe(1);
+    expect(result.brief.candidates[0].severity).toBe('high');
+    expect(result.brief.candidates[0].priorityScore).toBeGreaterThan(30);
+  });
+
+  it('kev-reachability-validation-brief wires naabu, httpx, nuclei cves, kev, and nvd', () => {
+    const filePath = join(seedTemplatesDir, 'kev-reachability-validation-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nucleiNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'nuclei_cve_scan',
+    );
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(nucleiNode.data.config.inputOverrides.templatePaths).toEqual([
+      'http/cves/2023/',
+      'http/cves/2024/',
+      'http/cves/2025/',
+      'http/cves/2026/',
+    ]);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:targets->naabu_ports:targets',
+        'extract_nuclei_cves:cveIds->query_nvd:cveIds',
+        'fetch_kev:status->assemble_validation_brief:kevStatus',
+      ]),
+    );
+  });
+
+  it('kev-reachability-validation-brief prioritizes KEV nuclei hits over non-KEV findings', () => {
+    const filePath = join(seedTemplatesDir, 'kev-reachability-validation-brief.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_validation_brief',
+    );
+    const result = runTemplateScript<{
+      brief: {
+        summary: { kevReachableCount: number };
+        candidates: { title: string; priorityScore: number; evidence: { knownExploited?: boolean } }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      authorizationNotes: 'audit fixture',
+      httpResponses: [{ url: 'https://app.example.com' }],
+      nucleiFindings: [
+        {
+          templateId: 'CVE-2024-0001',
+          name: 'CVE-2024-0001 RCE',
+          severity: 'critical',
+          matchedAt: 'https://app.example.com/vuln',
+        },
+        {
+          templateId: 'generic-misconfig',
+          name: 'Generic misconfiguration',
+          severity: 'medium',
+          matchedAt: 'https://app.example.com/admin',
+        },
+      ],
+      nucleiCveHits: { hits: [{ cveIds: ['CVE-2024-0001'] }] },
+      nvdStatus: 200,
+      kevStatus: 200,
+      nvdData: {
+        vulnerabilities: [
+          {
+            cve: {
+              id: 'CVE-2024-0001',
+              descriptions: [{ lang: 'en', value: 'Remote code execution' }],
+            },
+          },
+        ],
+      },
+      kevData: {
+        vulnerabilities: [{ cveID: 'CVE-2024-0001', product: 'ExampleApp' }],
+      },
+    });
+
+    expect(result.brief.summary.kevReachableCount).toBe(1);
+    expect(result.brief.candidates[0].evidence.knownExploited).toBe(true);
+    expect(result.brief.candidates[0].priorityScore).toBeGreaterThan(
+      result.brief.candidates[1].priorityScore,
+    );
+  });
+
+  it('web-logic-cve-candidate-hunt maps nuclei template to CNA candidate and respects scope', () => {
+    const filePath = join(seedTemplatesDir, 'web-logic-cve-candidate-hunt.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_cna_brief',
+    );
+    const result = runTemplateScript<{
+      brief: {
+        summary: { candidateCount: number };
+        candidates: { cweGuess: string; evidence: { matchedAt: string } }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      productName: 'Juice Shop',
+      authorizationNotes: 'audit fixture',
+      httpResponses: [],
+      endpoints: [],
+      ffufDiscoveries: [],
+      tlsFindings: [],
+      scanProfile: { outOfScopePaths: ['/logout'] },
+      nucleiFindings: [
+        {
+          templateId: 'http/default-logins/administrator-default-login',
+          name: 'Default admin login',
+          severity: 'high',
+          matchedAt: 'https://host.docker.internal:18443/login',
+          tags: ['default-login', 'auth'],
+        },
+        {
+          templateId: 'http/exposures/configs/env-file',
+          name: 'Env exposure',
+          severity: 'medium',
+          matchedAt: 'https://host.docker.internal:18443/logout',
+        },
+      ],
+    });
+
+    expect(result.brief.summary.candidateCount).toBe(1);
+    expect(result.brief.candidates[0].cweGuess).toBe('CWE-287');
+    expect(result.brief.candidates[0].evidence.matchedAt).toContain('/login');
+  });
+
+  it('cors-auth-edge-misconfig-triage wires httpx, CORS probe logic, and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'cors-auth-edge-misconfig-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual(
+      expect.arrayContaining([
+        'core.workflow.entrypoint',
+        'sentris.httpx.scan',
+        'core.logic.script',
+        'core.artifact.writer',
+      ]),
+    );
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:liveUrls->httpx_probe:targets',
+        'httpx_probe:responses->probe_cors_edges:httpResponses',
+        'probe_cors_edges:report->artifact_report:content',
+      ]),
+    );
+  });
+
+  it('cors-auth-edge-misconfig-triage ranks credentialed reflected CORS above harmless responses', async () => {
+    const filePath = join(seedTemplatesDir, 'cors-auth-edge-misconfig-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const probeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'probe_cors_edges',
+    );
+    const result = await runTemplateScriptAsync<{
+      report: {
+        summary: { highRiskCorsFindings: number; dangerousFindings: number };
+        findings: { url: string; severity: string; priorityScore: number }[];
+      };
+    }>(probeNode.data.config.params.code, {
+      liveUrls: ['https://api.example.com/data', 'https://static.example.com/'],
+      testOrigins: ['https://attacker.example'],
+      authorizationNotes: 'authorized test fixture',
+      httpResponses: [
+        { url: 'https://api.example.com/data', statusCode: 200, title: 'API' },
+        { url: 'https://static.example.com/', statusCode: 200, title: 'Static' },
+      ],
+      corsProbeResults: [
+        {
+          url: 'https://api.example.com/data',
+          origin: 'https://attacker.example',
+          method: 'GET',
+          status: 200,
+          accessControlAllowOrigin: 'https://attacker.example',
+          accessControlAllowCredentials: 'true',
+          accessControlAllowMethods: 'GET,POST',
+          exposedHeaders: 'x-api-key',
+        },
+        {
+          url: 'https://static.example.com/',
+          origin: 'https://attacker.example',
+          method: 'GET',
+          status: 200,
+          accessControlAllowOrigin: null,
+          accessControlAllowCredentials: null,
+        },
+      ],
+    });
+
+    expect(result.report.summary.highRiskCorsFindings).toBe(1);
+    expect(result.report.summary.dangerousFindings).toBe(1);
+    expect(result.report.findings[0].url).toBe('https://api.example.com/data');
+    expect(result.report.findings[0].severity).toBe('critical');
+    expect(result.report.findings[0].priorityScore).toBeGreaterThan(70);
+  });
+
+  it('graphql-exposure-triage wires landing, introspection, sample query, and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'graphql-exposure-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual([
+      'core.workflow.entrypoint',
+      'core.logic.script',
+      'core.http.request',
+      'core.http.request',
+      'core.http.request',
+      'core.logic.script',
+      'core.artifact.writer',
+    ]);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:graphqlEndpoint->build_graphql_probe:graphqlEndpoint',
+        'build_graphql_probe:endpoint->fetch_landing:url',
+        'build_graphql_probe:htmlHeaders->fetch_landing:headers',
+        'build_graphql_probe:endpoint->post_introspection:url',
+        'build_graphql_probe:introspectionBody->post_introspection:body',
+        'build_graphql_probe:jsonHeaders->post_introspection:headers',
+        'build_graphql_probe:endpoint->post_sample_query:url',
+        'build_graphql_probe:sampleQueryBody->post_sample_query:body',
+        'post_introspection:data->assemble_graphql_report:introspectionData',
+        'post_sample_query:data->assemble_graphql_report:sampleQueryData',
+        'assemble_graphql_report:report->artifact_report:content',
+      ]),
+    );
+  });
+
+  it('graphql-exposure-triage prioritizes unauthenticated introspection with risky mutations', () => {
+    const filePath = join(seedTemplatesDir, 'graphql-exposure-triage.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_graphql_report',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: {
+          introspectionEnabled: boolean;
+          unauthenticatedQuerySucceeded: boolean;
+          riskyMutations: number;
+          sensitiveSchemaSignals: number;
+          highestSeverity: string;
+        };
+        findings: { ruleId: string; severity: string; priorityScore: number }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      endpoint: 'https://api.example.com/graphql',
+      authorizationNotes: 'authorized test fixture',
+      landingStatus: 200,
+      landingRawBody: '<html>GraphiQL Playground</html>',
+      landingHeaders: { 'content-type': 'text/html' },
+      introspectionStatus: 200,
+      introspectionStatusText: 'OK',
+      introspectionData: {
+        data: {
+          __schema: {
+            queryType: { name: 'Query' },
+            mutationType: { name: 'Mutation' },
+            subscriptionType: null,
+            types: [
+              {
+                kind: 'OBJECT',
+                name: 'Mutation',
+                fields: [
+                  { name: 'deleteUser', args: [{ name: 'id', type: { name: 'ID' } }] },
+                  { name: 'createToken', args: [{ name: 'userId', type: { name: 'ID' } }] },
+                ],
+              },
+              {
+                kind: 'OBJECT',
+                name: 'User',
+                fields: [
+                  { name: 'email', args: [] },
+                  { name: 'passwordHash', args: [] },
+                  { name: 'apiKey', args: [] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+      sampleQueryStatus: 200,
+      sampleQueryData: { data: { __typename: 'Query' } },
+      sampleQueryRawBody: '{"data":{"__typename":"Query"}}',
+    });
+
+    expect(result.report.summary.introspectionEnabled).toBe(true);
+    expect(result.report.summary.unauthenticatedQuerySucceeded).toBe(true);
+    expect(result.report.summary.riskyMutations).toBe(2);
+    expect(result.report.summary.sensitiveSchemaSignals).toBeGreaterThanOrEqual(3);
+    expect(result.report.summary.highestSeverity).toBe('critical');
+    expect(result.report.findings[0]).toMatchObject({
+      ruleId: 'unauthenticated-graphql-introspection',
+      severity: 'critical',
+    });
+    expect(result.report.findings[0].priorityScore).toBeGreaterThan(80);
+  });
+
+  it('security-fix-without-cve-watch wires github releases, nvd, and kev without required secrets', () => {
+    const filePath = join(seedTemplatesDir, 'security-fix-without-cve-watch.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const fetchNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'fetch_releases',
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(fetchNode.data.config.inputOverrides.headers.Authorization).toBeUndefined();
+    expect(
+      template.graph.edges.some(
+        (edge: { source: string; target: string }) =>
+          edge.source === 'parse_github_repo' && edge.target === 'fetch_releases',
+      ),
+    ).toBe(true);
+  });
+
+  it('security-fix-without-cve-watch flags security release without CVE and ignores CVE release', () => {
+    const filePath = join(seedTemplatesDir, 'security-fix-without-cve-watch.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_fix_watch_brief',
+    );
+    const recent = new Date().toISOString();
+    const result = runTemplateScript<{
+      brief: {
+        summary: { candidateCount: number };
+        candidates: { title: string }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      repositoryUrl: 'https://github.com/OWASP/NodeGoat',
+      repositorySlug: 'OWASP/NodeGoat',
+      lookbackDays: 365,
+      researchNotes: 'audit fixture',
+      releasesStatus: 200,
+      nvdStatus: 200,
+      kevStatus: 200,
+      releasesData: [
+        {
+          tag_name: 'v1.2.3',
+          name: 'Security patch',
+          body: 'This release fixes a critical RCE vulnerability in auth handling.',
+          published_at: recent,
+          html_url: 'https://github.com/OWASP/NodeGoat/releases/tag/v1.2.3',
+        },
+        {
+          tag_name: 'v1.2.2',
+          name: 'CVE release',
+          body: 'Fixes CVE-2024-0001 authentication bypass.',
+          published_at: recent,
+        },
+      ],
+      nvdData: { vulnerabilities: [] },
+      kevData: { vulnerabilities: [] },
+    });
+
+    expect(result.brief.summary.candidateCount).toBe(1);
+    expect(result.brief.candidates[0].title).toContain('v1.2.3');
+  });
+
+  it('supply-chain-takeover-precursor-hunt flags postinstall script and malicious OSV record', async () => {
+    const filePath = join(seedTemplatesDir, 'supply-chain-takeover-precursor-hunt.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_precursor_brief',
+    );
+    const result = await runTemplateScriptAsync<{
+      brief: {
+        summary: { candidateCount: number; topCandidate: string | null };
+        candidates: { title: string; priorityScore: number; severity: string }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      packageSpecs: ['suspicious-pkg@1.0.0'],
+      researchNotes: 'audit fixture',
+      findings: [
+        {
+          packageName: 'evil-pkg',
+          id: 'MAL-2024-1',
+          isMaliciousPackageRecord: true,
+          summary: 'Malicious npm package',
+          severity: 'critical',
+        },
+      ],
+      summary: { packagesChecked: 1, maliciousPackageRecords: 1 },
+      packages: [],
+      registryRecords: [
+        {
+          name: 'suspicious-pkg',
+          requestedSpec: 'suspicious-pkg@1.0.0',
+          requestedVersion: '1.0.0',
+          latest: '1.0.0',
+          analyzedVersion: '1.0.0',
+          repositoryUrl: null,
+          maintainers: [{ name: 'new-maintainer' }],
+        },
+      ],
+      registryRiskSignals: [
+        {
+          packageName: 'suspicious-pkg',
+          packageSpec: 'suspicious-pkg@1.0.0',
+          version: '1.0.0',
+          signal: 'install-script',
+          severity: 'high',
+          score: 45,
+          rationale: 'Lifecycle install script present: postinstall',
+          evidence: { installScripts: ['postinstall'] },
+        },
+      ],
+      registrySummary: { packagesChecked: 1, recordsFetched: 1, riskSignals: 1 },
+      registryWarnings: [],
+    });
+
+    expect(nodeTypes).toContain('sentris.npm.registry.intel');
+    expect(template.manifest.edgeCount).toBe(template.graph.edges.length);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:packageSpecs->npm_registry_intel:packageSpecs',
+        'trigger_1:typosquatCandidates->npm_registry_intel:typosquatCandidates',
+        'npm_registry_intel:records->assemble_precursor_brief:registryRecords',
+        'npm_registry_intel:riskSignals->assemble_precursor_brief:registryRiskSignals',
+        'npm_registry_intel:summary->assemble_precursor_brief:registrySummary',
+        'npm_registry_intel:warnings->assemble_precursor_brief:registryWarnings',
+      ]),
+    );
+    expect(result.brief.summary.candidateCount).toBeGreaterThanOrEqual(2);
+    expect(result.brief.candidates[0].severity).toBe('critical');
+    expect(result.brief.candidates.some((item) => item.title.includes('Malicious npm advisory'))).toBe(
+      true,
+    );
+    expect(
+      result.brief.candidates.some((item) =>
+        (item as { priorityReasons?: string[] }).priorityReasons?.some((reason) =>
+          reason.includes('postinstall'),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it('bug-bounty-evidence-router wires public enrichment and artifact nodes', () => {
+    const filePath = join(seedTemplatesDir, 'bug-bounty-evidence-router.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const trigger = template.graph.nodes.find((node: { id: string }) => node.id === 'trigger_1');
+    const queryOsv = template.graph.nodes.find((node: { id: string }) => node.id === 'query_osv');
+    const runtimeInputIds = trigger.data.config.params.runtimeInputs.map(
+      (input: { id: string }) => input.id,
+    );
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(template.manifest.edgeCount).toBe(template.graph.edges.length);
+    expect(runtimeInputIds).not.toContain('packageEcosystem');
+    expect(queryOsv.data.config.params.ecosystem).toBe('npm');
+    expect(nodeTypes).toEqual([
+      'core.workflow.entrypoint',
+      'core.logic.script',
+      'sentris.httpx.scan',
+      'sentris.osv.query',
+      'sentris.nvd.cve.query',
+      'core.http.request',
+      'core.logic.script',
+      'core.artifact.writer',
+    ]);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'trigger_1:evidenceNotes->parse_evidence:evidenceNotes',
+        'trigger_1:authorizedTargets->parse_evidence:authorizedTargets',
+        'parse_evidence:httpTargets->httpx_probe:targets',
+        'parse_evidence:packageSpecs->query_osv:packageSpecs',
+        'parse_evidence:cveIds->query_nvd:cveIds',
+        'parse_evidence:keywordSearch->query_nvd:keywordSearch',
+        'assemble_router_report:report->artifact_report:content',
+      ]),
+    );
+  });
+
+  it('claude-code-bug-bounty-evidence-analyst wires enriched evidence into Claude Code safely', () => {
+    const filePath = join(seedTemplatesDir, 'claude-code-bug-bounty-evidence-analyst.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const claudeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'claude_code_triage',
+    );
+    const claudeArtifactNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'artifact_claude_report',
+    );
+    const nodeTypes = template.graph.nodes.map((node: { type: string }) => node.type);
+    const edges = template.graph.edges.map(
+      (edge: { source: string; target: string; sourceHandle?: string; targetHandle?: string }) =>
+        `${edge.source}:${edge.sourceHandle}->${edge.target}:${edge.targetHandle}`,
+    );
+
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'CLAUDE_CODE_OAUTH_TOKEN', type: 'string' }),
+    ]);
+    expect(template.manifest.nodeCount).toBe(template.graph.nodes.length);
+    expect(template.manifest.edgeCount).toBe(template.graph.edges.length);
+    expect(nodeTypes).toContain('core.ai.claude-code');
+    expect(claudeNode.data.config.inputOverrides.model).toMatchObject({
+      provider: 'anthropic',
+      authMode: 'subscription_oauth',
+      oauthTokenSecretId: '{{SECRET_PLACEHOLDER}}',
+      effort: 'medium',
+    });
+    expect(claudeNode.data.config.params.systemPrompt).toContain('Do not invent vulnerabilities');
+    expect(claudeArtifactNode.data.config.params).toMatchObject({
+      fileExtension: '.md',
+      mimeType: 'text/markdown',
+    });
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        'assemble_router_report:report->claude_code_triage:context',
+        'trigger_1:evidenceNotes->claude_code_triage:supplementaryInputA',
+        'trigger_1:authorizationNotes->claude_code_triage:supplementaryInputB',
+        'claude_code_triage:report->artifact_claude_report:content',
+      ]),
+    );
+  });
+
+  it('bug-bounty-evidence-router parses mixed notes into deduped public-data routes', () => {
+    const filePath = join(seedTemplatesDir, 'bug-bounty-evidence-router.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const parseNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'parse_evidence',
+    );
+    const result = runTemplateScript<{
+      httpTargets: string[];
+      packageSpecs: string[];
+      cveIds: string;
+      keywordSearch: string;
+      normalizedEvidence: {
+        cves: string[];
+        packages: { spec: string; ecosystem: string }[];
+        observations: string[];
+        truncation: { httpTargets: boolean; packageSpecs: boolean; cveIds: boolean };
+      };
+    }>(parseNode.data.config.params.code, {
+      evidenceNotes:
+        'Investigate CVE-2024-3094, https://scanme.nmap.org, lodash@4.17.20, and lodash@4.17.20 again. Also saw Apache on the landing page.',
+      authorizedTargets: ['https://scanme.nmap.org', 'example.com'],
+      authorizationNotes: '',
+    });
+
+    expect(result.cveIds).toContain('CVE-2024-3094');
+    expect(result.httpTargets).toEqual(
+      expect.arrayContaining(['https://scanme.nmap.org', 'https://example.com']),
+    );
+    expect(result.packageSpecs).toEqual(['lodash@4.17.20']);
+    expect(result.keywordSearch).toBe('apache');
+    expect(result.normalizedEvidence.packages).toContainEqual({
+      spec: 'lodash@4.17.20',
+      ecosystem: 'npm',
+    });
+    expect(result.normalizedEvidence.truncation).toEqual({
+      httpTargets: false,
+      packageSpecs: false,
+      cveIds: false,
+    });
+  });
+
+  it('bug-bounty-evidence-router assembles prioritized follow-up recommendations', () => {
+    const filePath = join(seedTemplatesDir, 'bug-bounty-evidence-router.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_router_report',
+    );
+    const result = runTemplateScript<{
+      report: {
+        summary: { runNow: number; manualReview: number; topAction: string | null };
+        runNow: { reason: string; recommendedWorkflow: string }[];
+        manualReview: { reason: string }[];
+        recommendedFollowUpWorkflows: { name: string }[];
+      };
+    }>(assembleNode.data.config.params.code, {
+      evidenceNotes: 'Check CVE-2024-3094 and lodash@4.17.20 against live target.',
+      authorizationNotes: 'authorized test fixture',
+      normalizedEvidence: {
+        cves: ['CVE-2024-3094'],
+        packages: [{ spec: 'lodash@4.17.20', ecosystem: 'npm' }],
+        httpTargets: ['https://scanme.nmap.org'],
+        observations: ['Apache landing page observed'],
+        truncation: { httpTargets: false, packageSpecs: false, cveIds: false },
+      },
+      httpResponses: [
+        {
+          url: 'https://scanme.nmap.org',
+          statusCode: 200,
+          title: 'Go ahead and ScanMe!',
+          technologies: ['Apache'],
+        },
+      ],
+      httpxResults: [{ scanner: 'httpx', severity: 'info', asset_key: 'https://scanme.nmap.org' }],
+      osvFindings: [
+        {
+          packageSpec: 'lodash@4.17.20',
+          packageName: 'lodash',
+          id: 'GHSA-test',
+          severity: 'high',
+          summary: 'Prototype pollution',
+          cves: ['CVE-2021-23337'],
+        },
+      ],
+      osvSummary: { findings: 1, vulnerablePackages: 1, countsBySeverity: { high: 1 } },
+      osvPackages: [{ spec: 'lodash@4.17.20', name: 'lodash', version: '4.17.20' }],
+      nvdStatus: 200,
+      nvdStatusText: 'OK',
+      nvdData: {
+        vulnerabilities: [
+          {
+            cve: {
+              id: 'CVE-2024-3094',
+              descriptions: [{ lang: 'en', value: 'xz backdoor issue' }],
+              metrics: {
+                cvssMetricV31: [{ cvssData: { baseSeverity: 'CRITICAL', baseScore: 10 } }],
+              },
+            },
+          },
+        ],
+      },
+      kevStatus: 200,
+      kevStatusText: 'OK',
+      kevData: {
+        vulnerabilities: [
+          {
+            cveID: 'CVE-2024-3094',
+            vendorProject: 'XZ Utils',
+            product: 'XZ Utils',
+          },
+        ],
+      },
+    });
+
+    expect(result.report.summary.runNow).toBeGreaterThanOrEqual(2);
+    expect(result.report.summary.topAction).toContain('CVE-2024-3094');
+    expect(result.report.runNow).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          recommendedWorkflow: 'CVE Impact Research Brief',
+        }),
+        expect.objectContaining({
+          recommendedWorkflow: 'GitHub Repo Dependency CVE Triage',
+        }),
+      ]),
+    );
+    expect(result.report.manualReview.map((item) => item.reason).join(' ')).toContain('live HTTP');
+    expect(result.report.recommendedFollowUpWorkflows.map((workflow) => workflow.name)).toEqual(
+      expect.arrayContaining([
+        'CVE Impact Research Brief',
+        'GitHub Repo Dependency CVE Triage',
+        'Web Attack Surface Quick Win Hunt',
+      ]),
+    );
   });
 });

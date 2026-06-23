@@ -18,6 +18,7 @@ import {
   mapRetryPolicy,
 } from './workflow-helpers.js';
 import { handleSubWorkflowCall } from './sub-workflow-handler.js';
+import { handleForEachLoopInWorkflow } from './for-each-workflow-handler.js';
 import { handleToolModeRegistration } from './tool-mode-handler.js';
 import { handleHumanInput } from './human-input-handler.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
@@ -328,6 +329,31 @@ export async function sentrisWorkflowRun(
             results,
             activities: { prepareRunPayloadActivity, recordTraceEventActivity },
             workflowFn: sentrisWorkflowRun,
+          });
+        }
+
+        if (action.componentId === 'core.workflow.for-each') {
+          const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
+            runComponentActivity(
+              input: RunComponentActivityInput,
+            ): Promise<RunComponentActivityOutput>;
+          }>({
+            startToCloseTimeout: '10 minutes',
+            heartbeatTimeout: '30 seconds',
+            retry: mapRetryPolicy(action.retryPolicy),
+          });
+
+          return handleForEachLoopInWorkflow({
+            input,
+            action,
+            mergedInputs,
+            mergedParams,
+            warnings,
+            results,
+            activities: {
+              runComponentActivity: runComponentWithRetry,
+              recordTraceEventActivity,
+            },
           });
         }
 

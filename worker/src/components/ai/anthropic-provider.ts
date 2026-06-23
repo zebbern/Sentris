@@ -12,7 +12,7 @@ import {
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_BASE_URL = process.env.ANTHROPIC_BASE_URL ?? '';
 
 const inputSchema = inputs({
@@ -43,15 +43,14 @@ const parameterSchema = parameters({
     z
       .string()
       .default(DEFAULT_MODEL)
-      .describe('Anthropic Claude model identifier (e.g., claude-sonnet-4-20250514).'),
+      .describe('Anthropic Claude model identifier (e.g., claude-sonnet-4-6).'),
     {
       label: 'Model',
       editor: 'select',
       options: [
-        { label: 'Claude Sonnet 4 (2025-05-14)', value: 'claude-sonnet-4-20250514' },
-        { label: 'Claude Opus 4 (2025-05-14)', value: 'claude-opus-4-20250514' },
-        { label: 'Claude 3.5 Haiku (2024-10-22)', value: 'claude-3-5-haiku-20241022' },
-        { label: 'Claude 3.5 Sonnet (2024-10-22)', value: 'claude-3-5-sonnet-20241022' },
+        { label: 'Claude Sonnet 4.6', value: 'claude-sonnet-4-6' },
+        { label: 'Claude Opus 4.8', value: 'claude-opus-4-8' },
+        { label: 'Claude Haiku 4.5', value: 'claude-haiku-4-5' },
       ],
       description: 'Anthropic Claude model to emit.',
     },

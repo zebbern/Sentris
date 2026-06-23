@@ -1,9 +1,14 @@
-import { describe, it, beforeEach, expect, vi } from 'bun:test';
-import { render, screen } from '@testing-library/react';
+import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { TopBar } from '../TopBar';
+import { createAlertDialogMock } from '@/test/mocks/dialog';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowStore } from '@/store/workflowStore';
+import { useWorkflowUiStore } from '@/store/workflowUiStore';
+
+mock.module('@/components/ui/alert-dialog', createAlertDialogMock);
+
+const { TopBar } = await import('../TopBar');
 
 const iso = () => new Date().toISOString();
 
@@ -19,6 +24,7 @@ const resetStores = () => {
     },
     isDirty: false,
   });
+  useWorkflowUiStore.setState({ mode: 'design' });
 };
 
 const hasDom = typeof document !== 'undefined';
@@ -28,6 +34,8 @@ describeTopBar('TopBar', () => {
   beforeEach(() => {
     resetStores();
   });
+
+  afterEach(cleanup);
 
   it('does not show progress information (removed for cleaner UI)', () => {
     useExecutionStore.setState({
@@ -46,11 +54,10 @@ describeTopBar('TopBar', () => {
 
     render(
       <MemoryRouter>
-        <TopBar onRun={vi.fn()} onSave={vi.fn()} />
+        <TopBar workflowId="workflow-1" onRun={mock()} onSave={mock()} />
       </MemoryRouter>,
     );
 
-    // Progress information was removed for cleaner UI
     expect(screen.queryByText('2/5 actions')).not.toBeInTheDocument();
   });
 
@@ -71,11 +78,85 @@ describeTopBar('TopBar', () => {
 
     render(
       <MemoryRouter>
-        <TopBar onRun={vi.fn()} onSave={vi.fn()} />
+        <TopBar workflowId="workflow-1" onRun={mock()} onSave={mock()} />
       </MemoryRouter>,
     );
 
-    // Failure details now live in the execution panel, not the builder top bar
     expect(screen.queryByText('Failed: ValidationError')).not.toBeInTheDocument();
+  });
+
+  it('shows save-before-run dialog when Run is clicked with unsaved changes', () => {
+    useWorkflowStore.setState({ isDirty: true });
+    const onRun = mock(() => {});
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={onRun} onSave={mock(() => Promise.resolve())} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    expect(screen.getByText('Want to save current state?')).toBeInTheDocument();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('calls onRun directly when workflow is clean', () => {
+    const onRun = mock(() => {});
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={onRun} onSave={mock(() => Promise.resolve())} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    expect(onRun).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Want to save current state?')).not.toBeInTheDocument();
+  });
+
+  it('Save & Run saves then runs when dialog is confirmed', async () => {
+    useWorkflowStore.setState({ isDirty: true });
+    const onRun = mock(() => {});
+    const onSave = mock(async () => {
+      useWorkflowStore.setState({ isDirty: false });
+    });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={onRun} onSave={onSave} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save & Run' }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onRun).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('Save only persists without running', async () => {
+    useWorkflowStore.setState({ isDirty: true });
+    const onRun = mock(() => {});
+    const onSave = mock(async () => {
+      useWorkflowStore.setState({ isDirty: false });
+    });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={onRun} onSave={onSave} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onRun).not.toHaveBeenCalled();
+    });
   });
 });

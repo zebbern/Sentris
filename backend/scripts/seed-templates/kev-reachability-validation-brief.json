@@ -1,0 +1,383 @@
+{
+  "_metadata": {
+    "name": "KEV Reachability Validation Brief",
+    "description": "Authorized CVE research workflow that discovers exposed services, runs Nuclei CVE templates, cross-references CISA KEV, enriches with NVD metadata, and writes a reachability validation brief for known-exploited CVEs on target.",
+    "category": "cve-research",
+    "tags": ["cve-research", "kev", "nuclei", "nvd", "reachability", "exploitability"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "KEV Reachability Validation Brief",
+    "description": "Validate which CISA KEV CVEs are reachable on authorized targets via bounded port scan, httpx, and Nuclei CVE templates.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "cve-research",
+    "tags": ["cve-research", "kev", "nuclei", "nvd", "reachability", "exploitability"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 11,
+    "edgeCount": 18
+  },
+  "graph": {
+    "name": "KEV Reachability Validation Brief",
+    "description": "Prove KEV-listed CVE reachability on authorized targets using Nuclei and public KEV/NVD metadata.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 280 },
+        "data": {
+          "label": "Authorized Targets Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "targets",
+                  "label": "Authorized targets",
+                  "type": "array",
+                  "required": true,
+                  "description": "Hosts, IPs, CIDRs, or domains authorized for bounded CVE reachability validation."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Scope notes and rate limits for the engagement."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "naabu_ports",
+        "type": "sentris.naabu.scan",
+        "position": { "x": 420, "y": 280 },
+        "data": {
+          "label": "Discover Exposed Ports",
+          "config": {
+            "params": {
+              "topPorts": 100,
+              "rate": 500,
+              "retries": 1,
+              "enablePing": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "extract_http_targets",
+        "type": "core.logic.script",
+        "position": { "x": 740, "y": 280 },
+        "data": {
+          "label": "Build HTTP Probe Targets",
+          "config": {
+            "params": {
+              "variables": [{ "name": "openPorts", "type": "list-json" }],
+              "returns": [{ "name": "httpTargets", "type": "list-text" }],
+              "code": "export function script(input) {\n  const ports = Array.isArray(input.openPorts) ? input.openPorts : [];\n  const urls = [];\n  for (const item of ports) {\n    const host = item?.host || item?.ip;\n    const port = Number(item?.port);\n    if (!host || !Number.isFinite(port)) continue;\n    if ([443, 8443, 9443].includes(port)) urls.push(`https://${host}:${port}`);\n    else if ([80, 8080, 8000, 8888, 3000, 5000, 7001, 9000].includes(port)) urls.push(`http://${host}:${port}`);\n    else urls.push(`http://${host}:${port}`, `https://${host}:${port}`);\n  }\n  return { httpTargets: Array.from(new Set(urls)) };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_fingerprint",
+        "type": "sentris.httpx.scan",
+        "position": { "x": 1060, "y": 280 },
+        "data": {
+          "label": "Fingerprint Live HTTP Services",
+          "config": {
+            "params": {
+              "threads": 50,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_nuclei_targets",
+        "type": "core.logic.script",
+        "position": { "x": 1380, "y": 280 },
+        "data": {
+          "label": "Build Nuclei Scan Targets",
+          "config": {
+            "params": {
+              "variables": [{ "name": "httpResponses", "type": "list-json" }],
+              "returns": [{ "name": "scanTargets", "type": "list-text" }],
+              "code": "export function script(input) {\n  const responses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const urls = responses.map((item) => item?.url || item?.finalUrl || item?.input).filter((value) => typeof value === 'string' && value.length > 0);\n  const unique = Array.from(new Set(urls));\n  return { scanTargets: unique.length > 0 ? unique.slice(0, 20) : ['http://no-live-target.invalid'] };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "nuclei_cve_scan",
+        "type": "sentris.nuclei.scan",
+        "position": { "x": 1700, "y": 280 },
+        "data": {
+          "label": "Run Nuclei CVE Templates",
+          "config": {
+            "params": {
+              "rateLimit": 10,
+              "concurrency": 3,
+              "timeout": 12,
+              "retries": 0,
+              "includeRaw": false,
+              "followRedirects": true,
+              "updateTemplates": true,
+              "disableHttpx": true,
+              "severityFilter": ["critical", "high", "medium"]
+            },
+            "inputOverrides": {
+              "templatePaths": [
+                "http/cves/2023/",
+                "http/cves/2024/",
+                "http/cves/2025/",
+                "http/cves/2026/"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "extract_nuclei_cves",
+        "type": "core.logic.script",
+        "position": { "x": 2020, "y": 180 },
+        "data": {
+          "label": "Extract CVE IDs From Nuclei Hits",
+          "config": {
+            "params": {
+              "variables": [{ "name": "nucleiFindings", "type": "list-json" }],
+              "returns": [
+                { "name": "cveIds", "type": "string" },
+                { "name": "nucleiCveHits", "type": "json" }
+              ],
+              "code": "export function script(input) {\n  const findings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const cvePattern = /CVE-\\d{4}-\\d+/gi;\n  const ids = new Set();\n  const hits = [];\n  for (const finding of findings) {\n    const text = [finding?.templateId, finding?.name, finding?.matchedAt, finding?.host].map((value) => String(value || '')).join(' ');\n    const matches = text.match(cvePattern) || [];\n    for (const match of matches) ids.add(match.toUpperCase());\n    if (matches.length > 0) {\n      hits.push({\n        cveIds: matches.map((item) => item.toUpperCase()),\n        templateId: finding?.templateId || null,\n        name: finding?.name || null,\n        severity: finding?.severity || null,\n        matchedAt: finding?.matchedAt || finding?.url || null\n      });\n    }\n  }\n  const cveIds = Array.from(ids).slice(0, 20);\n  return { cveIds: cveIds.length > 0 ? cveIds.join(', ') : 'CVE-0000-0000', nucleiCveHits: { hits, extractedCount: cveIds.length } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "query_nvd",
+        "type": "sentris.nvd.cve.query",
+        "position": { "x": 2020, "y": 380 },
+        "data": {
+          "label": "Enrich CVE Hits With NVD",
+          "config": {
+            "params": {
+              "resultsPerPage": 20,
+              "includeRejected": false,
+              "timeoutMs": 90000,
+              "failOnUnavailable": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_kev",
+        "type": "core.http.request",
+        "position": { "x": 1700, "y": 480 },
+        "data": {
+          "label": "Fetch CISA KEV Catalog",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {
+              "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_validation_brief",
+        "type": "core.logic.script",
+        "position": { "x": 2340, "y": 280 },
+        "data": {
+          "label": "Assemble KEV Reachability Brief",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "httpResponses", "type": "list-json" },
+                { "name": "nucleiFindings", "type": "list-json" },
+                { "name": "nucleiCveHits", "type": "json" },
+                { "name": "nvdData", "type": "json" },
+                { "name": "nvdStatus", "type": "number" },
+                { "name": "nvdStatusText", "type": "string" },
+                { "name": "kevData", "type": "json" },
+                { "name": "kevStatus", "type": "number" },
+                { "name": "kevStatusText", "type": "string" }
+              ],
+              "returns": [{ "name": "brief", "type": "json" }],
+              "code": "export function script(input) {\n  const nucleiFindings = Array.isArray(input.nucleiFindings) ? input.nucleiFindings : [];\n  const nucleiCveHits = input.nucleiCveHits && typeof input.nucleiCveHits === 'object' ? input.nucleiCveHits : { hits: [] };\n  const nvdStatus = Number(input.nvdStatus || 0);\n  const kevStatus = Number(input.kevStatus || 0);\n  const dataSources = {\n    nvd: { status: nvdStatus, statusText: input.nvdStatusText || null, ok: nvdStatus >= 200 && nvdStatus < 300 },\n    cisaKev: { status: kevStatus, statusText: input.kevStatusText || null, ok: kevStatus >= 200 && kevStatus < 300 }\n  };\n  const warnings = [];\n  if (!dataSources.nvd.ok) warnings.push('NVD enrichment unavailable: ' + (dataSources.nvd.statusText || dataSources.nvd.status || 'unknown error'));\n  if (!dataSources.cisaKev.ok) warnings.push('CISA KEV enrichment unavailable: ' + (dataSources.cisaKev.statusText || dataSources.cisaKev.status || 'unknown error'));\n  const kevItems = dataSources.cisaKev.ok && Array.isArray(input.kevData?.vulnerabilities) ? input.kevData.vulnerabilities : [];\n  const kevById = new Map(kevItems.map((item) => [String(item.cveID || '').toUpperCase(), item]));\n  const nvdItems = dataSources.nvd.ok && Array.isArray(input.nvdData?.vulnerabilities) ? input.nvdData.vulnerabilities : [];\n  const nvdById = new Map(nvdItems.map((item) => [String(item?.cve?.id || '').toUpperCase(), item?.cve || {}]));\n  const severityRank = (severity) => ({ critical: 4, high: 3, medium: 2, low: 1, info: 0 })[String(severity || '').toLowerCase()] || 0;\n  const cvePattern = /CVE-\\d{4}-\\d+/gi;\n  const candidates = [];\n  for (const finding of nucleiFindings) {\n    const text = [finding?.templateId, finding?.name].map((value) => String(value || '')).join(' ');\n    const matches = (text.match(cvePattern) || []).map((item) => item.toUpperCase());\n    const uniqueIds = Array.from(new Set(matches));\n    if (uniqueIds.length === 0) continue;\n    for (const cveId of uniqueIds) {\n      const kev = kevById.get(cveId) || null;\n      const cve = nvdById.get(cveId) || {};\n      const descriptions = Array.isArray(cve.descriptions) ? cve.descriptions : [];\n      const description = descriptions.find((item) => item?.lang === 'en')?.value || descriptions[0]?.value || null;\n      let priorityScore = severityRank(finding?.severity) * 15;\n      const priorityReasons = [];\n      if (kev) { priorityScore += 100; priorityReasons.push('listed in CISA KEV'); }\n      if (finding?.matchedAt) { priorityScore += 25; priorityReasons.push('Nuclei template matched on authorized target'); }\n      if (severityRank(finding?.severity) >= 3) { priorityScore += 10; priorityReasons.push(String(finding?.severity || 'unknown').toLowerCase() + ' nuclei severity'); }\n      candidates.push({\n        title: `${cveId} reachable via Nuclei on authorized target`,\n        severity: kev ? 'critical' : String(finding?.severity || 'medium').toLowerCase(),\n        cweGuess: null,\n        product: kev?.product || kev?.vendorProject || null,\n        affectedVersions: [],\n        impactSummary: description || 'Known CVE template matched during authorized reachability validation.',\n        evidence: {\n          source: 'nuclei',\n          cveId,\n          templateId: finding?.templateId || null,\n          name: finding?.name || null,\n          matchedAt: finding?.matchedAt || finding?.url || null,\n          severity: finding?.severity || null,\n          knownExploited: Boolean(kev)\n        },\n        reproOutline: ['Confirm matched URL is in authorized scope', 'Review Nuclei template and vendor advisory for exploit preconditions', 'Validate non-destructively inside scope before escalation'],\n        suggestedCnaPath: 'Existing CVE — coordinate with asset owner for remediation; not a novel CNA assignment candidate',\n        mitreCveRequestNotes: 'Validation brief for known CVE reachability, not a new CVE request',\n        priorityScore: Math.round(priorityScore * 10) / 10,\n        priorityReasons: priorityReasons.length > 0 ? priorityReasons : ['review manually']\n      });\n    }\n  }\n  const nonCveFindings = nucleiFindings.filter((finding) => !(String(finding?.templateId || '') + String(finding?.name || '')).match(cvePattern)).map((finding) => ({\n    title: finding?.name || finding?.templateId || 'Nuclei finding without CVE id',\n    severity: String(finding?.severity || 'medium').toLowerCase(),\n    cweGuess: null,\n    product: null,\n    affectedVersions: [],\n    impactSummary: 'Nuclei hit without explicit CVE identifier — lower priority for KEV validation.',\n    evidence: { source: 'nuclei', templateId: finding?.templateId || null, matchedAt: finding?.matchedAt || null },\n    reproOutline: ['Manual review required'],\n    suggestedCnaPath: 'Not a KEV validation lead unless mapped to a CVE manually',\n    mitreCveRequestNotes: 'Non-CVE nuclei hit from reachability scan',\n    priorityScore: severityRank(finding?.severity) * 5,\n    priorityReasons: ['no CVE id in nuclei template metadata']\n  }));\n  const ranked = [...candidates, ...nonCveFindings].sort((a, b) => b.priorityScore - a.priorityScore).slice(0, 50);\n  const kevMatches = ranked.filter((item) => item.evidence?.knownExploited === true);\n  const highestSeverity = ranked.reduce((current, item) => severityRank(item.severity) > severityRank(current) ? item.severity : current, null);\n  return {\n    brief: {\n      summary: {\n        candidateCount: ranked.length,\n        kevReachableCount: kevMatches.length,\n        highestSeverity,\n        topCandidate: ranked[0]?.title || null,\n        liveServices: Array.isArray(input.httpResponses) ? input.httpResponses.length : 0,\n        nucleiFindings: nucleiFindings.length\n      },\n      authorizationNotes: input.authorizationNotes || null,\n      dataSources,\n      warnings,\n      nucleiCveHits,\n      candidates: ranked,\n      kevMatches,\n      nextSteps: ['Prioritize KEV-listed reachable CVEs for immediate remediation review', 'Confirm exploit preconditions against observed service versions', 'Use only non-destructive validation inside authorized scope', 'This brief validates known CVE reachability — not novel CVE assignment']\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 2660, "y": 280 },
+        "data": {
+          "label": "Save KEV Reachability Brief",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "kev-reachability-validation-brief-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-naabu_ports-targets",
+        "source": "trigger_1",
+        "target": "naabu_ports",
+        "sourceHandle": "targets",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "naabu_ports-extract_http_targets-openPorts",
+        "source": "naabu_ports",
+        "target": "extract_http_targets",
+        "sourceHandle": "findings",
+        "targetHandle": "openPorts"
+      },
+      {
+        "id": "extract_http_targets-httpx_fingerprint-httpTargets",
+        "source": "extract_http_targets",
+        "target": "httpx_fingerprint",
+        "sourceHandle": "httpTargets",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "httpx_fingerprint-build_nuclei_targets-responses",
+        "source": "httpx_fingerprint",
+        "target": "build_nuclei_targets",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "build_nuclei_targets-nuclei_cve_scan-scanTargets",
+        "source": "build_nuclei_targets",
+        "target": "nuclei_cve_scan",
+        "sourceHandle": "scanTargets",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "nuclei_cve_scan-extract_nuclei_cves-findings",
+        "source": "nuclei_cve_scan",
+        "target": "extract_nuclei_cves",
+        "sourceHandle": "findings",
+        "targetHandle": "nucleiFindings"
+      },
+      {
+        "id": "extract_nuclei_cves-query_nvd-cveIds",
+        "source": "extract_nuclei_cves",
+        "target": "query_nvd",
+        "sourceHandle": "cveIds",
+        "targetHandle": "cveIds"
+      },
+      {
+        "id": "query_nvd-assemble_validation_brief-nvdData",
+        "source": "query_nvd",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "data",
+        "targetHandle": "nvdData"
+      },
+      {
+        "id": "query_nvd-assemble_validation_brief-nvdStatus",
+        "source": "query_nvd",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "status",
+        "targetHandle": "nvdStatus"
+      },
+      {
+        "id": "query_nvd-assemble_validation_brief-nvdStatusText",
+        "source": "query_nvd",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "statusText",
+        "targetHandle": "nvdStatusText"
+      },
+      {
+        "id": "fetch_kev-assemble_validation_brief-kevData",
+        "source": "fetch_kev",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "data",
+        "targetHandle": "kevData"
+      },
+      {
+        "id": "fetch_kev-assemble_validation_brief-kevStatus",
+        "source": "fetch_kev",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "status",
+        "targetHandle": "kevStatus"
+      },
+      {
+        "id": "fetch_kev-assemble_validation_brief-kevStatusText",
+        "source": "fetch_kev",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "statusText",
+        "targetHandle": "kevStatusText"
+      },
+      {
+        "id": "httpx_fingerprint-assemble_validation_brief-responses",
+        "source": "httpx_fingerprint",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "nuclei_cve_scan-assemble_validation_brief-findings",
+        "source": "nuclei_cve_scan",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "findings",
+        "targetHandle": "nucleiFindings"
+      },
+      {
+        "id": "extract_nuclei_cves-assemble_validation_brief-nucleiCveHits",
+        "source": "extract_nuclei_cves",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "nucleiCveHits",
+        "targetHandle": "nucleiCveHits"
+      },
+      {
+        "id": "trigger_1-assemble_validation_brief-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_validation_brief",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "assemble_validation_brief-artifact_report-brief",
+        "source": "assemble_validation_brief",
+        "target": "artifact_report",
+        "sourceHandle": "brief",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}

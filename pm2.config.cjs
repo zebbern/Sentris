@@ -313,6 +313,26 @@ const envConfig = {
 };
 
 const currentEnvConfig = envConfig[isProduction ? 'production' : 'development'];
+const sharedPackageSrc = path.join(__dirname, 'packages', 'shared', 'src');
+const componentSdkPackageSrc = path.join(__dirname, 'packages', 'component-sdk', 'src');
+const localRuntimePackageSrc = path.join(__dirname, 'packages', 'local-runtime', 'src');
+const backendDevWatchPaths = ['src', 'scripts/seed-templates', sharedPackageSrc];
+const workerDevWatchPaths = [
+  'src',
+  sharedPackageSrc,
+  componentSdkPackageSrc,
+  localRuntimePackageSrc,
+].filter((watchPath) => fs.existsSync(watchPath) || watchPath === 'src');
+const devRuntimeIgnoreWatch = [
+  'node_modules',
+  'dist',
+  '*.log',
+  '__tests__',
+  '*.test.ts',
+  '*.test.tsx',
+  '*.spec.ts',
+  '*.spec.tsx',
+];
 
 // Helper to get instance-specific env file path
 function getInstanceEnvFile(appName, instance) {
@@ -374,8 +394,8 @@ module.exports = {
         TEMPORAL_NAMESPACE: `sentris-dev-${instanceNum}`,
         TEMPORAL_TASK_QUEUE: `sentris-dev-${instanceNum}`,
       },
-      watch: !isProduction ? ['src'] : false,
-      ignore_watch: ['node_modules', 'dist', '*.log'],
+      watch: !isProduction ? backendDevWatchPaths : false,
+      ignore_watch: devRuntimeIgnoreWatch,
       max_memory_restart: '500M',
     },
     {
@@ -391,7 +411,7 @@ module.exports = {
         SENTRIS_INSTANCE: instanceNum,
       },
       watch: !isProduction ? ['src'] : false,
-      ignore_watch: ['node_modules', 'dist', '*.log'],
+      ignore_watch: devRuntimeIgnoreWatch,
     },
     {
       name: `sentris-worker-${instanceNum}`,
@@ -423,8 +443,8 @@ module.exports = {
         },
         swcBinaryPath ? { SWC_BINARY_PATH: swcBinaryPath } : {},
       ),
-      watch: !isProduction ? ['src'] : false,
-      ignore_watch: ['node_modules', 'dist', '*.log'],
+      watch: !isProduction ? workerDevWatchPaths : false,
+      ignore_watch: devRuntimeIgnoreWatch,
       max_memory_restart: '1G',
     },
     {

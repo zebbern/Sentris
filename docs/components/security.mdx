@@ -3,7 +3,7 @@ title: "Security Components"
 description: "Open source security tools for security automation workflows"
 ---
 
-Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **28 security components**.
+Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **29 security components**.
 
 ---
 
@@ -512,6 +512,30 @@ Query the OSV.dev API for known vulnerabilities affecting package versions.
 
 ---
 
+### NPM Registry Intel
+
+Fetch npm registry package metadata and emit supply-chain precursor signals without executing package code.
+
+| Input | Type | Description |
+|-------|------|-------------|
+| `packageSpecs` | Array | npm package names or package/version specs, including scoped packages |
+| `typosquatCandidates` | Array | Optional trusted package names for similarity checks |
+
+| Output | Type | Description |
+|--------|------|-------------|
+| `records` | Array | Normalized registry metadata for fetched packages |
+| `riskSignals` | Array | Install script, deprecation, missing repository, recent publish, and typo-similarity signals |
+| `summary` | JSON | Counts for fetched records, warnings, and signal severities |
+| `warnings` | Array | Recoverable registry lookup warnings |
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `maxPackages` | Number | Maximum unique packages to inspect |
+| `recentPublishDays` | Number | Publish-age window for recent publish signals |
+| `includeRawMetadata` | Boolean | Include bounded raw registry metadata in records |
+
+---
+
 ### NVD
 
 Query the NVD CVE API for vulnerability metadata and CVSS details.
@@ -531,17 +555,29 @@ Query the NVD CVE API for vulnerability metadata and CVSS details.
 
 ### Repo Files Extractor
 
-Fetches source and IaC files from a public GitHub repository for downstream scanners.
+Fetches bounded source, GitHub Actions workflow, and IaC files from a public GitHub repository for downstream scanners and CI/CD supply-chain review.
 
 | Input | Type | Description |
 |-------|------|-------------|
 | `repositoryUrl` | String | Public GitHub repository URL |
 | `ref` | String | Optional git ref (branch, tag, or commit) |
 
+| Output | Type | Description |
+|--------|------|-------------|
+| `sourceBundle` | Text | Source-code and reviewable workflow YAML bundle for existing Semgrep-style scanners |
+| `githubActionsBundle` | Text | Dedicated `.github/workflows/*.yml` and `.yaml` bundle for GitHub Actions risk review |
+| `terraformBundle` | Text | Terraform bundle for Checkov Terraform scans |
+| `kubernetesBundle` | Text | Kubernetes YAML bundle for Checkov Kubernetes scans |
+| `dockerfileBundle` | Text | Dockerfile bundle for Checkov Dockerfile scans |
+| `cloudformationBundle` | Text | CloudFormation bundle for Checkov CloudFormation scans |
+| `summary` | JSON | Repository, resolved ref, category counts, truncation, and byte bounds |
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `ref` | Text | Default git ref when the input port is not connected |
 | `maxFiles` | Number | Maximum number of files to extract |
+| `maxTotalBytes` | Number | Maximum combined bytes to fetch |
+| `maxFileBytes` | Number | Maximum bytes for an individual file |
 
 ---
 

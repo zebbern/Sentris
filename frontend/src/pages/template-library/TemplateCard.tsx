@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -113,11 +112,6 @@ export function TemplateCard({
   const validationAction = getValidationAction(template);
   const artifactCount = formatArtifactCount(template.validation?.artifactsCount);
 
-  const filteredTags = useMemo(() => {
-    const categoryLower = (template.category || '').toLowerCase();
-    return (template.tags || []).filter((t) => t.toLowerCase() !== categoryLower);
-  }, [template.category, template.tags]);
-
   return (
     <article
       className={cn(
@@ -135,8 +129,8 @@ export function TemplateCard({
         {/* Preview */}
         <PreviewSection graph={template.graph} category={template.category} />
 
-        {/* Header: Category badge + Author */}
-        <div className="flex items-center justify-between">
+        {/* Category badge */}
+        <div>
           <Badge
             variant="outline"
             className={cn(
@@ -147,17 +141,6 @@ export function TemplateCard({
             <CategoryIcon className="h-3 w-3" />
             {template.category || 'Automation'}
           </Badge>
-
-          {template.author && (
-            <div className="flex items-center gap-1.5">
-              <div className="h-5 w-5 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
-                {template.author.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-                {template.author}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Title + Description */}
@@ -188,43 +171,8 @@ export function TemplateCard({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* Tags & Metadata */}
-        <div className="space-y-2.5">
-          {/* Tags */}
-          {filteredTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {filteredTags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className={cn(
-                    'inline-flex items-center px-3 py-1 rounded-full text-xs',
-                    'bg-muted text-muted-foreground border border-border',
-                  )}
-                >
-                  {tag}
-                </span>
-              ))}
-              {filteredTags.length > 3 && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className={cn(
-                          'inline-flex items-center px-3 py-1 rounded-full text-xs cursor-default',
-                          'bg-muted text-muted-foreground border border-border',
-                        )}
-                      >
-                        +{filteredTags.length - 3}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{filteredTags.slice(3).join(', ')}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          )}
-
-          {/* Marketplace metadata */}
+        {/* Metadata */}
+        <div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/60">
             {validationBadge && (
               <>
@@ -332,32 +280,27 @@ export function TemplateCard({
             <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
           </Button>
 
-          {template.repository && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'h-11 w-11 rounded-xl p-0 flex-shrink-0',
-                      'bg-muted border-border hover:bg-muted/80',
-                    )}
-                    asChild
-                  >
-                    <a
-                      href={`https://github.com/${template.repository}/blob/${template.branch || 'main'}/${template.path}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Preview</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'h-11 w-11 rounded-xl p-0 flex-shrink-0',
+                    'bg-muted border-border hover:bg-muted/80',
+                  )}
+                  aria-label={`Preview ${template.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview(template);
+                  }}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Preview</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
     </article>
@@ -373,26 +316,13 @@ export function CardSkeleton() {
     <div className="flex flex-col rounded-2xl border border-border bg-card dark:bg-zinc-900 shadow-sm">
       <div className="p-5 md:p-6 space-y-6">
         <Skeleton className="h-44 w-full rounded-xl" />
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-24 rounded-full" />
-          <div className="flex items-center gap-1.5">
-            <Skeleton className="h-5 w-5 rounded-full" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-        </div>
+        <Skeleton className="h-6 w-24 rounded-full" />
         <div className="space-y-2">
           <Skeleton className="h-7 w-3/4" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-2/3" />
         </div>
-        <div className="space-y-2.5">
-          <div className="flex gap-1.5">
-            <Skeleton className="h-7 w-16 rounded-full" />
-            <Skeleton className="h-7 w-16 rounded-full" />
-            <Skeleton className="h-7 w-16 rounded-full" />
-          </div>
-          <Skeleton className="h-4 w-40" />
-        </div>
+        <Skeleton className="h-4 w-40" />
         <div className="flex gap-2">
           <Skeleton className="h-11 flex-1 rounded-xl" />
           <Skeleton className="h-11 w-11 rounded-xl" />

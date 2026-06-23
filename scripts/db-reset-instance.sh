@@ -5,7 +5,6 @@
 set -euo pipefail
 
 INSTANCE=${1:-0}
-COMPOSE_PROJECT_NAME="sentris-infra"
 DB_NAME="sentris_instance_$INSTANCE"
 
 # Colors
@@ -27,34 +26,38 @@ log_error() {
   echo -e "${RED}❌${NC} $*"
 }
 
+validate_instance() {
+  if [[ ! "$1" =~ ^[0-9]+$ ]] || [ "$1" -lt 0 ] || [ "$1" -gt 9 ]; then
+    log_error "Instance must be an integer from 0 to 9. Got: $1"
+    exit 1
+  fi
+}
+
+validate_instance "$INSTANCE"
+
 log_info "Resetting database for instance $INSTANCE..."
 echo ""
 
-# Find PostgreSQL container
-POSTGRES_CONTAINER=$(docker compose -f docker/docker-compose.infra.yml \
-  --project-name="$COMPOSE_PROJECT_NAME" \
-  ps -q postgres 2>/dev/null || echo "")
-
-if [ -z "$POSTGRES_CONTAINER" ]; then
+if ! docker ps --filter "name=sentris-postgres" --format "{{.Names}}" | grep -q "^sentris-postgres$"; then
   log_error "PostgreSQL container not found for instance $INSTANCE"
-  log_error "Is the instance running? Try: just dev $INSTANCE start"
+  log_error "Is the shared infra running? Try: SENTRIS_INSTANCE=$INSTANCE bun run dev"
   exit 1
 fi
 
-log_info "Found PostgreSQL container: $POSTGRES_CONTAINER"
+log_info "Found PostgreSQL container: sentris-postgres"
 
 # Drop and recreate database
 log_info "Dropping database $DB_NAME..."
-docker exec "$POSTGRES_CONTAINER" \
+docker exec sentris-postgres \
   psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
   -c "DROP DATABASE IF EXISTS \"$DB_NAME\";" || true
 
 log_info "Creating database $DB_NAME..."
-docker exec "$POSTGRES_CONTAINER" \
+docker exec sentris-postgres \
   psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
   -c "CREATE DATABASE \"$DB_NAME\" OWNER sentris;"
 
-docker exec "$POSTGRES_CONTAINER" \
+docker exec sentris-postgres \
   psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
   -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO sentris;"
 

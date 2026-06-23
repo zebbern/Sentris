@@ -4,6 +4,8 @@ import { SECURITY_COMPONENT_IDS } from '../worker/src/components/security/securi
 
 const docsPath = join(process.cwd(), 'docs/components/security.mdx');
 const docs = readFileSync(docsPath, 'utf8');
+const readmePath = join(process.cwd(), 'README.md');
+const readme = readFileSync(readmePath, 'utf8');
 
 const documentedSlugs = new Set<string>();
 for (const match of docs.matchAll(/^###\s+(.+)$/gm)) {
@@ -40,11 +42,14 @@ const slugByComponentId: Record<string, string> = {
   'sentris.repository.files.extract': 'repo files extractor',
   'sentris.repository.manifest.extract': 'manifest extractor',
   'sentris.osv.query': 'osv',
+  'sentris.npm.registry.intel': 'npm registry intel',
   'sentris.nvd.cve.query': 'nvd',
   'sentris.yara.run': 'yara',
 };
 
 const missing: string[] = [];
+const countFailures: string[] = [];
+const totalComponentCount = SECURITY_COMPONENT_IDS.length;
 
 for (const componentId of SECURITY_COMPONENT_IDS) {
   if (allowUndocumented.has(componentId)) {
@@ -62,6 +67,28 @@ if (missing.length > 0) {
   for (const componentId of missing) {
     console.error(`- ${componentId}`);
   }
+}
+
+if (!readme.includes(`${totalComponentCount} security components`)) {
+  countFailures.push(
+    `README.md should mention ${totalComponentCount} security components`,
+  );
+}
+
+if (!docs.includes(`**${totalComponentCount} security components**`)) {
+  countFailures.push(
+    `docs/components/security.mdx should mention ${totalComponentCount} security components`,
+  );
+}
+
+if (countFailures.length > 0) {
+  console.error('Security docs have stale component counts:');
+  for (const failure of countFailures) {
+    console.error(`- ${failure}`);
+  }
+}
+
+if (missing.length > 0 || countFailures.length > 0) {
   process.exit(1);
 }
 

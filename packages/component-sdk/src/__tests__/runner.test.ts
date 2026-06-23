@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { z } from 'zod';
-import { runComponentInline, runComponentWithRunner } from '../runner';
+import { runComponentInline, runComponentWithRunner, applyDockerContainerEnv } from '../runner';
 import { createExecutionContext } from '../context';
 import { defineComponent } from '../define-component';
 import { inputs, outputs, port } from '../schema-builders';
@@ -19,6 +19,27 @@ const dockerAvailable = (() => {
 const dockerIt = enableDockerRunnerTests && dockerAvailable ? it : it.skip;
 
 describe('Component Runner', () => {
+  describe('applyDockerContainerEnv', () => {
+    it('uses -e KEY without inline values and preserves special characters in spawn env', () => {
+      const dockerArgs = ['run', '--rm'];
+      const spawnEnv = applyDockerContainerEnv(dockerArgs, {
+        ANTHROPIC_API_KEY: 'prefix#suffix-with-special chars',
+        PORT: '8080',
+      });
+
+      expect(dockerArgs).toEqual([
+        'run',
+        '--rm',
+        '-e',
+        'ANTHROPIC_API_KEY',
+        '-e',
+        'PORT',
+      ]);
+      expect(spawnEnv.ANTHROPIC_API_KEY).toBe('prefix#suffix-with-special chars');
+      expect(spawnEnv.PORT).toBe('8080');
+    });
+  });
+
   describe('runComponentInline', () => {
     it('should execute component inline', async () => {
       const execute = async (params: { input: string }) => ({

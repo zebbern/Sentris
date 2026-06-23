@@ -9,7 +9,7 @@ export function TimelineStatusBar({
   isPlaying,
 }: TimelineStatusBarProps) {
   return (
-    <div className="flex items-center justify-between text-xs text-muted-foreground">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
       <div className="flex items-center gap-4">
         <span>{eventCount} events</span>
         <span>{nodeCount} nodes</span>

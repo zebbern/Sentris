@@ -1,0 +1,560 @@
+{
+  "_metadata": {
+    "name": "Claude Code Bug Bounty Evidence Analyst",
+    "description": "Credential-gated Claude Code workflow that enriches mixed bug bounty notes with public HTTP, OSV, NVD, and KEV context, then produces an exploitability and reportability review.",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "claude-code",
+      "ai",
+      "triage",
+      "cve",
+      "osv",
+      "nvd",
+      "httpx",
+      "reporting"
+    ],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Claude Code Bug Bounty Evidence Analyst",
+    "description": "Use Claude Code to review enriched bug bounty evidence and produce a prioritized markdown triage report for manual validation and submission planning.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "bug-bounty",
+    "tags": [
+      "bug-bounty",
+      "claude-code",
+      "ai",
+      "triage",
+      "cve",
+      "osv",
+      "nvd",
+      "httpx",
+      "reporting"
+    ],
+    "entryPoint": "trigger_1",
+    "nodeCount": 10,
+    "edgeCount": 25
+  },
+  "graph": {
+    "name": "Claude Code Bug Bounty Evidence Analyst",
+    "description": "AI-assisted bug bounty evidence triage: deterministic public enrichment feeds Claude Code for exploitability, false-positive, and reportability analysis.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 100,
+          "y": 300
+        },
+        "data": {
+          "label": "Mixed Evidence Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "evidenceNotes",
+                  "label": "Evidence notes",
+                  "type": "text",
+                  "required": true,
+                  "description": "Pasted bug bounty notes, recon output, CVE IDs, npm package specs, URLs, or observations to route."
+                },
+                {
+                  "id": "authorizedTargets",
+                  "label": "Authorized targets",
+                  "type": "array",
+                  "required": false,
+                  "defaultValue": [],
+                  "description": "Known in-scope hosts or URLs that may be safely probed."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Scope, rate-limit, or authorization context copied into the final report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "parse_evidence",
+        "type": "core.logic.script",
+        "position": {
+          "x": 440,
+          "y": 300
+        },
+        "data": {
+          "label": "Parse Evidence Routes",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "evidenceNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "authorizedTargets",
+                  "type": "list-text"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "httpTargets",
+                  "type": "list-text"
+                },
+                {
+                  "name": "packageSpecs",
+                  "type": "list-text"
+                },
+                {
+                  "name": "cveIds",
+                  "type": "string"
+                },
+                {
+                  "name": "keywordSearch",
+                  "type": "string"
+                },
+                {
+                  "name": "normalizedEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const notes = String(input.evidenceNotes || '');\n  const authorizedTargets = Array.isArray(input.authorizedTargets) ? input.authorizedTargets.map(String) : [];\n  const packageEcosystem = 'npm';\n  const addUnique = (items, value) => {\n    const text = String(value || '').trim();\n    if (!text || items.includes(text)) return;\n    items.push(text);\n  };\n  const cleanToken = (value) => String(value || '').trim().replace(/[\\])}>,.;:'\\\"]+$/g, '').replace(/^[([{<'\\\"]+/g, '');\n  const normalizeHttpTarget = (value) => {\n    const cleaned = cleanToken(value);\n    if (!cleaned) return null;\n    const candidate = /^https?:\\/\\//i.test(cleaned) ? cleaned : `https://${cleaned}`;\n    try {\n      const parsed = new URL(candidate);\n      if (!['http:', 'https:'].includes(parsed.protocol)) return null;\n      if (!parsed.hostname.includes('.') && parsed.hostname !== 'localhost') return null;\n      parsed.hash = '';\n      return parsed.toString().replace(/\\/$/, '');\n    } catch {\n      return null;\n    }\n  };\n  const cveSet = new Set();\n  for (const match of notes.matchAll(/\\bCVE-\\d{4}-\\d{4,}\\b/gi)) cveSet.add(match[0].toUpperCase());\n  const rawUrls = [];\n  for (const match of notes.matchAll(/https?:\\/\\/[^\\s<>'\\\")]+/gi)) rawUrls.push(match[0]);\n  const httpTargetsAll = [];\n  for (const target of [...rawUrls, ...authorizedTargets]) {\n    const normalized = normalizeHttpTarget(target);\n    if (normalized) addUnique(httpTargetsAll, normalized);\n  }\n  const packageSpecsAll = [];\n  const packagePattern = /(?:^|[\\s(`'\\\"])((?:@[a-z0-9][a-z0-9._-]*\\/)?[a-z0-9][a-z0-9._-]*@[0-9][a-z0-9._~+-]*(?:\\.[a-z0-9._~+-]+)*)(?=$|[\\s,;:`'\\\")\\]])/gi;\n  for (const match of notes.matchAll(packagePattern)) addUnique(packageSpecsAll, match[1]);\n  const keywordCandidates = ['apache', 'nginx', 'tomcat', 'wordpress', 'grafana', 'jenkins', 'spring', 'django', 'rails', 'struts', 'weblogic', 'jira', 'confluence', 'gitlab', 'nextjs', 'express'];\n  const lowerNotes = notes.toLowerCase();\n  const keywordSearch = keywordCandidates.find((keyword) => lowerNotes.includes(keyword)) || (packageSpecsAll[0] ? packageSpecsAll[0].split('@')[0] : 'web server');\n  const observations = notes.split(/[\\r\\n]+|(?<=[.!?])\\s+/).map((item) => item.trim()).filter(Boolean).slice(0, 20);\n  const cvesAll = Array.from(cveSet);\n  const httpTargets = httpTargetsAll.slice(0, 20);\n  const packageSpecs = packageSpecsAll.slice(0, 40);\n  const cves = cvesAll.slice(0, 25);\n  return {\n    httpTargets,\n    packageSpecs,\n    cveIds: cves.join(','),\n    keywordSearch,\n    normalizedEvidence: {\n      cves,\n      httpTargets,\n      packages: packageSpecs.map((spec) => ({ spec, ecosystem: packageEcosystem })),\n      observations,\n      authorizationNotes: String(input.authorizationNotes || '').trim() || null,\n      truncation: {\n        httpTargets: httpTargetsAll.length > httpTargets.length,\n        packageSpecs: packageSpecsAll.length > packageSpecs.length,\n        cveIds: cvesAll.length > cves.length\n      }\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "httpx_probe",
+        "type": "sentris.httpx.scan",
+        "position": {
+          "x": 820,
+          "y": 120
+        },
+        "data": {
+          "label": "Probe Routed Web Targets",
+          "config": {
+            "params": {
+              "threads": 25,
+              "followRedirects": true,
+              "tlsProbe": true,
+              "preferHttps": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "query_osv",
+        "type": "sentris.osv.query",
+        "position": {
+          "x": 820,
+          "y": 300
+        },
+        "data": {
+          "label": "Query Package Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "npm",
+              "severityFloor": "medium",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 20,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "query_nvd",
+        "type": "sentris.nvd.cve.query",
+        "position": {
+          "x": 820,
+          "y": 480
+        },
+        "data": {
+          "label": "Query CVE Metadata",
+          "config": {
+            "params": {
+              "resultsPerPage": 20,
+              "includeRejected": false,
+              "timeoutMs": 90000,
+              "failOnUnavailable": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_kev",
+        "type": "core.http.request",
+        "position": {
+          "x": 820,
+          "y": 660
+        },
+        "data": {
+          "label": "Fetch CISA KEV Context",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {
+              "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+            }
+          }
+        }
+      },
+      {
+        "id": "assemble_router_report",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1220,
+          "y": 300
+        },
+        "data": {
+          "label": "Assemble Routed Evidence Report",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "evidenceNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "normalizedEvidence",
+                  "type": "json"
+                },
+                {
+                  "name": "httpResponses",
+                  "type": "list-json"
+                },
+                {
+                  "name": "osvFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "osvSummary",
+                  "type": "json"
+                },
+                {
+                  "name": "osvPackages",
+                  "type": "list-json"
+                },
+                {
+                  "name": "nvdData",
+                  "type": "json"
+                },
+                {
+                  "name": "nvdStatus",
+                  "type": "number"
+                },
+                {
+                  "name": "nvdStatusText",
+                  "type": "string"
+                },
+                {
+                  "name": "kevData",
+                  "type": "json"
+                },
+                {
+                  "name": "kevStatus",
+                  "type": "number"
+                },
+                {
+                  "name": "kevStatusText",
+                  "type": "string"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const evidence = input.normalizedEvidence && typeof input.normalizedEvidence === 'object' ? input.normalizedEvidence : {};\n  const cves = Array.isArray(evidence.cves) ? evidence.cves.map(String) : [];\n  const packages = Array.isArray(evidence.packages) ? evidence.packages : [];\n  const httpTargets = Array.isArray(evidence.httpTargets) ? evidence.httpTargets.map(String) : [];\n  const observations = Array.isArray(evidence.observations) ? evidence.observations.map(String) : [];\n  const httpResponses = Array.isArray(input.httpResponses) ? input.httpResponses : [];\n  const osvFindings = Array.isArray(input.osvFindings) ? input.osvFindings : [];\n  const osvPackages = Array.isArray(input.osvPackages) ? input.osvPackages : [];\n  const nvdItems = Array.isArray(input.nvdData?.vulnerabilities) ? input.nvdData.vulnerabilities : [];\n  const kevItems = Array.isArray(input.kevData?.vulnerabilities) ? input.kevData.vulnerabilities : [];\n  const kevByCve = new Map(kevItems.map((item) => [String(item?.cveID || '').toUpperCase(), item]).filter(([id]) => id));\n  const severityRank = { critical: 5, high: 4, medium: 3, low: 2, info: 1, unknown: 0, none: 0 };\n  const cvssFor = (cve) => {\n    const metrics = cve?.metrics || {};\n    const entries = ['cvssMetricV40', 'cvssMetricV31', 'cvssMetricV30', 'cvssMetricV2'].flatMap((key) => Array.isArray(metrics[key]) ? metrics[key] : []);\n    const scores = entries.map((entry) => ({ severity: String(entry?.cvssData?.baseSeverity || entry?.baseSeverity || '').toLowerCase(), score: Number(entry?.cvssData?.baseScore) })).filter((item) => item.severity || Number.isFinite(item.score));\n    scores.sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || Number(b.score || 0) - Number(a.score || 0));\n    return scores[0] || { severity: 'unknown', score: null };\n  };\n  const nvdByCve = new Map(nvdItems.map((item) => [String(item?.cve?.id || '').toUpperCase(), item?.cve]).filter(([id]) => id));\n  const runNow = [];\n  const manualReview = [];\n  const notEnoughEvidence = [];\n  const recommended = new Map();\n  const addWorkflow = (name, reason) => {\n    if (!recommended.has(name)) recommended.set(name, { name, reason });\n  };\n  for (const cveId of cves) {\n    const cve = nvdByCve.get(cveId) || {};\n    const cvss = cvssFor(cve);\n    const kev = kevByCve.get(cveId) || null;\n    const priorityScore = (kev ? 120 : 0) + (severityRank[cvss.severity] || 0) * 20 + Number(cvss.score || 0);\n    const reason = `${cveId}${kev ? ' is listed in CISA KEV' : ' has public CVE metadata'}${cvss.severity && cvss.severity !== 'unknown' ? ` with ${cvss.severity} severity` : ''}`;\n    runNow.push({ type: 'cve', id: cveId, severity: cvss.severity, cvssScore: cvss.score, knownExploited: Boolean(kev), priorityScore, reason, recommendedWorkflow: 'CVE Impact Research Brief' });\n    addWorkflow('CVE Impact Research Brief', 'Build a deeper impact brief for explicit CVE IDs.');\n  }\n  for (const finding of osvFindings) {\n    const severity = String(finding?.severity || 'unknown').toLowerCase();\n    const priorityScore = (severityRank[severity] || 0) * 25 + (finding?.isMaliciousPackageRecord ? 60 : 0);\n    runNow.push({ type: 'package-advisory', id: finding?.id || null, packageSpec: finding?.packageSpec || finding?.packageName || null, severity, cves: Array.isArray(finding?.cves) ? finding.cves : [], priorityScore, reason: `${finding?.packageSpec || finding?.packageName || 'package'} has ${severity} OSV advisory ${finding?.id || ''}`.trim(), recommendedWorkflow: 'GitHub Repo Dependency CVE Triage' });\n    addWorkflow('GitHub Repo Dependency CVE Triage', 'Run repository-level dependency triage when package evidence came from source code.');\n    addWorkflow('NPM Dependency CVE Hunt', 'Run package-list OSV triage when only package specs are available.');\n  }\n  for (const response of httpResponses) {\n    const status = Number(response?.statusCode || response?.status_code || 0);\n    if (!status) continue;\n    manualReview.push({ type: 'live-http', target: response?.url || response?.input || null, statusCode: status, title: response?.title || null, technologies: Array.isArray(response?.technologies) ? response.technologies : [], reason: `live HTTP target responded with status ${status}` });\n    addWorkflow('Web Attack Surface Quick Win Hunt', 'Probe live web targets for safe, high-signal bug bounty checks.');\n  }\n  if (packages.length > 0 && osvFindings.length === 0) {\n    manualReview.push({ type: 'package-no-finding', reason: 'Package specs were extracted but OSV returned no medium-or-higher advisories.', packages: packages.slice(0, 20) });\n  }\n  if (httpTargets.length > 0 && httpResponses.length === 0) {\n    notEnoughEvidence.push({ type: 'web-no-response', reason: 'HTTP targets were extracted but did not return live httpx responses in this run.', targets: httpTargets.slice(0, 20) });\n  }\n  for (const observation of observations) {\n    if (!/https?:\\/\\/|CVE-\\d{4}-\\d{4,}|@[0-9]/i.test(observation)) {\n      notEnoughEvidence.push({ type: 'observation', reason: 'Observation needs manual classification before automated enrichment.', value: observation.slice(0, 240) });\n    }\n  }\n  runNow.sort((a, b) => Number(b.priorityScore || 0) - Number(a.priorityScore || 0) || String(a.id || a.packageSpec || '').localeCompare(String(b.id || b.packageSpec || '')));\n  const sourceStatus = {\n    nvd: { status: Number(input.nvdStatus || 0), statusText: input.nvdStatusText || null, ok: Number(input.nvdStatus || 0) >= 200 && Number(input.nvdStatus || 0) < 300 },\n    cisaKev: { status: Number(input.kevStatus || 0), statusText: input.kevStatusText || null, ok: Number(input.kevStatus || 0) >= 200 && Number(input.kevStatus || 0) < 300 },\n    osv: input.osvSummary || {},\n    httpx: { targets: httpTargets.length, responses: httpResponses.length }\n  };\n  return { report: { summary: { extractedCves: cves.length, extractedPackageSpecs: packages.length || osvPackages.length, extractedHttpTargets: httpTargets.length, runNow: runNow.length, manualReview: manualReview.length, notEnoughEvidence: notEnoughEvidence.length, topAction: runNow[0]?.reason || manualReview[0]?.reason || null }, authorizationNotes: String(input.authorizationNotes || evidence.authorizationNotes || '').trim() || null, extractedEvidence: evidence, sourceStatus, runNow, manualReview, notEnoughEvidence: notEnoughEvidence.slice(0, 50), recommendedFollowUpWorkflows: Array.from(recommended.values()), rawEvidencePreview: String(input.evidenceNotes || '').slice(0, 2000), nextSteps: ['Run the recommended specialized workflow for the highest-priority evidence bucket', 'Manually confirm scope and exploitability before reporting', 'Add API keys later only for credential-gated reputation enrichment workflows'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1580,
+          "y": 140
+        },
+        "data": {
+          "label": "Save Routed Evidence Context",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "claude-code-bug-bounty-evidence-context-{{date}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "claude_code_triage",
+        "type": "core.ai.claude-code",
+        "position": {
+          "x": 1580,
+          "y": 420
+        },
+        "data": {
+          "label": "Claude Code Exploitability Review",
+          "config": {
+            "params": {
+              "systemPrompt": "You are a senior bug bounty triage analyst using only authorized, non-destructive evidence. Review the routed evidence JSON, public enrichment results, and raw researcher notes. Do not invent vulnerabilities. Separate confirmed evidence from hypotheses and missing proof. Prioritize exploitability, business impact, false-positive risk, and what a researcher should verify next. Return concise markdown with sections: Executive summary, Highest-priority leads, Evidence table, False-positive checks, Safe next steps, Submission notes.",
+              "autoApprove": true,
+              "providerConfig": {},
+              "skillIds": [],
+              "enablePlugins": []
+            },
+            "inputOverrides": {
+              "task": "Analyze the routed bug bounty evidence and produce a markdown exploitability/reportability review. Keep every recommendation inside the stated authorization notes and avoid destructive testing.",
+              "model": {
+                "provider": "anthropic",
+                "modelId": "claude-sonnet-4-6",
+                "authMode": "subscription_oauth",
+                "oauthTokenSecretId": "{{SECRET_PLACEHOLDER}}",
+                "effort": "medium"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "artifact_claude_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 1940,
+          "y": 420
+        },
+        "data": {
+          "label": "Save Claude Analyst Report",
+          "config": {
+            "params": {
+              "fileExtension": ".md",
+              "mimeType": "text/markdown",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "claude-code-bug-bounty-analyst-report-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-parse_evidence-evidenceNotes",
+        "source": "trigger_1",
+        "target": "parse_evidence",
+        "sourceHandle": "evidenceNotes",
+        "targetHandle": "evidenceNotes"
+      },
+      {
+        "id": "trigger_1-parse_evidence-authorizedTargets",
+        "source": "trigger_1",
+        "target": "parse_evidence",
+        "sourceHandle": "authorizedTargets",
+        "targetHandle": "authorizedTargets"
+      },
+      {
+        "id": "trigger_1-parse_evidence-authorizationNotes",
+        "source": "trigger_1",
+        "target": "parse_evidence",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "parse_evidence-httpx_probe-httpTargets",
+        "source": "parse_evidence",
+        "target": "httpx_probe",
+        "sourceHandle": "httpTargets",
+        "targetHandle": "targets"
+      },
+      {
+        "id": "parse_evidence-query_osv-packageSpecs",
+        "source": "parse_evidence",
+        "target": "query_osv",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "parse_evidence-query_nvd-cveIds",
+        "source": "parse_evidence",
+        "target": "query_nvd",
+        "sourceHandle": "cveIds",
+        "targetHandle": "cveIds"
+      },
+      {
+        "id": "parse_evidence-query_nvd-keywordSearch",
+        "source": "parse_evidence",
+        "target": "query_nvd",
+        "sourceHandle": "keywordSearch",
+        "targetHandle": "keywordSearch"
+      },
+      {
+        "id": "trigger_1-assemble_router_report-evidenceNotes",
+        "source": "trigger_1",
+        "target": "assemble_router_report",
+        "sourceHandle": "evidenceNotes",
+        "targetHandle": "evidenceNotes"
+      },
+      {
+        "id": "trigger_1-assemble_router_report-authorizationNotes",
+        "source": "trigger_1",
+        "target": "assemble_router_report",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "parse_evidence-assemble_router_report-normalizedEvidence",
+        "source": "parse_evidence",
+        "target": "assemble_router_report",
+        "sourceHandle": "normalizedEvidence",
+        "targetHandle": "normalizedEvidence"
+      },
+      {
+        "id": "httpx_probe-assemble_router_report-responses",
+        "source": "httpx_probe",
+        "target": "assemble_router_report",
+        "sourceHandle": "responses",
+        "targetHandle": "httpResponses"
+      },
+      {
+        "id": "query_osv-assemble_router_report-findings",
+        "source": "query_osv",
+        "target": "assemble_router_report",
+        "sourceHandle": "findings",
+        "targetHandle": "osvFindings"
+      },
+      {
+        "id": "query_osv-assemble_router_report-summary",
+        "source": "query_osv",
+        "target": "assemble_router_report",
+        "sourceHandle": "summary",
+        "targetHandle": "osvSummary"
+      },
+      {
+        "id": "query_osv-assemble_router_report-packages",
+        "source": "query_osv",
+        "target": "assemble_router_report",
+        "sourceHandle": "packages",
+        "targetHandle": "osvPackages"
+      },
+      {
+        "id": "query_nvd-assemble_router_report-data",
+        "source": "query_nvd",
+        "target": "assemble_router_report",
+        "sourceHandle": "data",
+        "targetHandle": "nvdData"
+      },
+      {
+        "id": "query_nvd-assemble_router_report-status",
+        "source": "query_nvd",
+        "target": "assemble_router_report",
+        "sourceHandle": "status",
+        "targetHandle": "nvdStatus"
+      },
+      {
+        "id": "query_nvd-assemble_router_report-statusText",
+        "source": "query_nvd",
+        "target": "assemble_router_report",
+        "sourceHandle": "statusText",
+        "targetHandle": "nvdStatusText"
+      },
+      {
+        "id": "fetch_kev-assemble_router_report-data",
+        "source": "fetch_kev",
+        "target": "assemble_router_report",
+        "sourceHandle": "data",
+        "targetHandle": "kevData"
+      },
+      {
+        "id": "fetch_kev-assemble_router_report-status",
+        "source": "fetch_kev",
+        "target": "assemble_router_report",
+        "sourceHandle": "status",
+        "targetHandle": "kevStatus"
+      },
+      {
+        "id": "fetch_kev-assemble_router_report-statusText",
+        "source": "fetch_kev",
+        "target": "assemble_router_report",
+        "sourceHandle": "statusText",
+        "targetHandle": "kevStatusText"
+      },
+      {
+        "id": "assemble_router_report-artifact_report-report",
+        "source": "assemble_router_report",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      },
+      {
+        "id": "assemble_router_report-claude_code_triage-report",
+        "source": "assemble_router_report",
+        "target": "claude_code_triage",
+        "sourceHandle": "report",
+        "targetHandle": "context"
+      },
+      {
+        "id": "trigger_1-claude_code_triage-evidenceNotes",
+        "source": "trigger_1",
+        "target": "claude_code_triage",
+        "sourceHandle": "evidenceNotes",
+        "targetHandle": "supplementaryInputA"
+      },
+      {
+        "id": "trigger_1-claude_code_triage-authorizationNotes",
+        "source": "trigger_1",
+        "target": "claude_code_triage",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "supplementaryInputB"
+      },
+      {
+        "id": "claude_code_triage-artifact_claude_report-report",
+        "source": "claude_code_triage",
+        "target": "artifact_claude_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": [
+    {
+      "name": "CLAUDE_CODE_OAUTH_TOKEN",
+      "type": "string",
+      "description": "Claude Code subscription token produced by `claude setup-token`; stored in Sentris Secrets and mapped into the Claude Code node at workflow creation."
+    }
+  ]
+}

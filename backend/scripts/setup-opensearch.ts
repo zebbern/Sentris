@@ -53,7 +53,7 @@ async function main() {
               // Workflow context under sentris namespace
               sentris: {
                 type: 'object',
-                dynamic: true,
+                dynamic: 'true',
                 properties: {
                   organization_id: { type: 'keyword' },
                   run_id: { type: 'keyword' },

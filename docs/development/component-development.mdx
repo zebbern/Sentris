@@ -823,8 +823,10 @@ curl http://localhost/api/v1/health -H "x-internal-token: local-internal-token"
 
 **Run E2E tests:**
 ```bash
-RUN_E2E=true bun --cwd e2e-tests test
+bun run test:e2e:core
 ```
+
+The `bun run test:e2e*` commands resolve the active local instance and load `e2e-tests/.env.e2e` automatically. Use `SENTRIS_E2E_ENV_FILE=/path/to/custom.env` when you intentionally want a different env file.
 
 **Example E2E test pattern:**
 

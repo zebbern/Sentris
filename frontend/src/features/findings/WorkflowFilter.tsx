@@ -14,13 +14,14 @@ import { useWorkflowsList } from '@/hooks/queries/useWorkflowQueries';
 interface WorkflowFilterProps {
   value: string | undefined;
   onChange: (workflowId: string | undefined) => void;
+  triggerClassName?: string;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function WorkflowFilter({ value, onChange }: WorkflowFilterProps) {
+export function WorkflowFilter({ value, onChange, triggerClassName }: WorkflowFilterProps) {
   const { data: workflows } = useWorkflowsList();
 
   const handleChange = (val: string) => {
@@ -29,7 +30,7 @@ export function WorkflowFilter({ value, onChange }: WorkflowFilterProps) {
 
   return (
     <Select value={value ?? 'all'} onValueChange={handleChange}>
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className={triggerClassName ?? 'w-[180px]'}>
         <SelectValue placeholder="Workflow" />
       </SelectTrigger>
       <SelectContent>

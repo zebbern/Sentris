@@ -5,7 +5,7 @@ import type { Parameter } from '@/schemas/component';
 interface JsonFieldProps {
   parameter: Parameter;
   value: unknown;
-  onChange: (value: string | undefined) => void;
+  onChange: (value: unknown) => void;
 }
 
 /**
@@ -22,7 +22,6 @@ export function JsonField({ parameter, value, onChange }: JsonFieldProps) {
     if (!jsonTextareaRef.current) return;
 
     let textValue = '';
-    let needsNormalization = false;
 
     if (value === undefined || value === null || value === '') {
       textValue = '';
@@ -31,7 +30,6 @@ export function JsonField({ parameter, value, onChange }: JsonFieldProps) {
     } else {
       try {
         textValue = JSON.stringify(value, null, 2);
-        needsNormalization = true;
       } catch (error: unknown) {
         logger.error('Failed to serialize JSON parameter value', error);
         return;
@@ -44,11 +42,7 @@ export function JsonField({ parameter, value, onChange }: JsonFieldProps) {
       setJsonError(null);
       isExternalJsonUpdateRef.current = false;
     }
-
-    if (needsNormalization) {
-      onChange(textValue);
-    }
-  }, [value, onChange]);
+  }, [value]);
 
   // Validate and sync to parent only on blur for native undo behavior
   const handleJsonBlur = useCallback(() => {
@@ -62,9 +56,9 @@ export function JsonField({ parameter, value, onChange }: JsonFieldProps) {
     }
 
     try {
-      JSON.parse(nextValue);
+      const parsed: unknown = JSON.parse(nextValue);
       setJsonError(null);
-      onChange(nextValue);
+      onChange(parsed);
     } catch (_error: unknown) {
       setJsonError('Invalid JSON');
     }

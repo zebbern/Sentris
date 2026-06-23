@@ -292,9 +292,9 @@ just infra logs
 ### Applications only
 
 ```bash
-pm2 start pm2.config.cjs
-pm2 status
-pm2 logs
+bun run pm2 -- start pm2.config.cjs
+bun run pm2 -- status
+bun run pm2 -- logs
 ```
 
 ---

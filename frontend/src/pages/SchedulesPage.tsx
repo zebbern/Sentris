@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { RefreshCw, Plus } from 'lucide-react';
+import { RefreshCw, Plus, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
@@ -30,7 +31,6 @@ import { getWorkflowName, getStatusBadgeProps } from '@/utils/tableHelpers';
 import type { WorkflowOption, BadgeVariant } from '@/utils/tableHelpers';
 import {
   SchedulesTable,
-  ScheduleFilters,
   useScheduleActions,
   useScheduleEditorDrawer,
 } from './schedules';
@@ -46,7 +46,7 @@ export function SchedulesPage() {
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const organizationId = useAuthStore((state) => state.organizationId);
 
   // Local filter state (search is client-side, workflowId & status go to the query)
@@ -67,7 +67,7 @@ export function SchedulesPage() {
   });
   const error = schedulesError?.message ?? null;
 
-  const { data: workflowsRaw = [], isLoading: workflowsLoading } = useWorkflowsSummary();
+  const { data: workflowsRaw = [] } = useWorkflowsSummary();
   const workflowOptions: WorkflowOption[] = useMemo(
     () => workflowsRaw.map((w) => ({ id: w.id, name: w.name ?? 'Untitled workflow' })),
     [workflowsRaw],
@@ -229,22 +229,6 @@ export function SchedulesPage() {
     return actions;
   }, [selectedIds, orderedSchedules]);
 
-  const handleWorkflowFilterChange = (value: string) => {
-    const workflowId = value === 'all' ? null : value;
-    setFilters((prev) => ({ ...prev, workflowId }));
-    const nextParams = new URLSearchParams(searchParams);
-    if (workflowId) {
-      nextParams.set('workflowId', workflowId);
-    } else {
-      nextParams.delete('workflowId');
-    }
-    setSearchParams(nextParams, { replace: true });
-  };
-
-  const handleStatusFilterChange = (value: string) => {
-    setFilters((prev) => ({ ...prev, status: value as typeof filters.status }));
-  };
-
   const handleEdit = (schedule: WorkflowSchedule) => {
     openEditDrawer(schedule);
   };
@@ -272,39 +256,53 @@ export function SchedulesPage() {
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
           <PageToolbar
-            searchValue={filters.search}
-            onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-            searchLabel="Search schedules or workflows"
-            searchPlaceholder="Filter by schedule or workflow"
-            actions={
-              <>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
+            filters={
+              <div className="min-w-0 flex-1 space-y-2">
+                <label
+                  htmlFor="schedule-filter-search"
+                  className="flex items-center gap-2 text-xs uppercase text-muted-foreground"
                 >
-                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-                <Button variant="default" className="gap-2" onClick={openCreateDrawer}>
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">New schedule</span>
-                </Button>
-              </>
+                  <Search className="h-3.5 w-3.5" />
+                  Search schedules or workflows
+                </label>
+                <Input
+                  id="schedule-filter-search"
+                  type="search"
+                  placeholder="Filter by schedule or workflow"
+                  value={filters.search}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, search: e.target.value }))
+                  }
+                  aria-label="Filter by schedule or workflow"
+                />
+              </div>
             }
+            actions={
+              <div className="flex shrink-0 flex-col sm:ml-auto">
+                <div className="hidden text-xs sm:block" aria-hidden="true">
+                  &nbsp;
+                </div>
+                <div className="mt-2 flex gap-2 sm:mt-0">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleRefresh}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                    Refresh
+                  </Button>
+                  <Button variant="default" className="gap-2" onClick={openCreateDrawer}>
+                    <Plus className="h-4 w-4" />
+                    New schedule
+                  </Button>
+                </div>
+              </div>
+            }
+            className="w-full gap-4 sm:flex-row sm:items-end"
           />
 
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
-
-          <ScheduleFilters
-            status={filters.status}
-            workflowId={filters.workflowId}
-            workflowOptions={workflowOptions}
-            workflowsLoading={workflowsLoading}
-            onStatusChange={handleStatusFilterChange}
-            onWorkflowChange={handleWorkflowFilterChange}
-          />
 
           <SchedulesTable
             orderedSchedules={orderedSchedules}

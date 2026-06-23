@@ -1,0 +1,145 @@
+{
+  "_metadata": {
+    "name": "CNA Routing Resolver",
+    "description": "Determines whether a CVE Numbering Authority (CNA) covers an affected product by matching it against the public CNA list, and routes the report to that CNA or to MITRE as the CNA of Last Resort.",
+    "category": "cve-research",
+    "tags": ["cve-research", "mitre", "cna", "disclosure", "routing"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "CNA Routing Resolver",
+    "description": "Match an affected vendor/product against the published CNA list and recommend whether to disclose to a dedicated CNA or to MITRE as CNA of Last Resort.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "cve-research",
+    "tags": ["cve-research", "mitre", "cna", "disclosure", "routing"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 4,
+    "edgeCount": 7
+  },
+  "graph": {
+    "name": "CNA Routing Resolver",
+    "description": "Decide where to submit a vulnerability: a dedicated CNA or MITRE as CNA of Last Resort.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 280 },
+        "data": {
+          "label": "Affected Product Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "vendorOrProduct",
+                  "label": "Vendor or product",
+                  "type": "text",
+                  "required": true,
+                  "description": "Vendor or product name to match against the published CNA list (for example Apache, GitLab, Cisco)."
+                },
+                {
+                  "id": "productUrlOrRepo",
+                  "label": "Product URL or repository",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Optional product homepage or source repository, recorded in the routing report."
+                },
+                {
+                  "id": "keywords",
+                  "label": "Alternate names",
+                  "type": "array",
+                  "required": false,
+                  "defaultValue": [],
+                  "description": "Optional alternate vendor/product names or aliases to widen CNA matching."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Scope or research-authorization context copied into the report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_cna_list",
+        "type": "core.http.request",
+        "position": { "x": 460, "y": 160 },
+        "data": {
+          "label": "Fetch Published CNA List",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {
+              "url": "https://raw.githubusercontent.com/CVEProject/cve-website/dev/src/assets/data/CNAsList.json"
+            }
+          }
+        }
+      },
+      {
+        "id": "resolve_cna",
+        "type": "core.logic.script",
+        "position": { "x": 820, "y": 280 },
+        "data": {
+          "label": "Resolve CNA Routing",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "vendorOrProduct", "type": "string" },
+                { "name": "productUrlOrRepo", "type": "string" },
+                { "name": "keywords", "type": "list-text" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "cnaListData", "type": "json" },
+                { "name": "cnaStatus", "type": "number" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) { const vendor = String(input.vendorOrProduct || '').trim(); const productUrl = String(input.productUrlOrRepo || '').trim(); const keywords = Array.isArray(input.keywords) ? input.keywords.map(function (k) { return String(k).trim(); }).filter(Boolean) : []; const status = Number(input.cnaStatus || 0); const listOk = status >= 200 && status < 300; const raw = input.cnaListData; let entries = []; if (Array.isArray(raw)) { entries = raw; } else if (raw && Array.isArray(raw.data)) { entries = raw.data; } else if (raw && Array.isArray(raw.CNAs)) { entries = raw.CNAs; } const terms = [vendor].concat(keywords).map(function (t) { return String(t || '').toLowerCase(); }).filter(Boolean); const nameOf = function (e) { return String((e && (e.organizationName || e.shortName || e.name || e.short_name)) || '').trim(); }; const scopeOf = function (e) { if (!e) return ''; if (typeof e.scope === 'string') return e.scope; if (e.scope && typeof e.scope === 'object') return JSON.stringify(e.scope); return String(e.scopeText || ''); }; const contactOf = function (e) { if (!e) return null; const adv = e.securityAdvisories || e.advisories || {}; const url = (adv && (adv.url || adv.advisories)) || e.contactUrl || e.url || null; return url ? String(url) : null; }; const matches = []; for (const e of entries) { const name = nameOf(e); if (!name) continue; const hay = (name + ' ' + scopeOf(e)).toLowerCase(); const hit = terms.find(function (t) { return t && hay.indexOf(t) !== -1; }); if (hit) { matches.push({ organization: name, matchedTerm: hit, scope: scopeOf(e).slice(0, 400), advisoriesUrl: contactOf(e) }); } } matches.sort(function (a, b) { return a.organization.localeCompare(b.organization); }); const hasCna = matches.length > 0; const routing = hasCna ? 'dedicated-cna' : 'mitre-cna-of-last-resort'; return { report: { summary: { vendorOrProduct: vendor || null, routing: routing, matchedCnas: matches.length, cnaListLoaded: listOk, totalCnaEntries: entries.length }, routing: routing, recommendation: hasCna ? 'A CNA appears to cover this product. Report to the matched CNA using their published security advisory/contact channel. Escalate to MITRE only if the CNA is unresponsive or declines.' : 'No matching CNA was found. Submit through MITRE as the CNA of Last Resort using the CVE Request form at https://cveform.org.', matchedCnas: matches.slice(0, 10), submission: { ifDedicatedCna: 'Use the matched CNA security advisory/contact URL above and follow their disclosure policy and timelines.', ifMitreLastResort: 'Submit at https://cveform.org. Have product, version, vulnerability type (CWE), attack vector, impact, and a proof of concept ready.', verifyList: 'Confirm coverage on the official partner list: https://www.cve.org/PartnerInformation/ListofPartners' }, productUrlOrRepo: productUrl || null, authorizationNotes: String(input.authorizationNotes || '').trim() || null, sourceStatus: { cnaList: { status: status, ok: listOk, source: 'CVEProject/cve-website CNAsList.json' } }, nextSteps: hasCna ? ['Open the matched CNA advisory/contact URL', 'Generate the MITRE CVE Record Builder output to attach to your report'] : ['Run the MITRE CVE Record Builder to generate the submission package', 'Submit via https://cveform.org as CNA of Last Resort'], disclaimer: 'Automated CNA matching is best-effort substring matching against the public CNA list. Always verify the correct CNA and scope manually before disclosing.' } }; }"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1180, "y": 280 },
+        "data": {
+          "label": "Save CNA Routing Decision",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "cna-routing-resolver-{{date}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      { "id": "trigger_1-resolve_cna-vendorOrProduct", "source": "trigger_1", "target": "resolve_cna", "sourceHandle": "vendorOrProduct", "targetHandle": "vendorOrProduct" },
+      { "id": "trigger_1-resolve_cna-productUrlOrRepo", "source": "trigger_1", "target": "resolve_cna", "sourceHandle": "productUrlOrRepo", "targetHandle": "productUrlOrRepo" },
+      { "id": "trigger_1-resolve_cna-keywords", "source": "trigger_1", "target": "resolve_cna", "sourceHandle": "keywords", "targetHandle": "keywords" },
+      { "id": "trigger_1-resolve_cna-authorizationNotes", "source": "trigger_1", "target": "resolve_cna", "sourceHandle": "authorizationNotes", "targetHandle": "authorizationNotes" },
+      { "id": "fetch_cna_list-resolve_cna-data", "source": "fetch_cna_list", "target": "resolve_cna", "sourceHandle": "data", "targetHandle": "cnaListData" },
+      { "id": "fetch_cna_list-resolve_cna-status", "source": "fetch_cna_list", "target": "resolve_cna", "sourceHandle": "status", "targetHandle": "cnaStatus" },
+      { "id": "resolve_cna-artifact_report-report", "source": "resolve_cna", "target": "artifact_report", "sourceHandle": "report", "targetHandle": "content" }
+    ]
+  },
+  "requiredSecrets": []
+}

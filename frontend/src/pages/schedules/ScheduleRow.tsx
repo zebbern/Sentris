@@ -58,6 +58,17 @@ export function ScheduleRow({
         />
       </TableCell>
       <DragHandle {...handleProps} disabled={isDragDisabled} />
+      <TableCell className="whitespace-nowrap">
+        <Badge variant={statusBadgeProps.variant}>{statusBadgeProps.label}</Badge>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col">
+          <span className="font-medium truncate max-w-[120px] md:max-w-none">{workflowName}</span>
+          <span className="text-xs text-muted-foreground truncate max-w-[120px] md:max-w-none">
+            {schedule.workflowId}
+          </span>
+        </div>
+      </TableCell>
       <TableCell className="font-medium">
         <div className="flex flex-col">
           <span className="truncate max-w-[120px] md:max-w-none">{schedule.name}</span>
@@ -66,14 +77,6 @@ export function ScheduleRow({
               {schedule.description}
             </span>
           )}
-        </div>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        <div className="flex flex-col">
-          <span className="font-medium truncate max-w-[120px]">{workflowName}</span>
-          <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-            {schedule.workflowId}
-          </span>
         </div>
       </TableCell>
       <TableCell className="hidden lg:table-cell">
@@ -87,9 +90,6 @@ export function ScheduleRow({
       </TableCell>
       <TableCell className="text-sm hidden lg:table-cell whitespace-nowrap">
         {formatDateTime(schedule.lastRunAt)}
-      </TableCell>
-      <TableCell className="hidden sm:table-cell whitespace-nowrap">
-        <Badge variant={statusBadgeProps.variant}>{statusBadgeProps.label}</Badge>
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1 md:gap-2">
