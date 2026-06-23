@@ -857,4 +857,103 @@ describe('executeWorkflow', () => {
     expect(failureMetadata[0]?.at).toBe('fail');
     expect(failureMetadata[0]?.reason.message).toBe('boom');
   });
+
+  it('executes For Each loop bodies sequentially and aggregates iteration results', async () => {
+    const { compileWorkflowGraph } = await import('../../../../backend/src/dsl/compiler');
+    const definition = compileWorkflowGraph({
+      name: 'Loop runner test',
+      nodes: [
+        {
+          id: 'trigger',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Trigger',
+            config: {
+              params: {
+                runtimeInputs: [{ id: 'items', label: 'Items', type: 'array', required: true }],
+              },
+              inputOverrides: {},
+            },
+          },
+        },
+        {
+          id: 'loop',
+          type: 'core.workflow.for-each',
+          position: { x: 0, y: 100 },
+          data: { label: 'Loop', config: { params: {}, inputOverrides: {} } },
+        },
+        {
+          id: 'body_step',
+          type: 'core.logic.script',
+          position: { x: 0, y: 200 },
+          data: {
+            label: 'Body',
+            config: {
+              params: {
+                variables: [{ name: 'currentItem', type: 'string' }],
+                returns: [{ name: 'result', type: 'json' }],
+                code: "export function script(input) { return { result: { item: input.currentItem } }; }",
+              },
+              inputOverrides: {},
+            },
+          },
+        },
+        {
+          id: 'finalize',
+          type: 'core.logic.script',
+          position: { x: 0, y: 300 },
+          data: {
+            label: 'Finalize',
+            config: {
+              params: {
+                variables: [{ name: 'results', type: 'list-json' }],
+                returns: [{ name: 'report', type: 'json' }],
+                code: "export function script(input) { return { report: { items: input.results || [] } }; }",
+              },
+              inputOverrides: {},
+            },
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'trigger-loop-items',
+          source: 'trigger',
+          target: 'loop',
+          sourceHandle: 'items',
+          targetHandle: 'items',
+        },
+        {
+          id: 'loop-body',
+          source: 'loop',
+          target: 'body_step',
+          sourceHandle: 'body',
+          targetHandle: 'currentItem',
+        },
+        {
+          id: 'body-loop-back',
+          source: 'body_step',
+          target: 'loop',
+          sourceHandle: 'result',
+          targetHandle: 'loopBack',
+        },
+        {
+          id: 'loop-finalize-results',
+          source: 'loop',
+          target: 'finalize',
+          sourceHandle: 'results',
+          targetHandle: 'results',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
+
+    const result = await executeWorkflow(definition, { inputs: { items: ['alpha', 'beta'] } });
+
+    expect(result.success).toBe(true);
+    expect(result.outputs?.finalize).toEqual({
+      report: { items: [{ item: 'alpha' }, { item: 'beta' }] },
+    });
+  });
 });
