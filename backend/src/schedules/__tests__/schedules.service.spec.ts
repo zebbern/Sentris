@@ -53,6 +53,7 @@ const workflowDefinition: WorkflowDefinition = {
     environment: 'default',
     timeoutSeconds: 0,
   },
+  loopBodies: {},
 };
 
 const makeScheduleRecord = (

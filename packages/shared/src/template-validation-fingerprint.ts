@@ -121,6 +121,11 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       researchNotes:
         'Live audit fixture using public npm packages with known historical advisories.',
     },
+    'npm CVE Hunt Pipeline': {
+      packageSpecs: ['minimist@1.2.5'],
+      authorizationNotes:
+        'Smoke test: authorized research on public npm packages and GitHub source only. Non-destructive analysis.',
+    },
     'Passive OSINT Subdomain Expansion': {
       domain: 'example.com',
       knownSubdomains: ['www.example.com'],
@@ -258,7 +263,9 @@ export function createTemplateValidationFingerprint(value: unknown): string {
   return `sha256:${createHash('sha256').update(stableStringify(value)).digest('hex')}`;
 }
 
-export function getTemplateComponentIds(template: TemplateComponentSourceLike | null | undefined): string[] {
+export function getTemplateComponentIds(
+  template: TemplateComponentSourceLike | null | undefined,
+): string[] {
   const nodes = Array.isArray(template?.graph?.nodes) ? template.graph.nodes : [];
   return Array.from(
     new Set(

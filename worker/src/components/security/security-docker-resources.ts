@@ -250,6 +250,7 @@ export const SECURITY_DOCKER_COMPONENT_RESOURCE_PROFILES: Record<
   'sentris.semgrep.run': SECURITY_DOCKER_RESOURCE_STANDARD,
   'sentris.repository.files.extract': null,
   'sentris.repository.manifest.extract': null,
+  'sentris.npm.registry.intel': null,
   'sentris.osv.query': null,
   'sentris.nvd.cve.query': null,
   'sentris.yara.run': SECURITY_DOCKER_RESOURCE_LIGHT,

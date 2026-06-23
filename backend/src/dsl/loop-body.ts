@@ -1,7 +1,7 @@
 import type { WorkflowGraphDto, WorkflowNodeDto } from '../workflows/dto/workflow-graph.dto';
 import type {
   WorkflowAction,
-  WorkflowDefinition,
+  WorkflowDefinitionCore,
   WorkflowEdge,
   WorkflowNodeMetadata,
   LoopBodyDefinition,
@@ -64,7 +64,9 @@ function findBodyEntryEdge(
   );
 
   if (candidates.length === 0) {
-    const fallback = graphEdges.filter((edge) => edge.source === forEachId && edge.target !== forEachId);
+    const fallback = graphEdges.filter(
+      (edge) => edge.source === forEachId && edge.target !== forEachId,
+    );
     if (fallback.length === 1) {
       return { edge: fallback[0], bodyEntryRef: fallback[0].target };
     }
@@ -99,7 +101,6 @@ function buildLoopBodyDefinition(options: {
   bodyEntryRef: string;
   loopBackEdges: GraphEdge[];
   bodyEntryEdge: GraphEdge;
-  executableNodes: WorkflowNodeDto[];
   graphEdges: GraphEdge[];
   nodesMetadata: Record<string, WorkflowNodeMetadata>;
   actionsByRef: Map<string, WorkflowAction>;
@@ -110,7 +111,6 @@ function buildLoopBodyDefinition(options: {
     bodyEntryRef,
     loopBackEdges,
     bodyEntryEdge,
-    executableNodes,
     graphEdges,
     nodesMetadata,
     actionsByRef,
@@ -166,7 +166,7 @@ function buildLoopBodyDefinition(options: {
     dependencyCounts[action.ref] = action.dependsOn.length;
   }
 
-  const definition: WorkflowDefinition = {
+  const definition: WorkflowDefinitionCore = {
     version: 2,
     title: `Loop body for ${forEachId}`,
     entrypoint: { ref: bodyEntryRef },
@@ -239,7 +239,6 @@ export function extractLoopBodies(
     bodyEntryRef: bodyEntry.bodyEntryRef,
     loopBackEdges,
     bodyEntryEdge: bodyEntry.edge,
-    executableNodes,
     graphEdges,
     nodesMetadata,
     actionsByRef,
@@ -281,7 +280,9 @@ export function topoSortWithoutLoopBackCycles(
     }
   }
 
-  const filteredEdges = edges.filter((edge) => !loopBackPairs.has(`${edge.source}->${edge.target}`));
+  const filteredEdges = edges.filter(
+    (edge) => !loopBackPairs.has(`${edge.source}->${edge.target}`),
+  );
 
   const incoming = new Map<string, number>();
   const adjacency = new Map<string, string[]>();

@@ -25,6 +25,7 @@ const newTemplateFiles = [
   'kev-fresh-cve-watch-brief.json',
   'kev-reachability-validation-brief.json',
   'mitre-cve-record-builder.json',
+  'npm-cve-hunt-pipeline.json',
   'npm-dependency-cve-hunt.json',
   'oss-sast-cve-candidate-hunt.json',
   'passive-osint-subdomain-expansion.json',
@@ -191,10 +192,18 @@ describe('new seed templates', () => {
 
       const parsedGraph = WorkflowGraphSchema.parse(graph);
       const compiled = compileWorkflowGraph(parsedGraph);
+      const hasForEach = graph.nodes.some(
+        (node: { type: string }) => node.type === 'core.workflow.for-each',
+      );
 
       expect(compiled.entrypoint.ref).toBe('trigger_1');
-      expect(compiled.actions.length).toBe(graph.nodes.length);
-      expect(compiled.edges.length).toBe(graph.edges.length);
+      if (hasForEach) {
+        expect(compiled.loopBodies).toBeDefined();
+        expect(Object.keys(compiled.loopBodies ?? {}).length).toBeGreaterThan(0);
+      } else {
+        expect(compiled.actions.length).toBe(graph.nodes.length);
+        expect(compiled.edges.length).toBe(graph.edges.length);
+      }
 
       const entrypoint = parsedGraph.nodes.find((node) => node.id === 'trigger_1');
       const runtimeInputs = entrypoint?.data.config.params.runtimeInputs;
@@ -210,36 +219,35 @@ describe('new seed templates', () => {
     const assembleNode = template.graph.nodes.find(
       (node: { id: string }) => node.id === 'assemble_novelty',
     );
-    const result = runTemplateScript<{ report: Record<string, unknown> & { priorArt: { nvd: Array<{ cveId: string }> } } }>(
-      assembleNode.data.config.params.code,
-      {
-        candidateSummary: 'Prototype pollution in lodash',
+    const result = runTemplateScript<{
+      report: Record<string, unknown> & { priorArt: { nvd: { cveId: string }[] } };
+    }>(assembleNode.data.config.params.code, {
+      candidateSummary: 'Prototype pollution in lodash',
+      productName: 'lodash',
+      affectedVersion: '4.17.20',
+      authorizationNotes: 'test',
+      searchContext: {
         productName: 'lodash',
         affectedVersion: '4.17.20',
-        authorizationNotes: 'test',
-        searchContext: {
-          productName: 'lodash',
-          affectedVersion: '4.17.20',
-          knownRelatedCveIds: ['CVE-2020-8203'],
-        },
-        nvdData: {
-          vulnerabilities: [
-            {
-              cve: {
-                id: 'CVE-2020-8203',
-                descriptions: [{ lang: 'en', value: 'Prototype pollution in lodash' }],
-                metrics: { cvssMetricV31: [{ cvssData: { baseSeverity: 'HIGH', baseScore: 7.4 } }] },
-              },
-            },
-          ],
-        },
-        nvdStatus: 200,
-        osvFindings: [],
-        osvSummary: {},
-        kevData: { vulnerabilities: [] },
-        kevStatus: 200,
+        knownRelatedCveIds: ['CVE-2020-8203'],
       },
-    );
+      nvdData: {
+        vulnerabilities: [
+          {
+            cve: {
+              id: 'CVE-2020-8203',
+              descriptions: [{ lang: 'en', value: 'Prototype pollution in lodash' }],
+              metrics: { cvssMetricV31: [{ cvssData: { baseSeverity: 'HIGH', baseScore: 7.4 } }] },
+            },
+          },
+        ],
+      },
+      nvdStatus: 200,
+      osvFindings: [],
+      osvSummary: {},
+      kevData: { vulnerabilities: [] },
+      kevStatus: 200,
+    });
 
     expect(result.report.verdict).toBe('likely-duplicate');
     expect(result.report.priorArt.nvd[0].cveId).toBe('CVE-2020-8203');
@@ -277,23 +285,22 @@ describe('new seed templates', () => {
     const resolveNode = template.graph.nodes.find(
       (node: { id: string }) => node.id === 'resolve_cna',
     );
-    const result = runTemplateScript<{ report: { routing: string; matchedCnas: Array<{ organization: string }> } }>(
-      resolveNode.data.config.params.code,
-      {
-        vendorOrProduct: 'Apache',
-        productUrlOrRepo: 'https://github.com/apache/httpd',
-        keywords: ['httpd'],
-        authorizationNotes: '',
-        cnaListData: [
-          {
-            organizationName: 'Apache Software Foundation',
-            scope: 'All Apache projects',
-            securityAdvisories: { url: 'https://apache.org/security' },
-          },
-        ],
-        cnaStatus: 200,
-      },
-    );
+    const result = runTemplateScript<{
+      report: { routing: string; matchedCnas: { organization: string }[] };
+    }>(resolveNode.data.config.params.code, {
+      vendorOrProduct: 'Apache',
+      productUrlOrRepo: 'https://github.com/apache/httpd',
+      keywords: ['httpd'],
+      authorizationNotes: '',
+      cnaListData: [
+        {
+          organizationName: 'Apache Software Foundation',
+          scope: 'All Apache projects',
+          securityAdvisories: { url: 'https://apache.org/security' },
+        },
+      ],
+      cnaStatus: 200,
+    });
 
     expect(result.report.routing).toBe('dedicated-cna');
     expect(result.report.matchedCnas[0].organization).toContain('Apache');
@@ -422,6 +429,50 @@ describe('new seed templates', () => {
     expect(fallback.report.verdict).toBe('needs-human-review');
     expect(fallback.report.aiParseError).toBeTruthy();
     expect(fallback.report.mitreDescription).toBe('fallback desc');
+  });
+
+  it('npm-cve-hunt-pipeline compiles for-each loop with three Claude Code nodes', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const nodeTypes = graph.nodes.map((node: { type: string }) => node.type);
+    const compiled = compileWorkflowGraph(WorkflowGraphSchema.parse(graph));
+
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'CLAUDE_CODE_OAUTH_TOKEN', type: 'string' }),
+    ]);
+    expect(nodeTypes).toContain('core.workflow.for-each');
+    expect(nodeTypes.filter((type: string) => type === 'core.ai.claude-code')).toHaveLength(3);
+    expect(compiled.loopBodies?.package_loop).toBeDefined();
+    expect(compiled.loopBodies?.package_loop.bodyEntryRef).toBe('init_package');
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'package_loop',
+          target: 'init_package',
+          sourceHandle: 'body',
+          targetHandle: 'currentItem',
+        }),
+        expect.objectContaining({
+          source: 'collect_iteration',
+          target: 'package_loop',
+          sourceHandle: 'iteration',
+          targetHandle: 'loopBack',
+        }),
+        expect.objectContaining({
+          source: 'build_queue',
+          target: 'package_loop',
+          sourceHandle: 'items',
+          targetHandle: 'items',
+        }),
+        expect.objectContaining({
+          source: 'package_loop',
+          target: 'assemble_campaign',
+          sourceHandle: 'results',
+          targetHandle: 'results',
+        }),
+      ]),
+    );
   });
 
   it('cve-impact-research-brief includes source status in the report assembly inputs', () => {
@@ -2678,7 +2729,11 @@ describe('new seed templates', () => {
     const result = runTemplateScript<{
       brief: {
         summary: { kevReachableCount: number };
-        candidates: { title: string; priorityScore: number; evidence: { knownExploited?: boolean } }[];
+        candidates: {
+          title: string;
+          priorityScore: number;
+          evidence: { knownExploited?: boolean };
+        }[];
       };
     }>(assembleNode.data.config.params.code, {
       authorizationNotes: 'audit fixture',
@@ -3073,9 +3128,9 @@ describe('new seed templates', () => {
     );
     expect(result.brief.summary.candidateCount).toBeGreaterThanOrEqual(2);
     expect(result.brief.candidates[0].severity).toBe('critical');
-    expect(result.brief.candidates.some((item) => item.title.includes('Malicious npm advisory'))).toBe(
-      true,
-    );
+    expect(
+      result.brief.candidates.some((item) => item.title.includes('Malicious npm advisory')),
+    ).toBe(true);
     expect(
       result.brief.candidates.some((item) =>
         (item as { priorityReasons?: string[] }).priorityReasons?.some((reason) =>

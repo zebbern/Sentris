@@ -86,6 +86,7 @@ function buildDefinition(
     dependencyCounts,
     actions,
     config: { environment: 'default', timeoutSeconds: 0 },
+    loopBodies: {},
     ...overrides,
   };
 }
@@ -253,6 +254,7 @@ describe('validateWorkflowGraph', () => {
         dependencyCounts: {},
         actions: [],
         config: { environment: 'default', timeoutSeconds: 0 },
+        loopBodies: {},
       });
 
       expect(result.isValid).toBe(false);

@@ -5,7 +5,11 @@ import {
   type ExecutionContext,
 } from '@sentris/component-sdk';
 import '../npm-registry-intel';
-import type { NpmRegistryIntelInput, NpmRegistryIntelOutput } from '../npm-registry-intel';
+import type {
+  NpmRegistryIntelInputSchema,
+  NpmRegistryIntelOutput,
+  NpmRegistryIntelOutputSchema,
+} from '../npm-registry-intel';
 
 const npmPackageResponse = {
   name: 'suspicious-pkg',
@@ -67,9 +71,10 @@ describe('npm registry intel component', () => {
   });
 
   it('fetches npm metadata and emits package risk signals', async () => {
-    const component = componentRegistry.get<NpmRegistryIntelInput, NpmRegistryIntelOutput>(
-      'sentris.npm.registry.intel',
-    );
+    const component = componentRegistry.get<
+      NpmRegistryIntelInputSchema,
+      NpmRegistryIntelOutputSchema
+    >('sentris.npm.registry.intel');
     if (!component) throw new Error('NPM registry intel component was not registered');
 
     const fetchMock = vi.fn(async (url: string | URL | Request): Promise<Response> => {
@@ -95,7 +100,7 @@ describe('npm registry intel component', () => {
     });
     context.http.fetch = fetchMock as unknown as ExecutionContext['http']['fetch'];
 
-    const result = await component.execute(
+    const result = (await component.execute(
       {
         inputs: {
           packageSpecs: ['suspicious-pkg@1.0.0', '@scope/pkg@2.0.0'],
@@ -108,7 +113,7 @@ describe('npm registry intel component', () => {
         },
       },
       context,
-    );
+    )) as NpmRegistryIntelOutput;
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.records).toHaveLength(2);
@@ -164,19 +169,22 @@ describe('npm registry intel component', () => {
   });
 
   it('returns warnings for missing packages without failing the batch', async () => {
-    const component = componentRegistry.get<NpmRegistryIntelInput, NpmRegistryIntelOutput>(
-      'sentris.npm.registry.intel',
-    );
+    const component = componentRegistry.get<
+      NpmRegistryIntelInputSchema,
+      NpmRegistryIntelOutputSchema
+    >('sentris.npm.registry.intel');
     if (!component) throw new Error('NPM registry intel component was not registered');
 
-    const fetchMock = vi.fn(async (): Promise<Response> => new Response('not found', { status: 404 }));
+    const fetchMock = vi.fn(
+      async (): Promise<Response> => new Response('not found', { status: 404 }),
+    );
     const context = createExecutionContext({
       runId: 'test-run',
       componentRef: 'npm-registry-intel-missing',
     });
     context.http.fetch = fetchMock as unknown as ExecutionContext['http']['fetch'];
 
-    const result = await component.execute(
+    const result = (await component.execute(
       {
         inputs: {
           packageSpecs: ['missing-pkg@1.0.0'],
@@ -189,7 +197,7 @@ describe('npm registry intel component', () => {
         },
       },
       context,
-    );
+    )) as NpmRegistryIntelOutput;
 
     expect(result.records).toEqual([]);
     expect(result.riskSignals).toEqual([]);

@@ -30,6 +30,7 @@ const fixtureDefinition: WorkflowDefinition = {
     },
   ],
   config: { environment: 'default', timeoutSeconds: 0 },
+  loopBodies: {},
 };
 
 // ── Constants ───────────────────────────────────────────────────────

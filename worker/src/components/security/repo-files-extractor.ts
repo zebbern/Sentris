@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { z } from 'zod';
 import {
   componentRegistry,
@@ -10,6 +11,9 @@ import {
   ValidationError,
   type ExecutionContext,
 } from '@sentris/component-sdk';
+
+const require = createRequire(import.meta.url);
+const AdmZip = require('adm-zip') as typeof import('adm-zip');
 
 const DEFAULT_EXCLUDED_SEGMENTS = new Set([
   '.git',
@@ -55,6 +59,15 @@ const inputSchema = inputs({
     description: 'Optional branch, tag, or commit. Overrides the component default ref.',
     connectionType: { kind: 'primitive', name: 'text' },
   }),
+  githubToken: port(
+    z.string().trim().optional().describe('Optional GitHub token for archive download.'),
+    {
+      label: 'GitHub Token',
+      description: 'Optional PAT or fine-grained token to raise GitHub API rate limits.',
+      editor: 'secret',
+      connectionType: { kind: 'primitive', name: 'secret' },
+    },
+  ),
 });
 
 const parameterSchema = parameters({
@@ -100,6 +113,21 @@ const parameterSchema = parameters({
       editor: 'number',
       min: 100,
       max: 500_000,
+    },
+  ),
+  maxArchiveBytes: param(
+    z
+      .number()
+      .int()
+      .min(10_000)
+      .max(50_000_000)
+      .default(10_000_000)
+      .describe('Maximum GitHub zipball archive size to download.'),
+    {
+      label: 'Max Archive Bytes',
+      editor: 'number',
+      min: 10_000,
+      max: 50_000_000,
     },
   ),
 });
@@ -193,10 +221,10 @@ interface RepoContext {
   ref: string;
 }
 
-interface TreeItem {
-  path?: string;
-  type?: string;
-  size?: number;
+interface ArchiveFile {
+  path: string;
+  size: number;
+  content: Buffer;
 }
 
 interface Candidate {
@@ -246,12 +274,25 @@ function parseGitHubRepositoryIdentity(repositoryUrl: string): Omit<RepoContext,
   };
 }
 
+function buildGithubHeaders(token?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const trimmed = token?.trim();
+  if (trimmed) {
+    headers.Authorization = `Bearer ${trimmed}`;
+  }
+  return headers;
+}
+
 async function resolveEffectiveRef(
   context: Pick<ExecutionContext, 'http'>,
   inputRef: unknown,
   fallbackRef: string,
   owner: string,
   repo: string,
+  headers: Record<string, string>,
 ): Promise<string> {
   if (typeof inputRef === 'string' && inputRef.trim().length > 0) {
     return cleanRef(inputRef);
@@ -261,7 +302,7 @@ async function resolveEffectiveRef(
   try {
     const response = await context.http.fetch(metadataUrl, {
       method: 'GET',
-      headers: { Accept: 'application/vnd.github+json, application/json' },
+      headers,
     });
     if (response.ok) {
       const metadata = (await response.json()) as { default_branch?: unknown };
@@ -287,16 +328,49 @@ function encodePath(value: string): string {
     .join('/');
 }
 
-function treeUrl(repo: RepoContext): string {
+function zipballUrl(repo: RepoContext): string {
   return `https://api.github.com/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(
     repo.repo,
-  )}/git/trees/${encodePath(repo.ref)}?recursive=1`;
+  )}/zipball/${encodePath(repo.ref)}`;
 }
 
-function rawFileUrl(repo: RepoContext, path: string): string {
-  return `https://raw.githubusercontent.com/${encodeURIComponent(repo.owner)}/${encodeURIComponent(
-    repo.repo,
-  )}/${encodePath(repo.ref)}/${encodePath(path)}`;
+function normalizeZipEntryPath(entryName: string): string | null {
+  const normalized = entryName.replace(/\\/g, '/');
+  if (normalized.includes('..') || normalized.startsWith('/')) {
+    return null;
+  }
+
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  return parts.slice(1).join('/');
+}
+
+function listArchiveFiles(archive: Buffer): ArchiveFile[] {
+  const zip = new AdmZip(archive);
+  const files: ArchiveFile[] = [];
+
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) {
+      continue;
+    }
+
+    const path = normalizeZipEntryPath(entry.entryName);
+    if (!path) {
+      continue;
+    }
+
+    const content = entry.getData();
+    files.push({
+      path,
+      size: content.length,
+      content,
+    });
+  }
+
+  return files;
 }
 
 function pathSegments(path: string): string[] {
@@ -397,26 +471,32 @@ function appendBundle(existing: string, path: string, content: string): string {
   return `${existing}${existing ? '\n' : ''}# FILE: ${path}\n${content.trimEnd()}\n`;
 }
 
-async function fetchJson(context: Pick<ExecutionContext, 'http'>, url: string): Promise<unknown> {
+async function fetchArchive(
+  context: Pick<ExecutionContext, 'http'>,
+  url: string,
+  headers: Record<string, string>,
+  maxArchiveBytes: number,
+): Promise<Buffer> {
   const response = await context.http.fetch(url, {
     method: 'GET',
-    headers: { Accept: 'application/vnd.github+json, application/json' },
+    headers,
   });
   if (!response.ok) {
-    throw new Error(`GitHub tree fetch failed: ${response.status} ${response.statusText}`);
+    throw new Error(`GitHub archive fetch failed: ${response.status} ${response.statusText}`);
   }
-  return response.json();
-}
 
-async function fetchText(context: Pick<ExecutionContext, 'http'>, url: string): Promise<string> {
-  const response = await context.http.fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'text/plain, */*' },
-  });
-  if (!response.ok) {
-    throw new Error(`Raw file fetch failed: ${response.status} ${response.statusText}`);
+  const archive = Buffer.from(await response.arrayBuffer());
+  if (archive.length > maxArchiveBytes) {
+    throw new ValidationError('GitHub archive exceeds configured maxArchiveBytes', {
+      fieldErrors: {
+        maxArchiveBytes: [
+          `Archive size ${archive.length} bytes exceeds limit ${maxArchiveBytes} bytes`,
+        ],
+      },
+    });
   }
-  return response.text();
+
+  return archive;
 }
 
 const definition = defineComponent({
@@ -427,7 +507,7 @@ const definition = defineComponent({
   inputs: inputSchema,
   outputs: outputSchema,
   parameters: parameterSchema,
-  docs: 'Fetch bounded source and IaC files from an authorized public GitHub repository for downstream SAST and IaC scanners.',
+  docs: 'Download a GitHub zipball snapshot and extract bounded source and IaC files for downstream SAST and IaC scanners.',
   toolProvider: {
     kind: 'component',
     name: 'repository_files_extract',
@@ -440,7 +520,8 @@ const definition = defineComponent({
     category: 'security',
     description:
       'Extract bounded source, Terraform, Kubernetes, Dockerfile, and CloudFormation bundles from public GitHub repositories.',
-    documentationUrl: 'https://docs.github.com/en/rest/git/trees',
+    documentationUrl:
+      'https://docs.github.com/en/rest/repos/contents#download-a-repository-archive-zip',
     icon: 'Files',
     author: {
       name: 'SentrisAI',
@@ -456,28 +537,38 @@ const definition = defineComponent({
   async execute({ inputs, params }, context) {
     const parsedParams = parameterSchema.parse(params);
     const identity = parseGitHubRepositoryIdentity(inputs.repositoryUrl);
+    const githubHeaders = buildGithubHeaders(
+      typeof inputs.githubToken === 'string' ? inputs.githubToken : undefined,
+    );
     const effectiveRef = await resolveEffectiveRef(
       context,
       inputs.ref,
       parsedParams.ref,
       identity.owner,
       identity.repo,
+      githubHeaders,
     );
     const repo: RepoContext = { ...identity, ref: effectiveRef };
 
-    context.logger.info(`[RepoFilesExtractor] Fetching tree for ${repo.repository}@${repo.ref}`);
-    const tree = fetchTreeItems(await fetchJson(context, treeUrl(repo)));
+    context.logger.info(
+      `[RepoFilesExtractor] Downloading zipball for ${repo.repository}@${repo.ref}`,
+    );
+    const archive = await fetchArchive(
+      context,
+      zipballUrl(repo),
+      githubHeaders,
+      parsedParams.maxArchiveBytes,
+    );
+    const archiveFiles = listArchiveFiles(archive);
+    const contentByPath = new Map(archiveFiles.map((file) => [file.path, file.content]));
 
     const selected: Candidate[] = [];
     const skippedFiles: z.infer<typeof skippedFileSchema>[] = [];
     let totalBytes = 0;
     let truncated = false;
 
-    for (const item of tree) {
-      const path = typeof item.path === 'string' ? item.path : '';
-      const size = Number(item.size ?? 0);
-      if (!path || item.type !== 'blob') continue;
-
+    for (const item of archiveFiles) {
+      const { path, size } = item;
       if (isExcludedPath(path)) {
         skippedFiles.push({ path, reason: 'excluded_path' });
         continue;
@@ -519,7 +610,14 @@ const definition = defineComponent({
 
     for (const candidate of selected) {
       try {
-        const content = await fetchText(context, rawFileUrl(repo, candidate.path));
+        const rawContent = contentByPath.get(candidate.path);
+        if (!rawContent) {
+          skippedFiles.push({ path: candidate.path, reason: 'archive_missing_entry' });
+          truncated = true;
+          continue;
+        }
+
+        const content = rawContent.toString('utf8');
         const refined = refineCategory(candidate, content);
         files.push(refined);
 
@@ -540,7 +638,7 @@ const definition = defineComponent({
       } catch (error) {
         skippedFiles.push({
           path: candidate.path,
-          reason: error instanceof Error ? `fetch_failed:${error.message}` : 'fetch_failed',
+          reason: error instanceof Error ? `extract_failed:${error.message}` : 'extract_failed',
         });
         truncated = true;
       }
@@ -579,16 +677,10 @@ const definition = defineComponent({
   },
 });
 
-function fetchTreeItems(value: unknown): TreeItem[] {
-  if (!value || typeof value !== 'object') return [];
-  const tree = (value as { tree?: unknown }).tree;
-  return Array.isArray(tree) ? (tree as TreeItem[]) : [];
-}
-
 componentRegistry.register(definition);
 
 type RepositoryFilesExtractorInput = typeof inputSchema;
 type RepositoryFilesExtractorOutput = typeof outputSchema;
 
 export type { RepositoryFilesExtractorInput, RepositoryFilesExtractorOutput };
-export { definition };
+export { definition, normalizeZipEntryPath, zipballUrl as buildZipballUrl, listArchiveFiles };

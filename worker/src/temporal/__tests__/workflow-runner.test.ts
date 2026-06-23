@@ -859,95 +859,142 @@ describe('executeWorkflow', () => {
   });
 
   it('executes For Each loop bodies sequentially and aggregates iteration results', async () => {
-    const { compileWorkflowGraph } = await import('../../../../backend/src/dsl/compiler');
-    const definition = compileWorkflowGraph({
-      name: 'Loop runner test',
-      nodes: [
-        {
-          id: 'trigger',
-          type: 'core.workflow.entrypoint',
-          position: { x: 0, y: 0 },
-          data: {
-            label: 'Trigger',
-            config: {
-              params: {
-                runtimeInputs: [{ id: 'items', label: 'Items', type: 'array', required: true }],
-              },
-              inputOverrides: {},
-            },
-          },
-        },
-        {
-          id: 'loop',
-          type: 'core.workflow.for-each',
-          position: { x: 0, y: 100 },
-          data: { label: 'Loop', config: { params: {}, inputOverrides: {} } },
-        },
-        {
-          id: 'body_step',
-          type: 'core.logic.script',
-          position: { x: 0, y: 200 },
-          data: {
-            label: 'Body',
-            config: {
-              params: {
-                variables: [{ name: 'currentItem', type: 'string' }],
-                returns: [{ name: 'result', type: 'json' }],
-                code: "export function script(input) { return { result: { item: input.currentItem } }; }",
-              },
-              inputOverrides: {},
-            },
-          },
-        },
-        {
-          id: 'finalize',
-          type: 'core.logic.script',
-          position: { x: 0, y: 300 },
-          data: {
-            label: 'Finalize',
-            config: {
-              params: {
-                variables: [{ name: 'results', type: 'list-json' }],
-                returns: [{ name: 'report', type: 'json' }],
-                code: "export function script(input) { return { report: { items: input.results || [] } }; }",
-              },
-              inputOverrides: {},
-            },
-          },
-        },
-      ],
+    const definition: WorkflowDefinition = {
+      version: 2,
+      title: 'Loop runner test',
+      entrypoint: { ref: 'trigger' },
+      nodes: {
+        trigger: { ref: 'trigger', label: 'Trigger' },
+        build_queue: { ref: 'build_queue', label: 'Build Queue' },
+        loop: { ref: 'loop', label: 'Loop' },
+        finalize: { ref: 'finalize', label: 'Finalize' },
+      },
       edges: [
         {
-          id: 'trigger-loop-items',
-          source: 'trigger',
-          target: 'loop',
+          id: 'trigger-build_queue-items',
+          sourceRef: 'trigger',
+          targetRef: 'build_queue',
           sourceHandle: 'items',
           targetHandle: 'items',
+          kind: 'success',
         },
         {
-          id: 'loop-body',
-          source: 'loop',
-          target: 'body_step',
-          sourceHandle: 'body',
-          targetHandle: 'currentItem',
-        },
-        {
-          id: 'body-loop-back',
-          source: 'body_step',
-          target: 'loop',
-          sourceHandle: 'result',
-          targetHandle: 'loopBack',
+          id: 'build_queue-loop-items',
+          sourceRef: 'build_queue',
+          targetRef: 'loop',
+          sourceHandle: 'items',
+          targetHandle: 'items',
+          kind: 'success',
         },
         {
           id: 'loop-finalize-results',
-          source: 'loop',
-          target: 'finalize',
+          sourceRef: 'loop',
+          targetRef: 'finalize',
           sourceHandle: 'results',
           targetHandle: 'results',
+          kind: 'success',
         },
       ],
-      viewport: { x: 0, y: 0, zoom: 1 },
-    });
+      dependencyCounts: {
+        trigger: 0,
+        build_queue: 1,
+        loop: 1,
+        finalize: 1,
+      },
+      actions: [
+        {
+          ref: 'trigger',
+          componentId: 'core.workflow.entrypoint',
+          params: {
+            runtimeInputs: [{ id: 'items', label: 'Items', type: 'array', required: true }],
+          },
+          inputOverrides: {},
+          dependsOn: [],
+          inputMappings: {},
+        },
+        {
+          ref: 'build_queue',
+          componentId: 'core.logic.script',
+          params: {
+            variables: [{ name: 'items', type: 'list-text' }],
+            returns: [{ name: 'items', type: 'list-text' }],
+            code: 'export function script(input) { return { items: Array.isArray(input.items) ? input.items.map(String) : [] }; }',
+          },
+          inputOverrides: {},
+          dependsOn: ['trigger'],
+          inputMappings: {
+            items: { sourceRef: 'trigger', sourceHandle: 'items' },
+          },
+        },
+        {
+          ref: 'loop',
+          componentId: 'core.workflow.for-each',
+          params: {},
+          inputOverrides: {},
+          dependsOn: ['build_queue'],
+          inputMappings: {
+            items: { sourceRef: 'build_queue', sourceHandle: 'items' },
+          },
+        },
+        {
+          ref: 'finalize',
+          componentId: 'core.logic.script',
+          params: {
+            variables: [{ name: 'results', type: 'list-json' }],
+            returns: [{ name: 'report', type: 'json' }],
+            code: 'export function script(input) { return { report: { items: input.results || [] } }; }',
+          },
+          inputOverrides: {},
+          dependsOn: ['loop'],
+          inputMappings: {
+            results: { sourceRef: 'loop', sourceHandle: 'results' },
+          },
+        },
+      ],
+      config: { environment: 'test', timeoutSeconds: 30 },
+      loopBodies: {
+        loop: {
+          forEachRef: 'loop',
+          bodyEntryRef: 'body_step',
+          exitRefs: ['body_step'],
+          iterationCapture: {
+            sourceRef: 'body_step',
+            sourceHandle: 'result',
+          },
+          itemBinding: {
+            targetRef: 'body_step',
+            targetHandle: 'currentItem',
+          },
+          definition: {
+            version: 2,
+            title: 'Loop body for loop',
+            entrypoint: { ref: 'body_step' },
+            nodes: {
+              body_step: { ref: 'body_step', label: 'Body' },
+            },
+            edges: [],
+            dependencyCounts: { body_step: 0 },
+            actions: [
+              {
+                ref: 'body_step',
+                componentId: 'core.logic.script',
+                params: {
+                  variables: [{ name: 'currentItem', type: 'string' }],
+                  returns: [{ name: 'result', type: 'json' }],
+                  code: 'export function script(input) { return { result: { item: input.currentItem } }; }',
+                },
+                inputOverrides: {},
+                dependsOn: [],
+                inputMappings: {
+                  currentItem: { sourceRef: 'loop', sourceHandle: 'currentItem' },
+                },
+              },
+            ],
+            config: { environment: 'test', timeoutSeconds: 30 },
+          },
+        },
+      },
+    };
 
     const result = await executeWorkflow(definition, { inputs: { items: ['alpha', 'beta'] } });
 

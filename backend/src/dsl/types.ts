@@ -82,6 +82,8 @@ const WorkflowDefinitionCoreSchema = z.object({
   }),
 });
 
+export type WorkflowDefinitionCore = z.infer<typeof WorkflowDefinitionCoreSchema>;
+
 export const LoopBodyDefinitionSchema = z.object({
   forEachRef: z.string(),
   bodyEntryRef: z.string(),

@@ -73,9 +73,7 @@ const npmSummarySchema = z.object({
 
 const inputSchema = inputs({
   packageSpecs: port(
-    z
-      .array(z.string().min(1))
-      .describe('npm package names or package@version specs to inspect.'),
+    z.array(z.string().min(1)).describe('npm package names or package@version specs to inspect.'),
     {
       label: 'Package Specs',
       description:
@@ -165,6 +163,8 @@ const outputSchema = outputs({
   }),
 });
 
+export type NpmRegistryIntelInputSchema = typeof inputSchema;
+export type NpmRegistryIntelOutputSchema = typeof outputSchema;
 export type NpmRegistryIntelInput = z.infer<typeof inputSchema>;
 export type NpmRegistryIntelOutput = z.infer<typeof outputSchema>;
 type NormalizedNpmPackage = z.infer<typeof normalizedNpmPackageSchema>;

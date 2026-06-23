@@ -166,6 +166,14 @@ function toClaudeAuthModel(model: unknown): ClaudeAuthModel | undefined {
   };
 }
 
+function getClaudeEffort(model: unknown): string | undefined {
+  if (!isRecord(model) || model.provider !== 'anthropic') {
+    return undefined;
+  }
+
+  return typeof model.effort === 'string' && model.effort.length > 0 ? model.effort : undefined;
+}
+
 const definition = defineComponent({
   id: 'core.ai.claude-code',
   label: 'Claude Code Agent',
@@ -236,9 +244,7 @@ const definition = defineComponent({
           ? { modelId: model.modelId }
           : undefined,
       ),
-      ...buildClaudeEffortEnv(
-        isRecord(model) && typeof model.effort === 'string' ? model.effort : undefined,
-      ),
+      ...buildClaudeEffortEnv(getClaudeEffort(model)),
     };
     const contextJson = JSON.stringify(taskContext ?? {}, null, 2);
     const supplementaryFiles = buildSupplementaryFiles({

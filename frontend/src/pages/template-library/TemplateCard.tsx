@@ -174,6 +174,17 @@ export function TemplateCard({
         {/* Metadata */}
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/60">
+            {template.author && (
+              <>
+                <span
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground"
+                  title={template.author}
+                >
+                  {template.author.charAt(0).toUpperCase()}
+                </span>
+                <span className="text-border">&middot;</span>
+              </>
+            )}
             {validationBadge && (
               <>
                 <TooltipProvider>

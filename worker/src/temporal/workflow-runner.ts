@@ -277,8 +277,21 @@ export async function executeWorkflow(
         inputs: maskSecretOutputs(inputPorts, inputs) as Record<string, unknown>,
       });
 
-      const parsedInputs = component.inputs.parse(inputs);
       const parsedParams = component.parameters ? component.parameters.parse(params) : params;
+
+      let inputsSchema = component.inputs;
+      let outputsSchema = component.outputs;
+      if (typeof component.resolvePorts === 'function') {
+        const resolved = component.resolvePorts(parsedParams);
+        if (resolved?.inputs) {
+          inputsSchema = resolved.inputs;
+        }
+        if (resolved?.outputs) {
+          outputsSchema = resolved.outputs;
+        }
+      }
+
+      const parsedInputs = inputsSchema.parse(inputs);
 
       if (action.componentId === 'core.workflow.for-each') {
         const loopBody = getForEachLoopBody(definition, action.ref);
@@ -327,10 +340,7 @@ export async function executeWorkflow(
           }
 
           const captureSource = iterationRun.outputs?.[loopBody.iterationCapture.sourceRef];
-          const captured = resolveInputValue(
-            captureSource,
-            loopBody.iterationCapture.sourceHandle,
-          );
+          const captured = resolveInputValue(captureSource, loopBody.iterationCapture.sourceHandle);
           iterationOutputs.push(captured ?? captureSource ?? null);
         }
 
@@ -358,6 +368,9 @@ export async function executeWorkflow(
           nodeRef: action.ref,
           timestamp: new Date().toISOString(),
           level: 'info',
+          data: {
+            iterations: cappedItems.length,
+          },
           context: {
             runId,
             componentRef: action.ref,
@@ -365,7 +378,6 @@ export async function executeWorkflow(
             joinStrategy,
             triggeredBy,
             failure,
-            iterations: cappedItems.length,
           },
         });
 
@@ -417,7 +429,7 @@ export async function executeWorkflow(
         workflowDiagnosticLog(
           `✅ [WORKFLOW RUNNER] Component execution completed: ${action.componentId} for action: ${actionRef}`,
         );
-        let output = component.outputs.parse(rawOutput);
+        let output = outputsSchema.parse(rawOutput);
 
         // Check for payload size and spill if necessary
         if (output && options.storage) {
