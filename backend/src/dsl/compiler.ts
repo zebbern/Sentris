@@ -83,7 +83,6 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     }
   }
 
-  const orderedIds = topoSort(nodeIds, graph.edges);
   const incomingEdges = new Map<string, Set<string>>();
   type GraphEdge = (typeof graph.edges)[number];
   const edgesByTarget = new Map<string, GraphEdge[]>();
@@ -136,7 +135,7 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     };
   }
 
-  const actions: WorkflowAction[] = orderedIds.map((id) => {
+  const preliminaryActions: WorkflowAction[] = nodeIds.map((id) => {
     const node = executableNodes.find((n: WorkflowNodeDto) => n.id === id)!;
     const config = (node.data?.config ?? {}) as Record<string, unknown>;
     const {
@@ -229,6 +228,61 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     };
   });
 
+  const actionsByRef = new Map(preliminaryActions.map((action) => [action.ref, action]));
+  const loopExtraction = extractLoopBodies(
+    executableNodes,
+    graph.edges,
+    nodesMetadata,
+    actionsByRef,
+  );
+  const mainNodeIdSet = new Set(loopExtraction.mainNodeIds);
+  const mainGraphEdges = loopExtraction.mainEdges;
+
+  const orderedIds = topoSortWithoutLoopBackCycles(
+    loopExtraction.mainNodeIds,
+    mainGraphEdges,
+    loopExtraction.loopBodies,
+  );
+
+  const mainIncomingEdges = new Map<string, Set<string>>();
+  for (const nodeId of loopExtraction.mainNodeIds) {
+    mainIncomingEdges.set(nodeId, new Set());
+  }
+  for (const edge of mainGraphEdges) {
+    if (mainNodeIdSet.has(edge.source) && mainNodeIdSet.has(edge.target)) {
+      mainIncomingEdges.get(edge.target)?.add(edge.source);
+    }
+  }
+
+  const actions: WorkflowAction[] = orderedIds.map((id) => {
+    const action = actionsByRef.get(id);
+    if (!action) {
+      throw new Error(`Compiled action missing for node '${id}'.`);
+    }
+
+    const inputMappings: WorkflowAction['inputMappings'] = {};
+    for (const edge of edgesByTarget.get(id) ?? []) {
+      if (!mainNodeIdSet.has(edge.source)) {
+        continue;
+      }
+      const targetHandle = edge.targetHandle ?? edge.sourceHandle;
+      const sourceHandle = edge.sourceHandle ?? '__self__';
+      if (!targetHandle) {
+        continue;
+      }
+      inputMappings[targetHandle] = {
+        sourceRef: edge.source,
+        sourceHandle,
+      };
+    }
+
+    return {
+      ...action,
+      dependsOn: Array.from(mainIncomingEdges.get(id) ?? []),
+      inputMappings,
+    };
+  });
+
   const entrypointAction = actions.find(
     (action) => action.componentId === 'core.workflow.entrypoint',
   );
@@ -242,7 +296,7 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     dependencyCounts[action.ref] = action.dependsOn.length;
   }
 
-  const edges: WorkflowEdge[] = graph.edges.map((edge) => ({
+  const edges: WorkflowEdge[] = mainGraphEdges.map((edge) => ({
     id: edge.id,
     sourceRef: edge.source,
     targetRef: edge.target,
@@ -269,10 +323,13 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     title: graph.name,
     description: graph.description,
     entrypoint: { ref: entryNode },
-    nodes: nodesMetadata,
+    nodes: Object.fromEntries(
+      Object.entries(nodesMetadata).filter(([nodeId]) => mainNodeIdSet.has(nodeId)),
+    ),
     edges,
     dependencyCounts,
     actions,
+    loopBodies: loopExtraction.loopBodies,
     config: { environment: 'default', timeoutSeconds: 0 },
   };
 

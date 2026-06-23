@@ -15,7 +15,9 @@ const inputSchema = inputs({
     {
       label: 'Items',
       description: 'List of values to process. Each item runs the connected loop body once.',
-      connectionType: { kind: 'list', element: { kind: 'primitive', name: 'json' } },
+      allowAny: true,
+      reason: 'Loop items may be plain strings, package specs, or structured JSON objects.',
+      connectionType: { kind: 'list', element: { kind: 'primitive', name: 'text' } },
     },
   ),
 });
