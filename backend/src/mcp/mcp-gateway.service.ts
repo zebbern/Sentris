@@ -16,6 +16,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ErrorCode, McpError, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { ToolRegistryService, RegisteredTool } from './tool-registry.service';
 
 /** Minimal shape shared by MCP-discovered tools and pre-discovered DB tools */
@@ -36,11 +37,74 @@ function sanitizeToolNameSegment(segment: string): string {
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
 }
+
+const externalToolPassthroughSchema = z.object({}).passthrough();
 import { TemporalService } from '../temporal/temporal.service';
 import { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
 import { TraceRepository } from '../trace/trace.repository';
 import type { TraceEventType } from '../trace/types';
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+
+export function buildMcpGatewayCacheKey(runId: string, allowedNodeIds?: string[]): string {
+  if (!allowedNodeIds || allowedNodeIds.length === 0) {
+    return runId;
+  }
+  const escapeNodeId = (id: string): string => id.replace(/\\/g, '\\\\').replace(/,/g, '\\,');
+  return `${runId}:${[...allowedNodeIds].sort().map(escapeNodeId).join(',')}`;
+}
+
+export function parseMcpGatewayCacheKey(cacheKey: string, runId: string): string[] | undefined {
+  if (cacheKey === runId) {
+    return undefined;
+  }
+
+  const scopedPrefix = `${runId}:`;
+  if (!cacheKey.startsWith(scopedPrefix)) {
+    return undefined;
+  }
+
+  const encodedNodeIds = cacheKey.slice(scopedPrefix.length);
+  if (encodedNodeIds.length === 0) {
+    return undefined;
+  }
+
+  const nodeIds: string[] = [];
+  let current = '';
+  let escaping = false;
+
+  for (const char of encodedNodeIds) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escaping = true;
+      continue;
+    }
+
+    if (char === ',') {
+      if (current.length > 0) {
+        nodeIds.push(current);
+      }
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (escaping) {
+    current += '\\';
+  }
+
+  if (current.length > 0) {
+    nodeIds.push(current);
+  }
+
+  return nodeIds.length > 0 ? nodeIds : undefined;
+}
 
 @Injectable()
 export class McpGatewayService {
@@ -61,9 +125,10 @@ export class McpGatewayService {
   private readonly externalToolSchemas = new Map<string, Record<string, unknown>>();
 
   // Persistent MCP client pool for external (proxied) tool calls.
-  // Key: endpoint URL. The stdio-proxy is stateful and rejects re-initialization,
-  // so we must reuse a single client per endpoint for the lifetime of the run.
+  // Key: `${runId}\0${endpoint}`. The stdio-proxy is stateful and rejects
+  // re-initialization, so reuse clients within a run without crossing run boundaries.
   private readonly externalClients = new Map<string, Client>();
+  private readonly externalClientOwners = new Map<string, Set<string>>();
 
   constructor(
     private readonly toolRegistry: ToolRegistryService,
@@ -86,13 +151,7 @@ export class McpGatewayService {
     // 1. Validate Access
     await this.validateRunAccess(runId, organizationId);
 
-    // Cache key includes allowedNodeIds so different agents with different tool scopes get different servers
-    // Escape commas to prevent cache key collisions (e.g., ['a,b', 'c'] vs ['a', 'b,c'])
-    const escapeNodeId = (id: string): string => id.replace(/,/g, '\\,');
-    const cacheKey =
-      allowedNodeIds && allowedNodeIds.length > 0
-        ? `${runId}:${allowedNodeIds.sort().map(escapeNodeId).join(',')}`
-        : runId;
+    const cacheKey = buildMcpGatewayCacheKey(runId, allowedNodeIds);
 
     this.logger.debug(
       `[getServerForRun] runId=${runId}, cacheKey=${cacheKey}, allowedNodeIds=${JSON.stringify(allowedNodeIds)}`,
@@ -112,7 +171,7 @@ export class McpGatewayService {
 
     const toolSet = new Set<string>();
     this.registeredToolNames.set(cacheKey, toolSet);
-    await this.registerTools(server, runId, allowedTools, allowedNodeIds, toolSet);
+    await this.registerTools(server, cacheKey, runId, allowedTools, allowedNodeIds, toolSet);
     this.logger.log(`[getServerForRun] Registered ${toolSet.size} tools for run ${runId}`);
     this.patchListToolsWithExternalSchemas(server);
     this.servers.set(cacheKey, server);
@@ -135,11 +194,10 @@ export class McpGatewayService {
 
     await Promise.all(
       matchingEntries.map(async ([cacheKey, server]) => {
-        const allowedNodeIds =
-          cacheKey === runId ? undefined : cacheKey.split(':').slice(1).join(':').split(',');
+        const allowedNodeIds = parseMcpGatewayCacheKey(cacheKey, runId);
         const toolSet = this.registeredToolNames.get(cacheKey) ?? new Set<string>();
         this.registeredToolNames.set(cacheKey, toolSet);
-        await this.registerTools(server, runId, undefined, allowedNodeIds, toolSet);
+        await this.registerTools(server, cacheKey, runId, undefined, allowedNodeIds, toolSet);
         this.patchListToolsWithExternalSchemas(server);
       }),
     );
@@ -229,6 +287,7 @@ export class McpGatewayService {
    */
   private async registerTools(
     server: McpServer,
+    cacheKey: string,
     runId: string,
     allowedTools?: string[],
     allowedNodeIds?: string[],
@@ -422,7 +481,7 @@ export class McpGatewayService {
           this.logger.debug(
             `[registerTools]   FALLBACK: Discovering tools from endpoint: ${source.endpoint}`,
           );
-          tools = await this.discoverToolsFromEndpoint(source.endpoint);
+          tools = await this.discoverToolsFromEndpoint(runId, cacheKey, source.endpoint);
           this.logger.debug(
             `[registerTools]   FALLBACK result: discovered ${tools.length} tools from ${source.toolName}`,
           );
@@ -475,6 +534,7 @@ export class McpGatewayService {
             proxiedName,
             {
               description: t.description,
+              inputSchema: externalToolPassthroughSchema,
             },
             async (args: Record<string, unknown>) => {
               this.logger.debug(
@@ -485,7 +545,13 @@ export class McpGatewayService {
               await this.logToolCall(runId, proxiedName, 'STARTED', nodeRef);
 
               try {
-                const result = await this.proxyCallToExternal(source, t.name, args);
+                const result = await this.proxyCallToExternal(
+                  runId,
+                  cacheKey,
+                  source,
+                  t.name,
+                  args,
+                );
                 this.logger.debug(
                   `[ToolCall] ${proxiedName} result: ${JSON.stringify(result).slice(0, 200)}`,
                 );
@@ -534,10 +600,17 @@ export class McpGatewayService {
   /**
    * Get or create a persistent MCP client for an external endpoint.
    * The stdio-proxy is stateful: once initialized, it rejects subsequent initialize requests.
-   * We cache one client per endpoint and reuse it for both discovery and tool calls.
+   * We cache one client per run and endpoint and reuse it for both discovery and tool calls.
    */
-  private async getOrCreateExternalClient(endpoint: string): Promise<Client> {
-    const existing = this.externalClients.get(endpoint);
+  private async getOrCreateExternalClient(
+    runId: string,
+    cacheKey: string,
+    endpoint: string,
+  ): Promise<Client> {
+    const clientKey = this.getExternalClientKey(runId, endpoint);
+    this.rememberExternalClientOwner(cacheKey, clientKey);
+
+    const existing = this.externalClients.get(clientKey);
     if (existing) {
       return existing;
     }
@@ -557,20 +630,41 @@ export class McpGatewayService {
     );
 
     await client.connect(transport);
-    this.externalClients.set(endpoint, client);
+    this.externalClients.set(clientKey, client);
     this.logger.debug(`[getOrCreateExternalClient] Client connected and cached for ${endpoint}`);
     return client;
+  }
+
+  private getExternalClientKey(runId: string, endpoint: string): string {
+    return `${runId}\u0000${endpoint}`;
+  }
+
+  private rememberExternalClientOwner(cacheKey: string, clientKey: string): void {
+    const owners = this.externalClientOwners.get(cacheKey) ?? new Set<string>();
+    owners.add(clientKey);
+    this.externalClientOwners.set(cacheKey, owners);
+  }
+
+  private evictExternalClient(clientKey: string): void {
+    this.externalClients.delete(clientKey);
+    for (const owners of this.externalClientOwners.values()) {
+      owners.delete(clientKey);
+    }
   }
 
   /**
    * Discover tools on-the-fly from an MCP endpoint (for local-mcp type)
    * Uses the persistent client pool so the same connection is reused for later tool calls.
    */
-  private async discoverToolsFromEndpoint(endpoint: string): Promise<DiscoveredTool[]> {
+  private async discoverToolsFromEndpoint(
+    runId: string,
+    cacheKey: string,
+    endpoint: string,
+  ): Promise<DiscoveredTool[]> {
     try {
       this.logger.debug(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
 
-      const client = await this.getOrCreateExternalClient(endpoint);
+      const client = await this.getOrCreateExternalClient(runId, cacheKey, endpoint);
       const res = await client.listTools();
 
       const tools = res.tools ?? [];
@@ -586,7 +680,7 @@ export class McpGatewayService {
     } catch (error) {
       this.logger.error(`[discoverToolsFromEndpoint] FAILED for ${endpoint}: ${error}`);
       // If the client failed, remove it from cache so next attempt creates a fresh one
-      this.externalClients.delete(endpoint);
+      this.evictExternalClient(this.getExternalClientKey(runId, endpoint));
       return [];
     }
   }
@@ -596,6 +690,8 @@ export class McpGatewayService {
    * The client is initialized once per endpoint and reused for all subsequent calls.
    */
   private async proxyCallToExternal(
+    runId: string,
+    cacheKey: string,
     source: RegisteredTool,
     toolName: string,
     args: Record<string, unknown>,
@@ -613,7 +709,7 @@ export class McpGatewayService {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const client = await this.getOrCreateExternalClient(source.endpoint);
+        const client = await this.getOrCreateExternalClient(runId, cacheKey, source.endpoint);
 
         const result = await Promise.race([
           client.callTool({
@@ -633,7 +729,7 @@ export class McpGatewayService {
         lastError = error;
         this.logger.warn(`External tool call attempt ${attempt} failed: ${error}`);
         // Evict the broken client so next attempt creates a fresh one
-        this.externalClients.delete(source.endpoint);
+        this.evictExternalClient(this.getExternalClientKey(runId, source.endpoint));
         if (attempt < MAX_RETRIES) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
         }
@@ -738,24 +834,76 @@ export class McpGatewayService {
   }
 
   /**
-   * Cleanup server instance and external clients for a run
+   * Cleanup one cached gateway session.
+   */
+  async cleanupSession(cacheKey: string) {
+    await this.cleanupCacheKey(cacheKey);
+  }
+
+  /**
+   * Cleanup all server instances and external clients for a run.
    */
   async cleanupRun(runId: string) {
-    // Close MCP gateway server
-    const server = this.servers.get(runId);
-    if (server) {
-      await server.close();
-      this.servers.delete(runId);
+    const cacheKeys = new Set(
+      [...this.servers.keys(), ...this.registeredToolNames.keys()].filter((key) =>
+        this.isCacheKeyForRun(key, runId),
+      ),
+    );
+
+    for (const cacheKey of cacheKeys) {
+      await this.cleanupCacheKey(cacheKey);
     }
 
-    // Close all cached external MCP clients
-    // We close all of them since external endpoints are tied to the run's Docker containers
-    const clientEntries = Array.from(this.externalClients.entries());
-    for (const [endpoint, client] of clientEntries) {
-      await client.close().catch((err) => {
-        this.logger.warn(`Failed to close external client for ${endpoint}: ${err}`);
-      });
-      this.externalClients.delete(endpoint);
+    for (const [clientKey, client] of Array.from(this.externalClients.entries())) {
+      if (!clientKey.startsWith(`${runId}\u0000`)) continue;
+      await this.closeExternalClient(clientKey, client);
+    }
+  }
+
+  private isCacheKeyForRun(cacheKey: string, runId: string): boolean {
+    return cacheKey === runId || cacheKey.startsWith(`${runId}:`);
+  }
+
+  private async cleanupCacheKey(cacheKey: string): Promise<void> {
+    const server = this.servers.get(cacheKey);
+    if (server) {
+      await server.close();
+      this.servers.delete(cacheKey);
+    }
+
+    const toolNames = this.registeredToolNames.get(cacheKey);
+    if (toolNames) {
+      for (const toolName of toolNames) {
+        this.externalToolSchemas.delete(toolName);
+      }
+      this.registeredToolNames.delete(cacheKey);
+    }
+
+    const clientKeys = this.externalClientOwners.get(cacheKey) ?? new Set<string>();
+    this.externalClientOwners.delete(cacheKey);
+    for (const clientKey of clientKeys) {
+      if (this.isExternalClientStillOwned(clientKey)) continue;
+      const client = this.externalClients.get(clientKey);
+      if (client) {
+        await this.closeExternalClient(clientKey, client);
+      }
+    }
+  }
+
+  private isExternalClientStillOwned(clientKey: string): boolean {
+    for (const owners of this.externalClientOwners.values()) {
+      if (owners.has(clientKey)) return true;
+    }
+    return false;
+  }
+
+  private async closeExternalClient(clientKey: string, client: Client): Promise<void> {
+    await client.close().catch((err) => {
+      this.logger.warn(`Failed to close external client for ${clientKey}: ${err}`);
+    });
+    this.externalClients.delete(clientKey);
+    for (const owners of this.externalClientOwners.values()) {
+      owners.delete(clientKey);
     }
   }
 }

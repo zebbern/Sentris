@@ -1,6 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
 
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { PeriodSelector } from '@/features/triage-analytics/PeriodSelector';
 import { MttrCards } from '@/features/triage-analytics/MttrCards';
@@ -10,6 +9,7 @@ import { TriageVelocityChart } from '@/features/triage-analytics/TriageVelocityC
 import { SlaComplianceChart } from '@/features/triage-analytics/SlaComplianceChart';
 import { TopAssigneesTable } from '@/features/triage-analytics/TopAssigneesTable';
 import { SlaPolicySettings } from '@/features/triage-analytics/SlaPolicySettings';
+import { OpenSearchTelemetryLink } from '@/components/analytics/OpenSearchTelemetryLink';
 
 const DEFAULT_PERIOD = '30d';
 const VALID_PERIODS = new Set(['7d', '30d', '90d']);
@@ -28,7 +28,10 @@ export function TriageAnalyticsPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
       {/* Header */}
-      <PageToolbar actions={<PeriodSelector value={period} onChange={handlePeriodChange} />} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PeriodSelector value={period} onChange={handlePeriodChange} />
+        <OpenSearchTelemetryLink className="shrink-0" />
+      </div>
 
       {/* MTTR KPI Cards */}
       <section aria-label="Mean Time to Remediate">

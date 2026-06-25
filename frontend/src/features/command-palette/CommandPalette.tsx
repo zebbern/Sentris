@@ -6,7 +6,8 @@ import { useThemeStore } from '@/store/themeStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { usePlacementStore } from '@/components/layout/sidebar-state';
-import { Search, Hash, CornerDownLeft } from 'lucide-react';
+import { useIsMac } from '@/hooks/useIsMac';
+import { Search, Hash, CornerDownLeft, Command as CommandKeyIcon } from 'lucide-react';
 import type { ComponentMetadata } from '@/schemas/component';
 import type { Command, CommandCategory } from './command-palette-types';
 import { useStaticCommands } from './useStaticCommands';
@@ -33,6 +34,7 @@ export function CommandPalette() {
   const mode = useWorkflowUiStore((state) => state.mode);
   const setPlacement = usePlacementStore((state) => state.setPlacement);
   const currentWorkflowId = useWorkflowStore((state) => state.metadata.id);
+  const isMac = useIsMac();
 
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -211,7 +213,7 @@ export function CommandPalette() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent
-        className="max-w-2xl p-0 gap-0 overflow-hidden bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl"
+        className="max-w-xl p-0 gap-0 overflow-hidden rounded-xl border-border/50 bg-background/95 shadow-2xl backdrop-blur-xl [&>button.absolute]:hidden"
         onPointerDownOutside={(e) => {
           e.preventDefault();
           close();
@@ -223,38 +225,48 @@ export function CommandPalette() {
         </DialogDescription>
 
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
-          <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              canPlaceComponents
-                ? 'Search commands, components, workflows...'
-                : 'Search commands, workflows, settings...'
-            }
-            className="flex-1 bg-transparent border-none outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring text-base placeholder:text-muted-foreground/60"
-            aria-label="Search commands"
-            role="combobox"
-            aria-expanded={true}
-            aria-controls="command-palette-list"
-            aria-activedescendant={
-              flatCommandList[selectedIndex]
-                ? `cmd-${flatCommandList[selectedIndex].id}`
-                : undefined
-            }
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border/50 bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            ESC
-          </kbd>
+        <div className="px-3 pt-3 pb-2">
+          <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/40 px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                canPlaceComponents
+                  ? 'Search commands, components, workflows...'
+                  : 'Search commands, workflows, settings...'
+              }
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+              aria-label="Search commands"
+              role="combobox"
+              aria-expanded={true}
+              aria-controls="command-palette-list"
+              aria-activedescendant={
+                flatCommandList[selectedIndex]
+                  ? `cmd-${flatCommandList[selectedIndex].id}`
+                  : undefined
+              }
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {!query.trim() && (
+              <kbd className="hidden shrink-0 items-center gap-0.5 rounded border border-border/50 bg-background/70 px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
+                {isMac ? (
+                  <>
+                    <CommandKeyIcon className="h-2.5 w-2.5" />K
+                  </>
+                ) : (
+                  'Ctrl+K'
+                )}
+              </kbd>
+            )}
+          </div>
         </div>
 
         {/* Command list */}
@@ -262,17 +274,19 @@ export function CommandPalette() {
           ref={listRef}
           id="command-palette-list"
           role="listbox"
-          className="max-h-[400px] overflow-y-auto overflow-x-hidden"
+          className="max-h-[360px] overflow-x-hidden overflow-y-auto px-1.5 pb-2"
         >
           {(isLoadingWorkflows || isLoadingComponents) && query && (
-            <div className="px-4 py-3 text-sm text-muted-foreground">Loading...</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground">Loading...</div>
           )}
 
           {!isLoadingWorkflows && !isLoadingComponents && flatCommandList.length === 0 && (
-            <div className="px-4 py-8 text-center">
-              <Hash className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
+            <div className="px-3 py-8 text-center">
+              <Hash className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">No results found</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">Try a different search term</p>
+              <p className="mt-1 text-xs text-muted-foreground/60">
+                Try &quot;workflow&quot;, &quot;secrets&quot;, or a page name
+              </p>
             </div>
           )}
 
@@ -290,6 +304,7 @@ export function CommandPalette() {
                 selectedIndex={selectedIndex}
                 canPlaceComponents={canPlaceComponents}
                 hasQuery={query.trim().length > 0}
+                showDivider={groupIndex > 0}
                 onExecuteCommand={executeCommand}
                 onSelectIndex={setSelectedIndex}
                 onViewAll={handleViewAll}
@@ -299,8 +314,8 @@ export function CommandPalette() {
         </div>
 
         {/* Footer with keyboard hints */}
-        <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-t border-border/50 bg-muted/30 text-xs text-muted-foreground">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-4 border-t border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
               <kbd className="inline-flex h-5 items-center rounded border border-border/50 bg-background px-1 font-mono text-[10px]">
                 ↑
@@ -310,9 +325,9 @@ export function CommandPalette() {
               </kbd>
               <span>Navigate</span>
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:flex">
               <kbd className="inline-flex h-5 items-center rounded border border-border/50 bg-background px-1.5 font-mono text-[10px]">
-                <CornerDownLeft className="w-3 h-3" />
+                <CornerDownLeft className="h-3 w-3" />
               </kbd>
               <span>Select</span>
             </span>

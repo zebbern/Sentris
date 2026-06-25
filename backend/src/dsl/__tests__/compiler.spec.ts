@@ -115,6 +115,74 @@ describe('compileWorkflowGraph', () => {
     ]);
   });
 
+  it('preserves graph error edges in compiled workflow definitions', () => {
+    const graph: WorkflowGraphDto = {
+      name: 'Recoverable workflow',
+      nodes: [
+        {
+          id: 'trigger',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Trigger',
+            config: {
+              params: { runtimeInputs: [] },
+              inputOverrides: {},
+            },
+          },
+        },
+        {
+          id: 'request',
+          type: 'core.http.request',
+          position: { x: 0, y: 100 },
+          data: {
+            label: 'Request',
+            config: {
+              params: { method: 'GET' },
+              inputOverrides: { url: 'https://example.com' },
+            },
+          },
+        },
+        {
+          id: 'handler',
+          type: 'core.logic.script',
+          position: { x: 0, y: 200 },
+          data: {
+            label: 'Handler',
+            config: {
+              params: {
+                variables: [{ name: 'failure', type: 'json', required: false }],
+                returns: [{ name: 'handled', type: 'boolean' }],
+                code: 'export function script(input) { return { handled: Boolean(input.failure) }; }',
+              },
+              inputOverrides: {},
+            },
+          },
+        },
+      ],
+      edges: [
+        { id: 'trigger-request', source: 'trigger', target: 'request' },
+        {
+          id: 'request-handler-error',
+          source: 'request',
+          target: 'handler',
+          kind: 'error',
+        },
+      ],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+
+    const definition = compileWorkflowGraph(graph);
+
+    expect(definition.edges.find((edge) => edge.id === 'request-handler-error')).toEqual(
+      expect.objectContaining({
+        sourceRef: 'request',
+        targetRef: 'handler',
+        kind: 'error',
+      }),
+    );
+  });
+
   it('throws when referencing an unknown component', () => {
     const graph: WorkflowGraphDto = {
       name: 'invalid workflow',

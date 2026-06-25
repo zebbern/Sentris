@@ -61,7 +61,11 @@ function createContext(
   responses: Record<string, unknown | string | Buffer | { status: number; body: unknown }>,
 ) {
   const fetchMock = vi.fn(
-    async (url: string | URL | Request, _init?: RequestInit): Promise<Response> => {
+    async (
+      url: string | URL | Request,
+      _init?: RequestInit,
+      _options?: unknown,
+    ): Promise<Response> => {
       const text = String(url);
       const value = responses[text];
 
@@ -141,7 +145,6 @@ describe('repository files extractor component', () => {
           ref: 'main',
         },
         params: {
-          maxFiles: 20,
           maxTotalBytes: 10_000,
           maxFileBytes: 5_000,
         },
@@ -157,6 +160,7 @@ describe('repository files extractor component', () => {
           Accept: 'application/vnd.github+json',
         }),
       }),
+      { maxResponseBodySize: 0 },
     );
     expect(result.sourceBundle).toContain('FILE: src/server.js');
     expect(result.sourceBundle).toContain('process.env.API_KEY');
@@ -192,7 +196,9 @@ describe('repository files extractor component', () => {
     if (!component) throw new Error('Repository files extractor component was not registered');
 
     const archiveUrl = zipballUrl('example', 'project', 'main');
+    const metadataUrl = 'https://api.github.com/repos/example/project';
     const { context } = createContext({
+      [metadataUrl]: { default_branch: 'main' },
       [archiveUrl]: createRepoZip({
         '.github/workflows/ci.yml':
           'name: ci\non: pull_request_target\npermissions:\n  contents: write\n',
@@ -227,16 +233,16 @@ describe('repository files extractor component', () => {
     });
   });
 
-  it('enforces file and byte bounds before reading archive content', async () => {
+  it('enforces byte bounds before reading archive content', async () => {
     const component = componentRegistry.get<any, any>('sentris.repository.files.extract');
     if (!component) throw new Error('Repository files extractor component was not registered');
 
     const archiveUrl = zipballUrl('example', 'project', 'main');
     const { context, fetchMock } = createContext({
       [archiveUrl]: createRepoZip({
-        'a.js': 'console.log("a")',
-        'b.py': 'print("b")',
-        'c.go': 'package main',
+        'a.js': 'a'.repeat(400),
+        'b.py': 'b'.repeat(400),
+        'c.go': 'c'.repeat(400),
       }),
     });
 
@@ -247,7 +253,6 @@ describe('repository files extractor component', () => {
           ref: 'main',
         },
         params: {
-          maxFiles: 2,
           maxTotalBytes: 1_000,
           maxFileBytes: 10_000,
         },
@@ -258,7 +263,7 @@ describe('repository files extractor component', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.files.map((file) => file.path)).toEqual(['a.js', 'b.py']);
     expect(result.summary.truncated).toBe(true);
-    expect(result.skippedFiles).toContainEqual({ path: 'c.go', reason: 'max_files' });
+    expect(result.skippedFiles).toContainEqual({ path: 'c.go', reason: 'max_total_bytes' });
   });
 
   it('classifies serverless framework manifests as CloudFormation input', async () => {
@@ -266,7 +271,9 @@ describe('repository files extractor component', () => {
     if (!component) throw new Error('Repository files extractor component was not registered');
 
     const archiveUrl = zipballUrl('example', 'project', 'main');
+    const metadataUrl = 'https://api.github.com/repos/example/project';
     const { context } = createContext({
+      [metadataUrl]: { default_branch: 'main' },
       [archiveUrl]: createRepoZip({
         'serverless.yml':
           'service: public-api\nprovider:\n  name: aws\nfunctions:\n  api:\n    handler: handler.main\n',
@@ -294,7 +301,9 @@ describe('repository files extractor component', () => {
     if (!component) throw new Error('Repository files extractor component was not registered');
 
     const archiveUrl = zipballUrl('example', 'project', 'main');
+    const metadataUrl = 'https://api.github.com/repos/example/project';
     const { context } = createContext({
+      [metadataUrl]: { default_branch: 'main' },
       [archiveUrl]: createRepoZip({
         'cloudformation/template.json': JSON.stringify({
           AWSTemplateFormatVersion: '2010-09-09',
@@ -351,7 +360,9 @@ describe('repository files extractor component', () => {
     )) as RepoFilesExtractorResult;
 
     expect(fetchMock).toHaveBeenCalledWith(metadataUrl, expect.any(Object));
-    expect(fetchMock).toHaveBeenCalledWith(archiveUrl, expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(archiveUrl, expect.any(Object), {
+      maxResponseBodySize: 0,
+    });
     expect(result.ref).toBe('master');
     expect(result.summary.ref).toBe('master');
     expect(result.summary.repository).toBe('https://github.com/OWASP/NodeGoat');
@@ -388,7 +399,66 @@ describe('repository files extractor component', () => {
           Authorization: 'Bearer ghp_test-token',
         }),
       }),
+      { maxResponseBodySize: 0 },
     );
+  });
+
+  it('probes common branch names when repository metadata is unavailable', async () => {
+    const component = componentRegistry.get<any, any>('sentris.repository.files.extract');
+    if (!component) throw new Error('Repository files extractor component was not registered');
+
+    const metadataUrl = 'https://api.github.com/repos/example/project';
+    const masterBranchUrl = 'https://api.github.com/repos/example/project/branches/master';
+    const archiveUrl = zipballUrl('example', 'project', 'master');
+    const { context } = createContext({
+      [metadataUrl]: { status: 403, body: { message: 'rate limit' } },
+      [masterBranchUrl]: { name: 'master' },
+      [archiveUrl]: createRepoZip({
+        'src/server.js': 'console.log("master");\n',
+      }),
+    });
+
+    const result = (await component.execute(
+      {
+        inputs: {
+          repositoryUrl: 'https://github.com/example/project',
+        },
+        params: {},
+      },
+      context,
+    )) as RepoFilesExtractorResult;
+
+    expect(result.ref).toBe('master');
+    expect(result.files.map((file) => file.path)).toEqual(['src/server.js']);
+  });
+
+  it('falls back to codeload archive download when GitHub API endpoints are unavailable', async () => {
+    const component = componentRegistry.get<any, any>('sentris.repository.files.extract');
+    if (!component) throw new Error('Repository files extractor component was not registered');
+
+    const metadataUrl = 'https://api.github.com/repos/example/project';
+    const mainBranchUrl = 'https://api.github.com/repos/example/project/branches/main';
+    const codeloadUrl = 'https://codeload.github.com/example/project/zip/refs/heads/main';
+    const { context } = createContext({
+      [metadataUrl]: { status: 403, body: { message: 'rate limit' } },
+      [mainBranchUrl]: { status: 403, body: { message: 'rate limit' } },
+      [codeloadUrl]: createRepoZip({
+        'src/server.js': 'console.log("codeload");\n',
+      }),
+    });
+
+    const result = (await component.execute(
+      {
+        inputs: {
+          repositoryUrl: 'https://github.com/example/project',
+        },
+        params: {},
+      },
+      context,
+    )) as RepoFilesExtractorResult;
+
+    expect(result.ref).toBe('main');
+    expect(result.files.map((file) => file.path)).toEqual(['src/server.js']);
   });
 
   it('rejects non-GitHub repository URLs', async () => {

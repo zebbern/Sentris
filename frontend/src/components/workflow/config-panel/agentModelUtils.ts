@@ -8,7 +8,7 @@ import {
 
 export type ClaudeAuthMode = 'api_key' | 'subscription_oauth';
 
-export type AgentModelConfigValue = {
+export interface AgentModelConfigValue {
   provider: AgentModelProvider;
   modelId: string;
   authMode?: ClaudeAuthMode;
@@ -16,7 +16,7 @@ export type AgentModelConfigValue = {
   apiKey?: string;
   oauthTokenSecretId?: string;
   effort?: ClaudeEffortLevel;
-};
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -137,9 +137,7 @@ export function buildAgentModelOverride(
   const normalized = normalizeAgentModelConfig(config, componentId);
   const authMode = normalized.authMode ?? 'api_key';
   const effortFragment =
-    componentId === 'core.ai.claude-code' &&
-    normalized.effort &&
-    normalized.effort !== 'default'
+    componentId === 'core.ai.claude-code' && normalized.effort && normalized.effort !== 'default'
       ? { effort: normalized.effort }
       : {};
 

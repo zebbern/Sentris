@@ -34,8 +34,11 @@ interface NodeState {
   successParents: Set<string>;
   skippedParents: Set<string>; // New: track skipped reasons
   failureParents: Set<string>;
+  inactiveFailureParents: Set<string>;
   triggeredBySuccess: boolean;
   failureTriggered: boolean;
+  errorTriggeredBy?: string;
+  errorFailure?: WorkflowSchedulerRunContext['failure'];
   skipped: boolean; // New: track if node itself was skipped
   totalSuccessParents: number; // To facilitate 'any' strategy with skipping
 }
@@ -96,6 +99,7 @@ export async function runWorkflowWithScheduler(
       successParents,
       skippedParents: new Set(),
       failureParents,
+      inactiveFailureParents: new Set(),
       triggeredBySuccess: successParents.size === 0,
       failureTriggered: false,
       skipped: false,
@@ -116,6 +120,7 @@ export async function runWorkflowWithScheduler(
   }
 
   const failedErrors = new Map<string, unknown>();
+  const handledFailureSources = new Map<string, Set<string>>();
 
   while (pending.size > 0) {
     if (readyQueue.length === 0) {
@@ -180,6 +185,14 @@ export async function runWorkflowWithScheduler(
       const { ref, context } = outcome;
 
       if (outcome.status === 'fulfilled') {
+        const handledSources = handledFailureSources.get(ref);
+        if (handledSources) {
+          for (const source of handledSources) {
+            failedErrors.delete(source);
+          }
+          handledFailureSources.delete(ref);
+        }
+
         const activePorts = outcome.result?.activePorts;
         await handleSuccess(
           ref,
@@ -188,6 +201,7 @@ export async function runWorkflowWithScheduler(
           pending,
           nodeStates,
           successEdges,
+          failureDependents,
           onNodeSkipped,
         );
       } else {
@@ -201,6 +215,8 @@ export async function runWorkflowWithScheduler(
           successEdges,
           failureDependents,
           failedErrors,
+          handledFailureSources,
+          onNodeSkipped,
         );
       }
     }
@@ -220,6 +236,7 @@ async function handleSuccess(
   pending: Set<string>,
   nodeStates: Map<string, NodeState>,
   successEdges: Map<string, WorkflowEdge[]>,
+  failureDependents: Map<string, string[]>,
   onNodeSkipped?: (ref: string) => Promise<void>,
 ) {
   const edges = successEdges.get(ref) ?? [];
@@ -264,6 +281,7 @@ async function handleSuccess(
       pending,
       nodeStates,
       successEdges,
+      failureDependents,
       onNodeSkipped,
     );
   }
@@ -277,9 +295,20 @@ async function handleSuccess(
       pending,
       nodeStates,
       successEdges,
+      failureDependents,
       onNodeSkipped,
     );
   }
+
+  await markInactiveFailureDependents(
+    ref,
+    readyQueue,
+    pending,
+    nodeStates,
+    successEdges,
+    failureDependents,
+    onNodeSkipped,
+  );
 }
 
 async function processChild(
@@ -290,6 +319,7 @@ async function processChild(
   pending: Set<string>,
   nodeStates: Map<string, NodeState>,
   successEdges: Map<string, WorkflowEdge[]>,
+  failureDependents: Map<string, string[]>,
   onNodeSkipped?: (ref: string) => Promise<void>,
 ) {
   if (!pending.has(childRef)) return;
@@ -312,28 +342,72 @@ async function processChild(
     if (state.successParents.size === 0) {
       if (state.skippedParents.size > 0) {
         // If 'all' strategy and at least one parent skipped, we skip.
-        await handleSkip(childRef, readyQueue, pending, nodeStates, successEdges, onNodeSkipped);
+        await handleSkip(
+          childRef,
+          readyQueue,
+          pending,
+          nodeStates,
+          successEdges,
+          failureDependents,
+          onNodeSkipped,
+        );
       } else if (!state.triggeredBySuccess) {
         state.triggeredBySuccess = true;
-        readyQueue.push({ ref: childRef, context: { joinStrategy: state.strategy } });
+        queueReadyIfSatisfiedByFailureState(childRef, parentRef, state, readyQueue);
       }
     }
   } else {
     // ANY / FIRST
     if (type === 'fulfilled' && !state.triggeredBySuccess) {
       state.triggeredBySuccess = true;
-      readyQueue.push({
-        ref: childRef,
-        context: { joinStrategy: state.strategy, triggeredBy: parentRef },
-      });
+      queueReadyIfSatisfiedByFailureState(childRef, parentRef, state, readyQueue);
     } else if (state.successParents.size === 0) {
       // All parents finished.
       // If we haven't been triggered yet, it means everything skipped.
       if (!state.triggeredBySuccess) {
-        await handleSkip(childRef, readyQueue, pending, nodeStates, successEdges, onNodeSkipped);
+        await handleSkip(
+          childRef,
+          readyQueue,
+          pending,
+          nodeStates,
+          successEdges,
+          failureDependents,
+          onNodeSkipped,
+        );
       }
     }
   }
+}
+
+function queueReadyIfSatisfiedByFailureState(
+  childRef: string,
+  successParentRef: string,
+  state: NodeState,
+  readyQueue: ReadyItem[],
+) {
+  if (state.failureParents.size > 0) {
+    if (!state.errorTriggeredBy) {
+      return;
+    }
+
+    readyQueue.push({
+      ref: childRef,
+      context: {
+        joinStrategy: state.strategy,
+        triggeredBy: state.errorTriggeredBy,
+        failure: state.errorFailure,
+      },
+    });
+    return;
+  }
+
+  readyQueue.push({
+    ref: childRef,
+    context: {
+      joinStrategy: state.strategy,
+      triggeredBy: state.strategy === 'all' ? undefined : successParentRef,
+    },
+  });
 }
 
 async function handleSkip(
@@ -342,6 +416,7 @@ async function handleSkip(
   pending: Set<string>,
   nodeStates: Map<string, NodeState>,
   successEdges: Map<string, WorkflowEdge[]>,
+  failureDependents: Map<string, string[]>,
   onNodeSkipped?: (ref: string) => Promise<void>,
 ) {
   if (!pending.has(ref)) return;
@@ -353,6 +428,16 @@ async function handleSkip(
   if (onNodeSkipped) {
     await onNodeSkipped(ref);
   }
+
+  await markInactiveFailureDependents(
+    ref,
+    readyQueue,
+    pending,
+    nodeStates,
+    successEdges,
+    failureDependents,
+    onNodeSkipped,
+  );
 
   const edges = successEdges.get(ref) ?? [];
   const children = new Set(edges.map((e) => e.targetRef));
@@ -366,8 +451,46 @@ async function handleSkip(
       pending,
       nodeStates,
       successEdges,
+      failureDependents,
       onNodeSkipped,
     );
+  }
+}
+
+async function markInactiveFailureDependents(
+  ref: string,
+  readyQueue: ReadyItem[],
+  pending: Set<string>,
+  nodeStates: Map<string, NodeState>,
+  successEdges: Map<string, WorkflowEdge[]>,
+  failureDependents: Map<string, string[]>,
+  onNodeSkipped?: (ref: string) => Promise<void>,
+) {
+  const children = failureDependents.get(ref) ?? [];
+  for (const child of children) {
+    const childState = nodeStates.get(child);
+    if (
+      !childState ||
+      !pending.has(child) ||
+      childState.errorTriggeredBy ||
+      childState.failureTriggered ||
+      childState.skipped
+    ) {
+      continue;
+    }
+
+    childState.inactiveFailureParents.add(ref);
+    if (childState.inactiveFailureParents.size === childState.failureParents.size) {
+      await handleSkip(
+        child,
+        readyQueue,
+        pending,
+        nodeStates,
+        successEdges,
+        failureDependents,
+        onNodeSkipped,
+      );
+    }
   }
 }
 
@@ -380,6 +503,8 @@ async function handleFailure(
   successEdges: Map<string, WorkflowEdge[]>,
   failureDependents: Map<string, string[]>,
   failedErrors: Map<string, unknown>,
+  handledFailureSources: Map<string, Set<string>>,
+  onNodeSkipped?: (ref: string) => Promise<void>,
 ) {
   const queue: { ref: string; source: string }[] = [{ ref, source: triggerSource }];
   const seen = new Set<string>();
@@ -399,25 +524,34 @@ async function handleFailure(
     // Schedule failure dependents (error edges)
     const failureChildren = failureDependents.get(current) ?? [];
     const failureReason = normalizeFailureReason(failedErrors.get(current));
+    const failure = failureReason
+      ? {
+          at: current,
+          reason: failureReason,
+        }
+      : undefined;
+    const hasFailureHandler = failureChildren.length > 0;
     for (const child of failureChildren) {
       const childState = nodeStates.get(child);
       if (!childState || childState.failureTriggered) {
         continue;
       }
-      childState.failureTriggered = true;
-      readyQueue.push({
-        ref: child,
-        context: {
-          joinStrategy: childState.strategy,
-          triggeredBy: current,
-          failure: failureReason
-            ? {
-                at: current,
-                reason: failureReason,
-              }
-            : undefined,
-        },
-      });
+      childState.errorTriggeredBy = current;
+      childState.errorFailure = failure;
+      const handledSources = handledFailureSources.get(child) ?? new Set<string>();
+      handledSources.add(current);
+      handledFailureSources.set(child, handledSources);
+
+      if (childState.successParents.size === 0 && !childState.skipped) {
+        readyQueue.push({
+          ref: child,
+          context: {
+            joinStrategy: childState.strategy,
+            triggeredBy: current,
+            failure,
+          },
+        });
+      }
     }
 
     // Cancel success dependents and propagate failure downstream
@@ -432,12 +566,30 @@ async function handleFailure(
         continue;
       }
 
-      childState.successParents.delete(current);
+      if (!childState.successParents.has(current)) {
+        continue;
+      }
 
       if (!pending.has(child)) {
         continue;
       }
 
+      if (hasFailureHandler) {
+        await processChild(
+          child,
+          current,
+          'skipped',
+          readyQueue,
+          pending,
+          nodeStates,
+          successEdges,
+          failureDependents,
+          onNodeSkipped,
+        );
+        continue;
+      }
+
+      childState.successParents.delete(current);
       const remainingParents = childState.successParents.size;
       const shouldCancel =
         childState.strategy === 'all' || (remainingParents === 0 && !childState.triggeredBySuccess);
@@ -459,6 +611,11 @@ async function handleFailure(
 
 function normalizeFailureReason(reason: unknown): SchedulerFailureDetails | undefined {
   if (reason instanceof Error) {
+    const causeReason = normalizeFailureCause(reason);
+    if (causeReason && isGenericFailureWrapper(reason)) {
+      return causeReason;
+    }
+
     return {
       message: reason.message,
       name: reason.name && reason.name !== 'Error' ? reason.name : undefined,
@@ -482,4 +639,24 @@ function normalizeFailureReason(reason: unknown): SchedulerFailureDetails | unde
   }
 
   return { message: String(reason) };
+}
+
+function normalizeFailureCause(reason: Error): SchedulerFailureDetails | undefined {
+  const cause = (reason as Error & { cause?: unknown }).cause;
+  if (cause === undefined || cause === null || cause === reason) {
+    return undefined;
+  }
+  return normalizeFailureReason(cause);
+}
+
+function isGenericFailureWrapper(reason: Error): boolean {
+  const name = reason.name.toLowerCase();
+  const message = reason.message.toLowerCase();
+  return (
+    name === 'activityfailure' ||
+    name === 'workflowfailure' ||
+    name === 'applicationfailure' ||
+    message === 'activity task failed' ||
+    message === 'workflow task failed'
+  );
 }

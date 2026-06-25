@@ -71,7 +71,10 @@ description: Analyze KEV briefs
 
   it('mergeSkillFilesForResponse falls back to content', () => {
     expect(
-      mergeSkillFilesForResponse({ content: '# Legacy', files: null as unknown as Record<string, string> }),
+      mergeSkillFilesForResponse({
+        content: '# Legacy',
+        files: null as unknown as Record<string, string>,
+      }),
     ).toEqual({ 'SKILL.md': '# Legacy' });
   });
 

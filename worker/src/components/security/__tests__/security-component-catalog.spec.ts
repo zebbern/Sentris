@@ -15,7 +15,7 @@ describe('security component catalog', () => {
     await import('../register-all');
   });
 
-  it('registers all 29 security palette components', () => {
+  it('registers all security palette components', () => {
     for (const componentId of SECURITY_COMPONENT_IDS) {
       expect(componentRegistry.has(componentId), `${componentId} should be registered`).toBe(true);
     }

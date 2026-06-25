@@ -1,21 +1,26 @@
 import { useRef, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Workflow, ZoomIn, ZoomOut } from 'lucide-react';
 import { WorkflowPreview } from '@/features/templates/WorkflowPreview';
 import { cn } from '@/lib/utils';
-import { hasGraphNodes } from './types';
+import { getCategoryStyle, hasGraphNodes } from './types';
 
 export function PreviewSection({
   graph,
+  category,
+  onPreviewClick,
 }: {
   graph?: Record<string, unknown>;
   category?: string | null;
+  onPreviewClick?: () => void;
 }) {
   const [zoom, setZoom] = useState(1);
-  const [origin, setOrigin] = useState({ x: 50, y: 50 }); // percentage-based origin
+  const [origin, setOrigin] = useState({ x: 50, y: 50 });
   const containerRef = useRef<HTMLDivElement>(null);
   const hasGraph = hasGraphNodes(graph);
+  const catStyle = getCategoryStyle(category);
+  const CategoryIcon = catStyle.icon;
 
-  // Track cursor position for zoom origin
   const updateOrigin = (e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -25,7 +30,6 @@ export function PreviewSection({
     });
   };
 
-  // Scroll-wheel zoom at cursor position
   const handleWheel = (e: React.WheelEvent) => {
     e.stopPropagation();
     updateOrigin(e);
@@ -33,7 +37,6 @@ export function PreviewSection({
     setZoom((z) => Math.min(Math.max(z + delta, 0.75), 2.5));
   };
 
-  // Button zoom (uses last known cursor position)
   const handleZoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
     setZoom((z) => Math.min(z + 0.25, 2.5));
@@ -44,36 +47,40 @@ export function PreviewSection({
     setZoom((z) => Math.max(z - 0.25, 0.75));
   };
 
-  // Reset zoom on double-click
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setZoom(1);
     setOrigin({ x: 50, y: 50 });
   };
 
+  const handlePreviewClick = (e: React.MouseEvent) => {
+    if (zoom !== 1) return;
+    e.stopPropagation();
+    onPreviewClick?.();
+  };
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        'relative h-44 w-full overflow-hidden rounded-xl',
-        hasGraph && 'cursor-zoom-in',
+        'relative h-48 w-full overflow-hidden rounded-xl ring-1 ring-border/50',
+        hasGraph && zoom === 1 && 'cursor-pointer',
         hasGraph && zoom > 1 && 'cursor-zoom-out',
       )}
       style={{
         background: 'linear-gradient(180deg, hsl(var(--muted) / 0.5) 0%, hsl(var(--muted)) 100%)',
       }}
+      onClick={hasGraph && zoom === 1 ? handlePreviewClick : undefined}
       onWheel={hasGraph ? handleWheel : undefined}
       onMouseMove={hasGraph ? updateOrigin : undefined}
       onDoubleClick={hasGraph ? handleDoubleClick : undefined}
     >
-      {/* Dark theme gradient overlay */}
       <div
         className="absolute inset-0 hidden dark:block"
         style={{
           background: 'linear-gradient(180deg, hsl(var(--muted)) 0%, hsl(var(--background)) 100%)',
         }}
       />
-      {/* Subtle radial glow in dark mode */}
       <div
         className="absolute inset-0 hidden dark:block pointer-events-none"
         style={{
@@ -82,7 +89,6 @@ export function PreviewSection({
         }}
       />
 
-      {/* Subtle dot pattern */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -91,6 +97,17 @@ export function PreviewSection({
           backgroundSize: '12px 12px',
         }}
       />
+
+      <Badge
+        variant="outline"
+        className={cn(
+          'absolute top-2 left-2 z-10 gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium pointer-events-none',
+          catStyle.badge,
+        )}
+      >
+        <CategoryIcon className="h-3 w-3" />
+        {category || 'Automation'}
+      </Badge>
 
       {hasGraph ? (
         <>
@@ -104,42 +121,15 @@ export function PreviewSection({
             <WorkflowPreview graph={graph} className="w-full h-full" />
           </div>
 
-          {/* "Scroll to zoom" hint — visible on hover, hides once user zooms */}
           {zoom === 1 && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-foreground/5 backdrop-blur-sm text-[9px] font-medium text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="opacity-60">
-                <rect
-                  x="6"
-                  y="1"
-                  width="4"
-                  height="8"
-                  rx="2"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                />
-                <line
-                  x1="8"
-                  y1="4"
-                  x2="8"
-                  y2="6"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M8 11v2m-2 1h4"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinecap="round"
-                />
-              </svg>
-              Scroll to zoom
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-foreground/5 backdrop-blur-sm text-[10px] font-medium text-muted-foreground/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+              Click to preview
             </div>
           )}
 
-          {/* Zoom controls */}
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <button
+              type="button"
               onClick={handleZoomOut}
               className="p-1 rounded-md bg-background/80 backdrop-blur-sm border border-border/50 text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
               title="Zoom out"
@@ -147,6 +137,7 @@ export function PreviewSection({
               <ZoomOut className="h-3 w-3" />
             </button>
             <button
+              type="button"
               onClick={handleZoomIn}
               className="p-1 rounded-md bg-background/80 backdrop-blur-sm border border-border/50 text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
               title="Zoom in"
@@ -155,7 +146,6 @@ export function PreviewSection({
             </button>
           </div>
 
-          {/* Zoom indicator */}
           {zoom !== 1 && (
             <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-background/70 backdrop-blur-sm text-[9px] font-medium text-muted-foreground border border-border/30">
               {Math.round(zoom * 100)}%
@@ -163,7 +153,13 @@ export function PreviewSection({
           )}
         </>
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted-foreground/30">
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted-foreground/30 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreviewClick?.();
+          }}
+        >
           <Workflow className="h-8 w-8" />
           <span className="text-[10px] font-medium">No preview</span>
         </div>

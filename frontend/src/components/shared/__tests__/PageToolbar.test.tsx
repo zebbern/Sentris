@@ -34,4 +34,20 @@ describe('PageToolbar', () => {
     expect(controlsRow).toHaveClass('items-start');
     expect(Array.from(controlsRow.children)).toEqual([searchGroup, actionsGroup, filtersGroup]);
   });
+
+  it('uses inline search when searchLabel is provided without a title', () => {
+    render(
+      <PageToolbar
+        searchValue=""
+        onSearchChange={mock()}
+        searchLabel="Search requests"
+        searchPlaceholder="Filter by title, node, or run ID"
+        actions={<button type="button">Refresh</button>}
+      />,
+    );
+
+    expect(screen.queryByText('Search requests')).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search requests' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Filter by title, node, or run ID/i)).toBeInTheDocument();
+  });
 });

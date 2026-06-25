@@ -6,9 +6,12 @@ const SENTRIS_RUN_ID = 'sentris-run-123e4567-e89b-12d3-a456-426614174000';
 const UUID_RUN_ID = '123e4567-e89b-12d3-a456-426614174000';
 
 function makeRepository(pool: unknown) {
-  const repository = new TraceRepository({} as any, {
-    get: mock(() => 'postgres://sentris:test@localhost:5432/sentris_test'),
-  } as any);
+  const repository = new TraceRepository(
+    {} as any,
+    {
+      get: mock(() => 'postgres://sentris:test@localhost:5432/sentris_test'),
+    } as any,
+  );
 
   (repository as any).pool = pool;
   return repository;
@@ -60,9 +63,9 @@ describe('TraceRepository run notification channels', () => {
     const query = mock(async () => undefined);
     const repository = makeRepository({ query });
 
-    await expect(repository.notifyRun(`${SENTRIS_RUN_ID}";DROP TABLE traces;--`, '{}')).rejects.toThrow(
-      'Invalid runId format',
-    );
+    await expect(
+      repository.notifyRun(`${SENTRIS_RUN_ID}";DROP TABLE traces;--`, '{}'),
+    ).rejects.toThrow('Invalid runId format');
     expect(query).not.toHaveBeenCalled();
   });
 });

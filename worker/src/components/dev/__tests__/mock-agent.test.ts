@@ -186,4 +186,68 @@ describe('mock.agent', () => {
       Authorization: 'Bearer my-token',
     });
   });
+
+  test('calls Fetch MCP tools with safe fixed arguments', async () => {
+    const component = componentRegistry.get('mock.agent');
+    expect(component).toBeDefined();
+
+    const mockCallTool = vi.fn().mockResolvedValue({
+      isError: false,
+      content: [{ type: 'text', text: 'Example Domain\nThis domain is for use in examples.' }],
+    });
+
+    class MockClient {
+      connect = vi.fn().mockResolvedValue(undefined);
+      listTools = vi.fn().mockResolvedValue({
+        tools: [
+          {
+            name: 'Fetch_Reference__fetch',
+            description: 'Fetches a URL from the internet',
+          },
+        ],
+      });
+      callTool = mockCallTool;
+      close = vi.fn().mockResolvedValue(undefined);
+    }
+
+    class MockTransport {
+      constructor(
+        public url: URL,
+        public options: any,
+      ) {}
+    }
+
+    const context = createTestContext({
+      metadata: {
+        runId: 'test-run',
+        componentRef: 'mock.agent',
+        connectedToolNodeIds: ['custom_mcp_tools'],
+        mockAgentOverrides: {
+          Client: MockClient as any,
+          StreamableHTTPClientTransport: MockTransport as any,
+          getGatewaySessionToken: vi.fn().mockResolvedValue('fetch-token'),
+        },
+      } as any,
+    });
+
+    const result = await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      { inputs: {}, params: { callTools: true, maxToolCalls: 1 } },
+      context,
+    );
+
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: 'Fetch_Reference__fetch',
+      arguments: { url: 'https://example.com', max_length: 1200 },
+    });
+    expect(result.toolCallResults).toEqual([
+      {
+        toolName: 'Fetch_Reference__fetch',
+        success: true,
+        durationMs: expect.any(Number),
+        output: 'Example Domain\nThis domain is for use in examples.',
+      },
+    ]);
+  });
 });

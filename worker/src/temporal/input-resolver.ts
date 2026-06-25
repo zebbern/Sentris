@@ -1,6 +1,6 @@
 import { isSpilledDataMarker } from '@sentris/component-sdk';
 import type { ConnectionType } from '@sentris/component-sdk/types';
-import type { WorkflowAction } from './types';
+import type { WorkflowAction, WorkflowJoinStrategy } from './types';
 
 export interface InputWarning {
   target: string;
@@ -11,6 +11,11 @@ export interface InputWarning {
 
 export interface ManualOverride {
   target: string;
+}
+
+export interface JoinWarningFilterContext {
+  joinStrategy?: WorkflowJoinStrategy | 'all';
+  triggeredBy?: string;
 }
 
 interface CoercionResult {
@@ -245,4 +250,15 @@ export function buildActionPayload(
   }
 
   return { inputs, params, warnings, manualOverrides };
+}
+
+export function filterInactiveJoinWarnings(
+  warnings: InputWarning[],
+  context: JoinWarningFilterContext,
+): InputWarning[] {
+  if ((context.joinStrategy === 'any' || context.joinStrategy === 'first') && context.triggeredBy) {
+    return warnings.filter((warning) => warning.sourceRef === context.triggeredBy);
+  }
+
+  return warnings;
 }

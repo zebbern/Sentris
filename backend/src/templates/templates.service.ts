@@ -358,35 +358,42 @@ export class TemplateService {
 
     const secretKeys = ['secretId', 'secret_name', 'secretName', 'secretRef', 'secret_ref'];
     for (const key of secretKeys) {
-      if (record[key] === '{{SECRET_PLACEHOLDER}}') {
-        const possibleNameKeys = ['label', 'name', 'key', 'displayName'];
-        for (const nameKey of possibleNameKeys) {
-          const nameValue = record[nameKey];
-          if (typeof nameValue === 'string' && secretMappings[nameValue]) {
-            record[key] = secretMappings[nameValue];
-            break;
-          }
-        }
-
-        if (record[key] === '{{SECRET_PLACEHOLDER}}') {
-          const firstAvailable = Object.values(secretMappings)[0];
-          if (firstAvailable) {
-            record[key] = firstAvailable;
-          }
-        }
+      if (typeof record[key] === 'string') {
+        record[key] = this.replaceSecretPlaceholderString(String(record[key]), secretMappings);
       }
     }
 
     for (const [key, value] of Object.entries(record)) {
-      if (typeof value === 'string' && value.includes('{{SECRET_PLACEHOLDER}}')) {
-        const firstAvailable = Object.values(secretMappings)[0];
-        if (firstAvailable) {
-          record[key] = value.replace(/\{\{SECRET_PLACEHOLDER\}\}/g, firstAvailable);
+      if (typeof value === 'string') {
+        const replaced = this.replaceSecretPlaceholderString(value, secretMappings);
+        if (replaced !== value) {
+          record[key] = replaced;
         }
       } else if (typeof value === 'object' && value !== null) {
         this.traverseAndApplySecrets(value, secretMappings);
       }
     }
+  }
+
+  private replaceSecretPlaceholderString(
+    value: string,
+    secretMappings: Record<string, string>,
+  ): string {
+    if (/\{\{SECRET:[^}]+\}\}/.test(value)) {
+      return value.replace(/\{\{SECRET:([^}]+)\}\}/g, (match, secretName: string) => {
+        const mapped = secretMappings[secretName.trim()];
+        return mapped ?? '';
+      });
+    }
+
+    if (value.includes('{{SECRET_PLACEHOLDER}}')) {
+      const firstAvailable = Object.values(secretMappings)[0];
+      if (firstAvailable) {
+        return value.replace(/\{\{SECRET_PLACEHOLDER\}\}/g, firstAvailable);
+      }
+    }
+
+    return value;
   }
 }
 

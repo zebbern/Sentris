@@ -1,6 +1,5 @@
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
-import { ArrowRight } from 'lucide-react';
 import type { Command, ComponentCommand } from './command-palette-types';
 
 interface CommandItemProps {
@@ -31,23 +30,20 @@ export function CommandItem({
       onClick={onExecute}
       onMouseEnter={onMouseEnter}
       className={cn(
-        'w-full flex items-center gap-3 px-3 py-2.5 pl-3 border-l-2 text-left transition-colors duration-75',
-        isSelected
-          ? 'bg-primary/10 border-primary text-foreground'
-          : 'hover:bg-accent/50 border-transparent text-muted-foreground',
+        'mx-1.5 flex w-[calc(100%-0.75rem)] items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-75',
+        isSelected ? 'bg-accent text-foreground' : 'text-foreground hover:bg-accent/50',
         isComponent && !canPlaceComponents && 'opacity-50',
       )}
       disabled={isComponent && !canPlaceComponents}
     >
-      {/* Icon or Logo */}
-      <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+      <div className="flex h-5 w-5 shrink-0 items-center justify-center">
         {hasLogo ? (
           <img
             src={(command as ComponentCommand & { iconUrl: string }).iconUrl}
             alt=""
             width={20}
             height={20}
-            className="w-5 h-5 object-contain"
+            className="h-5 w-5 object-contain"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
@@ -56,26 +52,27 @@ export function CommandItem({
           <DynamicIcon
             name={command.iconName}
             fallback="box"
-            className={cn('w-4 h-4', isSelected ? 'text-primary' : 'text-muted-foreground')}
+            className={cn('h-4 w-4', isSelected ? 'text-foreground' : 'text-muted-foreground')}
           />
         ) : Icon ? (
-          <Icon className={cn('w-4 h-4', isSelected ? 'text-primary' : 'text-muted-foreground')} />
+          <Icon
+            className={cn('h-4 w-4', isSelected ? 'text-foreground' : 'text-muted-foreground')}
+          />
         ) : null}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm truncate">{command.label}</div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium leading-tight">{command.label}</div>
         {command.description && (
           <div
             className={cn(
-              'text-xs truncate',
-              isSelected ? 'text-muted-foreground' : 'text-muted-foreground',
+              'mt-0.5 truncate text-xs leading-tight',
+              isSelected ? 'text-muted-foreground' : 'text-muted-foreground/60',
             )}
           >
             {command.description}
           </div>
         )}
       </div>
-      {isSelected && <ArrowRight className="w-4 h-4 flex-shrink-0 text-primary" />}
     </button>
   );
 }

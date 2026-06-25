@@ -32,7 +32,7 @@ export interface DiscoveredAgentSkill {
 
 export interface ImportAgentSkillsResult {
   imported: AgentSkillResponse[];
-  skipped: Array<{ slug: string; reason: string }>;
+  skipped: { slug: string; reason: string }[];
 }
 
 export interface CreateAgentSkillInput {
@@ -128,7 +128,7 @@ export function useDeleteAgentSkill() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiRequest<void>(`/api/v1/agent-skills/${id}`, {
+      apiRequest<undefined>(`/api/v1/agent-skills/${id}`, {
         method: 'DELETE',
       }),
     onSuccess: () => {
@@ -140,10 +140,7 @@ export function useDeleteAgentSkill() {
 export function useImportDiscoveredAgentSkills() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      items: Array<{ slug: string; sourceRoot: string }>;
-      overwrite?: boolean;
-    }) =>
+    mutationFn: (input: { items: { slug: string; sourceRoot: string }[]; overwrite?: boolean }) =>
       apiRequest<ImportAgentSkillsResult>('/api/v1/agent-skills/import-discovered', {
         method: 'POST',
         body: JSON.stringify(input),

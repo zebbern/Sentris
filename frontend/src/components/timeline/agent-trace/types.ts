@@ -31,6 +31,7 @@ export interface AgentDerivedStep {
   toolName?: string;
   toolInput?: unknown;
   toolOutput?: unknown;
+  toolError?: unknown;
   timestamp?: string;
   sequence: number;
   startedAt?: string;

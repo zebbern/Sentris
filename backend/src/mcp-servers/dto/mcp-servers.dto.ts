@@ -122,6 +122,16 @@ export const TestConnectionResponseSchema = z.object({
 
 export class TestConnectionResponseDto extends createZodDto(TestConnectionResponseSchema) {}
 
+export const TestEnabledServerResponseSchema = z.object({
+  serverId: z.string(),
+  serverName: z.string(),
+  success: z.boolean(),
+  message: z.string().optional(),
+  toolCount: z.number().optional(),
+});
+
+export class TestEnabledServerResponseDto extends createZodDto(TestEnabledServerResponseSchema) {}
+
 export const HealthStatusResponseSchema = z.object({
   serverId: z.string(),
   status: z.enum(['healthy', 'unhealthy', 'unknown']),
@@ -134,10 +144,12 @@ export class HealthStatusResponseDto extends createZodDto(HealthStatusResponseSc
 export const McpServerResponse = McpServerResponseDto;
 export const McpToolResponse = McpToolResponseDto;
 export const TestConnectionResponse = TestConnectionResponseDto;
+export const TestEnabledServerResponse = TestEnabledServerResponseDto;
 export const HealthStatusResponse = HealthStatusResponseDto;
 
 // Type aliases for use in type annotations
 export type McpServerResponse = McpServerResponseDto;
 export type McpToolResponse = McpToolResponseDto;
 export type TestConnectionResponse = TestConnectionResponseDto;
+export type TestEnabledServerResponse = TestEnabledServerResponseDto;
 export type HealthStatusResponse = HealthStatusResponseDto;

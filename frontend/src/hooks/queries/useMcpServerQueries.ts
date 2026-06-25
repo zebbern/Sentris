@@ -35,6 +35,14 @@ export interface McpToolResponse {
   discoveredAt: string;
 }
 
+export interface TestEnabledMcpServerResponse {
+  serverId: string;
+  serverName: string;
+  success: boolean;
+  message?: string;
+  toolCount?: number;
+}
+
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = await getApiAuthHeaders();
   const { signal, ...restOptions } = options;
@@ -124,12 +132,33 @@ export function useToggleMcpServer() {
 }
 
 export function useTestMcpConnection() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       apiRequest<{ success: boolean; message?: string; toolCount?: number }>(
         `/api/v1/mcp-servers/${id}/test`,
         { method: 'POST' },
       ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
+      qc.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
+    },
+  });
+}
+
+export function useTestEnabledMcpServers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiRequest<TestEnabledMcpServerResponse[]>('/api/v1/mcp-servers/test-enabled', {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
+      qc.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
+      qc.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
+    },
   });
 }
 

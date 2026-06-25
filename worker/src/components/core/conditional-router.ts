@@ -221,6 +221,7 @@ const definition = defineComponent({
     return {
       matched: isMatch ? rawValue : null,
       unmatched: isMatch ? null : rawValue,
+      activeOutputPorts: isMatch ? ['matched'] : ['unmatched'],
     };
   },
 });

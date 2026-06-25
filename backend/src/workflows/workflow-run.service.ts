@@ -312,14 +312,7 @@ export class WorkflowRunService {
     );
     const nodeOverrides = options.nodeOverrides ?? {};
     let definitionWithOverrides = this.applyNodeOverrides(compiledDefinition, nodeOverrides);
-    definitionWithOverrides = {
-      ...definitionWithOverrides,
-      actions: definitionWithOverrides.actions.map((action) => {
-        const component = componentRegistry.get(action.componentId);
-        if (component?.retryPolicy) return { ...action, retryPolicy: component.retryPolicy };
-        return action;
-      }),
-    };
+    definitionWithOverrides = this.applyComponentRetryPolicies(definitionWithOverrides);
     const normalizedKey = this.normalizeIdempotencyKey(options.idempotencyKey);
     const runId =
       options.runId ??
@@ -365,6 +358,34 @@ export class WorkflowRunService {
       triggerMetadata,
       inputPreview,
       totalActions: definitionWithOverrides.actions.length,
+    };
+  }
+
+  private applyComponentRetryPolicies(definition: WorkflowDefinition): WorkflowDefinition {
+    const applyPolicies = (actions: WorkflowDefinition['actions']) =>
+      actions.map((action) => {
+        const component = componentRegistry.get(action.componentId);
+        if (component?.retryPolicy) return { ...action, retryPolicy: component.retryPolicy };
+        return action;
+      });
+
+    const loopBodies = Object.fromEntries(
+      Object.entries(definition.loopBodies ?? {}).map(([ref, body]) => [
+        ref,
+        {
+          ...body,
+          definition: {
+            ...body.definition,
+            actions: applyPolicies(body.definition.actions),
+          },
+        },
+      ]),
+    );
+
+    return {
+      ...definition,
+      actions: applyPolicies(definition.actions),
+      loopBodies,
     };
   }
 

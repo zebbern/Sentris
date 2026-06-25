@@ -1,6 +1,37 @@
 import { Cloud, GitBranch, Globe, Package } from 'lucide-react';
 import { env } from '@/config/env';
-import type { ServerFormData, TransportType, HeaderEntry } from './types';
+import type {
+  AgentReadiness,
+  ServerFormData,
+  ToolCounts,
+  TransportType,
+  HeaderEntry,
+} from './types';
+import type { McpHealthStatus } from '@sentris/shared';
+
+export function getMcpAgentReadiness(input: {
+  enabled: boolean;
+  healthStatus?: McpHealthStatus | null;
+  toolCounts?: ToolCounts | null;
+}): AgentReadiness {
+  if (!input.enabled) {
+    return { status: 'disabled', label: 'Disabled', tone: 'muted' };
+  }
+
+  if (input.healthStatus === 'unhealthy') {
+    return { status: 'unhealthy', label: 'Unhealthy', tone: 'destructive' };
+  }
+
+  if (input.healthStatus !== 'healthy') {
+    return { status: 'needs-test', label: 'Needs test', tone: 'warning' };
+  }
+
+  if (!input.toolCounts || input.toolCounts.enabled <= 0) {
+    return { status: 'no-tools', label: 'No tools', tone: 'warning' };
+  }
+
+  return { status: 'ready', label: 'Ready', tone: 'success' };
+}
 
 /**
  * Maps a group slug/name to an appropriate icon component.

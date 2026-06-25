@@ -76,30 +76,6 @@ const parameterSchema = parameters({
     editor: 'text',
     description: 'Branch, tag, or commit to read files from.',
   }),
-  maxFiles: param(
-    z.number().int().min(1).max(500).default(80).describe('Maximum files to fetch.'),
-    {
-      label: 'Max Files',
-      editor: 'number',
-      min: 1,
-      max: 500,
-    },
-  ),
-  maxTotalBytes: param(
-    z
-      .number()
-      .int()
-      .min(1_000)
-      .max(2_000_000)
-      .default(250_000)
-      .describe('Maximum total bytes to fetch.'),
-    {
-      label: 'Max Total Bytes',
-      editor: 'number',
-      min: 1_000,
-      max: 2_000_000,
-    },
-  ),
   maxFileBytes: param(
     z
       .number()
@@ -109,25 +85,27 @@ const parameterSchema = parameters({
       .default(50_000)
       .describe('Maximum size for an individual file.'),
     {
-      label: 'Max File Bytes',
+      label: 'Max File Size',
       editor: 'number',
       min: 100,
       max: 500_000,
+      description: 'Skip individual files larger than this limit.',
     },
   ),
-  maxArchiveBytes: param(
+  maxTotalBytes: param(
     z
       .number()
       .int()
-      .min(10_000)
-      .max(50_000_000)
-      .default(10_000_000)
-      .describe('Maximum GitHub zipball archive size to download.'),
+      .min(1_000)
+      .max(1_000_000_000)
+      .default(250_000)
+      .describe('Maximum total bytes to extract from the repository.'),
     {
-      label: 'Max Archive Bytes',
+      label: 'Max Total Size',
       editor: 'number',
-      min: 10_000,
-      max: 50_000_000,
+      min: 1_000,
+      max: 1_000_000_000,
+      description: 'Stop extracting once the combined selected file size reaches this limit.',
     },
   ),
 });
@@ -286,6 +264,32 @@ function buildGithubHeaders(token?: string): Record<string, string> {
   return headers;
 }
 
+async function resolveRefFromBranchCandidates(
+  context: Pick<ExecutionContext, 'http'>,
+  owner: string,
+  repo: string,
+  headers: Record<string, string>,
+  candidates: string[],
+): Promise<string | null> {
+  for (const candidate of candidates) {
+    const ref = cleanRef(candidate);
+    const branchUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodePath(ref)}`;
+    try {
+      const response = await context.http.fetch(branchUrl, {
+        method: 'GET',
+        headers,
+      });
+      if (response.ok) {
+        return ref;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 async function resolveEffectiveRef(
   context: Pick<ExecutionContext, 'http'>,
   inputRef: unknown,
@@ -314,10 +318,107 @@ async function resolveEffectiveRef(
       }
     }
   } catch {
-    // Fall back to the configured component default when metadata lookup fails.
+    // Fall back to branch probing when metadata lookup fails.
   }
 
-  return cleanRef(fallbackRef);
+  const branchCandidates = Array.from(
+    new Set([fallbackRef, 'main', 'master'].map((value) => value.trim()).filter(Boolean)),
+  );
+  const resolvedBranch = await resolveRefFromBranchCandidates(
+    context,
+    owner,
+    repo,
+    headers,
+    branchCandidates,
+  );
+  if (resolvedBranch) {
+    return resolvedBranch;
+  }
+
+  throw new Error(
+    `Unable to resolve git ref for ${owner}/${repo}. Provide a ref input or configure a GitHub token.`,
+  );
+}
+
+async function tryResolveEffectiveRef(
+  context: Pick<ExecutionContext, 'http'>,
+  inputRef: unknown,
+  fallbackRef: string,
+  owner: string,
+  repo: string,
+  headers: Record<string, string>,
+): Promise<string | null> {
+  try {
+    return await resolveEffectiveRef(context, inputRef, fallbackRef, owner, repo, headers);
+  } catch {
+    return null;
+  }
+}
+
+function buildRefCandidates(resolvedRef: string | null, fallbackRef: string): string[] {
+  return Array.from(
+    new Set(
+      [resolvedRef, fallbackRef, 'main', 'master']
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => cleanRef(value)),
+    ),
+  );
+}
+
+function codeloadArchiveUrl(owner: string, repo: string, ref: string): string {
+  return `https://codeload.github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/zip/refs/heads/${encodePath(ref)}`;
+}
+
+function resolveArchiveDownloadLimit(maxTotalBytes: number): number {
+  return Math.min(Math.max(maxTotalBytes * 10, 10_000_000), 1_000_000_000);
+}
+
+async function downloadRepositoryArchive(
+  context: Pick<ExecutionContext, 'http' | 'logger'>,
+  identity: Omit<RepoContext, 'ref'>,
+  refCandidates: string[],
+  githubHeaders: Record<string, string>,
+  maxTotalBytes: number,
+): Promise<{ archive: Buffer; ref: string }> {
+  const downloadHeaders = {
+    Accept: 'application/vnd.github+json, application/octet-stream, */*',
+  };
+  const attempts: { ref: string; url: string; headers: Record<string, string> }[] = [];
+
+  for (const ref of refCandidates) {
+    const repo: RepoContext = { ...identity, ref };
+    attempts.push({ ref, url: zipballUrl(repo), headers: githubHeaders });
+    attempts.push({
+      ref,
+      url: codeloadArchiveUrl(identity.owner, identity.repo, ref),
+      headers: downloadHeaders,
+    });
+  }
+
+  let lastError: Error | null = null;
+  const archiveDownloadLimit = resolveArchiveDownloadLimit(maxTotalBytes);
+  for (const attempt of attempts) {
+    try {
+      context.logger.info(
+        `[RepoFilesExtractor] Trying archive download for ${identity.owner}/${identity.repo}@${attempt.ref} via ${new URL(attempt.url).hostname}`,
+      );
+      const archive = await fetchArchive(
+        context,
+        attempt.url,
+        attempt.headers,
+        archiveDownloadLimit,
+        maxTotalBytes,
+      );
+      return { archive, ref: attempt.ref };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw (
+    lastError ??
+    new Error(`Unable to download GitHub archive for ${identity.owner}/${identity.repo}`)
+  );
 }
 
 function encodePath(value: string): string {
@@ -475,22 +576,27 @@ async function fetchArchive(
   context: Pick<ExecutionContext, 'http'>,
   url: string,
   headers: Record<string, string>,
-  maxArchiveBytes: number,
+  archiveDownloadLimit: number,
+  maxTotalBytes: number,
 ): Promise<Buffer> {
-  const response = await context.http.fetch(url, {
-    method: 'GET',
-    headers,
-  });
+  const response = await context.http.fetch(
+    url,
+    {
+      method: 'GET',
+      headers,
+    },
+    { maxResponseBodySize: 0 },
+  );
   if (!response.ok) {
     throw new Error(`GitHub archive fetch failed: ${response.status} ${response.statusText}`);
   }
 
   const archive = Buffer.from(await response.arrayBuffer());
-  if (archive.length > maxArchiveBytes) {
-    throw new ValidationError('GitHub archive exceeds configured maxArchiveBytes', {
+  if (archive.length > archiveDownloadLimit) {
+    throw new ValidationError('GitHub archive exceeds configured max total size', {
       fieldErrors: {
-        maxArchiveBytes: [
-          `Archive size ${archive.length} bytes exceeds limit ${maxArchiveBytes} bytes`,
+        maxTotalBytes: [
+          `Archive size ${archive.length} bytes exceeds download limit derived from max total size (${maxTotalBytes} bytes)`,
         ],
       },
     });
@@ -540,7 +646,7 @@ const definition = defineComponent({
     const githubHeaders = buildGithubHeaders(
       typeof inputs.githubToken === 'string' ? inputs.githubToken : undefined,
     );
-    const effectiveRef = await resolveEffectiveRef(
+    const resolvedRef = await tryResolveEffectiveRef(
       context,
       inputs.ref,
       parsedParams.ref,
@@ -548,16 +654,18 @@ const definition = defineComponent({
       identity.repo,
       githubHeaders,
     );
+    const refCandidates = buildRefCandidates(resolvedRef, parsedParams.ref);
+    const { archive, ref: effectiveRef } = await downloadRepositoryArchive(
+      context,
+      identity,
+      refCandidates,
+      githubHeaders,
+      parsedParams.maxTotalBytes,
+    );
     const repo: RepoContext = { ...identity, ref: effectiveRef };
 
     context.logger.info(
-      `[RepoFilesExtractor] Downloading zipball for ${repo.repository}@${repo.ref}`,
-    );
-    const archive = await fetchArchive(
-      context,
-      zipballUrl(repo),
-      githubHeaders,
-      parsedParams.maxArchiveBytes,
+      `[RepoFilesExtractor] Downloaded archive for ${repo.repository}@${repo.ref}`,
     );
     const archiveFiles = listArchiveFiles(archive);
     const contentByPath = new Map(archiveFiles.map((file) => [file.path, file.content]));
@@ -580,11 +688,6 @@ const definition = defineComponent({
         continue;
       }
 
-      if (selected.length >= parsedParams.maxFiles) {
-        skippedFiles.push({ path, reason: 'max_files' });
-        truncated = true;
-        continue;
-      }
       if (size > parsedParams.maxFileBytes) {
         skippedFiles.push({ path, reason: 'max_file_bytes' });
         truncated = true;

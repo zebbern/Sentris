@@ -8,7 +8,13 @@ import {
   buildClaudeAuthEnv,
   buildClaudeModelEnv,
   buildClaudeEffortEnv,
+  assertStructuredAgentOutput,
+  extractStructuredAgentJson,
+  normalizeReviewVerdict,
+  normalizeStructuredAgentOutput,
   formatClaudeAuthErrorHint,
+  sanitizeClaudeCodeReport,
+  stripAgentLogLines,
   buildSupplementaryFiles,
   fetchAgentSkills,
   mapAutoApprove,
@@ -179,6 +185,17 @@ describe('agent-runner-utils', () => {
     });
     expect(prompt).toContain('/workspace/supplementary-a.txt');
     expect(prompt).toContain('Investigate');
+    expect(prompt).toContain('# MCP Tools');
+  });
+
+  it('buildAgentPrompt omits MCP listing when structuredOutput is enabled', () => {
+    const prompt = buildAgentPrompt({
+      task: 'Review candidates',
+      structuredOutput: true,
+    });
+    expect(prompt).not.toContain('# MCP Tools');
+    expect(prompt).toContain('# Output Format');
+    expect(prompt).toContain('exactly one valid RFC 8259 JSON object');
   });
 
   it('fetchAgentSkills calls internal batch endpoint', async () => {
@@ -203,6 +220,68 @@ describe('agent-runner-utils', () => {
   it('assertSkillsResolved throws for missing skills', () => {
     expect(() => assertSkillsResolved(['missing-id'], [])).toThrow(
       'Agent skills not found or disabled',
+    );
+  });
+
+  it('assertStructuredAgentOutput validates required keys and candidates', () => {
+    expect(() => assertStructuredAgentOutput(null, ['candidates'])).toThrow(
+      'Structured agent output must be a JSON object',
+    );
+    expect(() => assertStructuredAgentOutput({ title: 'x' }, ['candidates'])).toThrow(
+      'missing required keys: candidates',
+    );
+    expect(() => assertStructuredAgentOutput({ candidates: [] }, ['candidates'])).toThrow(
+      'non-empty candidates array',
+    );
+    assertStructuredAgentOutput(
+      { candidates: [{ title: 'x' }], topCandidate: { title: 'x' }, confidence: 'high' },
+      ['candidates', 'topCandidate', 'confidence'],
+    );
+  });
+
+  it('normalizeReviewVerdict maps common aliases', () => {
+    expect(normalizeReviewVerdict('promote')).toBe('promote');
+    expect(normalizeReviewVerdict('PROMOTED')).toBe('promote');
+    expect(normalizeReviewVerdict('reject')).toBe('reject');
+    expect(normalizeReviewVerdict('rejected')).toBe('reject');
+    expect(normalizeReviewVerdict('maybe')).toBeNull();
+  });
+
+  it('normalizeStructuredAgentOutput canonicalizes reviewer verdict', () => {
+    const normalized = normalizeStructuredAgentOutput(
+      { verdict: 'rejected', confidence: 'high', rationale: 'weak evidence' },
+      ['verdict', 'confidence', 'rationale'],
+    ) as Record<string, unknown>;
+    expect(normalized.verdict).toBe('reject');
+    assertStructuredAgentOutput(normalized, ['verdict', 'confidence', 'rationale']);
+  });
+
+  it('extractStructuredAgentJson strips Claude Code log prefixes', () => {
+    const payload = {
+      candidates: [{ title: 'Example candidate' }],
+      topCandidate: { title: 'Example candidate' },
+      confidence: 'medium',
+      gaps: [],
+      notes: null,
+    };
+    const stdout = `[ClaudeCode] Starting agent run...\r\n${JSON.stringify(payload)}`;
+    expect(extractStructuredAgentJson(stdout)).toEqual(payload);
+    expect(sanitizeClaudeCodeReport(stdout)).toBe(JSON.stringify(payload));
+    expect(stripAgentLogLines(stdout)).toBe(JSON.stringify(payload));
+  });
+
+  it('extractStructuredAgentJson repairs raw newlines inside JSON strings', () => {
+    const stdout =
+      '[ClaudeCode] Starting agent run...\r\n' +
+      '{"verdict":"promote","confidence":0.75,"rationale":"line one\nline two"}';
+
+    expect(extractStructuredAgentJson(stdout)).toEqual({
+      verdict: 'promote',
+      confidence: 0.75,
+      rationale: 'line one\nline two',
+    });
+    expect(sanitizeClaudeCodeReport(stdout)).toBe(
+      '{"verdict":"promote","confidence":0.75,"rationale":"line one\\nline two"}',
     );
   });
 });

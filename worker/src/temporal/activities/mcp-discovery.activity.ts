@@ -1,6 +1,13 @@
 import { startMcpDockerServer } from '../../components/core/mcp-runtime';
+import {
+  isMcpStdioHostProxyId,
+  startMcpStdioHostProxy,
+  stopMcpStdioHostProxy,
+} from '../../components/core/mcp-stdio-host-proxy';
 import { Context } from '@temporalio/activity';
 import { createExecutionContext, type LogEventInput } from '@sentris/component-sdk';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -106,8 +113,7 @@ export async function discoverMcpToolsActivity(
         throw new Error('endpoint is required for http transport');
       }
       endpoint = input.endpoint;
-      await testMcpConnection(endpoint, input.headers);
-      ctx.heartbeat('http-connected');
+      ctx.heartbeat('http-endpoint-ready');
     }
     // STDIO: spawn Docker container
     else if (input.transport === 'stdio') {
@@ -133,7 +139,7 @@ export async function discoverMcpToolsActivity(
     }
 
     // Discover tools
-    const tools = await listMcpTools(endpoint, input.headers);
+    const tools = await discoverMcpToolsFromEndpoint(endpoint, input.headers);
     ctx.heartbeat('tools-discovered');
     return { tools };
   } finally {
@@ -178,8 +184,7 @@ export async function discoverMcpGroupToolsActivity(
         if (!server.endpoint) {
           throw new Error('endpoint is required for http transport');
         }
-        await testMcpConnection(server.endpoint, server.headers);
-        const tools = await listMcpTools(server.endpoint, server.headers);
+        const tools = await discoverMcpToolsFromEndpoint(server.endpoint, server.headers);
         results.push({ name: server.name, tools });
         ctx.heartbeat(`http-discovered:${server.name}`);
       } catch (error: unknown) {
@@ -198,7 +203,7 @@ export async function discoverMcpGroupToolsActivity(
         }
         const endpoint = `${baseEndpoint}/servers/${encodeURIComponent(server.name)}/sse`;
         await waitForContainerReady(`${baseEndpoint}/health`);
-        const tools = await listMcpTools(endpoint, server.headers);
+        const tools = await discoverMcpToolsFromEndpoint(endpoint, server.headers);
         results.push({ name: server.name, tools });
         ctx.heartbeat(`stdio-discovered:${server.name}`);
       } catch (error: unknown) {
@@ -237,20 +242,13 @@ async function spawnStdioContainer(input: {
 
   const { awsEnv, volumes } = getAwsConfig();
 
-  const result = await startMcpDockerServer({
-    image: input.image || 'zebbern/mcp-stdio-proxy:latest',
-    command: [],
-    env: {
-      MCP_COMMAND: input.command,
-      MCP_ARGS: JSON.stringify(input.args),
-      // Override baked-in named-servers.json to force single-server mode
-      MCP_NAMED_SERVERS: '{}',
-      ...awsEnv,
-    },
-    volumes: volumes.length > 0 ? volumes : undefined,
-    port: 0, // Auto-assign
-    autoRemove: true,
-    params: {},
+  void input.image;
+  void volumes;
+
+  const result = await startMcpStdioHostProxy({
+    command: input.command,
+    args: input.args,
+    env: awsEnv,
     context,
   });
 
@@ -348,77 +346,40 @@ function getAwsConfig(): {
   return { awsEnv, volumes };
 }
 
-/**
- * Test MCP connection (initialize)
- */
-async function testMcpConnection(
-  endpoint: string,
-  headers?: Record<string, string>,
-): Promise<void> {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-      ...(headers || {}),
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'sentris-flow', version: '1.0.0' },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`MCP initialize failed: ${response.status}`);
-  }
-
-  const data = (await response.json()) as { error?: { message: string } };
-  if (data.error) {
-    throw new Error(`MCP error: ${data.error.message}`);
-  }
-}
-
-/**
- * List tools via MCP protocol
- */
-async function listMcpTools(
+async function discoverMcpToolsFromEndpoint(
   endpoint: string,
   headers?: Record<string, string>,
 ): Promise<McpTool[]> {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json, text/event-stream',
-      ...(headers || {}),
-    },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'tools/list',
-      params: {},
-    }),
-  });
+  let client: Client | null = null;
 
-  if (!response.ok) {
-    throw new Error(`MCP tools/list failed: ${response.status}`);
+  try {
+    const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
+      requestInit: {
+        headers: {
+          Accept: 'application/json, text/event-stream',
+          ...(headers || {}),
+        },
+      },
+    });
+
+    client = new Client(
+      { name: 'sentris-worker-mcp-discovery', version: '1.0.0' },
+      { capabilities: {} },
+    );
+
+    await client.connect(transport);
+    const result = await client.listTools();
+
+    return (result.tools ?? []).map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
+    }));
+  } finally {
+    if (client) {
+      await client.close().catch(() => {});
+    }
   }
-
-  const data = (await response.json()) as {
-    error?: { message: string };
-    result?: { tools?: McpTool[] };
-  };
-  if (data.error) {
-    throw new Error(`MCP error: ${data.error.message}`);
-  }
-
-  return data.result?.tools || [];
 }
 
 /**
@@ -470,6 +431,10 @@ async function waitForContainerReady(endpoint: string): Promise<void> {
  */
 async function cleanupContainer(containerId: string | undefined): Promise<void> {
   if (!containerId) {
+    return;
+  }
+  if (isMcpStdioHostProxyId(containerId)) {
+    await stopMcpStdioHostProxy(containerId);
     return;
   }
   // Validate container ID to prevent command injection

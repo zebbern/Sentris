@@ -37,9 +37,13 @@ export const CreateAgentSkillSchema = z
     tags: z.array(z.string().min(1).max(64)).max(20).optional(),
     enabled: z.boolean().optional(),
   })
-  .refine((value) => Boolean(value.content?.trim()) || Boolean(value.files && Object.keys(value.files).length > 0), {
-    message: 'Either content or files must be provided',
-  });
+  .refine(
+    (value) =>
+      Boolean(value.content?.trim()) || Boolean(value.files && Object.keys(value.files).length > 0),
+    {
+      message: 'Either content or files must be provided',
+    },
+  );
 
 export class CreateAgentSkillDto extends createZodDto(CreateAgentSkillSchema) {}
 
@@ -99,7 +103,9 @@ export const ImportDiscoveredAgentSkillsSchema = z.object({
   overwrite: z.boolean().optional(),
 });
 
-export class ImportDiscoveredAgentSkillsDto extends createZodDto(ImportDiscoveredAgentSkillsSchema) {}
+export class ImportDiscoveredAgentSkillsDto extends createZodDto(
+  ImportDiscoveredAgentSkillsSchema,
+) {}
 
 export const ImportAgentSkillsResultSchema = z.object({
   imported: z.array(AgentSkillResponseSchema),

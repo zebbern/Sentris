@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import {
   componentRegistry,
   ComponentRetryPolicy,
@@ -10,6 +11,9 @@ import {
   port,
   param,
   ServiceError,
+  ContainerError,
+  stripAnsiCodes,
+  coerceBooleanFromText,
   coerceJsonFromText,
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
@@ -18,6 +22,7 @@ import { getGatewaySessionToken } from './utils';
 import {
   assertSkillsResolved,
   buildAgentPrompt,
+  normalizeStructuredAgentOutput,
   buildClaudeMcpConfig,
   buildClaudeRunCommand,
   buildClaudeSettings,
@@ -30,7 +35,11 @@ import {
   type ClaudeAuthModel,
   mapAutoApprove,
   materializeSkillsToVolume,
+  extractStructuredAgentJson,
+  assertStructuredAgentOutput,
+  sanitizeClaudeCodeReport,
 } from './agent-runner-utils';
+import { AgentStreamRecorder } from './agent-stream-recorder';
 
 const AGENT_PLUGIN_OPTIONS = [
   { label: 'Oh My ClaudeCode', value: 'oh-my-claudecode' },
@@ -74,6 +83,12 @@ const inputSchema = inputs({
     allowAny: true,
     reason: 'Tool-mode port acts as a graph anchor; payloads are not consumed directly.',
     connectionType: { kind: 'contract', name: 'mcp.tool' },
+  }),
+  trigger: port(z.unknown().optional().describe('Optional no-op gate input.'), {
+    label: 'Trigger',
+    description: 'Optional graph gate input; payloads are accepted but not consumed directly.',
+    allowAny: true,
+    reason: 'Trigger gates route execution without adding investigation context.',
   }),
   supplementaryInputA: port(
     z.string().optional().describe('Optional supplementary text written to supplementary-a.txt.'),
@@ -136,6 +151,26 @@ const parameterSchema = parameters({
       description: 'Enable pre-installed Claude Code plugins (when available in the image).',
     },
   ),
+  structuredOutput: param(
+    coerceBooleanFromText()
+      .default(false)
+      .describe('Fail the node when stdout is not parseable JSON.'),
+    {
+      label: 'Structured Output',
+      editor: 'boolean',
+      description:
+        'When enabled, the agent must return parseable JSON or the run fails immediately.',
+    },
+  ),
+  requiredOutputKeys: param(
+    z.array(z.string().min(1)).default([]).describe('Required top-level keys in JSON output.'),
+    {
+      label: 'Required Output Keys',
+      editor: 'json',
+      description:
+        'When structured output is enabled, fail if any listed keys are missing or invalid (e.g. candidates must be a non-empty array).',
+    },
+  ),
 });
 
 const outputSchema = outputs({
@@ -147,12 +182,18 @@ const outputSchema = outputs({
     label: 'Raw Output',
     description: 'Full stdout/stderr logs from the agent execution.',
   }),
+  agentRunId: port(z.string(), {
+    label: 'Agent Run ID',
+    description: 'Unique identifier for replaying this Claude Code session in the Agent tab.',
+  }),
 });
 
 const CLAUDE_CODE_TIMEOUT_SECONDS = Number.parseInt(
-  process.env.CLAUDE_CODE_TIMEOUT_SECONDS ?? '1800',
+  process.env.CLAUDE_CODE_TIMEOUT_SECONDS ?? '7200',
   10,
 );
+const AGENT_TRACE_TEXT_CHUNK_SIZE = 16_000;
+const CLAUDE_FAILURE_TAIL_LENGTH = 2_000;
 
 function toClaudeAuthModel(model: unknown): ClaudeAuthModel | undefined {
   if (!isRecord(model) || model.provider !== 'anthropic') {
@@ -172,6 +213,27 @@ function getClaudeEffort(model: unknown): string | undefined {
   }
 
   return typeof model.effort === 'string' && model.effort.length > 0 ? model.effort : undefined;
+}
+
+function summarizeClaudeFailureOutput(output: unknown): string {
+  if (typeof output !== 'string') {
+    return '';
+  }
+
+  const cleaned = stripAnsiCodes(output)
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n');
+
+  if (!cleaned) {
+    return '';
+  }
+
+  return cleaned.length > CLAUDE_FAILURE_TAIL_LENGTH
+    ? cleaned.slice(-CLAUDE_FAILURE_TAIL_LENGTH)
+    : cleaned;
 }
 
 const definition = defineComponent({
@@ -211,10 +273,20 @@ const definition = defineComponent({
   },
   async execute({ inputs, params }, context) {
     const { task, context: taskContext, model, supplementaryInputA, supplementaryInputB } = inputs;
-    const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins } = params;
+    const {
+      systemPrompt,
+      providerConfig,
+      autoApprove,
+      skillIds,
+      enablePlugins,
+      structuredOutput,
+      requiredOutputKeys,
+    } = params;
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
     const orgId = organizationId ?? context.organizationId ?? null;
+    const agentRunId = `${context.runId}:${context.componentRef}:${randomUUID()}`;
+    const agentStream = new AgentStreamRecorder(context, agentRunId);
 
     let gatewayToken = '';
     const connectedToolIds = connectedToolNodeIds ?? [];
@@ -256,6 +328,7 @@ const definition = defineComponent({
       systemPrompt,
       taskContext,
       supplementaryFiles: Object.keys(supplementaryFiles),
+      structuredOutput: structuredOutput ?? false,
     });
 
     const tenantId = context.organizationId ?? 'default-tenant';
@@ -266,7 +339,7 @@ const definition = defineComponent({
         '#!/bin/sh',
         'set -e',
         'cd /workspace',
-        'echo "[ClaudeCode] Starting agent run..."',
+        'echo "[ClaudeCode] Starting agent run..." >&2',
         buildClaudeRunCommand({
           skipPermissions: claudeSkipPermissions,
           enablePlugins: enablePlugins ?? [],
@@ -297,14 +370,35 @@ const definition = defineComponent({
       context.emitProgress({
         message: 'Running Claude Code agent...',
         level: 'info',
+        data: {
+          agentRunId,
+          agentStatus: 'running',
+        },
       });
+      agentStream.emitMessageStart();
 
       const runnerResult = await runComponentWithRunner(
         runnerConfig,
         async (raw) => raw,
         {},
         context,
-      );
+      ).catch((error: unknown) => {
+        if (error instanceof ContainerError) {
+          const terminalOutput = summarizeClaudeFailureOutput(error.details?.stdout);
+          const message = terminalOutput
+            ? `Claude Code container failed: ${terminalOutput}`
+            : error.message;
+          throw new ServiceError(message, {
+            cause: error,
+            details: {
+              ...(error.details ?? {}),
+              tool: 'claude-code',
+              terminalOutput,
+            },
+          });
+        }
+        throw error;
+      });
 
       let stdout = '';
       let stderr = '';
@@ -318,7 +412,7 @@ const definition = defineComponent({
         exitCode = typeof runnerResult.exitCode === 'number' ? runnerResult.exitCode : 0;
       }
 
-      const rawOutput = `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`;
+      const rawOutput = stderr ? `STDERR:\n${stderr.slice(0, 32_768)}` : '';
 
       if (exitCode !== 0) {
         const authHint = formatClaudeAuthErrorHint(stderr, claudeAuthModel);
@@ -330,9 +424,54 @@ const definition = defineComponent({
         });
       }
 
+      let structured = extractStructuredAgentJson(stdout);
+      if (structuredOutput && structured === null) {
+        throw new ServiceError('Claude Code did not return parseable JSON', {
+          details: {
+            tool: 'claude-code',
+            stdoutPreview: stdout.slice(0, 4000),
+          },
+        });
+      }
+
+      if (structuredOutput && structured !== null && requiredOutputKeys.length > 0) {
+        structured = normalizeStructuredAgentOutput(structured, requiredOutputKeys);
+        try {
+          assertStructuredAgentOutput(structured, requiredOutputKeys);
+        } catch (error) {
+          throw new ServiceError(
+            error instanceof Error ? error.message : 'Structured agent output validation failed',
+            {
+              details: {
+                tool: 'claude-code',
+                requiredOutputKeys,
+                stdoutPreview: stdout.slice(0, 4000),
+              },
+            },
+          );
+        }
+      }
+
+      const report =
+        structuredOutput && structured !== null
+          ? JSON.stringify(structured)
+          : sanitizeClaudeCodeReport(stdout);
+
+      emitAgentText(agentStream, report);
+      agentStream.emitFinish('stop', report);
+      context.emitProgress({
+        message: 'Claude Code agent completed.',
+        level: 'info',
+        data: {
+          agentRunId,
+          agentStatus: 'completed',
+        },
+      });
+
       return outputSchema.parse({
-        report: stdout,
+        report,
         rawOutput,
+        agentRunId,
       });
     } finally {
       await volume.cleanup();
@@ -342,6 +481,15 @@ const definition = defineComponent({
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function emitAgentText(agentStream: AgentStreamRecorder, text: string): void {
+  if (!text.trim()) {
+    return;
+  }
+  for (let offset = 0; offset < text.length; offset += AGENT_TRACE_TEXT_CHUNK_SIZE) {
+    agentStream.emitTextDelta(text.slice(offset, offset + AGENT_TRACE_TEXT_CHUNK_SIZE));
+  }
 }
 
 componentRegistry.register(definition);

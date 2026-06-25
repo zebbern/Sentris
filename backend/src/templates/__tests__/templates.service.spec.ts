@@ -710,5 +710,69 @@ describe('TemplateService', () => {
       expect(workflowsService.create).toHaveBeenCalled();
       expect(result.workflow.id).toBe('wf-2');
     });
+
+    it('applies named secret placeholders independently for multi-secret templates', async () => {
+      const tpl = makeTemplate({
+        graph: makeValidGraph({
+          nodes: [
+            {
+              id: 'extract',
+              type: 'sentris.repository.files.extract',
+              position: { x: 0, y: 0 },
+              data: {
+                label: 'Extract',
+                config: {
+                  params: {},
+                  inputOverrides: {
+                    githubToken: '{{SECRET:GITHUB_TOKEN}}',
+                  },
+                },
+              },
+            },
+            {
+              id: 'claude',
+              type: 'core.ai.claude-code',
+              position: { x: 0, y: 150 },
+              data: {
+                label: 'Claude',
+                config: {
+                  params: {},
+                  inputOverrides: {
+                    model: {
+                      oauthTokenSecretId: '{{SECRET:CLAUDE_CODE_OAUTH_TOKEN}}',
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        }),
+        requiredSecrets: [{ name: 'CLAUDE_CODE_OAUTH_TOKEN', type: 'string' }],
+      });
+      templatesRepository.findById.mockResolvedValue(tpl);
+      workflowsService.create.mockResolvedValue({
+        id: 'wf-3',
+      } as unknown as ServiceWorkflowResponse);
+      templatesRepository.incrementPopularity.mockResolvedValue(undefined);
+
+      await service.useTemplate('tpl-1', {
+        workflowName: 'Multi Secret Workflow',
+        secretMappings: {
+          CLAUDE_CODE_OAUTH_TOKEN: 'claude-secret-id',
+          GITHUB_TOKEN: 'github-secret-id',
+        },
+      });
+
+      const createArg = workflowsService.create.mock.calls[0]?.[0] as {
+        nodes: { id: string; data: { config: { inputOverrides: Record<string, unknown> } } }[];
+      };
+      const extractNode = createArg.nodes.find((node) => node.id === 'extract');
+      const claudeNode = createArg.nodes.find((node) => node.id === 'claude');
+      expect(extractNode?.data.config.inputOverrides.githubToken).toBe('github-secret-id');
+      expect(
+        (claudeNode?.data.config.inputOverrides.model as { oauthTokenSecretId: string })
+          .oauthTokenSecretId,
+      ).toBe('claude-secret-id');
+    });
   });
 });

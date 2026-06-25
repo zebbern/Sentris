@@ -544,7 +544,7 @@ function parseHttpxOutput(raw: string): Finding[] {
   return findings;
 }
 
-function preferHttpsFindings(findings: Finding[]): Finding[] {
+export function preferHttpsFindings(findings: Finding[]): Finding[] {
   const byEndpoint = new Map<string, Finding>();
   const order: string[] = [];
 

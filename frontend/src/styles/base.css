@@ -10,6 +10,14 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  .bg-app-chrome {
+    background-color: hsl(var(--background));
+  }
+
+  .dark .bg-app-chrome {
+    background-color: rgb(25 26 31 / 0.94);
+  }
 }
 
 /* Dark mode scrollbar */
@@ -71,8 +79,8 @@
   }
 
   .dark {
-    /* BG: #1C1C1C */
-    --background: 0 0% 11%;
+    /* BG: #151618 */
+    --background: 220 7% 9%;
     /* Text Primary: #FFFFFF */
     --foreground: 0 0% 100%;
     /* Card: #232427 */

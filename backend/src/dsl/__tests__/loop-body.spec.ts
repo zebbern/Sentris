@@ -45,7 +45,7 @@ describe('extractLoopBodies', () => {
                   { name: 'value', type: 'string' },
                 ],
                 returns: [{ name: 'result', type: 'json' }],
-                code: "export function script(input) { return { result: { item: input.currentItem, value: input.value } }; }",
+                code: 'export function script(input) { return { result: { item: input.currentItem, value: input.value } }; }',
               },
               inputOverrides: { value: 'seed' },
             },
@@ -61,7 +61,7 @@ describe('extractLoopBodies', () => {
               params: {
                 variables: [{ name: 'results', type: 'list-json' }],
                 returns: [{ name: 'report', type: 'json' }],
-                code: "export function script(input) { return { report: { count: Array.isArray(input.results) ? input.results.length : 0 } }; }",
+                code: 'export function script(input) { return { report: { count: Array.isArray(input.results) ? input.results.length : 0 } }; }',
               },
               inputOverrides: {},
             },
@@ -150,7 +150,7 @@ describe('compileWorkflowGraph for-each', () => {
               params: {
                 variables: [{ name: 'currentItem', type: 'string' }],
                 returns: [{ name: 'result', type: 'json' }],
-                code: "export function script(input) { return { result: { item: input.currentItem } }; }",
+                code: 'export function script(input) { return { result: { item: input.currentItem } }; }',
               },
               inputOverrides: {},
             },
@@ -166,7 +166,7 @@ describe('compileWorkflowGraph for-each', () => {
               params: {
                 variables: [{ name: 'results', type: 'list-json' }],
                 returns: [{ name: 'report', type: 'json' }],
-                code: "export function script(input) { return { report: { items: input.results || [] } }; }",
+                code: 'export function script(input) { return { report: { items: input.results || [] } }; }',
               },
               inputOverrides: {},
             },

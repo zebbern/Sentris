@@ -1,19 +1,19 @@
 import { ConfigurationError } from '@sentris/component-sdk';
 import { DEFAULT_API_BASE_URL, DEFAULT_GATEWAY_URL } from './utils';
 
-export type AgentSkillRecord = {
+export interface AgentSkillRecord {
   id: string;
   slug: string;
   content: string;
   files?: Record<string, string>;
-};
+}
 
 export type AgentSkillLayout = 'opencode' | 'claude';
 
-export type SupplementaryInputs = {
+export interface SupplementaryInputs {
   supplementaryInputA?: string;
   supplementaryInputB?: string;
-};
+}
 
 const AGENT_PLUGIN_DIRS: Record<string, string> = {
   'oh-my-claudecode': '/opt/plugins/oh-my-claudecode',
@@ -179,7 +179,10 @@ export function buildClaudeSettings(autoApprove: boolean): Record<string, unknow
   };
 }
 
-export function buildProviderEnv(model?: { provider: string; apiKey?: string }): Record<string, string> {
+export function buildProviderEnv(model?: {
+  provider: string;
+  apiKey?: string;
+}): Record<string, string> {
   if (!model?.apiKey) {
     return {};
   }
@@ -204,11 +207,11 @@ export function buildProviderEnv(model?: { provider: string; apiKey?: string }):
   }
 }
 
-export type ClaudeAuthModel = {
+export interface ClaudeAuthModel {
   authMode?: 'api_key' | 'subscription_oauth';
   apiKey?: string;
   oauthToken?: string;
-};
+}
 
 export function buildClaudeAuthEnv(model?: ClaudeAuthModel): Record<string, string> {
   if (!model) {
@@ -290,13 +293,58 @@ export function getOpenCodeModelString(
   return `${model.provider}/${model.modelId}`;
 }
 
+const STRUCTURED_OUTPUT_PROMPT_FOOTER =
+  '\n\n# Output Format\n' +
+  'Your stdout must contain exactly one valid RFC 8259 JSON object and nothing else.\n' +
+  'Do not write prose, status updates, MCP tool listings, markdown fences, or explanations before or after the JSON.\n' +
+  'Use /workspace/context.json and any supplementary files for investigation; do not narrate tool discovery in stdout.';
+
+const MCP_TOOLS_PROMPT_FOOTER =
+  '\n\n# MCP Tools\n' +
+  'Before you start, list the MCP tools you can see. If none are available, say so explicitly.';
+
+export function normalizeReviewVerdict(value: unknown): 'promote' | 'reject' | null {
+  const text = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (['promote', 'promoted', 'accept', 'accepted', 'yes'].includes(text)) {
+    return 'promote';
+  }
+  if (['reject', 'rejected', 'deny', 'denied', 'no'].includes(text)) {
+    return 'reject';
+  }
+  return null;
+}
+
+export function normalizeStructuredAgentOutput(value: unknown, requiredKeys: string[]): unknown {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  if (requiredKeys.includes('verdict')) {
+    const normalized = normalizeReviewVerdict(value.verdict);
+    if (normalized) {
+      value.verdict = normalized;
+    }
+  }
+
+  return value;
+}
+
 export function buildAgentPrompt(options: {
   task: string;
   systemPrompt?: string;
   taskContext?: unknown;
   supplementaryFiles?: string[];
+  structuredOutput?: boolean;
 }): string {
-  const { task, systemPrompt, taskContext, supplementaryFiles = [] } = options;
+  const {
+    task,
+    systemPrompt,
+    taskContext,
+    supplementaryFiles = [],
+    structuredOutput = false,
+  } = options;
 
   const defaultPrompt = `
 # Investigation Task
@@ -325,9 +373,7 @@ Please investigate the issue and generate a detailed report.
     }
   }
 
-  finalPrompt =
-    `${finalPrompt}\n\n# MCP Tools\n` +
-    `Before you start, list the MCP tools you can see. If none are available, say so explicitly.`;
+  finalPrompt += structuredOutput ? STRUCTURED_OUTPUT_PROMPT_FOOTER : MCP_TOOLS_PROMPT_FOOTER;
 
   return finalPrompt;
 }
@@ -364,6 +410,177 @@ export function buildClaudeRunCommand(options: {
     }
   }
   return parts.join(' \\\n  ');
+}
+
+/** Remove Claude Code container log lines that prefix structured JSON output. */
+export function stripAgentLogLines(text: string): string {
+  return stripAnsiSequences(String(text ?? ''))
+    .split(/\r?\n/)
+    .filter((line) => !/^\[ClaudeCode\]/i.test(line.trim()))
+    .join('\n')
+    .trim();
+}
+
+/** Extract the last complete top-level JSON object from agent stdout. */
+export function extractStructuredAgentJson(text: string): unknown | null {
+  const normalized = stripAgentLogLines(text);
+  if (!normalized) {
+    return null;
+  }
+
+  const sources: string[] = [];
+  const fenced = normalized.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    sources.push(fenced[1].trim());
+  }
+  sources.push(normalized);
+
+  let best: { value: unknown; length: number } | null = null;
+  for (const source of sources) {
+    for (let start = source.indexOf('{'); start !== -1; start = source.indexOf('{', start + 1)) {
+      const slice = sliceBalancedJsonObject(source, start);
+      if (!slice) {
+        continue;
+      }
+      const value = parseJsonObjectCandidate(slice);
+      if (value !== null) {
+        if (!best || slice.length > best.length) {
+          best = { value, length: slice.length };
+        }
+      }
+    }
+  }
+
+  return best?.value ?? null;
+}
+
+function stripAnsiSequences(text: string): string {
+  const escape = String.fromCharCode(27);
+  return text.replace(new RegExp(`${escape}\\[[0-?]*[ -/]*[@-~]`, 'g'), '');
+}
+
+function parseJsonObjectCandidate(candidate: string): unknown | null {
+  const attempts = [candidate, escapeRawJsonStringControls(candidate)];
+  for (const attempt of attempts) {
+    try {
+      return JSON.parse(attempt);
+    } catch {
+      // Try the next repair attempt.
+    }
+  }
+  return null;
+}
+
+function escapeRawJsonStringControls(text: string): string {
+  let output = '';
+  let inString = false;
+  let escaped = false;
+
+  for (const char of text) {
+    if (inString) {
+      if (escaped) {
+        output += char;
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        output += char;
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        output += char;
+        inString = false;
+        continue;
+      }
+      if (char === '\n') {
+        output += '\\n';
+        continue;
+      }
+      if (char === '\r') {
+        output += '\\r';
+        continue;
+      }
+      if (char === '\t') {
+        output += '\\t';
+        continue;
+      }
+      output += char;
+      continue;
+    }
+
+    output += char;
+    if (char === '"') {
+      inString = true;
+    }
+  }
+
+  return output;
+}
+
+export function assertStructuredAgentOutput(value: unknown, requiredKeys: string[]): void {
+  if (!isRecord(value)) {
+    throw new Error('Structured agent output must be a JSON object');
+  }
+
+  const missing = requiredKeys.filter((key) => !(key in value));
+  if (missing.length > 0) {
+    throw new Error(`Structured agent output missing required keys: ${missing.join(', ')}`);
+  }
+
+  if (requiredKeys.includes('candidates')) {
+    if (!Array.isArray(value.candidates) || value.candidates.length === 0) {
+      throw new Error('Structured agent output requires a non-empty candidates array');
+    }
+  }
+
+  if (requiredKeys.includes('verdict')) {
+    if (typeof value.verdict !== 'string' || value.verdict.trim().length === 0) {
+      throw new Error('Structured agent output requires a non-empty verdict string');
+    }
+  }
+}
+
+function sliceBalancedJsonObject(text: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    } else if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Normalize Claude Code stdout to strict JSON text for downstream merge nodes. */
+export function sanitizeClaudeCodeReport(stdout: string): string {
+  const parsed = extractStructuredAgentJson(stdout);
+  if (parsed !== null) {
+    return JSON.stringify(parsed);
+  }
+  return stripAgentLogLines(stdout);
 }
 
 export function assertSkillsResolved(requestedIds: string[], resolved: AgentSkillRecord[]): void {

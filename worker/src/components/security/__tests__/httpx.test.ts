@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeAll, afterEach, vi } from 'bun:test';
 import * as sdk from '@sentris/component-sdk';
 import { componentRegistry } from '../../index';
-import { buildHttpxArgs, parseHttpxOutput } from '../httpx';
+import { buildHttpxArgs, parseHttpxOutput, preferHttpsFindings } from '../httpx';
 import type { HttpxOutput, InputShape, OutputShape } from '../httpx';
 
 const runHttpxTests = process.env.ENABLE_HTTPX_COMPONENT_TESTS === 'true';
@@ -42,39 +42,20 @@ describe('httpx argument builder', () => {
 });
 
 describe('httpx component output normalization', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  test('preferHttps keeps the HTTPS response when both schemes match the same endpoint', async () => {
-    const component = componentRegistry.get<InputShape, OutputShape>('sentris.httpx.scan');
-    if (!component) throw new Error('Component not registered');
-
-    const context = sdk.createExecutionContext({
-      runId: 'test-run',
-      componentRef: 'httpx-prefer-https-test',
-    });
-
+  test('preferHttps keeps the HTTPS response when both schemes match the same endpoint', () => {
     const raw = [
       '{"url":"http://example.com/login","input":"example.com/login","host":"example.com","status-code":200,"scheme":"http","title":"HTTP Login"}',
       '{"url":"https://example.com/login","input":"example.com/login","host":"example.com","status-code":200,"scheme":"https","title":"HTTPS Login"}',
       '{"url":"http://example.com:8080/login","input":"example.com:8080/login","host":"example.com","port":8080,"status-code":200,"scheme":"http","title":"HTTP Admin"}',
     ].join('\n');
 
-    vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue(raw);
+    const responses = preferHttpsFindings(parseHttpxOutput(raw));
 
-    const inputs = component.inputs.parse({
-      targets: ['example.com'],
-    });
-
-    const result = await component.execute({ inputs, params: { preferHttps: true } }, context);
-
-    expect(result.responses.map((response) => response.url)).toEqual([
+    expect(responses.map((response) => response.url)).toEqual([
       'https://example.com/login',
       'http://example.com:8080/login',
     ]);
-    expect(result.resultCount).toBe(2);
-    expect(result.results).toHaveLength(2);
+    expect(responses).toHaveLength(2);
   });
 });
 

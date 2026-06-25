@@ -65,6 +65,14 @@ export interface ToolCounts {
   total: number;
 }
 
+export type AgentReadinessStatus = 'ready' | 'needs-test' | 'no-tools' | 'unhealthy' | 'disabled';
+
+export interface AgentReadiness {
+  status: AgentReadinessStatus;
+  label: string;
+  tone: 'success' | 'warning' | 'destructive' | 'muted';
+}
+
 export interface ConnectionInfo {
   endpoint?: string | null;
   command?: string | null;

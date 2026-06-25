@@ -25,7 +25,7 @@ export const MCP_SERVER_COMPONENTS: Record<
   },
 };
 
-export const MCP_GROUP_COMPONENTS = ['mcp.group.aws'];
+export const MCP_GROUP_COMPONENTS = ['mcp.group.aws', 'mcp.custom'];
 
 // ---------------------------------------------------------------------------
 // Type guards & predicates

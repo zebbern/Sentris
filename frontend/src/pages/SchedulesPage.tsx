@@ -29,11 +29,7 @@ import { useSortableList } from '@/hooks/useSortableList';
 import { useAuthStore } from '@/store/authStore';
 import { getWorkflowName, getStatusBadgeProps } from '@/utils/tableHelpers';
 import type { WorkflowOption, BadgeVariant } from '@/utils/tableHelpers';
-import {
-  SchedulesTable,
-  useScheduleActions,
-  useScheduleEditorDrawer,
-} from './schedules';
+import { SchedulesTable, useScheduleActions, useScheduleEditorDrawer } from './schedules';
 
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   active: 'default',
@@ -270,9 +266,7 @@ export function SchedulesPage() {
                   type="search"
                   placeholder="Filter by schedule or workflow"
                   value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
+                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
                   aria-label="Filter by schedule or workflow"
                 />
               </div>

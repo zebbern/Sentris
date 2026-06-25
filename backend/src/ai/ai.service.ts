@@ -96,9 +96,10 @@ export class AiService {
     if (!id) {
       return null;
     }
-    const label = typeof record.display_name === 'string' && record.display_name.trim().length > 0
-      ? record.display_name.trim()
-      : id;
+    const label =
+      typeof record.display_name === 'string' && record.display_name.trim().length > 0
+        ? record.display_name.trim()
+        : id;
     return { id, label };
   }
 }

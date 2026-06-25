@@ -2,7 +2,7 @@
  * Temporal workflow handler for core.workflow.for-each nodes.
  */
 import { ApplicationFailure } from '@temporalio/workflow';
-import { buildActionPayload } from '../input-resolver.js';
+import { buildActionPayload, filterInactiveJoinWarnings } from '../input-resolver.js';
 import { getForEachLoopBody, runForEachLoop } from './for-each-handler.js';
 import type {
   RunComponentActivityInput,
@@ -13,7 +13,10 @@ import type {
 } from '../types';
 
 export interface ForEachWorkflowActivities {
-  runComponentActivity(input: RunComponentActivityInput): Promise<RunComponentActivityOutput>;
+  runComponentActivityForAction(
+    action: WorkflowAction,
+    input: RunComponentActivityInput,
+  ): Promise<RunComponentActivityOutput>;
   recordTraceEventActivity(event: Record<string, unknown>): Promise<void>;
 }
 
@@ -22,7 +25,7 @@ export interface ForEachWorkflowHandlerParams {
   action: WorkflowAction;
   mergedInputs: Record<string, unknown>;
   mergedParams: Record<string, unknown>;
-  warnings: Array<{ target: string; sourceRef: string; sourceHandle: string }>;
+  warnings: { target: string; sourceRef: string; sourceHandle: string }[];
   results: Map<string, unknown>;
   activities: ForEachWorkflowActivities;
 }
@@ -108,21 +111,17 @@ export async function handleForEachLoopInWorkflow(
       const nodeMetadata = bodyDefinition.nodes?.[bodyAction.ref];
       const streamId = nodeMetadata?.streamId ?? nodeMetadata?.groupId ?? bodyAction.ref;
       const joinStrategy = nodeMetadata?.joinStrategy ?? schedulerContext.joinStrategy;
-      const { inputs, params: bodyParams, warnings: bodyWarnings } = buildActionPayload(
-        bodyAction,
-        iterationResults,
-      );
+      const {
+        inputs,
+        params: bodyParams,
+        warnings: bodyWarnings,
+      } = buildActionPayload(bodyAction, iterationResults);
+      const bodyWarningsToReport = filterInactiveJoinWarnings(bodyWarnings, {
+        joinStrategy,
+        triggeredBy: schedulerContext.triggeredBy,
+      });
 
-      if (bodyWarnings.length > 0) {
-        const missing = bodyWarnings.map((warning) => `'${warning.target}'`).join(', ');
-        throw ApplicationFailure.nonRetryable(
-          `Missing required inputs for loop body node ${bodyAction.ref}: ${missing}`,
-          'ValidationError',
-          [{ nodeRef: bodyAction.ref, missing }],
-        );
-      }
-
-      const output = await activities.runComponentActivity({
+      const output = await activities.runComponentActivityForAction(bodyAction, {
         runId: input.runId,
         workflowId: input.workflowId,
         workflowName: bodyDefinition.title,
@@ -136,12 +135,13 @@ export async function handleForEachLoopInWorkflow(
         params: bodyParams,
         inputOverrides: bodyAction.inputOverrides,
         rawParams: bodyAction.params,
-        warnings: bodyWarnings,
+        warnings: bodyWarningsToReport,
         metadata: {
           streamId,
           joinStrategy,
           groupId: nodeMetadata?.groupId,
           triggeredBy: schedulerContext.triggeredBy,
+          failure: schedulerContext.failure,
           connectedToolNodeIds: nodeMetadata?.connectedToolNodeIds,
         },
       });

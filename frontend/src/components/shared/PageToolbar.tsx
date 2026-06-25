@@ -15,7 +15,7 @@ interface PageToolbarProps {
   onSearchChange?: (value: string) => void;
   /** Placeholder text for the search input. */
   searchPlaceholder?: string;
-  /** Label shown above the search input with a Search icon. Omit for an inline-icon style. */
+  /** Label for the search input. Shown above the field when a title is present; otherwise used as aria-label only. */
   searchLabel?: string;
   /** Right-aligned action buttons (e.g. "New Item", "Refresh"). */
   actions?: ReactNode;
@@ -41,14 +41,18 @@ export function PageToolbar({
 }: PageToolbarProps) {
   const hasSearch = searchValue !== undefined && onSearchChange !== undefined;
   const hasTitle = Boolean(title);
+  const useStackedSearchLabel = Boolean(searchLabel && hasTitle);
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     onSearchChange?.(e.target.value);
   };
 
   const searchControl = (className: string) => (
-    <div data-testid="page-toolbar-search" className={cn(className, searchLabel && 'space-y-2')}>
-      {searchLabel ? (
+    <div
+      data-testid="page-toolbar-search"
+      className={cn(className, useStackedSearchLabel && 'space-y-2')}
+    >
+      {useStackedSearchLabel ? (
         <>
           <label className="text-xs uppercase text-muted-foreground flex items-center gap-2">
             <Search className="h-3.5 w-3.5" />
@@ -59,7 +63,7 @@ export function PageToolbar({
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={handleSearchChange}
-            aria-label={searchPlaceholder || 'Search'}
+            aria-label={searchLabel || searchPlaceholder || 'Search'}
           />
         </>
       ) : (
@@ -72,12 +76,31 @@ export function PageToolbar({
             onChange={handleSearchChange}
             className="pl-8"
             autoComplete="off"
-            aria-label={searchPlaceholder || 'Search'}
+            aria-label={searchLabel || searchPlaceholder || 'Search'}
           />
         </div>
       )}
     </div>
   );
+
+  const helpLink = helpUrl ? (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <a
+            href={helpUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="View documentation"
+          >
+            <CircleHelp className="h-4 w-4" />
+          </a>
+        </TooltipTrigger>
+        <TooltipContent>View documentation</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  ) : null;
 
   return (
     <div className={cn('flex flex-col', className)}>
@@ -86,24 +109,7 @@ export function PageToolbar({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-            {helpUrl && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <a
-                      href={helpUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      aria-label="View documentation"
-                    >
-                      <CircleHelp className="h-4 w-4" />
-                    </a>
-                  </TooltipTrigger>
-                  <TooltipContent>View documentation</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            {helpLink}
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
@@ -141,6 +147,11 @@ export function PageToolbar({
               {filters}
             </div>
           )}
+          {helpLink && (
+            <div data-testid="page-toolbar-help" className="flex items-center">
+              {helpLink}
+            </div>
+          )}
         </div>
       )}
 
@@ -149,10 +160,10 @@ export function PageToolbar({
 
       {/* Actions/filters-only fallback — no title, no search */}
       {!hasTitle && !hasSearch && (actions || filters) && (
-        <>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {filters}
           {actions}
-        </>
+        </div>
       )}
 
       {bulkBar}

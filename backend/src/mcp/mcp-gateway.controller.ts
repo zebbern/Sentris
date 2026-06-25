@@ -7,7 +7,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 import { Public } from '../auth/public.decorator';
 import { McpAuthGuard, type McpGatewayRequest } from './mcp-auth.guard';
-import { McpGatewayService } from './mcp-gateway.service';
+import { buildMcpGatewayCacheKey, McpGatewayService } from './mcp-gateway.service';
 import { SessionRegistryService } from './session-registry.service';
 import { setAffinityCookie } from './set-affinity-cookie';
 
@@ -50,10 +50,7 @@ export class McpGatewayController {
     }
 
     // Cache key includes allowedNodeIds to support multiple agents with different tool scopes
-    const cacheKey =
-      allowedNodeIds && allowedNodeIds.length > 0
-        ? `${runId}:${allowedNodeIds.sort().join(',')}`
-        : runId;
+    const cacheKey = buildMcpGatewayCacheKey(runId, allowedNodeIds);
 
     let transport = this.transports.get(cacheKey);
     const isExistingTransport = !!transport;
@@ -165,7 +162,7 @@ export class McpGatewayController {
         // We don't necessarily want to delete the transport here if POSTs are still allowed,
         // but for Sentris run-bounded sessions, closing SSE usually means the agent is done.
         this.transports.delete(cacheKey);
-        await this.mcpGateway.cleanupRun(runId);
+        await this.mcpGateway.cleanupSession(cacheKey);
 
         // Deregister session from Redis
         try {
@@ -182,7 +179,7 @@ export class McpGatewayController {
       // Handle DELETE (Session termination) — clean up transport and registry
       await transport.handleRequest(req, res, req.body);
       this.transports.delete(cacheKey);
-      await this.mcpGateway.cleanupRun(runId);
+      await this.mcpGateway.cleanupSession(cacheKey);
       try {
         await this.sessionRegistry.deregister(cacheKey);
       } catch (e) {

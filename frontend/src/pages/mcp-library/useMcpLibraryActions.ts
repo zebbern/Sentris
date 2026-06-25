@@ -1,25 +1,27 @@
-import { useState, useCallback } from 'react';
+import { type Dispatch, type SetStateAction, useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useDeleteMcpServer,
   useToggleMcpServer,
   useTestMcpConnection,
+  useTestEnabledMcpServers,
   useFetchServerTools,
   useToggleMcpTool,
-  useDiscoverMcpTools,
   type McpServerResponse,
 } from '@/hooks/queries/useMcpServerQueries';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 
 interface UseMcpLibraryActionsOptions {
   servers: McpServerResponse[];
+  setCheckingServers?: Dispatch<SetStateAction<Set<string>>>;
 }
 
-export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
+export function useMcpLibraryActions({ servers, setCheckingServers }: UseMcpLibraryActionsOptions) {
   const { toast } = useToast();
 
   // ------ Local state ------
   const [testingServer, setTestingServer] = useState<string | null>(null);
+  const [testingEnabledServers, setTestingEnabledServers] = useState(false);
   const [discoveringServerIds, setDiscoveringServerIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serverToDelete, setServerToDelete] = useState<string | null>(null);
@@ -31,9 +33,9 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
   const deleteServerMutation = useDeleteMcpServer();
   const toggleServerMutation = useToggleMcpServer();
   const testConnectionMutation = useTestMcpConnection();
+  const testEnabledServersMutation = useTestEnabledMcpServers();
   const fetchServerToolsMutation = useFetchServerTools();
   const toggleToolMutation = useToggleMcpTool();
-  const discoverToolsMutation = useDiscoverMcpTools();
 
   // ------ Handlers ------
   const handleDelete = useCallback(async () => {
@@ -85,6 +87,26 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
     [testConnectionMutation, toast],
   );
 
+  const handleTestEnabledServers = useCallback(async () => {
+    const enabledServerIds = servers.filter((server) => server.enabled).map((server) => server.id);
+    setTestingEnabledServers(true);
+    setCheckingServers?.(new Set(enabledServerIds));
+    try {
+      const results = await testEnabledServersMutation.mutateAsync();
+      const succeeded = results.filter((result) => result.success).length;
+      toast({
+        title: 'MCP server tests complete',
+        description: `${succeeded}/${results.length} enabled server(s) connected successfully.`,
+        variant: succeeded === results.length ? 'default' : 'destructive',
+      });
+    } catch {
+      // Global MutationCache error handler shows the toast
+    } finally {
+      setTestingEnabledServers(false);
+      setCheckingServers?.(new Set());
+    }
+  }, [servers, setCheckingServers, testEnabledServersMutation, toast]);
+
   const handleViewTools = useCallback(
     async (serverId: string) => {
       setSelectedServerForTools(serverId);
@@ -95,18 +117,15 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
   );
 
   const handleDiscoverServerTools = useCallback(
-    async (serverId: string, image?: string) => {
+    async (serverId: string, _image?: string) => {
       if (discoveringServerIds.has(serverId)) return;
       setDiscoveringServerIds((prev) => new Set(prev).add(serverId));
       try {
-        const discoveredTools = await discoverToolsMutation.mutateAsync({
-          serverId,
-          servers,
-          image,
-        });
+        const result = await testConnectionMutation.mutateAsync(serverId);
         toast({
-          title: 'Tool discovery complete',
-          description: `Discovered ${discoveredTools.length} tool(s) from this server.`,
+          title: result.success ? 'Tool discovery complete' : 'Tool discovery failed',
+          description: result.message ?? `Discovered ${result.toolCount ?? 0} tool(s).`,
+          variant: result.success ? 'default' : 'destructive',
         });
       } catch {
         // Global MutationCache error handler shows the toast
@@ -118,7 +137,7 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
         });
       }
     },
-    [discoveringServerIds, discoverToolsMutation, servers, toast],
+    [discoveringServerIds, testConnectionMutation, toast],
   );
 
   const handleToggleTool = useCallback(
@@ -148,6 +167,7 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
   return {
     // State
     testingServer,
+    testingEnabledServers,
     discoveringServerIds,
     setDiscoveringServerIds,
     deleteDialogOpen,
@@ -161,6 +181,7 @@ export function useMcpLibraryActions({ servers }: UseMcpLibraryActionsOptions) {
     handleDelete,
     handleToggle,
     handleTestConnection,
+    handleTestEnabledServers,
     handleViewTools,
     handleDiscoverServerTools,
     handleToggleTool,

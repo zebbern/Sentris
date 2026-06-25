@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +14,7 @@ import {
 import { Cloud, HelpCircle, Package, Trash2, Wrench, RefreshCw, Loader } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { McpHealthStatus } from '@sentris/shared';
-import type { ToolCounts } from './types';
+import type { AgentReadiness, ToolCounts } from './types';
 import { getGroupTheme } from './utils';
 import { GroupLogo } from './GroupLogo';
 import { HealthIndicator } from './HealthIndicator';
@@ -55,6 +55,7 @@ interface ImportedGroupsSectionProps {
     healthStatus: McpHealthStatus;
   }) => McpHealthStatus;
   getGroupServerToolCounts: (server: { serverId: string; toolCount: number }) => ToolCounts | null;
+  getGroupServerReadiness: (server: GroupServer) => AgentReadiness;
   onToggle: (serverId: string) => void;
   onViewTools: (serverId: string) => void;
   onDiscoverTools: (serverId: string, image?: string) => void;
@@ -70,6 +71,7 @@ export function ImportedGroupsSection({
   getGroupServers,
   getGroupServerHealthStatus,
   getGroupServerToolCounts,
+  getGroupServerReadiness,
   onToggle,
   onViewTools,
   onDiscoverTools,
@@ -218,6 +220,7 @@ export function ImportedGroupsSection({
                           {groupServerList.map((server) => {
                             const toolCounts = getGroupServerToolCounts(server);
                             const healthStatus = getGroupServerHealthStatus(server);
+                            const readiness = getGroupServerReadiness(server);
 
                             return (
                               <TableRow key={server.serverId}>
@@ -244,10 +247,13 @@ export function ImportedGroupsSection({
                                   />
                                 </TableCell>
                                 <TableCell>
-                                  <HealthIndicator
-                                    status={healthStatus}
-                                    checking={checkingServers.has(server.serverId)}
-                                  />
+                                  <div className="flex flex-col items-start gap-1">
+                                    <HealthIndicator
+                                      status={healthStatus}
+                                      checking={checkingServers.has(server.serverId)}
+                                    />
+                                    <ReadinessBadge readiness={readiness} />
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-center">
                                   {toolCounts && toolCounts.total > 0 ? (
@@ -339,5 +345,22 @@ export function ImportedGroupsSection({
         </Accordion>
       )}
     </div>
+  );
+}
+
+function ReadinessBadge({ readiness }: { readiness: AgentReadiness }) {
+  const variant: BadgeProps['variant'] =
+    readiness.tone === 'success'
+      ? 'success'
+      : readiness.tone === 'warning'
+        ? 'warning'
+        : readiness.tone === 'destructive'
+          ? 'destructive'
+          : 'secondary';
+
+  return (
+    <Badge variant={variant} className="text-[10px]">
+      {readiness.label}
+    </Badge>
   );
 }

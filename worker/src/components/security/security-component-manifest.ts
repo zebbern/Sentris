@@ -1,7 +1,7 @@
 import type { CachedComponentMetadata, ComponentParameterType } from '@sentris/component-sdk';
 import { SECURITY_DOCKER_RESOURCE_PARAMETER_IDS } from './security-docker-resources';
 
-/** Canonical security palette components (29). Includes mcp.group.aws from security folder. */
+/** Canonical security palette components (34). Includes mcp.group.aws from security folder. */
 export const SECURITY_COMPONENT_IDS = [
   'sentris.subfinder.run',
   'sentris.amass.enum',
@@ -26,10 +26,15 @@ export const SECURITY_COMPONENT_IDS = [
   'sentris.ffuf.run',
   'sentris.trivy.run',
   'sentris.semgrep.run',
+  'sentris.opengrep.run',
+  'sentris.codeql.run',
+  'sentris.jazzer-js.run',
   'sentris.repository.files.extract',
+  'sentris.github.repository.clone',
   'sentris.repository.manifest.extract',
   'sentris.osv.query',
   'sentris.npm.registry.intel',
+  'sentris.npm.package.source',
   'sentris.nvd.cve.query',
   'sentris.yara.run',
 ] as const;

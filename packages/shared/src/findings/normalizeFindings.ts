@@ -324,6 +324,81 @@ function normalizeSemgrep(nodeRef: string, componentId: string, outputs: Outputs
   });
 }
 
+/** opengrep — pattern static analysis (SAST) findings. */
+function normalizeOpenGrep(nodeRef: string, componentId: string, outputs: Outputs): Finding[] {
+  const findings = toArray((outputs as Record<string, unknown> | null)?.findings);
+  return findings.map((f, i) => {
+    const entry = f as Record<string, unknown>;
+    const checkId = asString(entry.checkId);
+    const path = asString(entry.path);
+    const line = entry.startLine ?? '?';
+    const message = asString(entry.message);
+    const rawSev = asString(entry.severity).toUpperCase();
+    let severity: FindingSeverity = 'info';
+    if (rawSev === 'ERROR') severity = 'high';
+    else if (rawSev === 'WARNING') severity = 'medium';
+    return makeFinding(nodeRef, componentId, i, {
+      severity,
+      type: 'code-finding',
+      finding: truncate(`${checkId}: ${message} (${path}:${line})`),
+      metadata: { scanner: 'opengrep', checkId, path, startLine: entry.startLine, cwe: entry.cwe },
+    });
+  });
+}
+
+/** codeql — semantic/data-flow static analysis findings. */
+function normalizeCodeql(nodeRef: string, componentId: string, outputs: Outputs): Finding[] {
+  const findings = toArray((outputs as Record<string, unknown> | null)?.findings);
+  return findings.map((f, i) => {
+    const entry = f as Record<string, unknown>;
+    const ruleId = asString(entry.ruleId);
+    const path = asString(entry.path);
+    const line = entry.startLine ?? '?';
+    const message = asString(entry.message);
+    const score = Number.parseFloat(asString(entry.securitySeverity));
+    let severity: FindingSeverity = 'info';
+    if (Number.isFinite(score)) {
+      if (score >= 9) severity = 'critical';
+      else if (score >= 7) severity = 'high';
+      else if (score >= 4) severity = 'medium';
+      else severity = 'low';
+    } else {
+      const rawSev = asString(entry.severity).toLowerCase();
+      if (rawSev === 'error') severity = 'high';
+      else if (rawSev === 'warning') severity = 'medium';
+    }
+    return makeFinding(nodeRef, componentId, i, {
+      severity,
+      type: 'code-finding',
+      finding: truncate(`${ruleId}: ${message} (${path}:${line})`),
+      metadata: { scanner: 'codeql', ruleId, path, startLine: entry.startLine, cwe: entry.cwe },
+    });
+  });
+}
+
+/** jazzer-js — runtime crash discovery findings. */
+function normalizeJazzerJs(nodeRef: string, componentId: string, outputs: Outputs): Finding[] {
+  const crashes = toArray((outputs as Record<string, unknown> | null)?.crashes);
+  return crashes.map((c, i) => {
+    const entry = c as Record<string, unknown>;
+    const targetName = asString(entry.targetName);
+    const error = asString(entry.error);
+    const crashPath = asString(entry.crashPath);
+    const location = crashPath ? ` (${crashPath})` : '';
+    return makeFinding(nodeRef, componentId, i, {
+      severity: 'high',
+      type: 'fuzz-crash',
+      finding: truncate(`${targetName}: ${error}${location}`),
+      metadata: {
+        scanner: 'jazzer-js',
+        targetName,
+        crashPath,
+        reproducerCommand: entry.reproducerCommand,
+      },
+    });
+  });
+}
+
 /** trufflehog — secret detection. */
 function normalizeTrufflehog(nodeRef: string, componentId: string, outputs: Outputs): Finding[] {
   const secrets = toArray((outputs as Record<string, unknown> | null)?.secrets);
@@ -427,6 +502,9 @@ const NORMALIZER_MAP: Record<string, Normalizer> = {
   'sentris.theharvester.run': normalizeTheHarvester,
   'sentris.trivy.run': normalizeTrivy,
   'sentris.semgrep.run': normalizeSemgrep,
+  'sentris.opengrep.run': normalizeOpenGrep,
+  'sentris.codeql.run': normalizeCodeql,
+  'sentris.jazzer-js.run': normalizeJazzerJs,
   'sentris.trufflehog.scan': normalizeTrufflehog,
   'core.ai.generate-text': normalizeAiGenerateText,
   'core.ai.agent': normalizeAiAgent,

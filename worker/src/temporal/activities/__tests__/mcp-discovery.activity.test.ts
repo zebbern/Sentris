@@ -27,6 +27,18 @@ const mockExecFile = vi.fn(
   },
 );
 const mockSpawn = vi.fn();
+const mockMcpConnect = vi.fn(async (_transport: unknown) => undefined);
+const mockMcpListTools = vi.fn(async () => ({
+  tools: [{ name: 'list_buckets', description: 'List storage buckets', inputSchema: {} }],
+}));
+const mockMcpClose = vi.fn(async () => undefined);
+const mockMcpTransport = vi.fn((_url: URL, _options?: unknown) => ({}));
+
+class MockMcpClient {
+  connect = mockMcpConnect;
+  listTools = mockMcpListTools;
+  close = mockMcpClose;
+}
 
 class MockRedis {
   setex = redisSetex;
@@ -77,9 +89,18 @@ mock.module('node:child_process', () => ({
   spawn: mockSpawn,
 }));
 
+mock.module('@modelcontextprotocol/sdk/client/index.js', () => ({
+  Client: MockMcpClient,
+}));
+
+mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+  StreamableHTTPClientTransport: mockMcpTransport,
+}));
+
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
 const originalFetch = globalThis.fetch;
 let cacheDiscoveryResultActivity: typeof import('../mcp-discovery.activity').cacheDiscoveryResultActivity;
+let discoverMcpToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpToolsActivity;
 let discoverMcpGroupToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpGroupToolsActivity;
 
 function createJsonResponse(body: unknown): Response {
@@ -91,13 +112,16 @@ function createJsonResponse(body: unknown): Response {
 
 describe('MCP discovery activity diagnostics', () => {
   beforeAll(async () => {
-    ({ cacheDiscoveryResultActivity, discoverMcpGroupToolsActivity } =
+    ({ cacheDiscoveryResultActivity, discoverMcpToolsActivity, discoverMcpGroupToolsActivity } =
       await import('../mcp-discovery.activity'));
   });
 
   beforeEach(() => {
     delete process.env.SENTRIS_DEBUG_WORKFLOW;
     vi.clearAllMocks();
+    mockMcpListTools.mockResolvedValue({
+      tools: [{ name: 'list_buckets', description: 'List storage buckets', inputSchema: {} }],
+    });
   });
 
   afterEach(() => {
@@ -134,6 +158,49 @@ describe('MCP discovery activity diagnostics', () => {
     }
   });
 
+  test('discoverMcpToolsActivity uses the MCP SDK for HTTP tool discovery', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('raw MCP fetch should not be used for HTTP discovery');
+    }) as unknown as typeof fetch;
+    mockMcpListTools.mockResolvedValueOnce({
+      tools: [
+        {
+          name: 'fetch_url',
+          description: 'Fetches a URL',
+          inputSchema: { type: 'object' },
+        },
+      ],
+    });
+
+    const result = await discoverMcpToolsActivity({
+      transport: 'http',
+      endpoint: 'https://example.test/mcp',
+      headers: { Authorization: 'Bearer token' },
+    });
+
+    expect(result.tools).toEqual([
+      {
+        name: 'fetch_url',
+        description: 'Fetches a URL',
+        inputSchema: { type: 'object' },
+      },
+    ]);
+    expect(mockMcpTransport).toHaveBeenCalledTimes(1);
+    const [url, options] = mockMcpTransport.mock.calls[0];
+    expect(String(url)).toBe('https://example.test/mcp');
+    expect(options).toEqual({
+      requestInit: {
+        headers: {
+          Accept: 'application/json, text/event-stream',
+          Authorization: 'Bearer token',
+        },
+      },
+    });
+    expect(mockMcpConnect).toHaveBeenCalledTimes(1);
+    expect(mockMcpListTools).toHaveBeenCalledTimes(1);
+    expect(mockMcpClose).toHaveBeenCalledTimes(1);
+  });
+
   test('discoverMcpGroupToolsActivity does not mirror successful stdio readiness diagnostics to console.log by default', async () => {
     globalThis.fetch = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
       const href = String(url);
@@ -143,11 +210,7 @@ describe('MCP discovery activity diagnostics', () => {
           servers: [{ ready: true }],
         });
       }
-      return createJsonResponse({
-        result: {
-          tools: [{ name: 'list_buckets', description: 'List storage buckets' }],
-        },
-      });
+      throw new Error(`unexpected fetch: ${href}`);
     }) as unknown as typeof fetch;
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -165,7 +228,7 @@ describe('MCP discovery activity diagnostics', () => {
       expect(result.results).toEqual([
         {
           name: 'storage',
-          tools: [{ name: 'list_buckets', description: 'List storage buckets' }],
+          tools: [{ name: 'list_buckets', description: 'List storage buckets', inputSchema: {} }],
         },
       ]);
       expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);

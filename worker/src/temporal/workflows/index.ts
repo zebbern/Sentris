@@ -8,7 +8,7 @@ import {
   uuid4,
 } from '@temporalio/workflow';
 import { runWorkflowWithScheduler } from '../workflow-scheduler.js';
-import { buildActionPayload } from '../input-resolver.js';
+import { buildActionPayload, filterInactiveJoinWarnings } from '../input-resolver.js';
 import {
   isMcpServerComponent,
   isMcpGroupComponent,
@@ -43,6 +43,9 @@ import type {
   RegisterLocalMcpActivityInput,
   PrepareAndRegisterToolActivityInput,
 } from '../types';
+
+/** Claude Code and other loop-body Docker agents can exceed the default 10m activity window. */
+const FOR_EACH_BODY_ACTIVITY_TIMEOUT = '135 minutes';
 
 const {
   runComponentActivity: _runComponentActivity,
@@ -286,7 +289,14 @@ export async function sentrisWorkflowRun(
           ]);
         }
 
+        const nodeMetadata = input.definition.nodes?.[action.ref];
+        const joinStrategy = nodeMetadata?.joinStrategy ?? schedulerContext.joinStrategy;
+        const { triggeredBy, failure } = schedulerContext;
         const { inputs, params, warnings } = buildActionPayload(action, results);
+        const warningsToReport = filterInactiveJoinWarnings(warnings, {
+          joinStrategy,
+          triggeredBy,
+        });
         const mergedInputs: Record<string, unknown> = { ...inputs };
         const mergedParams: Record<string, unknown> = { ...params };
 
@@ -323,7 +333,7 @@ export async function sentrisWorkflowRun(
             action,
             mergedInputs,
             mergedParams,
-            warnings,
+            warnings: warningsToReport,
             depth,
             callChain,
             results,
@@ -333,34 +343,36 @@ export async function sentrisWorkflowRun(
         }
 
         if (action.componentId === 'core.workflow.for-each') {
-          const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
-            runComponentActivity(
-              input: RunComponentActivityInput,
-            ): Promise<RunComponentActivityOutput>;
-          }>({
-            startToCloseTimeout: '10 minutes',
-            heartbeatTimeout: '30 seconds',
-            retry: mapRetryPolicy(action.retryPolicy),
-          });
-
           return handleForEachLoopInWorkflow({
             input,
             action,
             mergedInputs,
             mergedParams,
-            warnings,
+            warnings: warningsToReport,
             results,
             activities: {
-              runComponentActivity: runComponentWithRetry,
+              runComponentActivityForAction: async (
+                bodyAction: WorkflowAction,
+                activityInput: RunComponentActivityInput,
+              ) => {
+                const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
+                  runComponentActivity(
+                    input: RunComponentActivityInput,
+                  ): Promise<RunComponentActivityOutput>;
+                }>({
+                  startToCloseTimeout: FOR_EACH_BODY_ACTIVITY_TIMEOUT,
+                  heartbeatTimeout: '30 seconds',
+                  retry: mapRetryPolicy(bodyAction.retryPolicy),
+                });
+
+                return runComponentWithRetry(activityInput);
+              },
               recordTraceEventActivity,
             },
           });
         }
 
-        const nodeMetadata = input.definition.nodes?.[action.ref];
         const streamId = nodeMetadata?.streamId ?? nodeMetadata?.groupId ?? action.ref;
-        const joinStrategy = nodeMetadata?.joinStrategy ?? schedulerContext.joinStrategy;
-        const { triggeredBy, failure } = schedulerContext;
 
         const activityInput: RunComponentActivityInput = {
           runId: input.runId,
@@ -376,7 +388,7 @@ export async function sentrisWorkflowRun(
           params: mergedParams,
           inputOverrides: action.inputOverrides,
           rawParams: action.params,
-          warnings,
+          warnings: warningsToReport,
           metadata: {
             streamId,
             joinStrategy,

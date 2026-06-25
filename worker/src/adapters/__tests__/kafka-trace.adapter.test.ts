@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, mock, vi } from 'bun:test';
-import type { TraceEvent } from '@sentris/component-sdk';
+import { MAX_KAFKA_MESSAGE_BYTES, type TraceEvent } from '@sentris/component-sdk';
 
 const mockSend = vi.fn().mockResolvedValue(undefined);
 const mockConnect = vi.fn().mockResolvedValue(undefined);
@@ -146,6 +146,38 @@ describe('KafkaTraceAdapter', () => {
 
       const payload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
       expect(payload.error).toBe('Connection refused');
+    });
+
+    it('truncates oversized trace payloads before sending to Kafka', async () => {
+      const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
+
+      adapter.record({
+        type: 'NODE_COMPLETED',
+        runId: 'run-large-trace',
+        nodeRef: 'node.ai',
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: 'Agent completed',
+        outputSummary: {
+          report: 'x'.repeat(MAX_KAFKA_MESSAGE_BYTES),
+        },
+        data: {
+          report: 'y'.repeat(MAX_KAFKA_MESSAGE_BYTES),
+        },
+      });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      const value = mockSend.mock.calls[0][0].messages[0].value;
+      expect(Buffer.byteLength(value, 'utf8')).toBeLessThan(MAX_KAFKA_MESSAGE_BYTES);
+
+      const payload = JSON.parse(value);
+      expect(payload.outputSummary._truncated).toBe(true);
+      expect(payload.data._truncated).toBe(true);
+      expect(payload.data._originalSize).toBeGreaterThan(MAX_KAFKA_MESSAGE_BYTES);
+      expect(payload.runId).toBe('run-large-trace');
+      expect(payload.sequence).toBe(1);
     });
   });
 

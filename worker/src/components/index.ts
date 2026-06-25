@@ -76,10 +76,15 @@ import './security/katana';
 import './security/ffuf';
 import './security/trivy';
 import './security/semgrep';
+import './security/opengrep';
+import './security/codeql';
+import './security/jazzer-js';
 import './security/repo-files-extractor';
+import './security/github-repo-clone';
 import './security/manifest-extractor';
 import './security/osv';
 import './security/npm-registry-intel';
+import './security/npm-package-source';
 import './security/nvd';
 import './security/yara';
 

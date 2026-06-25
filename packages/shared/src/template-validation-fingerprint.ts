@@ -122,7 +122,7 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
         'Live audit fixture using public npm packages with known historical advisories.',
     },
     'npm CVE Hunt Pipeline': {
-      packageSpecs: ['minimist@1.2.5'],
+      packageSpecs: ['next@16.2.9'],
       authorizationNotes:
         'Smoke test: authorized research on public npm packages and GitHub source only. Non-destructive analysis.',
     },

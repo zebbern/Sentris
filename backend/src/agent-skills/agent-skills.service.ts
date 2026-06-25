@@ -78,7 +78,7 @@ export class AgentSkillsService {
     const organizationId = requireOrganizationId(auth);
     const overwrite = body.overwrite ?? false;
     const imported: AgentSkillResponse[] = [];
-    const skipped: Array<{ slug: string; reason: string }> = [];
+    const skipped: { slug: string; reason: string }[] = [];
 
     for (const item of body.items) {
       try {
@@ -143,7 +143,7 @@ export class AgentSkillsService {
     }
 
     const imported: AgentSkillResponse[] = [];
-    const skipped: Array<{ slug: string; reason: string }> = [];
+    const skipped: { slug: string; reason: string }[] = [];
 
     for (const bundle of bundles) {
       try {
@@ -196,7 +196,10 @@ export class AgentSkillsService {
     return this.mapToResponse(record);
   }
 
-  async createSkill(auth: AuthContext | null, body: CreateAgentSkillDto): Promise<AgentSkillResponse> {
+  async createSkill(
+    auth: AuthContext | null,
+    body: CreateAgentSkillDto,
+  ): Promise<AgentSkillResponse> {
     const organizationId = requireOrganizationId(auth);
     const bundle = normalizeSkillBundle({
       slug: body.slug,
@@ -273,10 +276,7 @@ export class AgentSkillsService {
     await this.repository.delete(id, organizationId);
   }
 
-  async batchGetSkills(
-    organizationId: string,
-    ids: string[],
-  ): Promise<AgentSkillBatchItem[]> {
+  async batchGetSkills(organizationId: string, ids: string[]): Promise<AgentSkillBatchItem[]> {
     const uniqueIds = [...new Set(ids.filter(Boolean))];
     if (uniqueIds.length === 0) return [];
     const rows = await this.repository.findByIds(uniqueIds, organizationId);

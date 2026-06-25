@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from 'bun:test';
 import { z } from 'zod';
 import { withPortMeta } from '@sentris/component-sdk';
 import type { ComponentDefinition, ISecretsService } from '@sentris/component-sdk';
-import { resolveSecretInputOverrides, resolveSecretParams, resolveLlmProviderModelOverrides } from '../secret-resolver';
+import {
+  resolveSecretInputOverrides,
+  resolveSecretParams,
+  resolveLlmProviderModelOverrides,
+} from '../secret-resolver';
 
 interface PortSpec {
   id: string;

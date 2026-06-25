@@ -75,19 +75,12 @@ export const CLAUDE_EFFORT_LEVEL_OPTIONS: {
     description: 'Deep, long-horizon agentic and coding work.',
   },
   {
-    label: 'Max',
+    label: 'Max (maximum capability)',
     value: 'max',
     description: 'Absolute maximum capability, no token constraints.',
   },
 ];
 
 export function isClaudeEffortLevel(value: unknown): value is ClaudeEffortLevel {
-  return (
-    value === 'default' ||
-    value === 'low' ||
-    value === 'medium' ||
-    value === 'high' ||
-    value === 'xhigh' ||
-    value === 'max'
-  );
+  return CLAUDE_EFFORT_LEVEL_OPTIONS.some((option) => option.value === value);
 }

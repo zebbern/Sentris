@@ -31,6 +31,7 @@ import {
   McpServerResponse,
   McpToolResponse,
   TestConnectionResponse,
+  TestEnabledServerResponse,
   HealthStatusResponse,
 } from './dto/mcp-servers.dto';
 import { CurrentAuth } from '../auth/auth-context.decorator';
@@ -129,6 +130,16 @@ export class McpServersController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ): Promise<McpServerResponse> {
     return this.mcpServersService.toggleServer(auth, id);
+  }
+
+  @Post('test-enabled')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Test all enabled MCP server connections' })
+  @ApiOkResponse({ type: [TestEnabledServerResponse] })
+  async testEnabledServers(
+    @CurrentAuth() auth: AuthContext | null,
+  ): Promise<TestEnabledServerResponse[]> {
+    return this.mcpServersService.testEnabledServers(auth);
   }
 
   @Post(':id/test')

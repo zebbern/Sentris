@@ -17,23 +17,23 @@ export const DEFAULT_AGENT_SKILL_DISCOVERY_DIRS = [
 
 export type AgentSkillFileMap = Record<string, string>;
 
-export type ParsedSkillBundle = {
+export interface ParsedSkillBundle {
   slug: string;
   name: string;
   description: string | null;
   files: AgentSkillFileMap;
   content: string;
   tags: string[];
-};
+}
 
-export type DiscoveredAgentSkillSummary = {
+export interface DiscoveredAgentSkillSummary {
   slug: string;
   name: string;
   description: string | null;
   sourceRoot: string;
   relativePath: string;
   fileCount: number;
-};
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -62,7 +62,10 @@ export function resolveAgentSkillsWorkspaceRoot(): string {
 export function resolveAgentSkillDiscoveryDirs(workspaceRoot?: string): string[] {
   const configured = process.env.SENTRIS_AGENT_SKILLS_DISCOVERY_DIRS?.trim();
   const relativeDirs = configured
-    ? configured.split(',').map((dir) => dir.trim()).filter(Boolean)
+    ? configured
+        .split(',')
+        .map((dir) => dir.trim())
+        .filter(Boolean)
     : [...DEFAULT_AGENT_SKILL_DISCOVERY_DIRS];
 
   const root = workspaceRoot ?? resolveAgentSkillsWorkspaceRoot();
@@ -111,7 +114,10 @@ export function parseSkillMdFrontmatter(content: string): {
     const separator = line.indexOf(':');
     if (separator <= 0) continue;
     const key = line.slice(0, separator).trim();
-    const value = line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, '');
+    const value = line
+      .slice(separator + 1)
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
     if (key === 'name') metadata.name = value;
     if (key === 'description') metadata.description = value;
     if (key === 'tags') {
@@ -181,7 +187,10 @@ export function normalizeSkillBundle(input: {
   };
 }
 
-async function readTextFileIfAllowed(filePath: string, relativePath: string): Promise<string | null> {
+async function readTextFileIfAllowed(
+  filePath: string,
+  relativePath: string,
+): Promise<string | null> {
   validateSkillRelativePath(relativePath);
   const fileStat = await stat(filePath);
   if (!fileStat.isFile() || fileStat.size > AGENT_SKILL_FILE_MAX_BYTES) {
@@ -293,7 +302,7 @@ export async function readDiscoveredSkillBundle(
 }
 
 export function parseSkillBundlesFromZipEntries(
-  entries: Array<{ entryName: string; getData: () => Buffer }>,
+  entries: { entryName: string; getData: () => Buffer }[],
 ): ParsedSkillBundle[] {
   const filesBySkill = new Map<string, AgentSkillFileMap>();
 
@@ -361,9 +370,10 @@ function slugifyFromSkillMd(files: AgentSkillFileMap): string {
     .slice(0, 128);
 }
 
-export function mergeSkillFilesForResponse(
-  record: { content: string; files?: AgentSkillFileMap | null },
-): AgentSkillFileMap {
+export function mergeSkillFilesForResponse(record: {
+  content: string;
+  files?: AgentSkillFileMap | null;
+}): AgentSkillFileMap {
   if (isRecord(record.files) && Object.keys(record.files).length > 0) {
     return record.files;
   }

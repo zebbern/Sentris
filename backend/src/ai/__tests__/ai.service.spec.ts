@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { afterEach, describe, expect, it, vi } from 'bun:test';
 
 import { DEFAULT_ORGANIZATION_ID } from '../../auth/constants';
 import type { AuthContext } from '../../auth/types';

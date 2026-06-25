@@ -1,4 +1,5 @@
 import { spawn, execFile as execFileCallback } from 'child_process';
+import { basename, dirname } from 'node:path';
 import { promisify } from 'util';
 import { ValidationError, ConfigurationError, ContainerError } from '@sentris/component-sdk';
 
@@ -18,14 +19,38 @@ const execFile = promisify(execFileCallback);
  * - Volumes are labeled for tracking and auditing
  * - Automatic cleanup prevents data leakage
  */
+export interface IsolatedContainerVolumeOptions {
+  /** When true, cleanup() is a no-op so downstream nodes can mount the volume until run-end cleanup. */
+  persist?: boolean;
+  /** Attach to an existing volume instead of creating a new one. */
+  attachTo?: string;
+}
+
 export class IsolatedContainerVolume {
   private volumeName?: string;
   private isInitialized = false;
+  private readonly persist: boolean;
+  private readonly attachedExisting: boolean;
 
   constructor(
     private tenantId: string,
     private runId: string,
+    options: IsolatedContainerVolumeOptions = {},
   ) {
+    this.persist = options.persist ?? false;
+    this.attachedExisting = Boolean(options.attachTo);
+
+    if (options.attachTo) {
+      if (!/^[a-zA-Z0-9_.-]+$/.test(options.attachTo)) {
+        throw new ValidationError('Invalid volume name', {
+          fieldErrors: { volumeName: ['contains unsupported characters'] },
+          details: { volumeName: options.attachTo },
+        });
+      }
+      this.volumeName = options.attachTo;
+      this.isInitialized = true;
+      return;
+    }
     // Validate tenant ID to prevent injection attacks
     if (!/^[a-zA-Z0-9_-]+$/.test(tenantId)) {
       throw new ValidationError(
@@ -50,6 +75,22 @@ export class IsolatedContainerVolume {
   }
 
   /**
+   * Attach to an existing Docker volume created earlier in the same workflow run.
+   */
+  static attachExisting(
+    tenantId: string,
+    runId: string,
+    volumeName: string,
+    options: Omit<IsolatedContainerVolumeOptions, 'attachTo'> = {},
+  ): IsolatedContainerVolume {
+    return new IsolatedContainerVolume(tenantId, runId, {
+      ...options,
+      persist: options.persist ?? true,
+      attachTo: volumeName,
+    });
+  }
+
+  /**
    * Creates the isolated volume and populates it with files.
    *
    * @param files - Map of filename to content (string or Buffer)
@@ -64,9 +105,15 @@ export class IsolatedContainerVolume {
    * });
    * ```
    */
-  async initialize(files: Record<string, string | Buffer>): Promise<string> {
+  async initialize(files: Record<string, string | Buffer> = {}): Promise<string> {
     if (this.isInitialized) {
       throw new ConfigurationError('Volume already initialized', {
+        details: { volumeName: this.volumeName, tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    if (this.attachedExisting) {
+      throw new ConfigurationError('Cannot initialize an attached existing volume', {
         details: { volumeName: this.volumeName, tenantId: this.tenantId, runId: this.runId },
       });
     }
@@ -187,10 +234,11 @@ export class IsolatedContainerVolume {
       // Strict validation to prevent path traversal and shell injection
       this.validateFilename(filename);
 
-      const contentString = typeof content === 'string' ? content : content.toString('utf-8');
-
-      // Use docker run with stdin to write the file
-      await this.writeFileToVolume(filename, contentString);
+      if (typeof content === 'string') {
+        await this.writeFileToVolume(filename, content);
+      } else {
+        await this.writeBinaryFileToVolume(filename, content);
+      }
     }
 
     // Make the volume directory writable by all users (including nonroot containers)
@@ -299,6 +347,268 @@ export class IsolatedContainerVolume {
       // Write content to stdin and close
       proc.stdin.write(content);
       proc.stdin.end();
+    });
+  }
+
+  /**
+   * Writes a binary file to the volume using docker run with stdin.
+   */
+  private async writeBinaryFileToVolume(filename: string, content: Buffer): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    const safeFilename = filename.replace(/'/g, "'\\''");
+    const writeCommand = safeFilename.includes('/')
+      ? `mkdir -p "$(dirname '/data/${safeFilename}')" && cat > '/data/${safeFilename}'`
+      : `cat > '/data/${safeFilename}'`;
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '-i',
+        '-v',
+        `${this.volumeName}:/data`,
+        '--entrypoint',
+        'sh',
+        'alpine:latest',
+        '-c',
+        writeCommand,
+      ]);
+
+      let stderr = '';
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to write binary file ${filename}: ${error.message}`));
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(
+              `Failed to write binary file ${filename}: exit code ${code}, stderr: ${stderr}`,
+            ),
+          );
+        } else {
+          resolve();
+        }
+      });
+
+      proc.stdin.write(content);
+      proc.stdin.end();
+    });
+  }
+
+  /**
+   * Extracts a zip archive into the volume root and removes the GitHub archive wrapper directory.
+   */
+  async extractZipArchive(archive: Buffer, archiveFilename = 'archive.zip'): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    this.validateFilename(archiveFilename);
+    await this.writeBinaryFileToVolume(archiveFilename, archive);
+    await this.unzipArchiveInVolume(archiveFilename);
+  }
+
+  /** Copy a host zip archive into the volume and extract it without piping large buffers to stdin. */
+  async extractZipArchiveFromPath(
+    hostZipPath: string,
+    archiveFilename = 'archive.zip',
+  ): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    this.validateFilename(archiveFilename);
+    await this.copyHostFileIntoVolume(hostZipPath, archiveFilename);
+    await this.unzipArchiveInVolume(archiveFilename);
+  }
+
+  /** Copy a host .tar.gz archive into the volume and extract it without piping large buffers to stdin. */
+  async extractTarGzArchiveFromPath(
+    hostArchivePath: string,
+    archiveFilename = 'archive.tgz',
+  ): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    this.validateFilename(archiveFilename);
+    await this.copyHostFileIntoVolume(hostArchivePath, archiveFilename);
+    await this.untarGzArchiveInVolume(archiveFilename);
+  }
+
+  private async copyHostFileIntoVolume(
+    hostFilePath: string,
+    targetFilename: string,
+  ): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    this.validateFilename(targetFilename);
+    const hostDir = dirname(hostFilePath);
+    const hostFile = basename(hostFilePath);
+    this.validateFilename(hostFile);
+
+    const safeHostFile = hostFile.replace(/'/g, "'\\''");
+    const safeTargetFilename = targetFilename.replace(/'/g, "'\\''");
+    const copyCommand = `cp '/host/${safeHostFile}' '/data/${safeTargetFilename}'`;
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '-v',
+        `${this.volumeName}:/data`,
+        '-v',
+        `${hostDir}:/host:ro`,
+        '--entrypoint',
+        'sh',
+        'alpine:latest',
+        '-c',
+        copyCommand,
+      ]);
+
+      let stderr = '';
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to copy host archive into volume: ${error.message}`));
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(
+              `Failed to copy host archive into volume: exit code ${code}, stderr: ${stderr}`,
+            ),
+          );
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  private async unzipArchiveInVolume(archiveFilename: string): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    const safeArchiveFilename = archiveFilename.replace(/'/g, "'\\''");
+    const extractCommand = [
+      'apk add --no-cache unzip >/dev/null',
+      `cd /data && unzip -q '${safeArchiveFilename}'`,
+      'ROOT=$(find . -mindepth 1 -maxdepth 1 -type d | head -1)',
+      'if [ -n "$ROOT" ]; then mv "$ROOT"/* . 2>/dev/null || true; mv "$ROOT"/.[!.]* . 2>/dev/null || true; rmdir "$ROOT" 2>/dev/null || true; fi',
+      `rm -f '${safeArchiveFilename}'`,
+      'chmod -R 777 /data',
+    ].join(' && ');
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '-v',
+        `${this.volumeName}:/data`,
+        '--entrypoint',
+        'sh',
+        'alpine:latest',
+        '-c',
+        extractCommand,
+      ]);
+
+      let stderr = '';
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to extract zip archive: ${error.message}`));
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Failed to extract zip archive: exit code ${code}, stderr: ${stderr}`));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  private async untarGzArchiveInVolume(archiveFilename: string): Promise<void> {
+    if (!this.volumeName) {
+      throw new ConfigurationError('Volume not initialized', {
+        details: { tenantId: this.tenantId, runId: this.runId },
+      });
+    }
+
+    const safeArchiveFilename = archiveFilename.replace(/'/g, "'\\''");
+    const extractCommand = [
+      `cd /data && tar -xzf '${safeArchiveFilename}'`,
+      'ROOT=$(find . -mindepth 1 -maxdepth 1 -type d | head -1)',
+      'if [ -n "$ROOT" ]; then mv "$ROOT"/* . 2>/dev/null || true; mv "$ROOT"/.[!.]* . 2>/dev/null || true; rmdir "$ROOT" 2>/dev/null || true; fi',
+      `rm -f '${safeArchiveFilename}'`,
+      'chmod -R 777 /data',
+    ].join(' && ');
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '-v',
+        `${this.volumeName}:/data`,
+        '--entrypoint',
+        'sh',
+        'alpine:latest',
+        '-c',
+        extractCommand,
+      ]);
+
+      let stderr = '';
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('error', (error) => {
+        reject(new Error(`Failed to extract tar.gz archive: ${error.message}`));
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(
+            new Error(`Failed to extract tar.gz archive: exit code ${code}, stderr: ${stderr}`),
+          );
+        } else {
+          resolve();
+        }
+      });
     });
   }
 
@@ -453,8 +763,8 @@ export class IsolatedContainerVolume {
    * ```
    */
   async cleanup(): Promise<void> {
-    if (!this.volumeName) {
-      return; // Nothing to clean up
+    if (!this.volumeName || this.persist) {
+      return;
     }
 
     try {

@@ -48,8 +48,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-const TOOLBAR_BUTTON_CLASS = 'h-8 shrink-0 px-2.5 text-xs';
-const TOOLBAR_ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0';
+const TOOLBAR_BUTTON_CLASS = 'h-7 shrink-0 px-2 text-xs';
+const TOOLBAR_ICON_BUTTON_CLASS = 'h-7 w-7 shrink-0';
 
 interface TopBarProps {
   workflowId?: string;
@@ -276,7 +276,7 @@ export function TopBar({
 
   return (
     <>
-      <div className="min-h-[52px] border-b bg-background flex flex-nowrap items-center gap-2 px-2 md:px-4 py-2">
+      <div className="relative z-[100] h-10 shrink-0 border-b border-border/80 bg-app-chrome backdrop-blur-sm flex flex-nowrap items-center gap-2 px-2 md:px-3">
         <Button
           variant="ghost"
           size="icon"
@@ -287,8 +287,8 @@ export function TopBar({
           <ArrowLeft className="h-4 w-4" />
         </Button>
 
-        <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
-          <div className="flex min-w-0 items-center gap-2 justify-self-start">
+        <div className="relative flex min-w-0 flex-1 items-center">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden pr-2">
             <div
               className={cn(
                 'flex min-w-0 max-w-full items-center gap-2',
@@ -311,7 +311,7 @@ export function TopBar({
                   onChange={(e) => setTempWorkflowName(e.target.value)}
                   onBlur={handleChangeWorkflowName}
                   onKeyDown={handleKeyDown}
-                  className="h-7 min-w-[80px] w-full border-none bg-transparent px-0 py-0 text-xs font-semibold shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-sm"
+                  className="h-6 min-w-[80px] w-full border-none bg-transparent px-0 py-0 text-xs font-semibold shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-sm"
                   placeholder="Workflow name"
                   maxLength={100}
                   onClick={(e) => e.stopPropagation()}
@@ -333,15 +333,17 @@ export function TopBar({
               )}
             </div>
             {metadata.currentVersion !== null && metadata.currentVersion !== undefined && (
-              <span className="hidden shrink-0 items-center rounded-md border border-border/60 bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground lg:inline-flex">
+              <span className="hidden shrink-0 items-center rounded-md border border-border/60 bg-muted px-1.5 py-0 text-[11px] font-medium text-muted-foreground lg:inline-flex">
                 v{metadata.currentVersion}
               </span>
             )}
           </div>
 
-          <div className="justify-self-center">{modeToggle}</div>
+          <div className="pointer-events-none absolute inset-y-0 left-1/2 flex -translate-x-1/2 items-center">
+            <div className="pointer-events-auto">{modeToggle}</div>
+          </div>
 
-          <div className="flex min-w-0 flex-wrap items-center justify-end justify-self-end gap-1 md:gap-1.5">
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1 md:gap-1.5">
             <Button
               onClick={handleRun}
               disabled={!canEdit}
@@ -364,7 +366,7 @@ export function TopBar({
                     onChange={handleFileChange}
                   />
                 )}
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
@@ -375,7 +377,13 @@ export function TopBar({
                       <MoreVertical className="h-3.5 w-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent
+                    align="end"
+                    side="bottom"
+                    sideOffset={6}
+                    collisionPadding={8}
+                    className="z-[200]"
+                  >
                     {mode === 'design' && (
                       <>
                         <DropdownMenuItem onClick={onUndo} disabled={!canEdit || !canUndo}>

@@ -35,10 +35,7 @@ export const agentSkills = pgTable(
   (table) => ({
     orgIdx: index('agent_skills_org_idx').on(table.organizationId),
     enabledIdx: index('agent_skills_enabled_idx').on(table.enabled),
-    orgSlugUnique: uniqueIndex('agent_skills_org_slug_uidx').on(
-      table.organizationId,
-      table.slug,
-    ),
+    orgSlugUnique: uniqueIndex('agent_skills_org_slug_uidx').on(table.organizationId, table.slug),
   }),
 );
 

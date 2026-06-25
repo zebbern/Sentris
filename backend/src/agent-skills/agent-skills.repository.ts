@@ -4,11 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 import { DRIZZLE_TOKEN } from '../database/database.module';
-import {
-  agentSkills,
-  type AgentSkillRecord,
-  type NewAgentSkillRecord,
-} from '../database/schema';
+import { agentSkills, type AgentSkillRecord, type NewAgentSkillRecord } from '../database/schema';
 
 import type { AgentSkillFileMap } from '../database/schema';
 

@@ -14,7 +14,6 @@ import {
   Zap,
   Webhook,
   ServerCog,
-  BarChart3,
   Sparkles,
   Settings,
   Package,
@@ -68,16 +67,6 @@ const navigationItems: NavItem[] = [
     ? [{ name: 'Connections', href: '/integrations', icon: Plug }]
     : []),
   { name: 'Artifact Library', href: '/artifacts', icon: Archive },
-  ...(env.VITE_OPENSEARCH_DASHBOARDS_URL
-    ? [
-        {
-          name: 'Dashboards',
-          href: env.VITE_OPENSEARCH_DASHBOARDS_URL,
-          icon: BarChart3,
-          external: true,
-        },
-      ]
-    : []),
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
@@ -147,12 +136,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             if (!canManageWorkflows) return;
             navigate('/workflows/new');
           }}
-          size={isMobile ? 'sm' : 'default'}
-          className={cn('gap-2', isMobile && 'h-8 px-3 text-xs')}
+          size="sm"
+          className="gap-1.5"
           disabled={!canManageWorkflows}
           aria-disabled={!canManageWorkflows}
         >
-          <Plus className={cn('w-4 h-4', isMobile && 'w-3.5 h-3.5')} />
+          <Plus className="h-3.5 w-3.5" />
           <span>
             New <span className="hidden md:inline">Workflow</span>
           </span>
@@ -185,7 +174,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           className={cn(
             'h-full transition-all duration-300 z-[110]',
             isMobile ? 'fixed left-0 top-0' : 'relative',
-            sidebarOpen ? 'w-56' : isMobile ? 'w-0 -translate-x-full' : 'w-14',
+            sidebarOpen ? 'w-52' : isMobile ? 'w-0 -translate-x-full' : 'w-12',
             isMobile && sidebarOpen && 'translate-x-0',
             !sidebarOpen && isMobile && 'pointer-events-none',
             sidebarOpen && isMobile && 'pointer-events-auto',
@@ -193,10 +182,18 @@ export function AppLayout({ children }: AppLayoutProps) {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <SidebarHeader className="flex items-center justify-between p-3 border-b">
+          <SidebarHeader
+            className={cn(
+              'flex h-10 shrink-0 items-center border-b px-2',
+              sidebarOpen ? 'justify-between' : 'justify-center',
+            )}
+          >
             <Link
               to="/"
-              className="flex items-center gap-2 min-w-0 flex-1"
+              className={cn(
+                'flex items-center min-w-0',
+                sidebarOpen ? 'gap-1.5 flex-1' : 'justify-center',
+              )}
               onClick={() => isMobile && setSidebarOpen(false)}
             >
               <div className="flex-shrink-0">
@@ -204,19 +201,19 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <img
                     src="/favicon.ico"
                     alt="Sentris Flow"
-                    width={24}
-                    height={24}
-                    className="w-5 h-5"
+                    width={20}
+                    height={20}
+                    className="w-4 h-4"
                     onError={() => setFaviconError(true)}
                   />
                 ) : (
-                  <span className="text-sm font-bold">SS</span>
+                  <span className="text-xs font-bold">SS</span>
                 )}
               </div>
               <span
                 className={cn(
-                  'font-bold text-lg transition-all duration-300 whitespace-nowrap overflow-hidden',
-                  sidebarOpen ? 'opacity-100 max-w-36' : 'opacity-0 max-w-0',
+                  'font-bold text-sm transition-all duration-300 whitespace-nowrap overflow-hidden',
+                  sidebarOpen ? 'opacity-100 max-w-32' : 'opacity-0 max-w-0',
                 )}
                 style={{
                   transitionDelay: sidebarOpen ? '150ms' : '0ms',
@@ -229,10 +226,10 @@ export function AppLayout({ children }: AppLayoutProps) {
             {isMobile && sidebarOpen && (
               <button
                 onClick={closeMobileSidebar}
-                className="p-2.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+                className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
                 aria-label="Close sidebar"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </SidebarHeader>
@@ -260,7 +257,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             isMobile ? 'w-full' : '',
           )}
         >
-          {!location.pathname.startsWith('/workflows') &&
+          {!location.pathname.startsWith('/workflows/') &&
             !location.pathname.startsWith('/webhooks/') && (
               <AppTopBar
                 sidebarOpen={sidebarOpen}

@@ -277,6 +277,39 @@ export function deriveAgentSteps(parts: AgentTraceChunk[]): AgentDerivedStep[] {
       markCompletion(snapshot.step);
     }
 
+    if (chunk?.type === 'data-tool-error') {
+      const toolCallId = ensureString(chunk.toolCallId);
+      let snapshot = toolCallId ? snapshotById.get(toolCallId) : undefined;
+      if (!snapshot) {
+        snapshot = findFallbackSnapshot();
+      }
+      if (!snapshot) {
+        snapshot = createSnapshotStep({
+          toolCallId,
+          toolName: ensureString(chunk.toolName),
+          input: chunk.input ?? null,
+          timestamp: entry.timestamp,
+          sequence: entry.sequence,
+        });
+      }
+      if (chunk.toolName && !snapshot.step.toolName) {
+        snapshot.step.toolName = ensureString(chunk.toolName);
+      }
+      snapshot.step.toolError =
+        chunk.error ??
+        chunk.message ??
+        (chunk.data as Record<string, unknown> | undefined)?.error ??
+        null;
+      snapshot.step.finishReason = 'error';
+      snapshot.step.finishedAt = entry.timestamp;
+      const startedAtMs = ensureDateMs(snapshot.step.startedAt);
+      const finishedAtMs = ensureDateMs(snapshot.step.finishedAt);
+      if (startedAtMs !== undefined && finishedAtMs !== undefined) {
+        snapshot.step.durationMs = Math.max(0, finishedAtMs - startedAtMs);
+      }
+      markCompletion(snapshot.step);
+    }
+
     if (chunk?.type === 'data-reasoning-step') {
       const payload = (chunk?.data ?? {}) as Record<string, unknown>;
       const actions: AgentReasoningAction[] = Array.isArray(payload?.actions)

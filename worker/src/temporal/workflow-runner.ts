@@ -25,7 +25,7 @@ import {
   WorkflowSchedulerError,
 } from './workflow-scheduler';
 import { createLightweightSummary } from './utils/component-output';
-import { buildActionPayload } from './input-resolver';
+import { buildActionPayload, filterInactiveJoinWarnings } from './input-resolver';
 import { isComponentFailure, extractFailureMessage } from './workflows/workflow-helpers';
 import type { ArtifactServiceFactory } from './artifact-factory';
 import { workflowDiagnosticLog } from './workflow-diagnostics';
@@ -140,6 +140,10 @@ export async function executeWorkflow(
       const { inputs, params, warnings, manualOverrides } = buildActionPayload(action, results, {
         componentMetadata: { inputs: inputPorts },
       });
+      const warningsToReport = filterInactiveJoinWarnings(warnings, {
+        joinStrategy,
+        triggeredBy,
+      });
 
       for (const override of manualOverrides) {
         options.trace?.record({
@@ -161,7 +165,7 @@ export async function executeWorkflow(
         });
       }
 
-      for (const warning of warnings) {
+      for (const warning of warningsToReport) {
         options.trace?.record({
           type: 'NODE_PROGRESS',
           runId,
@@ -217,7 +221,7 @@ export async function executeWorkflow(
                   `[WorkflowRunner] Spilled handle '${handle}' not found in downloaded data for parameter '${key}'`,
                 );
                 resolvedParams[key] = undefined;
-                warnings.push({
+                warningsToReport.push({
                   target: key,
                   sourceRef: 'spilled-storage',
                   sourceHandle: handle,
@@ -235,8 +239,8 @@ export async function executeWorkflow(
         }
       }
 
-      if (warnings.length > 0) {
-        const missing = warnings.map((warning) => `'${warning.target}'`).join(', ');
+      if (warningsToReport.length > 0) {
+        const missing = warningsToReport.map((warning) => `'${warning.target}'`).join(', ');
         throw new WorkflowSchedulerError(`Missing required inputs for ${action.ref}: ${missing}`);
       }
 

@@ -178,7 +178,7 @@ function buildLoopBodyDefinition(options: {
         targetRef: edge.target,
         sourceHandle: edge.sourceHandle,
         targetHandle: edge.targetHandle,
-        kind: 'success',
+        kind: edge.kind ?? 'success',
       }),
     ),
     dependencyCounts,

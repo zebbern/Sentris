@@ -15,6 +15,10 @@ import {
   AreAllToolsReadyActivityOutput,
 } from '../types';
 import { workflowDiagnosticLog } from '../workflow-diagnostics';
+import {
+  isMcpStdioHostProxyId,
+  stopMcpStdioHostProxy,
+} from '../../components/core/mcp-stdio-host-proxy';
 
 const DEFAULT_API_BASE_URL =
   process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
@@ -173,6 +177,13 @@ export async function cleanupRunResourcesActivity(
         if (!containerId || typeof containerId !== 'string') return;
         if (!/^[a-zA-Z0-9_.-]+$/.test(containerId)) {
           console.warn(`[MCP Cleanup] Skipping container with unsafe id: ${containerId}`);
+          return;
+        }
+        if (isMcpStdioHostProxyId(containerId)) {
+          const stopped = await stopMcpStdioHostProxy(containerId);
+          workflowDiagnosticLog(
+            `[MCP Cleanup] ${stopped ? 'Stopped' : 'Host proxy already gone'}: ${containerId}`,
+          );
           return;
         }
         try {

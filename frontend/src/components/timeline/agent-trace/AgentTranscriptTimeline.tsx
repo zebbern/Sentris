@@ -1,6 +1,7 @@
 import type { AgentDerivedStep } from './types';
 import { formatClock, formatDuration, summarizeUnknown } from './utils';
 import { ExpandableText } from './ExpandableText';
+import { MarkdownView } from '@/components/ui/markdown';
 
 function AgentPromptCard({ prompt }: { prompt: string }) {
   return (
@@ -27,6 +28,10 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
   const toolOutputSummary =
     step.toolOutput !== null && step.toolOutput !== undefined
       ? summarizeUnknown(step.toolOutput)
+      : null;
+  const toolErrorSummary =
+    step.toolError !== null && step.toolError !== undefined
+      ? summarizeUnknown(step.toolError)
       : null;
 
   return (
@@ -60,6 +65,12 @@ function AgentStepCard({ step }: { step: AgentDerivedStep }) {
             <p className="text-muted-foreground">
               Input: <span className="text-foreground">{toolInputSummary}</span>
             </p>
+          )}
+          {toolErrorSummary && (
+            <div className="mt-2 rounded border border-destructive/30 bg-destructive/10 p-2">
+              <p className="text-[11px] font-semibold uppercase text-destructive">Tool error</p>
+              <p className="mt-1 text-destructive">{toolErrorSummary}</p>
+            </div>
           )}
           {toolOutputSummary && (
             <p className="text-muted-foreground">
@@ -116,7 +127,10 @@ function AgentFinalResponseCard({ text }: { text: string }) {
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm shadow-sm">
       <p className="text-[11px] uppercase text-primary">Final Answer</p>
-      <p className="mt-1 whitespace-pre-wrap leading-relaxed text-foreground">{text}</p>
+      <MarkdownView
+        content={text}
+        className="mt-1 max-w-none text-sm leading-relaxed text-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3"
+      />
     </div>
   );
 }

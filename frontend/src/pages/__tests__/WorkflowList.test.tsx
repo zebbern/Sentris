@@ -210,7 +210,8 @@ describe('WorkflowList delete workflow flow', () => {
     mockWorkflows = [makeWorkflow('11111111-1111-4111-8111-111111111111', 'Test')];
     renderWorkflowList();
 
-    expect(screen.getByRole('heading', { level: 2, name: /Workflows/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: /Workflows/i })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Filter by name or description/i)).toBeInTheDocument();
   });
 
   it('opens confirmation dialog with workflow details when delete is clicked', async () => {

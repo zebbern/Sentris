@@ -250,30 +250,28 @@ export class TemplateValidationLedgerService {
       requiredSecrets: this.getRequiredSecrets(template),
     };
 
-    return this.getCandidateClassifications(template, entry, liveInputs).some(
-      (classification) => {
-        const currentFingerprint = createTemplateValidationFingerprint({
-          apiTemplate,
-          seedTemplate: seedTemplate ?? null,
-          liveInputs,
-          classification,
-          componentValidationFingerprints,
-        });
-        if (currentFingerprint === entry.fingerprint) return true;
+    return this.getCandidateClassifications(template, entry, liveInputs).some((classification) => {
+      const currentFingerprint = createTemplateValidationFingerprint({
+        apiTemplate,
+        seedTemplate: seedTemplate ?? null,
+        liveInputs,
+        classification,
+        componentValidationFingerprints,
+      });
+      if (currentFingerprint === entry.fingerprint) return true;
 
-        const legacyFingerprint = createTemplateValidationFingerprint({
-          apiTemplate,
-          seedTemplate: seedTemplate ?? null,
-          liveInputs,
-          classification,
-        });
-        return this.legacyFingerprintStillCoversComponents(
-          entry,
-          legacyFingerprint,
-          componentValidationVerifiedAt,
-        );
-      },
-    );
+      const legacyFingerprint = createTemplateValidationFingerprint({
+        apiTemplate,
+        seedTemplate: seedTemplate ?? null,
+        liveInputs,
+        classification,
+      });
+      return this.legacyFingerprintStillCoversComponents(
+        entry,
+        legacyFingerprint,
+        componentValidationVerifiedAt,
+      );
+    });
   }
 
   private legacyFingerprintStillCoversComponents(
@@ -328,7 +326,9 @@ export class TemplateValidationLedgerService {
   private getLedgerLiveInputs(
     entry: TemplateValidationLedgerEntry,
   ): Record<string, unknown> | null {
-    return entry.liveInputs && typeof entry.liveInputs === 'object' && !Array.isArray(entry.liveInputs)
+    return entry.liveInputs &&
+      typeof entry.liveInputs === 'object' &&
+      !Array.isArray(entry.liveInputs)
       ? entry.liveInputs
       : null;
   }

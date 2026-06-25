@@ -10,7 +10,7 @@ function Sidebar({
     <aside
       ref={ref}
       className={cn(
-        'flex flex-col border-r bg-background overflow-hidden',
+        'flex flex-col border-r border-border/80 bg-app-chrome overflow-hidden',
         // Ensure smooth transition for width changes
         'will-change-[width,transform]',
         className,
@@ -28,10 +28,7 @@ function SidebarHeader({
   return (
     <div
       ref={ref}
-      className={cn(
-        'border-b p-3 md:p-4 min-h-[56px] md:min-h-[60px] flex items-center',
-        className,
-      )}
+      className={cn('border-b px-2 min-h-10 flex items-center', className)}
       {...props}
     />
   );
@@ -66,7 +63,7 @@ function SidebarContent({
 
 function getSidebarItemClassName(isActive?: boolean, className?: string) {
   return cn(
-    'flex w-full items-center gap-2.5 px-3 py-2 md:py-1.5 text-left rounded-lg text-xs font-medium',
+    'flex w-full items-center gap-2.5 px-2.5 py-2 md:py-1.5 text-left rounded-lg text-[13px] font-medium',
     'transition-colors duration-150',
     'hover:bg-accent hover:text-accent-foreground',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',

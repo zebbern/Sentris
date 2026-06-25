@@ -137,8 +137,8 @@ export function AgentSkillsPage() {
   return (
     <div className="container max-w-5xl py-6 space-y-6">
       <p className="text-sm text-muted-foreground">
-        Discovered from {DISCOVERY_DIR_LABEL}. Import folders into your org library for use on
-        agent workflow nodes.
+        Discovered from {DISCOVERY_DIR_LABEL}. Import folders into your org library for use on agent
+        workflow nodes.
       </p>
 
       <div className="space-y-6">
@@ -243,9 +243,7 @@ export function AgentSkillsPage() {
                 <Button
                   size="sm"
                   onClick={handleImportSelected}
-                  disabled={
-                    selectedDiscoveryKeys.size === 0 || importDiscoveredMutation.isPending
-                  }
+                  disabled={selectedDiscoveryKeys.size === 0 || importDiscoveredMutation.isPending}
                 >
                   Import selected
                 </Button>

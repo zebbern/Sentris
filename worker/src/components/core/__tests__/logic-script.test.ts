@@ -180,6 +180,36 @@ describe('Logic/Script Component', () => {
     expect(result).toEqual({ diff: 6, product: 40 });
   });
 
+  it('injects failure metadata into a failure variable when present', async () => {
+    const runSpy = vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ handled: true });
+    const failureContext: ExecutionContext = {
+      ...mockContext,
+      metadata: {
+        ...mockContext.metadata,
+        failure: {
+          at: 'clone_repo',
+          reason: { message: 'archive not found', name: 'Error' },
+        },
+      },
+    };
+
+    const result = await definition.execute(
+      {
+        inputs: {},
+        params: {
+          code: 'export function script(input) { return { handled: Boolean(input.failure) }; }',
+          variables: [{ name: 'failure', type: 'json', required: false }],
+          returns: [{ name: 'handled', type: 'boolean', required: false }],
+        },
+      },
+      failureContext,
+    );
+
+    const runnerPayload = runSpy.mock.calls[0][2] as Record<string, unknown>;
+    expect(runnerPayload.failure).toEqual(failureContext.metadata.failure);
+    expect(result).toEqual({ handled: true });
+  });
+
   it('can access global fetch', async () => {
     vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ status: 200 });
     const code = `

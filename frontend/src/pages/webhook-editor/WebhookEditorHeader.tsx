@@ -82,9 +82,7 @@ export function WebhookEditorHeader({
             </Button>
           </div>
         ) : (
-          !isNew && (
-            <p className="mt-1 text-xs text-muted-foreground">Unsaved configuration</p>
-          )
+          !isNew && <p className="mt-1 text-xs text-muted-foreground">Unsaved configuration</p>
         )}
       </div>
 

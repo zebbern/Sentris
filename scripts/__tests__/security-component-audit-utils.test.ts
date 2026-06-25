@@ -166,14 +166,14 @@ describe('security-component-audit-utils', () => {
     const fixture = SECURITY_COMPONENT_LIVE_FIXTURES['sentris.repository.files.extract'];
     const baseContract = {
       outputs: [{ id: 'sourceBundle', label: 'Source Bundle' }],
-      parameters: [{ id: 'maxFiles', label: 'Max Files' }],
+      parameters: [{ id: 'maxTotalBytes', label: 'Max Total Size' }],
     };
     const changedContract = {
       outputs: [
         { id: 'sourceBundle', label: 'Source Bundle' },
         { id: 'githubActionsBundle', label: 'GitHub Actions Bundle' },
       ],
-      parameters: [{ id: 'maxFiles', label: 'Max Files' }],
+      parameters: [{ id: 'maxTotalBytes', label: 'Max Total Size' }],
     };
 
     expect(

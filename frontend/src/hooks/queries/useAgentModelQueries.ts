@@ -13,9 +13,7 @@ export interface ListAnthropicModelsResponse {
   error?: string | null;
 }
 
-async function fetchAnthropicModels(
-  apiKeySecretId: string,
-): Promise<ListAnthropicModelsResponse> {
+async function fetchAnthropicModels(apiKeySecretId: string): Promise<ListAnthropicModelsResponse> {
   const headers = await getApiAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/api/v1/ai/anthropic/models`, {
     method: 'POST',

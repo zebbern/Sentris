@@ -20,48 +20,6 @@ import { extractLoopBodies, topoSortWithoutLoopBackCycles } from './loop-body';
 
 const compilerLogger = new Logger('WorkflowCompiler');
 
-function topoSort(nodes: string[], edges: { source: string; target: string }[]): string[] {
-  const incoming = new Map<string, number>();
-  const adjacency = new Map<string, string[]>();
-
-  nodes.forEach((id) => {
-    incoming.set(id, 0);
-    adjacency.set(id, []);
-  });
-
-  for (const edge of edges) {
-    if (!incoming.has(edge.target)) {
-      throw new Error(`Edge references unknown node ${edge.target}`);
-    }
-    if (!incoming.has(edge.source)) {
-      throw new Error(`Edge references unknown node ${edge.source}`);
-    }
-    incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
-    adjacency.get(edge.source)?.push(edge.target);
-  }
-
-  const queue: string[] = nodes.filter((id) => (incoming.get(id) ?? 0) === 0);
-  const result: string[] = [];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    result.push(current);
-
-    for (const neighbor of adjacency.get(current) ?? []) {
-      incoming.set(neighbor, (incoming.get(neighbor) ?? 1) - 1);
-      if ((incoming.get(neighbor) ?? 0) === 0) {
-        queue.push(neighbor);
-      }
-    }
-  }
-
-  if (result.length !== nodes.length) {
-    throw new Error('Workflow graph contains a cycle');
-  }
-
-  return result;
-}
-
 export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinition {
   // Filter out UI-only nodes (like text-block) that shouldn't be executed
   const executableNodes = graph.nodes.filter((node: WorkflowNodeDto) => {
@@ -225,6 +183,7 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
       inputOverrides,
       dependsOn: Array.from(incomingEdges.get(id) ?? []),
       inputMappings,
+      retryPolicy: component?.retryPolicy,
     };
   });
 
@@ -302,7 +261,7 @@ export function compileWorkflowGraph(graph: WorkflowGraphDto): WorkflowDefinitio
     targetRef: edge.target,
     sourceHandle: edge.sourceHandle,
     targetHandle: edge.targetHandle,
-    kind: 'success',
+    kind: edge.kind ?? 'success',
   }));
 
   // Verify the entrypoint ref points to an entrypoint component

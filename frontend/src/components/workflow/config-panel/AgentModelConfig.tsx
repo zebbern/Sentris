@@ -162,8 +162,7 @@ export function AgentModelConfig({
       : Boolean(config.apiKeySecretId);
 
   const liveFetchFailed =
-    Boolean(liveFetchSecretId) &&
-    (modelsQuery.data?.source === 'error' || modelsQuery.isError);
+    Boolean(liveFetchSecretId) && (modelsQuery.data?.source === 'error' || modelsQuery.isError);
 
   return (
     <CollapsibleSection
@@ -219,9 +218,7 @@ export function AgentModelConfig({
                 placeholder="Select model"
                 selectedLabel={selectedModelLabel}
                 loading={isClaudeCode && modelsQuery.isFetching}
-                onRefresh={
-                  liveFetchSecretId ? () => void modelsQuery.refetch() : undefined
-                }
+                onRefresh={liveFetchSecretId ? () => void modelsQuery.refetch() : undefined}
               />
               {isClaudeCode ? (
                 <>
@@ -238,8 +235,8 @@ export function AgentModelConfig({
                     </p>
                   ) : liveFetchFailed ? (
                     <p className="text-[10px] text-muted-foreground">
-                      Live model list unavailable (subscription tokens cannot list models) —
-                      showing curated models. Type an exact id above if needed.
+                      Live model list unavailable (subscription tokens cannot list models) — showing
+                      curated models. Type an exact id above if needed.
                     </p>
                   ) : authMode === 'subscription_oauth' ? (
                     <p className="text-[10px] text-muted-foreground">

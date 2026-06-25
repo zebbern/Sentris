@@ -43,6 +43,9 @@ describe('core.ai.opencode', () => {
     const component = componentRegistry.get('core.ai.opencode');
     expect(component).toBeDefined();
     expect(component?.id).toBe('core.ai.opencode');
+    expect(
+      component?.inputs.safeParse({ task: 'Gate run', trigger: { verdict: 'promote' } }).success,
+    ).toBe(true);
   });
 
   it('should execute with valid inputs', async () => {
@@ -81,8 +84,15 @@ describe('core.ai.opencode', () => {
 
     expect(result.report).toContain('# Report');
 
-    const volumeInstance = (IsolatedContainerVolume as unknown as { mock: { results: Array<{ value: { initialize: { mock: { calls: Array<[Record<string, string>]> } } } }> } }).mock
-      .results[0].value;
+    const volumeInstance = (
+      IsolatedContainerVolume as unknown as {
+        mock: {
+          results: {
+            value: { initialize: { mock: { calls: [Record<string, string>][] } } };
+          }[];
+        };
+      }
+    ).mock.results[0].value;
     const initCall = volumeInstance.initialize.mock.calls[0][0];
 
     expect(initCall['context.json']).toContain('"alertId": "123"');
@@ -138,8 +148,15 @@ describe('core.ai.opencode', () => {
       context as never,
     );
 
-    const volumeInstance = (IsolatedContainerVolume as unknown as { mock: { results: Array<{ value: { initialize: { mock: { calls: Array<[Record<string, string>]> } } } }> } }).mock
-      .results[0].value;
+    const volumeInstance = (
+      IsolatedContainerVolume as unknown as {
+        mock: {
+          results: {
+            value: { initialize: { mock: { calls: [Record<string, string>][] } } };
+          }[];
+        };
+      }
+    ).mock.results[0].value;
     const initCall = volumeInstance.initialize.mock.calls[0][0];
 
     const config = JSON.parse(initCall['opencode.jsonc']);

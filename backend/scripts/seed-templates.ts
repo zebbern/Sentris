@@ -303,9 +303,7 @@ export async function seedTemplates(): Promise<void> {
       REMOVED_OFFICIAL_SEED_TEMPLATES,
     );
     if (deactivated > 0) {
-      console.log(
-        `\n  Deactivated ${deactivated} retired official seed template(s)`,
-      );
+      console.log(`\n  Deactivated ${deactivated} retired official seed template(s)`);
     }
 
     console.log(`\nDone: ${inserted} inserted, ${updated} updated, ${deactivated} deactivated\n`);

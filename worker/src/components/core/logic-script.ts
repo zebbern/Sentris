@@ -344,6 +344,15 @@ const definition = defineComponent({
       string,
       unknown
     >;
+    const declaresFailureVariable =
+      Array.isArray(variables) && variables.some((variable) => variable?.name === 'failure');
+    if (
+      declaresFailureVariable &&
+      runnerPayload.failure === undefined &&
+      context.metadata.failure
+    ) {
+      runnerPayload.failure = context.metadata.failure;
+    }
     const result = await runComponentWithRunner<typeof runnerPayload, Record<string, unknown>>(
       runnerConfig,
       async () => {

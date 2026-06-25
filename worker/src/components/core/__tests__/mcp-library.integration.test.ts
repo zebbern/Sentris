@@ -6,9 +6,21 @@ const mockStartMcpDockerServer = vi.fn(async () => ({
   endpoint: 'http://localhost:3000/mcp',
   containerId: 'container-123',
 }));
+const mockStartMcpStdioHostProxy = vi.fn(async () => ({
+  endpoint: 'http://localhost:3000/mcp',
+  containerId: 'host-mcp-proxy-123',
+}));
+const mockStopMcpStdioHostProxy = vi.fn(async () => true);
 
 vi.mock('../mcp-runtime', () => ({
   startMcpDockerServer: mockStartMcpDockerServer,
+}));
+
+vi.mock('../mcp-stdio-host-proxy', () => ({
+  MCP_STDIO_HOST_PROXY_ID_PREFIX: 'host-mcp-proxy-',
+  isMcpStdioHostProxyId: (id: string) => id.startsWith('host-mcp-proxy-'),
+  startMcpStdioHostProxy: mockStartMcpStdioHostProxy,
+  stopMcpStdioHostProxy: mockStopMcpStdioHostProxy,
 }));
 
 const mockConnect = vi.fn(async () => {});
@@ -159,7 +171,13 @@ describe('MCP Library Integration Tests', () => {
 
       // Verify result
       expect(result).toEqual({});
-      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
+      expect(mockStartMcpStdioHostProxy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'awslabs.cloudtrail-mcp-server',
+          args: [],
+        }),
+      );
+      expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v1/mcp-servers',
         expect.any(Object),
@@ -243,7 +261,143 @@ describe('MCP Library Integration Tests', () => {
       );
 
       expect(result).toEqual({});
-      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(2);
+      expect(mockStartMcpStdioHostProxy).toHaveBeenCalledTimes(2);
+      expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
+    });
+
+    test('should register all enabled servers with distinct child node ids when useAllEnabled is true', async () => {
+      setupFetchMocks([
+        {
+          id: 'aws-cloudtrail',
+          name: 'AWS CloudTrail',
+          transportType: 'stdio',
+          command: 'awslabs.cloudtrail-mcp-server',
+          args: [],
+          enabled: true,
+          endpoint: null,
+          hasHeaders: false,
+          headerKeys: null,
+        },
+        {
+          id: 'http-server',
+          name: 'HTTP MCP Server',
+          transportType: 'http',
+          command: null,
+          args: null,
+          enabled: true,
+          endpoint: 'https://example.com/mcp',
+          hasHeaders: false,
+          headerKeys: null,
+        },
+        {
+          id: 'disabled-server',
+          name: 'Disabled MCP Server',
+          transportType: 'http',
+          command: null,
+          args: null,
+          enabled: false,
+          endpoint: 'https://disabled.example.com/mcp',
+          hasHeaders: false,
+          headerKeys: null,
+        },
+      ]);
+
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      expect(component).toBeDefined();
+
+      const context = createExecutionContext({
+        runId: 'test-run-all-enabled',
+        componentRef: 'custom-mcps',
+      });
+
+      const result = await component!.execute(
+        {
+          inputs: {},
+          params: {
+            enabledServers: [],
+            useAllEnabled: true,
+          },
+        },
+        context,
+      );
+
+      expect(result).toEqual({});
+      const registerCalls = (global.fetch as any).mock.calls.filter(
+        ([url, init]: [string, RequestInit]) =>
+          url.includes('/register-mcp-server') && init?.method === 'POST',
+      );
+      const nodeIds = registerCalls.map(
+        ([, init]: [string, RequestInit]) => JSON.parse(String(init.body)).nodeId,
+      );
+
+      expect(nodeIds).toEqual(['custom-mcps/aws-cloudtrail', 'custom-mcps/http-server']);
+      expect(mockStartMcpStdioHostProxy).toHaveBeenCalledTimes(1);
+      expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
+    });
+
+    test('should continue registering remaining servers when an optional MCP server fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupFetchMocks([
+        {
+          id: 'broken-stdio',
+          name: 'Broken STDIO MCP',
+          transportType: 'stdio',
+          command: 'missing-mcp-server',
+          args: [],
+          enabled: true,
+          endpoint: null,
+          hasHeaders: false,
+          headerKeys: null,
+        },
+        {
+          id: 'working-stdio',
+          name: 'Working STDIO MCP',
+          transportType: 'stdio',
+          command: 'working-mcp-server',
+          args: [],
+          enabled: true,
+          endpoint: null,
+          hasHeaders: false,
+          headerKeys: null,
+        },
+      ]);
+      mockStartMcpStdioHostProxy
+        .mockRejectedValueOnce(new Error('host proxy failed to start'))
+        .mockResolvedValueOnce({
+          endpoint: 'http://localhost:3000/mcp',
+          containerId: 'host-mcp-proxy-456',
+        });
+
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      expect(component).toBeDefined();
+
+      const context = createExecutionContext({
+        runId: 'test-run-optional-failure',
+        componentRef: 'custom-mcps',
+      });
+
+      const result = await component!.execute(
+        {
+          inputs: {},
+          params: {
+            enabledServers: ['broken-stdio', 'working-stdio'],
+            continueOnServerError: true,
+          },
+        },
+        context,
+      );
+
+      expect(result).toEqual({});
+      const registerCalls = (global.fetch as any).mock.calls.filter(
+        ([url, init]: [string, RequestInit]) =>
+          url.includes('/register-mcp-server') && init?.method === 'POST',
+      );
+      expect(registerCalls).toHaveLength(1);
+      expect(JSON.parse(String(registerCalls[0][1].body)).nodeId).toBe('custom-mcps/working-stdio');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping unavailable MCP server'),
+      );
+      warnSpy.mockRestore();
     });
 
     test('should filter out disabled servers', async () => {
@@ -281,7 +435,8 @@ describe('MCP Library Integration Tests', () => {
       );
 
       expect(result).toEqual({});
-      expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
+      expect(mockStartMcpStdioHostProxy).toHaveBeenCalledTimes(1);
+      expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
     });
   });
 
@@ -359,6 +514,7 @@ describe('MCP Library Integration Tests', () => {
 
       expect(true).toBe(true); // Test passes if no error thrown
       expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
+      expect(mockStartMcpStdioHostProxy).not.toHaveBeenCalled();
     });
   });
 

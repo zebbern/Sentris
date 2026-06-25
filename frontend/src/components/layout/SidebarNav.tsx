@@ -6,12 +6,11 @@ import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/store/themeStore';
 import { useAuth, useAuthProvider } from '@/auth/auth-context';
 import { UserButton } from '@/components/auth/UserButton';
-import { NotificationCenter } from '@/components/layout/NotificationCenter';
 import { useIsMac } from '@/hooks/useIsMac';
 import { prefetchRoute } from '@/lib/prefetch-routes';
 
 const footerIconButtonClass =
-  'h-9 w-9 min-h-9 min-w-9 shrink-0 flex items-center justify-center rounded-lg p-0';
+  'h-7 w-7 min-h-7 min-w-7 shrink-0 flex items-center justify-center rounded-md p-0';
 
 export interface NavItem {
   name: string;
@@ -54,15 +53,51 @@ export function SidebarNav({
   const { isAuthenticated } = useAuth();
   const authProvider = useAuthProvider();
   const showUserButton = isAuthenticated || authProvider.name === 'clerk';
-  const collapsedIconButtonClass = isCompact
-    ? 'h-8 w-8 min-h-8 px-0 py-0 mx-auto justify-center gap-0'
-    : 'h-10 w-10 min-h-10 px-0 py-0 mx-auto justify-center gap-0';
+  const collapsedNavItemClass =
+    'h-10 w-10 min-h-10 min-w-10 max-w-10 shrink-0 p-0 mx-auto flex items-center justify-center gap-0';
+  const expandedNavItemClass = isCompact
+    ? 'w-full justify-start px-2.5 gap-2 py-2 md:py-1.5 min-h-[40px] md:min-h-0'
+    : 'w-full justify-start px-2.5 gap-2.5 py-2';
 
   return (
     <>
       <SidebarContent className="py-0">
+        <div className={cn('px-1.5 pt-1.5 pb-0.5', !sidebarOpen && 'flex justify-center')}>
+          <button
+            onClick={onOpenCommandPalette}
+            className={cn(
+              'flex items-center rounded-md transition-colors',
+              'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground',
+              sidebarOpen ? 'w-full gap-2 py-2 justify-between px-2.5' : collapsedNavItemClass,
+            )}
+            aria-label="Open command palette"
+          >
+            {sidebarOpen ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Search className="h-3.5 w-3.5 flex-shrink-0" />
+                  <NavLabel sidebarOpen={sidebarOpen} isCompact={false}>
+                    Search...
+                  </NavLabel>
+                </div>
+                <kbd className="hidden sm:inline-flex h-[18px] items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1 font-mono text-[11px] font-medium text-muted-foreground">
+                  {isMac ? (
+                    <>
+                      <Command className="h-2.5 w-2.5" />K
+                    </>
+                  ) : (
+                    'Ctrl+K'
+                  )}
+                </kbd>
+              </>
+            ) : (
+              <Search className="h-3.5 w-3.5 flex-shrink-0" />
+            )}
+          </button>
+        </div>
+
         <nav aria-label="Main navigation">
-          <ul className={cn('list-none px-2 mt-2', isCompact ? 'space-y-0.5' : 'space-y-1')}>
+          <ul className={cn('list-none px-1.5 mt-0.5', isCompact ? 'space-y-0.5' : 'space-y-1')}>
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -70,15 +105,14 @@ export function SidebarNav({
 
               if (isExternal) {
                 return (
-                  <li key={item.href}>
+                  <li key={item.href} className={cn(!sidebarOpen && 'flex justify-center')}>
                     <a
                       href={item.href}
                       className={getSidebarItemClassName(
                         false,
                         cn(
                           'flex items-center',
-                          isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-2.5 py-1.5',
-                          sidebarOpen ? 'justify-start px-3' : collapsedIconButtonClass,
+                          sidebarOpen ? expandedNavItemClass : collapsedNavItemClass,
                         ),
                       )}
                       onClick={(e) => {
@@ -87,7 +121,9 @@ export function SidebarNav({
                         window.open(item.href, '_blank', 'noopener,noreferrer');
                       }}
                     >
-                      <Icon className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+                      <Icon
+                        className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
+                      />
                       <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                         {item.name}
                       </NavLabel>
@@ -97,7 +133,7 @@ export function SidebarNav({
               }
 
               return (
-                <li key={item.href}>
+                <li key={item.href} className={cn(!sidebarOpen && 'flex justify-center')}>
                   <Link
                     to={item.href}
                     aria-current={active ? 'page' : undefined}
@@ -105,8 +141,7 @@ export function SidebarNav({
                       active,
                       cn(
                         'flex items-center',
-                        isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-2.5 py-1.5',
-                        sidebarOpen ? 'justify-start px-3' : collapsedIconButtonClass,
+                        sidebarOpen ? expandedNavItemClass : collapsedNavItemClass,
                       ),
                     )}
                     onMouseEnter={() => prefetchRoute(item.href)}
@@ -119,7 +154,9 @@ export function SidebarNav({
                       onDesktopNavClick(item.href);
                     }}
                   >
-                    <Icon className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+                    <Icon
+                      className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
+                    />
                     <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                       {item.name}
                     </NavLabel>
@@ -130,35 +167,49 @@ export function SidebarNav({
           </ul>
 
           {/* Manage Collapsible Section */}
-          <div className="px-2 mt-2">
+          <div className={cn('px-1.5 mt-1', !sidebarOpen && 'flex flex-col items-center')}>
             <button
               onClick={onSettingsToggle}
               aria-expanded={settingsOpen}
               aria-controls="manage-nav-section"
+              aria-label={sidebarOpen ? undefined : 'Manage'}
               className={cn(
-                'w-full flex items-center rounded-lg transition-colors',
-                isCompact ? 'gap-2 py-1.5' : 'gap-2.5 py-1.5',
+                'flex items-center rounded-lg transition-colors',
                 'hover:bg-muted/50 text-muted-foreground hover:text-foreground',
-                sidebarOpen ? 'justify-between px-3' : collapsedIconButtonClass,
+                sidebarOpen
+                  ? cn(
+                      'w-full',
+                      isCompact
+                        ? 'gap-2 py-2 justify-between px-2.5'
+                        : 'gap-2.5 py-2 justify-between px-2.5',
+                    )
+                  : collapsedNavItemClass,
               )}
             >
-              <div
-                className={cn(
-                  'flex items-center',
-                  sidebarOpen ? (isCompact ? 'gap-2' : 'gap-2.5') : 'gap-0 justify-center',
-                )}
-              >
-                <Settings className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
-                <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact} fontWeight="font-medium">
-                  Manage
-                </NavLabel>
-              </div>
-              {sidebarOpen && (
-                <ChevronDown
-                  className={cn(
-                    'h-3.5 w-3.5 transition-transform duration-200 flex-shrink-0',
-                    settingsOpen ? 'rotate-180' : '',
-                  )}
+              {sidebarOpen ? (
+                <>
+                  <div className={cn('flex items-center', isCompact ? 'gap-2' : 'gap-2.5')}>
+                    <Settings
+                      className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
+                    />
+                    <NavLabel
+                      sidebarOpen={sidebarOpen}
+                      isCompact={isCompact}
+                      fontWeight="font-medium"
+                    >
+                      Manage
+                    </NavLabel>
+                  </div>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 transition-transform duration-200 flex-shrink-0',
+                      settingsOpen ? 'rotate-180' : '',
+                    )}
+                  />
+                </>
+              ) : (
+                <Settings
+                  className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
                 />
               )}
             </button>
@@ -174,7 +225,7 @@ export function SidebarNav({
                 const Icon = item.icon;
                 const active = isActive(item.href);
                 return (
-                  <li key={item.href}>
+                  <li key={item.href} className={cn(!sidebarOpen && 'flex justify-center')}>
                     <Link
                       to={item.href}
                       aria-current={active ? 'page' : undefined}
@@ -182,8 +233,7 @@ export function SidebarNav({
                         active,
                         cn(
                           'flex items-center',
-                          isCompact ? 'gap-2 py-1.5 md:py-1 min-h-[36px] md:min-h-0' : 'gap-2.5 py-1.5',
-                          sidebarOpen ? 'justify-start px-3' : collapsedIconButtonClass,
+                          sidebarOpen ? expandedNavItemClass : collapsedNavItemClass,
                         ),
                       )}
                       onMouseEnter={() => prefetchRoute(item.href)}
@@ -197,7 +247,7 @@ export function SidebarNav({
                       }}
                     >
                       <Icon
-                        className={cn('flex-shrink-0', isCompact ? 'h-3 w-3' : 'h-3.5 w-3.5')}
+                        className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
                       />
                       <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                         {item.name}
@@ -212,60 +262,27 @@ export function SidebarNav({
       </SidebarContent>
 
       <SidebarFooter className="border-t p-0">
-        <div className="px-2 pt-2 pb-1">
-          <button
-            onClick={onOpenCommandPalette}
-            className={cn(
-              'w-full flex items-center gap-2.5 py-2 rounded-lg transition-colors',
-              'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground',
-              sidebarOpen ? 'justify-between px-3' : collapsedIconButtonClass,
-            )}
-            aria-label="Open command palette"
-          >
-            <div
-              className={cn('flex items-center', sidebarOpen ? 'gap-2.5' : 'gap-0 justify-center')}
-            >
-              <Search className="h-3.5 w-3.5 flex-shrink-0" />
-              <NavLabel sidebarOpen={sidebarOpen} isCompact={false}>
-                Search...
-              </NavLabel>
-            </div>
-            {sidebarOpen && (
-              <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/60 bg-background/80 px-1.5 font-mono text-xs font-medium text-muted-foreground">
-                {isMac ? (
-                  <>
-                    <Command className="h-2.5 w-2.5" />K
-                  </>
-                ) : (
-                  'Ctrl+K'
-                )}
-              </kbd>
-            )}
-          </button>
-        </div>
-
         <div
           className={cn(
-            'p-1.5',
-            sidebarOpen ? 'flex items-center gap-1' : 'flex flex-col items-center gap-1.5',
+            'px-1 py-0.5',
+            sidebarOpen ? 'flex items-center gap-0.5' : 'flex flex-col items-center gap-0.5',
           )}
         >
           {showUserButton && (
             <UserButton
+              compact
+              integratedNotifications
               className={cn(sidebarOpen ? 'min-w-0 flex-1' : 'w-auto mx-auto')}
               sidebarCollapsed={!sidebarOpen}
             />
           )}
-          <div className="flex shrink-0 items-center">
-            <NotificationCenter className={footerIconButtonClass} popoverSide="top" />
-            {sidebarOpen && (
-              <ThemeToggleButton
-                theme={theme}
-                onToggle={startTransition}
-                className={footerIconButtonClass}
-              />
-            )}
-          </div>
+          {sidebarOpen && (
+            <ThemeToggleButton
+              theme={theme}
+              onToggle={startTransition}
+              className={footerIconButtonClass}
+            />
+          )}
         </div>
       </SidebarFooter>
     </>
@@ -288,15 +305,19 @@ function NavLabel({
   return (
     <span
       className={cn(
-        'transition-all duration-300 whitespace-nowrap overflow-hidden flex-1',
-        isCompact ? 'text-[11px]' : 'text-xs',
+        'transition-all duration-300 whitespace-nowrap overflow-hidden',
+        isCompact ? 'text-xs' : 'text-[13px]',
         fontWeight,
-        sidebarOpen ? 'opacity-100' : 'opacity-0 max-w-0',
+        sidebarOpen ? 'flex-1 opacity-100' : 'hidden',
       )}
-      style={{
-        transitionDelay: sidebarOpen ? '200ms' : '0ms',
-        transitionProperty: 'opacity, max-width',
-      }}
+      style={
+        sidebarOpen
+          ? {
+              transitionDelay: '200ms',
+              transitionProperty: 'opacity, max-width',
+            }
+          : undefined
+      }
     >
       {children}
     </span>
@@ -322,9 +343,9 @@ function ThemeToggleButton({
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {theme === 'dark' ? (
-        <Sun className="h-4 w-4 text-amber-500" />
+        <Sun className="h-3 w-3 text-amber-500" />
       ) : (
-        <Moon className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+        <Moon className="h-3 w-3 text-slate-600 dark:text-slate-400" />
       )}
     </button>
   );

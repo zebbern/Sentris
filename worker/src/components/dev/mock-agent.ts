@@ -19,6 +19,7 @@ import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from '../ai/utils';
 const TEST_TOOL_CALLS: Record<string, Record<string, unknown>> = {
   abuseipdb_check: { ipAddress: '8.8.8.8' },
   virustotal_lookup: { indicator: '8.8.8.8' },
+  fetch: { url: 'https://example.com', max_length: 1200 },
 };
 
 /**
@@ -102,6 +103,9 @@ function getTestArgsForTool(toolName: string): Record<string, unknown> | null {
   const parts = toolName.split('__');
   if (parts.length === 2) {
     const actualToolName = parts[1];
+    if (TEST_TOOL_CALLS[actualToolName]) {
+      return TEST_TOOL_CALLS[actualToolName];
+    }
     if (AWS_TOOL_TEST_ARGS[actualToolName]) {
       return AWS_TOOL_TEST_ARGS[actualToolName];
     }

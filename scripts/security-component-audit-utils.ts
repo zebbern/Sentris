@@ -517,10 +517,43 @@ export const SECURITY_COMPONENT_LIVE_FIXTURES: Record<
     inputs: { target: 'console.log("audit");' },
     params: { config: 'p/ci', timeout: 120 },
   },
+  'sentris.opengrep.run': {
+    tier: 'B',
+    inputs: { target: 'console.log("audit");' },
+    params: { config: 'p/ci', timeoutSeconds: 120 },
+  },
+  'sentris.codeql.run': {
+    tier: 'B',
+    inputs: { target: '# FILE: index.js\nconsole.log("audit");\n' },
+    params: {
+      language: 'javascript-typescript',
+      querySuite: 'security-extended',
+      timeoutSeconds: 300,
+    },
+  },
+  'sentris.jazzer-js.run': {
+    tier: 'B',
+    inputs: { fuzzTargets: [] },
+    params: { timeoutSeconds: 30, maxCrashes: 1 },
+  },
   'sentris.repository.files.extract': {
     tier: 'A',
     inputs: { repositoryUrl: 'https://github.com/OWASP/NodeGoat' },
-    params: { maxFiles: 5 },
+    params: { maxTotalBytes: 250_000 },
+  },
+  'sentris.github.repository.clone': {
+    tier: 'A',
+    inputs: {
+      repositoryUrl: 'https://github.com/octocat/Hello-World',
+      ref: 'master',
+    },
+    params: {
+      refKind: 'branch',
+      emitSourceBundle: true,
+      maxFileBytes: 500_000,
+      maxTotalBytes: 5_000_000,
+      maxArchiveBytes: 500_000_000,
+    },
   },
   'sentris.repository.manifest.extract': {
     tier: 'A',
@@ -554,6 +587,18 @@ export const SECURITY_COMPONENT_LIVE_FIXTURES: Record<
       maxPackages: 5,
       recentPublishDays: 90,
       includeRawMetadata: false,
+    },
+  },
+  'sentris.npm.package.source': {
+    tier: 'A',
+    inputs: {
+      packageSpec: 'source-map-js@1.2.1',
+    },
+    params: {
+      emitSourceBundle: true,
+      maxFileBytes: 500_000,
+      maxTotalBytes: 5_000_000,
+      maxArchiveBytes: 500_000_000,
     },
   },
   'sentris.nvd.cve.query': {

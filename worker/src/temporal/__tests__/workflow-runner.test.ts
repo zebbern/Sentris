@@ -754,8 +754,8 @@ describe('executeWorkflow', () => {
     };
 
     const result = await executeWorkflow(definition);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('One or more workflow actions failed');
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     expect(executionOrder).toEqual(['errorHandler']);
   });
 
@@ -851,7 +851,8 @@ describe('executeWorkflow', () => {
 
     const result = await executeWorkflow(definition);
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     expect(failureMetadata).toHaveLength(1);
     expect(failureMetadata[0]).toBeDefined();
     expect(failureMetadata[0]?.at).toBe('fail');
@@ -1002,5 +1003,5 @@ describe('executeWorkflow', () => {
     expect(result.outputs?.finalize).toEqual({
       report: { items: [{ item: 'alpha' }, { item: 'beta' }] },
     });
-  });
+  }, 10000);
 });

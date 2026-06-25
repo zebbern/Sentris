@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, vi } from 'bun:test';
+import { beforeEach, describe, expect, it, mock, vi } from 'bun:test';
 
 import { McpServersService } from '../mcp-servers.service';
 import type { McpServersRepository } from '../mcp-servers.repository';
@@ -18,6 +18,33 @@ const authContext: AuthContext = {
   isAuthenticated: true,
   provider: 'test',
 };
+
+const mockMcpConnect = vi.fn(async () => {});
+const mockMcpListTools = vi.fn(async () => ({
+  tools: [
+    {
+      name: 'fetch_url',
+      description: 'Fetches a URL',
+      inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
+    },
+  ],
+}));
+const mockMcpClose = vi.fn(async () => {});
+const mockMcpTransport = vi.fn();
+
+class MockMcpClient {
+  connect = mockMcpConnect;
+  listTools = mockMcpListTools;
+  close = mockMcpClose;
+}
+
+mock.module('@modelcontextprotocol/sdk/client/index.js', () => ({
+  Client: MockMcpClient,
+}));
+
+mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+  StreamableHTTPClientTransport: mockMcpTransport,
+}));
 
 function makeServerRecord(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
   return {
@@ -86,6 +113,10 @@ describe('McpServersService', () => {
     auditLog = { record: vi.fn() };
     configSvc = { get: vi.fn() };
     redis = { get: vi.fn(), del: vi.fn() };
+    mockMcpConnect.mockClear();
+    mockMcpListTools.mockClear();
+    mockMcpClose.mockClear();
+    mockMcpTransport.mockClear();
 
     service = new McpServersService(
       repo as unknown as McpServersRepository,
@@ -319,6 +350,138 @@ describe('McpServersService', () => {
     expect(result[0].serverName).toBe('test-mcp-server');
   });
 
+  it('tests HTTP MCP servers with the MCP client and persists discovered tools', async () => {
+    repo.findById.mockResolvedValue(makeServerRecord());
+    repo.upsertTools.mockResolvedValue([]);
+    repo.updateHealthStatus.mockResolvedValue(undefined);
+
+    const result = await service.testServerConnection(authContext, 'server-1');
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Connection successful (1 tools available)',
+      toolCount: 1,
+    });
+    expect(mockMcpConnect).toHaveBeenCalledTimes(1);
+    expect(mockMcpListTools).toHaveBeenCalledTimes(1);
+    expect(mockMcpClose).toHaveBeenCalledTimes(1);
+    expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
+      {
+        toolName: 'fetch_url',
+        description: 'Fetches a URL',
+        inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
+      },
+    ]);
+    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'healthy', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
+  it('tests STDIO MCP servers through discovery workflow and persists discovered tools', async () => {
+    const temporalService = {
+      startWorkflow: vi.fn(async () => ({
+        workflowId: 'mcp-discovery-workflow-1',
+        runId: 'run-1',
+        taskQueue: 'sentris-worker-0',
+      })),
+      getWorkflowResult: vi.fn(async () => ({
+        status: 'completed',
+        tools: [{ name: 'fetch', description: 'Fetch URL', inputSchema: { type: 'object' } }],
+        toolCount: 1,
+      })),
+    };
+    service = new McpServersService(
+      repo as unknown as McpServersRepository,
+      encryption as unknown as McpServersEncryptionService,
+      secretResolver as unknown as SecretResolver,
+      redis as any,
+      temporalService as any,
+      auditLog as unknown as AuditLogService,
+      configSvc as any,
+    );
+    configSvc.get.mockReturnValue({ taskQueue: 'sentris-worker-0' });
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'mcp-fetch',
+        args: ['--stdio'],
+      }),
+    );
+    repo.upsertTools.mockResolvedValue([]);
+    repo.updateHealthStatus.mockResolvedValue(undefined);
+
+    const result = await service.testServerConnection(authContext, 'server-1');
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Connection successful (1 tools discovered)',
+      toolCount: 1,
+    });
+    expect(temporalService.startWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowType: 'mcpDiscoveryWorkflow',
+        taskQueue: 'sentris-worker-0',
+        args: [
+          expect.objectContaining({
+            transport: 'stdio',
+            command: 'mcp-fetch',
+            args: ['--stdio'],
+          }),
+        ],
+      }),
+    );
+    expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
+      { toolName: 'fetch', description: 'Fetch URL', inputSchema: { type: 'object' } },
+    ]);
+    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'healthy', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
+  it('marks STDIO MCP servers unhealthy when discovery workflow returns failed status', async () => {
+    const temporalService = {
+      startWorkflow: vi.fn(async () => ({
+        workflowId: 'mcp-discovery-workflow-2',
+        runId: 'run-2',
+        taskQueue: 'sentris-worker-0',
+      })),
+      getWorkflowResult: vi.fn(async () => ({
+        status: 'failed',
+        error: 'Failed to parse JSON',
+      })),
+    };
+    service = new McpServersService(
+      repo as unknown as McpServersRepository,
+      encryption as unknown as McpServersEncryptionService,
+      secretResolver as unknown as SecretResolver,
+      redis as any,
+      temporalService as any,
+      auditLog as unknown as AuditLogService,
+      configSvc as any,
+    );
+    configSvc.get.mockReturnValue({ taskQueue: 'sentris-worker-0' });
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'mcp-fetch',
+      }),
+    );
+    repo.updateHealthStatus.mockResolvedValue(undefined);
+
+    const result = await service.testServerConnection(authContext, 'server-1');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Connection test failed: Failed to parse JSON',
+    });
+    expect(repo.upsertTools).not.toHaveBeenCalled();
+    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'unhealthy', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
   it('lists all tools across enabled servers', async () => {
     repo.listAllToolsForOrganization.mockResolvedValue([
       { ...makeToolRecord(), serverName: 'srv' },
@@ -350,6 +513,79 @@ describe('McpServersService', () => {
     const result = await service.getHealthStatuses(authContext);
     expect(result).toEqual([
       { serverId: 'server-1', status: 'healthy', checkedAt: now.toISOString() },
+    ]);
+  });
+
+  it('tests all enabled servers and returns per-server results', async () => {
+    const enabledServers = [
+      makeServerRecord({ id: 'server-1', name: 'fetch-reference' }),
+      makeServerRecord({ id: 'server-2', name: 'semgrep-mcp' }),
+    ];
+    repo.listEnabled.mockResolvedValue(enabledServers);
+
+    const testSpy = vi.spyOn(service, 'testServerConnection');
+    testSpy.mockResolvedValueOnce({
+      success: true,
+      message: 'Connection successful (1 tools discovered)',
+      toolCount: 1,
+    });
+    testSpy.mockResolvedValueOnce({
+      success: false,
+      message: 'Connection failed: unauthorized',
+    });
+
+    const result = await service.testEnabledServers(authContext);
+
+    expect(repo.listEnabled).toHaveBeenCalledWith({ organizationId: DEFAULT_ORGANIZATION_ID });
+    expect(testSpy).toHaveBeenCalledWith(authContext, 'server-1');
+    expect(testSpy).toHaveBeenCalledWith(authContext, 'server-2');
+    expect(result).toEqual([
+      {
+        serverId: 'server-1',
+        serverName: 'fetch-reference',
+        success: true,
+        message: 'Connection successful (1 tools discovered)',
+        toolCount: 1,
+      },
+      {
+        serverId: 'server-2',
+        serverName: 'semgrep-mcp',
+        success: false,
+        message: 'Connection failed: unauthorized',
+      },
+    ]);
+  });
+
+  it('keeps batch testing remaining servers when one test throws', async () => {
+    repo.listEnabled.mockResolvedValue([
+      makeServerRecord({ id: 'server-1', name: 'broken-fetch' }),
+      makeServerRecord({ id: 'server-2', name: 'working-fetch' }),
+    ]);
+
+    const testSpy = vi.spyOn(service, 'testServerConnection');
+    testSpy.mockRejectedValueOnce(new Error('container exited before MCP initialized'));
+    testSpy.mockResolvedValueOnce({
+      success: true,
+      message: 'Connection successful (1 tools discovered)',
+      toolCount: 1,
+    });
+
+    const result = await service.testEnabledServers(authContext);
+
+    expect(result).toEqual([
+      {
+        serverId: 'server-1',
+        serverName: 'broken-fetch',
+        success: false,
+        message: 'container exited before MCP initialized',
+      },
+      {
+        serverId: 'server-2',
+        serverName: 'working-fetch',
+        success: true,
+        message: 'Connection successful (1 tools discovered)',
+        toolCount: 1,
+      },
     ]);
   });
 

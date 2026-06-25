@@ -70,6 +70,12 @@ const inputSchema = inputs({
     reason: 'Tool-mode port acts as a graph anchor; payloads are not consumed directly.',
     connectionType: { kind: 'contract', name: 'mcp.tool' },
   }),
+  trigger: port(z.unknown().optional().describe('Optional no-op gate input.'), {
+    label: 'Trigger',
+    description: 'Optional graph gate input; payloads are accepted but not consumed directly.',
+    allowAny: true,
+    reason: 'Trigger gates route execution without adding investigation context.',
+  }),
   supplementaryInputA: port(
     z.string().optional().describe('Optional supplementary text written to supplementary-a.txt.'),
     {
@@ -185,13 +191,7 @@ const definition = defineComponent({
     },
   },
   async execute({ inputs, params }, context) {
-    const {
-      task,
-      context: taskContext,
-      model,
-      supplementaryInputA,
-      supplementaryInputB,
-    } = inputs;
+    const { task, context: taskContext, model, supplementaryInputA, supplementaryInputB } = inputs;
     const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins } = params;
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
@@ -201,11 +201,7 @@ const definition = defineComponent({
     const connectedToolIds = connectedToolNodeIds ?? [];
     if (connectedToolIds.length > 0) {
       try {
-        gatewayToken = await getGatewaySessionToken(
-          context.runId,
-          orgId,
-          connectedToolIds,
-        );
+        gatewayToken = await getGatewaySessionToken(context.runId, orgId, connectedToolIds);
       } catch (error: unknown) {
         context.logger.error(`[OpenCode] Failed to generate gateway token: ${error}`);
       }

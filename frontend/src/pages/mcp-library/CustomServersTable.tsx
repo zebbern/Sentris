@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Switch } from '@/components/ui/switch';
@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Package, Plug, Plus, Wrench, Edit3, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { TransportType, ToolCounts } from './types';
+import type { AgentReadiness, TransportType, ToolCounts } from './types';
 import { HealthIndicator } from './HealthIndicator';
 import { TransportBadge } from './TransportBadge';
 import { ConnectionCell } from './ConnectionCell';
@@ -36,6 +36,7 @@ interface CustomServersTableProps {
   checkingServers: Set<string>;
   testingServer: string | null;
   toolCountsByServer: Record<string, ToolCounts>;
+  readinessByServer: Record<string, AgentReadiness>;
   onCreateNew: () => void;
   onToggle: (serverId: string) => void;
   onViewTools: (serverId: string) => void;
@@ -56,6 +57,7 @@ export function CustomServersTable({
   checkingServers,
   testingServer,
   toolCountsByServer,
+  readinessByServer,
   onCreateNew,
   onToggle,
   onViewTools,
@@ -138,144 +140,150 @@ export function CustomServersTable({
                   items={servers.map((s) => s.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {servers.map((server) => (
-                    <SortableTableRow key={server.id} id={server.id} disabled={isDragDisabled}>
-                      {({ handleProps }) => (
-                        <>
-                          <DragHandle {...handleProps} disabled={isDragDisabled} />
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{server.name}</div>
-                              {server.description && (
-                                <div className="text-xs text-muted-foreground truncate max-w-[180px]">
-                                  {server.description}
-                                </div>
+                  {servers.map((server) => {
+                    const readiness = readinessByServer[server.id];
+                    return (
+                      <SortableTableRow key={server.id} id={server.id} disabled={isDragDisabled}>
+                        {({ handleProps }) => (
+                          <>
+                            <DragHandle {...handleProps} disabled={isDragDisabled} />
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{server.name}</div>
+                                {server.description && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                    {server.description}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <TransportBadge type={server.transportType} />
+                            </TableCell>
+                            <TableCell>
+                              <ConnectionCell
+                                connection={{
+                                  endpoint: server.endpoint,
+                                  command: server.command,
+                                  args: server.args,
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col items-start gap-1">
+                                <HealthIndicator
+                                  status={server.lastHealthStatus ?? null}
+                                  checking={checkingServers.has(server.id)}
+                                />
+                                {readiness && <ReadinessBadge readiness={readiness} />}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {toolCountsByServer[server.id]?.total > 0 ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Badge variant="outline" className="font-mono text-xs">
+                                        {toolCountsByServer[server.id].enabled}/
+                                        {toolCountsByServer[server.id].total}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>
+                                        {toolCountsByServer[server.id].enabled} enabled out of{' '}
+                                        {toolCountsByServer[server.id].total} tools
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
                               )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <TransportBadge type={server.transportType} />
-                          </TableCell>
-                          <TableCell>
-                            <ConnectionCell
-                              connection={{
-                                endpoint: server.endpoint,
-                                command: server.command,
-                                args: server.args,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <HealthIndicator
-                              status={server.lastHealthStatus ?? null}
-                              checking={checkingServers.has(server.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {toolCountsByServer[server.id]?.total > 0 ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge variant="outline" className="font-mono text-xs">
-                                      {toolCountsByServer[server.id].enabled}/
-                                      {toolCountsByServer[server.id].total}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>
-                                      {toolCountsByServer[server.id].enabled} enabled out of{' '}
-                                      {toolCountsByServer[server.id].total} tools
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={server.enabled}
-                              onCheckedChange={() => onToggle(server.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="View tools"
-                                      onClick={() => onViewTools(server.id)}
-                                    >
-                                      <Wrench className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>View tools</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Switch
+                                checked={server.enabled}
+                                onCheckedChange={() => onToggle(server.id)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="View tools"
+                                        onClick={() => onViewTools(server.id)}
+                                      >
+                                        <Wrench className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>View tools</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
 
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Test connection"
-                                      onClick={() => onTestConnection(server.id)}
-                                      disabled={testingServer === server.id}
-                                    >
-                                      <Plug
-                                        className={cn(
-                                          'h-4 w-4',
-                                          testingServer === server.id && 'animate-pulse',
-                                        )}
-                                      />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Test connection</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Test connection"
+                                        onClick={() => onTestConnection(server.id)}
+                                        disabled={testingServer === server.id}
+                                      >
+                                        <Plug
+                                          className={cn(
+                                            'h-4 w-4',
+                                            testingServer === server.id && 'animate-pulse',
+                                          )}
+                                        />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Test connection</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
 
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Edit server"
-                                      onClick={() => onEdit(server.id)}
-                                    >
-                                      <Edit3 className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Edit</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Edit server"
+                                        onClick={() => onEdit(server.id)}
+                                      >
+                                        <Edit3 className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Edit</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
 
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      aria-label="Delete server"
-                                      onClick={() => onDelete(server.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Delete</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                          </TableCell>
-                        </>
-                      )}
-                    </SortableTableRow>
-                  ))}
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label="Delete server"
+                                        onClick={() => onDelete(server.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delete</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </TableCell>
+                          </>
+                        )}
+                      </SortableTableRow>
+                    );
+                  })}
                 </SortableContext>
               )}
             </TableBody>
@@ -283,5 +291,22 @@ export function CustomServersTable({
         </DndContext>
       </div>
     </>
+  );
+}
+
+function ReadinessBadge({ readiness }: { readiness: AgentReadiness }) {
+  const variant: BadgeProps['variant'] =
+    readiness.tone === 'success'
+      ? 'success'
+      : readiness.tone === 'warning'
+        ? 'warning'
+        : readiness.tone === 'destructive'
+          ? 'destructive'
+          : 'secondary';
+
+  return (
+    <Badge variant={variant} className="text-[10px]">
+      {readiness.label}
+    </Badge>
   );
 }

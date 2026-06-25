@@ -1,6 +1,9 @@
 import { Kafka, logLevel as KafkaLogLevel, type Producer } from 'kafkajs';
 import type { ITraceService, TraceEvent } from '@sentris/component-sdk';
-import { ConfigurationError } from '@sentris/component-sdk';
+import { ConfigurationError, MAX_KAFKA_MESSAGE_BYTES } from '@sentris/component-sdk';
+
+const TRACE_PREVIEW_CHARS = 12_000;
+const TRACE_FINAL_PREVIEW_CHARS = 2_000;
 
 interface KafkaTraceAdapterConfig {
   brokers: string[];
@@ -90,13 +93,15 @@ export class KafkaTraceAdapter implements ITraceService {
       sequence,
     };
 
+    const message = this.serializeForKafka(payload);
+
     void this.connectPromise
       .then(() =>
         this.producer.send({
           topic: this.config.topic,
           messages: [
             {
-              value: JSON.stringify(payload),
+              value: message,
             },
           ],
         }),
@@ -114,6 +119,115 @@ export class KafkaTraceAdapter implements ITraceService {
     const next = current + 1;
     this.sequenceByRun.set(runId, next);
     return next;
+  }
+
+  private serializeForKafka(payload: SerializedTraceEvent): string {
+    const message = JSON.stringify(payload);
+    const messageSize = Buffer.byteLength(message, 'utf8');
+    if (messageSize <= MAX_KAFKA_MESSAGE_BYTES) {
+      return message;
+    }
+
+    const truncated: SerializedTraceEvent = {
+      ...payload,
+      message: this.truncateString(payload.message, TRACE_PREVIEW_CHARS),
+      error: this.truncateTraceError(payload.error, TRACE_PREVIEW_CHARS),
+      outputSummary: this.truncateValue(payload.outputSummary, TRACE_PREVIEW_CHARS),
+      data: {
+        _truncated: true,
+        _originalSize: messageSize,
+        _payload:
+          payload.data && '_payload' in payload.data
+            ? this.truncateValue(payload.data._payload, TRACE_PREVIEW_CHARS)
+            : undefined,
+        _metadata:
+          payload.data && '_metadata' in payload.data
+            ? this.truncateValue(payload.data._metadata, TRACE_PREVIEW_CHARS)
+            : undefined,
+      },
+    };
+
+    const truncatedMessage = JSON.stringify(truncated);
+    if (Buffer.byteLength(truncatedMessage, 'utf8') <= MAX_KAFKA_MESSAGE_BYTES) {
+      return truncatedMessage;
+    }
+
+    return JSON.stringify({
+      ...truncated,
+      message: this.truncateString(payload.message, TRACE_FINAL_PREVIEW_CHARS),
+      error: this.truncateTraceError(payload.error, TRACE_FINAL_PREVIEW_CHARS),
+      outputSummary: {
+        _truncated: true,
+        _originalSize: messageSize,
+      },
+      data: {
+        _truncated: true,
+        _originalSize: messageSize,
+      },
+    });
+  }
+
+  private truncateTraceError(
+    error: SerializedTraceEvent['error'],
+    maxChars: number,
+  ): SerializedTraceEvent['error'] {
+    if (error === undefined || typeof error === 'string') {
+      return this.truncateString(error, maxChars);
+    }
+
+    return {
+      ...error,
+      message: this.truncateString(error.message, maxChars) ?? error.message,
+      stack: this.truncateString(error.stack, maxChars),
+      details: this.truncateValue(error.details, maxChars) as Record<string, unknown> | undefined,
+    };
+  }
+
+  private truncateString(value: string | undefined, maxChars: number): string | undefined {
+    if (value === undefined || value.length <= maxChars) {
+      return value;
+    }
+    return `${value.slice(0, maxChars)}... (truncated ${value.length - maxChars} chars)`;
+  }
+
+  private truncateValue(value: unknown, maxChars: number): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return this.truncateString(value, maxChars);
+    }
+
+    const serialized = JSON.stringify(value);
+    if (Buffer.byteLength(serialized, 'utf8') <= maxChars) {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return {
+        _truncated: true,
+        _originalType: 'array',
+        _itemCount: value.length,
+        _preview: value.slice(0, 5).map((item) => this.truncateValue(item, 1_000)),
+      };
+    }
+
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>);
+      const preview: Record<string, unknown> = {};
+      for (const [key, entryValue] of entries.slice(0, 20)) {
+        preview[key] = this.truncateValue(entryValue, 1_000);
+      }
+      return {
+        ...preview,
+        _truncated: true,
+        _originalType: 'object',
+        _keyCount: entries.length,
+      };
+    }
+
+    return value;
   }
 
   private packData(event: TraceEvent): Record<string, unknown> | null {

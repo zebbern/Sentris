@@ -18,21 +18,57 @@ import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import {
   mergeSecurityDockerRunner,
   securityDockerResourceParameterShape,
-  SECURITY_DOCKER_RESOURCE_STANDARD,
+  SECURITY_DOCKER_RESOURCE_HEAVY,
 } from './security-docker-resources';
 import { materializeFileBundle } from './bundle-files';
 
 const SEMGREP_IMAGE = 'semgrep/semgrep:latest';
-const SEMGREP_TIMEOUT_SECONDS = 600; // 10 minutes default
+const SEMGREP_TIMEOUT_SECONDS = 600;
+const SEMGREP_VOLUME_SCAN_TIMEOUT_SECONDS = 3600;
 const SEMGREP_RESULTS_FILE = 'semgrep-results.json';
 
+const DEFAULT_REPO_EXCLUDE_PATTERNS = [
+  'node_modules',
+  '.next',
+  'coverage',
+  'out',
+  '.git',
+  'vendor',
+  'fixtures',
+  '__snapshots__',
+  '*.min.js',
+  '*.min.css',
+  '*.map',
+] as const;
+
 const inputSchema = inputs({
-  target: port(z.string().describe('Source code content to scan'), {
+  target: port(z.string().optional().describe('Source code content to scan'), {
     label: 'Target Code',
     description:
-      'Source code content or file content to scan. Will be written to a file in the container for analysis.',
+      'Source code content or file content to scan. Optional when volumeName is provided.',
     connectionType: { kind: 'primitive', name: 'text' },
   }),
+  volumeName: port(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .describe('Existing Docker volume containing repository files.'),
+    {
+      label: 'Volume Name',
+      description: 'Mount an existing workflow volume instead of writing inline target content.',
+      connectionType: { kind: 'primitive', name: 'text' },
+    },
+  ),
+  scanPath: port(
+    z.string().trim().default('/repo').describe('Directory inside the mounted volume to scan.'),
+    {
+      label: 'Scan Path',
+      description: 'Directory path inside the mounted volume, for example /repo.',
+      connectionType: { kind: 'primitive', name: 'text' },
+    },
+  ),
   customFlags: port(
     z.string().optional().describe('Raw CLI flags to append to the semgrep command'),
     {
@@ -51,8 +87,59 @@ const parameterSchema = parameters({
     rows: 2,
     placeholder: 'auto',
     description:
-      'Semgrep rule config: "auto", a registry name like "p/owasp-top-ten", or custom YAML rules.',
+      'Fallback ruleset when configs is empty. Use configs for multi-ruleset security scans.',
   }),
+  configs: param(
+    z
+      .array(z.string().trim().min(1))
+      .optional()
+      .describe('Semgrep registry rulesets applied together for deeper coverage.'),
+    {
+      label: 'Config Rulesets',
+      editor: 'multi-select',
+      options: [
+        { label: 'Security audit', value: 'p/security-audit' },
+        { label: 'OWASP Top 10', value: 'p/owasp-top-ten' },
+        { label: 'JavaScript', value: 'p/javascript' },
+        { label: 'TypeScript', value: 'p/typescript' },
+        { label: 'React', value: 'p/react' },
+        { label: 'Node.js', value: 'p/nodejs' },
+        { label: 'Semgrep auto', value: 'auto' },
+      ],
+      description: 'Multiple Semgrep configs run in one scan for broader SAST coverage.',
+    },
+  ),
+  excludePatterns: param(
+    z
+      .array(z.string().trim().min(1))
+      .default([...DEFAULT_REPO_EXCLUDE_PATTERNS])
+      .describe('Path globs excluded from repository scans.'),
+    {
+      label: 'Exclude Patterns',
+      editor: 'multi-select',
+      options: DEFAULT_REPO_EXCLUDE_PATTERNS.map((pattern) => ({
+        label: pattern,
+        value: pattern,
+      })),
+      description: 'Skip generated assets, dependencies, and test fixtures during repo scans.',
+    },
+  ),
+  timeoutSeconds: param(
+    z
+      .number()
+      .int()
+      .min(60)
+      .max(7200)
+      .default(SEMGREP_TIMEOUT_SECONDS)
+      .describe('Maximum Semgrep container runtime in seconds.'),
+    {
+      label: 'Timeout (seconds)',
+      editor: 'number',
+      min: 60,
+      max: 7200,
+      description: 'Increase for full-repository scans on large monorepos.',
+    },
+  ),
   severity: param(
     z
       .array(z.enum(['ERROR', 'WARNING', 'INFO']))
@@ -254,10 +341,10 @@ const definition = defineComponent({
   retryPolicy: semgrepRetryPolicy,
   runner: {
     kind: 'docker',
-    ...SECURITY_DOCKER_RESOURCE_STANDARD,
+    ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: SEMGREP_IMAGE,
     network: 'bridge',
-    timeoutSeconds: SEMGREP_TIMEOUT_SECONDS,
+    timeoutSeconds: SEMGREP_VOLUME_SCAN_TIMEOUT_SECONDS,
     env: {
       HOME: '/tmp',
       // Disable Semgrep telemetry in container
@@ -309,12 +396,24 @@ const definition = defineComponent({
         : null;
     const customFlagArgs = customFlags ? splitCliArgs(customFlags) : [];
 
-    const target = inputs.target;
+    const target =
+      typeof inputs.target === 'string' && inputs.target.trim().length > 0 ? inputs.target : '';
+    const volumeName =
+      typeof inputs.volumeName === 'string' && inputs.volumeName.trim().length > 0
+        ? inputs.volumeName.trim()
+        : null;
+    const scanPath =
+      typeof inputs.scanPath === 'string' && inputs.scanPath.trim().length > 0
+        ? inputs.scanPath.trim().replace(/\/+$/, '')
+        : '/repo';
+    const volumeMountPath = '/repo';
 
-    if (target.trim().length === 0) {
-      context.logger.info('[Semgrep] No source content provided, returning empty results');
+    if (!volumeName && target.trim().length === 0) {
+      context.logger.info(
+        '[Semgrep] No source content or volume provided, returning empty results',
+      );
       context.emitProgress({
-        message: 'No source content provided to Semgrep',
+        message: 'No source content or repository volume provided to Semgrep',
         level: 'info',
       });
       return {
@@ -325,14 +424,25 @@ const definition = defineComponent({
       };
     }
 
-    context.logger.info(`[Semgrep] Starting SAST scan with config: ${parsedParams.config}`);
+    const configs =
+      parsedParams.configs && parsedParams.configs.length > 0
+        ? parsedParams.configs
+        : [parsedParams.config];
+    const timeoutSeconds = Math.max(
+      parsedParams.timeoutSeconds,
+      volumeName ? SEMGREP_VOLUME_SCAN_TIMEOUT_SECONDS : SEMGREP_TIMEOUT_SECONDS,
+    );
+
+    context.logger.info(`[Semgrep] Starting SAST scan with configs: ${configs.join(', ')}`);
     context.emitProgress({
-      message: `Launching Semgrep scan with config: ${parsedParams.config}`,
+      message: `Launching Semgrep scan with configs: ${configs.join(', ')} (timeout ${timeoutSeconds}s)`,
       level: 'info',
     });
 
     const tenantId = (context as any).tenantId ?? 'default-tenant';
-    const volume = new IsolatedContainerVolume(tenantId, context.runId);
+    const volume = volumeName
+      ? IsolatedContainerVolume.attachExisting(tenantId, context.runId, volumeName)
+      : new IsolatedContainerVolume(tenantId, context.runId);
 
     const baseRunner = definition.runner;
     if (baseRunner.kind !== 'docker') {
@@ -343,21 +453,31 @@ const definition = defineComponent({
 
     let rawOutput: string;
     try {
-      const inputFiles = materializeFileBundle(target, 'target-code.txt');
-      await volume.initialize(inputFiles);
-      context.logger.info(`[Semgrep] Created isolated volume: ${volume.getVolumeName()}`);
+      if (!volumeName) {
+        const inputFiles = materializeFileBundle(target, 'target-code.txt');
+        await volume.initialize(inputFiles);
+        context.logger.info(`[Semgrep] Created isolated volume: ${volume.getVolumeName()}`);
+      } else {
+        context.logger.info(`[Semgrep] Using existing repository volume: ${volumeName}`);
+      }
 
       // Build Semgrep CLI args
       // semgrep scan --config {config} --json /inputs/code/ [--severity ...] [--lang ...]
-      const args: string[] = [
-        'semgrep',
-        'scan',
-        '--config',
-        parsedParams.config,
-        '--json',
-        '--quiet',
-        `--json-output=/inputs/${SEMGREP_RESULTS_FILE}`,
-      ];
+      const args: string[] = ['semgrep', 'scan', '--json', '--quiet'];
+
+      for (const config of configs) {
+        args.push('--config', config);
+      }
+
+      if (!volumeName) {
+        args.push(`--json-output=/inputs/${SEMGREP_RESULTS_FILE}`);
+      }
+
+      if (volumeName) {
+        for (const pattern of parsedParams.excludePatterns) {
+          args.push('--exclude', pattern);
+        }
+      }
 
       if (parsedParams.severity && parsedParams.severity.length > 0) {
         for (const sev of parsedParams.severity) {
@@ -369,8 +489,8 @@ const definition = defineComponent({
         args.push('--lang', parsedParams.lang);
       }
 
-      // Target directory inside container (files at volume root)
-      args.push('/inputs/');
+      // Target directory inside container
+      args.push(volumeName ? `${scanPath}/` : '/inputs/');
 
       // Append custom flags last
       for (const flag of customFlagArgs) {
@@ -383,7 +503,13 @@ const definition = defineComponent({
         baseRunner,
         {
           command: [...(baseRunner.command ?? []), ...args],
-          volumes: [volume.getVolumeConfig('/inputs', false)],
+          volumes: [
+            volume.getVolumeConfig(
+              volumeName ? volumeMountPath : '/inputs',
+              volumeName ? true : false,
+            ),
+          ],
+          timeoutSeconds,
         },
         parsedParams,
       );
@@ -433,10 +559,12 @@ const definition = defineComponent({
       }
 
       try {
-        const outputFiles = await volume.readFiles([SEMGREP_RESULTS_FILE]);
-        const fileOutput = outputFiles[SEMGREP_RESULTS_FILE];
-        if (typeof fileOutput === 'string' && fileOutput.trim().length > 0) {
-          rawOutput = fileOutput;
+        if (!volumeName) {
+          const outputFiles = await volume.readFiles([SEMGREP_RESULTS_FILE]);
+          const fileOutput = outputFiles[SEMGREP_RESULTS_FILE];
+          if (typeof fileOutput === 'string' && fileOutput.trim().length > 0) {
+            rawOutput = fileOutput;
+          }
         }
       } catch (readError: unknown) {
         context.logger.warn(

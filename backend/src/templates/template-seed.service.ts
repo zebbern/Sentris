@@ -139,7 +139,10 @@ export class TemplateSeedService implements OnModuleInit {
           continue;
         }
 
-        await this.db.insert(templatesTable).values({ ...values, popularity: 0 }).execute();
+        await this.db
+          .insert(templatesTable)
+          .values({ ...values, popularity: 0 })
+          .execute();
         inserted++;
       } catch (fileError: unknown) {
         this.logger.error(
@@ -158,10 +161,14 @@ export class TemplateSeedService implements OnModuleInit {
 
   private async pruneRetiredOfficialSeeds(): Promise<void> {
     const names = Array.from(
-      new Set(REMOVED_OFFICIAL_SEED_TEMPLATES.map((template) => template.name.trim()).filter(Boolean)),
+      new Set(
+        REMOVED_OFFICIAL_SEED_TEMPLATES.map((template) => template.name.trim()).filter(Boolean),
+      ),
     );
     const paths = Array.from(
-      new Set(REMOVED_OFFICIAL_SEED_TEMPLATES.map((template) => template.path.trim()).filter(Boolean)),
+      new Set(
+        REMOVED_OFFICIAL_SEED_TEMPLATES.map((template) => template.path.trim()).filter(Boolean),
+      ),
     );
 
     const retiredConditions: SQL[] = [];

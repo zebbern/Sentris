@@ -40,6 +40,7 @@
     "security-components:check": "bun scripts/security-component-live-audit.ts --ledger-check",
     "security-components:audit": "bun scripts/security-component-live-audit.ts --sequential",
     "security-components:verify": "node scripts/verify-security-components.js",
+    "smoke:mcp-agent-tools": "bun scripts/smoke-mcp-agent-tools.ts",
     "dev:docs": "cd docs && mint dev",
     "lint": "bun run lint:frontend && bun run lint:backend && bun run lint:worker",
     "lint:frontend": "bun --cwd=frontend run lint",

@@ -12,9 +12,7 @@ for (const match of docs.matchAll(/^###\s+(.+)$/gm)) {
   documentedSlugs.add(match[1]!.trim().toLowerCase());
 }
 
-const allowUndocumented = new Set([
-  'sentris.security.terminal-demo',
-]);
+const allowUndocumented = new Set(['sentris.security.terminal-demo']);
 
 const slugByComponentId: Record<string, string> = {
   'sentris.subfinder.run': 'subfinder',
@@ -39,10 +37,15 @@ const slugByComponentId: Record<string, string> = {
   'sentris.ffuf.run': 'ffuf',
   'sentris.trivy.run': 'trivy',
   'sentris.semgrep.run': 'semgrep',
+  'sentris.opengrep.run': 'opengrep',
+  'sentris.codeql.run': 'codeql',
+  'sentris.jazzer-js.run': 'jazzer.js',
   'sentris.repository.files.extract': 'repo files extractor',
+  'sentris.github.repository.clone': 'github repository clone',
   'sentris.repository.manifest.extract': 'manifest extractor',
   'sentris.osv.query': 'osv',
   'sentris.npm.registry.intel': 'npm registry intel',
+  'sentris.npm.package.source': 'npm package source',
   'sentris.nvd.cve.query': 'nvd',
   'sentris.yara.run': 'yara',
 };
@@ -70,9 +73,7 @@ if (missing.length > 0) {
 }
 
 if (!readme.includes(`${totalComponentCount} security components`)) {
-  countFailures.push(
-    `README.md should mention ${totalComponentCount} security components`,
-  );
+  countFailures.push(`README.md should mention ${totalComponentCount} security components`);
 }
 
 if (!docs.includes(`**${totalComponentCount} security components**`)) {
@@ -92,4 +93,6 @@ if (missing.length > 0 || countFailures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Security docs cover all ${SECURITY_COMPONENT_IDS.length - allowUndocumented.size} documented palette components.`);
+console.log(
+  `Security docs cover all ${SECURITY_COMPONENT_IDS.length - allowUndocumented.size} documented palette components.`,
+);

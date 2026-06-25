@@ -1,9 +1,9 @@
 ---
-title: "Security Components"
-description: "Open source security tools for security automation workflows"
+title: 'Security Components'
+description: 'Open source security tools for security automation workflows'
 ---
 
-Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **29 security components**.
+Security components wrap popular open-source tools for subdomain discovery, DNS resolution, port scanning, secret detection, vulnerability analysis, threat intelligence, and more. Sentris Flow ships with **34 security components**.
 
 ---
 
@@ -21,21 +21,21 @@ Docker-based security components run with tiered default limits (light / standar
 ### Subfinder
 
 <Info>
-[GitHub](https://github.com/projectdiscovery/subfinder) · Docker: `ghcr.io/zebbern/subfinder`
+  [GitHub](https://github.com/projectdiscovery/subfinder) · Docker: `ghcr.io/zebbern/subfinder`
 </Info>
 
 Discovers subdomains using passive sources.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `domains` | Array | Target domains to enumerate |
+| Input            | Type   | Description                                             |
+| ---------------- | ------ | ------------------------------------------------------- |
+| `domains`        | Array  | Target domains to enumerate                             |
 | `providerConfig` | Secret | Optional provider-config.yaml for authenticated sources |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `subdomains` | Array | Discovered subdomain hostnames |
-| `rawOutput` | String | Raw tool output |
-| `subdomainCount` | Number | Total subdomains found |
+| Output           | Type   | Description                    |
+| ---------------- | ------ | ------------------------------ |
+| `subdomains`     | Array  | Discovered subdomain hostnames |
+| `rawOutput`      | String | Raw tool output                |
+| `subdomainCount` | Number | Total subdomains found         |
 
 **Example command:** `subfinder -d example.com -silent`
 
@@ -43,37 +43,36 @@ Discovers subdomains using passive sources.
 
 ### Amass
 
-<Info>
-[GitHub](https://github.com/owasp-amass/amass) · Docker: `ghcr.io/zebbern/amass`
-</Info>
+<Info>[GitHub](https://github.com/owasp-amass/amass) · Docker: `ghcr.io/zebbern/amass`</Info>
 
 Active and passive subdomain enumeration.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `domains` | Array | Target domains |
-| `mode` | Select | `passive` or `active` |
+| Input     | Type   | Description           |
+| --------- | ------ | --------------------- |
+| `domains` | Array  | Target domains        |
+| `mode`    | Select | `passive` or `active` |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `timeout` | Number | Timeout in minutes |
-| `maxDns` | Number | Max DNS queries per second |
+| Parameter | Type   | Description                |
+| --------- | ------ | -------------------------- |
+| `timeout` | Number | Timeout in minutes         |
+| `maxDns`  | Number | Max DNS queries per second |
 
 ---
 
 ### ShuffleDNS + MassDNS
 
 <Info>
-[GitHub (ShuffleDNS)](https://github.com/projectdiscovery/shuffledns) · [GitHub (MassDNS)](https://github.com/blechschmidt/massdns) · Docker: `ghcr.io/zebbern/shuffledns-massdns`
+  [GitHub (ShuffleDNS)](https://github.com/projectdiscovery/shuffledns) · [GitHub
+  (MassDNS)](https://github.com/blechschmidt/massdns) · Docker: `ghcr.io/zebbern/shuffledns-massdns`
 </Info>
 
-High-performance DNS bruteforcing and resolution. This is a combined image that has both ShuffleDNS with MassDNS pre-installed. 
+High-performance DNS bruteforcing and resolution. This is a combined image that has both ShuffleDNS with MassDNS pre-installed.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `domains` | Array | Target domains |
-| `wordlist` | File | Wordlist for bruteforcing |
-| `resolvers` | Array | Custom DNS resolvers |
+| Input       | Type  | Description               |
+| ----------- | ----- | ------------------------- |
+| `domains`   | Array | Target domains            |
+| `wordlist`  | File  | Wordlist for bruteforcing |
+| `resolvers` | Array | Custom DNS resolvers      |
 
 ---
 
@@ -81,31 +80,29 @@ High-performance DNS bruteforcing and resolution. This is a combined image that 
 
 ### DNSX
 
-<Info>
-[GitHub](https://github.com/projectdiscovery/dnsx) · Docker: `ghcr.io/zebbern/dnsx`
-</Info>
+<Info>[GitHub](https://github.com/projectdiscovery/dnsx) · Docker: `ghcr.io/zebbern/dnsx`</Info>
 
 Resolves DNS records with support for multiple record types and custom resolvers.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `domains` | Array | Domains to resolve |
+| Input         | Type  | Description                                  |
+| ------------- | ----- | -------------------------------------------- |
+| `domains`     | Array | Domains to resolve                           |
 | `recordTypes` | Array | DNS types: A, AAAA, CNAME, MX, NS, TXT, etc. |
-| `resolvers` | Array | Custom resolver IPs (e.g., 1.1.1.1:53) |
+| `resolvers`   | Array | Custom resolver IPs (e.g., 1.1.1.1:53)       |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `threads` | Number | Concurrent workers (default: 100) |
-| `retryCount` | Number | Retry attempts (default: 2) |
-| `rateLimit` | Number | Requests per second |
-| `showCdn` | Boolean | Annotate CDN providers |
-| `showAsn` | Boolean | Include ASN info |
+| Parameter    | Type    | Description                       |
+| ------------ | ------- | --------------------------------- |
+| `threads`    | Number  | Concurrent workers (default: 100) |
+| `retryCount` | Number  | Retry attempts (default: 2)       |
+| `rateLimit`  | Number  | Requests per second               |
+| `showCdn`    | Boolean | Annotate CDN providers            |
+| `showAsn`    | Boolean | Include ASN info                  |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `results` | Array | DNS responses grouped by record type |
-| `resolvedHosts` | Array | Unique resolved hostnames |
-| `rawOutput` | String | Raw JSONL output |
+| Output          | Type   | Description                          |
+| --------------- | ------ | ------------------------------------ |
+| `results`       | Array  | DNS responses grouped by record type |
+| `resolvedHosts` | Array  | Unique resolved hostnames            |
+| `rawOutput`     | String | Raw JSONL output                     |
 
 ---
 
@@ -113,29 +110,27 @@ Resolves DNS records with support for multiple record types and custom resolvers
 
 ### httpx
 
-<Info>
-[GitHub](https://github.com/projectdiscovery/httpx) · Docker: `ghcr.io/zebbern/httpx`
-</Info>
+<Info>[GitHub](https://github.com/projectdiscovery/httpx) · Docker: `ghcr.io/zebbern/httpx`</Info>
 
 Probes hosts for live HTTP services and captures response metadata.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input     | Type  | Description                |
+| --------- | ----- | -------------------------- |
 | `targets` | Array | Hostnames or URLs to probe |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `ports` | String | Comma-separated ports (e.g., "80,443,8080") |
-| `statusCodes` | String | Filter by HTTP status codes |
-| `threads` | Number | Concurrency level |
-| `followRedirects` | Boolean | Follow HTTP redirects |
-| `tlsProbe` | Boolean | Probe TLS endpoints |
-| `path` | String | Specific path to probe |
+| Parameter         | Type    | Description                                 |
+| ----------------- | ------- | ------------------------------------------- |
+| `ports`           | String  | Comma-separated ports (e.g., "80,443,8080") |
+| `statusCodes`     | String  | Filter by HTTP status codes                 |
+| `threads`         | Number  | Concurrency level                           |
+| `followRedirects` | Boolean | Follow HTTP redirects                       |
+| `tlsProbe`        | Boolean | Probe TLS endpoints                         |
+| `path`            | String  | Specific path to probe                      |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `results` | Array | HTTP response metadata |
-| `rawOutput` | String | Raw httpx JSON lines |
+| Output      | Type   | Description            |
+| ----------- | ------ | ---------------------- |
+| `results`   | Array  | HTTP response metadata |
+| `rawOutput` | String | Raw httpx JSON lines   |
 
 **Example command:** `httpx -l targets.txt -json -status-code 200,301`
 
@@ -145,27 +140,25 @@ Probes hosts for live HTTP services and captures response metadata.
 
 ### Naabu
 
-<Info>
-[GitHub](https://github.com/projectdiscovery/naabu) · Docker: `ghcr.io/zebbern/naabu`
-</Info>
+<Info>[GitHub](https://github.com/projectdiscovery/naabu) · Docker: `ghcr.io/zebbern/naabu`</Info>
 
 Fast active port scanning using SYN/CONNECT probes.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input     | Type  | Description              |
+| --------- | ----- | ------------------------ |
 | `targets` | Array | Hostnames or IPs to scan |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `ports` | String | Custom ports (e.g., "80,443,1000-2000") |
-| `topPorts` | Number | Scan top N common ports |
-| `rate` | Number | Packets per second |
-| `retries` | Number | Retry attempts per port |
-| `enablePing` | Boolean | Ping probe before scanning |
+| Parameter    | Type    | Description                             |
+| ------------ | ------- | --------------------------------------- |
+| `ports`      | String  | Custom ports (e.g., "80,443,1000-2000") |
+| `topPorts`   | Number  | Scan top N common ports                 |
+| `rate`       | Number  | Packets per second                      |
+| `retries`    | Number  | Retry attempts per port                 |
+| `enablePing` | Boolean | Ping probe before scanning              |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `findings` | Array | Open ports per target |
+| Output          | Type   | Description            |
+| --------------- | ------ | ---------------------- |
+| `findings`      | Array  | Open ports per target  |
 | `openPortCount` | Number | Total open ports found |
 
 **Example command:** `naabu -host scanme.sh -top-ports 100`
@@ -176,27 +169,25 @@ Fast active port scanning using SYN/CONNECT probes.
 
 ### Nuclei
 
-<Info>
-[GitHub](https://github.com/zebbern/Sentris) · Docker: `ghcr.io/zebbern/nuclei`
-</Info>
+<Info>[GitHub](https://github.com/zebbern/Sentris) · Docker: `ghcr.io/zebbern/nuclei`</Info>
 
 Template-based vulnerability scanning. This is nuclei custom image with nuclei-templates baked in.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `targets` | Array | URLs or hosts to scan |
+| Input       | Type  | Description           |
+| ----------- | ----- | --------------------- |
+| `targets`   | Array | URLs or hosts to scan |
 | `templates` | Array | Template IDs or paths |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `severity` | Array | Filter by severity (critical, high, medium, low) |
-| `rate` | Number | Requests per second |
-| `concurrency` | Number | Parallel template executions |
+| Parameter     | Type   | Description                                      |
+| ------------- | ------ | ------------------------------------------------ |
+| `severity`    | Array  | Filter by severity (critical, high, medium, low) |
+| `rate`        | Number | Requests per second                              |
+| `concurrency` | Number | Parallel template executions                     |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `findings` | Array | Detected vulnerabilities |
-| `criticalCount` | Number | Critical findings count |
+| Output          | Type   | Description              |
+| --------------- | ------ | ------------------------ |
+| `findings`      | Array  | Detected vulnerabilities |
+| `criticalCount` | Number | Critical findings count  |
 
 ---
 
@@ -205,27 +196,27 @@ Template-based vulnerability scanning. This is nuclei custom image with nuclei-t
 ### TruffleHog
 
 <Info>
-[GitHub](https://github.com/trufflesecurity/trufflehog) · Docker: `ghcr.io/zebbern/trufflehog`
+  [GitHub](https://github.com/trufflesecurity/trufflehog) · Docker: `ghcr.io/zebbern/trufflehog`
 </Info>
 
 Scans for leaked credentials across repositories, filesystems, and cloud storage.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `scanTarget` | String | Repository URL, path, bucket, or image |
-| `scanType` | Select | git, github, gitlab, s3, filesystem, docker |
+| Input        | Type   | Description                                 |
+| ------------ | ------ | ------------------------------------------- |
+| `scanTarget` | String | Repository URL, path, bucket, or image      |
+| `scanType`   | Select | git, github, gitlab, s3, filesystem, docker |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `onlyVerified` | Boolean | Show only verified secrets (default: true) |
-| `branch` | String | Specific branch to scan |
-| `sinceCommit` | String | Scan commits since reference (for PR scanning) |
+| Parameter      | Type    | Description                                    |
+| -------------- | ------- | ---------------------------------------------- |
+| `onlyVerified` | Boolean | Show only verified secrets (default: true)     |
+| `branch`       | String  | Specific branch to scan                        |
+| `sinceCommit`  | String  | Scan commits since reference (for PR scanning) |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `secrets` | Array | Detected secrets with verification status |
-| `verifiedCount` | Number | Number of verified secrets |
-| `hasVerifiedSecrets` | Boolean | Alert flag |
+| Output               | Type    | Description                               |
+| -------------------- | ------- | ----------------------------------------- |
+| `secrets`            | Array   | Detected secrets with verification status |
+| `verifiedCount`      | Number  | Number of verified secrets                |
+| `hasVerifiedSecrets` | Boolean | Alert flag                                |
 
 **Example command:** `trufflehog git https://github.com/org/repo --results=verified --json`
 
@@ -235,52 +226,48 @@ Scans for leaked credentials across repositories, filesystems, and cloud storage
 
 ### Prowler Scan
 
-<Info>
-[GitHub](https://github.com/prowler-cloud/prowler) · Docker: `ghcr.io/zebbern/prowler`
-</Info>
+<Info>[GitHub](https://github.com/prowler-cloud/prowler) · Docker: `ghcr.io/zebbern/prowler`</Info>
 
 Cloud (AWS, Azure, GCP) security posture management. Best practices auditing.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `credentials` | Object | AWS credentials |
-| `checks` | Array | Specific checks to run |
+| Input         | Type   | Description            |
+| ------------- | ------ | ---------------------- |
+| `credentials` | Object | AWS credentials        |
+| `checks`      | Array  | Specific checks to run |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `severity` | Array | Filter by severity |
+| Parameter  | Type  | Description           |
+| ---------- | ----- | --------------------- |
+| `severity` | Array | Filter by severity    |
 | `services` | Array | AWS services to audit |
 
 ### Supabase Scanner
 
 <Info>
-[GitHub](https://ghcr.io/zebbern/supabase-scanner) · Docker: `ghcr.io/zebbern/supabase-scanner`
+  [GitHub](https://ghcr.io/zebbern/supabase-scanner) · Docker: `ghcr.io/zebbern/supabase-scanner`
 </Info>
 
 Scans Supabase instances for misconfigurations.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input        | Type   | Description          |
+| ------------ | ------ | -------------------- |
 | `projectUrl` | String | Supabase project URL |
-| `apiKey` | Secret | Supabase API key |
+| `apiKey`     | Secret | Supabase API key     |
 
 ---
 
 ### Checkov
 
-<Info>
-[GitHub](https://github.com/bridgecrewio/checkov) · Docker: `bridgecrew/checkov`
-</Info>
+<Info>[GitHub](https://github.com/bridgecrewio/checkov) · Docker: `bridgecrew/checkov`</Info>
 
 Static analysis for Infrastructure-as-Code (Terraform, CloudFormation, Kubernetes, Dockerfile, Helm).
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | IaC file content to scan |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description              |
+| ------------- | ------ | ------------------------ |
+| `target`      | String | IaC file content to scan |
+| `customFlags` | String | Additional CLI flags     |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter   | Type   | Description                                                                         |
+| ----------- | ------ | ----------------------------------------------------------------------------------- |
 | `framework` | Select | IaC framework (terraform, cloudformation, kubernetes, dockerfile, helm, serverless) |
 
 ---
@@ -289,36 +276,34 @@ Static analysis for Infrastructure-as-Code (Terraform, CloudFormation, Kubernete
 
 ### Ffuf
 
-<Info>
-[GitHub](https://github.com/ffuf/ffuf) · Docker: `ffuf/ffuf`
-</Info>
+<Info>[GitHub](https://github.com/ffuf/ffuf) · Docker: `ffuf/ffuf`</Info>
 
 Web fuzzer for directory, file, and parameter discovery.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | URL with FUZZ keyword for fuzzing |
-| `wordlist` | String | Newline-separated wordlist content |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description                        |
+| ------------- | ------ | ---------------------------------- |
+| `target`      | String | URL with FUZZ keyword for fuzzing  |
+| `wordlist`    | String | Newline-separated wordlist content |
+| `customFlags` | String | Additional CLI flags               |
 
 ---
 
 ### Katana
 
 <Info>
-[GitHub](https://github.com/projectdiscovery/katana) · Docker: `projectdiscovery/katana`
+  [GitHub](https://github.com/projectdiscovery/katana) · Docker: `projectdiscovery/katana`
 </Info>
 
 Web crawler for endpoint and URL discovery.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `targets` | Array | URLs or domains to crawl |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description              |
+| ------------- | ------ | ------------------------ |
+| `targets`     | Array  | URLs or domains to crawl |
+| `customFlags` | String | Additional CLI flags     |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `depth` | Number | Maximum crawl depth (1–10, default: 3) |
+| Parameter | Type   | Description                            |
+| --------- | ------ | -------------------------------------- |
+| `depth`   | Number | Maximum crawl depth (1–10, default: 3) |
 
 ---
 
@@ -326,13 +311,13 @@ Web crawler for endpoint and URL discovery.
 
 WAF (Web Application Firewall) detection across target URLs.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `targets` | Array | URLs to check for WAF |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description           |
+| ------------- | ------ | --------------------- |
+| `targets`     | Array  | URLs to check for WAF |
+| `customFlags` | String | Additional CLI flags  |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter | Type    | Description                                |
+| --------- | ------- | ------------------------------------------ |
 | `findAll` | Boolean | Detect all WAFs (not just the first match) |
 
 ---
@@ -341,20 +326,93 @@ WAF (Web Application Firewall) detection across target URLs.
 
 ### Semgrep
 
-<Info>
-[GitHub](https://github.com/semgrep/semgrep) · Docker: `semgrep/semgrep`
-</Info>
+<Info>[GitHub](https://github.com/semgrep/semgrep) · Docker: `semgrep/semgrep`</Info>
 
 Static Application Security Testing (SAST) with configurable rulesets.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | Source code content to scan |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description                 |
+| ------------- | ------ | --------------------------- |
+| `target`      | String | Source code content to scan |
+| `customFlags` | String | Additional CLI flags        |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `config` | String | Semgrep rule config (e.g., `auto`, `p/owasp-top-ten`, or custom YAML rules) |
+| Parameter | Type   | Description                                                                 |
+| --------- | ------ | --------------------------------------------------------------------------- |
+| `config`  | String | Semgrep rule config (e.g., `auto`, `p/owasp-top-ten`, or custom YAML rules) |
+
+---
+
+### OpenGrep
+
+<Info>[GitHub](https://github.com/opengrep/opengrep) · Docker: `ghcr.io/opengrep/opengrep`</Info>
+
+Fast pattern SAST using Semgrep-compatible rules and JSON output.
+
+| Input         | Type   | Description                                |
+| ------------- | ------ | ------------------------------------------ |
+| `target`      | String | Source code content to scan                |
+| `volumeName`  | String | Existing workflow volume containing source |
+| `customFlags` | String | Additional CLI flags                       |
+
+| Parameter        | Type   | Description                            |
+| ---------------- | ------ | -------------------------------------- |
+| `config`         | String | Fallback ruleset                       |
+| `configs`        | Array  | Multiple rulesets for broader coverage |
+| `timeoutSeconds` | Number | Container runtime limit                |
+
+---
+
+### CodeQL
+
+<Info>
+  [Docs](https://codeql.github.com/docs/codeql-cli/) · Docker:
+  `mcr.microsoft.com/cstsectools/codeql-container`
+</Info>
+
+Deep semantic and data-flow analysis for JavaScript/TypeScript package source.
+
+| Input        | Type   | Description                                |
+| ------------ | ------ | ------------------------------------------ |
+| `target`     | String | Source code content to scan                |
+| `volumeName` | String | Existing workflow volume containing source |
+| `scanPath`   | String | Source path inside the volume              |
+
+| Parameter        | Type   | Description                                                     |
+| ---------------- | ------ | --------------------------------------------------------------- |
+| `language`       | Select | `javascript-typescript`                                         |
+| `querySuite`     | Select | `security-extended`, `security-and-quality`, or `code-scanning` |
+| `timeoutSeconds` | Number | Container runtime limit                                         |
+
+| Output     | Type   | Description                |
+| ---------- | ------ | -------------------------- |
+| `sarif`    | String | Raw SARIF output           |
+| `findings` | Array  | Normalized CodeQL findings |
+
+---
+
+### Jazzer.js
+
+<Info>
+  [GitHub](https://github.com/CodeIntelligenceTesting/jazzer.js) · Docker: `node:22-bookworm-slim`
+</Info>
+
+Coverage-guided runtime crash discovery for generated JS/TS fuzz harnesses.
+
+| Input         | Type   | Description                                        |
+| ------------- | ------ | -------------------------------------------------- |
+| `volumeName`  | String | Existing workflow volume containing package source |
+| `scanPath`    | String | Source path inside the volume                      |
+| `fuzzTargets` | JSON   | Generated `{ name, code, rationale }` harnesses    |
+
+| Parameter             | Type    | Description                        |
+| --------------------- | ------- | ---------------------------------- |
+| `timeoutSeconds`      | Number  | Overall fuzzing runtime limit      |
+| `maxCrashes`          | Number  | Maximum crash summaries to keep    |
+| `installDependencies` | Boolean | Run package install before fuzzing |
+
+| Output           | Type  | Description                     |
+| ---------------- | ----- | ------------------------------- |
+| `crashes`        | Array | Crash summaries and reproducers |
+| `harnessSummary` | JSON  | Harness count and rationale     |
 
 ---
 
@@ -362,21 +420,19 @@ Static Application Security Testing (SAST) with configurable rulesets.
 
 ### TestSSL
 
-<Info>
-[GitHub](https://github.com/drwetter/testssl.sh) · Docker: `drwetter/testssl.sh`
-</Info>
+<Info>[GitHub](https://github.com/drwetter/testssl.sh) · Docker: `drwetter/testssl.sh`</Info>
 
 Comprehensive SSL/TLS configuration auditing.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | Hostname:port to audit (e.g., `example.com:443`) |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description                                      |
+| ------------- | ------ | ------------------------------------------------ |
+| `target`      | String | Hostname:port to audit (e.g., `example.com:443`) |
+| `customFlags` | String | Additional CLI flags                             |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter   | Type    | Description                   |
+| ----------- | ------- | ----------------------------- |
 | `protocols` | Boolean | Test SSL/TLS protocol support |
-| `ciphers` | Boolean | Test cipher suites |
+| `ciphers`   | Boolean | Test cipher suites            |
 
 ---
 
@@ -384,19 +440,17 @@ Comprehensive SSL/TLS configuration auditing.
 
 ### Trivy
 
-<Info>
-[GitHub](https://github.com/aquasecurity/trivy) · Docker: `aquasec/trivy`
-</Info>
+<Info>[GitHub](https://github.com/aquasecurity/trivy) · Docker: `aquasec/trivy`</Info>
 
 Vulnerability scanner for container images, filesystems, and repositories.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | Container image name, filesystem path, or repo URL |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description                                        |
+| ------------- | ------ | -------------------------------------------------- |
+| `target`      | String | Container image name, filesystem path, or repo URL |
+| `customFlags` | String | Additional CLI flags                               |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter  | Type   | Description              |
+| ---------- | ------ | ------------------------ |
 | `scanType` | Select | `image`, `fs`, or `repo` |
 
 ---
@@ -406,18 +460,18 @@ Vulnerability scanner for container images, filesystems, and repositories.
 ### theHarvester
 
 <Info>
-[GitHub](https://github.com/laramies/theHarvester) · Docker: `ghcr.io/laramies/theharvester`
+  [GitHub](https://github.com/laramies/theHarvester) · Docker: `ghcr.io/laramies/theharvester`
 </Info>
 
 OSINT gathering for domains — emails, subdomains, hosts, and IPs from public sources.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `domain` | String | Target domain to harvest |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description              |
+| ------------- | ------ | ------------------------ |
+| `domain`      | String | Target domain to harvest |
+| `customFlags` | String | Additional CLI flags     |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter | Type   | Description                                                        |
+| --------- | ------ | ------------------------------------------------------------------ |
 | `sources` | String | Comma-separated data sources (e.g., `baidu,bing,duckduckgo,yahoo`) |
 
 ---
@@ -426,15 +480,15 @@ OSINT gathering for domains — emails, subdomains, hosts, and IPs from public s
 
 IP address reputation lookup via the AbuseIPDB API.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input       | Type   | Description                   |
+| ----------- | ------ | ----------------------------- |
 | `ipAddress` | String | IPv4 or IPv6 address to check |
-| `apiKey` | Secret | AbuseIPDB API key |
+| `apiKey`    | Secret | AbuseIPDB API key             |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `maxAgeInDays` | Number | Max age for reports (default: 90) |
-| `verbose` | Boolean | Include verbose information |
+| Parameter      | Type    | Description                       |
+| -------------- | ------- | --------------------------------- |
+| `maxAgeInDays` | Number  | Max age for reports (default: 90) |
+| `verbose`      | Boolean | Include verbose information       |
 
 ---
 
@@ -442,14 +496,14 @@ IP address reputation lookup via the AbuseIPDB API.
 
 Multi-engine threat analysis for IPs, domains, file hashes, and URLs.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input       | Type   | Description                              |
+| ----------- | ------ | ---------------------------------------- |
 | `indicator` | String | IP, domain, file hash, or URL to inspect |
-| `apiKey` | Secret | VirusTotal API key |
+| `apiKey`    | Secret | VirusTotal API key                       |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `type` | Select | `ip`, `domain`, `file`, or `url` |
+| Parameter | Type   | Description                      |
+| --------- | ------ | -------------------------------- |
+| `type`    | Select | `ip`, `domain`, `file`, or `url` |
 
 ---
 
@@ -457,17 +511,15 @@ Multi-engine threat analysis for IPs, domains, file hashes, and URLs.
 
 ### YARA
 
-<Info>
-[GitHub](https://github.com/VirusTotal/yara) · Docker: `blacktop/yara`
-</Info>
+<Info>[GitHub](https://github.com/VirusTotal/yara) · Docker: `blacktop/yara`</Info>
 
 Pattern matching engine for malware classification using YARA rules.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `target` | String | File content to scan |
-| `rules` | String | YARA rule definitions |
-| `customFlags` | String | Additional CLI flags |
+| Input         | Type   | Description           |
+| ------------- | ------ | --------------------- |
+| `target`      | String | File content to scan  |
+| `rules`       | String | YARA rule definitions |
+| `customFlags` | String | Additional CLI flags  |
 
 ---
 
@@ -475,22 +527,20 @@ Pattern matching engine for malware classification using YARA rules.
 
 ### Notify
 
-<Info>
-[GitHub](https://github.com/projectdiscovery/notify) · Docker: `ghcr.io/zebbern/notify`
-</Info>
+<Info>[GitHub](https://github.com/projectdiscovery/notify) · Docker: `ghcr.io/zebbern/notify`</Info>
 
 Sends alerts to Slack, Discord, Telegram, or email.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `messages` | Array | Alert messages to send |
+| Input            | Type   | Description                 |
+| ---------------- | ------ | --------------------------- |
+| `messages`       | Array  | Alert messages to send      |
 | `providerConfig` | Secret | Provider configuration YAML |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter     | Type         | Description                               |
+| ------------- | ------------ | ----------------------------------------- |
 | `providerIds` | Multi-select | Restrict delivery to configured providers |
-| `bulk` | Boolean | Send all messages as one payload |
-| `silent` | Boolean | Suppress notify CLI output |
+| `bulk`        | Boolean      | Send all messages as one payload          |
+| `silent`      | Boolean      | Suppress notify CLI output                |
 
 ---
 
@@ -500,14 +550,14 @@ Sends alerts to Slack, Discord, Telegram, or email.
 
 Query the OSV.dev API for known vulnerabilities affecting package versions.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input          | Type  | Description                                                         |
+| -------------- | ----- | ------------------------------------------------------------------- |
 | `packageSpecs` | Array | Package names with optional versions (for example `lodash@4.17.20`) |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `ecosystem` | Text | OSV ecosystem (`npm`, `PyPI`, `Go`, etc.) |
-| `severityFloor` | Select | Minimum severity to include in results |
+| Parameter           | Type    | Description                                  |
+| ------------------- | ------- | -------------------------------------------- |
+| `ecosystem`         | Text    | OSV ecosystem (`npm`, `PyPI`, `Go`, etc.)    |
+| `severityFloor`     | Select  | Minimum severity to include in results       |
 | `hydrateAdvisories` | Boolean | Fetch full advisory records for returned IDs |
 
 ---
@@ -516,23 +566,41 @@ Query the OSV.dev API for known vulnerabilities affecting package versions.
 
 Fetch npm registry package metadata and emit supply-chain precursor signals without executing package code.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `packageSpecs` | Array | npm package names or package/version specs, including scoped packages |
-| `typosquatCandidates` | Array | Optional trusted package names for similarity checks |
+| Input                 | Type  | Description                                                           |
+| --------------------- | ----- | --------------------------------------------------------------------- |
+| `packageSpecs`        | Array | npm package names or package/version specs, including scoped packages |
+| `typosquatCandidates` | Array | Optional trusted package names for similarity checks                  |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `records` | Array | Normalized registry metadata for fetched packages |
+| Output        | Type  | Description                                                                                  |
+| ------------- | ----- | -------------------------------------------------------------------------------------------- |
+| `records`     | Array | Normalized registry metadata for fetched packages                                            |
 | `riskSignals` | Array | Install script, deprecation, missing repository, recent publish, and typo-similarity signals |
-| `summary` | JSON | Counts for fetched records, warnings, and signal severities |
-| `warnings` | Array | Recoverable registry lookup warnings |
+| `summary`     | JSON  | Counts for fetched records, warnings, and signal severities                                  |
+| `warnings`    | Array | Recoverable registry lookup warnings                                                         |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `maxPackages` | Number | Maximum unique packages to inspect |
-| `recentPublishDays` | Number | Publish-age window for recent publish signals |
+| Parameter            | Type    | Description                                      |
+| -------------------- | ------- | ------------------------------------------------ |
+| `maxPackages`        | Number  | Maximum unique packages to inspect               |
+| `recentPublishDays`  | Number  | Publish-age window for recent publish signals    |
 | `includeRawMetadata` | Boolean | Include bounded raw registry metadata in records |
+
+---
+
+### NPM Package Source
+
+Fetch an installable npm package tarball, extract bounded source into a workflow volume, and emit reviewable source context.
+
+| Input            | Type   | Description                                        |
+| ---------------- | ------ | -------------------------------------------------- |
+| `packageSpec`    | String | npm package name with optional version             |
+| `registryRecord` | JSON   | Optional registry metadata from NPM Registry Intel |
+
+| Output              | Type   | Description                                                      |
+| ------------------- | ------ | ---------------------------------------------------------------- |
+| `sourceBundle`      | Text   | Bounded source bundle for agent review                           |
+| `volumeName`        | String | Persistent workflow volume with extracted package files          |
+| `volumePath`        | String | Container path to scan inside the volume                         |
+| `packageProvenance` | JSON   | Resolved version, tarball URL, and installable artifact metadata |
 
 ---
 
@@ -540,14 +608,14 @@ Fetch npm registry package metadata and emit supply-chain precursor signals with
 
 Query the NVD CVE API for vulnerability metadata and CVSS details.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input    | Type  | Description                                    |
+| -------- | ----- | ---------------------------------------------- |
 | `cveIds` | Array | CVE identifiers (for example `CVE-2021-44228`) |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `keywordSearch` | Text | Optional keyword search when no CVE IDs are supplied |
-| `resultsPerPage` | Number | Page size for NVD responses |
+| Parameter        | Type   | Description                                          |
+| ---------------- | ------ | ---------------------------------------------------- |
+| `keywordSearch`  | Text   | Optional keyword search when no CVE IDs are supplied |
+| `resultsPerPage` | Number | Page size for NVD responses                          |
 
 ---
 
@@ -557,27 +625,46 @@ Query the NVD CVE API for vulnerability metadata and CVSS details.
 
 Fetches bounded source, GitHub Actions workflow, and IaC files from a public GitHub repository for downstream scanners and CI/CD supply-chain review.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `repositoryUrl` | String | Public GitHub repository URL |
-| `ref` | String | Optional git ref (branch, tag, or commit) |
+| Input           | Type   | Description                               |
+| --------------- | ------ | ----------------------------------------- |
+| `repositoryUrl` | String | Public GitHub repository URL              |
+| `ref`           | String | Optional git ref (branch, tag, or commit) |
 
-| Output | Type | Description |
-|--------|------|-------------|
-| `sourceBundle` | Text | Source-code and reviewable workflow YAML bundle for existing Semgrep-style scanners |
-| `githubActionsBundle` | Text | Dedicated `.github/workflows/*.yml` and `.yaml` bundle for GitHub Actions risk review |
-| `terraformBundle` | Text | Terraform bundle for Checkov Terraform scans |
-| `kubernetesBundle` | Text | Kubernetes YAML bundle for Checkov Kubernetes scans |
-| `dockerfileBundle` | Text | Dockerfile bundle for Checkov Dockerfile scans |
-| `cloudformationBundle` | Text | CloudFormation bundle for Checkov CloudFormation scans |
-| `summary` | JSON | Repository, resolved ref, category counts, truncation, and byte bounds |
+| Output                 | Type | Description                                                                           |
+| ---------------------- | ---- | ------------------------------------------------------------------------------------- |
+| `sourceBundle`         | Text | Source-code and reviewable workflow YAML bundle for existing Semgrep-style scanners   |
+| `githubActionsBundle`  | Text | Dedicated `.github/workflows/*.yml` and `.yaml` bundle for GitHub Actions risk review |
+| `terraformBundle`      | Text | Terraform bundle for Checkov Terraform scans                                          |
+| `kubernetesBundle`     | Text | Kubernetes YAML bundle for Checkov Kubernetes scans                                   |
+| `dockerfileBundle`     | Text | Dockerfile bundle for Checkov Dockerfile scans                                        |
+| `cloudformationBundle` | Text | CloudFormation bundle for Checkov CloudFormation scans                                |
+| `summary`              | JSON | Repository, resolved ref, category counts, truncation, and byte bounds                |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `ref` | Text | Default git ref when the input port is not connected |
-| `maxFiles` | Number | Maximum number of files to extract |
-| `maxTotalBytes` | Number | Maximum combined bytes to fetch |
-| `maxFileBytes` | Number | Maximum bytes for an individual file |
+| Parameter       | Type   | Description                                          |
+| --------------- | ------ | ---------------------------------------------------- |
+| `ref`           | Text   | Default git ref when the input port is not connected |
+| `ref`           | Text   | Branch, tag, or commit to read files from            |
+| `maxFileBytes`  | Number | Maximum bytes for an individual file                 |
+| `maxTotalBytes` | Number | Maximum combined bytes to extract                    |
+
+---
+
+### GitHub Repository Clone
+
+Fetch a public GitHub repository archive into a persistent workflow volume and optionally emit a bounded source bundle for secondary review.
+
+| Input           | Type   | Description                     |
+| --------------- | ------ | ------------------------------- |
+| `repositoryUrl` | String | Public GitHub repository URL    |
+| `ref`           | String | Optional branch, tag, or commit |
+| `refCandidates` | Array  | Ordered fallback refs to try    |
+
+| Output         | Type   | Description                                                |
+| -------------- | ------ | ---------------------------------------------------------- |
+| `sourceBundle` | Text   | Bounded source bundle for review                           |
+| `volumeName`   | String | Persistent workflow volume with extracted repository files |
+| `volumePath`   | String | Container path to scan inside the volume                   |
+| `repository`   | String | Normalized repository URL                                  |
 
 ---
 
@@ -585,16 +672,16 @@ Fetches bounded source, GitHub Actions workflow, and IaC files from a public Git
 
 Extracts dependency manifests from a public GitHub repository for CVE and SBOM workflows.
 
-| Input | Type | Description |
-|-------|------|-------------|
-| `repositoryUrl` | String | Public GitHub repository URL |
-| `manifestPaths` | Array | Optional explicit manifest paths |
+| Input                    | Type    | Description                                     |
+| ------------------------ | ------- | ----------------------------------------------- |
+| `repositoryUrl`          | String  | Public GitHub repository URL                    |
+| `manifestPaths`          | Array   | Optional explicit manifest paths                |
 | `includeDevDependencies` | Boolean | Include dev dependencies when parsing manifests |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `ref` | Text | Default git ref when the input port is not connected |
-| `maxPackages` | Number | Maximum packages to emit per manifest |
+| Parameter     | Type   | Description                                          |
+| ------------- | ------ | ---------------------------------------------------- |
+| `ref`         | Text   | Default git ref when the input port is not connected |
+| `maxPackages` | Number | Maximum packages to emit per manifest                |
 
 ---
 
@@ -604,12 +691,12 @@ Extracts dependency manifests from a public GitHub repository for CVE and SBOM w
 
 Exposes curated AWS MCP servers (CloudTrail, IAM, CloudWatch, Lambda, DynamoDB, and more) to AI agent nodes.
 
-| Input | Type | Description |
-|-------|------|-------------|
+| Input         | Type     | Description                                                                       |
+| ------------- | -------- | --------------------------------------------------------------------------------- |
 | `credentials` | Contract | AWS credential bundle (`accessKeyId`, `secretAccessKey`, optional `sessionToken`) |
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
+| Parameter        | Type         | Description                          |
+| ---------------- | ------------ | ------------------------------------ |
 | `enabledServers` | Multi-select | AWS MCP servers to register as tools |
 
 ---

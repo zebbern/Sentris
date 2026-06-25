@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { startMcpDockerServer } from './mcp-runtime';
+import { startMcpStdioHostProxy } from './mcp-stdio-host-proxy';
 import { mcpDiagnosticLog } from './mcp-diagnostics';
 
 // Schema matching backend API response (McpServerResponse from mcp-servers.dto.ts)
@@ -47,6 +47,7 @@ export type McpTool = z.infer<typeof McpToolSchema>;
 export async function fetchEnabledServers(
   enabledServerIds: string[],
   context: ExecutionContext,
+  options: { useAllEnabled?: boolean } = {},
 ): Promise<McpServer[]> {
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
@@ -67,7 +68,9 @@ export async function fetchEnabledServers(
   const allServers = (await response.json()) as unknown[];
   return allServers
     .map((s) => McpServerSchema.parse(s))
-    .filter((s) => s.enabled && enabledServerIds.includes(s.id));
+    .filter(
+      (s) => s.enabled && (options.useAllEnabled === true || enabledServerIds.includes(s.id)),
+    );
 }
 
 export async function fetchResolvedConfig(
@@ -183,18 +186,14 @@ export async function registerServerTools(
     }
   }
 
-  // For stdio servers, we need to spawn a Docker container
+  const nodeId = `${context.componentRef}/${server.id}`;
+
+  // For stdio servers, expose the process through a host-side HTTP bridge.
   if (server.transportType === 'stdio') {
-    const { endpoint, containerId } = await startMcpDockerServer({
-      image: 'zebbern/mcp-stdio-proxy:latest',
-      command: [],
-      env: {
-        MCP_COMMAND: server.command || '',
-        MCP_ARGS: JSON.stringify((resolvedConfig.args ?? server.args) || []),
-        ...envFromHeaders,
-      },
-      port: 0, // Auto-assign port
-      params: {},
+    const { endpoint, containerId } = await startMcpStdioHostProxy({
+      command: server.command || '',
+      args: (resolvedConfig.args ?? server.args) || [],
+      env: envFromHeaders,
       context,
     });
 
@@ -204,7 +203,7 @@ export async function registerServerTools(
     // Register the server with pre-discovered tools
     await registerMcpServer({
       runId: context.runId,
-      nodeId: context.componentRef,
+      nodeId,
       serverName: server.name,
       serverId: server.id,
       transport: 'stdio',
@@ -221,7 +220,7 @@ export async function registerServerTools(
 
     await registerMcpServer({
       runId: context.runId,
-      nodeId: context.componentRef,
+      nodeId,
       serverName: server.name,
       serverId: server.id,
       transport: 'http',
@@ -231,6 +230,41 @@ export async function registerServerTools(
     });
   } else {
     throw new Error(`Unsupported server type: ${server.transportType}`);
+  }
+}
+
+/**
+ * Register a non-agent-callable parent marker so connected agents can wait for
+ * the MCP provider node while the gateway exposes the provider's child servers.
+ */
+export async function registerProviderReady(context: ExecutionContext): Promise<void> {
+  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
+  const internalApiUrl = `${backendUrl}/api/v1/internal/mcp`;
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
+
+  const response = await fetch(`${internalApiUrl}/register-component`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(internalToken ? { 'x-internal-token': internalToken } : {}),
+    },
+    body: JSON.stringify({
+      runId: context.runId,
+      nodeId: context.componentRef,
+      toolName: context.componentRef.replace(/[^a-zA-Z0-9]/g, '_'),
+      exposedToAgent: false,
+      componentId: 'mcp.custom',
+      description: 'Custom MCP provider readiness marker',
+      inputSchema: { type: 'object', properties: {} },
+      parameters: {},
+      credentials: {},
+      providerKind: 'mcp-group',
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to register MCP provider readiness marker: ${errorText}`);
   }
 }
 

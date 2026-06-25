@@ -52,6 +52,7 @@ export const WorkflowEdgeSchema = z.object({
   target: z.string(),
   sourceHandle: z.string().optional(),
   targetHandle: z.string().optional(),
+  kind: z.enum(['success', 'error']).optional(),
   type: z.enum(['default', 'smoothstep', 'step', 'straight', 'bezier']).optional(),
 });
 

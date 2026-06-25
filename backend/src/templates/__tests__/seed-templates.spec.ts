@@ -438,15 +438,299 @@ describe('new seed templates', () => {
     const nodeTypes = graph.nodes.map((node: { type: string }) => node.type);
     const compiled = compileWorkflowGraph(WorkflowGraphSchema.parse(graph));
 
+    expect(template._metadata.version).toBe('1.5.0');
     expect(template.requiredSecrets).toEqual([
       expect.objectContaining({ name: 'CLAUDE_CODE_OAUTH_TOKEN', type: 'string' }),
     ]);
+    const npmSourceNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'fetch_npm_source',
+    );
+    expect(npmSourceNode?.type).toBe('sentris.npm.package.source');
+    const cloneNode = graph.nodes.find((node: { id: string }) => node.id === 'clone_repo');
+    expect(cloneNode?.data?.config?.inputOverrides?.githubToken).toBe('{{SECRET:GITHUB_TOKEN}}');
+    expect(cloneNode?.type).toBe('sentris.github.repository.clone');
+    const repositoryContextNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'finalize_repository_context',
+    );
+    expect(repositoryContextNode?.data?.config?.joinStrategy).toBe('any');
+    const semgrepNode = graph.nodes.find((node: { id: string }) => node.id === 'semgrep_scan');
+    expect(semgrepNode?.data?.config?.params?.configs).toEqual(
+      expect.arrayContaining(['p/security-audit', 'p/owasp-top-ten']),
+    );
+    expect(semgrepNode?.data?.config?.params?.timeoutSeconds).toBe(3600);
+    const opengrepNode = graph.nodes.find((node: { id: string }) => node.id === 'opengrep_scan');
+    expect(opengrepNode?.type).toBe('sentris.opengrep.run');
+    expect(opengrepNode?.data?.config?.params?.configs).toEqual(
+      expect.arrayContaining(['p/security-audit', 'p/javascript']),
+    );
+    const codeqlNode = graph.nodes.find((node: { id: string }) => node.id === 'codeql_scan');
+    expect(codeqlNode?.type).toBe('sentris.codeql.run');
+    expect(codeqlNode?.data?.config?.params).toEqual(
+      expect.objectContaining({
+        language: 'javascript-typescript',
+        querySuite: 'security-extended',
+      }),
+    );
+    const jazzerNode = graph.nodes.find((node: { id: string }) => node.id === 'jazzer_scan');
+    expect(jazzerNode?.type).toBe('sentris.jazzer-js.run');
+    const scannerEvidenceNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_scanner_evidence',
+    );
+    expect(scannerEvidenceNode?.type).toBe('core.logic.script');
     expect(nodeTypes).toContain('core.workflow.for-each');
+    expect(nodeTypes).toContain('sentris.conditional-router.run');
     expect(nodeTypes.filter((type: string) => type === 'core.ai.claude-code')).toHaveLength(3);
-    expect(compiled.loopBodies?.package_loop).toBeDefined();
-    expect(compiled.loopBodies?.package_loop.bodyEntryRef).toBe('init_package');
+    const customMcpNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'custom_mcp_tools',
+    );
+    expect(customMcpNode?.type).toBe('mcp.custom');
+    expect(customMcpNode?.data?.config?.mode).toBe('tool');
+    expect(customMcpNode?.data?.config?.params).toEqual(
+      expect.objectContaining({
+        useAllEnabled: true,
+        continueOnServerError: true,
+      }),
+    );
     expect(graph.edges).toEqual(
       expect.arrayContaining([
+        expect.objectContaining({
+          source: 'custom_mcp_tools',
+          target: 'claude_hunter',
+          sourceHandle: 'tools',
+          targetHandle: 'tools',
+        }),
+        expect.objectContaining({
+          source: 'custom_mcp_tools',
+          target: 'claude_reviewer',
+          sourceHandle: 'tools',
+          targetHandle: 'tools',
+        }),
+        expect.objectContaining({
+          source: 'custom_mcp_tools',
+          target: 'claude_reporter',
+          sourceHandle: 'tools',
+          targetHandle: 'tools',
+        }),
+      ]),
+    );
+    expect(graph.nodes.some((node: { id: string }) => node.id === 'build_rejection_brief')).toBe(
+      true,
+    );
+    expect(graph.nodes.some((node: { id: string }) => node.id === 'finalize_reporter')).toBe(true);
+    const hunterNode = graph.nodes.find((node: { id: string }) => node.id === 'claude_hunter');
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'finalize_source_context',
+          target: 'claude_hunter',
+          sourceHandle: 'sourceBundle',
+          targetHandle: 'supplementaryInputA',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'semgrep_scan',
+          sourceHandle: 'volumeName',
+          targetHandle: 'volumeName',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'semgrep_scan',
+          sourceHandle: 'volumePath',
+          targetHandle: 'scanPath',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'opengrep_scan',
+          sourceHandle: 'volumeName',
+          targetHandle: 'volumeName',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'codeql_scan',
+          sourceHandle: 'volumeName',
+          targetHandle: 'volumeName',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'jazzer_scan',
+          sourceHandle: 'volumeName',
+          targetHandle: 'volumeName',
+        }),
+        expect.objectContaining({
+          source: 'merge_scanner_evidence',
+          target: 'build_hunter_context',
+          sourceHandle: 'scannerEvidence',
+          targetHandle: 'scannerEvidence',
+        }),
+        expect.objectContaining({
+          source: 'finalize_repository_context',
+          target: 'claude_hunter',
+          sourceHandle: 'repositorySourceBundle',
+          targetHandle: 'supplementaryInputB',
+        }),
+        expect.objectContaining({
+          source: 'finalize_repository_context',
+          target: 'build_hunter_context',
+          sourceHandle: 'repositorySourceStatus',
+          targetHandle: 'repositorySourceStatus',
+        }),
+        expect.objectContaining({
+          source: 'clone_failure_context',
+          target: 'finalize_repository_context',
+          sourceHandle: 'sourceContext',
+          targetHandle: 'sourceFromCloneFailure',
+        }),
+        expect.objectContaining({
+          source: 'source_unavailable',
+          target: 'finalize_repository_context',
+          sourceHandle: 'sourceContext',
+          targetHandle: 'sourceFromUnavailable',
+        }),
+      ]),
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('supplementary-a.txt');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('supplementary-b.txt');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'published npm tarball',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('CodeQL');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('OpenGrep');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('Jazzer.js');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Static Analysis Evidence',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Dynamic Fuzzing Evidence',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Manual / AI Source Review',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('Scanner Caveats');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('repository-only');
+    expect(hunterNode?.data?.config?.inputOverrides?.model).toEqual(
+      expect.objectContaining({ modelId: 'claude-opus-4-8', effort: 'max' }),
+    );
+    const reviewerNode = graph.nodes.find((node: { id: string }) => node.id === 'claude_reviewer');
+    const reporterNode = graph.nodes.find((node: { id: string }) => node.id === 'claude_reporter');
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain('followUpLeads');
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain(
+      'supplementary-b.txt',
+    );
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain(
+      'repositoryOnlyFindings',
+    );
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain(
+      'External MCP Evidence Used',
+    );
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain('CodeQL');
+    expect(String(reviewerNode?.data?.config?.params?.systemPrompt)).toContain('Jazzer crashes');
+    expect(reviewerNode?.data?.config?.inputOverrides?.model).toEqual(
+      expect.objectContaining({ modelId: 'claude-opus-4-8', effort: 'xhigh' }),
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('Markdown report');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'routing-metadata.json',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'External MCP Evidence Used',
+    );
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).toContain('MCP unavailable');
+    expect(String(hunterNode?.data?.config?.params?.systemPrompt)).not.toContain(
+      'STRICT JSON ONLY',
+    );
+    expect(hunterNode?.data?.config?.params?.structuredOutput).toBe(false);
+    expect(reviewerNode?.data?.config?.params?.structuredOutput).toBe(false);
+    expect(reviewerNode?.data?.config?.params?.requiredOutputKeys).toBeUndefined();
+    expect(reporterNode?.data?.config?.inputOverrides?.model).toEqual(
+      expect.objectContaining({ modelId: 'claude-opus-4-8', effort: 'medium' }),
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Markdown evidence pack',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'routing-metadata.json',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain('cve-record.json');
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'External MCP Evidence Used',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Static Analysis Evidence',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Dynamic Fuzzing Evidence',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain(
+      'Manual / AI Source Review',
+    );
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).toContain('Scanner Caveats');
+    expect(String(reporterNode?.data?.config?.params?.systemPrompt)).not.toContain(
+      'STRICT JSON ONLY',
+    );
+    expect(reporterNode?.data?.config?.params?.structuredOutput).toBe(false);
+    expect(reporterNode?.data?.config?.params?.requiredOutputKeys).toBeUndefined();
+    expect(compiled.loopBodies?.package_loop).toBeDefined();
+    expect(compiled.loopBodies?.package_loop.bodyEntryRef).toBe('init_package');
+    const loopBodyActionsByRef = new Map(
+      compiled.loopBodies?.package_loop.definition.actions.map((action) => [action.ref, action]),
+    );
+    expect(loopBodyActionsByRef.get('custom_mcp_tools')?.componentId).toBe('mcp.custom');
+    expect(
+      compiled.loopBodies?.package_loop.definition.nodes.claude_hunter.connectedToolNodeIds,
+    ).toEqual(['custom_mcp_tools']);
+    expect(
+      compiled.loopBodies?.package_loop.definition.nodes.claude_reviewer.connectedToolNodeIds,
+    ).toEqual(['custom_mcp_tools']);
+    expect(
+      compiled.loopBodies?.package_loop.definition.nodes.claude_reporter.connectedToolNodeIds,
+    ).toEqual(['custom_mcp_tools']);
+    expect(loopBodyActionsByRef.get('claude_reviewer')?.retryPolicy?.maxAttempts).toBe(1);
+    expect(loopBodyActionsByRef.get('claude_reporter')?.retryPolicy?.maxAttempts).toBe(1);
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'route_verdict',
+          target: 'claude_reporter',
+          sourceHandle: 'matched',
+          targetHandle: 'trigger',
+        }),
+        expect.objectContaining({
+          source: 'merge_reviewer',
+          target: 'claude_reporter',
+          sourceHandle: 'reporterContext',
+          targetHandle: 'context',
+        }),
+        expect.objectContaining({
+          source: 'merge_reviewer',
+          target: 'merge_reporter',
+          sourceHandle: 'reporterContext',
+          targetHandle: 'reporterContext',
+        }),
+      ]),
+    );
+    expect(graph.edges).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'route_verdict',
+          target: 'claude_reporter',
+          targetHandle: 'supplementaryInputB',
+        }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'build_source_success',
+          sourceHandle: 'sourceStatus',
+          targetHandle: 'sourceStatus',
+        }),
+        expect.objectContaining({
+          source: 'fetch_npm_source',
+          target: 'build_source_success',
+          sourceHandle: 'packageProvenance',
+          targetHandle: 'packageProvenance',
+        }),
         expect.objectContaining({
           source: 'package_loop',
           target: 'init_package',
@@ -454,7 +738,7 @@ describe('new seed templates', () => {
           targetHandle: 'currentItem',
         }),
         expect.objectContaining({
-          source: 'collect_iteration',
+          source: 'finalize_iteration',
           target: 'package_loop',
           sourceHandle: 'iteration',
           targetHandle: 'loopBack',
@@ -473,6 +757,1088 @@ describe('new seed templates', () => {
         }),
       ]),
     );
+  });
+
+  it('npm-cve-hunt-pipeline builds Jazzer.js fuzz targets without syntax errors', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const plannerNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'plan_jazzer_targets',
+    );
+
+    const result = runTemplateScript<{
+      fuzzTargets: { name: string; code: string; rationale: string }[];
+      harnessPlan: { targetCount: number; candidateFiles: string[]; caveat: string | null };
+    }>(plannerNode.data.config.params.code, {
+      sourceStatus: { sourceType: 'npm-tarball' },
+      sourceBundle: [
+        '# FILE: dist/index.js',
+        'exports.parse = function parse(data) { return String(data).split(","); };',
+        '# FILE: readme.md',
+        'docs only',
+      ].join('\n'),
+    });
+
+    expect(result.harnessPlan.targetCount).toBe(1);
+    expect(result.harnessPlan.candidateFiles).toEqual(['dist/index.js']);
+    expect(result.harnessPlan.caveat).toBe(null);
+    expect(result.fuzzTargets[0].code).toContain('module.exports.fuzz');
+    expect(result.fuzzTargets[0].code).toContain('require("/repo/dist/index.js")');
+  });
+
+  it('npm-cve-hunt-pipeline emits npm ref fallbacks for repository clone', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const buildGitRefNode = graph.nodes.find((node: { id: string }) => node.id === 'build_git_ref');
+
+    const result = runTemplateScript<{ ref: string; refCandidates: string[]; scanPath: string }>(
+      buildGitRefNode.data.config.params.code,
+      {
+        version: '1.2.3',
+        packageName: 'next',
+      },
+    );
+
+    expect(result.ref).toBe('v1.2.3');
+    expect(result.refCandidates).toEqual([
+      'v1.2.3',
+      '1.2.3',
+      'refs/heads/main',
+      'refs/heads/master',
+    ]);
+    expect(result.scanPath).toBe('/repo/packages/next');
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'build_git_ref',
+          sourceHandle: 'refCandidates',
+          target: 'clone_repo',
+          targetHandle: 'refCandidates',
+        }),
+      ]),
+    );
+  });
+
+  it('npm-cve-hunt-pipeline routes missing repositories into secondary repository context fallback', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const resolveRepoNode = graph.nodes.find((node: { id: string }) => node.id === 'resolve_repo');
+    const sourceUnavailableNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'source_unavailable',
+    );
+    const finalizeSourceNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'finalize_source_context',
+    );
+    const finalizeRepositoryNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'finalize_repository_context',
+    );
+
+    const resolved = runTemplateScript<{ repositoryUrl: string; hasRepository: boolean }>(
+      resolveRepoNode.data.config.params.code,
+      { registryRecords: [{ name: 'no-repo-package' }] },
+    );
+    expect(resolved).toEqual(expect.objectContaining({ repositoryUrl: '', hasRepository: false }));
+
+    const noSource = runTemplateScript<{
+      sourceContext: {
+        sourceBundle: string;
+        semgrepCount: number;
+        sourceStatus: { mode: string; semgrepSkipped: boolean; secondaryOnly: boolean };
+      };
+    }>(sourceUnavailableNode.data.config.params.code, {
+      trigger: '',
+      repositoryUrl: '',
+    });
+    expect(noSource.sourceContext.sourceBundle).toBe('');
+    expect(noSource.sourceContext.semgrepCount).toBe(0);
+    expect(noSource.sourceContext.sourceStatus).toEqual(
+      expect.objectContaining({
+        mode: 'repository-secondary-unavailable',
+        semgrepSkipped: true,
+        secondaryOnly: true,
+      }),
+    );
+    expect(finalizeSourceNode?.data?.config?.joinStrategy).toBe('any');
+    expect(finalizeRepositoryNode?.data?.config?.joinStrategy).toBe('any');
+
+    const repositoryFallback = runTemplateScript<{
+      repositorySourceBundle: string;
+      repositorySourceStatus: { mode: string; sourceProvided: boolean; secondaryOnly: boolean };
+    }>(finalizeRepositoryNode.data.config.params.code, {
+      sourceFromUnavailable: noSource.sourceContext,
+    });
+    expect(repositoryFallback.repositorySourceBundle).toBe('');
+    expect(repositoryFallback.repositorySourceStatus).toEqual(
+      expect.objectContaining({
+        mode: 'repository-secondary-unavailable',
+        sourceProvided: false,
+        secondaryOnly: true,
+      }),
+    );
+
+    const repositorySecondary = runTemplateScript<{
+      repositorySourceBundle: string;
+      repositorySourceStatus: {
+        mode: string;
+        repositoryUrl: string;
+        ref: string;
+        sourceProvided: boolean;
+        secondaryOnly: boolean;
+        promotionPolicy: string;
+      };
+    }>(finalizeRepositoryNode.data.config.params.code, {
+      repositorySourceBundle: 'FILE: index.js\nconsole.log("repo only");',
+      repository: 'https://github.com/acme/demo',
+      ref: 'v1.2.3',
+    });
+    expect(repositorySecondary.repositorySourceBundle).toContain('repo only');
+    expect(repositorySecondary.repositorySourceStatus).toEqual(
+      expect.objectContaining({
+        mode: 'repository-secondary-source',
+        repositoryUrl: 'https://github.com/acme/demo',
+        ref: 'v1.2.3',
+        sourceProvided: true,
+        secondaryOnly: true,
+      }),
+    );
+    expect(repositorySecondary.repositorySourceStatus.promotionPolicy).toContain(
+      'published npm tarball confirms',
+    );
+
+    expect(graph.edges).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'resolve_repo',
+          sourceHandle: 'repositoryUrl',
+          target: 'clone_repo',
+          targetHandle: 'repositoryUrl',
+        }),
+        expect.objectContaining({
+          source: 'clone_repo',
+          sourceHandle: 'sourceBundle',
+          target: 'claude_hunter',
+          targetHandle: 'supplementaryInputA',
+        }),
+      ]),
+    );
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'route_repository',
+          sourceHandle: 'matched',
+          target: 'clone_repo',
+          targetHandle: 'repositoryUrl',
+        }),
+        expect.objectContaining({
+          source: 'route_repository',
+          sourceHandle: 'unmatched',
+          target: 'source_unavailable',
+          targetHandle: 'trigger',
+        }),
+        expect.objectContaining({
+          source: 'finalize_source_context',
+          sourceHandle: 'sourceBundle',
+          target: 'claude_hunter',
+          targetHandle: 'supplementaryInputA',
+        }),
+        expect.objectContaining({
+          source: 'source_unavailable',
+          sourceHandle: 'sourceContext',
+          target: 'finalize_repository_context',
+          targetHandle: 'sourceFromUnavailable',
+        }),
+        expect.objectContaining({
+          source: 'finalize_repository_context',
+          sourceHandle: 'repositorySourceBundle',
+          target: 'claude_hunter',
+          targetHandle: 'supplementaryInputB',
+        }),
+      ]),
+    );
+  });
+
+  it('npm-cve-hunt-pipeline keeps invalid AI JSON as partial package output', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeHunterNode = graph.nodes.find((node: { id: string }) => node.id === 'merge_hunter');
+    const mergeReviewerNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reviewer',
+    );
+    const collectIterationNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'collect_iteration',
+    );
+
+    const hunter = runTemplateScript<{
+      hunterReport: { findings: { aiParseError?: string }; sourceStatus?: { mode: string } };
+      reviewContext: { hunter: { aiParseError?: string } };
+    }>(mergeHunterNode.data.config.params.code, {
+      agentContext: {
+        package: { packageSpec: 'left-pad@1.3.0', packageName: 'left-pad' },
+        signals: { semgrepCount: 0, osvFindings: [], registryRiskSignals: [] },
+        sourceStatus: { mode: 'repository-source', repositoryUrl: 'https://github.com/acme/demo' },
+      },
+      claudeReport: 'not json',
+      packageSpec: 'left-pad@1.3.0',
+      packageName: 'left-pad',
+    });
+
+    expect(hunter.hunterReport.findings.aiParseError).toContain('Claude hunter');
+    expect(hunter.hunterReport.sourceStatus?.mode).toBe('repository-source');
+    expect(hunter.reviewContext.hunter.aiParseError).toBeTruthy();
+
+    const reviewer = runTemplateScript<{
+      reviewerReport: { verdict: string; aiParseError?: string };
+      reporterContext: { reviewer: { aiParseError?: string } };
+    }>(mergeReviewerNode.data.config.params.code, {
+      hunterReport: hunter.hunterReport,
+      claudeReport: 'still not json',
+      packageSpec: 'left-pad@1.3.0',
+    });
+
+    expect(reviewer.reviewerReport.verdict).toBe('reject');
+    expect(reviewer.reviewerReport.aiParseError).toContain('Claude reviewer');
+    expect(reviewer.reporterContext.reviewer.aiParseError).toBeTruthy();
+
+    const collected = runTemplateScript<{
+      iteration: {
+        status: string;
+        sourceStatus?: { mode: string };
+        aiHealth?: { hunterParsed: boolean; reviewerParsed: boolean; reporterParsed: boolean };
+      };
+    }>(collectIterationNode.data.config.params.code, {
+      packageSpec: 'left-pad@1.3.0',
+      packageName: 'left-pad',
+      authorizationNotes: 'authorized',
+      hunterReport: hunter.hunterReport,
+      reviewerReport: reviewer.reviewerReport,
+      reporterReport: { mode: 'rejection-brief', generatedBy: 'template' },
+    });
+
+    expect(collected.iteration.status).toBe('partial');
+    expect(collected.iteration.sourceStatus?.mode).toBe('repository-source');
+    expect(collected.iteration.aiHealth).toEqual({
+      hunterParsed: false,
+      reviewerParsed: false,
+      reporterParsed: true,
+    });
+  });
+
+  it('npm-cve-hunt-pipeline recovers substantive markdown hunter findings without routing sidecar', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeHunterNode = graph.nodes.find((node: { id: string }) => node.id === 'merge_hunter');
+
+    const hunterMarkdown = [
+      '# Hunter Report',
+      '',
+      '## Candidate: high severity ReDoS vulnerability in minimatch published npm tarball',
+      '',
+      'The installable minimatch artifact contains a backtracking-heavy path matching path.',
+      'Root cause: adjacent extglob and brace parsing paths can build matcher expressions that trigger catastrophic regular expression backtracking.',
+      'Impact: an attacker-controlled glob can cause denial of service in services that pass user supplied patterns into minimatch.',
+      'Payload: a crafted pattern with repeated adjacent extglobs was observed to hang the process for roughly 36 seconds.',
+      'Evidence: the behavior is present in the published npm tarball for minimatch@10.2.5 and should be reviewed against the source and generated dist files.',
+      'Novelty: OSV did not return an advisory for this exact package/version candidate, so this needs manual duplicate review.',
+    ].join('\n');
+
+    const hunter = runTemplateScript<{
+      hunterReport: {
+        findings: {
+          candidates?: {
+            cweGuess?: string;
+            source?: string;
+            artifactEvidence?: string;
+          }[];
+          routingMetadataRecovery?: string;
+        };
+        aiParseError?: string | null;
+      };
+      reviewContext: {
+        hunter: { candidates?: unknown[]; routingMetadataRecovery?: string };
+      };
+    }>(mergeHunterNode.data.config.params.code, {
+      agentContext: {
+        package: {
+          packageSpec: 'minimatch@10.2.5',
+          packageName: 'minimatch',
+          version: '10.2.5',
+        },
+        packageProvenance: {
+          resolvedVersion: '10.2.5',
+          tarballUrl: 'https://registry.npmjs.org/minimatch/-/minimatch-10.2.5.tgz',
+        },
+        signals: { semgrepCount: 0, osvFindings: [], registryRiskSignals: [] },
+        sourceStatus: { mode: 'npm-tarball-source', sourceType: 'npm-tarball' },
+      },
+      claudeReport: hunterMarkdown,
+      packageSpec: 'minimatch@10.2.5',
+      packageName: 'minimatch',
+    });
+
+    const candidate = hunter.hunterReport.findings.candidates?.[0];
+
+    expect(hunter.hunterReport.aiParseError).toBeNull();
+    expect(hunter.hunterReport.findings.routingMetadataRecovery).toBe('markdown-report');
+    expect(candidate?.source).toBe('markdown-report-recovery');
+    expect(candidate?.cweGuess).toBe('CWE-1333');
+    expect(candidate?.artifactEvidence).toContain('minimatch-10.2.5.tgz');
+    expect(hunter.reviewContext.hunter.routingMetadataRecovery).toBe('markdown-report');
+    expect(hunter.reviewContext.hunter.candidates?.length).toBe(1);
+  });
+
+  it('npm-cve-hunt-pipeline accepts markdown agent reports with compact routing sidecars', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeHunterNode = graph.nodes.find((node: { id: string }) => node.id === 'merge_hunter');
+    const mergeReviewerNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reviewer',
+    );
+    const mergeReporterNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reporter',
+    );
+
+    const hunterMarkdown = [
+      '# Hunter Evidence',
+      '',
+      'The published tarball contains an unbounded parser recursion reachable from decode().',
+      '',
+      '```json title="routing-metadata.json"',
+      JSON.stringify({
+        candidates: [
+          {
+            title: 'Unbounded parser recursion',
+            severity: 'high',
+            cweGuess: 'CWE-674',
+            impactSummary: 'Crafted input can exhaust the JavaScript stack.',
+          },
+        ],
+        confidence: 'high',
+        repositoryOnlyFindings: [],
+        followUpLeads: [],
+      }),
+      '```',
+    ].join('\n');
+
+    const hunter = runTemplateScript<{
+      hunterReport: {
+        reportMarkdown?: string;
+        findings: { candidates?: { title?: string }[]; confidence?: string };
+        aiParseError?: string | null;
+      };
+    }>(mergeHunterNode.data.config.params.code, {
+      agentContext: {
+        package: { packageSpec: 'demo@1.0.0', packageName: 'demo' },
+        signals: { semgrepCount: 0, osvFindings: [], registryRiskSignals: [] },
+        sourceStatus: { mode: 'npm-tarball-source', sourceType: 'npm-tarball' },
+      },
+      claudeReport: hunterMarkdown,
+      packageSpec: 'demo@1.0.0',
+      packageName: 'demo',
+    });
+
+    expect(hunter.hunterReport.reportMarkdown).toBe(hunterMarkdown);
+    expect(hunter.hunterReport.aiParseError).toBeNull();
+    expect(hunter.hunterReport.findings.candidates?.[0]?.title).toBe('Unbounded parser recursion');
+
+    const reviewerMarkdown = [
+      '# Reviewer Verdict',
+      '',
+      'Promote. The candidate is present in the installable npm artifact.',
+      '',
+      '```json title="routing-metadata.json"',
+      JSON.stringify({
+        verdict: 'promote',
+        confidence: 'high',
+        promotedCandidate: {
+          title: 'Unbounded parser recursion',
+          severity: 'high',
+        },
+        rejectionReasons: [],
+        repositoryOnlyFindings: [],
+        followUpLeads: [],
+      }),
+      '```',
+    ].join('\n');
+
+    const reviewer = runTemplateScript<{
+      reviewerReport: {
+        reportMarkdown?: string;
+        verdict: string;
+        promotedCandidate?: { title?: string };
+        aiParseError?: string | null;
+      };
+      reporterContext: { reviewerReportMarkdown?: string };
+    }>(mergeReviewerNode.data.config.params.code, {
+      hunterReport: hunter.hunterReport,
+      claudeReport: reviewerMarkdown,
+      packageSpec: 'demo@1.0.0',
+    });
+
+    expect(reviewer.reviewerReport.reportMarkdown).toBe(reviewerMarkdown);
+    expect(reviewer.reviewerReport.aiParseError).toBeNull();
+    expect(reviewer.reviewerReport.verdict).toBe('promote');
+    expect(reviewer.reviewerReport.promotedCandidate?.title).toBe('Unbounded parser recursion');
+    expect(reviewer.reporterContext.reviewerReportMarkdown).toBe(reviewerMarkdown);
+
+    const reporterMarkdown = [
+      '# CVE Evidence Pack',
+      '',
+      '## Summary',
+      'A crafted input causes stack exhaustion.',
+      '',
+      '```json title="routing-metadata.json"',
+      JSON.stringify({
+        mode: 'submission-draft',
+        confidence: 'high',
+        summary: 'Validated promoted draft.',
+      }),
+      '```',
+      '',
+      '```json title="cve-record.json"',
+      JSON.stringify({
+        dataType: 'CVE_RECORD',
+        dataVersion: '5.1',
+        containers: {
+          cna: {
+            title: 'Custom CVE record from reporter markdown',
+            descriptions: [{ lang: 'en', value: 'Reporter supplied CVE JSON block.' }],
+          },
+        },
+      }),
+      '```',
+    ].join('\n');
+
+    const reporter = runTemplateScript<{
+      reporterReport: {
+        reportMarkdown?: string;
+        routingMetadata?: { mode?: string };
+        cveRecordV5?: { containers?: { cna?: { title?: string } } };
+        aiParseError?: string | null;
+      };
+    }>(mergeReporterNode.data.config.params.code, {
+      packageSpec: 'demo@1.0.0',
+      reporterContext: reviewer.reporterContext,
+      claudeReport: reporterMarkdown,
+    });
+
+    expect(reporter.reporterReport.reportMarkdown).toBe(reporterMarkdown);
+    expect(reporter.reporterReport.routingMetadata?.mode).toBe('submission-draft');
+    expect(reporter.reporterReport.cveRecordV5?.containers?.cna?.title).toBe(
+      'Custom CVE record from reporter markdown',
+    );
+    expect(reporter.reporterReport.aiParseError).toBeNull();
+  });
+
+  it('npm-cve-hunt-pipeline preserves installable hunter candidates when reviewer omits verdict', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeReviewerNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reviewer',
+    );
+
+    const result = runTemplateScript<{
+      reviewerReport: {
+        verdict: string;
+        promoted: boolean;
+        aiParseError?: string;
+        promotedCandidate?: { title?: string };
+        followUpLeads?: { lead?: string; status?: string; source?: string }[];
+      };
+      reporterContext: {
+        verdict: string;
+        promotedCandidate?: { title?: string };
+        followUpLeads?: { lead?: string; status?: string; source?: string }[];
+        reviewer: { aiParseError?: string };
+      };
+    }>(mergeReviewerNode.data.config.params.code, {
+      packageSpec: 'source-map-js',
+      hunterReport: {
+        packageName: 'source-map-js',
+        sourceStatus: {
+          mode: 'npm-tarball-source',
+          sourceType: 'npm-tarball',
+          installable: true,
+        },
+        packageProvenance: {
+          sourceType: 'npm-tarball',
+          installable: true,
+          resolvedVersion: '1.2.1',
+        },
+        findings: {
+          candidates: [
+            {
+              title: 'Polynomial ReDoS in url parsing regex',
+              severity: 'high',
+            },
+          ],
+        },
+      },
+      claudeReport: JSON.stringify({
+        lead: 'Sibling source-map packages may share the same regex.',
+        status: 'separate-released-artifact, needs fresh investigation',
+      }),
+    });
+
+    expect(result.reviewerReport.verdict).toBe('promote');
+    expect(result.reviewerReport.promoted).toBe(true);
+    expect(result.reviewerReport.aiParseError).toContain('missing verdict');
+    expect(result.reviewerReport.promotedCandidate?.title).toBe(
+      'Polynomial ReDoS in url parsing regex',
+    );
+    expect(result.reviewerReport.followUpLeads).toEqual([
+      expect.objectContaining({
+        lead: 'Sibling source-map packages may share the same regex.',
+        status: 'separate-released-artifact, needs fresh investigation',
+        source: 'reviewer_malformed_output',
+      }),
+    ]);
+    expect(result.reporterContext.verdict).toBe('promote');
+    expect(result.reporterContext.promotedCandidate?.title).toBe(
+      'Polynomial ReDoS in url parsing regex',
+    );
+    expect(result.reporterContext.reviewer.aiParseError).toContain('missing verdict');
+  });
+
+  it('npm-cve-hunt-pipeline preserves promoted candidates when reporter emits rejection brief', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeReporterNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reporter',
+    );
+
+    const result = runTemplateScript<{
+      reporterReport: {
+        mode: string;
+        promoted: boolean;
+        aiParseError?: string;
+        cveRecordV5?: {
+          containers?: {
+            cna?: {
+              affected?: { packageName?: string }[];
+              descriptions?: { value?: string }[];
+            };
+          };
+        };
+        reporterFallback?: { mode?: string };
+      };
+    }>(mergeReporterNode.data.config.params.code, {
+      packageSpec: 'source-map-js',
+      reporterContext: {
+        verdict: 'promote',
+        packageName: 'source-map-js',
+        packageProvenance: {
+          resolvedVersion: '1.2.1',
+          tarballUrl: 'https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz',
+        },
+        promotedCandidate: {
+          title: 'Denial of service in BasicSourceMapConsumer._parseMappings',
+          affectedVersionRange: '<=1.2.1',
+          cweGuess: 'CWE-400',
+          impactSummary: 'A crafted source map can exhaust memory or crash the process.',
+        },
+        reviewer: {
+          confidence: 'low',
+        },
+      },
+      claudeReport: JSON.stringify({
+        mode: 'rejection-brief',
+        rejectionBrief: { rationale: 'Reporter was uncertain.' },
+      }),
+    });
+
+    expect(result.reporterReport.mode).toBe('submission-draft');
+    expect(result.reporterReport.promoted).toBe(true);
+    expect(result.reporterReport.aiParseError).toContain('contradicted promoted verdict');
+    expect(result.reporterReport.reporterFallback?.mode).toBe('rejection-brief');
+    expect(result.reporterReport.cveRecordV5?.containers?.cna?.affected?.[0].packageName).toBe(
+      'source-map-js',
+    );
+    expect(result.reporterReport.cveRecordV5?.containers?.cna?.descriptions?.[0].value).toContain(
+      'crafted source map',
+    );
+  });
+
+  it('npm-cve-hunt-pipeline accepts raw reporter CVE records for promoted verdicts', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const mergeReporterNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'merge_reporter',
+    );
+
+    const rawCveRecord = {
+      dataType: 'CVE_RECORD',
+      dataVersion: '5.1',
+      containers: {
+        cna: {
+          title: 'minimatch ReDoS via extglob wildcard',
+          descriptions: [
+            { lang: 'en', value: 'A crafted pattern causes catastrophic backtracking.' },
+          ],
+        },
+      },
+    };
+
+    const result = runTemplateScript<{
+      reporterReport: {
+        mode: string;
+        promoted: boolean;
+        aiParseError?: string | null;
+        reporterFormatRecovery?: string;
+        reportMarkdown?: string;
+        routingMetadata?: { mode?: string };
+        cveRecordV5?: { containers?: { cna?: { title?: string } } };
+      };
+    }>(mergeReporterNode.data.config.params.code, {
+      packageSpec: 'minimatch',
+      reporterContext: {
+        verdict: 'promote',
+        packageName: 'minimatch',
+        packageProvenance: {
+          packageName: 'minimatch',
+          resolvedVersion: '10.2.5',
+          tarballUrl: 'https://registry.npmjs.org/minimatch/-/minimatch-10.2.5.tgz',
+        },
+        promotedCandidate: {
+          title: 'minimatch ReDoS via extglob wildcard',
+          impactSummary: 'A crafted pattern causes catastrophic backtracking.',
+        },
+        reviewer: {
+          confidence: 'low',
+        },
+      },
+      claudeReport: JSON.stringify(rawCveRecord),
+    });
+
+    expect(result.reporterReport.mode).toBe('submission-draft');
+    expect(result.reporterReport.promoted).toBe(true);
+    expect(result.reporterReport.aiParseError).toBeNull();
+    expect(result.reporterReport.reporterFormatRecovery).toBe('raw-cve-record');
+    expect(result.reporterReport.routingMetadata?.mode).toBe('submission-draft');
+    expect(result.reporterReport.cveRecordV5?.containers?.cna?.title).toBe(
+      'minimatch ReDoS via extglob wildcard',
+    );
+    expect(result.reporterReport.reportMarkdown).toContain('# CVE Evidence Pack - minimatch');
+    expect(result.reporterReport.reportMarkdown).toContain('cve-record.json');
+    expect(result.reporterReport.reportMarkdown).toContain('routing-metadata.json');
+  });
+
+  it('npm-cve-hunt-pipeline reports reviewer recovery without counting the package as partial', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const collectIterationNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'collect_iteration',
+    );
+    const assembleCampaignNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_campaign',
+    );
+
+    const collected = runTemplateScript<{
+      iteration: {
+        status: string;
+        warnings: string[];
+        aiHealth?: { hunterParsed: boolean; reviewerParsed: boolean; reporterParsed: boolean };
+      };
+    }>(collectIterationNode.data.config.params.code, {
+      packageSpec: 'utif2',
+      packageName: 'utif2',
+      hunterReport: {
+        sourceStatus: {
+          mode: 'npm-tarball-source',
+          sourceType: 'npm-tarball',
+          installable: true,
+        },
+        findings: {
+          candidates: [{ title: 'Unbounded TIFF IFD recursion', severity: 'high' }],
+        },
+      },
+      reviewerReport: {
+        verdict: 'promote',
+        promoted: true,
+        aiParseError: 'Claude reviewer output missing verdict',
+        promotedCandidate: { title: 'Unbounded TIFF IFD recursion', severity: 'high' },
+      },
+      reporterReport: {
+        mode: 'submission-draft',
+        cveRecordV5: { dataType: 'CVE_RECORD', dataVersion: '5.1' },
+      },
+    });
+
+    expect(collected.iteration.status).toBe('completed_with_reviewer_recovery');
+    expect(collected.iteration.warnings).toEqual(['reviewer JSON parse failed']);
+    expect(collected.iteration.aiHealth).toEqual({
+      hunterParsed: true,
+      reviewerParsed: false,
+      reporterParsed: true,
+    });
+
+    const campaign = runTemplateScript<{
+      campaign: {
+        summary: {
+          partialCount: number;
+          completedCount: number;
+          recoveredReviewerCount: number;
+          statusCounts: Record<string, number>;
+        };
+      };
+    }>(assembleCampaignNode.data.config.params.code, {
+      packageCount: 1,
+      results: [collected.iteration],
+    });
+
+    expect(campaign.campaign.summary.partialCount).toBe(0);
+    expect(campaign.campaign.summary.completedCount).toBe(0);
+    expect(campaign.campaign.summary.recoveredReviewerCount).toBe(1);
+    expect(campaign.campaign.summary.statusCounts).toEqual({
+      completed_with_reviewer_recovery: 1,
+    });
+  });
+
+  it('npm-cve-hunt-pipeline carries scanner evidence into collected package iterations', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const collectIterationNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'collect_iteration',
+    );
+
+    const scannerEvidence = {
+      semgrepFindings: [{ checkId: 'demo.rule', path: 'src/index.js', message: 'demo lead' }],
+      opengrepFindings: [],
+      codeqlFindings: [{ ruleId: 'js/demo', path: 'src/index.js', message: 'codeql lead' }],
+      jazzerCrashes: [],
+      counts: { semgrep: 1, opengrep: 0, codeql: 1, jazzerCrashes: 0 },
+      scannerCaveats: ['CodeQL result requires source confirmation.'],
+    };
+
+    const collected = runTemplateScript<{
+      iteration: {
+        scannerEvidence?: {
+          counts?: { semgrep?: number; codeql?: number };
+          scannerCaveats?: string[];
+        };
+      };
+    }>(collectIterationNode.data.config.params.code, {
+      packageSpec: 'demo@1.0.0',
+      packageName: 'demo',
+      hunterReport: {
+        sourceStatus: { mode: 'npm-tarball-source', installable: true },
+        evidenceDossier: { scannerEvidence },
+        findings: {
+          candidates: [{ title: 'Demo lead', severity: 'medium' }],
+        },
+      },
+      reviewerReport: {
+        verdict: 'promote',
+        promotedCandidate: { title: 'Demo lead', severity: 'medium' },
+      },
+      reporterReport: {
+        mode: 'submission-draft',
+        cveRecordV5: { dataType: 'CVE_RECORD', dataVersion: '5.1' },
+      },
+    });
+
+    expect(collected.iteration.scannerEvidence?.counts?.semgrep).toBe(1);
+    expect(collected.iteration.scannerEvidence?.counts?.codeql).toBe(1);
+    expect(collected.iteration.scannerEvidence?.scannerCaveats).toContain(
+      'CodeQL result requires source confirmation.',
+    );
+  });
+
+  it('npm-cve-hunt-pipeline saves a researcher-facing markdown campaign artifact', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const assembleCampaignNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_campaign',
+    );
+    const artifactNode = graph.nodes.find((node: { id: string }) => node.id === 'artifact_report');
+
+    const result = runTemplateScript<{
+      campaign: { summary: { promotedCount: number } };
+      campaignMarkdown?: string;
+    }>(assembleCampaignNode.data.config.params.code, {
+      packageCount: 1,
+      authorizationNotes: 'authorized test',
+      results: [
+        {
+          packageSpec: 'demo@1.0.0',
+          packageName: 'demo',
+          status: 'completed',
+          verdict: 'promote',
+          promoted: true,
+          reviewer: {
+            verdict: 'promote',
+            confidence: 'high',
+            promotedCandidate: {
+              title: 'Unbounded parser recursion',
+              severity: 'high',
+            },
+          },
+          hunter: {
+            findings: {
+              candidates: [{ title: 'Unbounded parser recursion', severity: 'high' }],
+              gaps: ['MCP gateway unavailable; no external MCP evidence used.'],
+              notes:
+                'Manual source review confirmed the parser recursion in the installable artifact.',
+            },
+          },
+          reporter: {
+            mode: 'submission-draft',
+            reportMarkdown: '# CVE Evidence Pack\n\n## Summary\nA crafted input crashes parsing.',
+            cveRecordV5: { dataType: 'CVE_RECORD', dataVersion: '5.1' },
+          },
+          scannerEvidence: {
+            semgrepFindings: [
+              {
+                checkId: 'demo.recursive-parser',
+                path: 'src/parser.js',
+                startLine: 12,
+                message: 'recursive parser consumes attacker input',
+              },
+            ],
+            opengrepFindings: [],
+            codeqlFindings: [
+              {
+                ruleId: 'js/resource-exhaustion',
+                path: 'src/parser.js',
+                startLine: 20,
+                message: 'loop bound depends on attacker input',
+              },
+            ],
+            jazzerCrashes: [],
+            counts: { semgrep: 1, opengrep: 0, codeql: 1, jazzerCrashes: 0 },
+            statuses: { opengrep: 'completed', codeql: 'completed', jazzer: 'skipped' },
+            scannerCaveats: [
+              'Jazzer.js produced no crashes or was skipped; continue exploitability review manually.',
+            ],
+          },
+          followUpLeads: [{ lead: 'Check earlier versions' }],
+        },
+      ],
+    });
+
+    expect(result.campaign.summary.promotedCount).toBe(1);
+    expect(result.campaignMarkdown).toContain('# npm CVE Hunt Campaign Report');
+    expect(result.campaignMarkdown).toContain('## Promoted Findings');
+    expect(result.campaignMarkdown).toContain('Unbounded parser recursion');
+    expect(result.campaignMarkdown).toContain('## Researcher Evidence Packs');
+    expect(result.campaignMarkdown).toContain('# CVE Evidence Pack');
+    expect(result.campaignMarkdown).toContain('## Static Analysis Evidence');
+    expect(result.campaignMarkdown).toContain('demo.recursive-parser');
+    expect(result.campaignMarkdown).toContain('js/resource-exhaustion');
+    expect(result.campaignMarkdown).toContain('## Dynamic Fuzzing Evidence');
+    expect(result.campaignMarkdown).toContain('Jazzer.js: 0 crash(es)');
+    expect(result.campaignMarkdown).toContain('## Manual / AI Source Review');
+    expect(result.campaignMarkdown).toContain('Manual source review confirmed');
+    expect(result.campaignMarkdown).toContain('## Scanner Caveats');
+    expect(result.campaignMarkdown).toContain('continue exploitability review manually');
+    expect(result.campaignMarkdown).toContain('## External MCP Evidence Used');
+    expect(result.campaignMarkdown).toContain('No MCP evidence was recorded');
+    expect(artifactNode?.data?.config?.params?.fileExtension).toBe('.md');
+    expect(artifactNode?.data?.config?.params?.mimeType).toBe('text/markdown');
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'assemble_campaign',
+          target: 'artifact_report',
+          sourceHandle: 'campaignMarkdown',
+          targetHandle: 'content',
+        }),
+      ]),
+    );
+  });
+
+  it('npm-cve-hunt-pipeline preserves rejected, repository-only, and follow-up leads in campaign artifact', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const assembleCampaignNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_campaign',
+    );
+
+    const result = runTemplateScript<{
+      campaign: {
+        schemaVersion: string;
+        summary: {
+          promotedCount: number;
+          rejectedCount: number;
+          repositoryOnlyCount: number;
+          followUpLeadCount: number;
+        };
+        promotedFindings: unknown[];
+        rejectedCandidates: unknown[];
+        repositoryOnlyFindings: unknown[];
+        followUpLeads: unknown[];
+      };
+    }>(assembleCampaignNode.data.config.params.code, {
+      packageCount: 2,
+      results: [
+        {
+          packageSpec: 'promoted@1.0.0',
+          promoted: true,
+          verdict: 'promote',
+          reviewer: {
+            promotedCandidate: { title: 'released vuln', affectedVersionRange: '1.0.0' },
+          },
+        },
+        {
+          packageSpec: 'source-map-js@1.2.1',
+          promoted: false,
+          verdict: 'reject',
+          followUpLeads: [{ title: 'released tarball while-push amplification' }],
+          reviewer: {
+            rejectionReasons: ['repo main only'],
+            repositoryOnlyFindings: [{ title: 'unreleased main branch issue' }],
+            followUpLeads: [{ title: 'released tarball while-push amplification' }],
+          },
+          reporter: {
+            followUpLeads: [{ title: 'released tarball while-push amplification' }],
+          },
+        },
+      ],
+    });
+
+    expect(result.campaign.schemaVersion).toBe('1.3');
+    expect(result.campaign.summary).toEqual(
+      expect.objectContaining({
+        promotedCount: 1,
+        rejectedCount: 1,
+        repositoryOnlyCount: 1,
+        followUpLeadCount: 1,
+      }),
+    );
+    expect(result.campaign.promotedFindings).toHaveLength(1);
+    expect(result.campaign.rejectedCandidates).toHaveLength(1);
+    expect(result.campaign.repositoryOnlyFindings).toEqual([
+      expect.objectContaining({
+        packageSpec: 'source-map-js@1.2.1',
+        title: 'unreleased main branch issue',
+      }),
+    ]);
+    expect(result.campaign.followUpLeads).toEqual([
+      expect.objectContaining({
+        packageSpec: 'source-map-js@1.2.1',
+        title: 'released tarball while-push amplification',
+      }),
+    ]);
+  });
+
+  it('npm-cve-hunt-pipeline converts source and agent failures into partial iterations', () => {
+    const filePath = join(seedTemplatesDir, 'npm-cve-hunt-pipeline.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const graph = template.graph;
+    const compiled = compileWorkflowGraph(WorkflowGraphSchema.parse(graph));
+    const body = compiled.loopBodies?.package_loop?.definition;
+    const reviewerFailureNode = graph.nodes.find(
+      (node: { id: string }) => node.id === 'reviewer_failure_iteration',
+    );
+
+    expect(body).toBeDefined();
+    expect(body?.nodes.finalize_source_context?.joinStrategy).toBe('any');
+    expect(body?.nodes.finalize_iteration?.joinStrategy).toBe('any');
+    expect(compiled.loopBodies?.package_loop.iterationCapture).toEqual({
+      sourceRef: 'finalize_iteration',
+      sourceHandle: 'iteration',
+    });
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'clone_repo',
+          target: 'clone_failure_context',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'semgrep_scan',
+          target: 'semgrep_failure_context',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'claude_hunter',
+          target: 'hunter_failure_iteration',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'claude_reviewer',
+          target: 'reviewer_failure_iteration',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'claude_reporter',
+          target: 'reporter_failure_iteration',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'finalize_iteration',
+          sourceHandle: 'iteration',
+          target: 'package_loop',
+          targetHandle: 'loopBack',
+        }),
+      ]),
+    );
+    expect(body?.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceRef: 'clone_repo',
+          targetRef: 'clone_failure_context',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          sourceRef: 'claude_hunter',
+          targetRef: 'hunter_failure_iteration',
+          kind: 'error',
+        }),
+      ]),
+    );
+
+    const reviewerFailure = runTemplateScript<{
+      iteration: {
+        status: string;
+        verdict: string;
+        packageProvenance?: { resolvedVersion?: string };
+        reviewer?: { verdict?: string; aiParseError?: string };
+        reporter?: { mode?: string; repositoryOnlyFindings?: unknown[]; followUpLeads?: unknown[] };
+        repositoryOnlyFindings?: unknown[];
+        followUpLeads?: unknown[];
+      };
+    }>(reviewerFailureNode!.data.config.params.code, {
+      failure: {
+        at: 'claude_reviewer',
+        reason: {
+          message: 'Structured agent output missing required keys: verdict, confidence, rationale',
+          name: 'ValidationError',
+        },
+      },
+      packageSpec: 'source-map-js',
+      packageName: 'source-map-js',
+      hunterReport: {
+        sourceStatus: { mode: 'npm-tarball-source' },
+        packageProvenance: { resolvedVersion: '1.2.1' },
+        repositoryOnlyFindings: [{ title: 'repo main issue' }],
+        followUpLeads: [{ title: 'tarball follow-up' }],
+        findings: { candidates: [{ title: 'candidate' }] },
+      },
+    });
+    expect(reviewerFailure.iteration.status).toBe('partial');
+    expect(reviewerFailure.iteration.verdict).toBe('reject');
+    expect(reviewerFailure.iteration.packageProvenance?.resolvedVersion).toBe('1.2.1');
+    expect(reviewerFailure.iteration.reviewer?.verdict).toBe('reject');
+    expect(reviewerFailure.iteration.reviewer?.aiParseError).toContain('Structured agent output');
+    expect(reviewerFailure.iteration.reporter?.mode).toBe('rejection-brief');
+    expect(reviewerFailure.iteration.repositoryOnlyFindings).toEqual([
+      expect.objectContaining({ title: 'repo main issue' }),
+    ]);
+    expect(reviewerFailure.iteration.followUpLeads).toEqual([
+      expect.objectContaining({ title: 'tarball follow-up' }),
+    ]);
   });
 
   it('cve-impact-research-brief includes source status in the report assembly inputs', () => {

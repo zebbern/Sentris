@@ -137,9 +137,7 @@ export async function resolveLlmProviderModelOverrides(
         };
         workflowDiagnosticLog('[Activity] Successfully resolved LLM provider oauthTokenSecretId');
       } else {
-        console.warn(
-          '[Activity] Secret reference not found in store for model.oauthTokenSecretId',
-        );
+        console.warn('[Activity] Secret reference not found in store for model.oauthTokenSecretId');
       }
     } catch (err: unknown) {
       console.warn(

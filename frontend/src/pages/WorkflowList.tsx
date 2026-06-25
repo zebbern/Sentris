@@ -216,7 +216,6 @@ export function WorkflowList() {
 
         {/* Filters */}
         <PageToolbar
-          title="Workflows"
           helpUrl={DOCS_URLS.userGuide}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}

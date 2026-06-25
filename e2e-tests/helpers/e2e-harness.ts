@@ -43,8 +43,12 @@ export function servicesAvailableSync(): boolean {
   try {
     const result = Bun.spawnSync(
       [
-        'curl', '-sf', '--max-time', '1',
-        '-H', `x-internal-token: ${HEADERS['x-internal-token']}`,
+        'curl',
+        '-sf',
+        '--max-time',
+        '1',
+        '-H',
+        `x-internal-token: ${HEADERS['x-internal-token']}`,
         `${API_BASE}/health`,
       ],
       { stdout: 'pipe', stderr: 'pipe' },
@@ -85,14 +89,8 @@ export function isE2EReady(): boolean {
  * `describe` that auto-skips when E2E is disabled or services are down.
  * For cloud tests pass `{ cloud: true }` to also require RUN_CLOUD_E2E.
  */
-export function e2eDescribe(
-  name: string,
-  fn: () => void,
-  opts?: { cloud?: boolean },
-): void {
-  const enabled = opts?.cloud
-    ? runE2E && runCloudE2E && _servicesOk
-    : runE2E && _servicesOk;
+export function e2eDescribe(name: string, fn: () => void, opts?: { cloud?: boolean }): void {
+  const enabled = opts?.cloud ? runE2E && runCloudE2E && _servicesOk : runE2E && _servicesOk;
   (enabled ? describe : describe.skip)(name, fn);
 }
 
@@ -257,9 +255,7 @@ export async function pollRunUntilAwaitingInput(
       headers: HEADERS,
     });
     const s = await res.json();
-    if (
-      ['AWAITING_INPUT', 'COMPLETED', 'FAILED', 'CANCELLED', 'TERMINATED'].includes(s.status)
-    ) {
+    if (['AWAITING_INPUT', 'COMPLETED', 'FAILED', 'CANCELLED', 'TERMINATED'].includes(s.status)) {
       return s;
     }
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -273,9 +269,10 @@ export async function pollRunUntilAwaitingInput(
 // ---------------------------------------------------------------------------
 
 /** List human input requests, with optional query filters. */
-export async function listHumanInputs(
-  query?: { status?: string; inputType?: string },
-): Promise<any[]> {
+export async function listHumanInputs(query?: {
+  status?: string;
+  inputType?: string;
+}): Promise<any[]> {
   const params = new URLSearchParams();
   if (query?.status) params.set('status', query.status);
   if (query?.inputType) params.set('inputType', query.inputType);
@@ -365,10 +362,7 @@ export async function listSecrets(): Promise<Array<{ id: string; name: string }>
   return res.json();
 }
 
-export async function createOrRotateSecret(
-  name: string,
-  value: string,
-): Promise<string> {
+export async function createOrRotateSecret(name: string, value: string): Promise<string> {
   const secrets = await listSecrets();
   const existing = secrets.find((s) => s.name === name);
   if (!existing) {
@@ -504,12 +498,31 @@ export interface CreateApiKeyConfig {
   name: string;
   description?: string;
   permissions: {
-    workflows: { run: boolean; list: boolean; read: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    workflows: {
+      run: boolean;
+      list: boolean;
+      read: boolean;
+      create?: boolean;
+      update?: boolean;
+      delete?: boolean;
+    };
     runs: { read: boolean; cancel: boolean };
     audit: { read: boolean };
     artifacts?: { read?: boolean; delete?: boolean };
-    schedules?: { list?: boolean; read?: boolean; create?: boolean; update?: boolean; delete?: boolean };
-    secrets?: { list?: boolean; read?: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    schedules?: {
+      list?: boolean;
+      read?: boolean;
+      create?: boolean;
+      update?: boolean;
+      delete?: boolean;
+    };
+    secrets?: {
+      list?: boolean;
+      read?: boolean;
+      create?: boolean;
+      update?: boolean;
+      delete?: boolean;
+    };
     'human-inputs'?: { read?: boolean; resolve?: boolean };
   };
   expiresAt?: string;
@@ -649,9 +662,12 @@ export async function deleteProviderConfig(provider: string): Promise<number> {
 
 /** List integration connections for a user. */
 export async function listConnections(userId: string): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/integrations/connections?userId=${encodeURIComponent(userId)}`, {
-    headers: HEADERS,
-  });
+  const res = await fetch(
+    `${API_BASE}/integrations/connections?userId=${encodeURIComponent(userId)}`,
+    {
+      headers: HEADERS,
+    },
+  );
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to list connections: ${res.status} ${text}`);
@@ -721,10 +737,7 @@ export async function createMcpServer(data: {
 }
 
 /** Update an MCP server via PATCH. */
-export async function updateMcpServer(
-  id: string,
-  patch: Record<string, unknown>,
-): Promise<any> {
+export async function updateMcpServer(id: string, patch: Record<string, unknown>): Promise<any> {
   const res = await fetch(`${API_BASE}/mcp-servers/${id}`, {
     method: 'PATCH',
     headers: HEADERS,
@@ -746,6 +759,23 @@ export async function toggleMcpServer(id: string): Promise<any> {
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to toggle MCP server ${id}: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+
+/** Test an MCP server connection and persist discovered tools. */
+export async function testMcpServerConnection(id: string): Promise<{
+  success: boolean;
+  message?: string;
+  toolCount?: number;
+}> {
+  const res = await fetch(`${API_BASE}/mcp-servers/${id}/test`, {
+    method: 'POST',
+    headers: HEADERS,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to test MCP server ${id}: ${res.status} ${text}`);
   }
   return res.json();
 }
@@ -772,7 +802,10 @@ export async function createSchedule(config: {
   description?: string | null;
   overlapPolicy?: 'skip' | 'buffer' | 'allow';
   catchupWindowSeconds?: number;
-  inputPayload?: { runtimeInputs?: Record<string, unknown>; nodeOverrides?: Record<string, unknown> };
+  inputPayload?: {
+    runtimeInputs?: Record<string, unknown>;
+    nodeOverrides?: Record<string, unknown>;
+  };
 }): Promise<any> {
   const res = await fetch(`${API_BASE}/schedules`, {
     method: 'POST',
@@ -816,10 +849,7 @@ export async function getSchedule(id: string): Promise<any> {
 }
 
 /** Update (PATCH) a schedule, returns the updated schedule. */
-export async function updateSchedule(
-  id: string,
-  patch: Record<string, unknown>,
-): Promise<any> {
+export async function updateSchedule(id: string, patch: Record<string, unknown>): Promise<any> {
   const res = await fetch(`${API_BASE}/schedules/${id}`, {
     method: 'PATCH',
     headers: HEADERS,

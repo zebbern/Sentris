@@ -98,9 +98,14 @@ const ROUTE_CONFIG: RouteEntry[] = [
     shortTitle: 'Analytics Settings',
     subtitle: 'Configure data retention and storage settings',
   },
-  // Prefix matches (must come after exact matches for the same prefix)
   {
     path: '/workflows',
+    title: 'Workflows',
+    shortTitle: 'Workflows',
+    subtitle: 'Manage and automate security workflows',
+  },
+  {
+    path: '/workflows/',
     prefix: true,
     title: 'Workflow Builder',
     shortTitle: 'Builder',
@@ -170,8 +175,8 @@ export function AppTopBar({
   return (
     <div
       className={cn(
-        'h-[56px] md:h-[60px] border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
-        'flex items-center px-3 md:px-4 gap-2 md:gap-4 sticky top-0 z-40',
+        'h-10 border-b border-border/80 bg-app-chrome backdrop-blur-sm',
+        'flex items-center px-3 gap-2 sticky top-0 z-40',
       )}
     >
       {/* Sidebar toggle - works on both mobile and desktop */}
@@ -189,12 +194,12 @@ export function AppTopBar({
                 ? 'Collapse sidebar'
                 : 'Expand sidebar'
           }
-          className="h-9 w-9 min-h-11 min-w-11 flex-shrink-0"
+          className="h-7 w-7 min-h-7 min-w-7 flex-shrink-0"
         >
           {sidebarOpen ? (
-            <PanelLeftClose className="h-5 w-5" />
+            <PanelLeftClose className="h-4 w-4" />
           ) : (
-            <PanelLeftOpen className="h-5 w-5" />
+            <PanelLeftOpen className="h-4 w-4" />
           )}
         </Button>
       )}
@@ -221,7 +226,7 @@ export function AppTopBar({
               </div>
             </Link>
             {/* Show page title on non-workflow pages */}
-            {location.pathname !== '/' && !location.pathname.startsWith('/workflows') && (
+            {location.pathname !== '/' && !location.pathname.startsWith('/workflows/') && (
               <>
                 <span className="text-muted-foreground">|</span>
                 <span className="font-medium text-sm truncate">
@@ -232,13 +237,13 @@ export function AppTopBar({
           </div>
         ) : (
           /* Desktop: Full page title — responsive sizing for tablet */
-          <div className="min-w-0">
-            <h1 className="text-base lg:text-xl font-semibold truncate">
+          <div className="min-w-0 leading-none">
+            <h1 className="text-sm font-semibold truncate leading-tight">
               <span className="lg:hidden">{pageInfo.shortTitle || pageInfo.title}</span>
               <span className="hidden lg:inline">{pageInfo.title}</span>
             </h1>
             {pageInfo.subtitle && (
-              <p className="text-sm text-muted-foreground truncate hidden lg:block">
+              <p className="text-[11px] text-muted-foreground truncate hidden lg:block leading-tight mt-0.5">
                 {pageInfo.subtitle}
               </p>
             )}

@@ -64,17 +64,16 @@ describe('SidebarNav', () => {
     for (const target of [findingsLink, manageButton, searchButton]) {
       expect(target.className).toContain('h-10');
       expect(target.className).toContain('w-10');
-      expect(target.className).toContain('px-0');
+      expect(target.className).toContain('p-0');
       expect(target.className).toContain('mx-auto');
     }
 
-    expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /switch to (light|dark) mode/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('shows theme toggle beside notifications when sidebar is expanded', () => {
+  it('shows theme toggle when sidebar is expanded', () => {
     renderWithProviders(
       <SidebarNav
         sidebarOpen={true}
@@ -92,7 +91,6 @@ describe('SidebarNav', () => {
       { initialEntries: ['/findings'] },
     );
 
-    expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument();
   });
 

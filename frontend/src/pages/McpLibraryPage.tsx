@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plug, Plus, RefreshCw } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
@@ -52,7 +52,7 @@ export function McpLibraryPage() {
   const [checkingServers, setCheckingServers] = useState<Set<string>>(new Set());
 
   // ------ Extracted hooks ------
-  const actions = useMcpLibraryActions({ servers });
+  const actions = useMcpLibraryActions({ servers, setCheckingServers });
   const data = useMcpLibraryData({
     servers,
     tools,
@@ -121,12 +121,23 @@ export function McpLibraryPage() {
               aria-label="Refresh MCP servers"
               onClick={() => {
                 queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.all() });
+                queryClient.invalidateQueries({ queryKey: queryKeys.mcpServers.tools() });
                 queryClient.invalidateQueries({ queryKey: queryKeys.mcpGroups.all() });
                 void groupActions.refreshTemplates();
               }}
               disabled={isLoading}
             >
               <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={actions.handleTestEnabledServers}
+              disabled={actions.testingEnabledServers}
+            >
+              <Plug
+                className={cn('h-4 w-4 mr-2', actions.testingEnabledServers && 'animate-pulse')}
+              />
+              Test all enabled
             </Button>
             <Button onClick={editor.handleCreateNew}>
               <Plus className="h-4 w-4 mr-2" />
@@ -180,6 +191,7 @@ export function McpLibraryPage() {
             getGroupServers={data.getGroupServers}
             getGroupServerHealthStatus={data.getGroupServerHealthStatus}
             getGroupServerToolCounts={data.getGroupServerToolCounts}
+            getGroupServerReadiness={data.getGroupServerReadiness}
             onToggle={actions.handleToggle}
             onViewTools={actions.handleViewTools}
             onDiscoverTools={(serverId) =>
@@ -196,6 +208,7 @@ export function McpLibraryPage() {
             checkingServers={checkingServers}
             testingServer={actions.testingServer}
             toolCountsByServer={data.toolCountsByServer}
+            readinessByServer={data.readinessByServer}
             onCreateNew={editor.handleCreateNew}
             onToggle={actions.handleToggle}
             onViewTools={actions.handleViewTools}

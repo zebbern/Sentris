@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, screen, cleanup } from '@testing-library/react';
+import { fireEvent, screen, cleanup, waitFor } from '@testing-library/react';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -49,6 +49,7 @@ const mockQueryState: {
   deleteServer: any;
   toggleServer: any;
   testConnection: any;
+  testEnabledServers: any;
   fetchServerTools: any;
   toggleTool: any;
   discoverTools: any;
@@ -63,6 +64,7 @@ const mockQueryState: {
   deleteServer: mock().mockResolvedValue(undefined),
   toggleServer: mock().mockResolvedValue({ id: 'srv-1', enabled: true, name: 'Test' }),
   testConnection: mock().mockResolvedValue({ success: true, message: 'OK' }),
+  testEnabledServers: mock().mockResolvedValue([]),
   fetchServerTools: mock().mockResolvedValue([]),
   toggleTool: mock().mockResolvedValue({ id: 'tool-1', toolName: 'test', enabled: true }),
   discoverTools: mock().mockResolvedValue([]),
@@ -86,6 +88,9 @@ mock.module('@/hooks/queries/useMcpServerQueries', () => ({
   }),
   useTestMcpConnection: () => ({
     mutateAsync: mockQueryState.testConnection,
+  }),
+  useTestEnabledMcpServers: () => ({
+    mutateAsync: mockQueryState.testEnabledServers,
   }),
   useFetchServerTools: () => ({
     mutateAsync: mockQueryState.fetchServerTools,
@@ -205,6 +210,9 @@ interface MockQueryOverrides {
   deleteServer?: (...args: any[]) => Promise<any>;
   toggleServer?: (...args: any[]) => Promise<any>;
   testConnection?: (...args: any[]) => Promise<any>;
+  testEnabledServers?: (...args: any[]) => Promise<any>;
+  fetchServerTools?: (...args: any[]) => Promise<any>;
+  discoverTools?: (...args: any[]) => Promise<any>;
 }
 
 const setupStore = (overrides: MockQueryOverrides = {}) => {
@@ -221,6 +229,9 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
     mock().mockResolvedValue({ id: 'srv-1', enabled: true, name: 'Test' });
   mockQueryState.testConnection =
     overrides.testConnection ?? mock().mockResolvedValue({ success: true, message: 'OK' });
+  mockQueryState.testEnabledServers = overrides.testEnabledServers ?? mock().mockResolvedValue([]);
+  mockQueryState.fetchServerTools = overrides.fetchServerTools ?? mock().mockResolvedValue([]);
+  mockQueryState.discoverTools = overrides.discoverTools ?? mock().mockResolvedValue([]);
 
   return mockQueryState;
 };
@@ -289,6 +300,14 @@ describe('McpLibraryPage', () => {
     expect(screen.getByText('Filesystem MCP')).toBeInTheDocument();
   });
 
+  it('renders agent readiness labels for custom MCP servers', () => {
+    setupStore();
+    renderPage();
+
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+  });
+
   it('renders server descriptions', () => {
     setupStore();
     renderPage();
@@ -343,6 +362,54 @@ describe('McpLibraryPage', () => {
 
     const refreshButton = screen.getByRole('button', { name: /Refresh MCP servers/i });
     expect(refreshButton).toBeInTheDocument();
+  });
+
+  it('runs batch testing for enabled MCP servers', async () => {
+    const testEnabledServers = mock().mockResolvedValue([
+      {
+        serverId: 'srv-001',
+        serverName: 'GitHub MCP',
+        success: true,
+        toolCount: 1,
+      },
+    ]);
+    setupStore({ testEnabledServers });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Test all enabled/i }));
+
+    await waitFor(() => expect(testEnabledServers).toHaveBeenCalledTimes(1));
+  });
+
+  it('uses the persistent connection test when discovering tools from the tools dialog', async () => {
+    const testConnection = mock().mockResolvedValue({
+      success: true,
+      message: 'Connection successful (1 tools discovered)',
+      toolCount: 1,
+    });
+    const discoverTools = mock().mockResolvedValue([
+      {
+        id: 'preview-tool',
+        toolName: 'preview',
+        serverId: 'srv-001',
+        serverName: 'GitHub MCP',
+        enabled: true,
+        discoveredAt: ISO,
+      },
+    ]);
+    setupStore({
+      servers: [baseServer],
+      tools: [],
+      testConnection,
+      discoverTools,
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /View tools/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Discover Tools/i }));
+
+    await waitFor(() => expect(testConnection).toHaveBeenCalledWith('srv-001'));
+    expect(discoverTools).not.toHaveBeenCalled();
   });
 
   it('shows ErrorBanner when error is set', () => {

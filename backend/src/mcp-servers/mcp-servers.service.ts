@@ -15,6 +15,7 @@ import type {
   McpToolResponse,
   TransportType,
   HealthStatus,
+  TestEnabledServerResponse,
 } from './dto/mcp-servers.dto';
 import type { McpServerRecord, McpServerToolRecord } from '../database/schema';
 import { SecretResolver } from '../secrets/secret-resolver';
@@ -518,6 +519,39 @@ export class McpServersService {
     }));
   }
 
+  async testEnabledServers(auth: AuthContext | null): Promise<TestEnabledServerResponse[]> {
+    const organizationId = requireOrganizationId(auth);
+    const servers = await this.repository.listEnabled({ organizationId });
+    const results: TestEnabledServerResponse[] = [];
+
+    for (const server of servers) {
+      try {
+        const result = await this.testServerConnection(auth, server.id);
+        results.push({
+          serverId: server.id,
+          serverName: server.name,
+          success: result.success,
+          message: result.message,
+          ...(typeof result.toolCount === 'number' ? { toolCount: result.toolCount } : {}),
+        });
+      } catch (error) {
+        try {
+          await this.repository.updateHealthStatus(server.id, 'unhealthy', { organizationId });
+        } catch {
+          // Preserve the per-server test result even if persisting health also fails.
+        }
+        results.push({
+          serverId: server.id,
+          serverName: server.name,
+          success: false,
+          message: error instanceof Error ? error.message : 'Connection test failed',
+        });
+      }
+    }
+
+    return results;
+  }
+
   /**
    * Test connection to an MCP server.
    * - HTTP: Direct MCP protocol test (fast, validates endpoint is reachable)
@@ -547,7 +581,7 @@ export class McpServersService {
 
       // For HTTP: do actual connection test
       if (server.transportType === 'http') {
-        return await this.testHttpConnectionDirect(server);
+        return await this.testHttpConnectionDirect(server, organizationId);
       }
 
       // For STDIO: use Temporal workflow to properly test via worker
@@ -575,7 +609,7 @@ export class McpServersService {
       // Wait for workflow to complete (with timeout)
       const WORKFLOW_TIMEOUT_MS = 60_000;
       try {
-        await Promise.race([
+        const discovery = (await Promise.race([
           this.temporalService.getWorkflowResult({
             workflowId: workflowResult.workflowId,
           }),
@@ -585,18 +619,32 @@ export class McpServersService {
               WORKFLOW_TIMEOUT_MS,
             ),
           ),
-        ]);
+        ])) as {
+          status?: string;
+          tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+          toolCount?: number;
+          error?: string;
+        };
 
-        // Discovery succeeded - tools are already saved by the workflow
-        await this.repository.updateHealthStatus(id, 'healthy', {});
-        const tools = await this.repository.listTools(id);
+        if (discovery.status !== 'completed') {
+          await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
+          return {
+            success: false,
+            message: `Connection test failed: ${discovery.error || 'discovery workflow failed'}`,
+          };
+        }
+
+        const discoveredTools = Array.isArray(discovery.tools) ? discovery.tools : [];
+        await this.repository.upsertTools(id, this.mapDiscoveredTools(discoveredTools));
+
+        await this.repository.updateHealthStatus(id, 'healthy', { organizationId });
         return {
           success: true,
-          message: `Connection successful (${tools.length} tools discovered)`,
-          toolCount: tools.length,
+          message: `Connection successful (${discoveredTools.length} tools discovered)`,
+          toolCount: discoveredTools.length,
         };
       } catch (workflowError) {
-        await this.repository.updateHealthStatus(id, 'unhealthy', {});
+        await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
         const errorMessage =
           workflowError instanceof Error ? workflowError.message : 'Connection test failed';
         const isTimeout = errorMessage.includes('timed out');
@@ -619,7 +667,10 @@ export class McpServersService {
   /**
    * Direct HTTP connection test
    */
-  private async testHttpConnectionDirect(server: McpServerRecord): Promise<{
+  private async testHttpConnectionDirect(
+    server: McpServerRecord,
+    organizationId: string,
+  ): Promise<{
     success: boolean;
     message: string;
     toolCount?: number;
@@ -640,78 +691,76 @@ export class McpServersService {
         throw new Error('Endpoint is required for HTTP transport');
       }
 
-      // Test MCP initialize
-      const initResponse = await fetch(server.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, text/event-stream',
-          ...(headers || {}),
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'sentris-flow', version: '1.0.0' },
-          },
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!initResponse.ok) {
-        throw new Error(`HTTP ${initResponse.status}: ${initResponse.statusText}`);
-      }
-
-      const initData = (await initResponse.json()) as { error?: { message: string } };
-      if (initData.error) {
-        throw new Error(initData.error.message);
-      }
-
-      // Try to get tool count
-      const toolsResponse = await fetch(server.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, text/event-stream',
-          ...(headers || {}),
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 2,
-          method: 'tools/list',
-          params: {},
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      let toolCount = 0;
-      if (toolsResponse.ok) {
-        const toolsData = (await toolsResponse.json()) as {
-          result?: { tools?: unknown[] };
-        };
-        toolCount = toolsData.result?.tools?.length ?? 0;
-      }
+      const tools = await this.discoverHttpTools(server.endpoint, headers ?? undefined);
+      await this.repository.upsertTools(server.id, this.mapDiscoveredTools(tools));
 
       // Update health status to healthy
-      await this.repository.updateHealthStatus(server.id, 'healthy', {});
+      await this.repository.updateHealthStatus(server.id, 'healthy', { organizationId });
 
       return {
         success: true,
-        message: `Connection successful (${toolCount} tools available)`,
-        toolCount,
+        message: `Connection successful (${tools.length} tools available)`,
+        toolCount: tools.length,
       };
     } catch (error) {
       // Update health status to unhealthy
-      await this.repository.updateHealthStatus(server.id, 'unhealthy', {});
+      await this.repository.updateHealthStatus(server.id, 'unhealthy', { organizationId });
 
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
       return {
         success: false,
         message: `Connection failed: ${errorMessage}`,
       };
+    }
+  }
+
+  private mapDiscoveredTools(
+    tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[],
+  ): {
+    toolName: string;
+    description: string | null;
+    inputSchema: Record<string, unknown> | null;
+  }[] {
+    return tools.map((tool) => ({
+      toolName: tool.name,
+      description: tool.description ?? null,
+      inputSchema: tool.inputSchema ?? null,
+    }));
+  }
+
+  private async discoverHttpTools(
+    endpoint: string,
+    headers?: Record<string, string>,
+  ): Promise<{ name: string; description?: string; inputSchema?: Record<string, unknown> }[]> {
+    const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
+      import('@modelcontextprotocol/sdk/client/index.js'),
+      import('@modelcontextprotocol/sdk/client/streamableHttp.js'),
+    ]);
+
+    const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
+      requestInit: {
+        headers: {
+          Accept: 'application/json, text/event-stream',
+          ...(headers || {}),
+        },
+      },
+    });
+
+    const client = new Client(
+      { name: 'sentris-flow-mcp-library', version: '1.0.0' },
+      { capabilities: {} },
+    );
+
+    try {
+      await client.connect(transport);
+      const result = await client.listTools();
+      return (result.tools ?? []).map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
+      }));
+    } finally {
+      await client.close().catch(() => {});
     }
   }
 

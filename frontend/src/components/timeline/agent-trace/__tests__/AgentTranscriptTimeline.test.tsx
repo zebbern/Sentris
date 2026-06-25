@@ -125,11 +125,43 @@ describe('AgentTranscriptTimeline', () => {
     expect(screen.getByText('Call ID: call-abc')).toBeTruthy();
   });
 
+  it('renders failed tool invocation errors', () => {
+    const steps = [
+      makeStep({
+        toolName: 'Fetch_Reference__fetch',
+        toolCallId: 'call-fetch',
+        toolInput: { url: 'https://example.com' },
+        toolOutput: undefined,
+        toolError: 'Connection failed: Failed to parse JSON',
+        finishReason: 'error',
+      }),
+    ];
+    render(<AgentTranscriptTimeline steps={steps} />);
+
+    expect(screen.getByText('Tool error')).toBeTruthy();
+    expect(screen.getByText('Connection failed: Failed to parse JSON')).toBeTruthy();
+  });
+
   it('renders final answer card', () => {
     render(<AgentTranscriptTimeline steps={[]} finalText="The vulnerability has been patched." />);
 
     expect(screen.getByText('Final Answer')).toBeTruthy();
     expect(screen.getByText('The vulnerability has been patched.')).toBeTruthy();
+  });
+
+  it('renders final answers as markdown for researcher reports', () => {
+    render(
+      <AgentTranscriptTimeline
+        steps={[]}
+        finalText={
+          '# Vulnerability Report\n\n- **Severity:** High\n\n```js\nthrow new Error("poc")\n```'
+        }
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Vulnerability Report' })).toBeTruthy();
+    expect(screen.getByText('Severity:')).toBeTruthy();
+    expect(screen.getByText('throw new Error("poc")')).toBeTruthy();
   });
 
   it('does not render final answer for empty text', () => {

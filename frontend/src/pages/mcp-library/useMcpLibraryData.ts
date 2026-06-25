@@ -3,7 +3,8 @@ import type { McpGroupServerResponse } from '@/services/mcpGroupsApi';
 import type { McpHealthStatus } from '@sentris/shared';
 import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpServerQueries';
 import type { McpGroupResponse, McpGroupTemplateResponse } from '@/services/mcpGroupsApi';
-import type { TransportType } from './types';
+import type { AgentReadiness, TransportType } from './types';
+import { getMcpAgentReadiness } from './utils';
 
 interface UseMcpLibraryDataOptions {
   servers: McpServerResponse[];
@@ -90,6 +91,18 @@ export function useMcpLibraryData({
     return counts;
   }, [servers, tools]);
 
+  const readinessByServer = useMemo(() => {
+    const readiness: Record<string, AgentReadiness> = {};
+    for (const server of servers) {
+      readiness[server.id] = getMcpAgentReadiness({
+        enabled: server.enabled,
+        healthStatus: server.lastHealthStatus ?? null,
+        toolCounts: toolCountsByServer[server.id] ?? null,
+      });
+    }
+    return readiness;
+  }, [servers, toolCountsByServer]);
+
   const serverTools = useMemo(() => {
     if (!selectedServerForTools) return [];
     return tools.filter((t) => t.serverId === selectedServerForTools);
@@ -124,6 +137,21 @@ export function useMcpLibraryData({
     [toolCountsByServer],
   );
 
+  const getGroupServerReadiness = useCallback(
+    (server: {
+      serverId: string;
+      enabled: boolean;
+      healthStatus: McpHealthStatus;
+      toolCount: number;
+    }) =>
+      getMcpAgentReadiness({
+        enabled: server.enabled,
+        healthStatus: getGroupServerHealthStatus(server),
+        toolCounts: getGroupServerToolCounts(server),
+      }),
+    [getGroupServerHealthStatus, getGroupServerToolCounts],
+  );
+
   const getServerDiscoveryImage = useCallback(
     (serverId: string) => {
       const server = servers.find((s) => s.id === serverId);
@@ -142,10 +170,12 @@ export function useMcpLibraryData({
     filteredTemplates,
     filteredGroups,
     toolCountsByServer,
+    readinessByServer,
     serverTools,
     selectedServer,
     getGroupServerHealthStatus,
     getGroupServerToolCounts,
+    getGroupServerReadiness,
     getServerDiscoveryImage,
   };
 }

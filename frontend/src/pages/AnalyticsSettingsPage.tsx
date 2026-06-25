@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Save, Shield, Clock, Info } from 'lucide-react';
+import { Save, Shield, Clock, Info, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,8 @@ import { useAuthStore } from '@/store/authStore';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { hasAdminRole } from '@/utils/auth';
 import type { SubscriptionTier } from '@/services/api';
+import { OpenSearchTelemetryLink } from '@/components/analytics/OpenSearchTelemetryLink';
+import { env } from '@/config/env';
 
 const TIER_LIMITS: Record<SubscriptionTier, number> = {
   free: 30,
@@ -345,6 +347,24 @@ export function AnalyticsSettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {env.VITE_OPENSEARCH_DASHBOARDS_URL && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Run Telemetry
+                  </CardTitle>
+                  <CardDescription>
+                    Explore workflow run events, logs, and indexed telemetry in OpenSearch
+                    Dashboards.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <OpenSearchTelemetryLink variant="card" />
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>
