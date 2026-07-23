@@ -3,6 +3,7 @@ import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Template, TemplateCategory } from '@/types/templates';
+import { getTemplateSetupLevel } from '@/pages/template-library/setupLevel';
 import { createDialogMock } from '@/test/mocks/dialog';
 import {
   createDndCoreMock,
@@ -448,5 +449,72 @@ describe('TemplateLibraryPage', () => {
     const useTemplateButtons = screen.getAllByRole('button', { name: /Use Template/i });
     expect(useTemplateButtons.length).toBe(1);
     expect(screen.queryByLabelText(/^Preview network recon scan$/i)).not.toBeInTheDocument();
+  });
+
+  it('filters to net-only templates when "No setup required" is toggled', () => {
+    mockQueryState.templates = [
+      {
+        id: 'net',
+        name: 'net only',
+        tags: [],
+        repository: 'r',
+        path: 'p',
+        branch: 'main',
+        manifest: {},
+        graph: {
+          nodes: [
+            { id: 'a', type: 'core.workflow.entrypoint' },
+            { id: 'b', type: 'sentris.nvd.cve.query' },
+          ],
+        },
+        requiredSecrets: [],
+        popularity: 0,
+        isOfficial: false,
+        isVerified: false,
+        isActive: true,
+        createdAt: '2026-07-23T00:00:00.000Z',
+        updatedAt: '2026-07-23T00:00:00.000Z',
+      },
+      {
+        id: 'docker',
+        name: 'docker scan',
+        tags: [],
+        repository: 'r',
+        path: 'p',
+        branch: 'main',
+        manifest: {},
+        graph: {
+          nodes: [
+            { id: 'a', type: 'core.workflow.entrypoint' },
+            { id: 'b', type: 'sentris.nuclei.scan' },
+          ],
+        },
+        requiredSecrets: [],
+        popularity: 0,
+        isOfficial: false,
+        isVerified: false,
+        isActive: true,
+        createdAt: '2026-07-23T00:00:00.000Z',
+        updatedAt: '2026-07-23T00:00:00.000Z',
+      },
+    ] as Template[];
+
+    render(
+      <MemoryRouter>
+        <TemplateLibraryPage />
+      </MemoryRouter>,
+    );
+
+    // Both visible initially.
+    expect(screen.getByText('Net Only')).toBeDefined();
+    expect(screen.getByText('Docker Scan')).toBeDefined();
+
+    // Toggle "No setup required".
+    fireEvent.click(screen.getByRole('button', { name: /No setup required/i }));
+
+    expect(screen.getByText('Net Only')).toBeDefined();
+    expect(screen.queryByText('Docker Scan')).toBeNull();
+    // sanity: helper agrees
+    expect(getTemplateSetupLevel(mockQueryState.templates[1])).toBe('needs-tooling');
   });
 });
