@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, RefreshCw, Search, Tag, X, ExternalLink } from 'lucide-react';
+import { Filter, RefreshCw, Search, Tag, X, ExternalLink, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCategoryStyle } from './types';
 
@@ -30,6 +30,8 @@ export interface TemplateFiltersProps {
   onSync: () => void;
   isSyncing: boolean;
   canManageWorkflows: boolean;
+  noSetupOnly: boolean;
+  onToggleNoSetupOnly: () => void;
 }
 
 export function TemplateFilters({
@@ -46,6 +48,8 @@ export function TemplateFilters({
   onSync,
   isSyncing,
   canManageWorkflows,
+  noSetupOnly,
+  onToggleNoSetupOnly,
 }: TemplateFiltersProps) {
   return (
     <div className="mb-6 space-y-3">
@@ -110,6 +114,24 @@ export function TemplateFilters({
           <ExternalLink className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Contribute</span>
         </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 ml-1">
+        <button
+          type="button"
+          onClick={onToggleNoSetupOnly}
+          aria-pressed={noSetupOnly}
+          title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+            noSetupOnly
+              ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted',
+          )}
+        >
+          <Zap className="h-3.5 w-3.5" />
+          No setup required
+        </button>
       </div>
 
       {tags.length > 0 && (

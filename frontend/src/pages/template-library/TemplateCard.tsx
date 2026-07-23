@@ -2,11 +2,12 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatTimeAgo } from '@/utils/timeFormat';
-import { Star, KeyRound, ArrowRight } from 'lucide-react';
+import { Star, KeyRound, ArrowRight, Zap } from 'lucide-react';
 import type { Template } from '@/hooks/queries/useTemplateQueries';
 import { cn } from '@/lib/utils';
 import { toTitleCase } from './types';
 import { PreviewSection } from './PreviewSection';
+import { isNoSetupTemplate } from './setupLevel';
 
 // ---------------------------------------------------------------------------
 // Template card
@@ -76,6 +77,8 @@ function TemplateCardStats({ template }: { template: Template }) {
 }
 
 export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps) {
+  const noSetup = isNoSetupTemplate(template);
+
   const handleCardKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -102,6 +105,16 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
       )}
     >
       <div className="flex flex-1 flex-col gap-4 p-4">
+        {noSetup && (
+          <span
+            className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+            title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
+          >
+            <Zap className="h-3 w-3" />
+            No setup required
+          </span>
+        )}
+
         <PreviewSection
           graph={template.graph}
           category={template.category}

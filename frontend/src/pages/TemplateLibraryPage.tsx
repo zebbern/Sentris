@@ -1,5 +1,5 @@
 import { useCallback, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layers } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -25,6 +25,7 @@ import {
   CardSkeleton,
   TemplateDetailModal,
   TemplateFilters,
+  isNoSetupTemplate,
 } from './template-library';
 
 export function TemplateLibraryPage() {
@@ -37,6 +38,10 @@ export function TemplateLibraryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showNoSetupOnly, setShowNoSetupOnly] = useState(
+    () => searchParams.get('setup') === 'none',
+  );
 
   const filters = useMemo(() => {
     const f: { category?: string; search?: string; tags?: string[] } = {};
@@ -47,6 +52,10 @@ export function TemplateLibraryPage() {
   }, [selectedCategory, searchQuery, selectedTags]);
 
   const { data: templates = [], isLoading, error, refetch } = useTemplates(filters);
+  const visibleTemplates = useMemo(
+    () => (showNoSetupOnly ? templates.filter(isNoSetupTemplate) : templates),
+    [templates, showNoSetupOnly],
+  );
   const { data: categoriesRaw = [] } = useTemplateCategories();
   const { data: tags = [] } = useTemplateTags();
 
@@ -85,6 +94,21 @@ export function TemplateLibraryPage() {
     setSelectedCategory(null);
     setSelectedTags([]);
     setSearchQuery('');
+    setShowNoSetupOnly(false);
+    const params = new URLSearchParams(searchParams);
+    if (params.has('setup')) {
+      params.delete('setup');
+      setSearchParams(params, { replace: true });
+    }
+  };
+
+  const toggleNoSetupOnly = () => {
+    const next = !showNoSetupOnly;
+    setShowNoSetupOnly(next);
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('setup', 'none');
+    else params.delete('setup');
+    setSearchParams(params, { replace: true });
   };
 
   const handleUseTemplate = (template: Template) => {
@@ -105,7 +129,11 @@ export function TemplateLibraryPage() {
   };
 
   const isSyncing = syncMutation.isPending;
-  const hasFilters = Boolean(selectedCategory || selectedTags.length > 0 || searchQuery);
+  const hasFilters = Boolean(
+    selectedCategory || selectedTags.length > 0 || searchQuery || showNoSetupOnly,
+  );
+  const libraryEmpty =
+    templates.length === 0 && !selectedCategory && !searchQuery && selectedTags.length === 0;
 
   const getTemplateId = useCallback((t: Template) => t.id, []);
 
@@ -116,7 +144,7 @@ export function TemplateLibraryPage() {
     handleDragEnd,
     isDragDisabled,
   } = useSortableList({
-    items: templates,
+    items: visibleTemplates,
     getId: getTemplateId,
     storageKey: `sentris:sort:templates:${organizationId}`,
     disabled: hasFilters,
@@ -139,6 +167,8 @@ export function TemplateLibraryPage() {
           onSync={handleSync}
           isSyncing={isSyncing}
           canManageWorkflows={canManageWorkflows}
+          noSetupOnly={showNoSetupOnly}
+          onToggleNoSetupOnly={toggleNoSetupOnly}
         />
 
         {error && (
@@ -151,25 +181,39 @@ export function TemplateLibraryPage() {
               <CardSkeleton key={i} />
             ))}
           </div>
-        ) : error && templates.length === 0 ? null : templates.length === 0 ? (
+        ) : error && visibleTemplates.length === 0 ? null : visibleTemplates.length === 0 ? (
           <EmptyState
             icon={Layers}
             title="No templates found"
             description={
-              hasFilters
-                ? "Try adjusting your filters or search query to find what you're looking for."
-                : 'No templates available yet. Sync from GitHub to load templates.'
+              libraryEmpty
+                ? canManageWorkflows
+                  ? 'No templates available yet. Sync from GitHub to load the template library.'
+                  : 'No templates available yet. The library is synced from GitHub by an administrator — ask an admin to run a sync, or browse the catalog on GitHub.'
+                : "Try adjusting your filters or search query to find what you're looking for."
             }
             action={
-              hasFilters ? (
+              libraryEmpty ? (
+                canManageWorkflows ? (
+                  <Button onClick={handleSync} disabled={isSyncing}>
+                    {isSyncing ? 'Syncing…' : 'Sync templates'}
+                  </Button>
+                ) : (
+                  <Button variant="outline" asChild>
+                    <a
+                      href="https://github.com/zebbern/Sentris"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Browse templates on GitHub
+                    </a>
+                  </Button>
+                )
+              ) : (
                 <Button variant="outline" onClick={clearFilters}>
                   Clear filters
                 </Button>
-              ) : canManageWorkflows ? (
-                <Button onClick={handleSync} disabled={isSyncing}>
-                  {isSyncing ? 'Syncing…' : 'Sync templates'}
-                </Button>
-              ) : undefined
+              )
             }
           />
         ) : (

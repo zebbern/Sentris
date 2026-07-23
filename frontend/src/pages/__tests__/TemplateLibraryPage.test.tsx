@@ -3,6 +3,7 @@ import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { fireEvent, render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Template, TemplateCategory } from '@/types/templates';
+import { getTemplateSetupLevel } from '@/pages/template-library/setupLevel';
 import { createDialogMock } from '@/test/mocks/dialog';
 import {
   createDndCoreMock,
@@ -271,7 +272,9 @@ describe('TemplateLibraryPage', () => {
 
     expect(screen.getByText('No templates found')).toBeInTheDocument();
     expect(
-      screen.getByText('No templates available yet. Sync from GitHub to load templates.'),
+      screen.getByText(
+        'No templates available yet. Sync from GitHub to load the template library.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -448,5 +451,130 @@ describe('TemplateLibraryPage', () => {
     const useTemplateButtons = screen.getAllByRole('button', { name: /Use Template/i });
     expect(useTemplateButtons.length).toBe(1);
     expect(screen.queryByLabelText(/^Preview network recon scan$/i)).not.toBeInTheDocument();
+  });
+
+  it('filters to net-only templates when "No setup required" is toggled', () => {
+    mockQueryState.templates = [
+      {
+        id: 'net',
+        name: 'net only',
+        tags: [],
+        repository: 'r',
+        path: 'p',
+        branch: 'main',
+        manifest: {},
+        graph: {
+          nodes: [
+            { id: 'a', type: 'core.workflow.entrypoint' },
+            { id: 'b', type: 'sentris.nvd.cve.query' },
+          ],
+        },
+        requiredSecrets: [],
+        popularity: 0,
+        isOfficial: false,
+        isVerified: false,
+        isActive: true,
+        createdAt: '2026-07-23T00:00:00.000Z',
+        updatedAt: '2026-07-23T00:00:00.000Z',
+      },
+      {
+        id: 'docker',
+        name: 'docker scan',
+        tags: [],
+        repository: 'r',
+        path: 'p',
+        branch: 'main',
+        manifest: {},
+        graph: {
+          nodes: [
+            { id: 'a', type: 'core.workflow.entrypoint' },
+            { id: 'b', type: 'sentris.nuclei.scan' },
+          ],
+        },
+        requiredSecrets: [],
+        popularity: 0,
+        isOfficial: false,
+        isVerified: false,
+        isActive: true,
+        createdAt: '2026-07-23T00:00:00.000Z',
+        updatedAt: '2026-07-23T00:00:00.000Z',
+      },
+    ] as Template[];
+
+    renderPage();
+
+    // Both visible initially.
+    expect(screen.getByText('Net Only')).toBeDefined();
+    expect(screen.getByText('Docker Scan')).toBeDefined();
+
+    // Toggle "No setup required".
+    fireEvent.click(screen.getByRole('button', { name: /No setup required/i }));
+
+    expect(screen.getByText('Net Only')).toBeDefined();
+    expect(screen.queryByText('Docker Scan')).toBeNull();
+    // sanity: helper agrees
+    expect(getTemplateSetupLevel(mockQueryState.templates[1])).toBe('needs-tooling');
+  });
+
+  it('shows a non-admin-friendly empty state when the library is empty and user cannot sync', () => {
+    mockRoles = [];
+    mockQueryState.templates = [];
+
+    renderPage();
+
+    expect(screen.getByText(/synced from GitHub by an administrator/i)).toBeDefined();
+    const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
+    expect(link.getAttribute('href')).toContain('github.com');
+    // The toolbar always renders a "Sync templates" control (disabled for non-admins);
+    // it must not be an active CTA in the empty state.
+    const syncButton = screen.queryByRole('button', { name: /Sync templates/i });
+    if (syncButton) expect(syncButton).toBeDisabled();
+  });
+
+  it('shows the empty-library state (not filter copy) for a non-admin deep-linked to ?setup=none on an empty library', () => {
+    // Regression guard for FIX 1: the onboarding checklist deep-links a
+    // brand-new user to /templates?setup=none, which sets showNoSetupOnly
+    // -> hasFilters becomes true. A truly empty (unsynced) library must
+    // still show the non-admin "browse on GitHub" empty state, not the
+    // "Try adjusting your filters" copy.
+    mockRoles = [];
+    mockQueryState.templates = [];
+
+    render(
+      <MemoryRouter initialEntries={['/templates?setup=none']}>
+        <TemplateLibraryPage />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
+    expect(link.getAttribute('href')).toContain('github.com');
+    expect(screen.queryByText(/Try adjusting your filters/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the "adjust your filters" empty state (not the sync/GitHub empty state) when a search filters a non-empty library to zero results', () => {
+    // Regression guard: `filters` (category/search/tags) is a server-side
+    // query — `templates` coming back empty because of an active search
+    // does NOT mean the library itself is empty. Simulate that by setting
+    // the mocked query result to [] and then driving a search term through
+    // the UI so `searchQuery` becomes non-empty.
+    mockQueryState.templates = [];
+
+    renderPage();
+
+    const searchInput = screen.getByPlaceholderText('Filter by template name');
+    fireEvent.change(searchInput, { target: { value: 'zzz-no-match' } });
+
+    expect(screen.getByText(/Try adjusting your filters/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Clear filters/i })).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole('link', { name: /Browse templates on GitHub/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/synced from GitHub by an administrator/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'No templates available yet. Sync from GitHub to load the template library.',
+      ),
+    ).not.toBeInTheDocument();
   });
 });

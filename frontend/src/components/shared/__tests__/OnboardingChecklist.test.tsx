@@ -57,6 +57,18 @@ describe('OnboardingChecklist', () => {
     expect(link.getAttribute('href')).toBe('/workflows/new');
   });
 
+  it('links the "Run a workflow" step to the no-setup template library', () => {
+    renderWithProviders(<OnboardingChecklist {...defaultProps} />);
+    const link = screen.getByRole('link', { name: 'Run a workflow' });
+    expect(link.getAttribute('href')).toBe('/templates?setup=none');
+  });
+
+  it('links the "Add a component" step to the workflow builder', () => {
+    renderWithProviders(<OnboardingChecklist {...defaultProps} />);
+    const link = screen.getByRole('link', { name: 'Add a component to your workflow' });
+    expect(link.getAttribute('href')).toBe('/workflows/new');
+  });
+
   // -----------------------------------------------------------------------
   // Completion detection
   // -----------------------------------------------------------------------
