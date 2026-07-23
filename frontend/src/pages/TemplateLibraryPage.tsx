@@ -132,7 +132,8 @@ export function TemplateLibraryPage() {
   const hasFilters = Boolean(
     selectedCategory || selectedTags.length > 0 || searchQuery || showNoSetupOnly,
   );
-  const libraryEmpty = templates.length === 0;
+  const libraryEmpty =
+    templates.length === 0 && !selectedCategory && !searchQuery && selectedTags.length === 0;
 
   const getTemplateId = useCallback((t: Template) => t.id, []);
 

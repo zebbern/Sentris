@@ -550,4 +550,31 @@ describe('TemplateLibraryPage', () => {
     expect(link.getAttribute('href')).toContain('github.com');
     expect(screen.queryByText(/Try adjusting your filters/i)).not.toBeInTheDocument();
   });
+
+  it('shows the "adjust your filters" empty state (not the sync/GitHub empty state) when a search filters a non-empty library to zero results', () => {
+    // Regression guard: `filters` (category/search/tags) is a server-side
+    // query — `templates` coming back empty because of an active search
+    // does NOT mean the library itself is empty. Simulate that by setting
+    // the mocked query result to [] and then driving a search term through
+    // the UI so `searchQuery` becomes non-empty.
+    mockQueryState.templates = [];
+
+    renderPage();
+
+    const searchInput = screen.getByPlaceholderText('Filter by template name');
+    fireEvent.change(searchInput, { target: { value: 'zzz-no-match' } });
+
+    expect(screen.getByText(/Try adjusting your filters/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Clear filters/i })).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole('link', { name: /Browse templates on GitHub/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/synced from GitHub by an administrator/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'No templates available yet. Sync from GitHub to load the template library.',
+      ),
+    ).not.toBeInTheDocument();
+  });
 });
