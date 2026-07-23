@@ -272,7 +272,9 @@ describe('TemplateLibraryPage', () => {
 
     expect(screen.getByText('No templates found')).toBeInTheDocument();
     expect(
-      screen.getByText('No templates available yet. Sync from GitHub to load templates.'),
+      screen.getByText(
+        'No templates available yet. Sync from GitHub to load the template library.',
+      ),
     ).toBeInTheDocument();
   });
 
@@ -516,5 +518,24 @@ describe('TemplateLibraryPage', () => {
     expect(screen.queryByText('Docker Scan')).toBeNull();
     // sanity: helper agrees
     expect(getTemplateSetupLevel(mockQueryState.templates[1])).toBe('needs-tooling');
+  });
+
+  it('shows a non-admin-friendly empty state when the library is empty and user cannot sync', () => {
+    mockRoles = [];
+    mockQueryState.templates = [];
+
+    render(
+      <MemoryRouter>
+        <TemplateLibraryPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/synced from GitHub by an administrator/i)).toBeDefined();
+    const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
+    expect(link.getAttribute('href')).toContain('github.com');
+    // The toolbar always renders a "Sync templates" control (disabled for non-admins);
+    // it must not be an active CTA in the empty state.
+    const syncButton = screen.queryByRole('button', { name: /Sync templates/i });
+    if (syncButton) expect(syncButton).toBeDisabled();
   });
 });

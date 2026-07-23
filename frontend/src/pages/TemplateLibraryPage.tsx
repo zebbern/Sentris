@@ -186,7 +186,9 @@ export function TemplateLibraryPage() {
             description={
               hasFilters
                 ? "Try adjusting your filters or search query to find what you're looking for."
-                : 'No templates available yet. Sync from GitHub to load templates.'
+                : canManageWorkflows
+                  ? 'No templates available yet. Sync from GitHub to load the template library.'
+                  : 'No templates available yet. The library is synced from GitHub by an administrator — ask an admin to run a sync, or browse the catalog on GitHub.'
             }
             action={
               hasFilters ? (
@@ -197,7 +199,17 @@ export function TemplateLibraryPage() {
                 <Button onClick={handleSync} disabled={isSyncing}>
                   {isSyncing ? 'Syncing…' : 'Sync templates'}
                 </Button>
-              ) : undefined
+              ) : (
+                <Button variant="outline" asChild>
+                  <a
+                    href="https://github.com/zebbern/Sentris"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Browse templates on GitHub
+                  </a>
+                </Button>
+              )
             }
           />
         ) : (
