@@ -21,6 +21,11 @@ export const queryKeys = {
     root: () => ['schedules', getOrgScope()] as const,
     all: (filters?: Record<string, unknown>) => ['schedules', getOrgScope(), filters] as const,
   },
+  targets: {
+    root: () => ['targets', getOrgScope()] as const,
+    all: () => ['targets', getOrgScope(), 'all'] as const,
+    detail: (id: string) => ['targets', getOrgScope(), id] as const,
+  },
   mcpServers: {
     all: () => ['mcpServers', getOrgScope()] as const,
     tools: () => ['mcpServers', getOrgScope(), 'tools'] as const,
