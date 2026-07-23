@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getTemplateSetupLevel, isNoSetupTemplate } from '../setupLevel';
+
+// Repo root's backend/scripts/seed-templates/, resolved relative to this test file
+// (frontend/src/pages/template-library/__tests__/).
+const SEED_TEMPLATES_DIR = join(import.meta.dir, '../../../../../backend/scripts/seed-templates');
+
+function loadSeedNodeTypes(fileName: string): string[] {
+  const raw = readFileSync(join(SEED_TEMPLATES_DIR, fileName), 'utf-8');
+  const parsed = JSON.parse(raw) as { graph?: { nodes?: { type?: string }[] } };
+  return (parsed.graph?.nodes ?? []).map((n) => n.type).filter((t): t is string => !!t);
+}
 
 // Minimal template shape the helper reads.
 function tpl(nodeTypes: string[], requiredSecrets: { name: string; type: string }[] = []) {
@@ -61,5 +73,25 @@ describe('getTemplateSetupLevel', () => {
     // add a typeless node
     (t.graph.nodes as { id: string; type?: string }[]).push({ id: 'x' });
     expect(getTemplateSetupLevel(t)).toBe('needs-tooling');
+  });
+
+  describe('allowlist drift guard (real seed templates)', () => {
+    // Guards against NET_ONLY_COMPONENT_TYPES drifting out of sync with the
+    // actual seed templates: this must fail if someone removes a
+    // currently-allowlisted net-only type that these seeds rely on.
+    it('classifies kev-fresh-cve-watch-brief.json as no-setup', () => {
+      const nodeTypes = loadSeedNodeTypes('kev-fresh-cve-watch-brief.json');
+      expect(getTemplateSetupLevel(tpl(nodeTypes))).toBe('no-setup');
+    });
+
+    it('classifies npm-dependency-cve-hunt.json as no-setup', () => {
+      const nodeTypes = loadSeedNodeTypes('npm-dependency-cve-hunt.json');
+      expect(getTemplateSetupLevel(tpl(nodeTypes))).toBe('no-setup');
+    });
+
+    it('classifies subdomain-takeover-triage.json as needs-tooling', () => {
+      const nodeTypes = loadSeedNodeTypes('subdomain-takeover-triage.json');
+      expect(getTemplateSetupLevel(tpl(nodeTypes))).toBe('needs-tooling');
+    });
   });
 });

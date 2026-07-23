@@ -95,20 +95,20 @@ export function TemplateLibraryPage() {
     setSelectedTags([]);
     setSearchQuery('');
     setShowNoSetupOnly(false);
-    if (searchParams.has('setup')) {
-      searchParams.delete('setup');
-      setSearchParams(searchParams, { replace: true });
+    const params = new URLSearchParams(searchParams);
+    if (params.has('setup')) {
+      params.delete('setup');
+      setSearchParams(params, { replace: true });
     }
   };
 
   const toggleNoSetupOnly = () => {
-    setShowNoSetupOnly((prev) => {
-      const next = !prev;
-      if (next) searchParams.set('setup', 'none');
-      else searchParams.delete('setup');
-      setSearchParams(searchParams, { replace: true });
-      return next;
-    });
+    const next = !showNoSetupOnly;
+    setShowNoSetupOnly(next);
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('setup', 'none');
+    else params.delete('setup');
+    setSearchParams(params, { replace: true });
   };
 
   const handleUseTemplate = (template: Template) => {
@@ -132,6 +132,7 @@ export function TemplateLibraryPage() {
   const hasFilters = Boolean(
     selectedCategory || selectedTags.length > 0 || searchQuery || showNoSetupOnly,
   );
+  const libraryEmpty = templates.length === 0;
 
   const getTemplateId = useCallback((t: Template) => t.id, []);
 
@@ -184,30 +185,32 @@ export function TemplateLibraryPage() {
             icon={Layers}
             title="No templates found"
             description={
-              hasFilters
-                ? "Try adjusting your filters or search query to find what you're looking for."
-                : canManageWorkflows
+              libraryEmpty
+                ? canManageWorkflows
                   ? 'No templates available yet. Sync from GitHub to load the template library.'
                   : 'No templates available yet. The library is synced from GitHub by an administrator — ask an admin to run a sync, or browse the catalog on GitHub.'
+                : "Try adjusting your filters or search query to find what you're looking for."
             }
             action={
-              hasFilters ? (
+              libraryEmpty ? (
+                canManageWorkflows ? (
+                  <Button onClick={handleSync} disabled={isSyncing}>
+                    {isSyncing ? 'Syncing…' : 'Sync templates'}
+                  </Button>
+                ) : (
+                  <Button variant="outline" asChild>
+                    <a
+                      href="https://github.com/zebbern/Sentris"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Browse templates on GitHub
+                    </a>
+                  </Button>
+                )
+              ) : (
                 <Button variant="outline" onClick={clearFilters}>
                   Clear filters
-                </Button>
-              ) : canManageWorkflows ? (
-                <Button onClick={handleSync} disabled={isSyncing}>
-                  {isSyncing ? 'Syncing…' : 'Sync templates'}
-                </Button>
-              ) : (
-                <Button variant="outline" asChild>
-                  <a
-                    href="https://github.com/zebbern/Sentris"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Browse templates on GitHub
-                  </a>
                 </Button>
               )
             }

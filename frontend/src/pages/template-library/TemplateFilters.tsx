@@ -121,6 +121,7 @@ export function TemplateFilters({
           type="button"
           onClick={onToggleNoSetupOnly}
           aria-pressed={noSetupOnly}
+          title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
             noSetupOnly

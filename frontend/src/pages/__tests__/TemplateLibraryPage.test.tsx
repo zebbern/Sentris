@@ -501,11 +501,7 @@ describe('TemplateLibraryPage', () => {
       },
     ] as Template[];
 
-    render(
-      <MemoryRouter>
-        <TemplateLibraryPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     // Both visible initially.
     expect(screen.getByText('Net Only')).toBeDefined();
@@ -524,11 +520,7 @@ describe('TemplateLibraryPage', () => {
     mockRoles = [];
     mockQueryState.templates = [];
 
-    render(
-      <MemoryRouter>
-        <TemplateLibraryPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     expect(screen.getByText(/synced from GitHub by an administrator/i)).toBeDefined();
     const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
@@ -537,5 +529,25 @@ describe('TemplateLibraryPage', () => {
     // it must not be an active CTA in the empty state.
     const syncButton = screen.queryByRole('button', { name: /Sync templates/i });
     if (syncButton) expect(syncButton).toBeDisabled();
+  });
+
+  it('shows the empty-library state (not filter copy) for a non-admin deep-linked to ?setup=none on an empty library', () => {
+    // Regression guard for FIX 1: the onboarding checklist deep-links a
+    // brand-new user to /templates?setup=none, which sets showNoSetupOnly
+    // -> hasFilters becomes true. A truly empty (unsynced) library must
+    // still show the non-admin "browse on GitHub" empty state, not the
+    // "Try adjusting your filters" copy.
+    mockRoles = [];
+    mockQueryState.templates = [];
+
+    render(
+      <MemoryRouter initialEntries={['/templates?setup=none']}>
+        <TemplateLibraryPage />
+      </MemoryRouter>,
+    );
+
+    const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
+    expect(link.getAttribute('href')).toContain('github.com');
+    expect(screen.queryByText(/Try adjusting your filters/i)).not.toBeInTheDocument();
   });
 });
