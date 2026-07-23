@@ -62,6 +62,9 @@ const WebhookEditorPage = lazyWithRetry(() =>
 const SchedulesPage = lazyWithRetry(() =>
   import('@/pages/SchedulesPage').then((m) => ({ default: m.SchedulesPage })),
 );
+const TargetsPage = lazyWithRetry(() =>
+  import('@/pages/TargetsPage').then((m) => ({ default: m.TargetsPage })),
+);
 const ActionCenterPage = lazyWithRetry(() =>
   import('@/pages/ActionCenterPage').then((m) => ({ default: m.ActionCenterPage })),
 );
@@ -211,6 +214,14 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <SchedulesPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/targets"
+          element={
+            <ErrorBoundary>
+              <TargetsPage />
             </ErrorBoundary>
           }
         />

@@ -119,6 +119,13 @@ const ROUTE_CONFIG: RouteEntry[] = [
     subtitle: 'Manage recurring workflow cadences',
   },
   {
+    path: '/targets',
+    prefix: true,
+    title: 'Targets',
+    shortTitle: 'Targets',
+    subtitle: 'Save scopes of domains, repos, and IP ranges to run templates against',
+  },
+  {
     path: '/settings',
     prefix: true,
     title: 'Settings',
