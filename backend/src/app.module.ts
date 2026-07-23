@@ -56,6 +56,7 @@ import { FindingTriageModule } from './findings/finding-triage.module';
 import { OrgMembersModule } from './org/org-members.module';
 import { TicketingModule } from './ticketing/ticketing.module';
 import { AgentSkillsModule } from './agent-skills/agent-skills.module';
+import { ScopesModule } from './scopes/scopes.module';
 import { AiModule } from './ai/ai.module';
 import { AllExceptionsFilter } from './common/filters';
 import { LoggingInterceptor } from './common/interceptors';
@@ -93,6 +94,7 @@ const coreModules = [
   OrgMembersModule,
   TicketingModule,
   AgentSkillsModule,
+  ScopesModule,
   AiModule,
 ];
 
