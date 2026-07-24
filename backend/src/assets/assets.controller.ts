@@ -5,7 +5,7 @@ import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 import { assetTypeEnum } from '../database/schema';
 import type { AssetType } from './asset-extractor';
-import { AssetInventoryService } from './assets.service';
+import { AssetsService } from './assets.service';
 import { AssetResponse } from './dto/assets.dto';
 
 const VALID_ASSET_TYPES = new Set<string>(assetTypeEnum.enumValues);
@@ -14,7 +14,7 @@ const MAX_LIMIT = 1000;
 @ApiTags('assets')
 @Controller('scopes')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetInventoryService) {}
+  constructor(private readonly assetsService: AssetsService) {}
 
   @Get(':scopeId/assets')
   @ApiOperation({ summary: 'List discovered assets for a scope' })
