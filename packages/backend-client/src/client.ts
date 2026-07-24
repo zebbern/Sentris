@@ -2056,6 +2056,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mcp-servers/test-enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test all enabled MCP server connections */
+        post: operations["McpServersController_testEnabledServers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mcp-servers/{id}/test": {
         parameters: {
             query?: never;
@@ -2956,6 +2973,43 @@ export interface paths {
         patch: operations["AgentSkillsController_updateSkill"];
         trace?: never;
     };
+    "/api/v1/scopes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List scopes for the current organization */
+        get: operations["ScopesController_listScopes"];
+        put?: never;
+        /** Create a scope */
+        post: operations["ScopesController_createScope"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scopes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a scope by id */
+        get: operations["ScopesController_getScope"];
+        put?: never;
+        post?: never;
+        /** Delete a scope */
+        delete: operations["ScopesController_deleteScope"];
+        options?: never;
+        head?: never;
+        /** Update a scope */
+        patch: operations["ScopesController_updateScope"];
+        trace?: never;
+    };
     "/api/v1/ai/anthropic/models": {
         parameters: {
             query?: never;
@@ -3118,6 +3172,8 @@ export interface components {
                 sourceHandle?: string;
                 targetHandle?: string;
                 /** @enum {string} */
+                kind?: "success" | "error";
+                /** @enum {string} */
                 type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
             }[];
             /**
@@ -3194,6 +3250,8 @@ export interface components {
                     target: string;
                     sourceHandle?: string;
                     targetHandle?: string;
+                    /** @enum {string} */
+                    kind?: "success" | "error";
                     /** @enum {string} */
                     type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
                 }[];
@@ -3276,6 +3334,8 @@ export interface components {
                 target: string;
                 sourceHandle?: string;
                 targetHandle?: string;
+                /** @enum {string} */
+                kind?: "success" | "error";
                 /** @enum {string} */
                 type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
             }[];
@@ -3377,6 +3437,8 @@ export interface components {
                     sourceHandle?: string;
                     targetHandle?: string;
                     /** @enum {string} */
+                    kind?: "success" | "error";
+                    /** @enum {string} */
                     type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
                 }[];
                 /**
@@ -3401,6 +3463,8 @@ export interface components {
             /** Format: uuid */
             versionId?: string;
             version?: number;
+            /** Format: uuid */
+            scopeId?: string;
         };
         WorkflowTagsResponseDto: {
             tags: string[];
@@ -4322,6 +4386,13 @@ export interface components {
             healthCheckUrl?: string | null;
             enabled?: boolean;
         };
+        TestEnabledServerResponseDto: {
+            serverId: string;
+            serverName: string;
+            success: boolean;
+            message?: string;
+            toolCount?: number;
+        };
         TestConnectionResponseDto: {
             success: boolean;
             message?: string;
@@ -4882,6 +4953,48 @@ export interface components {
             tags?: string[];
             enabled?: boolean;
         };
+        ScopeResponse: {
+            /** Format: uuid */
+            id: string;
+            organizationId: string;
+            name: string;
+            description: string | null;
+            domains: string[];
+            repos: string[];
+            ipRanges: string[];
+            runtimeValues: {
+                [key: string]: unknown;
+            };
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateScopeDto: {
+            name: string;
+            description?: string | null;
+            /** @default [] */
+            domains: string[];
+            /** @default [] */
+            repos: string[];
+            /** @default [] */
+            ipRanges: string[];
+            /** @default {} */
+            runtimeValues: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateScopeDto: {
+            name?: string;
+            description?: string | null;
+            domains?: string[];
+            repos?: string[];
+            ipRanges?: string[];
+            runtimeValues?: {
+                [key: string]: unknown;
+            };
+        };
         ListAnthropicModelsDto: {
             apiKeySecretId: string;
         };
@@ -5058,6 +5171,7 @@ export interface operations {
                 status?: string;
                 limit?: number;
                 offset?: number;
+                scopeId?: string;
             };
             header?: never;
             path?: never;
@@ -8599,6 +8713,25 @@ export interface operations {
             };
         };
     };
+    McpServersController_testEnabledServers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestEnabledServerResponseDto"][];
+                };
+            };
+        };
+    };
     McpServersController_testConnection: {
         parameters: {
             query?: never;
@@ -10206,6 +10339,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentSkillResponse"];
+                };
+            };
+        };
+    };
+    ScopesController_listScopes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"][];
+                };
+            };
+        };
+    };
+    ScopesController_createScope: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScopeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"];
+                };
+            };
+        };
+    };
+    ScopesController_getScope: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"];
+                };
+            };
+        };
+    };
+    ScopesController_deleteScope: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ScopesController_updateScope: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateScopeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"];
                 };
             };
         };
