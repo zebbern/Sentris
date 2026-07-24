@@ -139,9 +139,12 @@ describe('RunWorkflowDialog scope prefill', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({
-      domains: ['example.com', 'app.example.com'],
-    });
+    expect(onRun).toHaveBeenCalledWith(
+      {
+        domains: ['example.com', 'app.example.com'],
+      },
+      's1',
+    );
   });
 
   it('leaves inputs not covered by the scope untouched', () => {
@@ -162,9 +165,12 @@ describe('RunWorkflowDialog scope prefill', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({
-      domains: ['example.com', 'app.example.com'],
-      authorizationNotes: 'pre-authorized by security team',
-    });
+    expect(onRun).toHaveBeenCalledWith(
+      {
+        domains: ['example.com', 'app.example.com'],
+        authorizationNotes: 'pre-authorized by security team',
+      },
+      's1',
+    );
   });
 });

@@ -165,7 +165,7 @@ describe('RunWorkflowDialog', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: false });
+    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: false }, null);
   });
 
   it('submits updated boolean runtime inputs as booleans', () => {
@@ -191,7 +191,7 @@ describe('RunWorkflowDialog', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: true });
+    expect(onRun).toHaveBeenCalledWith({ includeDevDependencies: true }, null);
   });
 
   it('renders file input for file-type inputs', () => {

@@ -26,6 +26,7 @@ export const executionsApi = {
       inputs?: Record<string, unknown>;
       versionId?: string;
       version?: number;
+      scopeId?: string | null;
     },
   ): Promise<{ executionId: string }> => {
     const payload = options
@@ -33,6 +34,7 @@ export const executionsApi = {
           inputs: options.inputs,
           versionId: options.versionId,
           version: options.version,
+          scopeId: options.scopeId ?? undefined,
         }
       : undefined;
     const response = (await apiClient.runWorkflow(workflowId, payload)) as ApiResponse<{

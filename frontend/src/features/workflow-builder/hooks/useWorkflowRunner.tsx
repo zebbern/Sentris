@@ -56,6 +56,7 @@ interface UseWorkflowRunnerResult {
     inputs?: Record<string, unknown>;
     versionId?: string | null;
     version?: number;
+    scopeId?: string | null;
   }) => Promise<void>;
 }
 
@@ -87,6 +88,7 @@ export function useWorkflowRunner({
       inputs?: Record<string, unknown>;
       versionId?: string | null;
       version?: number;
+      scopeId?: string | null;
     }) => {
       if (!canManageWorkflows) {
         toast({
@@ -126,6 +128,7 @@ export function useWorkflowRunner({
           inputs: options?.inputs,
           versionId: options?.versionId ?? pendingVersionId ?? undefined,
           version: options?.version,
+          scopeId: options?.scopeId,
         });
 
         if (runId) {

@@ -30,6 +30,7 @@ export interface ExecutionRun {
   inputPreview: ExecutionInputPreview;
   parentRunId?: string | null;
   parentNodeRef?: string | null;
+  scopeId?: string | null;
 }
 
 const INITIAL_LIMIT = 5;
@@ -84,6 +85,7 @@ const normalizeRun = (run: Record<string, unknown>): ExecutionRun => {
     },
     parentRunId: typeof run.parentRunId === 'string' ? run.parentRunId : null,
     parentNodeRef: typeof run.parentNodeRef === 'string' ? run.parentNodeRef : null,
+    scopeId: typeof run.scopeId === 'string' ? run.scopeId : null,
   };
 };
 
