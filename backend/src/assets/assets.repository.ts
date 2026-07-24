@@ -14,6 +14,7 @@ export class AssetInventoryRepository {
   ) {}
 
   async upsertMany(records: NewAssetRecord[]): Promise<void> {
+    if (records.length === 0) return;
     const now = new Date();
     for (const record of records) {
       await this.db
@@ -28,8 +29,9 @@ export class AssetInventoryRepository {
           ],
           set: {
             lastSeenAt: now,
-            lastSeenRunId: record.lastSeenRunId,
-            metadata: record.metadata,
+            lastSeenRunId: record.lastSeenRunId ?? null,
+            sourceComponentId: record.sourceComponentId ?? null,
+            metadata: record.metadata ?? {},
             updatedAt: now,
           },
         });
