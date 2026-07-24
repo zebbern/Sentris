@@ -29,3 +29,4 @@ export * from './finding-triage';
 export * from './sla-policies';
 export * from './ticketing';
 export * from './agent-skills';
+export * from './scopes';

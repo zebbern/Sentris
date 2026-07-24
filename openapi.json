@@ -6502,6 +6502,31 @@
         ]
       }
     },
+    "/api/v1/mcp-servers/test-enabled": {
+      "post": {
+        "operationId": "McpServersController_testEnabledServers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TestEnabledServerResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Test all enabled MCP server connections",
+        "tags": [
+          "mcp-servers"
+        ]
+      }
+    },
     "/api/v1/mcp-servers/{id}/test": {
       "post": {
         "operationId": "McpServersController_testConnection",
@@ -8630,6 +8655,153 @@
         ]
       }
     },
+    "/api/v1/scopes": {
+      "get": {
+        "operationId": "ScopesController_listScopes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScopeResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List scopes for the current organization",
+        "tags": [
+          "scopes"
+        ]
+      },
+      "post": {
+        "operationId": "ScopesController_createScope",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScopeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a scope",
+        "tags": [
+          "scopes"
+        ]
+      }
+    },
+    "/api/v1/scopes/{id}": {
+      "get": {
+        "operationId": "ScopesController_getScope",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a scope by id",
+        "tags": [
+          "scopes"
+        ]
+      },
+      "patch": {
+        "operationId": "ScopesController_updateScope",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScopeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a scope",
+        "tags": [
+          "scopes"
+        ]
+      },
+      "delete": {
+        "operationId": "ScopesController_deleteScope",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a scope",
+        "tags": [
+          "scopes"
+        ]
+      }
+    },
     "/api/v1/ai/anthropic/models": {
       "post": {
         "operationId": "AiController_listAnthropicModels",
@@ -9171,6 +9343,13 @@
                 "targetHandle": {
                   "type": "string"
                 },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "error"
+                  ]
+                },
                 "type": {
                   "type": "string",
                   "enum": [
@@ -9407,6 +9586,13 @@
                     },
                     "targetHandle": {
                       "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error"
+                      ]
                     },
                     "type": {
                       "type": "string",
@@ -9675,6 +9861,13 @@
                 },
                 "targetHandle": {
                   "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "error"
+                  ]
                 },
                 "type": {
                   "type": "string",
@@ -10006,6 +10199,13 @@
                     },
                     "targetHandle": {
                       "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "success",
+                        "error"
+                      ]
                     },
                     "type": {
                       "type": "string",
@@ -13282,6 +13482,31 @@
           }
         }
       },
+      "TestEnabledServerResponseDto": {
+        "type": "object",
+        "properties": {
+          "serverId": {
+            "type": "string"
+          },
+          "serverName": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "toolCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "serverId",
+          "serverName",
+          "success"
+        ]
+      },
       "TestConnectionResponseDto": {
         "type": "object",
         "properties": {
@@ -15278,6 +15503,165 @@
           },
           "enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "ScopeResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipRanges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtimeValues": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "name",
+          "description",
+          "domains",
+          "repos",
+          "ipRanges",
+          "runtimeValues",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateScopeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "domains": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repos": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipRanges": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtimeValues": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateScopeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "nullable": true
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ipRanges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "runtimeValues": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
           }
         }
       },
