@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Target } from 'lucide-react';
+import { ArrowLeft, Target, Boxes } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatStartTime, formatDuration } from '@/utils/timeFormat';
+import { formatStartTime, formatDuration, formatTimeAgo } from '@/utils/timeFormat';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
 import { useTargetDetail } from './target-detail';
 
@@ -45,6 +45,16 @@ function RunHistorySkeleton() {
   );
 }
 
+function AssetsSkeleton() {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
+    </div>
+  );
+}
+
 function BackLink() {
   return (
     <Link
@@ -57,8 +67,16 @@ function BackLink() {
 }
 
 export function TargetDetailPage() {
-  const { scope, isLoadingScope, runs, isLoadingRuns, activeTab, navigateToTab } =
-    useTargetDetail();
+  const {
+    scope,
+    isLoadingScope,
+    runs,
+    isLoadingRuns,
+    assets,
+    isLoadingAssets,
+    activeTab,
+    navigateToTab,
+  } = useTargetDetail();
 
   if (isLoadingScope) {
     return (
@@ -94,6 +112,7 @@ export function TargetDetailPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="runs">Run History</TabsTrigger>
+            <TabsTrigger value="assets">Assets</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 pt-2">
@@ -145,6 +164,54 @@ export function TargetDetailPage() {
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {run.triggerLabel ?? '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="assets" className="pt-2">
+            {isLoadingAssets ? (
+              <AssetsSkeleton />
+            ) : assets.length === 0 ? (
+              <EmptyState
+                icon={Boxes}
+                title="No assets yet"
+                description="Discovered assets from recon runs against this target will appear here."
+                className="py-10"
+              />
+            ) : (
+              <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+                <div className="overflow-x-auto">
+                  <Table aria-label="Assets">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Asset</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>First seen</TableHead>
+                        <TableHead>Last seen</TableHead>
+                        <TableHead>Source</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {assets.map((asset) => (
+                        <TableRow key={asset.id}>
+                          <TableCell className="font-medium">{asset.assetValue}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{asset.assetType}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatTimeAgo(asset.firstSeenAt)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatTimeAgo(asset.lastSeenAt)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {asset.sourceComponentId ?? '—'}
                           </TableCell>
                         </TableRow>
                       ))}
