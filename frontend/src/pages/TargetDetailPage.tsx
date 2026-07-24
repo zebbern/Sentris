@@ -143,8 +143,8 @@ export function TargetDetailPage() {
                           <TableCell className="text-muted-foreground">
                             {run.duration != null ? formatDuration(run.duration) : '—'}
                           </TableCell>
-                          <TableCell className="text-muted-foreground capitalize">
-                            {run.triggerLabel ?? run.triggerType}
+                          <TableCell className="text-muted-foreground">
+                            {run.triggerLabel ?? '—'}
                           </TableCell>
                         </TableRow>
                       ))}

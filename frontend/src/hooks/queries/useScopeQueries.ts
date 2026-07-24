@@ -19,11 +19,24 @@ export function useScope(id: string, options?: { enabled?: boolean }) {
   });
 }
 
+export interface ScopeRunSummary {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: string;
+  startTime: string;
+  duration?: number;
+  triggerLabel?: string | null;
+}
+
 export function useScopeRuns(scopeId: string) {
   return useQuery({
-    queryKey: [...queryKeys.targets.detail(scopeId), 'runs'],
-    queryFn: () => api.executions.listRuns({ scopeId, limit: 50 }),
-    enabled: !!scopeId,
+    queryKey: queryKeys.targets.runs(scopeId),
+    queryFn: async () => {
+      const response = await api.executions.listRuns({ scopeId, limit: 50 });
+      return (response.runs ?? []) as unknown as ScopeRunSummary[];
+    },
+    enabled: Boolean(scopeId),
   });
 }
 

@@ -3,7 +3,7 @@ import { restoreMockedModules, realModuleExports } from '@/test/restore-mocks';
 import { fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderWithProviders } from '@/test/render-with-providers';
 import type { Scope } from '@/types/scopes';
-import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
+import type { ScopeRunSummary } from '@/hooks/queries/useScopeQueries';
 
 // --- Mock isolation ---
 mock.module('@/hooks/useDocumentTitle', () => ({ useDocumentTitle: () => {} }));
@@ -67,7 +67,7 @@ mock.module('@/components/ui/tabs', () => ({
 const mockState: {
   scope: Scope | undefined;
   isLoadingScope: boolean;
-  runs: ExecutionRun[];
+  runs: ScopeRunSummary[];
   isLoadingRuns: boolean;
 } = {
   scope: undefined,
@@ -78,7 +78,7 @@ const mockState: {
 
 mock.module('@/hooks/queries/useScopeQueries', () => ({
   useScope: () => ({ data: mockState.scope, isLoading: mockState.isLoadingScope, error: null }),
-  useScopeRuns: () => ({ data: { runs: mockState.runs }, isLoading: mockState.isLoadingRuns }),
+  useScopeRuns: () => ({ data: mockState.runs, isLoading: mockState.isLoadingRuns }),
 }));
 
 // Import AFTER mocks
@@ -101,24 +101,14 @@ const scope: Scope = {
   updatedAt: ISO,
 };
 
-const makeRun = (o: Partial<ExecutionRun> = {}): ExecutionRun => ({
+const makeRun = (o: Partial<ScopeRunSummary> = {}): ScopeRunSummary => ({
   id: 'run-001',
   workflowId: 'wf-001',
   workflowName: 'Scan Pipeline',
   status: 'COMPLETED',
   startTime: ISO,
-  endTime: '2024-06-15T12:05:00.000Z',
   duration: 120_000,
-  nodeCount: 4,
-  eventCount: 12,
-  createdAt: ISO,
-  isLive: false,
-  workflowVersionId: 'v1',
-  workflowVersion: 1,
-  triggerType: 'manual',
-  triggerSource: null,
   triggerLabel: 'Manual run',
-  inputPreview: { runtimeInputs: {}, nodeOverrides: {} },
   ...o,
 });
 

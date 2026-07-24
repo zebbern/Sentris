@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useScope, useScopeRuns } from '@/hooks/queries/useScopeQueries';
+import { useScope, useScopeRuns, type ScopeRunSummary } from '@/hooks/queries/useScopeQueries';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 import { TARGET_DETAIL_TABS, type TargetDetailTab } from './targetDetailTypes';
 
 function isTargetDetailTab(value: string): value is TargetDetailTab {
@@ -18,7 +17,7 @@ export function useTargetDetail() {
   const { data: scope, isLoading: isLoadingScope, error: scopeError } = useScope(scopeId);
 
   const { data: runsData, isLoading: isLoadingRuns } = useScopeRuns(scopeId);
-  const runs = useMemo(() => (runsData?.runs ?? []) as ExecutionRun[], [runsData]);
+  const runs = useMemo<ScopeRunSummary[]>(() => runsData ?? [], [runsData]);
 
   useDocumentTitle(scope?.name ?? 'Target');
 
