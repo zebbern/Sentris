@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Consumer, Kafka } from 'kafkajs';
 import { getTopicResolver } from '../common/kafka-topic-resolver';
 
@@ -38,6 +39,7 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly nodeIORepository: NodeIORepository,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     const kafka = this.configService.get<KafkaConfig>('kafka')!;
     const brokerEnv = kafka.brokers;
@@ -174,6 +176,16 @@ export class NodeIOIngestService implements OnModuleInit, OnModuleDestroy {
         outputsSpilled: event.outputsSpilled,
         outputsStorageRef: event.outputsStorageRef,
       });
+
+      try {
+        this.eventEmitter.emit('asset.nodeio.completed', {
+          runId: event.runId,
+          nodeRef: event.nodeRef,
+          componentId: event.componentId,
+        });
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to emit asset.nodeio.completed: ${err}`);
+      }
     }
   }
 }

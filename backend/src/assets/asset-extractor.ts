@@ -1,0 +1,90 @@
+import { normalizeAllFindings, type Finding } from '@sentris/shared';
+import { assetTypeEnum } from '../database/schema';
+
+export type AssetType = (typeof assetTypeEnum.enumValues)[number];
+
+/** Recon components whose outputs carry inventory assets. */
+export const RECON_COMPONENT_IDS: ReadonlySet<string> = new Set([
+  'sentris.subfinder.run',
+  'sentris.httpx.scan',
+  'sentris.naabu.scan',
+  'sentris.dnsx.run',
+  'sentris.katana.run',
+  'sentris.theharvester.run',
+]);
+
+/** normalizeFindings `type` → asset_type. Only asset-bearing kinds map; the rest are dropped. */
+const TYPE_MAP: Record<string, AssetType> = {
+  subdomain: 'subdomain',
+  'ip-address': 'ip-address',
+  'http-probe': 'http-probe',
+  'open-port': 'open-port',
+  'dns-record': 'dns-record',
+  'crawled-url': 'crawled-url',
+};
+
+export interface ExtractedAsset {
+  assetType: AssetType;
+  assetValue: string;
+  sourceComponentId: string;
+  metadata: Record<string, unknown>;
+}
+
+function str(value: unknown): string {
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+/** Per-type assetValue: prefer the structured metadata key over the human `finding` string. */
+function deriveAssetValue(assetType: AssetType, finding: Finding): string {
+  const md = (finding.metadata ?? {}) as Record<string, unknown>;
+  switch (assetType) {
+    case 'http-probe':
+      return str(md.url) || finding.finding;
+    case 'open-port': {
+      const host = str(md.host);
+      const port = str(md.port);
+      return host && port ? `${host}:${port}` : finding.finding;
+    }
+    case 'dns-record':
+      return str(md.host ?? md.name) || finding.finding;
+    default:
+      // subdomain, ip-address, crawled-url — the `finding` string IS the value.
+      return finding.finding;
+  }
+}
+
+/**
+ * Pure extractor: normalize a single recon node's outputs into deduped assets.
+ * Non-recon components yield `[]`. Failures inside normalizeAllFindings are swallowed there.
+ */
+export function extractAssets(input: {
+  componentId: string;
+  nodeRef: string;
+  runId: string;
+  outputs: Record<string, unknown> | null;
+}): ExtractedAsset[] {
+  if (!RECON_COMPONENT_IDS.has(input.componentId)) return [];
+
+  const findings = normalizeAllFindings([
+    { nodeRef: input.nodeRef, componentId: input.componentId, outputs: input.outputs },
+  ]);
+
+  const seen = new Set<string>();
+  const out: ExtractedAsset[] = [];
+  for (const f of findings) {
+    const assetType = TYPE_MAP[f.type];
+    if (!assetType) continue;
+    const assetValue = deriveAssetValue(assetType, f).trim();
+    if (!assetValue) continue;
+    const key = `${assetType}::${assetValue}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      assetType,
+      assetValue,
+      sourceComponentId: input.componentId,
+      metadata: (f.metadata ?? {}) as Record<string, unknown>,
+    });
+  }
+  return out;
+}

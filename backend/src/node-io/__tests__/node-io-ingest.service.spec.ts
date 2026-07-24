@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { NodeIOIngestService } from '../node-io-ingest.service';
 import type { NodeIORepository } from '../node-io.repository';
 import type { ConfigService } from '@nestjs/config';
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { KafkaConfig } from '../../config';
+
+function createMockEventEmitter(): EventEmitter2 {
+  return { emit: () => true } as unknown as EventEmitter2;
+}
 
 function createMockConfigService(): ConfigService {
   const kafkaConfig: KafkaConfig = {
@@ -54,7 +59,11 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
+    const service = new NodeIOIngestService(
+      repository,
+      createMockConfigService(),
+      createMockEventEmitter(),
+    ) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };
@@ -69,7 +78,11 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
+    const service = new NodeIOIngestService(
+      repository,
+      createMockConfigService(),
+      createMockEventEmitter(),
+    ) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };
@@ -86,7 +99,11 @@ describe('NodeIOIngestService', () => {
       recordStart: async () => undefined,
       recordCompletion: async () => undefined,
     } as unknown as NodeIORepository;
-    const service = new NodeIOIngestService(repository, createMockConfigService()) as unknown as {
+    const service = new NodeIOIngestService(
+      repository,
+      createMockConfigService(),
+      createMockEventEmitter(),
+    ) as unknown as {
       kafkaGroupId: string;
       kafkaClientId: string;
     };

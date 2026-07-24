@@ -40,6 +40,14 @@ export function useScopeRuns(scopeId: string) {
   });
 }
 
+export function useTargetAssets(scopeId: string) {
+  return useQuery({
+    queryKey: queryKeys.targets.assets(scopeId),
+    queryFn: () => api.assets.listByScope(scopeId),
+    enabled: Boolean(scopeId),
+  });
+}
+
 export function useCreateScope() {
   const qc = useQueryClient();
   return useMutation({

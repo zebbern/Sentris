@@ -26,6 +26,7 @@ export const queryKeys = {
     all: () => ['targets', getOrgScope(), 'all'] as const,
     detail: (id: string) => ['targets', getOrgScope(), id] as const,
     runs: (id: string) => ['targets', getOrgScope(), id, 'runs'] as const,
+    assets: (id: string) => ['targets', getOrgScope(), id, 'assets'] as const,
   },
   mcpServers: {
     all: () => ['mcpServers', getOrgScope()] as const,

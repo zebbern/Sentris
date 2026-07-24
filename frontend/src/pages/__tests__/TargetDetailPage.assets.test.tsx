@@ -2,7 +2,7 @@ import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun
 import { restoreMockedModules, realModuleExports } from '@/test/restore-mocks';
 import { fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderWithProviders } from '@/test/render-with-providers';
-import type { Scope } from '@/types/scopes';
+import type { Scope, Asset } from '@/types/scopes';
 import type { ScopeRunSummary } from '@/hooks/queries/useScopeQueries';
 
 // --- Mock isolation ---
@@ -63,23 +63,27 @@ mock.module('@/components/ui/tabs', () => ({
   ),
 }));
 
-// --- Mutable mock state for scope + runs queries ---
+// --- Mutable mock state for scope + runs + assets queries ---
 const mockState: {
   scope: Scope | undefined;
   isLoadingScope: boolean;
   runs: ScopeRunSummary[];
   isLoadingRuns: boolean;
+  assets: Asset[];
+  isLoadingAssets: boolean;
 } = {
   scope: undefined,
   isLoadingScope: false,
   runs: [],
   isLoadingRuns: false,
+  assets: [],
+  isLoadingAssets: false,
 };
 
 mock.module('@/hooks/queries/useScopeQueries', () => ({
   useScope: () => ({ data: mockState.scope, isLoading: mockState.isLoadingScope, error: null }),
   useScopeRuns: () => ({ data: mockState.runs, isLoading: mockState.isLoadingRuns }),
-  useTargetAssets: () => ({ data: [], isLoading: false }),
+  useTargetAssets: () => ({ data: mockState.assets, isLoading: mockState.isLoadingAssets }),
 }));
 
 // Import AFTER mocks
@@ -102,14 +106,20 @@ const scope: Scope = {
   updatedAt: ISO,
 };
 
-const makeRun = (o: Partial<ScopeRunSummary> = {}): ScopeRunSummary => ({
-  id: 'run-001',
-  workflowId: 'wf-001',
-  workflowName: 'Scan Pipeline',
-  status: 'COMPLETED',
-  startTime: ISO,
-  duration: 120_000,
-  triggerLabel: 'Manual run',
+const makeAsset = (o: Partial<Asset> = {}): Asset => ({
+  id: 'asset-001',
+  organizationId: 'org-001',
+  scopeId: 'scope-001',
+  assetType: 'subdomain',
+  assetValue: 'api.contoso.com',
+  firstSeenAt: ISO,
+  lastSeenAt: ISO,
+  firstSeenRunId: 'run-001',
+  lastSeenRunId: 'run-001',
+  sourceComponentId: 'subfinder',
+  metadata: {},
+  createdAt: ISO,
+  updatedAt: ISO,
   ...o,
 });
 
@@ -118,6 +128,8 @@ const setup = (o: Partial<typeof mockState> = {}) => {
   mockState.isLoadingScope = o.isLoadingScope ?? false;
   mockState.runs = o.runs ?? [];
   mockState.isLoadingRuns = o.isLoadingRuns ?? false;
+  mockState.assets = o.assets ?? [];
+  mockState.isLoadingAssets = o.isLoadingAssets ?? false;
 };
 
 const renderPage = () =>
@@ -134,32 +146,25 @@ afterAll(() =>
 );
 
 // --- Tests ---
-describe('TargetDetailPage', () => {
+describe('TargetDetailPage assets tab', () => {
   beforeEach(() => {
     cleanup();
     setup();
   });
   afterEach(cleanup);
 
-  it('renders the scope name and Overview tab with its domains', () => {
+  it('shows an asset row with its value and type on the Assets tab', () => {
+    setup({ assets: [makeAsset()] });
     renderPage();
-    expect(screen.getByText('Contoso Ltd')).toBeInTheDocument();
-    expect(screen.getByText('contoso.com')).toBeInTheDocument();
-    expect(screen.getByText('app.contoso.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
+    expect(screen.getByText('api.contoso.com')).toBeInTheDocument();
+    expect(screen.getByText('subdomain')).toBeInTheDocument();
   });
 
-  it('shows a run row with its status text on the Run History tab', () => {
-    setup({ runs: [makeRun()] });
+  it('shows "No assets yet" empty state when there are no assets', () => {
+    setup({ assets: [] });
     renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: /run history/i }));
-    expect(screen.getByText('Scan Pipeline')).toBeInTheDocument();
-    expect(screen.getByText('Completed')).toBeInTheDocument();
-  });
-
-  it('shows "No runs yet" empty state when there are no runs', () => {
-    setup({ runs: [] });
-    renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: /run history/i }));
-    expect(screen.getByText('No runs yet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
+    expect(screen.getByText('No assets yet')).toBeInTheDocument();
   });
 });

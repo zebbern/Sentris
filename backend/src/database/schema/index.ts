@@ -30,3 +30,4 @@ export * from './sla-policies';
 export * from './ticketing';
 export * from './agent-skills';
 export * from './scopes';
+export * from './assets';

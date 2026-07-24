@@ -29,6 +29,7 @@ import { orgMembersApi } from './orgMembers';
 import { ticketingApi } from './ticketing';
 import { triageAnalyticsApi } from './triage-analytics';
 import { scopesApi } from './scopes';
+import { assetsApi } from './assets';
 import { httpGet, httpPost, httpPut, httpPatch, httpDel } from './client';
 
 export const api = {
@@ -53,6 +54,7 @@ export const api = {
   ticketing: ticketingApi,
   triageAnalytics: triageAnalyticsApi,
   scopes: scopesApi,
+  assets: assetsApi,
 
   // Generic HTTP methods
   get: httpGet,
