@@ -13,9 +13,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Play, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
+import { useScopes } from '@/hooks/queries/useScopeQueries';
+import { mergeScopeValues } from './scopeInputMapping';
 
 type RuntimeInputType =
   | 'file'
@@ -64,6 +73,7 @@ export function RunWorkflowDialog({
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formSeed, setFormSeed] = useState(0);
+  const { data: scopes = [] } = useScopes();
 
   // Reset inputs when dialog opens
   useEffect(() => {
@@ -163,6 +173,13 @@ export function RunWorkflowDialog({
     }
 
     setInputs((prev) => ({ ...prev, [inputId]: parsedValue }));
+  };
+
+  const handlePrefillFromScope = (value: string) => {
+    const scope = scopes.find((s) => s.id === value);
+    if (!scope) return;
+    setInputs(mergeScopeValues(inputs, scope, runtimeInputs));
+    setFormSeed((seed) => seed + 1);
   };
 
   const handleRun = () => {
@@ -408,6 +425,27 @@ export function RunWorkflowDialog({
               : 'Click Run to start the workflow execution.'}
           </DialogDescription>
         </DialogHeader>
+
+        {runtimeInputs.length > 0 && scopes.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <Label htmlFor="prefill-from-target">Prefill from target</Label>
+            <Select onValueChange={handlePrefillFromScope}>
+              <SelectTrigger id="prefill-from-target">
+                <SelectValue placeholder="Prefill from a saved target…" />
+              </SelectTrigger>
+              <SelectContent>
+                {scopes.map((scope) => (
+                  <SelectItem key={scope.id} value={scope.id}>
+                    {scope.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Fill matching inputs (domains, repos, IPs) from a saved target.
+            </p>
+          </div>
+        )}
 
         {runtimeInputs.length > 0 && (
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
