@@ -108,6 +108,7 @@ const BaseRunWorkflowRequestSchema = z.object({
   inputs: z.record(z.string(), z.unknown()).optional(),
   versionId: z.string().uuid().optional(),
   version: z.coerce.number().int().min(1).optional(),
+  scopeId: z.string().uuid().optional(),
 });
 
 const validateVersionSelection = (value: { versionId?: string; version?: number }) =>
@@ -151,6 +152,7 @@ export const ListRunsQuerySchema = z.object({
     .optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0).optional(),
+  scopeId: z.string().uuid().optional(),
 });
 
 export class ListRunsQueryDto extends createZodDto(ListRunsQuerySchema) {}

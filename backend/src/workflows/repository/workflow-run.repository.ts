@@ -19,6 +19,7 @@ interface CreateWorkflowRunInput {
   temporalRunId?: string | null;
   parentRunId?: string | null;
   parentNodeRef?: string | null;
+  scopeId?: string | null;
   totalActions: number;
   inputs: Record<string, unknown>;
   organizationId?: string | null;
@@ -56,6 +57,9 @@ export class WorkflowRunRepository {
     if (input.parentNodeRef !== undefined) {
       values.parentNodeRef = input.parentNodeRef ?? null;
     }
+    if (input.scopeId !== undefined) {
+      values.scopeId = input.scopeId ?? null;
+    }
 
     if (input.temporalRunId !== undefined) {
       values.temporalRunId = input.temporalRunId;
@@ -79,6 +83,9 @@ export class WorkflowRunRepository {
     }
     if (input.parentNodeRef !== undefined) {
       updateValues.parentNodeRef = input.parentNodeRef ?? null;
+    }
+    if (input.scopeId !== undefined) {
+      updateValues.scopeId = input.scopeId ?? null;
     }
 
     if (input.temporalRunId !== undefined) {
@@ -118,6 +125,7 @@ export class WorkflowRunRepository {
       organizationId?: string | null;
       parentRunId?: string;
       onlyRoots?: boolean;
+      scopeId?: string;
     } = {},
   ): Promise<WorkflowRunRecord[]> {
     const conditions: SQL[] = [];
@@ -132,6 +140,10 @@ export class WorkflowRunRepository {
 
     if (options.parentRunId) {
       conditions.push(eq(workflowRunsTable.parentRunId, options.parentRunId));
+    }
+
+    if (options.scopeId) {
+      conditions.push(eq(workflowRunsTable.scopeId, options.scopeId));
     }
 
     if (options.onlyRoots) {

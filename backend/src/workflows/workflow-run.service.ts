@@ -35,6 +35,7 @@ export interface WorkflowRunRequest {
   inputs?: Record<string, unknown>;
   versionId?: string;
   version?: number;
+  scopeId?: string;
 }
 
 export interface WorkflowRunHandle {
@@ -58,6 +59,7 @@ export interface PreparedRunPayload {
   triggerMetadata: ExecutionTriggerMetadata;
   inputPreview: ExecutionInputPreview;
   totalActions: number;
+  scopeId?: string;
 }
 
 export interface WorkflowRunSummary {
@@ -80,6 +82,7 @@ export interface WorkflowRunSummary {
   inputPreview: ExecutionInputPreview;
   parentRunId?: string | null;
   parentNodeRef?: string | null;
+  scopeId: string | null;
 }
 
 const SENTRIS_WORKFLOW_TYPE = 'sentrisWorkflowRun';
@@ -237,6 +240,7 @@ export class WorkflowRunService {
         triggerSource: prepared.triggerMetadata.sourceId,
         triggerLabel: prepared.triggerMetadata.label,
         inputPreview: prepared.inputPreview,
+        scopeId: prepared.scopeId,
       });
       return {
         runId: prepared.runId,
@@ -320,6 +324,7 @@ export class WorkflowRunService {
     const triggerMetadata = options.trigger ?? this.buildEntryPointTriggerMetadata(auth);
     const inputs = request.inputs ?? {};
     const inputPreview = this.buildInputPreview(inputs, nodeOverrides);
+    const scopeId = request.scopeId;
     await this.runRepository.upsert({
       runId,
       workflowId: workflow.id,
@@ -334,6 +339,7 @@ export class WorkflowRunService {
       inputPreview,
       parentRunId: options.parentRunId,
       parentNodeRef: options.parentNodeRef,
+      scopeId,
     });
     this.analyticsService.trackWorkflowStarted({
       workflowId: workflow.id,
@@ -358,6 +364,7 @@ export class WorkflowRunService {
       triggerMetadata,
       inputPreview,
       totalActions: definitionWithOverrides.actions.length,
+      scopeId,
     };
   }
 
@@ -447,6 +454,7 @@ export class WorkflowRunService {
       status?: ExecutionStatus;
       limit?: number;
       offset?: number;
+      scopeId?: string;
     } = {},
   ) {
     const organizationId = requireOrganizationId(auth);
@@ -730,6 +738,7 @@ export class WorkflowRunService {
       inputPreview,
       parentRunId: run.parentRunId ?? null,
       parentNodeRef: run.parentNodeRef ?? null,
+      scopeId: run.scopeId ?? null,
     };
   }
 

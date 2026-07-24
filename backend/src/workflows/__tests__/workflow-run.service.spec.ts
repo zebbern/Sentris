@@ -88,6 +88,7 @@ function makeRunRecord(overrides: Record<string, unknown> = {}) {
     temporalRunId: 'temporal-abc',
     parentRunId: null,
     parentNodeRef: null,
+    scopeId: null,
     totalActions: 1,
     inputs: {},
     organizationId: DEFAULT_ORGANIZATION_ID,
@@ -145,6 +146,7 @@ describe('WorkflowRunService', () => {
     runRepo = {
       findByRunId: vi.fn(),
       upsert: vi.fn().mockImplementation(async (input: any) => makeRunRecord(input)),
+      list: vi.fn().mockResolvedValue([]),
     };
     temporalSvc = {
       startWorkflow: vi.fn().mockResolvedValue({
@@ -333,6 +335,13 @@ describe('WorkflowRunService', () => {
         NotFoundException,
       );
     });
+
+    it('threads scopeId into the upsert and the returned payload', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      const payload = await service.prepareRunPayload('wf-1', { scopeId: 'scope-1' }, authContext);
+      expect(payload.scopeId).toBe('scope-1');
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: 'scope-1' }));
+    });
   });
 
   // ── startPreparedRun ──────────────────────────────────────────
@@ -378,6 +387,25 @@ describe('WorkflowRunService', () => {
       temporalSvc.startWorkflow.mockRejectedValue(new Error('Connection refused'));
       await expect(service.startPreparedRun(makePreparedPayload())).rejects.toThrow(
         'Connection refused',
+      );
+    });
+
+    it('carries scopeId from the prepared payload into the upsert', async () => {
+      runRepo.findByRunId.mockResolvedValue(null);
+      await service.startPreparedRun(makePreparedPayload({ scopeId: 'scope-1' }));
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: 'scope-1' }));
+    });
+  });
+
+  // ── listRuns ────────────────────────────────────────────────────
+  describe('listRuns', () => {
+    it('forwards scopeId to the repository', async () => {
+      await service.listRuns(authContext, { scopeId: 'scope-1' });
+      expect(runRepo.list).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scopeId: 'scope-1',
+          organizationId: DEFAULT_ORGANIZATION_ID,
+        }),
       );
     });
   });

@@ -115,6 +115,7 @@ export class WorkflowRunsController {
       status: query.status,
       limit: query.limit,
       offset: query.offset,
+      scopeId: query.scopeId,
     });
   }
 
