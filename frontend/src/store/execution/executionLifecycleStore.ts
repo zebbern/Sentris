@@ -38,6 +38,7 @@ interface ExecutionLifecycleStoreActions {
       inputs?: Record<string, unknown>;
       versionId?: string;
       version?: number;
+      scopeId?: string | null;
     },
   ) => Promise<string | undefined>;
   stopExecution: () => Promise<void>;

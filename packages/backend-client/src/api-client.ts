@@ -196,6 +196,7 @@ export class SentrisApiClient {
     status?: string;
     limit?: number;
     offset?: number;
+    scopeId?: string;
   }) {
     return this.client.GET('/api/v1/workflows/runs', {
       params: {
@@ -204,6 +205,7 @@ export class SentrisApiClient {
           status: options?.status,
           limit: options?.limit,
           offset: options?.offset,
+          scopeId: options?.scopeId,
         },
       },
     });

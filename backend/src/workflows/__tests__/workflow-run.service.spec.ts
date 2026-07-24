@@ -88,6 +88,7 @@ function makeRunRecord(overrides: Record<string, unknown> = {}) {
     temporalRunId: 'temporal-abc',
     parentRunId: null,
     parentNodeRef: null,
+    scopeId: null,
     totalActions: 1,
     inputs: {},
     organizationId: DEFAULT_ORGANIZATION_ID,
@@ -123,6 +124,8 @@ function makePreparedPayload(overrides: Partial<PreparedRunPayload> = {}): Prepa
 describe('WorkflowRunService', () => {
   let workflowRepo: Record<string, ReturnType<typeof vi.fn>>;
   let runRepo: Record<string, ReturnType<typeof vi.fn>>;
+  let versionRepo: Record<string, ReturnType<typeof vi.fn>>;
+  let traceRepo: Record<string, ReturnType<typeof vi.fn>>;
   let temporalSvc: Record<string, ReturnType<typeof vi.fn>>;
   let analyticsSvc: Record<string, ReturnType<typeof vi.fn>>;
   let auditLogSvc: Record<string, ReturnType<typeof vi.fn>>;
@@ -145,6 +148,15 @@ describe('WorkflowRunService', () => {
     runRepo = {
       findByRunId: vi.fn(),
       upsert: vi.fn().mockImplementation(async (input: any) => makeRunRecord(input)),
+      list: vi.fn().mockResolvedValue([]),
+    };
+    versionRepo = {
+      findById: vi.fn().mockResolvedValue(makeVersionRecord()),
+      findLatestByWorkflowId: vi.fn().mockResolvedValue(makeVersionRecord()),
+    };
+    traceRepo = {
+      countByType: vi.fn().mockResolvedValue(0),
+      getEventTimeRange: vi.fn().mockResolvedValue({ firstTimestamp: null, lastTimestamp: null }),
     };
     temporalSvc = {
       startWorkflow: vi.fn().mockResolvedValue({
@@ -165,8 +177,8 @@ describe('WorkflowRunService', () => {
     service = new WorkflowRunService(
       workflowRepo as unknown as WorkflowRepository,
       runRepo as unknown as WorkflowRunRepository,
-      {} as unknown as WorkflowVersionRepository,
-      {} as unknown as TraceRepository,
+      versionRepo as unknown as WorkflowVersionRepository,
+      traceRepo as unknown as TraceRepository,
       temporalSvc as unknown as TemporalService,
       analyticsSvc as unknown as AnalyticsService,
       auditLogSvc as unknown as AuditLogService,
@@ -333,6 +345,20 @@ describe('WorkflowRunService', () => {
         NotFoundException,
       );
     });
+
+    it('threads scopeId into the upsert and the returned payload', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      const payload = await service.prepareRunPayload('wf-1', { scopeId: 'scope-1' }, authContext);
+      expect(payload.scopeId).toBe('scope-1');
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: 'scope-1' }));
+    });
+
+    it('defaults scopeId to null when the request omits it', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      const payload = await service.prepareRunPayload('wf-1', {}, authContext);
+      expect(payload.scopeId).toBeNull();
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: null }));
+    });
   });
 
   // ── startPreparedRun ──────────────────────────────────────────
@@ -379,6 +405,44 @@ describe('WorkflowRunService', () => {
       await expect(service.startPreparedRun(makePreparedPayload())).rejects.toThrow(
         'Connection refused',
       );
+    });
+
+    it('carries scopeId from the prepared payload into the upsert', async () => {
+      runRepo.findByRunId.mockResolvedValue(null);
+      await service.startPreparedRun(makePreparedPayload({ scopeId: 'scope-1' }));
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: 'scope-1' }));
+    });
+  });
+
+  // ── listRuns ────────────────────────────────────────────────────
+  describe('listRuns', () => {
+    it('forwards scopeId to the repository', async () => {
+      await service.listRuns(authContext, { scopeId: 'scope-1' });
+      expect(runRepo.list).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scopeId: 'scope-1',
+          organizationId: DEFAULT_ORGANIZATION_ID,
+        }),
+      );
+    });
+  });
+
+  // ── getRun ──────────────────────────────────────────────────────
+  describe('getRun', () => {
+    it('surfaces scopeId on the run summary', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(
+        makeRunRecord({ status: 'COMPLETED', scopeId: 'scope-1' }),
+      );
+      const summary = await service.getRun('sentris-run-abc', authContext);
+      expect(summary.scopeId).toBe('scope-1');
+    });
+
+    it('yields scopeId null when the run has no scope', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(makeRunRecord({ status: 'COMPLETED', scopeId: null }));
+      const summary = await service.getRun('sentris-run-abc', authContext);
+      expect(summary.scopeId).toBeNull();
     });
   });
 

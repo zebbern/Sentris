@@ -65,6 +65,9 @@ const SchedulesPage = lazyWithRetry(() =>
 const TargetsPage = lazyWithRetry(() =>
   import('@/pages/TargetsPage').then((m) => ({ default: m.TargetsPage })),
 );
+const TargetDetailPage = lazyWithRetry(() =>
+  import('@/pages/TargetDetailPage').then((m) => ({ default: m.TargetDetailPage })),
+);
 const ActionCenterPage = lazyWithRetry(() =>
   import('@/pages/ActionCenterPage').then((m) => ({ default: m.ActionCenterPage })),
 );
@@ -222,6 +225,22 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <TargetsPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/targets/:id"
+          element={
+            <ErrorBoundary>
+              <TargetDetailPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/targets/:id/runs"
+          element={
+            <ErrorBoundary>
+              <TargetDetailPage />
             </ErrorBoundary>
           }
         />

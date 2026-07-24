@@ -21,6 +21,7 @@ export const workflowRunsTable = pgTable(
     temporalRunId: text('temporal_run_id'),
     parentRunId: text('parent_run_id'),
     parentNodeRef: text('parent_node_ref'),
+    scopeId: uuid('scope_id'),
     totalActions: integer('total_actions').notNull().default(0),
     inputs: jsonb('inputs').$type<Record<string, unknown>>().notNull().default({}),
     triggerType: text('trigger_type').notNull().default('manual'),
@@ -53,6 +54,11 @@ export const workflowRunsTable = pgTable(
     orgStatusCreatedAtIdx: index('workflow_runs_org_status_created_at_idx').on(
       table.organizationId,
       table.status,
+      table.createdAt,
+    ),
+    scopeOrgCreatedAtIdx: index('workflow_runs_org_scope_created_at_idx').on(
+      table.organizationId,
+      table.scopeId,
       table.createdAt,
     ),
   }),

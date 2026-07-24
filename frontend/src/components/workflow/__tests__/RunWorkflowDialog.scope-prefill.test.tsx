@@ -139,9 +139,12 @@ describe('RunWorkflowDialog scope prefill', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({
-      domains: ['example.com', 'app.example.com'],
-    });
+    expect(onRun).toHaveBeenCalledWith(
+      {
+        domains: ['example.com', 'app.example.com'],
+      },
+      's1',
+    );
   });
 
   it('leaves inputs not covered by the scope untouched', () => {
@@ -162,9 +165,44 @@ describe('RunWorkflowDialog scope prefill', () => {
     const runButtons = screen.getAllByText('Run Workflow');
     fireEvent.click(runButtons[runButtons.length - 1]);
 
-    expect(onRun).toHaveBeenCalledWith({
-      domains: ['example.com', 'app.example.com'],
-      authorizationNotes: 'pre-authorized by security team',
-    });
+    expect(onRun).toHaveBeenCalledWith(
+      {
+        domains: ['example.com', 'app.example.com'],
+        authorizationNotes: 'pre-authorized by security team',
+      },
+      's1',
+    );
+  });
+
+  it('runs with a null scopeId when no target is selected', () => {
+    const inputs: RuntimeInputDef[] = [
+      { id: 'domains', label: 'Domains', type: 'array', required: false },
+    ];
+    const onRun = mock(() => {});
+    const props = createDefaultProps({ runtimeInputs: inputs, onRun });
+    render(<RunWorkflowDialog {...props} />);
+
+    const runButtons = screen.getAllByText('Run Workflow');
+    fireEvent.click(runButtons[runButtons.length - 1]);
+
+    expect(onRun).toHaveBeenCalledWith({}, null);
+  });
+
+  it('binds the Select value to the chosen target', () => {
+    const inputs: RuntimeInputDef[] = [
+      { id: 'domains', label: 'Domains', type: 'array', required: true },
+    ];
+    const props = createDefaultProps({ runtimeInputs: inputs });
+    render(<RunWorkflowDialog {...props} />);
+
+    const option = screen.getByRole('option', { name: 'Example Corp' });
+    expect(option).toHaveAttribute('aria-selected', 'false');
+
+    fireEvent.click(option);
+
+    expect(screen.getByRole('option', { name: 'Example Corp' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 });

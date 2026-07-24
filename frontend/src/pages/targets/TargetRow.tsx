@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -29,7 +30,12 @@ export function TargetRow({ scope, canManage, onEdit, onDelete }: TargetRowProps
     <>
       <TableCell className="font-medium">
         <div className="flex flex-col">
-          <span className="truncate max-w-[160px] md:max-w-none">{scope.name}</span>
+          <Link
+            to={`/targets/${scope.id}`}
+            className="truncate max-w-[160px] hover:underline md:max-w-none"
+          >
+            {scope.name}
+          </Link>
           {scope.description && (
             <span className="text-xs text-muted-foreground truncate max-w-[160px] md:max-w-none">
               {scope.description}

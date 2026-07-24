@@ -58,7 +58,7 @@ interface RunWorkflowDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   runtimeInputs: RuntimeInputDefinition[];
-  onRun: (inputs: Record<string, unknown>) => void;
+  onRun: (inputs: Record<string, unknown>, scopeId?: string | null) => void;
   initialValues?: Record<string, unknown>;
 }
 
@@ -73,6 +73,7 @@ export function RunWorkflowDialog({
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formSeed, setFormSeed] = useState(0);
+  const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
   const { data: scopes = [] } = useScopes();
 
   // Reset inputs when dialog opens
@@ -95,6 +96,7 @@ export function RunWorkflowDialog({
       setUploading({});
       setErrors({});
       setFormSeed((seed) => seed + 1);
+      setSelectedScopeId(null);
     }
   }, [initialValues, open, runtimeInputs]);
 
@@ -180,6 +182,7 @@ export function RunWorkflowDialog({
     if (!scope) return;
     setInputs(mergeScopeValues(inputs, scope, runtimeInputs));
     setFormSeed((seed) => seed + 1);
+    setSelectedScopeId(scope.id);
   };
 
   const handleRun = () => {
@@ -196,7 +199,7 @@ export function RunWorkflowDialog({
       return;
     }
 
-    onRun(inputs);
+    onRun(inputs, selectedScopeId);
     onOpenChange(false);
   };
 
@@ -429,7 +432,7 @@ export function RunWorkflowDialog({
         {runtimeInputs.length > 0 && scopes.length > 0 && (
           <div className="space-y-2 pt-2">
             <Label htmlFor="prefill-from-target">Prefill from target</Label>
-            <Select onValueChange={handlePrefillFromScope}>
+            <Select value={selectedScopeId ?? ''} onValueChange={handlePrefillFromScope}>
               <SelectTrigger id="prefill-from-target">
                 <SelectValue placeholder="Prefill from a saved target…" />
               </SelectTrigger>
