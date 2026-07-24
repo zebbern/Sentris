@@ -205,6 +205,7 @@ export const executionsApi = {
   listRuns: async (options?: {
     workflowId?: string;
     status?: string;
+    scopeId?: string;
     limit?: number;
     offset?: number;
   }) => {

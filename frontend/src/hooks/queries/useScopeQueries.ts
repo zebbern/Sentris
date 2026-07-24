@@ -19,6 +19,14 @@ export function useScope(id: string, options?: { enabled?: boolean }) {
   });
 }
 
+export function useScopeRuns(scopeId: string) {
+  return useQuery({
+    queryKey: [...queryKeys.targets.detail(scopeId), 'runs'],
+    queryFn: () => api.executions.listRuns({ scopeId, limit: 50 }),
+    enabled: !!scopeId,
+  });
+}
+
 export function useCreateScope() {
   const qc = useQueryClient();
   return useMutation({
