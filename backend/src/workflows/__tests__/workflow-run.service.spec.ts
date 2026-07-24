@@ -124,6 +124,8 @@ function makePreparedPayload(overrides: Partial<PreparedRunPayload> = {}): Prepa
 describe('WorkflowRunService', () => {
   let workflowRepo: Record<string, ReturnType<typeof vi.fn>>;
   let runRepo: Record<string, ReturnType<typeof vi.fn>>;
+  let versionRepo: Record<string, ReturnType<typeof vi.fn>>;
+  let traceRepo: Record<string, ReturnType<typeof vi.fn>>;
   let temporalSvc: Record<string, ReturnType<typeof vi.fn>>;
   let analyticsSvc: Record<string, ReturnType<typeof vi.fn>>;
   let auditLogSvc: Record<string, ReturnType<typeof vi.fn>>;
@@ -148,6 +150,14 @@ describe('WorkflowRunService', () => {
       upsert: vi.fn().mockImplementation(async (input: any) => makeRunRecord(input)),
       list: vi.fn().mockResolvedValue([]),
     };
+    versionRepo = {
+      findById: vi.fn().mockResolvedValue(makeVersionRecord()),
+      findLatestByWorkflowId: vi.fn().mockResolvedValue(makeVersionRecord()),
+    };
+    traceRepo = {
+      countByType: vi.fn().mockResolvedValue(0),
+      getEventTimeRange: vi.fn().mockResolvedValue({ firstTimestamp: null, lastTimestamp: null }),
+    };
     temporalSvc = {
       startWorkflow: vi.fn().mockResolvedValue({
         workflowId: 'sentris-run-abc',
@@ -167,8 +177,8 @@ describe('WorkflowRunService', () => {
     service = new WorkflowRunService(
       workflowRepo as unknown as WorkflowRepository,
       runRepo as unknown as WorkflowRunRepository,
-      {} as unknown as WorkflowVersionRepository,
-      {} as unknown as TraceRepository,
+      versionRepo as unknown as WorkflowVersionRepository,
+      traceRepo as unknown as TraceRepository,
       temporalSvc as unknown as TemporalService,
       analyticsSvc as unknown as AnalyticsService,
       auditLogSvc as unknown as AuditLogService,
@@ -342,6 +352,13 @@ describe('WorkflowRunService', () => {
       expect(payload.scopeId).toBe('scope-1');
       expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: 'scope-1' }));
     });
+
+    it('defaults scopeId to null when the request omits it', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      const payload = await service.prepareRunPayload('wf-1', {}, authContext);
+      expect(payload.scopeId).toBeNull();
+      expect(runRepo.upsert).toHaveBeenCalledWith(expect.objectContaining({ scopeId: null }));
+    });
   });
 
   // ── startPreparedRun ──────────────────────────────────────────
@@ -407,6 +424,25 @@ describe('WorkflowRunService', () => {
           organizationId: DEFAULT_ORGANIZATION_ID,
         }),
       );
+    });
+  });
+
+  // ── getRun ──────────────────────────────────────────────────────
+  describe('getRun', () => {
+    it('surfaces scopeId on the run summary', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(
+        makeRunRecord({ status: 'COMPLETED', scopeId: 'scope-1' }),
+      );
+      const summary = await service.getRun('sentris-run-abc', authContext);
+      expect(summary.scopeId).toBe('scope-1');
+    });
+
+    it('yields scopeId null when the run has no scope', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(makeRunRecord({ status: 'COMPLETED', scopeId: null }));
+      const summary = await service.getRun('sentris-run-abc', authContext);
+      expect(summary.scopeId).toBeNull();
     });
   });
 

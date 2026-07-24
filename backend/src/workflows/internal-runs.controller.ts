@@ -59,6 +59,7 @@ export class InternalRunsController {
         inputs: body.inputs,
         versionId: body.versionId,
         version: body.version,
+        scopeId: body.scopeId,
       },
       auth,
       {

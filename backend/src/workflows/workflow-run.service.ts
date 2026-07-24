@@ -59,7 +59,7 @@ export interface PreparedRunPayload {
   triggerMetadata: ExecutionTriggerMetadata;
   inputPreview: ExecutionInputPreview;
   totalActions: number;
-  scopeId?: string;
+  scopeId?: string | null;
 }
 
 export interface WorkflowRunSummary {
@@ -324,7 +324,7 @@ export class WorkflowRunService {
     const triggerMetadata = options.trigger ?? this.buildEntryPointTriggerMetadata(auth);
     const inputs = request.inputs ?? {};
     const inputPreview = this.buildInputPreview(inputs, nodeOverrides);
-    const scopeId = request.scopeId;
+    const scopeId = request.scopeId ?? null;
     await this.runRepository.upsert({
       runId,
       workflowId: workflow.id,
