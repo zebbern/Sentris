@@ -36,6 +36,11 @@ mock.module('@/lib/logger', () => ({
   },
 }));
 
+// Mock the scopes query hook (no saved targets in these tests)
+mock.module('@/hooks/queries/useScopeQueries', () => ({
+  useScopes: () => ({ data: [], isLoading: false, error: null }),
+}));
+
 const { RunWorkflowDialog } = await import('../RunWorkflowDialog');
 
 interface RuntimeInputDef {
