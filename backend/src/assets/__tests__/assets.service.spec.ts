@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
 import { DEFAULT_ORGANIZATION_ID } from '../../auth/constants';
@@ -216,6 +216,12 @@ describe('AssetInventoryService', () => {
       await expect(service.listAssets(authContext, 'missing', {})).rejects.toThrow(
         NotFoundException,
       );
+      expect(repository.listByScope).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when auth is null', async () => {
+      await expect(service.listAssets(null, 'scope-1', {})).rejects.toThrow(ForbiddenException);
+      expect(scopesService.getScope).not.toHaveBeenCalled();
       expect(repository.listByScope).not.toHaveBeenCalled();
     });
   });
