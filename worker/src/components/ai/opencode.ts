@@ -205,6 +205,7 @@ const outputSchema = outputs({
 });
 
 const AGENT_TRACE_TEXT_CHUNK_SIZE = 16_000;
+const OPENCODE_START_SENTINEL = '[OpenCode] Starting agent run...';
 
 function getOpenCodeTimeoutSeconds(profileTimeoutSeconds: number): number {
   const configuredTimeout = process.env.OPENCODE_TIMEOUT_SECONDS;
@@ -425,7 +426,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function sanitizeOpenCodeReport(stdout: string): string {
-  return stripAnsiCodes(stdout)
+  const sanitized = stripAnsiCodes(stdout);
+  const startIndex = sanitized.indexOf(OPENCODE_START_SENTINEL);
+  if (startIndex >= 0) {
+    return sanitized.slice(startIndex + OPENCODE_START_SENTINEL.length).trim();
+  }
+
+  return sanitized
     .split(/\r?\n/)
     .filter((line) => !/^\[OpenCode\]/i.test(line.trim()))
     .join('\n')

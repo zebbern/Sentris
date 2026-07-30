@@ -216,7 +216,13 @@ describe('core.ai.opencode', () => {
   it('publishes a sanitized, bounded replay trace before cleaning the workspace', async () => {
     const report = 'R'.repeat(16_001);
     runSpy.mockResolvedValueOnce({
-      stdout: `[OpenCode] Starting agent run...\n${report}`,
+      stdout: [
+        '[OpenCode] Listing MCP tools before run...',
+        'sentris-gateway connected',
+        '[OpenCode] === Full tool list output above ===',
+        '[OpenCode] Starting agent run...',
+        report,
+      ].join('\n'),
       stderr: '',
       exitCode: 0,
       results: [],
@@ -270,6 +276,7 @@ describe('core.ai.opencode', () => {
 
     expect(result.agentRunId).toMatch(/^trace-run:opencode-node:/);
     expect(result.report).toBe(report);
+    expect(result.rawOutput).toContain('sentris-gateway connected');
     expect(emitProgress).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'Running OpenCode agent...',
@@ -307,4 +314,32 @@ describe('core.ai.opencode', () => {
     expect(textDeltas.every((part) => part.textDelta.length <= 16_000)).toBe(true);
     expect(volumeInstance?.cleanup).toHaveBeenCalledTimes(1);
   }, 5_000);
+
+  it('preserves non-wrapper stdout when the OpenCode start sentinel is absent', async () => {
+    runSpy.mockResolvedValueOnce({
+      stdout: '\u001b[31mconnection note\u001b[0m\n# Final report',
+      stderr: '',
+      exitCode: 0,
+      results: [],
+      raw: '',
+    } as never);
+
+    const component = componentRegistry.get('core.ai.opencode');
+    if (!component) throw new Error('Component not found');
+
+    const result = await component.execute(
+      { inputs: { task: 'Summarize the advisory' }, params: {} },
+      {
+        runId: 'fallback-run',
+        componentRef: 'opencode-node',
+        organizationId: 'org-1',
+        metadata: { connectedToolNodeIds: [], organizationId: 'org-1' },
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+        emitProgress: vi.fn(),
+      } as never,
+    );
+
+    expect(result.report).toBe('connection note\n# Final report');
+    expect(result.rawOutput).toContain('\u001b[31mconnection note\u001b[0m');
+  });
 });
