@@ -51,7 +51,8 @@ const DEFAULT_MAX_TOKENS = 1024;
 const DEFAULT_MEMORY_SIZE = 8;
 const LOG_TRUNCATE_LIMIT = 2000;
 
-import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from './utils';
+import { DEFAULT_GATEWAY_URL } from './utils';
+import { getToolAvailabilityPrompt, prepareAgentGatewayAccess } from './agent-tool-access';
 
 const agentMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']),
@@ -226,6 +227,22 @@ const parameterSchema = parameters({
       description: 'Optional override for the profile reasoning/tool-step budget.',
     },
   ),
+  toolAvailability: param(
+    z
+      .enum(['required', 'best-effort'])
+      .default('required')
+      .describe('How to handle unavailable MCP tools.'),
+    {
+      label: 'Tool Availability',
+      editor: 'select',
+      options: [
+        { label: 'Required', value: 'required' },
+        { label: 'Best effort', value: 'best-effort' },
+      ],
+      description:
+        'Fail when connected tools are unavailable, or continue with built-in capabilities.',
+    },
+  ),
 });
 
 const outputSchema = outputs({
@@ -242,6 +259,20 @@ const outputSchema = outputs({
     label: 'Agent Run ID',
     description: 'Unique identifier for streaming and replaying this agent session.',
   }),
+  toolStatus: port(
+    z.object({
+      requested: z.boolean(),
+      status: z.enum(['not-requested', 'configured', 'degraded']),
+      connectedNodeCount: z.number().int().nonnegative(),
+      availableToolCount: z.number().int().nonnegative().optional(),
+      message: z.string().optional(),
+    }),
+    {
+      label: 'Tool Status',
+      description: 'Whether connected MCP tools were requested and configured for this agent run.',
+      connectionType: { kind: 'primitive', name: 'json' },
+    },
+  ),
 });
 
 function ensureModelName(provider: ModelProvider, modelId?: string | null): string {
@@ -503,6 +534,7 @@ async function registerGatewayTools({
 }: RegisterGatewayToolsParams): Promise<{
   tools: ToolSet;
   close: () => Promise<void>;
+  availableToolCount: number;
 }> {
   logInfo?.(`[AGENT] Connecting to MCP gateway at ${gatewayUrl} to discover tools`);
   const mcpClient = await createClient({
@@ -519,6 +551,7 @@ async function registerGatewayTools({
   );
   return {
     tools,
+    availableToolCount: Object.keys(tools).length,
     close: async () => {
       await mcpClient.close();
     },
@@ -567,8 +600,15 @@ Loop the Conversation State output back into the next agent invocation to keep m
   },
   async execute({ inputs, params }, context) {
     const { userInput, conversationState, chatModel, modelApiKey } = inputs;
-    const { systemPrompt, temperature, maxTokens, memorySize, executionProfile, stepLimit } =
-      params;
+    const {
+      systemPrompt,
+      temperature,
+      maxTokens,
+      memorySize,
+      executionProfile,
+      stepLimit,
+      toolAvailability,
+    } = params;
     const profile = getAgentExecutionProfileConfig(executionProfile);
     const effectiveStepLimit = stepLimit ?? profile.defaultStepLimit;
 
@@ -585,31 +625,35 @@ Loop the Conversation State output back into the next agent invocation to keep m
       aiSdkOverrides?.createGoogleGenerativeAI ?? createGoogleGenerativeAI;
     const createAnthropicImpl = aiSdkOverrides?.createAnthropic ?? createAnthropic;
 
-    let discoveredTools: ToolSet = {};
-    let closeDiscovery: (() => Promise<void>) | undefined;
-
-    if (connectedToolNodeIds && connectedToolNodeIds.length > 0) {
-      context.logger.info(
-        `Discovering tools from gateway for nodes: ${connectedToolNodeIds.join(', ')}`,
-      );
-      try {
-        const sessionToken = await getGatewaySessionToken(
-          context.runId,
-          organizationId ?? null,
-          connectedToolNodeIds,
-        );
-        const discoveryResult = await registerGatewayTools({
+    const gatewayAccess = await prepareAgentGatewayAccess<ToolSet>({
+      runId: context.runId,
+      organizationId: organizationId ?? null,
+      connectedToolNodeIds,
+      ttlSeconds: profile.mcpTokenTtlSeconds,
+      toolAvailability,
+      discoverTools: async (sessionToken) => {
+        if (connectedToolNodeIds && connectedToolNodeIds.length > 0) {
+          context.logger.info(
+            `Discovering tools from gateway for nodes: ${connectedToolNodeIds.join(', ')}`,
+          );
+        }
+        return registerGatewayTools({
           gatewayUrl: DEFAULT_GATEWAY_URL,
           sessionToken,
           createClient: createMCPClientImpl,
           logInfo: (message) => context.logger.info(message),
         });
-        discoveredTools = discoveryResult.tools;
-        closeDiscovery = discoveryResult.close;
-      } catch (error: unknown) {
-        context.logger.error(`Failed to discover tools from gateway: ${error}`);
-      }
-    }
+      },
+      onDegraded: (message) => {
+        context.logger.warn(`Connected MCP tools are unavailable: ${message}`);
+        context.emitProgress({
+          level: 'warn',
+          message: `Connected MCP tools are unavailable: ${message}`,
+        });
+      },
+    });
+    const discoveredTools = gatewayAccess.discovery?.tools ?? {};
+    const closeDiscovery = gatewayAccess.discovery?.close;
 
     try {
       agentStream.emitMessageStart();
@@ -678,6 +722,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
           : systemMessageEntry && systemMessageEntry.content !== undefined
             ? JSON.stringify(systemMessageEntry.content)
             : '';
+      const instructions = `${resolvedSystemPrompt}${getToolAvailabilityPrompt(gatewayAccess.toolStatus)}`;
       const messagesForModel = toModelMessages(historyWithUser);
 
       const openAIOptions = {
@@ -711,7 +756,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
       const agentSettings: ToolLoopAgentSettings<never, AgentTools> = {
         id: `${sessionId}-agent`,
         model,
-        instructions: resolvedSystemPrompt || undefined,
+        instructions: instructions || undefined,
         temperature,
         maxOutputTokens: maxTokens,
         stopWhen: stepCountIsImpl(effectiveStepLimit),
@@ -799,6 +844,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         responseText,
         conversationState: nextState,
         agentRunId,
+        toolStatus: gatewayAccess.toolStatus,
       };
     } finally {
       await agentStream.settleWithoutChangingExecution();

@@ -6,6 +6,7 @@ import type { SecretsEncryptionService } from '../../secrets/secrets.encryption'
 class MockRedis {
   private data = new Map<string, Map<string, string>>();
   private kv = new Map<string, string>();
+  readonly expirations: { key: string; seconds: number }[] = [];
 
   async hset(key: string, field: string, value: string): Promise<number> {
     if (!this.data.has(key)) {
@@ -40,7 +41,8 @@ class MockRedis {
     return 1;
   }
 
-  async expire(_key: string, _seconds: number): Promise<number> {
+  async expire(key: string, seconds: number): Promise<number> {
+    this.expirations.push({ key, seconds });
     return 1;
   }
 
@@ -94,6 +96,23 @@ describe('ToolRegistryService', () => {
       expect(tool?.status).toBe('ready');
       expect(tool?.type).toBe('component');
       expect(tool?.encryptedCredentials).toBeDefined();
+    });
+
+    it('keeps run tool records available for the maximum agent session lifetime', async () => {
+      await service.registerComponentTool({
+        runId: 'run-registry-ttl',
+        nodeId: 'node-a',
+        toolName: 'check_ip_reputation',
+        componentId: 'security.abuseipdb',
+        description: 'Check IP reputation',
+        inputSchema: { type: 'object', properties: {} },
+        credentials: {},
+      });
+
+      expect(redis.expirations).toContainEqual({
+        key: 'mcp:run:run-registry-ttl:tools',
+        seconds: 10800,
+      });
     });
   });
 

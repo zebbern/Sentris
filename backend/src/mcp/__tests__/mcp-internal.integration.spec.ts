@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'bun:test';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -46,6 +46,7 @@ class MockRedis {
 describe('MCP Internal API (Integration)', () => {
   let app: INestApplication;
   let redis: MockRedis;
+  const generateSessionToken = vi.fn(async () => 'mock-token');
   const INTERNAL_TOKEN = 'test-internal-token';
 
   beforeAll(async () => {
@@ -81,7 +82,7 @@ describe('MCP Internal API (Integration)', () => {
       providers: [
         { provide: ToolRegistryService, useValue: toolRegistryService },
         { provide: McpGatewayService, useValue: mockGatewayService },
-        { provide: McpAuthService, useValue: { generateSessionToken: async () => 'mock-token' } },
+        { provide: McpAuthService, useValue: { generateSessionToken } },
         {
           provide: McpGroupsService,
           useValue: { getServerConfig: async () => ({}) },
@@ -153,6 +154,29 @@ describe('MCP Internal API (Integration)', () => {
     const tool = JSON.parse(toolJson!);
     expect(tool.toolName).toBe('test_tool');
     expect(tool.status).toBe('ready');
+  });
+
+  it('forwards requested token TTL to the auth service', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/internal/mcp/generate-token')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({
+        runId: 'run-token-ttl',
+        organizationId: 'org-token-ttl',
+        agentId: 'agent-token-ttl',
+        allowedNodeIds: ['tool-a'],
+        ttlSeconds: 900,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ token: 'mock-token' });
+    expect(generateSessionToken).toHaveBeenLastCalledWith(
+      'run-token-ttl',
+      'org-token-ttl',
+      'agent-token-ttl',
+      ['tool-a'],
+      900,
+    );
   });
 
   it('registers an MCP server with pre-discovered tools', async () => {

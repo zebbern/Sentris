@@ -198,6 +198,26 @@ describe('agent-runner-utils', () => {
     expect(prompt).toContain('exactly one valid RFC 8259 JSON object');
   });
 
+  it('includes the gateway limitation in the agent prompt when tools degrade', () => {
+    const prompt = buildAgentPrompt({
+      task: 'Investigate',
+      toolStatus: {
+        requested: true,
+        status: 'degraded',
+        connectedNodeCount: 1,
+        message: 'gateway unavailable',
+      },
+    });
+
+    expect(prompt).toContain('# Tool Availability');
+    expect(prompt).toContain(
+      'Connected MCP tools are unavailable for this run: gateway unavailable.',
+    );
+    expect(prompt).toContain(
+      'Continue with built-in capabilities and state this limitation in the final result.',
+    );
+  });
+
   it('fetchAgentSkills calls internal batch endpoint', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,

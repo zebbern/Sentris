@@ -1,5 +1,6 @@
 import { ConfigurationError } from '@sentris/component-sdk';
 import { DEFAULT_API_BASE_URL, DEFAULT_GATEWAY_URL } from './utils';
+import { getToolAvailabilityPrompt, type AgentToolStatus } from './agent-tool-access';
 
 export interface AgentSkillRecord {
   id: string;
@@ -337,6 +338,7 @@ export function buildAgentPrompt(options: {
   taskContext?: unknown;
   supplementaryFiles?: string[];
   structuredOutput?: boolean;
+  toolStatus?: AgentToolStatus;
 }): string {
   const {
     task,
@@ -344,6 +346,7 @@ export function buildAgentPrompt(options: {
     taskContext,
     supplementaryFiles = [],
     structuredOutput = false,
+    toolStatus,
   } = options;
 
   const defaultPrompt = `
@@ -374,6 +377,9 @@ Please investigate the issue and generate a detailed report.
   }
 
   finalPrompt += structuredOutput ? STRUCTURED_OUTPUT_PROMPT_FOOTER : MCP_TOOLS_PROMPT_FOOTER;
+  if (toolStatus) {
+    finalPrompt += getToolAvailabilityPrompt(toolStatus);
+  }
 
   return finalPrompt;
 }

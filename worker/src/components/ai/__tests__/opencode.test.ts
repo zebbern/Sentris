@@ -84,6 +84,11 @@ describe('core.ai.opencode', () => {
     const result = await component.execute({ inputs, params }, context as never);
 
     expect(result.report).toContain('# Report');
+    expect(result.toolStatus).toEqual({
+      requested: true,
+      status: 'configured',
+      connectedNodeCount: 1,
+    });
 
     const volumeInstance = (
       IsolatedContainerVolume as unknown as {
@@ -112,6 +117,43 @@ describe('core.ai.opencode', () => {
     expect(runnerCall.memoryLimit).toBe('4g');
     expect(runnerCall.cpuLimit).toBe('4');
     expect(runnerCall.pidsLimit).toBe(1024);
+  });
+
+  it('continues with a prompt limitation in best-effort mode when gateway setup fails', async () => {
+    vi.spyOn(utils, 'getGatewaySessionToken').mockRejectedValue(new Error('gateway unavailable'));
+    const component = componentRegistry.get('core.ai.opencode');
+    if (!component) throw new Error('Component not found');
+
+    const result = await component.execute(
+      { inputs: { task: 'Investigate' }, params: { toolAvailability: 'best-effort' } },
+      {
+        runId: 'best-effort-run',
+        componentRef: 'best-effort-ref',
+        organizationId: 'org-1',
+        metadata: { connectedToolNodeIds: ['tool-1'], organizationId: 'org-1' },
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+        emitProgress: vi.fn(),
+      } as never,
+    );
+
+    expect(result.toolStatus).toEqual({
+      requested: true,
+      status: 'degraded',
+      connectedNodeCount: 1,
+      message: 'gateway unavailable',
+    });
+    const volume = (
+      IsolatedContainerVolume as never as {
+        mock: {
+          results: {
+            value: { initialize: { mock: { calls: [Record<string, string>][] } } };
+          }[];
+        };
+      }
+    ).mock.results[0].value;
+    expect(volume.initialize.mock.calls[0][0]['prompt.txt']).toContain(
+      'Connected MCP tools are unavailable for this run: gateway unavailable.',
+    );
   });
 
   it('should merge providerConfig and skills into workspace', async () => {

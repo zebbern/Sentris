@@ -16,6 +16,9 @@ export interface McpSessionMetadata {
 export class McpAuthService {
   private readonly logger = new Logger(McpAuthService.name);
   private readonly TOKEN_PREFIX = 'mcp:session:';
+  private readonly DEFAULT_TOKEN_TTL_SECONDS = 60 * 60;
+  private readonly MIN_TOKEN_TTL_SECONDS = 60;
+  private readonly MAX_TOKEN_TTL_SECONDS = 3 * 60 * 60;
 
   constructor(@Inject(TOOL_REGISTRY_REDIS) private readonly redis: Redis) {}
 
@@ -27,10 +30,14 @@ export class McpAuthService {
     organizationId: string | null,
     agentId = 'agent',
     allowedNodeIds?: string[],
-    ttlSeconds = 3600, // 1 hour default
+    ttlSeconds = this.DEFAULT_TOKEN_TTL_SECONDS,
   ): Promise<string> {
+    const boundedTtlSeconds = Math.min(
+      this.MAX_TOKEN_TTL_SECONDS,
+      Math.max(this.MIN_TOKEN_TTL_SECONDS, ttlSeconds),
+    );
     const token = `mcp_sk_${uuid4().replace(/-/g, '')}`;
-    const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+    const expiresAt = Math.floor(Date.now() / 1000) + boundedTtlSeconds;
 
     const metadata: McpSessionMetadata = {
       runId,
@@ -44,7 +51,7 @@ export class McpAuthService {
       `${this.TOKEN_PREFIX}${token}`,
       JSON.stringify(metadata),
       'EX',
-      ttlSeconds,
+      boundedTtlSeconds,
     );
 
     return token;

@@ -88,7 +88,7 @@ export interface RegisteredTool {
   registeredAt: string;
 }
 
-const REGISTRY_TTL_SECONDS = 60 * 60; // 1 hour
+const REGISTRY_TTL_SECONDS = 3 * 60 * 60;
 
 @Injectable()
 export class ToolRegistryService implements OnModuleDestroy {

@@ -177,6 +177,11 @@ describe('core.ai.agent (refactor)', () => {
     );
 
     expect(result.responseText).toBe('Hello agent');
+    expect(result.toolStatus).toEqual({
+      requested: false,
+      status: 'not-requested',
+      connectedNodeCount: 0,
+    });
     expect(createMCPClientMock).not.toHaveBeenCalled();
 
     const settings = expectRecord(toolLoopAgentSettings, 'agent settings');
@@ -284,6 +289,12 @@ describe('core.ai.agent (refactor)', () => {
       );
 
       expect(result.responseText).toBe('Agent final answer');
+      expect(result.toolStatus).toEqual({
+        requested: true,
+        status: 'configured',
+        connectedNodeCount: 1,
+        availableToolCount: 1,
+      });
       expect(fetchCalls).toBeGreaterThan(0);
       expect(createMCPClientMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -298,6 +309,46 @@ describe('core.ai.agent (refactor)', () => {
       const settings = expectRecord(toolLoopAgentSettings, 'agent settings');
       const tools = expectRecord(settings.tools, 'agent tools');
       expect(Object.keys(tools)).toEqual(['ping']);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('fails by default when gateway discovery returns zero connected tools', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock: typeof fetch = async () =>
+      new Response(JSON.stringify({ token: 'gateway-token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+    createMCPClientMock.mockResolvedValue({ tools: async () => ({}), close: async () => {} });
+
+    try {
+      await expect(
+        runComponentWithRunner(
+          component!.runner,
+          component!.execute,
+          {
+            inputs: {
+              userInput: 'Use tools',
+              chatModel: { provider: 'openai', modelId: 'gpt-4o-mini' },
+              modelApiKey: 'sk-test',
+            },
+            params: { systemPrompt: '', temperature: 0.3, maxTokens: 64, memorySize: 3 },
+          },
+          createTestContext({
+            metadata: {
+              ...createTestContext().metadata,
+              connectedToolNodeIds: ['tool-node-1'],
+            },
+          }),
+        ),
+      ).rejects.toThrow('Connected MCP tools are required but unavailable');
     } finally {
       globalThis.fetch = originalFetch;
     }

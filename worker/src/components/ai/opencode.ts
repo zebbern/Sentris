@@ -13,7 +13,7 @@ import {
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
-import { getGatewaySessionToken } from './utils';
+import { prepareAgentGatewayAccess } from './agent-tool-access';
 import {
   assertSkillsResolved,
   buildAgentPrompt,
@@ -154,6 +154,22 @@ const parameterSchema = parameters({
       description: 'Choose fast, investigative, or deep autonomous execution capacity.',
     },
   ),
+  toolAvailability: param(
+    z
+      .enum(['required', 'best-effort'])
+      .default('required')
+      .describe('How to handle unavailable MCP tools.'),
+    {
+      label: 'Tool Availability',
+      editor: 'select',
+      options: [
+        { label: 'Required', value: 'required' },
+        { label: 'Best effort', value: 'best-effort' },
+      ],
+      description:
+        'Fail when connected tools are unavailable, or continue with built-in capabilities.',
+    },
+  ),
 });
 
 const outputSchema = outputs({
@@ -165,6 +181,20 @@ const outputSchema = outputs({
     label: 'Raw Output',
     description: 'Full stdout/stderr logs from the agent execution.',
   }),
+  toolStatus: port(
+    z.object({
+      requested: z.boolean(),
+      status: z.enum(['not-requested', 'configured', 'degraded']),
+      connectedNodeCount: z.number().int().nonnegative(),
+      availableToolCount: z.number().int().nonnegative().optional(),
+      message: z.string().optional(),
+    }),
+    {
+      label: 'Tool Status',
+      description: 'Whether connected MCP tools were requested and configured for this agent run.',
+      connectionType: { kind: 'primitive', name: 'json' },
+    },
+  ),
 });
 
 function getOpenCodeTimeoutSeconds(profileTimeoutSeconds: number): number {
@@ -217,22 +247,34 @@ const definition = defineComponent({
   },
   async execute({ inputs, params }, context) {
     const { task, context: taskContext, model, supplementaryInputA, supplementaryInputB } = inputs;
-    const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins, executionProfile } =
-      params;
+    const {
+      systemPrompt,
+      providerConfig,
+      autoApprove,
+      skillIds,
+      enablePlugins,
+      executionProfile,
+      toolAvailability,
+    } = params;
     const profile = getAgentExecutionProfileConfig(executionProfile);
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
     const orgId = organizationId ?? context.organizationId ?? null;
 
-    let gatewayToken = '';
-    const connectedToolIds = connectedToolNodeIds ?? [];
-    if (connectedToolIds.length > 0) {
-      try {
-        gatewayToken = await getGatewaySessionToken(context.runId, orgId, connectedToolIds);
-      } catch (error: unknown) {
-        context.logger.error(`[OpenCode] Failed to generate gateway token: ${error}`);
-      }
-    }
+    const gatewayAccess = await prepareAgentGatewayAccess({
+      runId: context.runId,
+      organizationId: orgId,
+      connectedToolNodeIds,
+      ttlSeconds: profile.mcpTokenTtlSeconds,
+      toolAvailability,
+      onDegraded: (message) => {
+        context.logger.warn(`[OpenCode] Connected MCP tools are unavailable: ${message}`);
+        context.emitProgress({
+          message: `Connected MCP tools are unavailable: ${message}`,
+          level: 'warn',
+        });
+      },
+    });
 
     const skills = await fetchAgentSkills(orgId, skillIds ?? []);
     assertSkillsResolved(skillIds ?? [], skills);
@@ -252,7 +294,7 @@ const definition = defineComponent({
     };
 
     const opencodeConfig = {
-      ...resolveGatewayMcpConfig(gatewayToken),
+      ...resolveGatewayMcpConfig(gatewayAccess.gatewayToken),
       provider: providerConfigForOpenCode,
       model: getOpenCodeModelString(model),
       permission: opencodePermission,
@@ -270,6 +312,7 @@ const definition = defineComponent({
       systemPrompt,
       taskContext,
       supplementaryFiles: Object.keys(supplementaryFiles),
+      toolStatus: gatewayAccess.toolStatus,
     });
 
     const tenantId = context.organizationId ?? 'default-tenant';
@@ -339,6 +382,7 @@ const definition = defineComponent({
       return outputSchema.parse({
         report: stdout,
         rawOutput: `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
+        toolStatus: gatewayAccess.toolStatus,
       });
     } finally {
       await volume.cleanup();

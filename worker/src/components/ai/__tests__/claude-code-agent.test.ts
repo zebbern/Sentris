@@ -95,6 +95,11 @@ describe('core.ai.claude-code', () => {
     );
 
     expect(result.report).toContain('# Claude report');
+    expect(result.toolStatus).toEqual({
+      requested: true,
+      status: 'configured',
+      connectedNodeCount: 1,
+    });
 
     const volumeInstance = (
       IsolatedContainerVolume as unknown as {

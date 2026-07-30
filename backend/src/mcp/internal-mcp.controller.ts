@@ -30,6 +30,7 @@ export class InternalMcpController {
       body.organizationId ?? null,
       body.agentId,
       body.allowedNodeIds,
+      body.ttlSeconds,
     );
     return { token };
   }
