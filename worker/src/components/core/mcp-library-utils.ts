@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { startMcpStdioHostProxy } from './mcp-stdio-host-proxy';
+import { startMcpStdioHostProxy, stopMcpStdioHostProxy } from './mcp-stdio-host-proxy';
 import { mcpDiagnosticLog } from './mcp-diagnostics';
 import { buildBackendApiUrl, resolveBackendApiBaseUrl } from '../../common/backend-url';
 
@@ -263,27 +263,32 @@ export async function registerServerTools(
       context,
     });
 
-    // Discover tools through the same-worker loopback proxy.
-    const tools = filterMcpToolsForServer(
-      server.id,
-      await discoverToolsFromEndpoint(endpoint, httpHeaders),
-      options.persistedTools ?? [],
-      options.toolExclusions,
-    );
+    try {
+      // Discover tools through the same-worker loopback proxy.
+      const tools = filterMcpToolsForServer(
+        server.id,
+        await discoverToolsFromEndpoint(endpoint, httpHeaders),
+        options.persistedTools ?? [],
+        options.toolExclusions,
+      );
 
-    // Register the server with pre-discovered tools
-    await registerMcpServer({
-      runId: context.runId,
-      nodeId,
-      serverName: server.name,
-      serverId: server.id,
-      transport: 'stdio',
-      endpoint,
-      // The registry's legacy cleanup-handle field stores Docker IDs or host-proxy IDs.
-      containerId: proxyId,
-      headers: httpHeaders,
-      tools,
-    });
+      // Register the server with pre-discovered tools
+      await registerMcpServer({
+        runId: context.runId,
+        nodeId,
+        serverName: server.name,
+        serverId: server.id,
+        transport: 'stdio',
+        endpoint,
+        // The registry's legacy cleanup-handle field stores Docker IDs or host-proxy IDs.
+        containerId: proxyId,
+        headers: httpHeaders,
+        tools,
+      });
+    } catch (error) {
+      await stopMcpStdioHostProxy(proxyId).catch(() => {});
+      throw error;
+    }
   }
   // For HTTP servers, register directly with resolved headers
   else if (server.transportType === 'http' && server.endpoint) {

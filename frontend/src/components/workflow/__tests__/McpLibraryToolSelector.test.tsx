@@ -71,6 +71,7 @@ describe('McpLibraryToolSelector', () => {
     queryState.servers = [
       server('server-a', 'Server A'),
       server('server-b', 'Server B'),
+      server('server-c', 'Runtime Discovery Server'),
       server('server-disabled', 'Disabled Server', false),
     ];
     queryState.tools = [
@@ -93,6 +94,22 @@ describe('McpLibraryToolSelector', () => {
 
     expect(screen.getByText('Server A')).toBeDefined();
     expect(screen.queryByText('Server B')).toBeNull();
+    expect(screen.queryByText('Disabled Server')).toBeNull();
+  });
+
+  it('renders every globally enabled server when useAllEnabled is active', () => {
+    renderWithProviders(
+      <McpLibraryToolSelector
+        selectedServerIds={[]}
+        useAllEnabled
+        toolExclusions={[]}
+        onToolExclusionsChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('Server A')).toBeDefined();
+    expect(screen.getByText('Server B')).toBeDefined();
+    expect(screen.getByText('Runtime Discovery Server')).toBeDefined();
     expect(screen.queryByText('Disabled Server')).toBeNull();
   });
 
@@ -149,5 +166,20 @@ describe('McpLibraryToolSelector', () => {
     );
 
     expect(screen.getByText('1 tool enabled')).toBeDefined();
+  });
+
+  it('labels the count as known when a displayed server relies on runtime discovery', () => {
+    renderWithProviders(
+      <McpLibraryToolSelector
+        selectedServerIds={['server-c']}
+        toolExclusions={[]}
+        onToolExclusionsChange={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByText('0 known tools enabled; additional tools discovered at runtime'),
+    ).toBeDefined();
+    expect(screen.queryByText('0 tools enabled')).toBeNull();
   });
 });

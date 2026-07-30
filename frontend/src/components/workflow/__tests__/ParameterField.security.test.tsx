@@ -4,12 +4,17 @@ import { fireEvent, render, screen } from '@testing-library/react';
 mock.module('../McpLibraryToolSelector', () => ({
   McpLibraryToolSelector: ({
     onToolExclusionsChange,
+    useAllEnabled,
   }: {
     onToolExclusionsChange: (exclusions: string[]) => void;
+    useAllEnabled?: boolean;
   }) => (
-    <button type="button" onClick={() => onToolExclusionsChange(['server-a:ping'])}>
-      Exclude ping
-    </button>
+    <>
+      {useAllEnabled && <span>All enabled mode</span>}
+      <button type="button" onClick={() => onToolExclusionsChange(['server-a:ping'])}>
+        Exclude ping
+      </button>
+    </>
   ),
 }));
 
@@ -117,5 +122,24 @@ describe('ParameterField security component parameters', () => {
 
     expect(onUpdateParameter).toHaveBeenCalledWith('toolExclusions', ['server-a:ping']);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('passes mcp.custom useAllEnabled scope to the tool selector', () => {
+    render(
+      <ParameterField
+        parameter={{
+          id: 'toolExclusions',
+          label: 'Enabled Tools',
+          type: 'multi-select',
+          default: [],
+        }}
+        value={[]}
+        onChange={() => undefined}
+        componentId="mcp.custom"
+        parameters={{ enabledServers: [], useAllEnabled: true }}
+      />,
+    );
+
+    expect(screen.getByText('All enabled mode')).toBeDefined();
   });
 });

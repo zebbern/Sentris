@@ -72,7 +72,11 @@ describe('MCP Library Integration Tests', () => {
     global.fetch = originalFetch;
   });
 
-  function setupFetchMocks(servers: any[] = [], persistedTools: any[] = []) {
+  function setupFetchMocks(
+    servers: any[] = [],
+    persistedTools: any[] = [],
+    persistedToolsStatus = 200,
+  ) {
     // Add required timestamps to servers
     const serversWithTimestamps = servers.map((s) => ({
       ...s,
@@ -92,10 +96,14 @@ describe('MCP Library Integration Tests', () => {
 
       // Fetch persisted tool enablement records
       if (url.endsWith('/api/v1/mcp-servers/tools')) {
-        return new Response(JSON.stringify(persistedTools), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          persistedToolsStatus === 200 ? JSON.stringify(persistedTools) : 'policy unavailable',
+          {
+            status: persistedToolsStatus,
+            statusText: persistedToolsStatus === 200 ? 'OK' : 'Service Unavailable',
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
       }
 
       // Fetch all servers endpoint
@@ -186,6 +194,7 @@ describe('MCP Library Integration Tests', () => {
           args: [],
         }),
       );
+      expect(mockStopMcpStdioHostProxy).not.toHaveBeenCalled();
       expect(mockStartMcpDockerServer).not.toHaveBeenCalled();
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:3000/api/v1/mcp-servers',
@@ -702,6 +711,107 @@ describe('MCP Library Integration Tests', () => {
   });
 
   describe('Edge Cases and Error Handling', () => {
+    test('skips every MCP server but still marks the provider ready when policy fetch fails in continuation mode', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupFetchMocks(
+        [
+          {
+            id: 'http-server',
+            name: 'HTTP MCP Server',
+            transportType: 'http',
+            command: null,
+            args: null,
+            enabled: true,
+            endpoint: 'https://example.com/mcp',
+            hasHeaders: false,
+            headerKeys: null,
+          },
+        ],
+        [],
+        503,
+      );
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      const context = createExecutionContext({
+        runId: 'test-run-policy-continue',
+        componentRef: 'custom-mcps',
+      });
+
+      const result = await component!.execute(
+        {
+          inputs: {},
+          params: {
+            enabledServers: ['http-server'],
+            continueOnServerError: true,
+          },
+        },
+        context,
+      );
+
+      const registerServerCalls = (global.fetch as any).mock.calls.filter(([url]: [string]) =>
+        url.includes('/register-mcp-server'),
+      );
+      const providerReadyCalls = (global.fetch as any).mock.calls.filter(([url]: [string]) =>
+        url.includes('/register-component'),
+      );
+      expect(result).toEqual({});
+      expect(registerServerCalls).toHaveLength(0);
+      expect(mockListTools).not.toHaveBeenCalled();
+      expect(providerReadyCalls).toHaveLength(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to fetch persisted MCP tools: Service Unavailable'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    test('throws when policy fetch fails and continuation mode is disabled', async () => {
+      setupFetchMocks(
+        [
+          {
+            id: 'http-server',
+            name: 'HTTP MCP Server',
+            transportType: 'http',
+            command: null,
+            args: null,
+            enabled: true,
+            endpoint: 'https://example.com/mcp',
+            hasHeaders: false,
+            headerKeys: null,
+          },
+        ],
+        [],
+        503,
+      );
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      const context = createExecutionContext({
+        runId: 'test-run-policy-fail',
+        componentRef: 'custom-mcps',
+      });
+
+      await expect(
+        component!.execute(
+          {
+            inputs: {},
+            params: {
+              enabledServers: ['http-server'],
+              continueOnServerError: false,
+            },
+          },
+          context,
+        ),
+      ).rejects.toThrow('Failed to fetch persisted MCP tools: Service Unavailable');
+
+      expect(
+        (global.fetch as any).mock.calls.some(([url]: [string]) =>
+          url.includes('/register-mcp-server'),
+        ),
+      ).toBe(false);
+      expect(
+        (global.fetch as any).mock.calls.some(([url]: [string]) =>
+          url.includes('/register-component'),
+        ),
+      ).toBe(false);
+    });
+
     test('should handle empty server selection', async () => {
       setupFetchMocks([]);
 

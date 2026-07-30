@@ -109,6 +109,7 @@ export function ParameterField({
     return (
       <McpLibraryToolSelector
         selectedServerIds={selectedServerIds}
+        useAllEnabled={parameters?.useAllEnabled === true}
         toolExclusions={toolExclusions}
         onToolExclusionsChange={(exclusions) => {
           if (onUpdateParameter) {

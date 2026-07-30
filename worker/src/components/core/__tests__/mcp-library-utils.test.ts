@@ -5,6 +5,17 @@ import type { McpServer, PersistedMcpTool } from '../mcp-library-utils';
 const originalFetch = globalThis.fetch;
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
 
+const mockStartMcpStdioHostProxy = vi.fn(async () => ({
+  endpoint: 'http://localhost:3000/mcp',
+  proxyId: 'host-mcp-proxy-test',
+}));
+const mockStopMcpStdioHostProxy = vi.fn(async () => true);
+
+vi.mock('../mcp-stdio-host-proxy', () => ({
+  startMcpStdioHostProxy: mockStartMcpStdioHostProxy,
+  stopMcpStdioHostProxy: mockStopMcpStdioHostProxy,
+}));
+
 const mockConnect = vi.fn(async () => {});
 const mockListTools = vi.fn(async () => ({
   tools: [
@@ -65,6 +76,24 @@ function persistedTool(serverId: string, toolName: string, enabled: boolean): Pe
   };
 }
 
+const stdioServer: McpServer = {
+  id: 'stdio-server',
+  name: 'STDIO Server',
+  description: null,
+  transportType: 'stdio',
+  endpoint: null,
+  command: 'example-mcp',
+  args: [],
+  hasHeaders: false,
+  headerKeys: null,
+  enabled: true,
+  healthCheckUrl: null,
+  lastHealthCheck: null,
+  lastHealthStatus: null,
+  createdAt: '2026-07-31T00:00:00.000Z',
+  updatedAt: '2026-07-31T00:00:00.000Z',
+};
+
 describe('mcp-library-utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,6 +147,60 @@ describe('mcp-library-utils', () => {
         [persistedTool('server-a', 'ping', false)],
       ),
     ).toThrow('No MCP tools remain enabled for server server-a');
+  });
+
+  test('stops a started stdio proxy exactly once when filtering leaves zero tools', async () => {
+    const fetchMock: typeof fetch = async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith('/api/v1/mcp-servers/stdio-server/resolve')) {
+        return Response.json({ headers: {}, args: [] });
+      }
+      return new Response('not found', { status: 404 });
+    };
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+    const context = createExecutionContext({
+      runId: 'run-stdio-filter-failure',
+      componentRef: 'mcp.custom',
+    });
+
+    await expect(
+      registerServerTools(stdioServer, context, {
+        persistedTools: [persistedTool('stdio-server', 'ping', false)],
+      }),
+    ).rejects.toThrow('No MCP tools remain enabled for server stdio-server');
+
+    expect(mockStopMcpStdioHostProxy).toHaveBeenCalledTimes(1);
+    expect(mockStopMcpStdioHostProxy).toHaveBeenCalledWith('host-mcp-proxy-test');
+  });
+
+  test('stops a started stdio proxy once on registration failure and preserves that error', async () => {
+    const fetchMock: typeof fetch = async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith('/api/v1/mcp-servers/stdio-server/resolve')) {
+        return Response.json({ headers: {}, args: [] });
+      }
+      if (url.endsWith('/api/v1/internal/mcp/register-mcp-server')) {
+        return new Response('registry unavailable', {
+          status: 503,
+          statusText: 'Registry unavailable',
+        });
+      }
+      return new Response('not found', { status: 404 });
+    };
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+    mockStopMcpStdioHostProxy.mockRejectedValueOnce(new Error('cleanup also failed'));
+    const context = createExecutionContext({
+      runId: 'run-stdio-registration-failure',
+      componentRef: 'mcp.custom',
+    });
+
+    await expect(registerServerTools(stdioServer, context)).rejects.toThrow(
+      'Failed to register server stdio-server: Registry unavailable',
+    );
+
+    expect(mockStopMcpStdioHostProxy).toHaveBeenCalledTimes(1);
   });
 
   test('does not mirror successful HTTP server registration diagnostics to console.log by default', async () => {

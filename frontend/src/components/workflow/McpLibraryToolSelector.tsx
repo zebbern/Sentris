@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 export interface McpLibraryToolSelectorProps {
   selectedServerIds: string[];
+  useAllEnabled?: boolean;
   toolExclusions: string[];
   onToolExclusionsChange: (exclusions: string[]) => void;
   disabled?: boolean;
@@ -21,6 +22,7 @@ const toolExclusionKey = (serverId: string, toolName: string) => `${serverId}:${
 
 export function McpLibraryToolSelector({
   selectedServerIds,
+  useAllEnabled = false,
   toolExclusions,
   onToolExclusionsChange,
   disabled = false,
@@ -33,8 +35,10 @@ export function McpLibraryToolSelector({
 
   const selectedServers = useMemo(() => {
     const selectedIds = new Set(selectedServerIds);
-    return servers.filter((server) => server.enabled && selectedIds.has(server.id));
-  }, [selectedServerIds, servers]);
+    return servers.filter(
+      (server) => server.enabled && (useAllEnabled || selectedIds.has(server.id)),
+    );
+  }, [selectedServerIds, servers, useAllEnabled]);
 
   const selectedServerIdSet = useMemo(
     () => new Set(selectedServers.map((server) => server.id)),
@@ -45,6 +49,13 @@ export function McpLibraryToolSelector({
     [selectedServerIdSet, tools],
   );
   const exclusionSet = useMemo(() => new Set(toolExclusions), [toolExclusions]);
+  const serversWithPersistedTools = useMemo(
+    () => new Set(selectedTools.map((tool) => tool.serverId)),
+    [selectedTools],
+  );
+  const hasRuntimeDiscoveredTools = selectedServers.some(
+    (server) => !serversWithPersistedTools.has(server.id),
+  );
   const finalEnabledCount = useMemo(
     () =>
       selectedTools.filter(
@@ -102,7 +113,11 @@ export function McpLibraryToolSelector({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {finalEnabledCount} tool{finalEnabledCount === 1 ? '' : 's'} enabled
+          {hasRuntimeDiscoveredTools
+            ? `${finalEnabledCount} known tool${
+                finalEnabledCount === 1 ? '' : 's'
+              } enabled; additional tools discovered at runtime`
+            : `${finalEnabledCount} tool${finalEnabledCount === 1 ? '' : 's'} enabled`}
         </span>
         <Button
           variant="ghost"

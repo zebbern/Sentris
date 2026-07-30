@@ -108,10 +108,26 @@ const definition = defineComponent({
 
     // 1. Fetch server details from backend
     const servers = await fetchEnabledServers(enabledServers, context, { useAllEnabled });
-    const persistedTools = servers.length > 0 ? await fetchPersistedMcpTools(context) : [];
+    let persistedTools: Awaited<ReturnType<typeof fetchPersistedMcpTools>> = [];
+    let canRegisterServers = true;
+    if (servers.length > 0) {
+      try {
+        persistedTools = await fetchPersistedMcpTools(context);
+      } catch (error) {
+        if (!continueOnServerError) {
+          throw error;
+        }
+        canRegisterServers = false;
+        console.warn(
+          `[mcp.custom] Skipping all MCP servers because tool policy could not be loaded: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
 
     // 2. Register each server's tools with Tool Registry
-    for (const server of servers) {
+    for (const server of canRegisterServers ? servers : []) {
       try {
         await registerServerTools(server, context, { persistedTools, toolExclusions });
       } catch (error) {
