@@ -7,6 +7,7 @@ import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
 import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
+import { RunReportSummary } from './RunReportSummary';
 import {
   ChevronDown,
   ChevronRight,
@@ -17,7 +18,6 @@ import {
   XCircle,
   SkipForward,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -198,11 +198,11 @@ export function RunResultsSummary({ runId, selectedRun, className }: RunResultsS
               </button>
             </div>
 
-            {/* AI summary placeholder */}
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Sparkles className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-              <span className="text-xs italic">AI summary will appear here</span>
-            </div>
+            <RunReportSummary
+              runId={runId}
+              artifacts={artifacts ?? []}
+              onViewReport={() => setInspectorTab('artifacts')}
+            />
           </div>
         )}
       </Card>
