@@ -212,4 +212,99 @@ describe('core.ai.opencode', () => {
     expect(config.plugin).toEqual(['superpowers']);
     expect(initCall['.opencode/skills/investigate/SKILL.md']).toContain('# Investigate');
   });
+
+  it('publishes a sanitized, bounded replay trace before cleaning the workspace', async () => {
+    const report = 'R'.repeat(16_001);
+    runSpy.mockResolvedValueOnce({
+      stdout: `[OpenCode] Starting agent run...\n${report}`,
+      stderr: '',
+      exitCode: 0,
+      results: [],
+      raw: '',
+    } as never);
+
+    const component = componentRegistry.get('core.ai.opencode');
+    if (!component) throw new Error('Component not found');
+
+    let releaseFinishPublication: (() => void) | undefined;
+    const finishPublication = new Promise<void>((resolve) => {
+      releaseFinishPublication = resolve;
+    });
+    let finishPublicationStarted: (() => void) | undefined;
+    const finishStarted = new Promise<void>((resolve) => {
+      finishPublicationStarted = resolve;
+    });
+    const publish = vi.fn((event: { part: { type: string } }) => {
+      if (event.part.type === 'finish') {
+        finishPublicationStarted?.();
+        return finishPublication;
+      }
+      return Promise.resolve();
+    });
+    const emitProgress = vi.fn();
+
+    const execution = component.execute(
+      { inputs: { task: 'Summarize the advisory' }, params: {} },
+      {
+        runId: 'trace-run',
+        componentRef: 'opencode-node',
+        organizationId: 'org-1',
+        metadata: { connectedToolNodeIds: [], organizationId: 'org-1' },
+        logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+        emitProgress,
+        agentTracePublisher: { publish },
+      } as never,
+    );
+
+    await finishStarted;
+
+    const volumeInstance = (
+      IsolatedContainerVolume as unknown as {
+        mock: { results: { value: { cleanup: ReturnType<typeof vi.fn> } }[] };
+      }
+    ).mock.results.at(-1)?.value;
+    expect(volumeInstance?.cleanup).not.toHaveBeenCalled();
+
+    releaseFinishPublication?.();
+    const result = await execution;
+
+    expect(result.agentRunId).toMatch(/^trace-run:opencode-node:/);
+    expect(result.report).toBe(report);
+    expect(emitProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Running OpenCode agent...',
+        data: expect.objectContaining({
+          agentRunId: result.agentRunId,
+          agentStatus: 'running',
+        }),
+      }),
+    );
+    expect(emitProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'OpenCode agent completed.',
+        data: expect.objectContaining({
+          agentRunId: result.agentRunId,
+          agentStatus: 'completed',
+        }),
+      }),
+    );
+
+    const parts = publish.mock.calls.map(([event]) => event.part) as {
+      type: string;
+      textDelta?: string;
+    }[];
+    expect(parts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'message-start' }),
+        expect.objectContaining({ type: 'finish', responseText: report }),
+      ]),
+    );
+    const textDeltas = parts.filter(
+      (part): part is { type: 'text-delta'; textDelta: string } => part.type === 'text-delta',
+    );
+    expect(textDeltas.map((part) => part.textDelta).join('')).toBe(report);
+    expect(textDeltas).toHaveLength(2);
+    expect(textDeltas.every((part) => part.textDelta.length <= 16_000)).toBe(true);
+    expect(volumeInstance?.cleanup).toHaveBeenCalledTimes(1);
+  }, 5_000);
 });

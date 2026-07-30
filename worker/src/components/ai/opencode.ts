@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import {
   componentRegistry,
   ComponentRetryPolicy,
@@ -10,6 +11,7 @@ import {
   port,
   param,
   coerceJsonFromText,
+  stripAnsiCodes,
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
@@ -26,6 +28,7 @@ import {
   mergeOpenCodePlugins,
   resolveGatewayMcpConfig,
 } from './agent-runner-utils';
+import { AgentStreamRecorder } from './agent-stream-recorder';
 import {
   AGENT_EXECUTION_PROFILE_OPTIONS,
   DEFAULT_AGENT_EXECUTION_PROFILE,
@@ -181,6 +184,10 @@ const outputSchema = outputs({
     label: 'Raw Output',
     description: 'Full stdout/stderr logs from the agent execution.',
   }),
+  agentRunId: port(z.string(), {
+    label: 'Agent Run ID',
+    description: 'Unique identifier for replaying this OpenCode session in the Agent tab.',
+  }),
   toolStatus: port(
     z.object({
       requested: z.boolean(),
@@ -196,6 +203,8 @@ const outputSchema = outputs({
     },
   ),
 });
+
+const AGENT_TRACE_TEXT_CHUNK_SIZE = 16_000;
 
 function getOpenCodeTimeoutSeconds(profileTimeoutSeconds: number): number {
   const configuredTimeout = process.env.OPENCODE_TIMEOUT_SECONDS;
@@ -260,6 +269,8 @@ const definition = defineComponent({
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
     const orgId = organizationId ?? context.organizationId ?? null;
+    const agentRunId = `${context.runId}:${context.componentRef}:${randomUUID()}`;
+    const agentStream = new AgentStreamRecorder(context, agentRunId);
 
     const gatewayAccess = await prepareAgentGatewayAccess({
       runId: context.runId,
@@ -360,7 +371,12 @@ const definition = defineComponent({
       context.emitProgress({
         message: 'Running OpenCode agent...',
         level: 'info',
+        data: {
+          agentRunId,
+          agentStatus: 'running',
+        },
       });
+      agentStream.emitMessageStart();
 
       const runnerResult = await runComponentWithRunner(
         runnerConfig,
@@ -379,12 +395,26 @@ const definition = defineComponent({
         stderr = (runnerResult.stderr as string) || '';
       }
 
+      const report = sanitizeOpenCodeReport(stdout);
+      emitAgentText(agentStream, report);
+      agentStream.emitFinish('stop', report);
+      context.emitProgress({
+        message: 'OpenCode agent completed.',
+        level: 'info',
+        data: {
+          agentRunId,
+          agentStatus: 'completed',
+        },
+      });
+
       return outputSchema.parse({
-        report: stdout,
+        report,
         rawOutput: `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`,
+        agentRunId,
         toolStatus: gatewayAccess.toolStatus,
       });
     } finally {
+      await agentStream.settleWithoutChangingExecution();
       await volume.cleanup();
     }
   },
@@ -392,6 +422,23 @@ const definition = defineComponent({
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function sanitizeOpenCodeReport(stdout: string): string {
+  return stripAnsiCodes(stdout)
+    .split(/\r?\n/)
+    .filter((line) => !/^\[OpenCode\]/i.test(line.trim()))
+    .join('\n')
+    .trim();
+}
+
+function emitAgentText(agentStream: AgentStreamRecorder, text: string): void {
+  if (!text.trim()) {
+    return;
+  }
+  for (let offset = 0; offset < text.length; offset += AGENT_TRACE_TEXT_CHUNK_SIZE) {
+    agentStream.emitTextDelta(text.slice(offset, offset + AGENT_TRACE_TEXT_CHUNK_SIZE));
+  }
 }
 
 componentRegistry.register(definition);
