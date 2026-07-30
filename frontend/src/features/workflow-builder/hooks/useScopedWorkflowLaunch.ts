@@ -18,9 +18,10 @@ export function useScopedWorkflowLaunch({
   const handledRequestRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!requested || !ready || !requestKey || handledRequestRef.current === requestKey) return;
+    const effectiveRequestKey = requestKey ?? '__generic_launch__';
+    if (!requested || !ready || handledRequestRef.current === effectiveRequestKey) return;
 
-    handledRequestRef.current = requestKey;
+    handledRequestRef.current = effectiveRequestKey;
     onConsume();
     void onLaunch();
   }, [onConsume, onLaunch, ready, requestKey, requested]);

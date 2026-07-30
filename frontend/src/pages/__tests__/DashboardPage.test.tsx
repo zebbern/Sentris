@@ -356,8 +356,8 @@ describe('DashboardPage', () => {
     it('renders all quick action links', () => {
       setup();
       renderPage();
-      expect(screen.getByRole('link', { name: /create workflow/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /template library/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /run a template/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /build from scratch/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /all workflows/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /schedules/i })).toBeInTheDocument();
     });
@@ -365,13 +365,13 @@ describe('DashboardPage', () => {
     it('links point to correct routes', () => {
       setup();
       renderPage();
-      expect(screen.getByRole('link', { name: /create workflow/i })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: /run a template/i })).toHaveAttribute(
+        'href',
+        '/templates?setup=none',
+      );
+      expect(screen.getByRole('link', { name: /build from scratch/i })).toHaveAttribute(
         'href',
         '/workflows/new',
-      );
-      expect(screen.getByRole('link', { name: /template library/i })).toHaveAttribute(
-        'href',
-        '/templates',
       );
       expect(screen.getByRole('link', { name: /all workflows/i })).toHaveAttribute(
         'href',

@@ -82,6 +82,15 @@ describe('ValidationDock', () => {
     expect(screen.getByText('All validated')).toBeInTheDocument();
   });
 
+  it('prompts for a runnable step when the graph only contains the entry point', () => {
+    const nodes = [createNode('entry', 'core.workflow.entrypoint', 'Entry Point')];
+
+    render(<ValidationDock nodes={nodes} edges={[]} mode="design" onNodeClick={mock(() => {})} />);
+
+    expect(screen.getByText('Add a step to make this runnable')).toBeInTheDocument();
+    expect(screen.queryByText('All validated')).not.toBeInTheDocument();
+  });
+
   it('displays validation issues with node names and messages', () => {
     validationWarningsMap = {
       n1: ['Missing required input: Target'],

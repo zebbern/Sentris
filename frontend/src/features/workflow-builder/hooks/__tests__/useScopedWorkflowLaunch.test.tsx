@@ -3,6 +3,35 @@ import { act, renderHook } from '@testing-library/react';
 import { useScopedWorkflowLaunch } from '../useScopedWorkflowLaunch';
 
 describe('useScopedWorkflowLaunch', () => {
+  it('launches a generic request once when no scope key is provided', async () => {
+    const onConsume = mock(() => {});
+    const onLaunch = mock(() => Promise.resolve());
+    const { rerender } = renderHook(
+      ({ ready }) =>
+        useScopedWorkflowLaunch({
+          requested: true,
+          ready,
+          requestKey: null,
+          onConsume,
+          onLaunch,
+        }),
+      { initialProps: { ready: false } },
+    );
+
+    rerender({ ready: true });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onConsume).toHaveBeenCalledTimes(1);
+    expect(onLaunch).toHaveBeenCalledTimes(1);
+
+    rerender({ ready: true });
+    expect(onConsume).toHaveBeenCalledTimes(1);
+    expect(onLaunch).toHaveBeenCalledTimes(1);
+  });
+
   it('waits for the workflow, consumes the request, and launches exactly once', async () => {
     const onConsume = mock(() => {});
     const onLaunch = mock(() => Promise.resolve());

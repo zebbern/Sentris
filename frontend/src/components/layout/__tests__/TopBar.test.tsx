@@ -116,6 +116,47 @@ describeTopBar('TopBar', () => {
     expect(screen.queryByText('Want to save current state?')).not.toBeInTheDocument();
   });
 
+  it('offers Save and disables Execute for a workflow that has not been created yet', () => {
+    useWorkflowStore.setState({
+      metadata: {
+        id: null,
+        name: 'Untitled Workflow',
+        description: '',
+        currentVersionId: null,
+        currentVersion: null,
+      },
+      isDirty: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="new" onRun={mock()} onSave={mock()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Save workflow' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Execute' })).toBeDisabled();
+  });
+
+  it('saves directly from the visible Save button', async () => {
+    useWorkflowStore.setState({ isDirty: true });
+    const onSave = mock(async () => {
+      useWorkflowStore.setState({ isDirty: false });
+    });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={mock()} onSave={onSave} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save workflow' }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('Save & Run saves then runs when dialog is confirmed', async () => {
     useWorkflowStore.setState({ isDirty: true });
     const onRun = mock(() => {});

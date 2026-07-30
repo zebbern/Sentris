@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useUseTemplate, type Template } from '@/hooks/queries/useTemplateQueries';
+import { useSecrets } from '@/hooks/queries/useSecretQueries';
+import { Link } from 'react-router-dom';
 
 interface UseTemplateModalProps {
   template: Template;
@@ -29,24 +31,25 @@ export function UseTemplateModal({
 }: UseTemplateModalProps) {
   const useTemplateMutation = useUseTemplate();
   const isLoading = useTemplateMutation.isPending;
+  const requiredSecrets = template.requiredSecrets || [];
+  const {
+    data: availableSecrets = [],
+    isLoading: isLoadingSecrets,
+    error: secretsError,
+  } = useSecrets({ enabled: open && requiredSecrets.length > 0 });
 
-  const [workflowName, setWorkflowName] = useState(`${template.name} - Copy`);
+  const [workflowName, setWorkflowName] = useState(template.name);
   const [secretMappings, setSecretMappings] = useState<Record<string, string>>({});
-  const [showSecrets, setShowSecrets] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Reset state when template or open changes to avoid stale data (#3)
   useEffect(() => {
     if (open) {
-      setWorkflowName(`${template.name} - Copy`);
+      setWorkflowName(template.name);
       setSecretMappings({});
-      setShowSecrets(false);
       setError(null);
     }
-  }, [template.id, open]);
-
-  // Initialize secret mappings with placeholder values
-  const requiredSecrets = template.requiredSecrets || [];
+  }, [template.id, template.name, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +65,7 @@ export function UseTemplateModal({
 
     if (unmappedSecrets.length > 0) {
       setError(
-        `Please provide values for all required secrets: ${unmappedSecrets.map((s) => s.name).join(', ')}`,
+        `Select an existing Sentris secret for each required credential: ${unmappedSecrets.map((s) => s.name).join(', ')}`,
       );
       return;
     }
@@ -70,7 +73,7 @@ export function UseTemplateModal({
     try {
       const result = await useTemplateMutation.mutateAsync({
         templateId: template.id,
-        workflowName,
+        workflowName: workflowName.trim(),
         secretMappings: requiredSecrets.length > 0 ? secretMappings : undefined,
       });
       onSuccess(result.workflow?.id ?? result.workflowId);
@@ -90,9 +93,10 @@ export function UseTemplateModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Use Template: {template.name}</DialogTitle>
+          <DialogTitle>Configure &amp; Run: {template.name}</DialogTitle>
           <DialogDescription>
-            Create a new workflow from this template. Configure the required secrets below.
+            Create the workflow, map any stored credentials, then continue straight to its run
+            setup.
           </DialogDescription>
         </DialogHeader>
 
@@ -131,51 +135,66 @@ export function UseTemplateModal({
           {/* Required Secrets */}
           {requiredSecrets.length > 0 ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4" />
-                  Required Secrets ({requiredSecrets.length})
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSecrets(!showSecrets)}
-                  className="gap-1"
-                >
-                  {showSecrets ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showSecrets ? 'Hide' : 'Show'}
-                </Button>
-              </div>
+              <Label className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Required Secrets ({requiredSecrets.length})
+              </Label>
 
-              <div className="space-y-3">
-                {requiredSecrets.map((secret) => (
-                  <div key={secret.name} className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={`secret-${secret.name}`} className="text-sm">
-                        {secret.name}
-                      </Label>
-                      <Badge variant="outline" className="text-xs">
-                        {secret.type}
-                      </Badge>
+              {isLoadingSecrets ? (
+                <p className="text-sm text-muted-foreground">Loading Sentris secrets…</p>
+              ) : secretsError ? (
+                <div
+                  role="alert"
+                  className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+                >
+                  Could not load secrets. Try again from the Secrets page.
+                </div>
+              ) : availableSecrets.length === 0 ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                  <p className="text-sm font-medium">No stored secrets are available.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Add the credentials once in Sentris, then return here to map them safely.
+                  </p>
+                  <Button asChild variant="outline" size="sm" className="mt-3">
+                    <Link to="/secrets">Open secret settings</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {requiredSecrets.map((secret) => (
+                    <div key={secret.name} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`secret-${secret.name}`} className="text-sm">
+                          {secret.name}
+                        </Label>
+                        <Badge variant="outline" className="text-xs">
+                          {secret.type}
+                        </Badge>
+                      </div>
+                      {secret.description && (
+                        <p className="text-xs text-muted-foreground">{secret.description}</p>
+                      )}
+                      <select
+                        id={`secret-${secret.name}`}
+                        value={secretMappings[secret.name] || ''}
+                        onChange={(e) => handleSecretMappingChange(secret.name, e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <option value="">Select an existing Sentris secret</option>
+                        {availableSecrets.map((availableSecret) => (
+                          <option key={availableSecret.id} value={availableSecret.id}>
+                            {availableSecret.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    {secret.description && (
-                      <p className="text-xs text-muted-foreground">{secret.description}</p>
-                    )}
-                    <Input
-                      id={`secret-${secret.name}`}
-                      type={showSecrets ? 'text' : 'password'}
-                      value={secretMappings[secret.name] || ''}
-                      onChange={(e) => handleSecretMappingChange(secret.name, e.target.value)}
-                      placeholder={`Enter value for ${secret.name}`}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <p className="text-xs text-muted-foreground">
-                These secrets will be created in your organization and referenced in the workflow.
+                Only secret references are saved in the workflow. Credential values remain in the
+                Sentris secret store.
               </p>
             </div>
           ) : (
@@ -204,9 +223,17 @@ export function UseTemplateModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="gap-2">
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                (requiredSecrets.length > 0 &&
+                  (isLoadingSecrets || availableSecrets.length === 0 || Boolean(secretsError)))
+              }
+              className="gap-2"
+            >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Create Workflow
+              Create &amp; Run
             </Button>
           </DialogFooter>
         </form>

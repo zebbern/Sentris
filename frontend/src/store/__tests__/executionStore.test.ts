@@ -59,6 +59,7 @@ const mockExecutions = {
   stream: mock(),
   listRuns: mock(async () => ({ runs: [] })),
 };
+const mockInvalidateQueries = mock();
 
 mock.module('@/services/api', () => ({
   api: {
@@ -116,7 +117,7 @@ mock.module('@/lib/queryClient', () => ({
     }),
     getQueryData: mock(() => undefined),
     setQueryData: mock(),
-    invalidateQueries: mock(),
+    invalidateQueries: mockInvalidateQueries,
     prefetchQuery: mock(),
   },
 }));
@@ -209,6 +210,25 @@ describe('useExecutionStore', () => {
 
     expect(useExecutionStore.getState().pollingInterval).toBeNull();
     expect(useExecutionStore.getState().status).toBe('failed');
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['runArtifacts', 'test-org', 'run-1'],
+    });
+  });
+
+  it('refreshes partial artifacts after stopping a run', async () => {
+    useExecutionStore.setState({
+      runId: 'run-1',
+      workflowId: 'wf-1',
+      status: 'running',
+    });
+    mockExecutions.cancel.mockResolvedValue(undefined);
+    mockExecutions.getStatus.mockResolvedValue(baseStatus({ status: 'CANCELLED' }));
+
+    await useExecutionStore.getState().stopExecution();
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['runArtifacts', 'test-org', 'run-1'],
+    });
   });
 
   describe('Streaming functionality', () => {

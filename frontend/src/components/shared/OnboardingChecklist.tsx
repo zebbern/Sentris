@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Circle, Rocket, Workflow, Puzzle, Play, X } from 'lucide-react';
+import { CheckCircle2, Circle, Rocket, Workflow, Play, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -77,16 +77,16 @@ export function OnboardingChecklist({
       {
         id: 'create-workflow',
         label: 'Create your first workflow',
-        description: 'Design a security automation workflow in the visual builder.',
-        icon: Workflow,
+        description: 'Start from a verified template that runs without local setup.',
+        icon: Rocket,
         isComplete: totalWorkflows > 0,
-        href: '/workflows/new',
+        href: '/templates?setup=none',
       },
       {
         id: 'add-component',
-        label: 'Add a component to your workflow',
-        description: 'Drag components from the palette onto the canvas.',
-        icon: Puzzle,
+        label: 'Explore the visual builder',
+        description: 'Customize a template or build your own workflow from scratch.',
+        icon: Workflow,
         isComplete: hasWorkflowWithNodes,
         href: '/workflows/new',
       },
@@ -96,7 +96,7 @@ export function OnboardingChecklist({
         description: 'Start with a template that needs no setup — just outbound internet.',
         icon: Play,
         isComplete: totalRuns > 0,
-        href: '/templates?setup=none',
+        href: totalWorkflows > 0 ? '/workflows' : '/templates?setup=none',
       },
     ],
     [totalWorkflows, hasWorkflowWithNodes, totalRuns],

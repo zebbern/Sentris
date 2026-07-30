@@ -212,7 +212,9 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
 
   // --- Auto-focus: switch to the most relevant tab on run completion ---
   const { data: nodeIOData } = useExecutionNodeIO(selectedRunId);
-  const { data: runArtifacts } = useRunArtifacts(selectedRunId ?? undefined);
+  const { data: runArtifacts, isFetching: artifactsFetching } = useRunArtifacts(
+    selectedRunId ?? undefined,
+  );
 
   const hasAgentTrace = useMemo(() => {
     const nodes = nodeIOData?.nodes ?? [];
@@ -237,6 +239,7 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         }
       | undefined,
     artifactCount: runArtifacts?.length ?? 0,
+    artifactsFetching,
     hasAgentTrace,
     setInspectorTab,
     selectNode,

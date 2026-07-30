@@ -18,6 +18,8 @@ interface AutoFocusOptions {
   nodeIOData: { nodes: NodeIOEntry[] } | undefined;
   /** Count of artifacts produced by the run. */
   artifactCount: number;
+  /** Whether the run artifact query is still refreshing after completion. */
+  artifactsFetching: boolean;
   /** Whether the run contains agent trace data. */
   hasAgentTrace: boolean;
   /** Setter for the inspector tab. */
@@ -43,12 +45,14 @@ export function useAutoFocusOnCompletion({
   runStatus,
   nodeIOData,
   artifactCount,
+  artifactsFetching,
   hasAgentTrace,
   setInspectorTab,
   selectNode,
   userOverrodeTab,
 }: AutoFocusOptions): string {
   const hasAutoFocused = useRef(false);
+  const hasPendingAutoFocus = useRef(false);
   const prevRunIdRef = useRef<string | null>(null);
   const prevStatusRef = useRef<ExecutionStatus | undefined>(undefined);
   const [announcement, setAnnouncement] = useState('');
@@ -57,6 +61,7 @@ export function useAutoFocusOnCompletion({
   useEffect(() => {
     if (selectedRunId !== prevRunIdRef.current) {
       hasAutoFocused.current = false;
+      hasPendingAutoFocus.current = false;
       userOverrodeTab.current = false;
       prevRunIdRef.current = selectedRunId;
       prevStatusRef.current = undefined;
@@ -84,8 +89,13 @@ export function useAutoFocusOnCompletion({
     const wasPreviouslyNonTerminal =
       prevStatus !== undefined && !(TERMINAL_STATUSES as readonly string[]).includes(prevStatus);
 
-    if (!wasPreviouslyNonTerminal) return;
+    if (wasPreviouslyNonTerminal) {
+      hasPendingAutoFocus.current = true;
+    }
 
+    if (!hasPendingAutoFocus.current || artifactsFetching) return;
+
+    hasPendingAutoFocus.current = false;
     hasAutoFocused.current = true;
 
     const nodes = nodeIOData?.nodes ?? [];
@@ -120,6 +130,7 @@ export function useAutoFocusOnCompletion({
     runStatus,
     nodeIOData,
     artifactCount,
+    artifactsFetching,
     hasAgentTrace,
     setInspectorTab,
     selectNode,

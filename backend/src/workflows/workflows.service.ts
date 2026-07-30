@@ -3,7 +3,6 @@ import {
   Logger,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
@@ -11,7 +10,6 @@ import { z } from 'zod';
 
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 
-import { compileWorkflowGraph } from '../dsl/compiler';
 import '@sentris/worker/components';
 import { componentRegistry, extractPorts } from '@sentris/component-sdk';
 import { WorkflowDefinition } from '../dsl/types';
@@ -190,25 +188,11 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     return this.workflowRunService.ensureRunAccess(runId, auth);
   }
 
-  async create(
-    dto: WorkflowGraphDto,
-    auth?: AuthContext | null,
-    options?: { skipValidation?: boolean },
-  ): Promise<ServiceWorkflowResponse> {
+  async create(dto: WorkflowGraphDto, auth?: AuthContext | null): Promise<ServiceWorkflowResponse> {
     const input = this.parse(dto);
 
-    // Validate workflow graph before saving (including port connections)
-    // Templates skip validation because they are blueprints with unfilled inputs
-    if (!options?.skipValidation) {
-      try {
-        compileWorkflowGraph(input);
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          throw new BadRequestException(`Workflow validation failed: ${error.message}`);
-        }
-        throw error;
-      }
-    }
+    // Persistence intentionally accepts incomplete drafts. Execution and explicit
+    // commit compile the selected version and surface actionable validation errors.
 
     this.ensureOrganizationAdmin(auth);
     const organizationId = requireOrganizationId(auth);
@@ -260,15 +244,7 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<ServiceWorkflowResponse> {
     const input = this.parse(dto);
 
-    // Validate workflow graph before saving (including port connections)
-    try {
-      compileWorkflowGraph(input);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new BadRequestException(`Workflow validation failed: ${error.message}`);
-      }
-      throw error;
-    }
+    // Keep editing recoverable: validation gates execution/commit, not draft saves.
 
     const organizationId = await this.requireWorkflowAdmin(id, auth);
     const { response, version } = await this.repository.transaction(async (executor) => {

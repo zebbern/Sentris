@@ -1,15 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  Workflow,
-  Play,
-  CalendarClock,
-  Zap,
-  Plus,
-  Package,
-  ArrowRight,
-  Download,
-} from 'lucide-react';
+import { Workflow, Play, CalendarClock, Zap, Plus, ArrowRight, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -213,16 +204,16 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
 function QuickActions() {
   return (
     <div className="flex flex-wrap gap-3">
-      <Button asChild variant="outline" className="gap-2">
-        <Link to="/workflows/new">
-          <Plus className="h-4 w-4" />
-          Create Workflow
+      <Button asChild className="gap-2">
+        <Link to="/templates?setup=none">
+          <Play className="h-4 w-4" />
+          Run a Template
         </Link>
       </Button>
       <Button asChild variant="outline" className="gap-2">
-        <Link to="/templates">
-          <Package className="h-4 w-4" />
-          Template Library
+        <Link to="/workflows/new">
+          <Plus className="h-4 w-4" />
+          Build from Scratch
         </Link>
       </Button>
       <Button asChild variant="outline" className="gap-2">

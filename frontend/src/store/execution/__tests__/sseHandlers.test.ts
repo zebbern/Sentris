@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, mock, spyOn } from 'bun:test';
 import {
   createTraceHandler,
   createStatusHandler,
@@ -9,6 +9,8 @@ import {
 import { useTerminalStreamStore } from '../terminalStreamStore';
 import { useExecutionLogStore } from '../executionLogStore';
 import type { ExecutionLog } from '@/schemas/execution';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
 
 // ---------------------------------------------------------------------------
 // SSE accessor mock factory
@@ -129,10 +131,14 @@ describe('createTraceHandler', () => {
 
 describe('createStatusHandler', () => {
   let accessor: ReturnType<typeof createMockAccessor>;
+  let invalidateQueriesSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     accessor = createMockAccessor();
+    invalidateQueriesSpy = spyOn(queryClient, 'invalidateQueries');
   });
+
+  afterEach(() => invalidateQueriesSpy.mockRestore());
 
   it('updates status and lifecycle in state', () => {
     const handler = createStatusHandler(accessor, 'run-1');
@@ -171,6 +177,9 @@ describe('createStatusHandler', () => {
     };
     handler(makeMessageEvent(statusPayload));
     expect(accessor._stopPolling).toHaveBeenCalled();
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+      queryKey: queryKeys.artifacts.byRun('run-1'),
+    });
   });
 
   it('does not stop polling on non-terminal status', () => {
@@ -186,6 +195,7 @@ describe('createStatusHandler', () => {
     };
     handler(makeMessageEvent(statusPayload));
     expect(accessor._stopPolling).not.toHaveBeenCalled();
+    expect(invalidateQueriesSpy).not.toHaveBeenCalled();
   });
 
   it('does not throw on invalid JSON', () => {

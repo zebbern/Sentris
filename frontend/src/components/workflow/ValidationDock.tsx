@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, CirclePlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
@@ -7,6 +7,7 @@ import { getNodeValidationWarnings } from '@/utils/connectionValidation';
 import type { Node, Edge } from '@xyflow/react';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { isEntryPointNode } from '@/utils/entryPointUtils';
 
 interface ValidationIssue {
   nodeId: string;
@@ -76,6 +77,8 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
   const totalIssues = validationIssues.length;
   const hasIssues = totalIssues > 0;
   const shouldCollapse = totalIssues > COLLAPSE_THRESHOLD;
+  const needsRunnableStep =
+    !hasIssues && nodes.length <= 1 && nodes.every((node) => isEntryPointNode(node));
 
   // Don't show dock if not in design mode
   if (!isDesignMode) {
@@ -103,7 +106,9 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             'transition-all duration-200 active:scale-95',
             hasIssues
               ? 'border-destructive/50 hover:border-destructive'
-              : 'border-green-500/50 hover:border-green-500 dark:border-green-400/50 dark:hover:border-green-400',
+              : needsRunnableStep
+                ? 'border-amber-500/50 hover:border-amber-500'
+                : 'border-green-500/50 hover:border-green-500 dark:border-green-400/50 dark:hover:border-green-400',
           )}
         >
           {hasIssues ? (
@@ -111,6 +116,8 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
               <AlertCircle className="h-4 w-4 text-destructive" />
               <span className="text-xs font-medium">{totalIssues}</span>
             </>
+          ) : needsRunnableStep ? (
+            <CirclePlus className="h-4 w-4 text-amber-500" />
           ) : (
             <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
           )}
@@ -145,13 +152,17 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             <div className="flex items-center gap-2">
               {hasIssues ? (
                 <AlertCircle className="h-4 w-4 text-destructive" />
+              ) : needsRunnableStep ? (
+                <CirclePlus className="h-4 w-4 text-amber-500" />
               ) : (
                 <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
               )}
               <span className="text-sm font-medium">
                 {hasIssues
                   ? `${totalIssues} ${totalIssues === 1 ? 'issue' : 'issues'}`
-                  : 'All validated'}
+                  : needsRunnableStep
+                    ? 'Add a step to make this runnable'
+                    : 'All validated'}
               </span>
             </div>
             <button
@@ -186,6 +197,15 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
                   </button>
                 ))}
               </div>
+            ) : needsRunnableStep ? (
+              <div className="flex items-center justify-center px-6 py-8">
+                <div className="text-center">
+                  <CirclePlus className="mx-auto mb-2 h-8 w-8 text-amber-500" />
+                  <p className="text-sm text-muted-foreground">
+                    Choose a component from the library and connect it to the Entry Point.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="flex items-center justify-center py-8">
                 <div className="text-center">
@@ -208,7 +228,11 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
         'bg-background/95 backdrop-blur-sm border rounded-md shadow-md',
         'max-w-lg w-auto',
         'transition-all duration-200',
-        hasIssues ? 'border-red-500/50' : 'border-green-500/50',
+        hasIssues
+          ? 'border-red-500/50'
+          : needsRunnableStep
+            ? 'border-amber-500/50'
+            : 'border-green-500/50',
       )}
       style={{
         left: '40%', // 50% - 10% = 40%
@@ -271,6 +295,13 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             ))}
           </div>
         </>
+      ) : needsRunnableStep ? (
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <CirclePlus className="h-3 w-3 shrink-0 text-amber-500" />
+          <span className="text-[11px] text-muted-foreground">
+            Add a step to make this runnable
+          </span>
+        </div>
       ) : (
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <CheckCircle2 className="h-3 w-3 text-green-500 dark:text-green-400 shrink-0" />

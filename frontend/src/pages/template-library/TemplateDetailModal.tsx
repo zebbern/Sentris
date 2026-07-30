@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,10 +8,25 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { WorkflowPreview } from '@/features/templates/WorkflowPreview';
-import { Workflow, ArrowRight } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileOutput,
+  KeyRound,
+  SlidersHorizontal,
+  Workflow,
+  Wrench,
+  Zap,
+} from 'lucide-react';
 import type { Template } from '@/hooks/queries/useTemplateQueries';
 import { cn } from '@/lib/utils';
 import { getCategoryStyle, hasGraphNodes, toTitleCase } from './types';
+import {
+  getTemplateRuntimeInputCount,
+  getTemplateSetupLevel,
+  isLiveVerifiedTemplate,
+  templateProducesArtifact,
+} from './setupLevel';
 
 // ---------------------------------------------------------------------------
 // Template detail modal
@@ -38,10 +52,12 @@ export function TemplateDetailModal({
   const catStyle = getCategoryStyle(template.category);
   const CategoryIcon = catStyle.icon;
   const hasGraph = hasGraphNodes(template.graph);
-  const filteredTags = useMemo(() => {
-    const categoryLower = (template.category || '').toLowerCase();
-    return (template.tags || []).filter((t) => t.toLowerCase() !== categoryLower);
-  }, [template.category, template.tags]);
+  const setupLevel = getTemplateSetupLevel(template);
+  const runtimeInputCount = getTemplateRuntimeInputCount(template);
+  const producesArtifact = templateProducesArtifact(template);
+  const liveVerified = isLiveVerifiedTemplate(template);
+  const categoryLower = (template.category || '').toLowerCase();
+  const filteredTags = (template.tags || []).filter((tag) => tag.toLowerCase() !== categoryLower);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,6 +138,47 @@ export function TemplateDetailModal({
             </div>
           )}
 
+          <div
+            className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+            aria-label="Template readiness"
+          >
+            {liveVerified && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-700 dark:text-sky-300">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Live verified
+              </span>
+            )}
+            {setupLevel === 'no-setup' ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
+                <Zap className="h-3.5 w-3.5" />
+                No setup required
+              </span>
+            ) : setupLevel === 'needs-secrets' ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300">
+                <KeyRound className="h-3.5 w-3.5" />
+                {template.requiredSecrets.length} stored secret
+                {template.requiredSecrets.length === 1 ? '' : 's'}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1">
+                <Wrench className="h-3.5 w-3.5" />
+                Local tools required
+              </span>
+            )}
+            {runtimeInputCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                {runtimeInputCount} run input{runtimeInputCount === 1 ? '' : 's'}
+              </span>
+            )}
+            {producesArtifact && (
+              <span className="inline-flex items-center gap-1">
+                <FileOutput className="h-3.5 w-3.5" />
+                Creates a report
+              </span>
+            )}
+          </div>
+
           <Button
             className={cn(
               'w-full h-11 rounded-xl font-medium gap-2',
@@ -130,7 +187,7 @@ export function TemplateDetailModal({
             onClick={() => onUse(template)}
             disabled={!canUse}
           >
-            Use Template
+            Configure &amp; Run
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

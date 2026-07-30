@@ -6,12 +6,8 @@ import { api, API_BASE_URL } from '@/services/api';
 import { serializeWorkflowForCreate, serializeWorkflowForUpdate } from '@/utils/workflowSerializer';
 import { cloneNodes, cloneEdges, type GraphSnapshot } from './useWorkflowGraphControllers';
 import { track, Events } from '@/features/analytics/events';
-import { getNodeValidationWarnings } from '@/utils/connectionValidation';
-import { getComponentFromCache } from '@/hooks/queries/useComponentQueries';
-import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { queryClient } from '@/lib/queryClient';
 import { queryKeys } from '@/lib/queryKeys';
-import type { SecretSummary } from '@/schemas/secret';
 import { logger } from '@/lib/logger';
 
 interface WorkflowMetadataShape {
@@ -90,9 +86,6 @@ export function useDesignWorkflowPersistence({
   const [hasGraphChanges, setHasGraphChanges] = useState(false);
   const [hasMetadataChanges, setHasMetadataChanges] = useState(false);
 
-  // Preload secrets via TanStack Query (replaces manual Zustand fetch)
-  useSecrets();
-
   useEffect(() => {
     const currentSignature = computeGraphSignature(designNodes, designEdges);
 
@@ -145,7 +138,7 @@ export function useDesignWorkflowPersistence({
         return;
       }
 
-      if (!isDirty) {
+      if (!isDirty && !isNewWorkflow) {
         if (showToast) {
           toast({
             title: 'No changes to save',
@@ -154,40 +147,6 @@ export function useDesignWorkflowPersistence({
         }
         return;
       }
-
-      // --- VALIDATION CHECK ---
-      // Ensure secrets are fresh in TanStack Query cache
-      await queryClient.refetchQueries({ queryKey: queryKeys.secrets.all() });
-      const secrets = queryClient.getQueryData<SecretSummary[]>(queryKeys.secrets.all()) ?? [];
-      const allIssues: string[] = [];
-
-      designNodes.forEach((node) => {
-        const nodeData = node.data as FrontendNodeData;
-        const componentRef = nodeData.componentId ?? nodeData.componentSlug;
-        const component = getComponentFromCache(componentRef);
-
-        if (!component) return;
-
-        const warnings = getNodeValidationWarnings(
-          node as ReactFlowNode<FrontendNodeData>,
-          designEdges,
-          component,
-          secrets,
-        );
-        warnings.forEach((w) => allIssues.push(`${nodeData.label || node.id}: ${w}`));
-      });
-
-      if (allIssues.length > 0) {
-        if (showToast) {
-          toast({
-            variant: 'destructive',
-            title: 'Cannot save workflow',
-            description: `Please fix the following issues:\n${allIssues[0]}${allIssues.length > 1 ? ` (+${allIssues.length - 1} more)` : ''}`,
-          });
-        }
-        return;
-      }
-      // --- END VALIDATION CHECK ---
 
       try {
         if (!designNodes || !Array.isArray(designNodes)) {

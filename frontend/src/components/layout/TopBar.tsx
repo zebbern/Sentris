@@ -20,6 +20,8 @@ import {
   ExternalLink,
   Package,
   History,
+  Save,
+  Check,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -114,6 +116,7 @@ export function TopBar({
   const isOrgReady = authProvider !== 'clerk' || organizationId !== DEFAULT_ORG_ID;
   const canEdit = Boolean(canManageWorkflows);
   const { toast } = useToast();
+  const hasPersistedWorkflow = Boolean(workflowId && workflowId !== 'new');
 
   const handleChangeWorkflowName = () => {
     const trimmed = (tempWorkflowName ?? '').trim();
@@ -175,6 +178,16 @@ export function TopBar({
           onRun?.();
         }
       }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!canEdit || (!isDirty && hasPersistedWorkflow) || isSaving) return;
+    setIsSaving(true);
+    try {
+      await Promise.resolve(onSave());
     } finally {
       setIsSaving(false);
     }
@@ -266,6 +279,7 @@ export function TopBar({
             : `/workflows/${workflowId}/runs`;
           navigate(executionPath);
         }}
+        disabled={!hasPersistedWorkflow}
         aria-pressed={mode === 'execution'}
       >
         <MonitorPlay className="h-3.5 w-3.5 shrink-0" />
@@ -344,6 +358,28 @@ export function TopBar({
           </div>
 
           <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1 md:gap-1.5">
+            {mode === 'design' && (
+              <Button
+                onClick={() => void handleSave()}
+                disabled={!canEdit || (!isDirty && hasPersistedWorkflow) || isSaving}
+                variant="outline"
+                size="sm"
+                aria-label={isDirty || !hasPersistedWorkflow ? 'Save workflow' : 'Workflow saved'}
+                className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5')}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : isDirty || !hasPersistedWorkflow ? (
+                  <Save className="h-3.5 w-3.5" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">
+                  {isSaving ? 'Saving…' : isDirty || !hasPersistedWorkflow ? 'Save' : 'Saved'}
+                </span>
+              </Button>
+            )}
+
             <Button
               onClick={handleRun}
               disabled={!canEdit}

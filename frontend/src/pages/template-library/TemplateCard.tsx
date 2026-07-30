@@ -2,12 +2,27 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatTimeAgo } from '@/utils/timeFormat';
-import { Star, KeyRound, ArrowRight, Zap } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileOutput,
+  KeyRound,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  Wrench,
+  Zap,
+} from 'lucide-react';
 import type { Template } from '@/hooks/queries/useTemplateQueries';
 import { cn } from '@/lib/utils';
 import { toTitleCase } from './types';
 import { PreviewSection } from './PreviewSection';
-import { isNoSetupTemplate } from './setupLevel';
+import {
+  getTemplateRuntimeInputCount,
+  getTemplateSetupLevel,
+  isLiveVerifiedTemplate,
+  templateProducesArtifact,
+} from './setupLevel';
 
 // ---------------------------------------------------------------------------
 // Template card
@@ -18,6 +33,7 @@ export interface TemplateCardProps {
   onUse: (template: Template) => void;
   onPreview: (template: Template) => void;
   canUse: boolean;
+  recommended?: boolean;
 }
 
 function TemplateCardStats({ template }: { template: Template }) {
@@ -44,16 +60,6 @@ function TemplateCardStats({ template }: { template: Template }) {
     );
   }
 
-  if (template.requiredSecrets && template.requiredSecrets.length > 0) {
-    segments.push(
-      <span key="secrets" className="inline-flex shrink-0 items-center gap-1">
-        <KeyRound className="h-3 w-3" />
-        {template.requiredSecrets.length} secret
-        {template.requiredSecrets.length !== 1 ? 's' : ''}
-      </span>,
-    );
-  }
-
   if (template.updatedAt) {
     segments.push(
       <span key="updated" className="truncate">
@@ -76,44 +82,68 @@ function TemplateCardStats({ template }: { template: Template }) {
   );
 }
 
-export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCardProps) {
-  const noSetup = isNoSetupTemplate(template);
-
-  const handleCardKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onPreview(template);
-    }
-  };
+export function TemplateCard({
+  template,
+  onUse,
+  onPreview,
+  canUse,
+  recommended = false,
+}: TemplateCardProps) {
+  const setupLevel = getTemplateSetupLevel(template);
+  const runtimeInputCount = getTemplateRuntimeInputCount(template);
+  const producesArtifact = templateProducesArtifact(template);
+  const liveVerified = isLiveVerifiedTemplate(template);
 
   return (
     <article
-      role="button"
-      tabIndex={0}
-      aria-label={`View ${toTitleCase(template.name)} template details`}
-      onClick={() => onPreview(template)}
-      onKeyDown={handleCardKeyDown}
       className={cn(
-        'group flex flex-col rounded-2xl cursor-pointer',
+        'group flex flex-col rounded-2xl',
         'bg-card dark:bg-zinc-900',
         'border border-border',
         'shadow-sm',
         'transition-colors duration-200 ease-out',
         'hover:bg-muted/30 hover:border-border/80',
         'dark:hover:border-white/10',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       )}
     >
       <div className="flex flex-1 flex-col gap-4 p-4">
-        {noSetup && (
-          <span
-            className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
-            title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
-          >
-            <Zap className="h-3 w-3" />
-            No setup required
-          </span>
-        )}
+        <div
+          className="flex min-h-6 flex-wrap items-center gap-1.5"
+          aria-label="Template readiness"
+        >
+          {recommended && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+              <Sparkles className="h-3 w-3" />
+              Recommended starter
+            </span>
+          )}
+          {liveVerified && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-300">
+              <CheckCircle2 className="h-3 w-3" />
+              Live verified
+            </span>
+          )}
+          {setupLevel === 'no-setup' ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300"
+              title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
+            >
+              <Zap className="h-3 w-3" />
+              No setup required
+            </span>
+          ) : setupLevel === 'needs-secrets' ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+              <KeyRound className="h-3 w-3" />
+              {template.requiredSecrets.length} stored secret
+              {template.requiredSecrets.length === 1 ? '' : 's'}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <Wrench className="h-3 w-3" />
+              Local tools required
+            </span>
+          )}
+        </div>
 
         <PreviewSection
           graph={template.graph}
@@ -122,11 +152,16 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
         />
 
         <div>
-          <h3
-            className="text-lg font-semibold leading-tight text-foreground line-clamp-1"
-            title={template.name}
-          >
-            {toTitleCase(template.name)}
+          <h3 className="text-lg font-semibold leading-tight">
+            <button
+              type="button"
+              aria-label={`View ${toTitleCase(template.name)} template details`}
+              onClick={() => onPreview(template)}
+              className="line-clamp-1 text-left text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              title={template.name}
+            >
+              {toTitleCase(template.name)}
+            </button>
           </h3>
 
           {template.description && (
@@ -138,6 +173,23 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
             </p>
           )}
         </div>
+
+        {(runtimeInputCount > 0 || producesArtifact) && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {runtimeInputCount > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <SlidersHorizontal className="h-3 w-3" />
+                {runtimeInputCount} run input{runtimeInputCount === 1 ? '' : 's'}
+              </span>
+            )}
+            {producesArtifact && (
+              <span className="inline-flex items-center gap-1">
+                <FileOutput className="h-3 w-3" />
+                Creates a report
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="flex-1" />
 
@@ -154,7 +206,7 @@ export function TemplateCard({ template, onUse, onPreview, canUse }: TemplateCar
           }}
           disabled={!canUse}
         >
-          Use Template
+          Configure &amp; Run
           <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
         </Button>
       </div>

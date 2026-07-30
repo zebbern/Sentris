@@ -944,7 +944,7 @@ describe('WorkflowsService', () => {
     expect(updated.currentVersion).toBe(1);
   });
 
-  it('validates the graph on update and throws on invalid graph', async () => {
+  it('saves an incomplete graph as a draft for later configuration', async () => {
     const invalidGraph = WorkflowGraphSchema.parse({
       name: 'Bad workflow',
       nodes: [
@@ -967,7 +967,9 @@ describe('WorkflowsService', () => {
       viewport: { x: 0, y: 0, zoom: 1 },
     });
 
-    await expect(service.update('workflow-id', invalidGraph, authContext)).rejects.toThrow();
+    await expect(service.update('workflow-id', invalidGraph, authContext)).resolves.toMatchObject({
+      id: 'workflow-id',
+    });
   });
 
   // ── delete ─────────────────────────────────────────────────────────────────

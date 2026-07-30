@@ -2,6 +2,7 @@ import { describe, it, expect, mock, afterEach, beforeEach } from 'bun:test';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { createDialogMock } from '@/test/mocks/dialog';
 import type { Template } from '@/types/templates';
+import { MemoryRouter } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // Module mocks (BEFORE import)
@@ -11,11 +12,35 @@ mock.module('@/components/ui/dialog', createDialogMock);
 
 const mockMutateAsync = mock(() => Promise.resolve({ workflowId: 'wf-new-123' }));
 let mockIsPending = false;
+let mockSecrets = [
+  {
+    id: 'secret-api',
+    name: 'Scanner API key',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+  },
+  {
+    id: 'secret-db',
+    name: 'Database password',
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+  },
+];
+let mockSecretsLoading = false;
+let mockSecretsError: Error | null = null;
 
 mock.module('@/hooks/queries/useTemplateQueries', () => ({
   useUseTemplate: () => ({
     mutateAsync: mockMutateAsync,
     isPending: mockIsPending,
+  }),
+}));
+
+mock.module('@/hooks/queries/useSecretQueries', () => ({
+  useSecrets: () => ({
+    data: mockSecrets,
+    isLoading: mockSecretsLoading,
+    error: mockSecretsError,
   }),
 }));
 
@@ -64,7 +89,11 @@ function renderModal(
   };
 
   return {
-    ...render(<UseTemplateModal {...defaultProps} />),
+    ...render(
+      <MemoryRouter>
+        <UseTemplateModal {...defaultProps} />
+      </MemoryRouter>,
+    ),
     props: defaultProps,
   };
 }
@@ -78,6 +107,22 @@ describe('UseTemplateModal', () => {
     mockMutateAsync.mockReset();
     mockMutateAsync.mockImplementation(() => Promise.resolve({ workflowId: 'wf-new-123' }));
     mockIsPending = false;
+    mockSecrets = [
+      {
+        id: 'secret-api',
+        name: 'Scanner API key',
+        createdAt: '2025-01-01T00:00:00Z',
+        updatedAt: '2025-01-01T00:00:00Z',
+      },
+      {
+        id: 'secret-db',
+        name: 'Database password',
+        createdAt: '2025-01-01T00:00:00Z',
+        updatedAt: '2025-01-01T00:00:00Z',
+      },
+    ];
+    mockSecretsLoading = false;
+    mockSecretsError = null;
   });
 
   afterEach(() => {
@@ -87,14 +132,14 @@ describe('UseTemplateModal', () => {
   it('renders dialog with template name in title', () => {
     renderModal({ name: 'My Template' });
 
-    expect(screen.getByText(/Use Template: My Template/)).toBeTruthy();
+    expect(screen.getByText(/Configure & Run: My Template/)).toBeTruthy();
   });
 
-  it('name input is pre-filled with "{template.name} - Copy"', () => {
+  it('name input is pre-filled with the template name', () => {
     renderModal({ name: 'Security Scan' });
 
     const input = screen.getByLabelText('Workflow Name') as HTMLInputElement;
-    expect(input.value).toBe('Security Scan - Copy');
+    expect(input.value).toBe('Security Scan');
   });
 
   it('renders category and description info', () => {
@@ -138,7 +183,7 @@ describe('UseTemplateModal', () => {
     const onSuccess = mock(() => {});
     renderModal({ requiredSecrets: [] }, { onSuccess });
 
-    fireEvent.click(screen.getByText('Create Workflow'));
+    fireEvent.click(screen.getByText('Create & Run'));
 
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
@@ -151,7 +196,7 @@ describe('UseTemplateModal', () => {
 
     renderModal({ requiredSecrets: [] }, { onSuccess });
 
-    fireEvent.click(screen.getByText('Create Workflow'));
+    fireEvent.click(screen.getByText('Create & Run'));
 
     await waitFor(() => {
       expect(onSuccess).toHaveBeenCalledWith('wf-created-456');
@@ -165,7 +210,7 @@ describe('UseTemplateModal', () => {
     const input = screen.getByLabelText('Workflow Name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '' } });
 
-    fireEvent.click(screen.getByText('Create Workflow'));
+    fireEvent.click(screen.getByText('Create & Run'));
 
     await waitFor(() => {
       expect(screen.getByText('Please enter a workflow name')).toBeTruthy();
@@ -177,11 +222,44 @@ describe('UseTemplateModal', () => {
       requiredSecrets: [{ name: 'API_KEY', type: 'string' }],
     });
 
-    fireEvent.click(screen.getByText('Create Workflow'));
+    fireEvent.click(screen.getByText('Create & Run'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Please provide values for all required secrets/)).toBeTruthy();
+      expect(screen.getByText(/for each required credential/)).toBeTruthy();
     });
+  });
+
+  it('sends stored secret IDs rather than raw credential values', async () => {
+    renderModal({
+      requiredSecrets: [{ name: 'API_KEY', type: 'string' }],
+    });
+
+    fireEvent.change(screen.getByLabelText('API_KEY'), {
+      target: { value: 'secret-api' },
+    });
+    fireEvent.click(screen.getByText('Create & Run'));
+
+    await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledWith({
+        templateId: 'tpl-1',
+        workflowName: 'Security Scan Template',
+        secretMappings: { API_KEY: 'secret-api' },
+      });
+    });
+  });
+
+  it('links to secret settings and prevents creation when no secrets exist', () => {
+    mockSecrets = [];
+    renderModal({
+      requiredSecrets: [{ name: 'API_KEY', type: 'string' }],
+    });
+
+    expect(screen.getByText('No stored secrets are available.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Open secret settings' })).toHaveAttribute(
+      'href',
+      '/secrets',
+    );
+    expect(screen.getByRole('button', { name: 'Create & Run' })).toBeDisabled();
   });
 
   it('shows error state when mutation fails', async () => {
@@ -189,7 +267,7 @@ describe('UseTemplateModal', () => {
 
     renderModal({ requiredSecrets: [] });
 
-    fireEvent.click(screen.getByText('Create Workflow'));
+    fireEvent.click(screen.getByText('Create & Run'));
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeTruthy();
@@ -199,6 +277,6 @@ describe('UseTemplateModal', () => {
   it('does not render when open is false', () => {
     renderModal({}, { open: false });
 
-    expect(screen.queryByText(/Use Template/)).toBeNull();
+    expect(screen.queryByText(/Configure & Run/)).toBeNull();
   });
 });

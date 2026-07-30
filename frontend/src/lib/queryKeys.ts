@@ -76,6 +76,8 @@ export const queryKeys = {
     library: (filters?: Record<string, unknown>) =>
       ['artifactLibrary', getOrgScope(), filters] as const,
     byRun: (runId: string) => ['runArtifacts', getOrgScope(), runId] as const,
+    preview: (runId: string, artifactId: string) =>
+      ['runArtifactPreview', getOrgScope(), runId, artifactId] as const,
   },
   humanInputs: {
     root: () => ['humanInputs', getOrgScope()] as const,

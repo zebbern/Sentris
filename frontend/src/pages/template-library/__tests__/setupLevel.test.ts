@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getTemplateSetupLevel, isNoSetupTemplate } from '../setupLevel';
+import {
+  compareTemplatesForActivation,
+  getTemplateRuntimeInputCount,
+  getTemplateSetupLevel,
+  isLiveVerifiedTemplate,
+  isNoSetupTemplate,
+  isRecommendedTemplate,
+  templateProducesArtifact,
+} from '../setupLevel';
 
 // Repo root's backend/scripts/seed-templates/, resolved relative to this test file
 // (frontend/src/pages/template-library/__tests__/).
@@ -93,5 +101,65 @@ describe('getTemplateSetupLevel', () => {
       const nodeTypes = loadSeedNodeTypes('subdomain-takeover-triage.json');
       expect(getTemplateSetupLevel(tpl(nodeTypes))).toBe('needs-tooling');
     });
+  });
+});
+
+describe('template activation metadata', () => {
+  const base = {
+    graph: {
+      nodes: [
+        {
+          id: 'entry',
+          type: 'core.workflow.entrypoint',
+          data: {
+            config: {
+              params: {
+                runtimeInputs: [{ id: 'target' }, { id: 'notes' }],
+              },
+            },
+          },
+        },
+        { id: 'report', type: 'core.artifact.writer' },
+      ],
+    },
+    requiredSecrets: [],
+    isOfficial: true,
+    isVerified: true,
+    popularity: 0,
+    validation: {
+      status: 'live-verified' as const,
+      recommendation: 'keep' as const,
+      rationale: 'Passed a live run.',
+      isCurrent: true,
+    },
+  };
+
+  it('extracts run-input and artifact signals from the graph', () => {
+    expect(getTemplateRuntimeInputCount(base)).toBe(2);
+    expect(templateProducesArtifact(base)).toBe(true);
+  });
+
+  it('only treats current live verification as live verified', () => {
+    expect(isLiveVerifiedTemplate(base)).toBe(true);
+    expect(
+      isLiveVerifiedTemplate({
+        validation: { ...base.validation, isCurrent: false },
+      }),
+    ).toBe(false);
+  });
+
+  it('recommends official, verified, no-setup templates', () => {
+    expect(isRecommendedTemplate(base)).toBe(true);
+    expect(isRecommendedTemplate({ ...base, isOfficial: false })).toBe(false);
+  });
+
+  it('orders a proven no-setup starter ahead of a tooling-heavy template', () => {
+    const needsTooling = {
+      ...base,
+      graph: { nodes: [{ id: 'scanner', type: 'sentris.nuclei.scan' }] },
+      popularity: 10_000,
+    };
+
+    expect(compareTemplatesForActivation(base, needsTooling)).toBeLessThan(0);
   });
 });

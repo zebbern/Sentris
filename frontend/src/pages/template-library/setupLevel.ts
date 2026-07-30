@@ -26,12 +26,22 @@ export const NET_ONLY_COMPONENT_TYPES: ReadonlySet<string> = new Set<string>([
 export type SetupLevel = 'no-setup' | 'needs-secrets' | 'needs-tooling';
 
 type Classifiable = Pick<Template, 'graph' | 'requiredSecrets'>;
+type Rankable = Pick<
+  Template,
+  'graph' | 'requiredSecrets' | 'isOfficial' | 'isVerified' | 'popularity' | 'validation'
+>;
 
-function nodeTypes(graph: Template['graph']): (string | undefined)[] {
+function graphNodes(graph: Template['graph']): Record<string, unknown>[] {
   if (!graph || typeof graph !== 'object') return [];
   const nodes = (graph as { nodes?: unknown }).nodes;
   if (!Array.isArray(nodes)) return [];
-  return nodes
+  return nodes.filter(
+    (node): node is Record<string, unknown> => Boolean(node) && typeof node === 'object',
+  );
+}
+
+function nodeTypes(graph: Template['graph']): (string | undefined)[] {
+  return graphNodes(graph)
     .map((n) => (n && typeof n === 'object' ? (n as { type?: unknown }).type : undefined))
     .map((t) => (typeof t === 'string' ? t : undefined));
 }
@@ -54,4 +64,55 @@ export function getTemplateSetupLevel(template: Classifiable): SetupLevel {
 
 export function isNoSetupTemplate(template: Classifiable): boolean {
   return getTemplateSetupLevel(template) === 'no-setup';
+}
+
+export function isLiveVerifiedTemplate(template: Pick<Template, 'validation'>): boolean {
+  return template.validation?.status === 'live-verified' && template.validation.isCurrent === true;
+}
+
+export function getTemplateRuntimeInputCount(template: Pick<Template, 'graph'>): number {
+  for (const node of graphNodes(template.graph)) {
+    if (node.type !== 'core.workflow.entrypoint') continue;
+    const data = node.data;
+    if (!data || typeof data !== 'object') continue;
+    const config = (data as { config?: unknown }).config;
+    if (!config || typeof config !== 'object') continue;
+    const params = (config as { params?: unknown }).params;
+    if (!params || typeof params !== 'object') continue;
+    const runtimeInputs = (params as { runtimeInputs?: unknown }).runtimeInputs;
+    if (Array.isArray(runtimeInputs)) return runtimeInputs.length;
+  }
+  return 0;
+}
+
+export function templateProducesArtifact(template: Pick<Template, 'graph'>): boolean {
+  return nodeTypes(template.graph).includes('core.artifact.writer');
+}
+
+export function isRecommendedTemplate(template: Rankable): boolean {
+  return (
+    getTemplateSetupLevel(template) === 'no-setup' &&
+    template.isOfficial &&
+    (template.validation ? isLiveVerifiedTemplate(template) : template.isVerified)
+  );
+}
+
+/**
+ * Put low-friction, proven templates first for users who have not chosen a
+ * filter or their own manual card order.
+ */
+export function compareTemplatesForActivation(a: Rankable, b: Rankable): number {
+  const score = (template: Rankable) => {
+    let result = 0;
+    if (isRecommendedTemplate(template)) result += 1_000;
+    if (getTemplateSetupLevel(template) === 'no-setup') result += 400;
+    if (isLiveVerifiedTemplate(template)) result += 200;
+    if (template.isOfficial) result += 100;
+    if (templateProducesArtifact(template)) result += 50;
+    result += Math.max(0, 40 - getTemplateRuntimeInputCount(template) * 5);
+    result += Math.min(template.popularity, 49);
+    return result;
+  };
+
+  return score(b) - score(a);
 }

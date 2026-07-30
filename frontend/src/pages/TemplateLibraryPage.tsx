@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Layers } from 'lucide-react';
+import { Layers, Sparkles } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,9 @@ import {
   CardSkeleton,
   TemplateDetailModal,
   TemplateFilters,
+  compareTemplatesForActivation,
   isNoSetupTemplate,
+  isRecommendedTemplate,
 } from './template-library';
 
 export function TemplateLibraryPage() {
@@ -55,6 +57,20 @@ export function TemplateLibraryPage() {
   const visibleTemplates = useMemo(
     () => (showNoSetupOnly ? templates.filter(isNoSetupTemplate) : templates),
     [templates, showNoSetupOnly],
+  );
+  const activationOrderedTemplates = useMemo(
+    () => [...visibleTemplates].sort(compareTemplatesForActivation),
+    [visibleTemplates],
+  );
+  const recommendedTemplateIds = useMemo(
+    () =>
+      new Set(
+        activationOrderedTemplates
+          .filter(isRecommendedTemplate)
+          .slice(0, 3)
+          .map((template) => template.id),
+      ),
+    [activationOrderedTemplates],
   );
   const { data: categoriesRaw = [] } = useTemplateCategories();
   const { data: tags = [] } = useTemplateTags();
@@ -125,7 +141,7 @@ export function TemplateLibraryPage() {
   const handleTemplateUseSuccess = (workflowId: string) => {
     setIsUseModalOpen(false);
     setSelectedTemplate(null);
-    navigate(`/workflows/${workflowId}`);
+    navigate(`/workflows/${workflowId}?launch=1`);
   };
 
   const isSyncing = syncMutation.isPending;
@@ -144,7 +160,7 @@ export function TemplateLibraryPage() {
     handleDragEnd,
     isDragDisabled,
   } = useSortableList({
-    items: visibleTemplates,
+    items: activationOrderedTemplates,
     getId: getTemplateId,
     storageKey: `sentris:sort:templates:${organizationId}`,
     disabled: hasFilters,
@@ -217,43 +233,58 @@ export function TemplateLibraryPage() {
             }
           />
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={collisionDetection}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={orderedTemplates.map((t) => t.id)}
-              strategy={rectSortingStrategy}
-            >
-              <div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                role="region"
-                aria-label="Template list"
-              >
-                {orderedTemplates.map((template) => (
-                  <SortableCard
-                    key={template.id}
-                    id={template.id}
-                    disabled={isDragDisabled}
-                    className="group relative"
-                  >
-                    {({ handleProps }) => (
-                      <>
-                        <CardDragHandle {...handleProps} disabled={isDragDisabled} />
-                        <TemplateCard
-                          template={template}
-                          onUse={handleUseTemplate}
-                          onPreview={setPreviewTemplate}
-                          canUse={canManageWorkflows}
-                        />
-                      </>
-                    )}
-                  </SortableCard>
-                ))}
+          <>
+            {!hasFilters && recommendedTemplateIds.size > 0 && (
+              <div className="mb-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                <div>
+                  <h2 className="text-sm font-semibold">Start here</h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Recommended starters run with minimal setup and have been verified by Sentris.
+                  </p>
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
+            )}
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={collisionDetection}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedTemplates.map((t) => t.id)}
+                strategy={rectSortingStrategy}
+              >
+                <div
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                  role="region"
+                  aria-label="Template list"
+                >
+                  {orderedTemplates.map((template) => (
+                    <SortableCard
+                      key={template.id}
+                      id={template.id}
+                      disabled={isDragDisabled}
+                      className="group relative"
+                    >
+                      {({ handleProps }) => (
+                        <>
+                          <CardDragHandle {...handleProps} disabled={isDragDisabled} />
+                          <TemplateCard
+                            template={template}
+                            onUse={handleUseTemplate}
+                            onPreview={setPreviewTemplate}
+                            canUse={canManageWorkflows}
+                            recommended={recommendedTemplateIds.has(template.id)}
+                          />
+                        </>
+                      )}
+                    </SortableCard>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </>
         )}
       </div>
 

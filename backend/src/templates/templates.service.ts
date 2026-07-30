@@ -292,11 +292,7 @@ export class TemplateService {
       `Creating workflow "${params.workflowName}" from template "${template.name}" (${templateId})`,
     );
 
-    // Skip validation: templates are blueprints with unfilled required inputs
-    // that users configure after creation
-    const workflow = await this.workflowsService.create(workflowGraph, authContext, {
-      skipValidation: true,
-    });
+    const workflow = await this.workflowsService.create(workflowGraph, authContext);
 
     // 5. Increment the template's popularity counter
     await this.templatesRepository.incrementPopularity(templateId);

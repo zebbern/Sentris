@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ExecutionInspector } from '@/components/timeline/ExecutionInspector';
@@ -13,10 +13,13 @@ import { WorkflowDesignerPane } from '@/features/workflow-builder/components/Wor
 import { WorkflowExecutionPane } from '@/features/workflow-builder/components/WorkflowExecutionPane';
 import { WorkflowBuilderToolbar } from '@/features/workflow-builder/components/WorkflowBuilderToolbar';
 import { HistoryDebugger } from '@/features/workflow-builder/components/HistoryDebugger';
+import { NewWorkflowWelcome } from '@/features/workflow-builder/components/NewWorkflowWelcome';
 import { useWorkflowBuilderState } from '@/features/workflow-builder/hooks/useWorkflowBuilderState';
+import { isEntryPointNode } from '@/utils/entryPointUtils';
 
 const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
   const state = useWorkflowBuilderState();
+  const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(false);
 
   if (state.shouldShowInitialLoader) {
     return (
@@ -53,8 +56,15 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
     />
   );
 
+  const shouldShowWelcome =
+    state.isNewWorkflow &&
+    state.mode === 'design' &&
+    !isWelcomeDismissed &&
+    state.nodes.length <= 1 &&
+    state.nodes.every(isEntryPointNode);
+
   const designerCanvas = (
-    <>
+    <div className="relative h-full flex-1">
       <WorkflowDesignerPane
         workflowId={state.workflowId}
         workflowName={state.workflowName}
@@ -68,8 +78,9 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
         showSummary={state.mode === 'design'}
         onNavigateToSchedules={state.navigateToSchedules}
       />
+      {shouldShowWelcome && <NewWorkflowWelcome onDismiss={() => setIsWelcomeDismissed(true)} />}
       {state.mode === 'design' && state.showDemoComponents && <HistoryDebugger />}
-    </>
+    </div>
   );
 
   const executionCanvas = (

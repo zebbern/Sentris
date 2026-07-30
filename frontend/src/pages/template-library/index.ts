@@ -11,4 +11,13 @@ export type { TemplateDetailModalProps } from './TemplateDetailModal';
 export type { TemplateFiltersProps } from './TemplateFilters';
 export type { SetupLevel } from './setupLevel';
 export { CATEGORY_STYLES, getCategoryStyle, hasGraphNodes, toTitleCase } from './types';
-export { NET_ONLY_COMPONENT_TYPES, getTemplateSetupLevel, isNoSetupTemplate } from './setupLevel';
+export {
+  NET_ONLY_COMPONENT_TYPES,
+  compareTemplatesForActivation,
+  getTemplateRuntimeInputCount,
+  getTemplateSetupLevel,
+  isLiveVerifiedTemplate,
+  isNoSetupTemplate,
+  isRecommendedTemplate,
+  templateProducesArtifact,
+} from './setupLevel';

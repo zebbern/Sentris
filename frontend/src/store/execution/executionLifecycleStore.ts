@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { TERMINAL_STATUSES } from '@sentris/shared';
 import { api } from '@/services/api';
 import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
 import { logger } from '@/lib/logger';
 import { executionStatusOptions, executionTraceOptions } from '@/lib/executionQueryOptions';
 import { invalidateRunsForWorkflow } from '@/hooks/queries/useRunQueries';
@@ -164,6 +165,10 @@ export const useExecutionLifecycleStore = create<ExecutionLifecycleStore>((set, 
       logger.error('Failed to stop execution:', error);
       get().stopPolling();
       set({ status: 'cancelled' });
+    } finally {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.artifacts.byRun(runId),
+      });
     }
   },
 
@@ -245,6 +250,9 @@ export const useExecutionLifecycleStore = create<ExecutionLifecycleStore>((set, 
 
       const status = (statusPayload as ExecutionStatusResponse).status;
       if (status && TERMINAL_STATUSES.includes(status)) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.artifacts.byRun(runId),
+        });
         get().stopPolling();
         const currentWorkflowId = get().workflowId;
         if (currentWorkflowId) {

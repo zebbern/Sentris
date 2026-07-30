@@ -1,5 +1,7 @@
 import { TERMINAL_STATUSES } from '@sentris/shared';
 import { logger } from '@/lib/logger';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/lib/queryKeys';
 import {
   ExecutionStatusResponseSchema,
   type ExecutionLog,
@@ -103,6 +105,9 @@ export const createStatusHandler =
         };
       });
       if (TERMINAL_STATUSES.includes(statusPayload.status)) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.artifacts.byRun(runId),
+        });
         get().stopPolling();
       }
     } catch (error: unknown) {

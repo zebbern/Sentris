@@ -308,11 +308,11 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getAllByText('compliance').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders "Use Template" buttons for each template', () => {
+  it('renders "Configure & Run" buttons for each template', () => {
     setupStore();
     renderPage();
 
-    const useButtons = screen.getAllByRole('button', { name: /Use Template/i });
+    const useButtons = screen.getAllByRole('button', { name: /Configure & Run/i });
     expect(useButtons.length).toBe(2);
   });
 
@@ -374,7 +374,7 @@ describe('TemplateLibraryPage', () => {
     renderPage();
 
     // templateA has 1 required secret
-    expect(screen.getByText('1 secret')).toBeInTheDocument();
+    expect(screen.getByText('1 stored secret')).toBeInTheDocument();
   });
 
   it('renders author initials avatar', () => {
@@ -394,7 +394,7 @@ describe('TemplateLibraryPage', () => {
     expect(updatedTexts.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('does not render validation badges or revalidation controls', () => {
+  it('surfaces current live verification without admin revalidation controls', () => {
     setupStore({
       templates: [
         {
@@ -414,11 +414,47 @@ describe('TemplateLibraryPage', () => {
 
     renderPage();
 
-    expect(screen.queryByText('Live verified')).not.toBeInTheDocument();
+    expect(screen.getByText('Live verified')).toBeInTheDocument();
     expect(screen.queryByText('Validation stale')).not.toBeInTheDocument();
     expect(screen.queryByText('Revalidate')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Filter by validation')).not.toBeInTheDocument();
     expect(screen.queryByText('Recent revalidations')).not.toBeInTheDocument();
+  });
+
+  it('puts a verified no-setup template in the Start here position', () => {
+    const starter: Template = {
+      ...templateB,
+      id: 'starter',
+      name: 'quick dependency check',
+      isOfficial: true,
+      isVerified: true,
+      graph: {
+        nodes: [
+          { id: 'entry', type: 'core.workflow.entrypoint' },
+          { id: 'lookup', type: 'sentris.osv.query' },
+          { id: 'report', type: 'core.artifact.writer' },
+        ],
+      },
+      validation: {
+        status: 'live-verified',
+        recommendation: 'keep',
+        terminalStatus: 'COMPLETED',
+        artifactsCount: 1,
+        verifiedAt: '2026-06-21T07:15:23.121Z',
+        rationale: 'Live execution completed and produced an artifact.',
+        isCurrent: true,
+      },
+    };
+    setupStore({ templates: [templateA, starter] });
+
+    renderPage();
+
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument();
+    expect(screen.getByText('Recommended starter')).toBeInTheDocument();
+    const detailsButtons = screen.getAllByRole('button', {
+      name: /template details/i,
+    });
+    expect(detailsButtons[0]).toHaveTextContent('Quick Dependency Check');
   });
 
   it('opens the preview modal when a template card is clicked', () => {
@@ -435,11 +471,11 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Network Recon Scan');
   });
 
-  it('does not open preview when Use Template is clicked', () => {
+  it('does not open preview when Configure & Run is clicked', () => {
     setupStore({ templates: [templateA] });
     renderPage();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Use Template/i })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: /Configure & Run/i })[0]!);
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -448,7 +484,7 @@ describe('TemplateLibraryPage', () => {
     setupStore({ templates: [templateA] });
     renderPage();
 
-    const useTemplateButtons = screen.getAllByRole('button', { name: /Use Template/i });
+    const useTemplateButtons = screen.getAllByRole('button', { name: /Configure & Run/i });
     expect(useTemplateButtons.length).toBe(1);
     expect(screen.queryByLabelText(/^Preview network recon scan$/i)).not.toBeInTheDocument();
   });

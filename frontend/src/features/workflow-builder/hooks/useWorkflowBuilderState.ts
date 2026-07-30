@@ -333,8 +333,12 @@ export function useWorkflowBuilderState() {
 
   useScopedWorkflowLaunch({
     requested: launchRequested,
-    ready: !isLoading && !isNewWorkflow && Boolean(metadata.id),
-    requestKey: metadata.id && requestedScopeId ? `${metadata.id}:${requestedScopeId}` : null,
+    ready: !isLoading && !isNewWorkflow && Boolean(id && metadata.id === id),
+    requestKey: metadata.id
+      ? requestedScopeId
+        ? `${metadata.id}:${requestedScopeId}`
+        : metadata.id
+      : null,
     onConsume: consumeScopedLaunch,
     onLaunch: handleRun,
   });

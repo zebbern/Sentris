@@ -46,15 +46,15 @@ describe('OnboardingChecklist', () => {
   it('renders all three checklist items', () => {
     renderWithProviders(<OnboardingChecklist {...defaultProps} />);
     expect(screen.getByText('Create your first workflow')).toBeTruthy();
-    expect(screen.getByText('Add a component to your workflow')).toBeTruthy();
+    expect(screen.getByText('Explore the visual builder')).toBeTruthy();
     expect(screen.getByText('Run a workflow')).toBeTruthy();
   });
 
-  it('shows "Create your first workflow" as a link to /workflows/new', () => {
+  it('sends the first-workflow action to no-setup templates', () => {
     renderWithProviders(<OnboardingChecklist {...defaultProps} />);
     const link = screen.getByLabelText('Create your first workflow');
     expect(link.tagName).toBe('A');
-    expect(link.getAttribute('href')).toBe('/workflows/new');
+    expect(link.getAttribute('href')).toBe('/templates?setup=none');
   });
 
   it('links the "Run a workflow" step to the no-setup template library', () => {
@@ -63,9 +63,9 @@ describe('OnboardingChecklist', () => {
     expect(link.getAttribute('href')).toBe('/templates?setup=none');
   });
 
-  it('links the "Add a component" step to the workflow builder', () => {
+  it('keeps the build-from-scratch workflow builder discoverable', () => {
     renderWithProviders(<OnboardingChecklist {...defaultProps} />);
-    const link = screen.getByRole('link', { name: 'Add a component to your workflow' });
+    const link = screen.getByRole('link', { name: 'Explore the visual builder' });
     expect(link.getAttribute('href')).toBe('/workflows/new');
   });
 
@@ -78,7 +78,7 @@ describe('OnboardingChecklist', () => {
     expect(screen.getByText('1 of 3 completed')).toBeTruthy();
   });
 
-  it('marks "Add a component" as complete when hasWorkflowWithNodes is true', () => {
+  it('marks the builder step complete when a workflow has nodes', () => {
     renderWithProviders(
       <OnboardingChecklist {...defaultProps} totalWorkflows={1} hasWorkflowWithNodes={true} />,
     );
