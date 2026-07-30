@@ -4845,6 +4845,42 @@ describe('new seed templates', () => {
     expect(unavailable.report.warnings.join(' ')).toContain('no usable DNS evidence');
   });
 
+  it('domain-email-authentication-posture does not infer missing records for a valid domain when DNS is unavailable', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+    const unavailable = runTemplateScript<{
+      report: {
+        findings: { title: string }[];
+        warnings: string[];
+        sourceStatuses: {
+          rootTxt: { usable: boolean };
+          dmarcTxt: { usable: boolean };
+          mx: { usable: boolean };
+        };
+      };
+    }>(assembleNode.data.config.params.code, {
+      domain: 'example.com',
+      validDomain: true,
+      rootStatus: 503,
+      rootStatusText: 'Service Unavailable',
+      dmarcStatus: 503,
+      dmarcStatusText: 'Service Unavailable',
+      mxStatus: 503,
+      mxStatusText: 'Service Unavailable',
+    });
+
+    expect(unavailable.report.sourceStatuses).toEqual({
+      rootTxt: expect.objectContaining({ usable: false }),
+      dmarcTxt: expect.objectContaining({ usable: false }),
+      mx: expect.objectContaining({ usable: false }),
+    });
+    expect(unavailable.report.findings).toEqual([]);
+    expect(unavailable.report.warnings.join(' ')).toContain('no usable DNS evidence');
+  });
+
   it('oidc-discovery-configuration-review does not infer metadata findings from unavailable or invalid inputs', () => {
     const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
     const template = JSON.parse(readFileSync(filePath, 'utf8'));
