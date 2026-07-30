@@ -17,6 +17,7 @@ const newTemplateFiles = [
   'cors-auth-edge-misconfig-triage.json',
   'cve-impact-research-brief.json',
   'cve-novelty-duplicate-gate.json',
+  'domain-email-authentication-posture.json',
   'exposed-service-cve-mapper.json',
   'exposure-to-cve-brief.json',
   'github-actions-supply-chain-triage.json',
@@ -27,6 +28,7 @@ const newTemplateFiles = [
   'mitre-cve-record-builder.json',
   'npm-cve-hunt-pipeline.json',
   'npm-dependency-cve-hunt.json',
+  'oidc-discovery-configuration-review.json',
   'oss-sast-cve-candidate-hunt.json',
   'passive-osint-subdomain-expansion.json',
   'public-repo-code-iac-risk-triage.json',
@@ -4722,5 +4724,81 @@ describe('new seed templates', () => {
         'Web Attack Surface Quick Win Hunt',
       ]),
     );
+  });
+
+  it('domain-email-authentication-posture reviews public DNS records without secrets', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual(
+      expect.arrayContaining([
+        'core.workflow.entrypoint',
+        'core.logic.script',
+        'core.http.request',
+        'core.artifact.writer',
+      ]),
+    );
+
+    const result = runTemplateScript<{
+      report: { summary: { findings: number }; warnings: unknown[]; nextSteps: unknown[] };
+    }>(assembleNode.data.config.params.code, {
+      domain: 'example.com',
+      validDomain: true,
+      authorizationNotes: 'test fixture',
+      rootData: { Answer: [{ type: 16, data: '"v=spf1 -all"' }] },
+      rootStatus: 200,
+      dmarcData: { Answer: [{ type: 16, data: '"v=DMARC1; p=none; pct=50"' }] },
+      dmarcStatus: 200,
+      mxData: { Answer: [] },
+      mxStatus: 200,
+    });
+
+    expect(result.report.summary.findings).toBeGreaterThanOrEqual(0);
+    expect(result.report.nextSteps.length).toBeGreaterThan(0);
+    expect(result.report.warnings).toEqual(expect.any(Array));
+  });
+
+  it('oidc-discovery-configuration-review evaluates public metadata without secrets', () => {
+    const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_oidc_review',
+    );
+
+    expect(template.requiredSecrets).toEqual([]);
+    expect(template.graph.nodes.map((node: { type: string }) => node.type)).toEqual(
+      expect.arrayContaining([
+        'core.workflow.entrypoint',
+        'core.logic.script',
+        'core.http.request',
+        'core.artifact.writer',
+      ]),
+    );
+
+    const result = runTemplateScript<{
+      report: { summary: { findings: number }; warnings: unknown[]; nextSteps: unknown[] };
+    }>(assembleNode.data.config.params.code, {
+      expectedIssuer: 'https://accounts.google.com',
+      validIssuer: true,
+      status: 200,
+      statusText: 'OK',
+      data: {
+        issuer: 'https://accounts.google.com',
+        authorization_endpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        token_endpoint: 'https://oauth2.googleapis.com/token',
+        jwks_uri: 'https://www.googleapis.com/oauth2/v3/certs',
+        code_challenge_methods_supported: ['S256'],
+        id_token_signing_alg_values_supported: ['RS256'],
+        response_types_supported: ['code'],
+      },
+    });
+
+    expect(result.report.summary.findings).toBeGreaterThanOrEqual(0);
+    expect(result.report.nextSteps.length).toBeGreaterThan(0);
+    expect(result.report.warnings).toEqual(expect.any(Array));
   });
 });

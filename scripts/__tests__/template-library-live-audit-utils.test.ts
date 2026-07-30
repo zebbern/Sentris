@@ -91,6 +91,14 @@ describe('template library live audit helpers', () => {
       yaraRules: 'rule SentrisFixtureIOC { strings: $a = "sentris-ioc-fixture" condition: $a }',
       authorizationNotes: 'Live audit fixture: benign payload for local YARA validation.',
     });
+    expect(inputs['Domain Email Authentication Posture']).toEqual({
+      domain: 'example.com',
+      authorizationNotes: 'Live audit fixture: public DNS records only.',
+    });
+    expect(inputs['OIDC Discovery Configuration Review']).toEqual({
+      issuerUrl: 'https://accounts.google.com',
+      authorizationNotes: 'Live audit fixture: public OIDC discovery metadata only.',
+    });
   });
 
   it('resolves audit secret mappings from explicit JSON and per-secret env variables', () => {

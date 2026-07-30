@@ -93,6 +93,10 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       authorizationNotes:
         'Live audit fixture: bounded public Nmap scanme target for non-destructive CORS header probing.',
     },
+    'Domain Email Authentication Posture': {
+      domain: 'example.com',
+      authorizationNotes: 'Live audit fixture: public DNS records only.',
+    },
     'Exposed Service CVE Mapper': {
       targets: ['scanme.nmap.org'],
       authorizationNotes:
@@ -214,6 +218,10 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       productName: 'NodeGoat',
       authorizationNotes:
         'Live audit fixture: intentionally vulnerable public Node.js training app for SAST CVE candidate review.',
+    },
+    'OIDC Discovery Configuration Review': {
+      issuerUrl: 'https://accounts.google.com',
+      authorizationNotes: 'Live audit fixture: public OIDC discovery metadata only.',
     },
     'Public Repo Full Code Security': {
       repositoryUrl: 'https://github.com/OWASP/NodeGoat',

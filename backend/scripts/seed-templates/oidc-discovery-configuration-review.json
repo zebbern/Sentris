@@ -1,0 +1,209 @@
+{
+  "_metadata": {
+    "name": "OIDC Discovery Configuration Review",
+    "description": "Reviews public OpenID Connect discovery metadata for evidence-backed configuration risks without authenticating or exercising endpoints.",
+    "category": "security-posture",
+    "tags": ["oidc", "openid-connect", "discovery", "identity", "configuration"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "OIDC Discovery Configuration Review",
+    "description": "Fetch public OIDC discovery metadata and highlight configuration signals that warrant validation.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "security-posture",
+    "tags": ["oidc", "openid-connect", "discovery", "identity", "configuration"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 5,
+    "edgeCount": 10
+  },
+  "graph": {
+    "name": "OIDC Discovery Configuration Review",
+    "description": "Public OIDC discovery metadata review.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 260 },
+        "data": {
+          "label": "OIDC Issuer Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "issuerUrl",
+                  "label": "OIDC issuer URL",
+                  "type": "text",
+                  "required": true,
+                  "description": "HTTPS issuer URL to review, for example https://accounts.google.com."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Optional scope or reporting context."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_discovery_request",
+        "type": "core.logic.script",
+        "position": { "x": 400, "y": 260 },
+        "data": {
+          "label": "Normalize Issuer and Build Discovery Request",
+          "config": {
+            "params": {
+              "variables": [{ "name": "issuerUrl", "type": "string" }],
+              "returns": [
+                { "name": "expectedIssuer", "type": "string" },
+                { "name": "validIssuer", "type": "boolean" },
+                { "name": "discoveryUrl", "type": "string" }
+              ],
+              "code": "export function script(input) {\n  const rawIssuer = String(input.issuerUrl || '').trim();\n  let issuer = '';\n  try {\n    const parsed = new URL(rawIssuer);\n    if (parsed.protocol === 'https:' && !parsed.username && !parsed.password) {\n      parsed.search = '';\n      parsed.hash = '';\n      parsed.pathname = parsed.pathname.replace(/\\/+$/, '');\n      issuer = parsed.toString().replace(/\\/$/, '');\n    }\n  } catch (_) {}\n  const validIssuer = Boolean(issuer);\n  const discoveryUrl = `${issuer || 'https://invalid.invalid'}/.well-known/openid-configuration`;\n  return { expectedIssuer: issuer, validIssuer, discoveryUrl };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_discovery",
+        "type": "core.http.request",
+        "position": { "x": 700, "y": 260 },
+        "data": {
+          "label": "Fetch OIDC Discovery Metadata",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 30000,
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "assemble_oidc_review",
+        "type": "core.logic.script",
+        "position": { "x": 1000, "y": 260 },
+        "data": {
+          "label": "Assemble OIDC Discovery Review",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "expectedIssuer", "type": "string" },
+                { "name": "validIssuer", "type": "boolean" },
+                { "name": "authorizationNotes", "type": "string" },
+                { "name": "status", "type": "number" },
+                { "name": "statusText", "type": "string" },
+                { "name": "data", "type": "json" },
+                { "name": "rawBody", "type": "string" }
+              ],
+              "returns": [{ "name": "report", "type": "json" }],
+              "code": "export function script(input) {\n  const warnings = [];\n  const findings = [];\n  const asArray = (value) => Array.isArray(value) ? value : [];\n  let metadata = input.data && typeof input.data === 'object' ? input.data : {};\n  if ((!metadata || Object.keys(metadata).length === 0) && typeof input.rawBody === 'string') {\n    try { metadata = JSON.parse(input.rawBody); } catch (_) { warnings.push('Discovery response body was not valid JSON.'); }\n  }\n  const status = Number(input.status || 0);\n  if (!input.validIssuer) warnings.push('The issuer URL must be an HTTPS URL; the request was routed to invalid.invalid.');\n  if (status < 200 || status >= 300) warnings.push(`OIDC discovery request unavailable: ${input.statusText || status || 'unknown error'}`);\n  if (metadata.issuer !== input.expectedIssuer) findings.push({ severity: 'high', title: 'Discovery issuer does not match the requested issuer', evidence: { expectedIssuer: input.expectedIssuer || null, advertisedIssuer: metadata.issuer || null } });\n  const insecureEndpoints = ['authorization_endpoint', 'token_endpoint', 'jwks_uri', 'userinfo_endpoint'].filter((key) => metadata[key] && !String(metadata[key]).startsWith('https://'));\n  if (insecureEndpoints.length > 0) findings.push({ severity: 'high', title: 'Discovery metadata advertises a non-HTTPS endpoint', evidence: { endpointKeys: insecureEndpoints } });\n  if (!asArray(metadata.code_challenge_methods_supported).includes('S256')) findings.push({ severity: 'medium', title: 'PKCE S256 is not advertised', evidence: { codeChallengeMethodsSupported: asArray(metadata.code_challenge_methods_supported) } });\n  if (asArray(metadata.id_token_signing_alg_values_supported).includes('none')) findings.push({ severity: 'high', title: 'Unsigned ID tokens are advertised', evidence: { idTokenSigningAlgorithms: asArray(metadata.id_token_signing_alg_values_supported) } });\n  if (asArray(metadata.response_types_supported).some((value) => /\\btoken\\b|\\bid_token\\s+token\\b|\\bcode\\s+id_token\\b/.test(String(value)))) findings.push({ severity: 'medium', title: 'Potentially higher-risk response type is advertised', evidence: { responseTypesSupported: asArray(metadata.response_types_supported) } });\n  return { report: { summary: { expectedIssuer: input.expectedIssuer || null, findings: findings.length, status }, findings, warnings, sourceStatus: { status, statusText: input.statusText || null, ok: status >= 200 && status < 300 }, metadata: { issuer: metadata.issuer || null, authorizationEndpoint: metadata.authorization_endpoint || null, tokenEndpoint: metadata.token_endpoint || null, jwksUri: metadata.jwks_uri || null, userinfoEndpoint: metadata.userinfo_endpoint || null, codeChallengeMethodsSupported: asArray(metadata.code_challenge_methods_supported), idTokenSigningAlgorithms: asArray(metadata.id_token_signing_alg_values_supported), responseTypesSupported: asArray(metadata.response_types_supported) }, authorizationNotes: input.authorizationNotes || null, note: 'Advertised capability does not prove enforcement; validate relevant behavior only within authorized scope.', nextSteps: ['Confirm issuer matching is enforced by every relying party', 'Require HTTPS for all discovery-advertised endpoints', 'Prefer authorization code flow with PKCE S256 and validate server-side enforcement', 'Reject unsigned ID tokens and restrict accepted signing algorithms', 'Review advertised response types against relying-party policy'] } };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": { "x": 1300, "y": 260 },
+        "data": {
+          "label": "Save OIDC Discovery Review",
+          "config": {
+            "params": {
+              "fileExtension": ".json",
+              "mimeType": "application/json",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": { "artifactName": "oidc-discovery-configuration-review-{{date}}" }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger-build-issuer",
+        "source": "trigger_1",
+        "target": "build_discovery_request",
+        "sourceHandle": "issuerUrl",
+        "targetHandle": "issuerUrl"
+      },
+      {
+        "id": "build-fetch-url",
+        "source": "build_discovery_request",
+        "target": "fetch_discovery",
+        "sourceHandle": "discoveryUrl",
+        "targetHandle": "url"
+      },
+      {
+        "id": "build-assemble-issuer",
+        "source": "build_discovery_request",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "expectedIssuer",
+        "targetHandle": "expectedIssuer"
+      },
+      {
+        "id": "build-assemble-valid",
+        "source": "build_discovery_request",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "validIssuer",
+        "targetHandle": "validIssuer"
+      },
+      {
+        "id": "trigger-assemble-notes",
+        "source": "trigger_1",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "fetch-assemble-status",
+        "source": "fetch_discovery",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "status",
+        "targetHandle": "status"
+      },
+      {
+        "id": "fetch-assemble-status-text",
+        "source": "fetch_discovery",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "statusText",
+        "targetHandle": "statusText"
+      },
+      {
+        "id": "fetch-assemble-data",
+        "source": "fetch_discovery",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "data",
+        "targetHandle": "data"
+      },
+      {
+        "id": "fetch-assemble-raw-body",
+        "source": "fetch_discovery",
+        "target": "assemble_oidc_review",
+        "sourceHandle": "rawBody",
+        "targetHandle": "rawBody"
+      },
+      {
+        "id": "assemble-artifact",
+        "source": "assemble_oidc_review",
+        "target": "artifact_report",
+        "sourceHandle": "report",
+        "targetHandle": "content"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}
