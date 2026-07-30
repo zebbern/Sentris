@@ -40,6 +40,11 @@ import {
   sanitizeClaudeCodeReport,
 } from './agent-runner-utils';
 import { AgentStreamRecorder } from './agent-stream-recorder';
+import {
+  AGENT_EXECUTION_PROFILE_OPTIONS,
+  DEFAULT_AGENT_EXECUTION_PROFILE,
+  getAgentExecutionProfileConfig,
+} from './agent-execution-profile';
 
 const AGENT_PLUGIN_OPTIONS = [
   { label: 'Oh My ClaudeCode', value: 'oh-my-claudecode' },
@@ -171,6 +176,18 @@ const parameterSchema = parameters({
         'When structured output is enabled, fail if any listed keys are missing or invalid (e.g. candidates must be a non-empty array).',
     },
   ),
+  executionProfile: param(
+    z
+      .enum(['fast', 'investigate', 'deep'])
+      .default(DEFAULT_AGENT_EXECUTION_PROFILE)
+      .describe('Execution budget for agent duration and container resources.'),
+    {
+      label: 'Execution Profile',
+      editor: 'select',
+      options: [...AGENT_EXECUTION_PROFILE_OPTIONS],
+      description: 'Choose fast, investigative, or deep autonomous execution capacity.',
+    },
+  ),
 });
 
 const outputSchema = outputs({
@@ -188,10 +205,17 @@ const outputSchema = outputs({
   }),
 });
 
-const CLAUDE_CODE_TIMEOUT_SECONDS = Number.parseInt(
-  process.env.CLAUDE_CODE_TIMEOUT_SECONDS ?? '7200',
-  10,
-);
+function getClaudeCodeTimeoutSeconds(profileTimeoutSeconds: number): number {
+  const configuredTimeout = process.env.CLAUDE_CODE_TIMEOUT_SECONDS;
+  if (configuredTimeout === undefined) {
+    return profileTimeoutSeconds;
+  }
+
+  const timeoutSeconds = Number.parseInt(configuredTimeout, 10);
+  return Number.isFinite(timeoutSeconds) && timeoutSeconds > 0
+    ? timeoutSeconds
+    : profileTimeoutSeconds;
+}
 const AGENT_TRACE_TEXT_CHUNK_SIZE = 16_000;
 const CLAUDE_FAILURE_TAIL_LENGTH = 2_000;
 
@@ -246,7 +270,8 @@ const definition = defineComponent({
     entrypoint: 'claude',
     network: 'bridge' as const,
     command: ['--help'],
-    timeoutSeconds: CLAUDE_CODE_TIMEOUT_SECONDS,
+    timeoutSeconds: getAgentExecutionProfileConfig(DEFAULT_AGENT_EXECUTION_PROFILE)
+      .runnerTimeoutSeconds,
   },
   inputs: inputSchema,
   outputs: outputSchema,
@@ -281,7 +306,9 @@ const definition = defineComponent({
       enablePlugins,
       structuredOutput,
       requiredOutputKeys,
+      executionProfile,
     } = params;
+    const profile = getAgentExecutionProfileConfig(executionProfile);
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
     const orgId = organizationId ?? context.organizationId ?? null;
@@ -359,6 +386,10 @@ const definition = defineComponent({
 
       const runnerConfig = {
         ...definition.runner,
+        timeoutSeconds: getClaudeCodeTimeoutSeconds(profile.runnerTimeoutSeconds),
+        memoryLimit: profile.memoryLimit,
+        cpuLimit: profile.cpuLimit,
+        pidsLimit: profile.pidsLimit,
         entrypoint: '/bin/sh',
         command: ['/workspace/run.sh'],
         network: 'bridge' as const,

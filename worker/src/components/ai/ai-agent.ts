@@ -29,6 +29,11 @@ import {
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
 import { AgentStreamRecorder } from './agent-stream-recorder';
+import {
+  AGENT_EXECUTION_PROFILE_OPTIONS,
+  DEFAULT_AGENT_EXECUTION_PROFILE,
+  getAgentExecutionProfileConfig,
+} from './agent-execution-profile';
 
 type ModelProvider = 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan' | 'anthropic';
 
@@ -44,7 +49,6 @@ const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 1024;
 const DEFAULT_MEMORY_SIZE = 8;
-const DEFAULT_STEP_LIMIT = 4;
 const LOG_TRUNCATE_LIMIT = 2000;
 
 import { DEFAULT_GATEWAY_URL, getGatewaySessionToken } from './utils';
@@ -194,20 +198,32 @@ const parameterSchema = parameters({
       description: 'How many recent turns to keep in memory (excluding the system prompt).',
     },
   ),
+  executionProfile: param(
+    z
+      .enum(['fast', 'investigate', 'deep'])
+      .default(DEFAULT_AGENT_EXECUTION_PROFILE)
+      .describe('Execution budget for agent duration, resources, and default reasoning steps.'),
+    {
+      label: 'Execution Profile',
+      editor: 'select',
+      options: [...AGENT_EXECUTION_PROFILE_OPTIONS],
+      description: 'Choose fast, investigative, or deep autonomous execution capacity.',
+    },
+  ),
   stepLimit: param(
     z
       .number()
       .int()
       .min(1)
-      .max(12)
-      .default(DEFAULT_STEP_LIMIT)
+      .max(128)
+      .optional()
       .describe('Maximum sequential reasoning/tool steps before the agent stops.'),
     {
       label: 'Step Limit',
       editor: 'number',
       min: 1,
-      max: 12,
-      description: 'Maximum reasoning/tool steps before the agent stops automatically.',
+      max: 128,
+      description: 'Optional override for the profile reasoning/tool-step budget.',
     },
   ),
 });
@@ -551,7 +567,10 @@ Loop the Conversation State output back into the next agent invocation to keep m
   },
   async execute({ inputs, params }, context) {
     const { userInput, conversationState, chatModel, modelApiKey } = inputs;
-    const { systemPrompt, temperature, maxTokens, memorySize, stepLimit } = params;
+    const { systemPrompt, temperature, maxTokens, memorySize, executionProfile, stepLimit } =
+      params;
+    const profile = getAgentExecutionProfileConfig(executionProfile);
+    const effectiveStepLimit = stepLimit ?? profile.defaultStepLimit;
 
     const agentRunId = `${context.runId}:${context.componentRef}:${randomUUID()}`;
 
@@ -695,7 +714,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         instructions: resolvedSystemPrompt || undefined,
         temperature,
         maxOutputTokens: maxTokens,
-        stopWhen: stepCountIsImpl(stepLimit),
+        stopWhen: stepCountIsImpl(effectiveStepLimit),
         onStepFinish: (stepResult: AgentStepResult) => {
           for (const call of stepResult.toolCalls) {
             const input = getToolInput(call);

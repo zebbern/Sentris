@@ -78,6 +78,7 @@ describe('core.ai.opencode', () => {
     const params = {
       systemPrompt: 'You are a detective.',
       autoApprove: false,
+      executionProfile: 'deep',
     };
 
     const result = await component.execute({ inputs, params }, context as never);
@@ -107,6 +108,10 @@ describe('core.ai.opencode', () => {
     expect(runnerCall.image).toBe('ghcr.io/zebbern/opencode:latest');
     expect(runnerCall.network).toBe('bridge');
     expect(runnerCall.env.OPENAI_API_KEY).toBe('sk-test');
+    expect(runnerCall.timeoutSeconds).toBe(7200);
+    expect(runnerCall.memoryLimit).toBe('4g');
+    expect(runnerCall.cpuLimit).toBe('4');
+    expect(runnerCall.pidsLimit).toBe(1024);
   });
 
   it('should merge providerConfig and skills into workspace', async () => {

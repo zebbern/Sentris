@@ -11,6 +11,7 @@ import {
   uuid4,
 } from '@temporalio/workflow';
 import { runWorkflowWithScheduler } from '../workflow-scheduler.js';
+import { getActivityStartToCloseTimeout } from '../../components/ai/agent-execution-profile.js';
 import { buildActionPayload, filterInactiveJoinWarnings } from '../input-resolver.js';
 import {
   isMcpServerComponent,
@@ -543,7 +544,7 @@ export async function sentrisWorkflowRun(
             input: RunComponentActivityInput,
           ): Promise<RunComponentActivityOutput>;
         }>({
-          startToCloseTimeout: '10 minutes',
+          startToCloseTimeout: getActivityStartToCloseTimeout(action.componentId, mergedParams),
           heartbeatTimeout: '30 seconds',
           retry: retryOptions,
         });

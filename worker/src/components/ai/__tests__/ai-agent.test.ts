@@ -191,6 +191,34 @@ describe('core.ai.agent (refactor)', () => {
     });
   });
 
+  test('uses the execution profile step limit when no explicit limit is saved', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      {
+        inputs: {
+          userInput: 'Investigate the target',
+          conversationState: undefined,
+          chatModel: { provider: 'openai', modelId: 'gpt-4o-mini' },
+          modelApiKey: 'sk-test',
+        },
+        params: {
+          systemPrompt: '',
+          temperature: 0.2,
+          maxTokens: 128,
+          memorySize: 4,
+          executionProfile: 'deep',
+        },
+      },
+      createTestContext(),
+    );
+
+    expect(stepCountIsMock).toHaveBeenCalledWith(64);
+  });
+
   test('discovers gateway tools and passes them to the agent', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();

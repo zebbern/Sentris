@@ -88,6 +88,7 @@ describe('core.ai.claude-code', () => {
           autoApprove: true,
           skillIds: ['skill-1'],
           enablePlugins: ['oh-my-claudecode'],
+          executionProfile: 'deep',
         },
       },
       context as never,
@@ -117,6 +118,10 @@ describe('core.ai.claude-code', () => {
     expect(runnerCall.env.ANTHROPIC_API_KEY).toBe('sk-test');
     expect(runnerCall.env.ANTHROPIC_MODEL).toBe('claude-sonnet-4-6');
     expect(runnerCall.env.CLAUDE_CODE_EFFORT_LEVEL).toBe('xhigh');
+    expect(runnerCall.timeoutSeconds).toBe(7200);
+    expect(runnerCall.memoryLimit).toBe('4g');
+    expect(runnerCall.cpuLimit).toBe('4');
+    expect(runnerCall.pidsLimit).toBe(1024);
   });
 
   it('passes subscription oauth token env when configured', async () => {

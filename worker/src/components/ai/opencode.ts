@@ -26,6 +26,11 @@ import {
   mergeOpenCodePlugins,
   resolveGatewayMcpConfig,
 } from './agent-runner-utils';
+import {
+  AGENT_EXECUTION_PROFILE_OPTIONS,
+  DEFAULT_AGENT_EXECUTION_PROFILE,
+  getAgentExecutionProfileConfig,
+} from './agent-execution-profile';
 
 const AGENT_PLUGIN_OPTIONS = [
   { label: 'Oh My ClaudeCode', value: 'oh-my-claudecode' },
@@ -137,6 +142,18 @@ const parameterSchema = parameters({
       description: 'Enable pre-installed OpenCode plugins (when available in the image).',
     },
   ),
+  executionProfile: param(
+    z
+      .enum(['fast', 'investigate', 'deep'])
+      .default(DEFAULT_AGENT_EXECUTION_PROFILE)
+      .describe('Execution budget for agent duration and container resources.'),
+    {
+      label: 'Execution Profile',
+      editor: 'select',
+      options: [...AGENT_EXECUTION_PROFILE_OPTIONS],
+      description: 'Choose fast, investigative, or deep autonomous execution capacity.',
+    },
+  ),
 });
 
 const outputSchema = outputs({
@@ -150,10 +167,17 @@ const outputSchema = outputs({
   }),
 });
 
-const OPENCODE_TIMEOUT_SECONDS = Number.parseInt(
-  process.env.OPENCODE_TIMEOUT_SECONDS ?? '1800',
-  10,
-);
+function getOpenCodeTimeoutSeconds(profileTimeoutSeconds: number): number {
+  const configuredTimeout = process.env.OPENCODE_TIMEOUT_SECONDS;
+  if (configuredTimeout === undefined) {
+    return profileTimeoutSeconds;
+  }
+
+  const timeoutSeconds = Number.parseInt(configuredTimeout, 10);
+  return Number.isFinite(timeoutSeconds) && timeoutSeconds > 0
+    ? timeoutSeconds
+    : profileTimeoutSeconds;
+}
 
 const definition = defineComponent({
   id: 'core.ai.opencode',
@@ -165,7 +189,8 @@ const definition = defineComponent({
     entrypoint: 'opencode',
     network: 'bridge' as const,
     command: ['help'],
-    timeoutSeconds: OPENCODE_TIMEOUT_SECONDS,
+    timeoutSeconds: getAgentExecutionProfileConfig(DEFAULT_AGENT_EXECUTION_PROFILE)
+      .runnerTimeoutSeconds,
   },
   inputs: inputSchema,
   outputs: outputSchema,
@@ -192,7 +217,9 @@ const definition = defineComponent({
   },
   async execute({ inputs, params }, context) {
     const { task, context: taskContext, model, supplementaryInputA, supplementaryInputB } = inputs;
-    const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins } = params;
+    const { systemPrompt, providerConfig, autoApprove, skillIds, enablePlugins, executionProfile } =
+      params;
+    const profile = getAgentExecutionProfileConfig(executionProfile);
 
     const { connectedToolNodeIds, organizationId } = context.metadata;
     const orgId = organizationId ?? context.organizationId ?? null;
@@ -275,6 +302,10 @@ const definition = defineComponent({
 
       const runnerConfig = {
         ...definition.runner,
+        timeoutSeconds: getOpenCodeTimeoutSeconds(profile.runnerTimeoutSeconds),
+        memoryLimit: profile.memoryLimit,
+        cpuLimit: profile.cpuLimit,
+        pidsLimit: profile.pidsLimit,
         entrypoint: '/bin/sh',
         command: ['/workspace/run.sh'],
         network: 'bridge' as const,
