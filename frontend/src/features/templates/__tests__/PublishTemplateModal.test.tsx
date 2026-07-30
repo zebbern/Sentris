@@ -107,6 +107,7 @@ const repoInfoResponse = {
   owner: 'acme',
   repo: 'security-templates',
   branch: 'main',
+  url: 'https://github.com/acme/security-templates',
 };
 
 const publishResponse = {

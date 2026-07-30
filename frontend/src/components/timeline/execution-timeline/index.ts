@@ -5,7 +5,7 @@ export { ExecutionTimeline } from '../ExecutionTimeline';
 export { PlaybackControls } from './PlaybackControls';
 export { TimelineTrack } from './TimelineTrack';
 export { TimelineOverview } from './TimelineOverview';
-export { TimelineStatusBar } from './TimelineStatusBar';
+export { TimelineStatusCounts, TimelinePlaybackState } from './TimelineStatusBar';
 
 // Export types
 export type {

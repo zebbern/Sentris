@@ -40,7 +40,7 @@ export function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const initialMountRef = useRef(true);
+  const prevPathnameRef = useRef(location.pathname);
 
   // Check if we're on a workflow builder page
   const isOnWorkflowPage =
@@ -190,12 +190,15 @@ export function CommandPalette() {
     }
   }, [selectedIndex]);
 
-  // Close on location change (skip initial mount to avoid closing on lazy-load)
+  // Close when the route actually changes. Compare against the previous pathname
+  // instead of an "initial mount" flag — React Strict Mode re-runs effects on the
+  // same instance, which would treat the second run as a navigation and close
+  // the palette immediately after lazy-load mount.
   useEffect(() => {
-    if (initialMountRef.current) {
-      initialMountRef.current = false;
+    if (prevPathnameRef.current === location.pathname) {
       return;
     }
+    prevPathnameRef.current = location.pathname;
     close();
   }, [location.pathname, close]);
 
@@ -212,13 +215,7 @@ export function CommandPalette() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent
-        className="max-w-xl p-0 gap-0 overflow-hidden rounded-xl border-border/50 bg-background/95 shadow-2xl backdrop-blur-xl [&>button.absolute]:hidden"
-        onPointerDownOutside={(e) => {
-          e.preventDefault();
-          close();
-        }}
-      >
+      <DialogContent className="max-w-xl p-0 gap-0 overflow-hidden rounded-xl border-border/50 bg-background/95 shadow-2xl backdrop-blur-xl [&>button.absolute]:hidden">
         <DialogTitle className="sr-only">Command Palette</DialogTitle>
         <DialogDescription className="sr-only">
           Search commands, workflows, and navigation

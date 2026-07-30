@@ -115,7 +115,6 @@ export function WorkflowBuilderShell({
           libraryPanelWidth={libraryPanelWidth}
           isMobile={isMobile}
           libraryContent={libraryContent}
-          onToggleLibrary={onToggleLibrary}
         />
 
         {/* Wrapper: flex column for main + terminal dock */}

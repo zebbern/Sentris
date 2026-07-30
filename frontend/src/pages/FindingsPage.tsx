@@ -151,7 +151,10 @@ export function FindingsPage() {
   );
 
   const [search, setSearch] = useState('');
-  const [severity, setSeverity] = useState('all');
+  const severityParam = searchParams.get('severity');
+  const [severity, setSeverity] = useState(
+    severityParam && severityParam !== 'all' ? severityParam : 'all',
+  );
   const [triageStatus, setTriageStatus] = useState('all');
   const [cursorNavigation, setCursorNavigation] = useState<CursorNavigation>({
     queryKey: '',
@@ -190,9 +193,21 @@ export function FindingsPage() {
     setSearch(value);
   }, []);
 
-  const handleSeverityChange = useCallback((value: string) => {
-    setSeverity(value);
-  }, []);
+  const handleSeverityChange = useCallback(
+    (value: string) => {
+      setSeverity(value);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === 'all') {
+          next.delete('severity');
+        } else {
+          next.set('severity', value);
+        }
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
 
   const handleTriageStatusChange = useCallback((value: string) => {
     setTriageStatus(value);

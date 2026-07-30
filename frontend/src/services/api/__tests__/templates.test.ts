@@ -62,6 +62,7 @@ describe('templatesApi.getRepoInfo', () => {
       owner: 'acme',
       repo: 'security-templates',
       branch: 'main',
+      url: 'https://github.com/acme/security-templates',
     };
     fetchMock.mockResolvedValueOnce({
       ok: true,

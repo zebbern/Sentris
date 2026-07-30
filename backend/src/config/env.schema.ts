@@ -141,6 +141,13 @@ export const backendEnvSchema = z
       }),
     GITHUB_TEMPLATE_BRANCH: z.string().optional().default('main'),
     GITHUB_TEMPLATE_TOKEN: z.string().optional(),
+    COMMUNITY_TEMPLATES_INDEX_URL: z
+      .string()
+      .url()
+      .optional()
+      .default(
+        'https://raw.githubusercontent.com/zebbern/Sentris/main/community/template/index.json',
+      ),
 
     // --- Version Check ---
     SENTRIS_VERSION_CHECK_URL: z.string().optional().default(''),

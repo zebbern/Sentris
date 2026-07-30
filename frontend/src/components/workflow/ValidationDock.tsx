@@ -224,7 +224,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
   return (
     <div
       className={cn(
-        'absolute bottom-3 z-50',
+        'absolute bottom-3 left-1/2 z-50 -translate-x-1/2',
         'bg-background/95 backdrop-blur-sm border rounded-md shadow-md',
         'max-w-lg w-auto',
         'transition-all duration-200',
@@ -234,10 +234,6 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
             ? 'border-amber-500/50'
             : 'border-green-500/50',
       )}
-      style={{
-        left: '40%', // 50% - 10% = 40%
-        transform: 'translateX(-50%)',
-      }}
     >
       {hasIssues ? (
         <>

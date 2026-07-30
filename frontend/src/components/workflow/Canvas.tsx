@@ -121,6 +121,7 @@ export function Canvas({
   const selectEvent = useExecutionTimelineStore((s) => s.selectEvent);
   const mode = useWorkflowUiStore((state) => state.mode);
   const showHeatMap = useWorkflowUiStore((state) => state.showHeatMap);
+  const toggleHeatMap = useWorkflowUiStore((state) => state.toggleHeatMap);
   const smartRouting = useWorkflowUiStore((state) => state.smartRouting);
   const toggleSmartRouting = useWorkflowUiStore((state) => state.toggleSmartRouting);
   const edgeBundling = useWorkflowUiStore((state) => state.edgeBundling);
@@ -503,16 +504,18 @@ export function Canvas({
                   position="bottom-left"
                   className="!bg-card !border !border-border !rounded-md !shadow-lg [&>button]:!bg-card [&>button]:!border-border [&>button]:!fill-foreground [&>button:hover]:!bg-accent max-md:!bottom-14"
                 />
-                <Panel position="top-right" className="!m-2 !z-30">
-                  <div className="flex flex-col gap-1.5">
+                {mode === 'design' && (
+                  <Panel position="top-right" className="!m-2 !z-30">
                     <button
-                      onClick={toggleSmartRouting}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
-                        smartRouting
-                          ? 'bg-sky-500 text-white border-sky-600 hover:bg-sky-600'
+                      onClick={toggleEdgeBundling}
+                      className={`flex h-8 w-8 items-center justify-center rounded-md border shadow-sm transition-colors ${
+                        edgeBundling
+                          ? 'bg-violet-500 text-white border-violet-600 hover:bg-violet-600'
                           : 'bg-card text-foreground border-border hover:bg-accent'
                       }`}
-                      title={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
+                      title={edgeBundling ? 'Disable edge bundling' : 'Enable edge bundling'}
+                      aria-label={edgeBundling ? 'Disable edge bundling' : 'Enable edge bundling'}
+                      aria-pressed={edgeBundling}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -524,22 +527,61 @@ export function Canvas({
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 12h8" />
+                        <path d="M12 5l8 0" />
+                        <path d="M12 12l8 0" />
+                        <path d="M12 19l8 0" />
+                        <circle cx="12" cy="12" r="1" />
+                      </svg>
+                    </button>
+                  </Panel>
+                )}
+                <Panel
+                  position="bottom-right"
+                  className={`!m-2 !z-30 ${showCanvasMinimap ? '!mb-[152px]' : ''}`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={toggleSmartRouting}
+                      className={`flex h-8 w-8 items-center justify-center rounded-md border shadow-sm transition-colors ${
+                        smartRouting
+                          ? 'bg-sky-500 text-white border-sky-600 hover:bg-sky-600'
+                          : 'bg-card text-foreground border-border hover:bg-accent'
+                      }`}
+                      title={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
+                      aria-label={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
+                      aria-pressed={smartRouting}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
                       >
                         <circle cx="6" cy="19" r="3" />
                         <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
                         <circle cx="18" cy="5" r="3" />
                       </svg>
-                      Smart Routing
                     </button>
-                    {mode === 'design' && (
+                    {mode === 'execution' && (
                       <button
-                        onClick={toggleEdgeBundling}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border shadow-sm transition-colors ${
-                          edgeBundling
-                            ? 'bg-violet-500 text-white border-violet-600 hover:bg-violet-600'
+                        onClick={toggleHeatMap}
+                        className={`flex h-8 w-8 items-center justify-center rounded-md border shadow-sm transition-colors ${
+                          showHeatMap
+                            ? 'bg-orange-500 text-white border-orange-600 hover:bg-orange-600'
                             : 'bg-card text-foreground border-border hover:bg-accent'
                         }`}
-                        title={edgeBundling ? 'Disable edge bundling' : 'Enable edge bundling'}
+                        title={showHeatMap ? 'Disable heat map' : 'Enable heat map'}
+                        aria-label={showHeatMap ? 'Disable heat map' : 'Enable heat map'}
+                        aria-pressed={showHeatMap}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -551,14 +593,10 @@ export function Canvas({
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
+                          aria-hidden="true"
                         >
-                          <path d="M4 12h8" />
-                          <path d="M12 5l8 0" />
-                          <path d="M12 12l8 0" />
-                          <path d="M12 19l8 0" />
-                          <circle cx="12" cy="12" r="1" />
+                          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
                         </svg>
-                        Edge Bundling
                       </button>
                     )}
                   </div>

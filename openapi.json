@@ -8493,6 +8493,31 @@
         ]
       }
     },
+    "/api/v1/templates/community/import": {
+      "post": {
+        "operationId": "TemplatesController_importCommunityTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportCommunityTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Imported community template"
+          }
+        },
+        "summary": "Import a community template from the published catalog",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
     "/api/v1/templates/publish": {
       "post": {
         "operationId": "TemplatesController_publishTemplate",
@@ -16617,6 +16642,19 @@
           "workflowId",
           "status"
         ]
+      },
+      "ImportCommunityTemplateDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "templatePath": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "PublishTemplateDto": {
         "type": "object",

@@ -280,3 +280,22 @@ The `/analytics` page provides triage performance metrics derived from `finding_
 - **SLA policy management** (`GET/PUT /findings/sla-policies`): Configurable per-org severity→deadline mappings. Admin-only write access via `@Roles('ADMIN')`. Atomic replacement via transactional delete+insert.
 - **Database**: `sla_policies` table with unique `(organization_id, severity)` constraint. Time-series indexes on `finding_triage(organization_id, created_at)` and `(organization_id, severity_override, created_at)` for aggregation query performance.
 - **Frontend**: recharts charts (AreaChart, BarChart, PieChart), MTTR KPI cards, top assignees table, SLA policy settings form. WCAG 2.2 AA accessible — visually-hidden data tables, `role="img"` containers, `aria-busy` loading states, `prefers-reduced-motion` support.
+
+## Learned User Preferences
+
+- Prefers compact app chrome: shorter top bar, narrower sidebar, centered sidebar icons/brand, and icon-only canvas controls with hover labels instead of always-visible text.
+- Component config panel should default to hiding non-editable info sections (e.g. Documentation); keep anything that changes run behavior; persist like other UI prefs; toggle copy is "Hide info sections?" / "Show info sections?".
+- After frontend UI work, verify in the browser rather than relying on code review alone.
+- Browser document title should be "Sentris Flow" only (no tagline).
+- List-page Refresh actions belong in the App top bar (same pattern as Action Center / Artifacts), not in page toolbars.
+- Prefers simple component parameters over extra modes/options; for agent/CVE research workflows, maximize chance of real findings over cost or tight timeout conservatism.
+- Prefers single zip/archive download for repo fetch when equivalent to multi-request clone paths.
+- Execution timeline: play at end should restart from the beginning; prefer unit-based duration display (ms/s/m/h) over padded `0:0x` clock-style text.
+
+## Learned Workspace Facts
+
+- App shell visual baseline: main background around `#151618`, top/sidebar chrome around translucent `#191a1f`.
+- Canvas heatmap control belongs with Smart Routing overlays on the canvas (not only in the workflow top bar).
+- Agent Skills are folder bundles (not only a single `SKILL.md`) and should be discoverable from `.agents/skills`, `.claude/skills`, `.github/skills`, `.codex/skills`, `.kimi/skills`, and `.opencode/skills`.
+- Template Library direction: Official (Sentris-team) and Community tabs; community catalog intended via PR-reviewed GitHub path under `zebbern/Sentris` (`community/template(s)`), with author shoutout styling while keeping official templates for users who distrust community content.
+- Primary product use case emphasized in recent work: bug-bounty / security-research workflows aimed at reportable findings (e.g. CVE-oriented templates).

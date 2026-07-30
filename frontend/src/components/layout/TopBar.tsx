@@ -22,7 +22,9 @@ import {
   History,
   Save,
   Check,
+  StopCircle,
 } from 'lucide-react';
+import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,8 +52,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
-const TOOLBAR_BUTTON_CLASS = 'h-7 shrink-0 px-2 text-xs';
-const TOOLBAR_ICON_BUTTON_CLASS = 'h-7 w-7 shrink-0';
+const TOOLBAR_BUTTON_CLASS = 'h-8 shrink-0 px-3 text-xs';
+// Solid buttons need a 1px border too, or they look taller than outline (Save).
+const TOOLBAR_SOLID_BUTTON_CLASS = cn(TOOLBAR_BUTTON_CLASS, 'border border-transparent');
+const TOOLBAR_ICON_BUTTON_CLASS = 'h-8 w-8 shrink-0';
 
 interface TopBarProps {
   workflowId?: string;
@@ -96,7 +100,10 @@ export function TopBar({
 }: TopBarProps) {
   const navigate = useNavigate();
   const isMac = useIsMac();
+  const { status: executionStatus, stopExecution } = useWorkflowExecution(workflowId);
+  const isRunActive = executionStatus === 'running' || executionStatus === 'queued';
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessFlash, setSaveSuccessFlash] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [saveBeforeRunOpen, setSaveBeforeRunOpen] = useState(false);
   const [tempWorkflowName, setTempWorkflowName] = useState('');
@@ -104,6 +111,7 @@ export function TopBar({
   const [showPencil, setShowPencil] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const saveFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const metadata = useWorkflowStore((s) => s.metadata);
   const isDirty = useWorkflowStore((s) => s.isDirty);
@@ -183,11 +191,32 @@ export function TopBar({
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (saveFlashTimeoutRef.current) {
+        clearTimeout(saveFlashTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const needsSave = isDirty || !hasPersistedWorkflow;
+  const showSaveButton = mode === 'design' && (needsSave || isSaving || saveSuccessFlash);
+
   const handleSave = async () => {
-    if (!canEdit || (!isDirty && hasPersistedWorkflow) || isSaving) return;
+    if (!canEdit || (!isDirty && hasPersistedWorkflow) || isSaving || saveSuccessFlash) return;
     setIsSaving(true);
     try {
       await Promise.resolve(onSave());
+      if (!useWorkflowStore.getState().isDirty) {
+        setSaveSuccessFlash(true);
+        if (saveFlashTimeoutRef.current) {
+          clearTimeout(saveFlashTimeoutRef.current);
+        }
+        saveFlashTimeoutRef.current = setTimeout(() => {
+          setSaveSuccessFlash(false);
+          saveFlashTimeoutRef.current = null;
+        }, 700);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -358,38 +387,54 @@ export function TopBar({
           </div>
 
           <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1 md:gap-1.5">
-            {mode === 'design' && (
+            {showSaveButton && (
               <Button
                 onClick={() => void handleSave()}
-                disabled={!canEdit || (!isDirty && hasPersistedWorkflow) || isSaving}
-                variant="outline"
+                disabled={!canEdit || isSaving || saveSuccessFlash}
                 size="sm"
-                aria-label={isDirty || !hasPersistedWorkflow ? 'Save workflow' : 'Workflow saved'}
-                className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5')}
+                aria-label={saveSuccessFlash ? 'Saved' : 'Save workflow'}
+                className={cn(
+                  TOOLBAR_SOLID_BUTTON_CLASS,
+                  'gap-1.5 transition-colors duration-300',
+                  saveSuccessFlash
+                    ? 'border-transparent bg-green-600 text-white hover:bg-green-600'
+                    : 'border-transparent bg-amber-500 text-white hover:bg-amber-500',
+                )}
               >
                 {isSaving ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : isDirty || !hasPersistedWorkflow ? (
-                  <Save className="h-3.5 w-3.5" />
-                ) : (
+                ) : saveSuccessFlash ? (
                   <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
                 )}
-                <span className="hidden sm:inline">
-                  {isSaving ? 'Saving…' : isDirty || !hasPersistedWorkflow ? 'Save' : 'Saved'}
-                </span>
+                <span className="hidden sm:inline">{isSaving ? 'Saving…' : 'Save'}</span>
               </Button>
             )}
 
-            <Button
-              onClick={handleRun}
-              disabled={!canEdit}
-              size="sm"
-              aria-label="Run"
-              className={cn(TOOLBAR_BUTTON_CLASS, 'gap-1.5')}
-            >
-              <Play className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Run</span>
-            </Button>
+            {isRunActive ? (
+              <Button
+                onClick={() => stopExecution()}
+                variant="destructive"
+                size="sm"
+                aria-label="Stop"
+                className={cn(TOOLBAR_SOLID_BUTTON_CLASS, 'gap-1.5')}
+              >
+                <StopCircle className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Stop</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={handleRun}
+                disabled={!canEdit}
+                size="sm"
+                aria-label="Run"
+                className={cn(TOOLBAR_SOLID_BUTTON_CLASS, 'gap-1.5')}
+              >
+                <Play className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Run</span>
+              </Button>
+            )}
 
             {showOverflowMenu && (
               <>

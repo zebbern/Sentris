@@ -9,9 +9,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Button } from '@/components/ui/button';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-import { Link2, Plus } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
@@ -51,9 +50,6 @@ export interface WebhooksTableProps {
   onViewHistory: (webhook: WebhookConfiguration) => void;
   onRegeneratePath: (webhook: WebhookConfiguration) => void;
   onDelete: (webhook: WebhookConfiguration) => void;
-
-  // Empty state
-  onCreateNew?: () => void;
 }
 
 function TableSkeleton() {
@@ -97,7 +93,6 @@ export function WebhooksTable({
   onViewHistory,
   onRegeneratePath,
   onDelete,
-  onCreateNew,
 }: WebhooksTableProps) {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -167,16 +162,8 @@ export function WebhooksTable({
                     <EmptyState
                       icon={Link2}
                       title="No webhooks found"
-                      description='Create your first webhook with the "New webhook" button or tweak the filters above.'
+                      description='Create your first webhook with the "New webhook" button in the top bar, or tweak the filters above.'
                       className="py-10"
-                      action={
-                        onCreateNew ? (
-                          <Button onClick={onCreateNew} className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            New webhook
-                          </Button>
-                        ) : undefined
-                      }
                     />
                   </TableCell>
                 </TableRow>

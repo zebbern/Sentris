@@ -5,15 +5,13 @@ import { ExecutionTimeline } from '@/components/timeline/ExecutionTimeline';
 import { EventInspector } from '@/components/timeline/EventInspector';
 import { Button } from '@/components/ui/button';
 import { MessageModal } from '@/components/ui/MessageModal';
-import { StopCircle, RefreshCw, Link2, Globe, Loader2, FileSearch } from 'lucide-react';
-import { useIsMobile } from '@/hooks/useIsMobile';
+import { Globe, Loader2, FileSearch } from 'lucide-react';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { logger } from '@/lib/logger';
 import { useExecutionStore } from '@/store/executionStore';
 import { useWorkflowExecution } from '@/hooks/useWorkflowExecution';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useWorkflowStore } from '@/store/workflowStore';
-import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useParams } from 'react-router-dom';
 import { useWorkflowRuns } from '@/hooks/queries/useRunQueries';
 import { cn } from '@/lib/utils';
@@ -25,9 +23,7 @@ import { NetworkPanel } from '@/components/timeline/NetworkPanel';
 import { FindingsPanel } from '@/components/timeline/FindingsPanel';
 import { getTriggerDisplay } from '@/utils/triggerDisplay';
 import { ExecutionTabs } from '@/components/execution/ExecutionTabs';
-import { RunInfoDisplay } from '@/components/timeline/RunInfoDisplay';
 import { RunResultsSummary } from '@/components/timeline/RunResultsSummary';
-import { isRunLive } from '@/features/workflow-builder/utils/executionRuns';
 import { useAutoFocusOnCompletion } from '@/hooks/useAutoFocusOnCompletion';
 import { useRunArtifacts } from '@/hooks/queries/useArtifactQueries';
 import { useExecutionNodeIO } from '@/hooks/queries/useExecutionQueries';
@@ -104,17 +100,25 @@ const MIN_TIMELINE_HEIGHT = 10;
 const MAX_TIMELINE_HEIGHT = 320;
 const DEFAULT_TIMELINE_HEIGHT = 320;
 
+const INSPECTOR_TABS = [
+  { id: 'events', label: 'Events' },
+  { id: 'logs', label: 'Logs' },
+  { id: 'agent', label: 'Agent' },
+  { id: 'artifacts', label: 'Artifacts' },
+  { id: 'io', label: 'I/O' },
+  { id: 'findings', label: 'Findings', icon: FileSearch },
+  { id: 'network', label: 'Network', icon: Globe },
+] as const;
+
 export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {}) {
   const { runId: routeRunId } = useParams<{ runId?: string }>();
   const selectedRunId = useExecutionTimelineStore((s) => s.selectedRunId);
   const playbackMode = useExecutionTimelineStore((s) => s.playbackMode);
   const isPlaying = useExecutionTimelineStore((s) => s.isPlaying);
-  const { id: workflowId, currentVersion: currentWorkflowVersion } = useWorkflowStore(
-    (state) => state.metadata,
-  );
+  const { id: workflowId } = useWorkflowStore((state) => state.metadata);
   const { data: runsPage, isLoading: isLoadingRuns } = useWorkflowRuns(workflowId);
   const runs = runsPage?.runs ?? [];
-  const { status, runStatus, stopExecution, runId: liveRunId } = useWorkflowExecution();
+  const { status, runStatus, runId: liveRunId } = useWorkflowExecution();
   const inspectorTab = useWorkflowUiStore((s) => s.inspectorTab);
   const setInspectorTab = useWorkflowUiStore((s) => s.setInspectorTab);
   const getDisplayLogs = useExecutionStore((s) => s.getDisplayLogs);
@@ -200,8 +204,6 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
       return value <= threshold;
     });
   }, [rawLogs, logLevelFilter]);
-  const { copy } = useCopyToClipboard();
-
   const selectedRun = useMemo(
     () => runs.find((run) => run.id === selectedRunId),
     [runs, selectedRunId],
@@ -254,19 +256,6 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
     [setInspectorTab],
   );
 
-  const handleCopyLink = useCallback(async () => {
-    if (!selectedRun) return;
-    const basePath = `/workflows/${selectedRun.workflowId}/runs/${selectedRun.id}`;
-    const absoluteUrl =
-      typeof window !== 'undefined' ? `${window.location.origin}${basePath}` : basePath;
-    await copy(absoluteUrl, {
-      successTitle: 'Run link copied',
-      successDescription: 'Share this URL to open the execution directly.',
-      errorTitle: 'Unable to copy link automatically',
-      errorDescription: absoluteUrl,
-    });
-  }, [selectedRun, copy]);
-
   useEffect(() => {
     // Switch log mode based on timeline playback mode
     if (playbackMode === 'live') {
@@ -291,7 +280,6 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
     });
   };
 
-  const isMobile = useIsMobile();
   return (
     <>
       {/* Screen reader announcement for auto-focus tab changes */}
@@ -308,72 +296,15 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
             runsPage={runsPage ?? null}
             isLoadingRuns={isLoadingRuns}
           />
-          <div className="flex items-center gap-2">
-            {runStatus?.progress &&
-              selectedRunId === liveRunId &&
-              (status === 'running' || status === 'queued') && (
-                <span className="text-[11px] text-muted-foreground font-medium">
-                  {runStatus.progress.completedActions}/{runStatus.progress.totalActions}
-                </span>
-              )}
-            {selectedRunId === liveRunId && (status === 'running' || status === 'queued') && (
-              <Button
-                onClick={() => stopExecution()}
-                variant="destructive"
-                size="sm"
-                className="h-7 px-2 gap-1"
-              >
-                <StopCircle className="h-3.5 w-3.5 md:h-3 md:w-3" />
-                {!isMobile && <span className="text-xs">Stop</span>}
-              </Button>
+          {runStatus?.progress &&
+            selectedRunId === liveRunId &&
+            (status === 'running' || status === 'queued') && (
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {runStatus.progress.completedActions}/{runStatus.progress.totalActions}
+              </span>
             )}
-          </div>
         </div>
 
-        {/* Run Info - Compact */}
-        {selectedRun && (
-          <div className="px-3 py-2.5 border-b">
-            <div className="rounded-lg border bg-card p-2.5">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="font-medium text-sm truncate font-mono" title={selectedRun.id}>
-                  {selectedRun.id.split('-').slice(0, 3).join('-')}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                    onClick={handleCopyLink}
-                    title="Copy run link"
-                    aria-label="Copy run link"
-                  >
-                    <Link2 className="h-3 w-3" />
-                  </Button>
-                  {onRerunRun && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-3 gap-1.5"
-                      disabled={isRunLive(selectedRun)}
-                      title={
-                        isRunLive(selectedRun) ? 'Wait for run to complete' : 'Rerun this workflow'
-                      }
-                      onClick={() => onRerunRun(selectedRun.id)}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Rerun
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <RunInfoDisplay
-                run={selectedRun}
-                currentWorkflowVersion={currentWorkflowVersion}
-                showBadges={true}
-              />
-            </div>
-          </div>
-        )}
         {/* Run Results Summary Banner — only for terminal runs */}
         {selectedRun && TERMINAL_STATUSES.includes(selectedRun.status) && (
           <RunResultsSummary runId={selectedRunId!} selectedRun={selectedRun} />
@@ -437,73 +368,39 @@ export function ExecutionInspector({ onRerunRun }: ExecutionInspectorProps = {})
         </div>
         <div className="border-b" />
 
-        {/* Tabs */}
-        <div className="border-b px-3 py-2 flex min-w-0 items-center justify-between gap-2 bg-muted/20 overflow-x-auto">
-          <div className="inline-flex shrink-0 rounded-md border bg-background p-0.5 text-xs">
-            <Button
-              variant={inspectorTab === 'events' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs"
-              onClick={() => handleTabClick('events')}
-            >
-              Events
-            </Button>
-            <Button
-              variant={inspectorTab === 'logs' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs"
-              onClick={() => handleTabClick('logs')}
-            >
-              Logs
-            </Button>
-            <Button
-              variant={inspectorTab === 'agent' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs"
-              onClick={() => handleTabClick('agent')}
-            >
-              Agent
-            </Button>
-            <Button
-              variant={inspectorTab === 'artifacts' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs"
-              onClick={() => handleTabClick('artifacts')}
-            >
-              Artifacts
-            </Button>
-            <Button
-              variant={inspectorTab === 'io' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs"
-              onClick={() => handleTabClick('io')}
-            >
-              I/O
-            </Button>
-            <Button
-              variant={inspectorTab === 'findings' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs gap-1"
-              onClick={() => handleTabClick('findings')}
-            >
-              <FileSearch className="h-3 w-3" />
-              Findings
-            </Button>
-            <Button
-              variant={inspectorTab === 'network' ? 'default' : 'ghost'}
-              size="sm"
-              className="h-6 px-2.5 text-xs gap-1"
-              onClick={() => handleTabClick('network')}
-            >
-              <Globe className="h-3 w-3" />
-              Network
-            </Button>
+        {/* Tabs — equal-width segments that fill the inspector panel */}
+        <div className="flex min-w-0 items-center gap-2 border-b bg-muted/20 px-2 py-2">
+          <div
+            className="flex min-w-0 flex-1 rounded-md border bg-background p-0.5 text-xs"
+            role="tablist"
+            aria-label="Inspector views"
+          >
+            {INSPECTOR_TABS.map((tab) => {
+              const Icon = 'icon' in tab ? tab.icon : null;
+              const isActive = inspectorTab === tab.id;
+              return (
+                <Button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  variant={isActive ? 'default' : 'ghost'}
+                  size="sm"
+                  title={tab.label}
+                  className="h-6 min-w-0 flex-1 gap-1 overflow-hidden px-1 text-xs"
+                  onClick={() => handleTabClick(tab.id)}
+                >
+                  {Icon ? <Icon className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
+                  <span className="min-w-0 truncate">{tab.label}</span>
+                </Button>
+              );
+            })}
           </div>
           {inspectorTab === 'logs' && (
             <select
               value={logLevelFilter}
               onChange={(event) => setLogLevelFilter(event.target.value as LogLevelFilter)}
-              className="h-6 rounded border bg-background px-1.5 text-[11px]"
+              className="h-6 shrink-0 rounded border bg-background px-1.5 text-[11px]"
+              aria-label="Log level filter"
             >
               {LOG_LEVEL_OPTIONS.map((option) => (
                 <option key={option} value={option}>

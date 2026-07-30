@@ -202,7 +202,6 @@ describe('WebhooksPage', () => {
     renderPage();
 
     expect(screen.queryByRole('heading', { level: 2, name: /^Webhooks$/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New webhook/i })).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {
@@ -248,12 +247,12 @@ describe('WebhooksPage', () => {
     expect(screen.getByText('Failed to load webhooks')).toBeInTheDocument();
   });
 
-  it('renders "New webhook" button', () => {
-    setupStore();
+  it('renders empty state without a duplicate New webhook CTA', () => {
+    setupStore({ webhooks: [] });
     renderPage();
 
-    const newButton = screen.getByRole('button', { name: /New webhook/i });
-    expect(newButton).toBeInTheDocument();
+    expect(screen.getByText('No webhooks found')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /New webhook/i })).not.toBeInTheDocument();
   });
 
   it('renders "Select all webhooks" checkbox', () => {
@@ -298,12 +297,11 @@ describe('WebhooksPage', () => {
     expect(screen.getByText('Slack Notification')).toBeInTheDocument();
   });
 
-  it('renders Refresh button', () => {
+  it('does not render page-local Refresh button', () => {
     setupStore();
     renderPage();
 
-    const refreshButtons = screen.getAllByRole('button', { name: /Refresh/i });
-    expect(refreshButtons.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole('button', { name: /Refresh/i })).not.toBeInTheDocument();
   });
 
   it('renders drag handles for DnD sortable rows', () => {

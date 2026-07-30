@@ -11,6 +11,7 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OverrideDraft, ScheduleWorkflowNode } from './scheduleTypes';
+import { FieldHintLabel } from './FieldHintLabel';
 
 interface NodeOverridesSectionProps {
   nodeOverridesDraft: OverrideDraft;
@@ -38,21 +39,23 @@ export function NodeOverridesSection({
   const overrideEntries = Object.entries(nodeOverridesDraft);
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold">Node overrides</h3>
-          <p className="text-xs text-muted-foreground">
-            Override component parameters for this schedule without touching the workflow graph.
-          </p>
-        </div>
-        <Badge variant="outline">{overrideEntries.length} overrides</Badge>
+    <section className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <FieldHintLabel
+          as="heading"
+          hint="Override component parameters for this schedule without touching the workflow graph."
+        >
+          Node overrides
+        </FieldHintLabel>
+        <Badge variant="outline" className="text-[11px]">
+          {overrideEntries.length} overrides
+        </Badge>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {overrideEntries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Workflow nodes will appear here so you can override parameters when this schedule runs.
+          <p className="text-xs text-muted-foreground">
+            Select a workflow to override node parameters for scheduled runs.
           </p>
         ) : (
           overrideEntries.map(([nodeId, draftValue]) => {

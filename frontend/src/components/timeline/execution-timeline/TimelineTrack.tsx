@@ -23,26 +23,26 @@ export const TimelineTrack = forwardRef<HTMLDivElement, TimelineTrackProps>(func
   const showPlayhead = playbackMode === 'replay' || isLiveMode;
 
   return (
-    <div className="space-y-2 relative">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+    <div className="relative space-y-1.5">
+      <div className="flex items-center justify-between text-[11px] tabular-nums text-muted-foreground">
         <span>{formatTime(viewportStartMs)}</span>
         <span>{formatTime(viewportEndMs)}</span>
       </div>
       <div
         ref={ref}
-        className="relative h-14 bg-muted rounded-lg border transition-all hover:border-blue-300/50 overflow-hidden"
+        className="relative h-16 overflow-hidden rounded-xl border border-border/60 bg-muted/40 transition-colors hover:border-primary/30"
         onMouseDown={onMouseDown}
         onWheel={onWheel}
       >
         <div
-          className="absolute inset-y-3 left-0 bg-gradient-to-r from-blue-400/30 to-blue-500/40 rounded-r-full"
+          className="absolute inset-y-3.5 left-0 rounded-r-full bg-gradient-to-r from-blue-400/25 to-blue-500/35"
           style={{ width: `${visibleProgress * 100}%` }}
         />
         {visibleMarkers.map((marker) => (
           <div
             key={marker.id}
             className={cn(
-              'absolute top-3 bottom-3 w-[2px] rounded-full',
+              'absolute top-3.5 bottom-3.5 w-[2px] rounded-full',
               EVENT_COLORS[marker.type] ?? EVENT_COLORS.default,
             )}
             style={{ left: `${marker.viewportPosition * 100}%` }}
@@ -52,22 +52,22 @@ export const TimelineTrack = forwardRef<HTMLDivElement, TimelineTrackProps>(func
         {visibleAgentMarkers.map((marker) => (
           <div
             key={`agent-${marker.id}`}
-            className="absolute top-1 bottom-1 flex items-center justify-center"
+            className="absolute top-1.5 bottom-1.5 flex items-center justify-center"
             style={{ left: `${marker.viewportPosition * 100}%` }}
             title={`${marker.label} • ${formatTimestamp(marker.timestamp)}`}
           >
-            <div className="w-3 h-3 rotate-45 border border-amber-500 bg-amber-200 shadow-sm" />
+            <div className="h-3 w-3 rotate-45 border border-amber-500 bg-amber-200 shadow-sm" />
           </div>
         ))}
         {showPlayhead && (
           <div className="absolute inset-0 pointer-events-none">
             <div
-              className="absolute inset-y-2 w-10 -ml-5 flex flex-col items-center gap-2"
+              className="absolute inset-y-2.5 -ml-5 flex w-10 flex-col items-center gap-2"
               style={{ left: `${visibleProgress * 100}%` }}
             >
               <div
                 className={cn(
-                  'flex-1 w-[3px] rounded-full shadow-lg',
+                  'w-[3px] flex-1 rounded-full shadow-lg',
                   isLiveMode ? 'bg-red-400' : 'bg-blue-400',
                 )}
               />

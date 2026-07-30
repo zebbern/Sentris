@@ -62,7 +62,7 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
         role="button"
         tabIndex={disabled || component.deprecated ? -1 : 0}
         className={cn(
-          'group relative flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-all',
+          'group relative flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-all',
           'hover:bg-muted/50 border border-border/30 hover:border-border/60',
           'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
           'md:cursor-move', // Desktop: show move cursor
@@ -82,14 +82,14 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
         aria-label={`Add ${component.name} component`}
       >
         {/* Icon */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {component.logo ? (
             <img
               src={component.logo}
               alt={component.name}
-              width={20}
-              height={20}
-              className="h-5 w-5 object-contain"
+              width={16}
+              height={16}
+              className="h-4 w-4 object-contain"
               onError={(e) => {
                 // Fallback to icon if image fails to load
                 e.currentTarget.style.display = 'none';
@@ -99,18 +99,15 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
           ) : null}
           <DynamicIcon
             name={component.icon || 'Box'}
-            className={cn(
-              'h-5 w-5 text-muted-foreground flex-shrink-0',
-              component.logo && 'hidden',
-            )}
+            className={cn('h-4 w-4 text-muted-foreground shrink-0', component.logo && 'hidden')}
           />
         </div>
 
         {/* Title and description */}
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <span className="block text-sm font-medium leading-tight truncate">{component.name}</span>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <span className="block truncate text-xs font-medium leading-tight">{component.name}</span>
           {description && (
-            <p className="text-xs text-muted-foreground truncate mt-0.5 leading-snug">
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
               {description}
             </p>
           )}
@@ -125,9 +122,9 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
       role="button"
       tabIndex={disabled || component.deprecated ? -1 : 0}
       className={cn(
-        'group relative flex flex-col p-2 border border-border/50 rounded-md cursor-pointer transition-all',
+        'group relative flex flex-col p-1.5 border border-border/50 rounded-md cursor-pointer transition-all',
         'bg-background/50 hover:bg-background hover:border-border',
-        'text-foreground min-h-[4.5rem]',
+        'text-foreground min-h-[3.75rem]',
         'focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none',
         'md:cursor-move',
         disabled ? 'cursor-not-allowed opacity-50' : 'hover:shadow-sm hover:scale-[1.02]',
@@ -146,14 +143,14 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
       aria-label={`Add ${component.name} component`}
     >
       {/* Default: Centered icon and name */}
-      <div className="flex flex-col items-center justify-center gap-1 flex-1 group-hover:hidden transition-all">
+      <div className="flex flex-1 flex-col items-center justify-center gap-0.5 transition-all group-hover:hidden">
         {component.logo ? (
           <img
             src={component.logo}
             alt={component.name}
-            width={20}
-            height={20}
-            className="h-5 w-5 flex-shrink-0 object-contain"
+            width={16}
+            height={16}
+            className="h-4 w-4 shrink-0 object-contain"
             onError={(e) => {
               // Fallback to icon if image fails to load
               e.currentTarget.style.display = 'none';
@@ -163,9 +160,9 @@ export function ComponentItem({ component, disabled, viewMode }: ComponentItemPr
         ) : null}
         <DynamicIcon
           name={component.icon || 'Box'}
-          className={cn('h-5 w-5 flex-shrink-0 text-muted-foreground', component.logo && 'hidden')}
+          className={cn('h-4 w-4 shrink-0 text-muted-foreground', component.logo && 'hidden')}
         />
-        <span className="text-[11px] font-medium leading-tight text-center line-clamp-2">
+        <span className="line-clamp-2 text-center text-[10px] font-medium leading-tight">
           {component.name}
         </span>
       </div>

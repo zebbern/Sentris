@@ -16,7 +16,12 @@ describe('TemplatesController', () => {
       getRevalidationJobLog: vi.fn().mockReturnValue(result),
     };
     const githubSyncService = {};
-    const controller = new TemplatesController(templateService as any, githubSyncService as any);
+    const communityImportService = {};
+    const controller = new TemplatesController(
+      templateService as any,
+      githubSyncService as any,
+      communityImportService as any,
+    );
 
     const response = await controller.getRevalidationJobLog(
       'template-revalidation-00000000-0000-4000-8000-000000000001',
@@ -71,7 +76,11 @@ describe('TemplatesController', () => {
       getRevalidationJobs: vi.fn().mockReturnValue(result),
     };
     const githubSyncService = {};
-    const controller = new TemplatesController(templateService as any, githubSyncService as any);
+    const controller = new TemplatesController(
+      templateService as any,
+      githubSyncService as any,
+      {} as any,
+    );
 
     const response = await controller.getRevalidationJobs('5');
 
@@ -114,7 +123,11 @@ describe('TemplatesController', () => {
       getRevalidationJob: vi.fn().mockReturnValue(result),
     };
     const githubSyncService = {};
-    const controller = new TemplatesController(templateService as any, githubSyncService as any);
+    const controller = new TemplatesController(
+      templateService as any,
+      githubSyncService as any,
+      {} as any,
+    );
 
     const response = await controller.getRevalidationJob(
       'template-revalidation-00000000-0000-4000-8000-000000000000',
@@ -124,6 +137,21 @@ describe('TemplatesController', () => {
       'template-revalidation-00000000-0000-4000-8000-000000000000',
     );
     expect(response).toEqual(result);
+  });
+
+  it('delegates community import requests to CommunityImportService', async () => {
+    const result = { id: 'tmpl-1', name: 'Demo', isOfficial: false };
+    const communityImportService = {
+      importCommunityTemplate: vi.fn().mockResolvedValue(result),
+    };
+    const controller = new TemplatesController({} as any, {} as any, communityImportService as any);
+
+    const response = await controller.importCommunityTemplate({ id: 'demo-passive-lookup' });
+
+    expect(communityImportService.importCommunityTemplate).toHaveBeenCalledWith({
+      id: 'demo-passive-lookup',
+    });
+    expect(response).toMatchObject(result);
   });
 
   it('delegates template revalidation requests to TemplateService', async () => {
@@ -139,7 +167,11 @@ describe('TemplatesController', () => {
       revalidateTemplate: vi.fn().mockResolvedValue(result),
     };
     const githubSyncService = {};
-    const controller = new TemplatesController(templateService as any, githubSyncService as any);
+    const controller = new TemplatesController(
+      templateService as any,
+      githubSyncService as any,
+      {} as any,
+    );
 
     const response = await controller.revalidateTemplate('tpl-1', {
       userId: 'user-1',

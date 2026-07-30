@@ -1,4 +1,4 @@
-import { Play, Pause, SkipBack, SkipForward, Flame, Route } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,12 +8,44 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { PLAYBACK_SPEEDS } from './constants';
-import type { PlaybackControlsProps } from './types';
+import type { PlaybackControlsProps, TimelineViewTogglesProps } from './types';
 
-const segmentedGroupClass =
+const transportGroupClass =
   'inline-flex shrink-0 items-center rounded-md border bg-background p-0.5';
-const segmentedButtonClass = 'h-6 shrink-0 px-0 text-xs';
-const segmentedIconButtonClass = 'h-6 w-6 shrink-0 p-0';
+const transportIconButtonClass = 'h-6 w-6 shrink-0 p-0';
+const transportButtonClass = 'h-6 shrink-0 px-0 text-xs';
+
+export function TimelineViewToggles({
+  playbackMode,
+  isLiveFollowing,
+  onGoLive,
+}: TimelineViewTogglesProps) {
+  const isLiveMode = playbackMode === 'live';
+
+  if (!isLiveMode) return null;
+
+  return (
+    <div className="flex min-w-0 w-full flex-wrap items-center justify-end gap-1.5">
+      <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 text-[11px] font-medium uppercase tracking-wide text-primary">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+        LIVE
+      </span>
+
+      {!isLiveFollowing && (
+        <div className="inline-flex items-center gap-1.5">
+          <span className="text-[11px] text-red-500">Behind live</span>
+          <Button
+            size="sm"
+            onClick={onGoLive}
+            className="h-6 shrink-0 px-2 text-xs bg-red-500 text-white hover:bg-red-600"
+          >
+            Go Live
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function PlaybackControls({
   currentTime,
@@ -21,29 +53,21 @@ export function PlaybackControls({
   isPlaying,
   playbackMode,
   playbackSpeed,
-  isLiveFollowing,
-  showHeatMap,
-  smartRouting,
   onPlayPause,
   onStepForward,
   onStepBackward,
   onSpeedChange,
-  onGoLive,
-  onToggleHeatMap,
-  onToggleSmartRouting,
 }: PlaybackControlsProps) {
-  const isLiveMode = playbackMode === 'live';
-
   return (
-    <div className="flex min-w-0 w-full flex-wrap items-center gap-2">
-      <div className={segmentedGroupClass}>
+    <div className="flex shrink-0 items-center gap-1.5">
+      <div className={transportGroupClass}>
         <Button
           variant="ghost"
           size="sm"
           onClick={onStepBackward}
           disabled={currentTime <= 0}
           aria-label="Step backward"
-          className={segmentedIconButtonClass}
+          className={transportIconButtonClass}
         >
           <SkipBack className="h-3.5 w-3.5" />
         </Button>
@@ -53,7 +77,7 @@ export function PlaybackControls({
           onClick={onPlayPause}
           disabled={playbackMode === 'live'}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          className={segmentedIconButtonClass}
+          className={transportIconButtonClass}
         >
           {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
         </Button>
@@ -63,20 +87,20 @@ export function PlaybackControls({
           onClick={onStepForward}
           disabled={currentTime >= totalDuration}
           aria-label="Step forward"
-          className={segmentedIconButtonClass}
+          className={transportIconButtonClass}
         >
           <SkipForward className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      <div className={segmentedGroupClass}>
+      <div className={transportGroupClass}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
               disabled={playbackMode === 'live'}
-              className={cn(segmentedButtonClass, 'min-w-[2.75rem] px-2')}
+              className={cn(transportButtonClass, 'min-w-[2.75rem] px-2')}
             >
               {playbackSpeed}x
             </Button>
@@ -94,67 +118,6 @@ export function PlaybackControls({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      <div className={cn(segmentedGroupClass, 'max-w-full')}>
-        <span
-          className={cn(
-            'inline-flex h-6 shrink-0 items-center px-2 text-[11px] font-medium uppercase tracking-wide',
-            isLiveMode ? 'text-primary' : 'text-muted-foreground',
-          )}
-        >
-          {isLiveMode ? (
-            <span className="inline-flex items-center gap-1">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-              LIVE
-            </span>
-          ) : (
-            'EXECUTION'
-          )}
-        </span>
-        <Button
-          variant={showHeatMap ? 'default' : 'ghost'}
-          size="sm"
-          onClick={onToggleHeatMap}
-          aria-label={showHeatMap ? 'Disable heat map' : 'Enable heat map'}
-          className={cn(
-            segmentedButtonClass,
-            'gap-1 px-2',
-            showHeatMap && 'bg-orange-500 text-white hover:bg-orange-600',
-          )}
-        >
-          <Flame className="h-3 w-3 shrink-0" />
-          <span className="hidden sm:inline">Heat Map</span>
-        </Button>
-        <Button
-          variant={smartRouting ? 'default' : 'ghost'}
-          size="sm"
-          onClick={onToggleSmartRouting}
-          aria-label={smartRouting ? 'Disable smart routing' : 'Enable smart routing'}
-          className={cn(
-            segmentedButtonClass,
-            'gap-1 px-2',
-            smartRouting && 'bg-sky-500 text-white hover:bg-sky-600',
-          )}
-        >
-          <Route className="h-3 w-3 shrink-0" />
-          <span className="hidden sm:inline">Smart Routing</span>
-        </Button>
-      </div>
-
-      {isLiveMode && !isLiveFollowing && (
-        <div className={segmentedGroupClass}>
-          <span className="inline-flex h-6 items-center px-2 text-[11px] text-red-500">
-            Behind live
-          </span>
-          <Button
-            size="sm"
-            onClick={onGoLive}
-            className="h-6 shrink-0 px-2 text-xs bg-red-500 text-white hover:bg-red-600"
-          >
-            Go Live
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

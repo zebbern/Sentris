@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { List, Grid3x3, Hand } from 'lucide-react';
+import { List, Grid3x3, Hand, Search, PanelLeftClose, X } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
 import { Input } from '@/components/ui/input';
@@ -20,13 +20,17 @@ import { getCategorySeparatorColor, getCategoryTextColorClass } from '@/utils/ca
 import { useThemeStore } from '@/store/themeStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { useCustomScrollbar } from '@/hooks/useCustomScrollbar';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { ComponentItem, type ViewMode } from './ComponentItem';
 
 interface SidebarProps {
   canManageWorkflows?: boolean;
+  /** When set, shows a hide-library control to the left of the search bar. */
+  onHideLibrary?: () => void;
 }
 
-export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
+export function Sidebar({ canManageWorkflows = true, onHideLibrary }: SidebarProps) {
+  const isMobile = useIsMobile();
   const { data: componentIndex, isLoading: loading, error: componentsError } = useComponents();
   const error = componentsError?.message ?? null;
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,11 +203,39 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
 
   return (
     <div className="h-full w-full max-w-[320px] border-r bg-background flex flex-col">
-      <div className="p-4 border-b space-y-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold leading-none">Components</h2>
+      <div className="border-b px-3 py-2 space-y-2">
+        <div className="flex items-center gap-1.5">
           <TooltipProvider>
-            <div className="flex items-center gap-0.5 border border-border/50 rounded-md p-0.5 h-7">
+            {onHideLibrary && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    onClick={onHideLibrary}
+                    className="h-8 w-8 shrink-0 p-0"
+                    aria-expanded={true}
+                    aria-label="Hide component library"
+                  >
+                    {isMobile ? <X className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Hide components</TooltipContent>
+              </Tooltip>
+            )}
+            <div className="relative min-w-0 flex-1">
+              <Search
+                className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                placeholder="Search components..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 py-0 pl-8 text-sm"
+                aria-label="Search components"
+              />
+            </div>
+            <div className="flex h-8 shrink-0 items-center gap-0.5 rounded-md border border-border/50 p-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -238,16 +270,6 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
           </TooltipProvider>
         </div>
 
-        <div className="relative">
-          <Input
-            placeholder="Search components..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="text-sm"
-            aria-label="Search components"
-          />
-        </div>
-
         {hasBranchInfo && (
           <div className="space-y-1">
             {frontendBranch && (
@@ -271,7 +293,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
       <div className="relative flex-1 overflow-hidden">
         <div
           ref={scrollContainerRef}
-          className="h-full w-full overflow-y-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="h-full w-full overflow-y-auto px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {loading ? (
             <div className="space-y-0">
@@ -336,7 +358,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
               {Object.keys(filteredComponentsByCategory).length > 0 && (
                 <Accordion
                   type="multiple"
-                  className="space-y-2"
+                  className="space-y-1.5"
                   value={openAccordionItems}
                   onValueChange={setOpenAccordionItems}
                 >
@@ -351,33 +373,33 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                       <AccordionItem
                         key={category}
                         value={category}
-                        className="border border-border/50 rounded-sm px-3 py-1 transition-colors"
+                        className="rounded-sm border border-border/50 px-2 py-0.5 transition-colors"
                       >
                         <AccordionTrigger
                           className={cn(
-                            'py-3 hover:no-underline hover:bg-muted/50 rounded-sm -mx-3 -my-1 px-3 [&[data-state=open]]:text-foreground',
-                            'group transition-colors relative',
+                            'relative -mx-2 -my-0.5 rounded-sm px-2 py-2 hover:bg-muted/50 hover:no-underline [&[data-state=open]]:text-foreground',
+                            'group transition-colors',
                           )}
                           style={{
                             borderLeftWidth: categoryAccentColor ? '3px' : undefined,
                             borderLeftColor: categoryAccentColor || undefined,
                           }}
                         >
-                          <div className="flex flex-col items-start gap-0.5 w-full">
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-2">
+                          <div className="flex w-full flex-col items-start gap-0.5">
+                            <div className="flex w-full items-center justify-between">
+                              <div className="flex items-center gap-1.5">
                                 {categoryConfig?.icon && (
                                   <DynamicIcon
                                     name={categoryConfig.icon}
                                     className={cn(
-                                      'h-4 w-4 flex-shrink-0',
+                                      'h-3.5 w-3.5 shrink-0',
                                       getCategoryTextColor(category),
                                     )}
                                   />
                                 )}
                                 <h3
                                   className={cn(
-                                    'text-sm font-semibold transition-colors',
+                                    'text-xs font-semibold transition-colors',
                                     getCategoryTextColor(category),
                                   )}
                                 >
@@ -387,7 +409,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                             </div>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="pt-1 pb-2 px-0">
+                        <AccordionContent className="px-0 pb-1.5 pt-0.5">
                           {viewMode === 'list' ? (
                             <div className="space-y-0.5">
                               {components.map((component) => (
@@ -400,7 +422,7 @@ export function Sidebar({ canManageWorkflows = true }: SidebarProps) {
                               ))}
                             </div>
                           ) : (
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1">
                               {components.map((component) => (
                                 <ComponentItem
                                   key={component.id}

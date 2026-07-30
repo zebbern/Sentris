@@ -134,14 +134,6 @@ mock.module('@/hooks/useWorkflowExecution', () => ({
   }),
 }));
 
-mock.module('@/hooks/useCopyToClipboard', () => ({
-  useCopyToClipboard: () => ({ copy: mock(async () => {}) }),
-}));
-
-mock.module('@/hooks/useIsMobile', () => ({
-  useIsMobile: () => false,
-}));
-
 const mockNavigate = mock(() => {});
 
 mock.module('react-router-dom', () => ({
@@ -154,17 +146,15 @@ mock.module('@/utils/triggerDisplay', () => ({
   getTriggerDisplay: () => ({ icon: '▶', label: 'Manual run', variant: 'secondary' }),
 }));
 
-mock.module('@/features/workflow-builder/utils/executionRuns', () => ({
-  isRunLive: (run?: any) => run?.isLive ?? false,
-}));
-
 mock.module('@/lib/logger', () => ({
   logger: { error: mock(() => {}) },
 }));
 
 // Mock sub-components to isolate ExecutionInspector
 mock.module('@/components/timeline/RunSelector', () => ({
-  RunSelector: () => <div data-testid="run-selector" />,
+  RunSelector: ({ onRerun }: { onRerun?: (runId: string) => void }) => (
+    <div data-testid="run-selector" data-has-rerun={onRerun ? 'true' : 'false'} />
+  ),
 }));
 
 mock.module('@/components/timeline/ExecutionTimeline', () => ({
@@ -193,10 +183,6 @@ mock.module('@/components/timeline/NetworkPanel', () => ({
 
 mock.module('@/components/execution/ExecutionTabs', () => ({
   ExecutionTabs: () => <div data-testid="execution-tabs" />,
-}));
-
-mock.module('@/components/timeline/RunInfoDisplay', () => ({
-  RunInfoDisplay: ({ run }: any) => <div data-testid="run-info-display">{run.id}</div>,
 }));
 
 mock.module('@/components/ui/MessageModal', () => ({
@@ -253,14 +239,10 @@ describe('ExecutionInspector', () => {
       '@/components/timeline/NetworkPanel',
       '@/components/timeline/NodeIOInspector',
       '@/components/timeline/RunSelector',
-      '@/components/timeline/RunInfoDisplay',
       '@/components/artifacts/RunArtifactsPanel',
       '@/components/execution/ExecutionTabs',
       '@/components/ui/MessageModal',
-      '@/features/workflow-builder/utils/executionRuns',
       '@/hooks/queries/useRunQueries',
-      '@/hooks/useCopyToClipboard',
-      '@/hooks/useIsMobile',
       '@/hooks/useWorkflowExecution',
       '@/lib/logger',
       '@/store/executionStore',
@@ -332,19 +314,20 @@ describe('ExecutionInspector', () => {
     expect(screen.getByTestId('network-panel')).toBeTruthy();
   });
 
-  it('shows Stop button when run is active', () => {
+  it('shows run progress when run is active', () => {
     mockExecRunId = 'run-1';
     mockExecStatus = 'running';
+    mockSelectedRunId = 'run-1';
     renderInspector();
 
-    expect(screen.getByText('Stop')).toBeTruthy();
+    expect(screen.queryByText('Stop')).toBeNull();
   });
 
-  it('shows Rerun button when onRerunRun is provided', () => {
+  it('passes onRerun to RunSelector when onRerunRun is provided', () => {
     const onRerun = mock(() => {});
     renderInspector({ onRerunRun: onRerun });
 
-    expect(screen.getByText('Rerun')).toBeTruthy();
+    expect(screen.getByTestId('run-selector').getAttribute('data-has-rerun')).toBe('true');
   });
 
   it('shows "Select a run to explore" when no run is selected', () => {

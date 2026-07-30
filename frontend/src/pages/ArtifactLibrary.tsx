@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Download, FileBox, RefreshCw, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import { useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Download, FileBox, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +22,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import type { ArtifactMetadata } from '@sentris/shared';
 import { Badge } from '@/components/ui/badge';
 import { getRemoteUploads } from '@/utils/artifacts';
@@ -56,7 +55,8 @@ const formatTimestamp = (value: string) => {
 
 export function ArtifactLibrary() {
   useDocumentTitle('Artifacts');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') ?? '';
   const queryClient = useQueryClient();
   const { confirm, dialogProps } = useConfirmDialog();
   const { toast } = useToast();
@@ -103,26 +103,6 @@ export function ArtifactLibrary() {
   return (
     <div className="flex-1 bg-background" aria-busy={libraryLoading}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <PageToolbar
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Filter by name..."
-          actions={
-            <Button
-              type="button"
-              variant="ghost"
-              className="gap-2"
-              onClick={handleRefresh}
-              disabled={libraryLoading}
-              aria-label="Refresh artifacts"
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          }
-          className="gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-6"
-        />
-
         <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
           {libraryLoading && !libraryError ? (
             <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
@@ -134,7 +114,7 @@ export function ArtifactLibrary() {
                   <TableHead className="min-w-[100px] hidden sm:table-cell">Run</TableHead>
                   <TableHead className="min-w-[60px]">Size</TableHead>
                   <TableHead className="min-w-[100px] hidden lg:table-cell">Created</TableHead>
-                  <TableHead className="min-w-[120px]">Actions</TableHead>
+                  <TableHead className="w-[88px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -160,9 +140,9 @@ export function ArtifactLibrary() {
                       <Skeleton className="h-4 w-[100px]" />
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Skeleton className="h-8 w-[60px]" />
-                        <Skeleton className="h-8 w-[80px]" />
+                      <div className="flex justify-end gap-1">
+                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-8 w-8" />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -199,7 +179,7 @@ export function ArtifactLibrary() {
                         <TableHead className="min-w-[100px] hidden lg:table-cell">
                           Created
                         </TableHead>
-                        <TableHead className="min-w-[120px]">Actions</TableHead>
+                        <TableHead className="w-[88px] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -357,13 +337,24 @@ function ArtifactLibraryRow({
           <TableCell className="align-top text-xs md:text-sm text-muted-foreground hidden lg:table-cell">
             {formatTimestamp(artifact.createdAt)}
           </TableCell>
-          <TableCell className="align-top">
-            <div className="flex flex-wrap justify-start gap-1 md:gap-2">
+          <TableCell className="align-middle text-right">
+            <div className="inline-flex items-center justify-end gap-1.5">
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="gap-1 md:gap-2 h-8 px-2 md:px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onDownload}
+                disabled={isDownloading}
+                aria-label={`Download ${artifact.name}`}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => {
                   onDelete();
                 }}
@@ -371,21 +362,6 @@ function ArtifactLibraryRow({
                 aria-label={`Delete ${artifact.name}`}
               >
                 <Trash2 className="h-4 w-4" />
-                <span className="hidden md:inline">{isDeleting ? 'Deleting…' : 'Delete'}</span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="gap-1 md:gap-2 h-8 px-2 md:px-3"
-                onClick={onDownload}
-                disabled={isDownloading}
-                aria-label={`Download ${artifact.name}`}
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden md:inline">
-                  {isDownloading ? 'Downloading…' : 'Download'}
-                </span>
               </Button>
             </div>
           </TableCell>

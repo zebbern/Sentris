@@ -40,6 +40,8 @@ describeTopBar('TopBar', () => {
   it('does not show progress information (removed for cleaner UI)', () => {
     useExecutionStore.setState({
       status: 'running',
+      runId: 'run-1',
+      workflowId: 'workflow-1',
       runStatus: {
         runId: 'run-1',
         workflowId: 'workflow-1',
@@ -59,6 +61,36 @@ describeTopBar('TopBar', () => {
     );
 
     expect(screen.queryByText('2/5 actions')).not.toBeInTheDocument();
+  });
+
+  it('transforms Run into Stop while execution is active', () => {
+    const stopExecution = mock(async () => {});
+    useExecutionStore.setState({
+      status: 'running',
+      runId: 'run-1',
+      workflowId: 'workflow-1',
+      stopExecution,
+      runStatus: {
+        runId: 'run-1',
+        workflowId: 'workflow-1',
+        status: 'RUNNING',
+        startedAt: iso(),
+        updatedAt: iso(),
+        taskQueue: 'sentris-default',
+        historyLength: 10,
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={mock()} onSave={mock()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
+    const stopButton = screen.getByRole('button', { name: 'Stop' });
+    fireEvent.click(stopButton);
+    expect(stopExecution).toHaveBeenCalledTimes(1);
   });
 
   it('keeps failure context out of the builder top bar', () => {
@@ -138,6 +170,18 @@ describeTopBar('TopBar', () => {
     expect(screen.getByRole('button', { name: 'Execute' })).toBeDisabled();
   });
 
+  it('hides Save when the persisted workflow is clean', () => {
+    useWorkflowStore.setState({ isDirty: false });
+
+    render(
+      <MemoryRouter>
+        <TopBar workflowId="workflow-1" onRun={mock()} onSave={mock()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Save workflow' })).toBeNull();
+  });
+
   it('saves directly from the visible Save button', async () => {
     useWorkflowStore.setState({ isDirty: true });
     const onSave = mock(async () => {
@@ -154,6 +198,10 @@ describeTopBar('TopBar', () => {
 
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Saved' })).toBeInTheDocument();
     });
   });
 

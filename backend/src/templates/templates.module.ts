@@ -7,6 +7,7 @@ import { WorkflowsModule } from '../workflows/workflows.module';
 import type { RedisConfig } from '../config';
 import { TemplatesController } from './templates.controller';
 import { TemplateService } from './templates.service';
+import { CommunityImportService } from './community-import.service';
 import { WorkflowSanitizationService } from './workflow-sanitization.service';
 import { TemplatesRepository } from './templates.repository';
 import { GitHubSyncService } from './github-sync.service';
@@ -49,11 +50,12 @@ import { TEMPLATE_CACHE_REDIS } from './templates.tokens';
     TemplateRevalidationService,
     TemplateValidationLedgerService,
     TemplateService,
+    CommunityImportService,
     WorkflowSanitizationService,
     TemplatesRepository,
     GitHubSyncService,
     EtagCacheService,
   ],
-  exports: [TemplateService, GitHubSyncService],
+  exports: [TemplateService, GitHubSyncService, CommunityImportService],
 })
 export class TemplatesModule {}

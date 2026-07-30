@@ -21,7 +21,7 @@ const mockComponent = {
     icon: 'Search',
   },
   description: 'Runs an Nmap port scan on a target host.',
-  documentation: null,
+  documentation: 'Nmap scans hosts for open ports.',
   documentationUrl: null,
   icon: 'Search',
   logo: null,
@@ -138,6 +138,18 @@ mock.module('@/utils/runtimeInputUtils', () => ({
   normalizeRuntimeInputs: () => [],
 }));
 
+let hideConfigInfoSections = true;
+const setHideConfigInfoSections = mock((value: boolean) => {
+  hideConfigInfoSections = value;
+});
+
+mock.module('@/store/userPreferencesStore', () => ({
+  useUserPreferencesStore: createStoreMock(() => ({
+    hideConfigInfoSections,
+    setHideConfigInfoSections,
+  })),
+}));
+
 const { ConfigPanel } = await import('../ConfigPanel');
 
 function createSelectedNode(overrides: Partial<FrontendNodeData> = {}): Node<FrontendNodeData> {
@@ -162,6 +174,8 @@ describe('ConfigPanel', () => {
   afterEach(() => {
     cleanup();
     isComponentsLoading = false;
+    hideConfigInfoSections = true;
+    setHideConfigInfoSections.mockClear();
   });
 
   it('returns null when no node is selected', () => {
@@ -225,5 +239,27 @@ describe('ConfigPanel', () => {
     render(<ConfigPanel selectedNode={node} onClose={mock(() => {})} />);
 
     expect(screen.getByRole('heading', { name: 'Tool' })).toBeInTheDocument();
+  });
+
+  it('hides info sections by default and shows them when toggled off', () => {
+    const { rerender } = render(
+      <ConfigPanel selectedNode={createSelectedNode()} onClose={mock(() => {})} />,
+    );
+
+    expect(screen.getByLabelText('Show info sections?')).toBeInTheDocument();
+    expect(screen.queryByText('Documentation')).toBeNull();
+    expect(screen.queryByText('Outputs')).toBeNull();
+    expect(screen.getByText('Parameters')).toBeInTheDocument();
+    expect(screen.getByText('Inputs')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Show info sections?'));
+    expect(setHideConfigInfoSections).toHaveBeenCalledWith(false);
+
+    hideConfigInfoSections = false;
+    rerender(<ConfigPanel selectedNode={createSelectedNode()} onClose={mock(() => {})} />);
+
+    expect(screen.getByLabelText('Hide info sections?')).toBeInTheDocument();
+    expect(screen.getByText('Documentation')).toBeInTheDocument();
+    expect(screen.getByText('Outputs')).toBeInTheDocument();
   });
 });

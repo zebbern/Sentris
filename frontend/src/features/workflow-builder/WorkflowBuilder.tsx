@@ -121,7 +121,7 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
         topBar={topBarNode}
         isLibraryVisible={state.isLibraryVisible}
         onToggleLibrary={state.toggleLibrary}
-        libraryContent={<Sidebar />}
+        libraryContent={<Sidebar onHideLibrary={state.toggleLibrary} />}
         canvasContent={canvasContent}
         showScheduleSidebarContainer={false}
         isScheduleSidebarVisible={state.schedulesPanelOpen}

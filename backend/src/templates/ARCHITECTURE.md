@@ -2,16 +2,19 @@
 
 ## Overview
 
-The Template Library provides a centralized repository of workflow templates that users can browse and use as starting points for their own workflows. Templates are stored in a **public** GitHub repository and synced to the application database.
+The Template Library provides a catalog of workflow templates users can browse, preview, and instantiate. The frontend (`/templates`) has two tabs:
+
+- **Official** — rows in Postgres `templates`, filled by local seed files + GitHub sync from `GITHUB_TEMPLATE_REPO` (default `zebbern/sentris-templates`)
+- **Community** — remote catalog from the Sentris repo (`community/template/…`), imported into the org on demand
 
 ### Key Features
 
-- Browse workflow templates by category, tags, or search
-- Templates stored in a public GitHub repository (no authentication needed)
-- Automatic sync on backend startup
-- Manual "Sync from GitHub" button for on-demand refresh
-- Workflow sanitization to remove secrets before publishing
-- Support for both community and official templates
+- Browse/filter official templates (search, category, no-setup); activation ranking + recommended starters on the client
+- Official templates: public GitHub sync (startup + every 30 minutes + admin Sync) and local seed upsert on boot
+- Live validation ledger enrichment (`template.validation`) for “live verified” badges
+- Workflow sanitization before publish; GitHub web flow for upstream PRs (no backend PR token)
+- Community catalog browse/import (separate from official sync)
+- Use template → create workflow → `/workflows/:id?launch=1`
 
 ---
 
@@ -66,12 +69,14 @@ Templates are fetched from a **public** GitHub repository using the GitHub API a
 
 ### Sync Triggers
 
-| Trigger          | When                            | How                                     |
-| ---------------- | ------------------------------- | --------------------------------------- |
-| **Startup sync** | Backend boots                   | `onModuleInit()` in `GitHubSyncService` |
-| **Manual sync**  | Admin clicks "Sync from GitHub" | `POST /templates/sync`                  |
+| Trigger            | When                     | How                                               |
+| ------------------ | ------------------------ | ------------------------------------------------- |
+| **Startup sync**   | Backend boots            | `onModuleInit()` in `GitHubSyncService`           |
+| **Scheduled sync** | Every 30 minutes         | `setInterval` in `GitHubSyncService` (ETag cache) |
+| **Manual sync**    | Admin clicks Sync        | `POST /templates/sync`                            |
+| **Local seed**     | Backend boots (non-test) | `TemplateSeedService.onModuleInit()`              |
 
-A **concurrent sync guard** prevents overlapping syncs from running simultaneously.
+A **concurrent sync guard** prevents overlapping GitHub syncs from running simultaneously.
 
 ### Sync Process
 
@@ -146,38 +151,11 @@ Each template file in GitHub must follow this structure:
 
 ---
 
-## Auto-Sync: Startup
+## Auto-Sync: Startup + Schedule
 
-The backend automatically syncs templates on startup:
+`GitHubSyncService` syncs on module init, then every 30 minutes. Failures are logged and do not crash the process. ETag caching avoids GitHub rate-limit burns when content is unchanged.
 
-1. **On startup** -- immediate sync when the backend boots
-
-### Implementation
-
-```typescript
-// Location: github-sync.service.ts
-
-@Injectable()
-export class GitHubSyncService implements OnModuleInit {
-  private isSyncing = false;
-
-  async onModuleInit(): Promise<void> {
-    // 1. Log repo config
-    const { owner, repo, branch } = this.getRepoConfig();
-    this.logger.log(`Template repo: ${owner}/${repo} (branch: ${branch})`);
-
-    // 2. Initial sync on startup
-    const result = await this.syncTemplates();
-  }
-}
-```
-
-### Behavior
-
-- Triggers when `TemplatesModule` is initialized
-- Runs automatically on backend startup
-- Logs results but doesn't fail the application if sync errors occur
-- Concurrent sync guard prevents overlapping runs
+`TemplateSeedService` separately upserts `backend/scripts/seed-templates/*.json` on startup (skipped in test / when ingest is disabled).
 
 ### How PR Merge -> Database Works
 
@@ -737,38 +715,59 @@ Common validation failures:
 
 ---
 
+## Frontend (current)
+
+```
+frontend/src/pages/TemplateLibraryPage.tsx     # Official + Community tabs
+frontend/src/pages/template-library/           # Cards, filters, setupLevel, community panel
+frontend/src/features/templates/               # UseTemplateModal, PublishTemplateModal, preview
+frontend/src/hooks/queries/useTemplateQueries.ts
+frontend/src/hooks/queries/useCommunityCatalog.ts
+```
+
+Deep links: `?setup=none` (no-setup filter), `?id=<uuid>` (open official detail modal), `?tab=community`.
+
+Official Contribute / empty-state browse URLs come from `GET /templates/repo-info` (fallback `zebbern/sentris-templates`). Community Contribute uses the Sentris `community/template` tree.
+
+---
+
 ## Related Files
 
 ```
 backend/src/templates/
-+-- templates.module.ts           # Module definition
-+-- templates.controller.ts       # HTTP endpoints
-+-- templates.service.ts          # Business logic
-+-- github-sync.service.ts        # GitHub API integration
-+-- workflow-sanitization.service.ts  # Secret removal
-+-- templates.repository.ts       # Database operations
-+-- ARCHITECTURE.md               # This file
++-- templates.module.ts
++-- templates.controller.ts
++-- templates.service.ts
++-- github-sync.service.ts              # Public repo sync + 30m schedule
++-- template-seed.service.ts            # Local official seed upsert
++-- template-validation-ledger.service.ts
++-- template-revalidation.service.ts    # Admin live-audit jobs
++-- workflow-sanitization.service.ts
++-- templates.repository.ts
++-- ARCHITECTURE.md
 
-backend/src/database/schema/
-+-- templates.ts                  # Database schema definitions
+backend/scripts/seed-templates/         # Official seed JSON graphs
+backend/src/database/schema/templates.ts
 
+frontend/src/pages/TemplateLibraryPage.tsx
+frontend/src/pages/template-library/
 frontend/src/features/templates/
-+-- components/                   # Template UI components
-+-- hooks/                        # Custom React hooks
-+-- TemplateLibrary.tsx           # Main page
 ```
 
 ---
 
 ## Version History
 
-- **v1.2.0** - Simplified to startup sync + manual sync
+- **v1.3.0** - Official/Community UI, seed + ledger, scheduled sync restored
+  - Local `TemplateSeedService` + validation ledger enrichment on list/get
+  - GitHub sync: startup + 30-minute interval (ETag cache) + manual Sync
+  - Frontend activation ranking / no-setup filter; community catalog tab
+  - Official browse/contribute URLs aligned to `GITHUB_TEMPLATE_REPO`
+
+- **v1.2.0** - Simplified sync surface
   - Removed webhook controller and webhook-based sync
   - Removed `GITHUB_TEMPLATE_TOKEN` and private repo support (repo must be public)
-  - Removed periodic sync (`setInterval`, `GITHUB_SYNC_INTERVAL_MS`, `OnModuleDestroy`)
-  - Removed `getHeaders()` method and `Authorization` header logic
-  - Architecture is now: startup sync + manual "Sync from GitHub" button
-  - Only 2 env vars: `GITHUB_TEMPLATE_REPO` and `GITHUB_TEMPLATE_BRANCH`
+  - Only 2 env vars for GitHub sync: `GITHUB_TEMPLATE_REPO` and `GITHUB_TEMPLATE_BRANCH`
 
 - **v1.1.0** - Private repo support + periodic sync
   - Added `GITHUB_TEMPLATE_TOKEN` auth for private repositories

@@ -151,7 +151,8 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   mockToast.mockClear();
 };
 
-const renderPage = () => renderWithProviders(<TargetsPage />);
+const renderPage = (initialEntries: string[] = ['/targets']) =>
+  renderWithProviders(<TargetsPage />, { initialEntries });
 
 // --- Tests ---
 describe('TargetsPage', () => {
@@ -179,22 +180,17 @@ describe('TargetsPage', () => {
     );
   });
 
-  it('shows the empty state with "No targets yet" and an admin "New target" action', () => {
+  it('shows the empty state with "No targets yet" without a duplicate New target CTA', () => {
     setupStore({ scopes: [] });
     renderPage();
 
     expect(screen.getByText('No targets yet')).toBeInTheDocument();
-    const newTargetButtons = screen.getAllByRole('button', { name: /New target/i });
-    expect(newTargetButtons.length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole('button', { name: /New target/i })).not.toBeInTheDocument();
   });
 
-  it('clicking "New target" opens the editor dialog', () => {
+  it('opens the editor dialog from the create query param', () => {
     setupStore();
-    renderPage();
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: /New target/i })[0]!);
+    renderPage(['/targets?create=1']);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Create target')).toBeInTheDocument();
@@ -202,9 +198,7 @@ describe('TargetsPage', () => {
 
   it('associates every target editor label with its form control', () => {
     setupStore();
-    renderPage();
-
-    fireEvent.click(screen.getAllByRole('button', { name: /New target/i })[0]!);
+    renderPage(['/targets?create=1']);
 
     for (const accessibleName of ['Name', 'Description', 'Domains', 'Repos', 'IP ranges']) {
       expect(screen.getByRole('textbox', { name: accessibleName })).toBeInTheDocument();
@@ -213,9 +207,7 @@ describe('TargetsPage', () => {
 
   it('submitting the editor with a name calls create', async () => {
     setupStore();
-    renderPage();
-
-    fireEvent.click(screen.getAllByRole('button', { name: /New target/i })[0]!);
+    renderPage(['/targets?create=1']);
 
     const nameInput = screen.getByPlaceholderText('Example Corp');
     fireEvent.change(nameInput, { target: { value: 'New Target Co' } });

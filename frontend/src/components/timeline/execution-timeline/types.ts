@@ -16,22 +16,22 @@ export interface AgentMarkerData {
   visible: boolean;
 }
 
+export interface TimelineViewTogglesProps {
+  playbackMode: 'live' | 'replay';
+  isLiveFollowing: boolean;
+  onGoLive: () => void;
+}
+
 export interface PlaybackControlsProps {
   currentTime: number;
   totalDuration: number;
   isPlaying: boolean;
   playbackMode: 'live' | 'replay';
   playbackSpeed: number;
-  isLiveFollowing: boolean;
-  showHeatMap: boolean;
-  smartRouting: boolean;
   onPlayPause: () => void;
   onStepForward: () => void;
   onStepBackward: () => void;
   onSpeedChange: (speed: number) => void;
-  onGoLive: () => void;
-  onToggleHeatMap: () => void;
-  onToggleSmartRouting: () => void;
 }
 
 export interface TimelineTrackProps {
@@ -62,8 +62,8 @@ export interface TimelineOverviewProps {
 export interface TimelineStatusBarProps {
   eventCount: number;
   nodeCount: number;
-  playbackSpeed: number;
   playbackMode: 'live' | 'replay';
   isSeeking: boolean;
   isPlaying: boolean;
+  className?: string;
 }

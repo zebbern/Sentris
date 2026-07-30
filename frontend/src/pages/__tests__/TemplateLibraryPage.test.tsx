@@ -1,7 +1,8 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { Template, TemplateCategory } from '@/types/templates';
 import { getTemplateSetupLevel } from '@/pages/template-library/setupLevel';
 import { createDialogMock } from '@/test/mocks/dialog';
@@ -21,13 +22,11 @@ import { createSelectMock } from '@/test/mocks/radix-select';
 const mockQueryState: {
   templates: Template[];
   categories: TemplateCategory[];
-  tags: string[];
   isLoading: boolean;
   error: Error | null;
 } = {
   templates: [],
   categories: [],
-  tags: [],
   isLoading: false,
   error: null,
 };
@@ -77,8 +76,13 @@ mock.module('@/hooks/queries/useTemplateQueries', () => ({
   useTemplateCategories: () => ({
     data: mockQueryState.categories,
   }),
-  useTemplateTags: () => ({
-    data: mockQueryState.tags,
+  useTemplateRepoInfo: () => ({
+    data: {
+      owner: 'zebbern',
+      repo: 'sentris-templates',
+      branch: 'main',
+      url: 'https://github.com/zebbern/sentris-templates',
+    },
   }),
   useSyncTemplates: () => ({
     mutateAsync: mockSyncMutateAsync,
@@ -86,6 +90,50 @@ mock.module('@/hooks/queries/useTemplateQueries', () => ({
   }),
   useUseTemplate: () => ({
     mutateAsync: mock(async () => ({ workflowId: 'wf-new' })),
+    isPending: false,
+  }),
+}));
+
+const mockImportMutateAsync = mock(async () => ({
+  id: 'imported-tmpl',
+  name: 'Imported Community Template',
+}));
+const mockCommunityCatalogState: {
+  templates: {
+    id: string;
+    name: string;
+    description: string;
+    author: { displayName: string };
+    templatePath: string;
+    htmlUrl: string;
+    reviewed?: boolean;
+  }[];
+  isLoading: boolean;
+  error: Error | null;
+} = {
+  templates: [],
+  isLoading: false,
+  error: null,
+};
+
+mock.module('@/hooks/queries/useCommunityCatalog', () => ({
+  useCommunityCatalog: () => ({
+    data: {
+      version: 1,
+      updatedAt: '2026-07-30T00:00:00.000Z',
+      templates: mockCommunityCatalogState.templates,
+    },
+    isLoading: mockCommunityCatalogState.isLoading,
+    error: mockCommunityCatalogState.error,
+    refetch: mock(async () => {}),
+  }),
+  useCommunityTemplateJson: () => ({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  }),
+  useImportCommunityTemplate: () => ({
+    mutateAsync: mockImportMutateAsync,
     isPending: false,
   }),
 }));
@@ -192,7 +240,6 @@ const mockCategories: TemplateCategory[] = [
 const setupStore = (overrides: Partial<typeof mockQueryState> & { roles?: string[] } = {}) => {
   mockQueryState.templates = overrides.templates ?? [templateA, templateB];
   mockQueryState.categories = overrides.categories ?? mockCategories;
-  mockQueryState.tags = overrides.tags ?? ['network', 'recon', 'audit', 'cis'];
   mockQueryState.isLoading = overrides.isLoading ?? false;
   mockQueryState.error = overrides.error ?? null;
   mockRoles = overrides.roles ?? ['ADMIN'];
@@ -202,12 +249,20 @@ const setupStore = (overrides: Partial<typeof mockQueryState> & { roles?: string
   mockToast.mockClear();
 };
 
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <TemplateLibraryPage />
-    </MemoryRouter>,
+const renderPage = (initialEntry = '/templates') => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/templates" element={<TemplateLibraryPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -223,6 +278,7 @@ afterAll(() =>
     '@/components/ui/tooltip',
     '@/components/ui/select',
     '@/hooks/queries/useTemplateQueries',
+    '@/hooks/queries/useCommunityCatalog',
     '@/store/authStore',
     '@/utils/auth',
     '@/components/ui/use-toast',
@@ -332,15 +388,12 @@ describe('TemplateLibraryPage', () => {
     expect(syncBtn).toBeInTheDocument();
   });
 
-  it('renders tag filter buttons', () => {
+  it('does not render the tag filter chip row', () => {
     setupStore();
     renderPage();
 
-    // Tags may also appear inside template cards, so use getAllByText
-    expect(screen.getAllByText('network').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('recon').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('audit').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('cis').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole('button', { name: 'network' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'recon' })).not.toBeInTheDocument();
   });
 
   it('search input is rendered and accepts input', () => {
@@ -390,8 +443,9 @@ describe('TemplateLibraryPage', () => {
     setupStore();
     renderPage();
 
-    const updatedTexts = screen.getAllByText(/Updated/i);
-    expect(updatedTexts.length).toBeGreaterThanOrEqual(2);
+    // Card meta uses formatTimeAgo (e.g. "today", "1d ago") without an "Updated" prefix.
+    const relativeTimes = screen.getAllByText(/ago|today/i);
+    expect(relativeTimes.length).toBeGreaterThanOrEqual(2);
   });
 
   it('surfaces current live verification without admin revalidation controls', () => {
@@ -421,7 +475,7 @@ describe('TemplateLibraryPage', () => {
     expect(screen.queryByText('Recent revalidations')).not.toBeInTheDocument();
   });
 
-  it('puts a verified no-setup template in the Start here position', () => {
+  it('prioritizes verified no-setup templates as recommended starters', () => {
     const starter: Template = {
       ...templateB,
       id: 'starter',
@@ -449,7 +503,6 @@ describe('TemplateLibraryPage', () => {
 
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument();
     expect(screen.getByText('Recommended starter')).toBeInTheDocument();
     const detailsButtons = screen.getAllByRole('button', {
       name: /template details/i,
@@ -544,7 +597,7 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getByText('Docker Scan')).toBeDefined();
 
     // Toggle "No setup required".
-    fireEvent.click(screen.getByRole('button', { name: /No setup required/i }));
+    fireEvent.click(screen.getByRole('button', { name: /No setup/i }));
 
     expect(screen.getByText('Net Only')).toBeDefined();
     expect(screen.queryByText('Docker Scan')).toBeNull();
@@ -560,11 +613,20 @@ describe('TemplateLibraryPage', () => {
 
     expect(screen.getByText(/synced from GitHub by an administrator/i)).toBeDefined();
     const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
-    expect(link.getAttribute('href')).toContain('github.com');
+    expect(link.getAttribute('href')).toBe('https://github.com/zebbern/sentris-templates');
     // The toolbar always renders a "Sync templates" control (disabled for non-admins);
     // it must not be an active CTA in the empty state.
     const syncButton = screen.queryByRole('button', { name: /Sync templates/i });
     if (syncButton) expect(syncButton).toBeDisabled();
+  });
+
+  it('opens the detail modal when deep-linked with ?id=', async () => {
+    setupStore({ templates: [templateA] });
+    renderPage(`/templates?id=${templateA.id}`);
+
+    const dialog = await waitFor(() => screen.getByRole('dialog'));
+    expect(dialog.textContent).toMatch(/Network Recon Scan/i);
+    expect(dialog.textContent).toMatch(/Configure & Run/i);
   });
 
   it('shows the empty-library state (not filter copy) for a non-admin deep-linked to ?setup=none on an empty library', () => {
@@ -576,19 +638,15 @@ describe('TemplateLibraryPage', () => {
     mockRoles = [];
     mockQueryState.templates = [];
 
-    render(
-      <MemoryRouter initialEntries={['/templates?setup=none']}>
-        <TemplateLibraryPage />
-      </MemoryRouter>,
-    );
+    renderPage('/templates?setup=none');
 
     const link = screen.getByRole('link', { name: /Browse templates on GitHub/i });
-    expect(link.getAttribute('href')).toContain('github.com');
+    expect(link.getAttribute('href')).toBe('https://github.com/zebbern/sentris-templates');
     expect(screen.queryByText(/Try adjusting your filters/i)).not.toBeInTheDocument();
   });
 
   it('shows the "adjust your filters" empty state (not the sync/GitHub empty state) when a search filters a non-empty library to zero results', () => {
-    // Regression guard: `filters` (category/search/tags) is a server-side
+    // Regression guard: `filters` (category/search) is a server-side
     // query — `templates` coming back empty because of an active search
     // does NOT mean the library itself is empty. Simulate that by setting
     // the mocked query result to [] and then driving a search term through
@@ -612,5 +670,42 @@ describe('TemplateLibraryPage', () => {
         'No templates available yet. Sync from GitHub to load the template library.',
       ),
     ).not.toBeInTheDocument();
+  });
+
+  it('defaults to the Official tab and shows Official filters', () => {
+    renderPage();
+    expect(screen.getByRole('tab', { name: 'Official' }).getAttribute('data-state')).toBe('active');
+    expect(screen.getByPlaceholderText('Filter by template name')).toBeInTheDocument();
+  });
+
+  it('opens the Community tab from ?tab=community and preserves setup', () => {
+    mockCommunityCatalogState.templates = [
+      {
+        id: 'demo-passive-lookup',
+        name: 'HTTP URL Status Check',
+        description:
+          'Community example template: GET a public URL and summarize HTTP status metadata.',
+        author: { displayName: 'zebbern' },
+        templatePath: 'community/template/demo-passive-lookup/template.json',
+        htmlUrl:
+          'https://github.com/zebbern/Sentris/tree/main/community/template/demo-passive-lookup',
+        reviewed: true,
+      },
+    ];
+
+    renderPage('/templates?tab=community&setup=none');
+
+    expect(screen.getByRole('tab', { name: 'Community' }).getAttribute('data-state')).toBe(
+      'active',
+    );
+    expect(screen.getByPlaceholderText('Search community templates')).toBeInTheDocument();
+    expect(screen.getByText('HTTP URL Status Check')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Filter by template name')).not.toBeInTheDocument();
+  });
+
+  it('switches to Community via the tab control', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: 'Community' }));
+    expect(screen.getByPlaceholderText('Search community templates')).toBeInTheDocument();
   });
 });

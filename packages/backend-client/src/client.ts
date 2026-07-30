@@ -2768,6 +2768,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates/community/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a community template from the published catalog */
+        post: operations["TemplatesController_importCommunityTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates/publish": {
         parameters: {
             query?: never;
@@ -5184,6 +5201,10 @@ export interface components {
             }[];
             error?: string;
             errorCode?: string;
+        };
+        ImportCommunityTemplateDto: {
+            id?: string;
+            templatePath?: string;
         };
         PublishTemplateDto: {
             workflowId: string;
@@ -10479,6 +10500,28 @@ export interface operations {
         responses: {
             /** @description Returns template details */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TemplatesController_importCommunityTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCommunityTemplateDto"];
+            };
+        };
+        responses: {
+            /** @description Imported community template */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

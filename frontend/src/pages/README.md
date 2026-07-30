@@ -4,30 +4,30 @@ Top-level page components representing application routes. Every page uses `Reac
 
 ## Page Components
 
-| File                        | Title              | Description                                                                                |
-| --------------------------- | ------------------ | ------------------------------------------------------------------------------------------ |
-| `WorkflowList.tsx`          | Workflows          | Dashboard with workflow cards, recent runs, and create/import actions                      |
-| `SecretsManager.tsx`        | Secrets            | Secrets and credential management with create, edit, rotate, and bulk delete               |
-| `IntegrationsManager.tsx`   | Connections        | OAuth provider connections and third-party integrations                                    |
-| `ArtifactLibrary.tsx`       | Artifacts          | File and artifact browser for workflow outputs                                             |
-| `SettingsPage.tsx`          | Settings           | Tabbed settings: General, Appearance, Notifications, Keyboard Shortcuts, Audit Log (admin) |
-| `TemplateLibraryPage.tsx`   | Template Library   | Browse, filter, and use workflow templates synced from GitHub                              |
-| `McpLibraryPage.tsx`        | MCP Library        | Manage MCP server groups, enable servers, and browse available tools                       |
-| `SchedulesPage.tsx`         | Schedules          | Cron-based workflow scheduling with create, edit, pause, and delete                        |
-| `WebhooksPage.tsx`          | Webhooks           | Webhook endpoint management for triggering workflows via HTTP                              |
-| `WebhookEditorPage.tsx`     | Webhook Editor     | Detailed webhook configuration with payload testing and delivery logs                      |
-| `ActionCenterPage.tsx`      | Action Center      | Human-in-the-loop task queue for pending workflow approvals and inputs                     |
-| `AnalyticsSettingsPage.tsx` | Analytics Settings | PostHog analytics opt-in/out and event tracking configuration                              |
-| `ApiKeysManager.tsx`        | API Keys           | API key lifecycle management (create, revoke, copy)                                        |
-| `RunRedirect.tsx`           | —                  | Utility route (`/runs/:runId`) that resolves a run's workflow and redirects                |
-| `NotFound.tsx`              | Not Found          | 404 page for unmatched routes                                                              |
-| `IntegrationCallback.tsx`   | —                  | OAuth callback handler for integration provider flows                                      |
+| File                        | Title              | Description                                                                                 |
+| --------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| `WorkflowList.tsx`          | Workflows          | Dashboard with workflow cards, recent runs, and create/import actions                       |
+| `SecretsManager.tsx`        | Secrets            | Secrets and credential management with create, edit, rotate, and bulk delete                |
+| `IntegrationsManager.tsx`   | Connections        | OAuth provider connections and third-party integrations                                     |
+| `ArtifactLibrary.tsx`       | Artifacts          | File and artifact browser for workflow outputs                                              |
+| `SettingsPage.tsx`          | Settings           | Tabbed settings: General, Appearance, Notifications, Keyboard Shortcuts, Audit Log (admin)  |
+| `TemplateLibraryPage.tsx`   | Template Library   | Official + Community tabs; browse/import templates (Community via published GitHub catalog) |
+| `McpLibraryPage.tsx`        | MCP Library        | Manage MCP server groups, enable servers, and browse available tools                        |
+| `SchedulesPage.tsx`         | Schedules          | Cron-based workflow scheduling with create, edit, pause, and delete                         |
+| `WebhooksPage.tsx`          | Webhooks           | Webhook endpoint management for triggering workflows via HTTP                               |
+| `WebhookEditorPage.tsx`     | Webhook Editor     | Detailed webhook configuration with payload testing and delivery logs                       |
+| `ActionCenterPage.tsx`      | Action Center      | Human-in-the-loop task queue for pending workflow approvals and inputs                      |
+| `AnalyticsSettingsPage.tsx` | Analytics Settings | PostHog analytics opt-in/out and event tracking configuration                               |
+| `ApiKeysManager.tsx`        | API Keys           | API key lifecycle management (create, revoke, copy)                                         |
+| `RunRedirect.tsx`           | —                  | Utility route (`/runs/:runId`) that resolves a run's workflow and redirects                 |
+| `NotFound.tsx`              | Not Found          | 404 page for unmatched routes                                                               |
+| `IntegrationCallback.tsx`   | —                  | OAuth callback handler for integration provider flows                                       |
 
 ## Sub-page Directories
 
 | Directory           | Contents                                                                                                         |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `template-library/` | `TemplateCard`, `TemplateFilters`, `TemplateDetailModal`, `PreviewSection`, types                                |
+| `template-library/` | Official cards/filters/modal + Community cards/panel/detail modal, types                                         |
 | `mcp-library/`      | MCP group cards, server selectors, tool browser components                                                       |
 | `schedules/`        | Schedule form, schedule row, cron expression helpers                                                             |
 | `integrations/`     | Provider cards, connection status, OAuth flow components                                                         |

@@ -23,12 +23,49 @@ const mockState = {
     failedCount: 0,
     activeSchedules: 0,
     pendingActions: 0,
+    openFindingsTotal: 0,
   },
   recentRuns: [] as ExecutionRun[],
+  failedRuns: [] as ExecutionRun[],
+  pendingActions: [] as {
+    id: string;
+    title: string;
+    inputType: string;
+    runId: string;
+    workflowId: string;
+  }[],
+  upcomingSchedules: [] as {
+    id: string;
+    workflowId: string;
+    name: string;
+    nextRunAt: string | null;
+    cronExpression: string;
+    humanLabel: string | null;
+  }[],
+  findingsSeverityCounts: [] as { severity: string; count: number }[],
+  attentionFindings: [] as {
+    id: string;
+    name?: string;
+    severity?: string;
+    workflow_name?: string;
+  }[],
   workflows: [] as WorkflowSummary[],
   isLoading: false,
   isError: false,
-  errors: {} as { workflows?: Error; runs?: Error; schedules?: Error; humanInputs?: Error },
+  sectionLoading: {
+    failedRuns: false,
+    findings: false,
+    schedules: false,
+    humanInputs: false,
+  },
+  errors: {} as {
+    workflows?: Error;
+    runs?: Error;
+    schedules?: Error;
+    humanInputs?: Error;
+    findings?: Error;
+    failedRuns?: Error;
+  },
   refetch: mock(),
 };
 
@@ -94,14 +131,26 @@ const defaultStats = {
   failedCount: 1,
   activeSchedules: 2,
   pendingActions: 1,
+  openFindingsTotal: 0,
 };
 
 const setup = (o: Partial<typeof mockState> & { stats?: Partial<typeof mockState.stats> } = {}) => {
   mockState.stats = { ...defaultStats, ...o.stats };
   mockState.recentRuns = o.recentRuns ?? runs;
+  mockState.failedRuns = o.failedRuns ?? [];
+  mockState.pendingActions = o.pendingActions ?? [];
+  mockState.upcomingSchedules = o.upcomingSchedules ?? [];
+  mockState.findingsSeverityCounts = o.findingsSeverityCounts ?? [];
+  mockState.attentionFindings = o.attentionFindings ?? [];
   mockState.workflows = o.workflows ?? [];
   mockState.isLoading = o.isLoading ?? false;
   mockState.isError = o.isError ?? false;
+  mockState.sectionLoading = o.sectionLoading ?? {
+    failedRuns: false,
+    findings: false,
+    schedules: false,
+    humanInputs: false,
+  };
   mockState.errors = o.errors ?? {};
   mockState.refetch = o.refetch ?? mock();
 };
@@ -151,6 +200,7 @@ describe('DashboardPage', () => {
           failedCount: 0,
           activeSchedules: 0,
           pendingActions: 0,
+          openFindingsTotal: 0,
         },
       });
       renderPage();
@@ -198,7 +248,7 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Failed to load pending actions')).toBeInTheDocument();
       // Other cards still render values — scope within stats grid to avoid ambiguity
       const statsGrid = within(screen.getByText('Runs (24h)').closest('[aria-busy]')!);
-      expect(statsGrid.getByText('3')).toBeInTheDocument(); // recentRunsCount
+      expect(statsGrid.getByText('2 succeeded, 1 failed')).toBeInTheDocument();
     });
 
     it('"Try again" calls refetch', () => {
@@ -230,18 +280,19 @@ describe('DashboardPage', () => {
           failedCount: 2,
           activeSchedules: 4,
           pendingActions: 3,
+          openFindingsTotal: 0,
         },
       });
       renderPage();
       // Scope assertions within the stats grid to avoid ambiguity
       const statsGrid = within(screen.getByText('Workflows').closest('[aria-busy]')!);
       expect(statsGrid.getByText('12')).toBeInTheDocument();
-      expect(statsGrid.getByText('8')).toBeInTheDocument();
+      expect(statsGrid.getByText('6 succeeded, 2 failed')).toBeInTheDocument();
       expect(statsGrid.getByText('4')).toBeInTheDocument();
       expect(statsGrid.getByText('3')).toBeInTheDocument();
     });
 
-    it('shows succeeded/failed breakdown subtitle', () => {
+    it('shows succeeded/failed breakdown in runs stat value', () => {
       setup({
         stats: {
           totalWorkflows: 5,
@@ -250,6 +301,7 @@ describe('DashboardPage', () => {
           failedCount: 3,
           activeSchedules: 0,
           pendingActions: 0,
+          openFindingsTotal: 0,
         },
       });
       renderPage();
@@ -265,13 +317,14 @@ describe('DashboardPage', () => {
           failedCount: 0,
           activeSchedules: 0,
           pendingActions: 0,
+          openFindingsTotal: 0,
         },
       });
       renderPage();
       expect(screen.getByText('No runs in last 24h')).toBeInTheDocument();
     });
 
-    it('shows "X total" subtitle when no succeeded/failed breakdown', () => {
+    it('shows "X total" when no succeeded/failed breakdown', () => {
       setup({
         stats: {
           totalWorkflows: 1,
@@ -280,10 +333,82 @@ describe('DashboardPage', () => {
           failedCount: 0,
           activeSchedules: 0,
           pendingActions: 0,
+          openFindingsTotal: 0,
         },
       });
       renderPage();
       expect(screen.getByText('5 total')).toBeInTheDocument();
+    });
+  });
+
+  // Ops panels
+  describe('operations overview', () => {
+    it('shows all-clear state when there is nothing needing attention', () => {
+      setup();
+      renderPage();
+      expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument();
+      expect(screen.getByText(/all clear/i)).toBeInTheDocument();
+    });
+
+    it('lists failed runs under needs attention', () => {
+      setup({
+        failedRuns: [
+          makeRun({
+            id: 'fail-1',
+            workflowId: 'wf-fail',
+            workflowName: 'Broken Scan',
+            status: 'FAILED',
+          }),
+        ],
+      });
+      renderPage();
+      expect(screen.getByText('Broken Scan')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Broken Scan'));
+      expect(mockNavigate).toHaveBeenCalledWith('/workflows/wf-fail/runs/fail-1');
+    });
+
+    it('lists pending actions under needs attention', () => {
+      setup({
+        pendingActions: [
+          {
+            id: 'hi-1',
+            title: 'Approve production deploy',
+            inputType: 'approval',
+            runId: 'run-x',
+            workflowId: 'wf-x',
+          },
+        ],
+      });
+      renderPage();
+      expect(screen.getByText('Approve production deploy')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Approve production deploy'));
+      expect(mockNavigate).toHaveBeenCalledWith('/action-center');
+    });
+
+    it('renders findings snapshot counts and upcoming schedules', () => {
+      const nextRun = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+      setup({
+        stats: { ...defaultStats, openFindingsTotal: 4 },
+        findingsSeverityCounts: [
+          { severity: 'critical', count: 1 },
+          { severity: 'high', count: 3 },
+        ],
+        upcomingSchedules: [
+          {
+            id: 'sch-1',
+            workflowId: 'wf-001',
+            name: 'Nightly recon',
+            nextRunAt: nextRun,
+            cronExpression: '0 2 * * *',
+            humanLabel: 'Daily at 2:00 AM',
+          },
+        ],
+      });
+      renderPage();
+      expect(screen.getByRole('heading', { name: 'Findings' })).toBeInTheDocument();
+      expect(screen.getByText(/open$/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Coming up' })).toBeInTheDocument();
+      expect(screen.getByText('Nightly recon')).toBeInTheDocument();
     });
   });
 
@@ -317,7 +442,8 @@ describe('DashboardPage', () => {
     it('renders "View all" link pointing to workflows', () => {
       setup();
       renderPage();
-      const viewAllLink = screen.getByRole('link', { name: /view all/i });
+      const recentRuns = screen.getByRole('region', { name: 'Recent runs' });
+      const viewAllLink = within(recentRuns).getByRole('link', { name: /view all/i });
       expect(viewAllLink).toHaveAttribute('href', '/workflows');
     });
 
@@ -356,28 +482,35 @@ describe('DashboardPage', () => {
     it('renders all quick action links', () => {
       setup();
       renderPage();
-      expect(screen.getByRole('link', { name: /run a template/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /build from scratch/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /all workflows/i })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /schedules/i })).toBeInTheDocument();
+      const quickActions = screen.getByRole('region', { name: 'Quick actions' });
+      expect(
+        within(quickActions).getByRole('link', { name: /run a template/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(quickActions).getByRole('link', { name: /build from scratch/i }),
+      ).toBeInTheDocument();
+      expect(
+        within(quickActions).getByRole('link', { name: /all workflows/i }),
+      ).toBeInTheDocument();
+      expect(within(quickActions).getByRole('link', { name: /^schedules$/i })).toBeInTheDocument();
     });
 
     it('links point to correct routes', () => {
       setup();
       renderPage();
-      expect(screen.getByRole('link', { name: /run a template/i })).toHaveAttribute(
+      const quickActions = screen.getByRole('region', { name: 'Quick actions' });
+      expect(within(quickActions).getByRole('link', { name: /run a template/i })).toHaveAttribute(
         'href',
         '/templates?setup=none',
       );
-      expect(screen.getByRole('link', { name: /build from scratch/i })).toHaveAttribute(
-        'href',
-        '/workflows/new',
-      );
-      expect(screen.getByRole('link', { name: /all workflows/i })).toHaveAttribute(
+      expect(
+        within(quickActions).getByRole('link', { name: /build from scratch/i }),
+      ).toHaveAttribute('href', '/workflows/new');
+      expect(within(quickActions).getByRole('link', { name: /all workflows/i })).toHaveAttribute(
         'href',
         '/workflows',
       );
-      expect(screen.getByRole('link', { name: /schedules/i })).toHaveAttribute(
+      expect(within(quickActions).getByRole('link', { name: /^schedules$/i })).toHaveAttribute(
         'href',
         '/schedules',
       );

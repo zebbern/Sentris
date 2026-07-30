@@ -1,5 +1,4 @@
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -9,6 +8,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ScheduleFormState, WorkflowOption } from './scheduleTypes';
+import { FieldHintLabel } from './FieldHintLabel';
 
 interface ScheduleFormFieldsProps {
   form: ScheduleFormState;
@@ -28,10 +28,12 @@ export function ScheduleFormFields({
   onWorkflowChange,
 }: ScheduleFormFieldsProps) {
   return (
-    <section className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Workflow</Label>
+    <section className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Choose which workflow this cadence should invoke.">
+            Workflow
+          </FieldHintLabel>
           <Select
             value={form.workflowId || 'none'}
             disabled={workflowDisabled || workflowOptions.length === 0}
@@ -43,7 +45,7 @@ export function ScheduleFormFields({
               onWorkflowChange(value);
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9">
               <SelectValue placeholder="Select workflow" />
             </SelectTrigger>
             <SelectContent>
@@ -58,34 +60,31 @@ export function ScheduleFormFields({
             </SelectContent>
           </Select>
           {selectedWorkflow ? (
-            <p className="text-xs text-muted-foreground">{selectedWorkflow.name}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Choose which workflow this cadence should invoke.
-            </p>
-          )}
+            <p className="truncate text-[11px] text-muted-foreground">{selectedWorkflow.name}</p>
+          ) : null}
         </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Schedule name</Label>
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Appears in run metadata and chips inside the workflow.">
+            Schedule name
+          </FieldHintLabel>
           <Input
             value={form.name}
             onChange={(event) => onFieldChange('name', event.target.value)}
             placeholder="Daily quick scan"
             maxLength={100}
+            className="h-9"
           />
-          <p className="text-xs text-muted-foreground">
-            Appears in run metadata and chips inside the workflow.
-          </p>
         </div>
       </div>
-      <div className="space-y-2">
-        <Label className="text-sm font-medium">Description</Label>
+      <div className="space-y-1.5">
+        <FieldHintLabel hint="Optional context for other operators.">Description</FieldHintLabel>
         <Textarea
           value={form.description}
           onChange={(event) => onFieldChange('description', event.target.value)}
-          rows={3}
+          rows={2}
           maxLength={500}
           placeholder="Optional context for other operators."
+          className="min-h-[2.75rem] resize-y"
         />
       </div>
     </section>

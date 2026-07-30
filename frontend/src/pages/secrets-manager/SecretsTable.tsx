@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -11,14 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { KeyRound, RefreshCw } from 'lucide-react';
-import { PageToolbar } from '@/components/shared/PageToolbar';
+import { KeyRound } from 'lucide-react';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
 import type { SecretSummary } from '@/schemas/secret';
-import { cn } from '@/lib/utils';
 import { SecretRow } from './SecretRow';
 import type { DragEndEvent } from '@dnd-kit/core';
 
@@ -28,7 +25,7 @@ export interface SecretsTableProps {
   error: string | null;
   isReadOnly: boolean;
 
-  // Refresh
+  // Refresh (error retry)
   onRefresh: () => void;
 
   // DnD
@@ -117,24 +114,13 @@ export function SecretsTable({
 }: SecretsTableProps) {
   return (
     <div className="border rounded-lg bg-card p-4 md:p-6">
-      <PageToolbar
-        filters={
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>
-            <p className="text-xs md:text-sm text-muted-foreground">
-              Only metadata is shown. Use the Secret Fetch component or parameter selectors to
-              reference a secret.
-            </p>
-          </div>
-        }
-        actions={
-          <Button variant="outline" onClick={onRefresh} disabled={loading} className="gap-2">
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-        }
-        className="sm:flex-row sm:items-center justify-between gap-3 mb-4"
-      />
+      <div className="mb-4">
+        <h2 className="text-lg md:text-xl font-semibold">Stored secrets</h2>
+        <p className="text-xs md:text-sm text-muted-foreground">
+          Only metadata is shown. Use the Secret Fetch component or parameter selectors to reference
+          a secret.
+        </p>
+      </div>
 
       {error && <ErrorBanner message={error} onRetry={onRefresh} className="mb-4" />}
 

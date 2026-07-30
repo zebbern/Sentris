@@ -26,6 +26,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { exportTableData, type ExportColumn } from '@/lib/exportTableData';
 import { formatDuration, formatStartTime } from '@/utils/timeFormat';
 import { getStatusBadgeClassFromStatus, formatStatusText } from '@/utils/statusBadgeStyles';
+import { DashboardOpsPanels } from '@/pages/dashboard/DashboardOpsPanels';
 import type { ExecutionRun } from '@/hooks/queries/useRunQueries';
 
 // ---------------------------------------------------------------------------
@@ -47,54 +48,61 @@ const RECENT_RUNS_EXPORT_COLUMNS: ExportColumn[] = [
 
 interface StatCardProps {
   title: string;
-  value: number;
+  value: string | number;
   icon: React.ElementType;
-  subtitle?: string;
+  href?: string;
   isLoading: boolean;
   error?: Error;
   onRetry?: () => void;
 }
 
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  subtitle,
-  isLoading,
-  error,
-  onRetry,
-}: StatCardProps) {
+function StatCard({ title, value, icon: Icon, href, isLoading, error, onRetry }: StatCardProps) {
   if (error) {
     return (
       <Card>
-        <CardContent className="p-5">
+        <CardContent className="p-3">
           <ErrorBanner message={`Failed to load ${title.toLowerCase()}`} onRetry={onRetry} />
         </CardContent>
       </Card>
     );
   }
 
-  return (
-    <Card className="transition-colors hover:bg-muted/30">
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
-          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        </div>
-        <div className="mt-2">
-          {isLoading ? (
-            <Skeleton className="h-8 w-16" />
-          ) : (
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight">{value}</p>
-          )}
-        </div>
-        {subtitle && !isLoading && (
-          <p className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</p>
+  const content = (
+    <CardContent className="p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-xs font-medium text-muted-foreground">{title}</p>
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <div className="mt-1.5">
+        {isLoading ? (
+          <Skeleton className="h-7 w-14" />
+        ) : (
+          <p
+            className={
+              typeof value === 'number'
+                ? 'text-xl font-bold tracking-tight sm:text-2xl'
+                : 'truncate text-base font-bold tracking-tight sm:text-lg'
+            }
+          >
+            {value}
+          </p>
         )}
-        {isLoading && <Skeleton className="mt-1 h-3 w-24" />}
-      </CardContent>
-    </Card>
+      </div>
+    </CardContent>
   );
+
+  if (href) {
+    return (
+      <Link
+        to={href}
+        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+      >
+        <Card className="transition-colors hover:bg-muted/30">{content}</Card>
+      </Link>
+    );
+  }
+
+  return <Card className="transition-colors hover:bg-muted/30">{content}</Card>;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,13 +118,13 @@ interface RecentRunsTableProps {
 
 function RecentRunsSkeleton() {
   return (
-    <div className="space-y-3" aria-hidden="true">
+    <div className="space-y-2" aria-hidden="true">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-5 w-20 rounded-full" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-20" />
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="h-3.5 w-32" />
+          <Skeleton className="h-4 w-20 rounded-full" />
+          <Skeleton className="h-3.5 w-16" />
+          <Skeleton className="h-3.5 w-20" />
         </div>
       ))}
     </div>
@@ -136,7 +144,7 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
 
   if (runs.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
+      <p className="py-5 text-center text-xs text-muted-foreground">
         No runs yet. Execute a workflow to see activity here.
       </p>
     );
@@ -144,14 +152,14 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
 
   return (
     <div className="rounded-md border">
-      <Table aria-label="Recent workflow runs">
+      <Table aria-label="Recent workflow runs" className="text-xs">
         <TableHeader>
           <TableRow>
-            <TableHead>Workflow</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="hidden sm:table-cell">Duration</TableHead>
-            <TableHead className="hidden md:table-cell">Started</TableHead>
-            <TableHead className="hidden lg:table-cell">Trigger</TableHead>
+            <TableHead className="h-8 px-3 py-1.5 text-xs">Workflow</TableHead>
+            <TableHead className="h-8 px-3 py-1.5 text-xs">Status</TableHead>
+            <TableHead className="hidden h-8 px-3 py-1.5 text-xs sm:table-cell">Duration</TableHead>
+            <TableHead className="hidden h-8 px-3 py-1.5 text-xs md:table-cell">Started</TableHead>
+            <TableHead className="hidden h-8 px-3 py-1.5 text-xs lg:table-cell">Trigger</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -169,24 +177,27 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
                 }
               }}
             >
-              <TableCell className="font-medium max-w-[200px] truncate">
+              <TableCell className="max-w-[200px] truncate px-3 py-1.5 font-medium">
                 {run.workflowName}
               </TableCell>
-              <TableCell>
+              <TableCell className="px-3 py-1.5">
                 <Badge
                   variant="outline"
-                  className={getStatusBadgeClassFromStatus(run.status, 'text-xs whitespace-nowrap')}
+                  className={getStatusBadgeClassFromStatus(
+                    run.status,
+                    'text-[10px] whitespace-nowrap',
+                  )}
                 >
                   {formatStatusText(run.status)}
                 </Badge>
               </TableCell>
-              <TableCell className="hidden sm:table-cell text-muted-foreground">
+              <TableCell className="hidden px-3 py-1.5 text-muted-foreground sm:table-cell">
                 {run.duration != null ? formatDuration(run.duration) : '—'}
               </TableCell>
-              <TableCell className="hidden md:table-cell text-muted-foreground">
+              <TableCell className="hidden px-3 py-1.5 text-muted-foreground md:table-cell">
                 {formatStartTime(run.startTime)}
               </TableCell>
-              <TableCell className="hidden lg:table-cell text-muted-foreground capitalize">
+              <TableCell className="hidden px-3 py-1.5 capitalize text-muted-foreground lg:table-cell">
                 {run.triggerLabel ?? run.triggerType}
               </TableCell>
             </TableRow>
@@ -203,7 +214,7 @@ function RecentRunsTable({ runs, isLoading, error, onRetry }: RecentRunsTablePro
 
 function QuickActions() {
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap justify-center gap-3">
       <Button asChild className="gap-2">
         <Link to="/templates?setup=none">
           <Play className="h-4 w-4" />
@@ -238,9 +249,22 @@ function QuickActions() {
 
 export function DashboardPage() {
   useDocumentTitle('Dashboard');
-  const { stats, recentRuns, isLoading, errors, refetch, workflows } = useDashboardData();
+  const {
+    stats,
+    recentRuns,
+    failedRuns,
+    pendingActions,
+    upcomingSchedules,
+    findingsSeverityCounts,
+    attentionFindings,
+    isLoading,
+    sectionLoading,
+    errors,
+    refetch,
+    workflows,
+  } = useDashboardData();
 
-  const runsSubtitle = useMemo(() => {
+  const runsDisplayValue = useMemo(() => {
     if (stats.recentRunsCount === 0) return 'No runs in last 24h';
     const parts: string[] = [];
     if (stats.succeededCount > 0) parts.push(`${stats.succeededCount} succeeded`);
@@ -258,21 +282,26 @@ export function DashboardPage() {
         isLoading={isLoading}
       />
 
+      {/* Quick actions */}
+      <section aria-label="Quick actions">
+        <QuickActions />
+      </section>
+
       {/* Stats cards */}
       <div className="grid grid-cols-4 gap-3 sm:gap-4" aria-busy={isLoading}>
         <StatCard
           title="Workflows"
           value={stats.totalWorkflows}
           icon={Workflow}
+          href="/workflows"
           isLoading={isLoading && !errors.workflows}
           error={errors.workflows}
           onRetry={refetch}
         />
         <StatCard
           title="Runs (24h)"
-          value={stats.recentRunsCount}
+          value={runsDisplayValue}
           icon={Play}
-          subtitle={runsSubtitle}
           isLoading={isLoading && !errors.runs}
           error={errors.runs}
           onRetry={refetch}
@@ -281,6 +310,7 @@ export function DashboardPage() {
           title="Active Schedules"
           value={stats.activeSchedules}
           icon={CalendarClock}
+          href="/schedules"
           isLoading={isLoading && !errors.schedules}
           error={errors.schedules}
           onRetry={refetch}
@@ -289,22 +319,32 @@ export function DashboardPage() {
           title="Pending Actions"
           value={stats.pendingActions}
           icon={Zap}
+          href="/action-center"
           isLoading={isLoading && !errors.humanInputs}
           error={errors.humanInputs}
           onRetry={refetch}
         />
       </div>
 
-      {/* Quick actions */}
-      <section aria-label="Quick actions">
-        <h2 className="text-lg font-semibold tracking-tight mb-4">Quick Actions</h2>
-        <QuickActions />
+      {/* Ops overview: attention + findings + upcoming */}
+      <section aria-label="Operations overview">
+        <DashboardOpsPanels
+          failedRuns={failedRuns}
+          pendingActions={pendingActions}
+          attentionFindings={attentionFindings}
+          findingsSeverityCounts={findingsSeverityCounts}
+          openFindingsTotal={stats.openFindingsTotal}
+          upcomingSchedules={upcomingSchedules}
+          sectionLoading={sectionLoading}
+          errors={errors}
+          onRetry={refetch}
+        />
       </section>
 
       {/* Recent runs */}
       <section aria-label="Recent runs" aria-busy={isLoading && !errors.runs}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold tracking-tight">Recent Runs</h2>
+        <div className="mb-1.5 flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">Recent Runs</h2>
           <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

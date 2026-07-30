@@ -19,11 +19,11 @@ describe('PeriodSelector', () => {
     cleanup();
   });
 
-  it('renders period label', () => {
+  it('does not render a Period label', () => {
     const onChange = mock();
     renderWithProviders(<PeriodSelector value="30d" onChange={onChange} />);
 
-    expect(screen.getByText('Period')).toBeInTheDocument();
+    expect(screen.queryByText('Period')).not.toBeInTheDocument();
   });
 
   it('renders all period options', () => {

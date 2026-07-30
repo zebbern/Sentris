@@ -18,3 +18,14 @@ export const UseTemplateSchema = z.object({
 });
 
 export class UseTemplateDto extends createZodDto(UseTemplateSchema) {}
+
+export const ImportCommunityTemplateSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    templatePath: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.id || value.templatePath), {
+    message: 'Either id or templatePath is required',
+  });
+
+export class ImportCommunityTemplateDto extends createZodDto(ImportCommunityTemplateSchema) {}

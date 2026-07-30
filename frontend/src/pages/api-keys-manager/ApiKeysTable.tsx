@@ -12,13 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Key, Plus, RefreshCw } from 'lucide-react';
+import { Key, Plus } from 'lucide-react';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-import { cn } from '@/lib/utils';
 import type { components } from '@sentris/backend-client';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { ApiKeyRow } from './ApiKeyRow';
@@ -137,21 +136,16 @@ export function ApiKeysTable({
         searchValue={searchQuery}
         onSearchChange={onSearchChange}
         searchPlaceholder="Filter by name..."
+        searchClassName="min-w-[16rem] flex-1"
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={onCreateOpen}
-              disabled={isReadOnly}
-              className="self-start sm:self-auto gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Create new key
-            </Button>
-            <Button variant="outline" onClick={onRefresh} disabled={loading} className="gap-2">
-              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          </div>
+          <Button
+            onClick={onCreateOpen}
+            disabled={isReadOnly}
+            className="self-start sm:self-auto gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create new key
+          </Button>
         }
         className="sm:flex-row sm:items-center justify-between gap-4 mb-4 md:mb-8"
       />
@@ -220,14 +214,6 @@ export function ApiKeysTable({
                         title="No API keys"
                         description="Create your first API key to enable programmatic access."
                         className="py-10"
-                        action={
-                          !isReadOnly ? (
-                            <Button onClick={onCreateOpen} className="gap-2">
-                              <Plus className="h-4 w-4" />
-                              Create new key
-                            </Button>
-                          ) : undefined
-                        }
                       />
                     </TableCell>
                   </TableRow>

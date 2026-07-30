@@ -168,12 +168,16 @@ export const UserButton: React.FC<UserButtonProps> = ({
     </div>
   );
 
+  const navMenuIconClass = 'mr-2 h-4 w-4 shrink-0';
+  const logoutMenuItemClass = 'relative justify-center';
+  const logoutMenuIconClass = 'absolute left-2 h-4 w-4';
+
   const userMenuItems = (
     <>
       {showUserInfo && (
         <>
           <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
+            <div className="flex flex-col items-center space-y-1 text-center">
               <p className="text-sm font-medium leading-none">
                 {user.firstName && user.lastName
                   ? `${user.firstName} ${user.lastName}`
@@ -198,38 +202,32 @@ export const UserButton: React.FC<UserButtonProps> = ({
             openNotifications();
           }}
         >
-          <Bell className="mr-2 h-4 w-4" />
+          <Bell className={navMenuIconClass} />
           <span>Notifications{unreadCount > 0 ? ` (${unreadCount})` : ''}</span>
         </DropdownMenuItem>
       )}
 
-      <DropdownMenuItem>
-        <User className="mr-2 h-4 w-4" />
-        <span>Profile</span>
-      </DropdownMenuItem>
-
       <DropdownMenuItem onClick={() => navigate('/settings/audit')}>
-        <Settings className="mr-2 h-4 w-4" />
+        <Settings className={navMenuIconClass} />
         <span>Settings</span>
       </DropdownMenuItem>
 
       {user.organizationId && (
         <DropdownMenuItem>
-          <Shield className="mr-2 h-4 w-4" />
+          <Shield className={navMenuIconClass} />
           <span>Organization</span>
         </DropdownMenuItem>
       )}
 
       <DropdownMenuSeparator />
 
-      <DropdownMenuItem onClick={() => authProvider.signOut()} className="text-red-600">
-        <LogOut className="mr-2 h-4 w-4" />
-        <span>Sign out</span>
+      <DropdownMenuItem
+        className={cn(logoutMenuItemClass, 'text-red-600')}
+        onClick={() => authProvider.signOut()}
+      >
+        <LogOut className={logoutMenuIconClass} />
+        <span>Logout</span>
       </DropdownMenuItem>
-
-      <DropdownMenuSeparator />
-
-      <div className="px-2 py-1.5 text-xs text-muted-foreground">Provider: {authProvider.name}</div>
     </>
   );
 

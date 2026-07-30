@@ -1,13 +1,8 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { RefreshCw, Plus, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -19,7 +14,6 @@ import {
   useResumeSchedule,
   useRunSchedule,
   useDeleteSchedule,
-  type StatusFilter,
 } from '@/hooks/queries/useScheduleQueries';
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -42,24 +36,18 @@ export function SchedulesPage() {
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const organizationId = useAuthStore((state) => state.organizationId);
-
-  // Local filter state (search is client-side, workflowId & status go to the query)
-  const initialWorkflowId = searchParams.get('workflowId') || null;
-  const [filters, setFilters] = useState<{
-    search: string;
-    status: StatusFilter;
-    workflowId: string | null;
-  }>({ search: '', status: 'all', workflowId: initialWorkflowId });
+  const searchQuery = searchParams.get('search') ?? '';
+  const workflowIdFilter = searchParams.get('workflowId') || null;
 
   const {
     data: schedules = [],
     isLoading,
     error: schedulesError,
   } = useSchedules({
-    workflowId: filters.workflowId,
-    status: filters.status,
+    workflowId: workflowIdFilter,
+    status: 'all',
   });
   const error = schedulesError?.message ?? null;
 
@@ -97,8 +85,17 @@ export function SchedulesPage() {
     handleScheduleSaved,
   } = useScheduleEditorDrawer({ queryClient, toast });
 
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('create');
+    setSearchParams(next, { replace: true });
+    openCreateDrawer();
+  }, [openCreateDrawer, searchParams, setSearchParams]);
+
   const filteredSchedules = useMemo(() => {
-    const query = filters.search.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
 
     return schedules.filter((schedule) => {
       const workflowName = getWorkflowName(schedule.workflowId, workflowOptions);
@@ -109,10 +106,9 @@ export function SchedulesPage() {
 
       return matchesSearch;
     });
-  }, [filters.search, schedules, workflowOptions]);
+  }, [searchQuery, schedules, workflowOptions]);
 
-  const hasActiveFilters =
-    filters.search.trim().length > 0 || filters.status !== 'all' || filters.workflowId !== null;
+  const hasActiveFilters = searchQuery.trim().length > 0 || workflowIdFilter !== null;
 
   const getScheduleId = useCallback((s: WorkflowSchedule) => s.id, []);
 
@@ -251,51 +247,6 @@ export function SchedulesPage() {
     <TooltipProvider>
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
-          <PageToolbar
-            filters={
-              <div className="min-w-0 flex-1 space-y-2">
-                <label
-                  htmlFor="schedule-filter-search"
-                  className="flex items-center gap-2 text-xs uppercase text-muted-foreground"
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  Search schedules or workflows
-                </label>
-                <Input
-                  id="schedule-filter-search"
-                  type="search"
-                  placeholder="Filter by schedule or workflow"
-                  value={filters.search}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                  aria-label="Filter by schedule or workflow"
-                />
-              </div>
-            }
-            actions={
-              <div className="flex shrink-0 flex-col sm:ml-auto">
-                <div className="hidden text-xs sm:block" aria-hidden="true">
-                  &nbsp;
-                </div>
-                <div className="mt-2 flex gap-2 sm:mt-0">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={handleRefresh}
-                    disabled={isLoading}
-                  >
-                    <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                    Refresh
-                  </Button>
-                  <Button variant="default" className="gap-2" onClick={openCreateDrawer}>
-                    <Plus className="h-4 w-4" />
-                    New schedule
-                  </Button>
-                </div>
-              </div>
-            }
-            className="w-full gap-4 sm:flex-row sm:items-end"
-          />
-
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
           <SchedulesTable
@@ -322,7 +273,6 @@ export function SchedulesPage() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             error={!!schedulesError}
-            onCreateNew={openCreateDrawer}
           />
         </div>
       </div>
@@ -330,9 +280,7 @@ export function SchedulesPage() {
         open={editorOpen}
         mode={editorMode}
         schedule={activeSchedule ?? undefined}
-        defaultWorkflowId={
-          editorMode === 'create' ? filters.workflowId : activeSchedule?.workflowId
-        }
+        defaultWorkflowId={editorMode === 'create' ? workflowIdFilter : activeSchedule?.workflowId}
         workflowOptions={workflowOptions}
         onClose={closeDrawer}
         onSaved={handleScheduleSaved}

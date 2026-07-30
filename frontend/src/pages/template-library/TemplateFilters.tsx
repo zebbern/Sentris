@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Filter, RefreshCw, Search, Tag, X, ExternalLink, Zap } from 'lucide-react';
+import { Filter, RefreshCw, Search, X, ExternalLink, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCategoryStyle } from './types';
 
@@ -22,9 +22,6 @@ export interface TemplateFiltersProps {
   selectedCategory: string | null;
   onCategoryChange: (category: string) => void;
   categories: TemplateCategoryInfo[];
-  tags: string[];
-  selectedTags: string[];
-  onToggleTag: (tag: string) => void;
   hasFilters: boolean;
   onClearFilters: () => void;
   onSync: () => void;
@@ -32,6 +29,8 @@ export interface TemplateFiltersProps {
   canManageWorkflows: boolean;
   noSetupOnly: boolean;
   onToggleNoSetupOnly: () => void;
+  /** Browse/contribute URL for the official template GitHub repository. */
+  contributeUrl: string;
 }
 
 export function TemplateFilters({
@@ -40,9 +39,6 @@ export function TemplateFilters({
   selectedCategory,
   onCategoryChange,
   categories,
-  tags,
-  selectedTags,
-  onToggleTag,
   hasFilters,
   onClearFilters,
   onSync,
@@ -50,24 +46,25 @@ export function TemplateFilters({
   canManageWorkflows,
   noSetupOnly,
   onToggleNoSetupOnly,
+  contributeUrl,
 }: TemplateFiltersProps) {
   return (
-    <div className="mb-6 space-y-3">
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Filter by template name"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 h-9"
+            className="h-9 pl-10"
             aria-label="Filter templates by name"
           />
         </div>
 
         <Select value={selectedCategory || 'all'} onValueChange={onCategoryChange}>
-          <SelectTrigger className="w-full sm:w-[180px] h-9" aria-label="Filter by category">
-            <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+          <SelectTrigger className="h-9 w-full sm:w-[180px]" aria-label="Filter by category">
+            <Filter className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -91,11 +88,28 @@ export function TemplateFilters({
         </Select>
 
         <Button
+          type="button"
+          variant={noSetupOnly ? 'secondary' : 'outline'}
+          size="sm"
+          onClick={onToggleNoSetupOnly}
+          aria-pressed={noSetupOnly}
+          title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
+          className={cn(
+            'h-9 gap-2',
+            noSetupOnly &&
+              'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300',
+          )}
+        >
+          <Zap className="h-3.5 w-3.5" />
+          No setup
+        </Button>
+
+        <Button
           variant="outline"
           size="sm"
           onClick={onSync}
           disabled={isSyncing || !canManageWorkflows}
-          className="gap-2 h-9"
+          className="h-9 gap-2"
           aria-label="Sync templates"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')} />
@@ -105,68 +119,26 @@ export function TemplateFilters({
         <Button
           variant="outline"
           size="sm"
-          onClick={() =>
-            window.open('https://github.com/zebbern/Sentris', '_blank', 'noopener,noreferrer')
-          }
-          className="gap-2 h-9"
+          onClick={() => window.open(contributeUrl, '_blank', 'noopener,noreferrer')}
+          className="h-9 gap-2"
           aria-label="Contribute templates"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Contribute</span>
         </Button>
+
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className="h-9 gap-1 px-2.5 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </Button>
+        )}
       </div>
-
-      <div className="flex flex-wrap items-center gap-2 ml-1">
-        <button
-          type="button"
-          onClick={onToggleNoSetupOnly}
-          aria-pressed={noSetupOnly}
-          title="Runs with only outbound internet — no API keys or Docker images required. You may still enter a target in the run dialog."
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-            noSetupOnly
-              ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-              : 'border-border bg-muted/40 text-muted-foreground hover:bg-muted',
-          )}
-        >
-          <Zap className="h-3.5 w-3.5" />
-          No setup required
-        </button>
-      </div>
-
-      {tags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 ml-1">
-          <Tag className="h-3.5 w-3.5 text-muted-foreground mr-0.5" />
-          {tags.slice(0, 12).map((tag) => (
-            <button
-              key={tag}
-              onClick={() => onToggleTag(tag)}
-              className={cn(
-                'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200',
-                'border',
-                selectedTags.includes(tag)
-                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                  : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted hover:border-border',
-              )}
-              aria-pressed={selectedTags.includes(tag)}
-            >
-              {tag}
-            </button>
-          ))}
-
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClearFilters}
-              className="h-7 px-2.5 text-xs gap-1 text-muted-foreground hover:text-foreground ml-1"
-            >
-              <X className="h-3 w-3" />
-              Clear
-            </Button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -47,25 +47,9 @@ mock.module('@/store/executionTimelineStore', () => {
   return { useExecutionTimelineStore };
 });
 
-const defaultWorkflowUiState: Record<string, any> = {
-  showHeatMap: false,
-  toggleHeatMap: mock(() => {}),
-  smartRouting: false,
-  toggleSmartRouting: mock(() => {}),
-};
-
-mock.module('@/store/workflowUiStore', () => {
-  const useWorkflowUiStore = ((selector?: any) => {
-    return selector ? selector(defaultWorkflowUiState) : defaultWorkflowUiState;
-  }) as any;
-  useWorkflowUiStore.getState = () => defaultWorkflowUiState;
-  useWorkflowUiStore.setState = () => {};
-  useWorkflowUiStore.subscribe = () => () => {};
-  return { useWorkflowUiStore };
-});
-
 // Mock sub-components to isolate ExecutionTimeline
 mock.module('@/components/timeline/execution-timeline/PlaybackControls', () => ({
+  TimelineViewToggles: () => <div data-testid="timeline-view-toggles" />,
   PlaybackControls: (props: any) => (
     <div data-testid="playback-controls" data-playing={props.isPlaying} />
   ),
@@ -80,7 +64,8 @@ mock.module('@/components/timeline/execution-timeline/TimelineOverview', () => (
 }));
 
 mock.module('@/components/timeline/execution-timeline/TimelineStatusBar', () => ({
-  TimelineStatusBar: () => <div data-testid="timeline-status-bar" />,
+  TimelineStatusCounts: () => <div data-testid="timeline-status-counts" />,
+  TimelinePlaybackState: () => <div data-testid="timeline-playback-state" />,
 }));
 
 mock.module('@/components/timeline/execution-timeline/utils', () => ({
@@ -99,7 +84,6 @@ describe('ExecutionTimeline', () => {
   afterAll(() => {
     restoreMockedModules([
       '@/store/executionTimelineStore',
-      '@/store/workflowUiStore',
       '@/components/timeline/execution-timeline/PlaybackControls',
       '@/components/timeline/execution-timeline/TimelineTrack',
       '@/components/timeline/execution-timeline/TimelineOverview',
@@ -116,10 +100,12 @@ describe('ExecutionTimeline', () => {
   it('renders PlaybackControls and TimelineTrack when visible', () => {
     render(<ExecutionTimeline />);
 
+    expect(screen.getByTestId('timeline-view-toggles')).toBeTruthy();
     expect(screen.getByTestId('playback-controls')).toBeTruthy();
     expect(screen.getByTestId('timeline-track')).toBeTruthy();
     expect(screen.queryByTestId('timeline-overview')).toBeNull();
-    expect(screen.getByTestId('timeline-status-bar')).toBeTruthy();
+    expect(screen.getByTestId('timeline-status-counts')).toBeTruthy();
+    expect(screen.getByTestId('timeline-playback-state')).toBeTruthy();
   });
 
   it('renders TimelineOverview when zoomed in', () => {

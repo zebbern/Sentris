@@ -25,6 +25,8 @@ interface PageToolbarProps {
   bulkBar?: ReactNode;
   /** Additional CSS classes for the outer wrapper. */
   className?: string;
+  /** Override search control width/layout classes (defaults differ for titled vs no-title toolbars). */
+  searchClassName?: string;
 }
 
 export function PageToolbar({
@@ -38,10 +40,13 @@ export function PageToolbar({
   filters,
   bulkBar,
   className,
+  searchClassName,
 }: PageToolbarProps) {
   const hasSearch = searchValue !== undefined && onSearchChange !== undefined;
   const hasTitle = Boolean(title);
   const useStackedSearchLabel = Boolean(searchLabel && hasTitle);
+  const resolvedSearchClassName =
+    searchClassName ?? (hasTitle ? 'flex-1' : 'min-w-[16rem] flex-1 sm:flex-none sm:w-72');
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     onSearchChange?.(e.target.value);
@@ -121,7 +126,7 @@ export function PageToolbar({
           data-testid="page-toolbar-controls"
           className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
         >
-          {searchControl('flex-1')}
+          {searchControl(resolvedSearchClassName)}
           {((!hasTitle && actions) || filters) && (
             <div className="flex flex-wrap gap-2">
               {filters}
@@ -133,9 +138,9 @@ export function PageToolbar({
 
       {hasSearch && !hasTitle && (
         <div data-testid="page-toolbar-controls" className="flex flex-wrap items-start gap-3">
-          {searchControl('min-w-[16rem] flex-1 sm:flex-none sm:w-72')}
+          {searchControl(resolvedSearchClassName)}
           {actions && (
-            <div data-testid="page-toolbar-actions" className="flex items-center gap-2">
+            <div data-testid="page-toolbar-actions" className="flex shrink-0 items-center gap-2">
               {actions}
             </div>
           )}

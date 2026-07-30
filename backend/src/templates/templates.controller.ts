@@ -22,7 +22,10 @@ import { ZodValidationPipe } from 'nestjs-zod';
 
 import { TemplateService } from './templates.service';
 import { GitHubSyncService } from './github-sync.service';
+import { CommunityImportService } from './community-import.service';
 import {
+  ImportCommunityTemplateDto,
+  ImportCommunityTemplateSchema,
   PublishTemplateDto,
   PublishTemplateSchema,
   UseTemplateDto,
@@ -43,6 +46,7 @@ export class TemplatesController {
   constructor(
     private readonly templateService: TemplateService,
     private readonly githubSyncService: GitHubSyncService,
+    private readonly communityImportService: CommunityImportService,
   ) {}
 
   /**
@@ -187,6 +191,25 @@ export class TemplatesController {
       throw new HttpException('Template not found', HttpStatus.NOT_FOUND);
     }
     return template;
+  }
+
+  /**
+   * POST /templates/community/import - Import a published community template (admin)
+   *
+   * Re-fetches the public catalog entry + template.json from main. Does not auto-run
+   * or bind secrets; returns a persisted non-official template for the Use flow.
+   */
+  @Post('community/import')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Import a community template from the published catalog' })
+  @ApiCreatedResponse({ description: 'Imported community template' })
+  async importCommunityTemplate(
+    @Body(new ZodValidationPipe(ImportCommunityTemplateSchema))
+    dto: ImportCommunityTemplateDto,
+  ) {
+    return await this.communityImportService.importCommunityTemplate(dto);
   }
 
   /**

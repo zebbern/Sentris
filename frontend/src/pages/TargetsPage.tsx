@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -21,6 +20,7 @@ export function TargetsPage() {
   const { toast } = useToast();
   const { confirm, dialogProps } = useConfirmDialog();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const roles = useAuthStore((state) => state.roles);
   const canManage = hasAdminRole(roles);
 
@@ -38,6 +38,18 @@ export function TargetsPage() {
     setActiveScope(null);
     setEditorOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('create');
+    setSearchParams(next, { replace: true });
+
+    if (canManage) {
+      openCreateDialog();
+    }
+  }, [canManage, searchParams, setSearchParams]);
 
   const openEditDialog = (scope: Scope) => {
     setEditorMode('edit');
@@ -82,15 +94,6 @@ export function TargetsPage() {
     <TooltipProvider>
       <div className="flex-1 bg-background" aria-busy={isLoading}>
         <div className="container mx-auto px-3 md:px-4 py-4 md:py-8 space-y-4 md:space-y-6">
-          {canManage && (
-            <div className="flex justify-end">
-              <Button variant="default" className="gap-2" onClick={openCreateDialog}>
-                <Plus className="h-4 w-4" />
-                New target
-              </Button>
-            </div>
-          )}
-
           {error && <ErrorBanner message={error} />}
 
           <TargetsTable
@@ -101,7 +104,6 @@ export function TargetsPage() {
             error={!!scopesError}
             onEdit={openEditDialog}
             onDelete={handleDelete}
-            onCreateNew={canManage ? openCreateDialog : undefined}
           />
         </div>
       </div>

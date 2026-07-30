@@ -19,6 +19,7 @@ import { ConfigPanelFooter } from './config-panel/ConfigPanelFooter';
 import { useReactFlow } from '@xyflow/react';
 import { API_V1_URL, api } from '@/services/api';
 import { useWorkflowStore } from '@/store/workflowStore';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { logger } from '@/lib/logger';
 import { useApiKeys, useApiKeyUiStore } from '@/hooks/queries/useApiKeyQueries';
 import { useOptionalWorkflowSchedulesContext } from '@/features/workflow-builder/contexts/useWorkflowSchedulesContext';
@@ -57,6 +58,7 @@ export function ConfigPanel({
   onViewSchedules,
 }: ConfigPanelProps) {
   const isMobile = useIsMobile();
+  const hideConfigInfoSections = useUserPreferencesStore((s) => s.hideConfigInfoSections);
   const { data: componentIndex, isLoading: loading } = useComponents();
   const getComponent = (ref: string) => {
     if (!componentIndex || !ref) return null;
@@ -251,12 +253,14 @@ export function ConfigPanel({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-2">
-          <ConfigPanelDocumentation
-            documentation={component.documentation}
-            documentationUrl={component.documentationUrl}
-          />
+          {!hideConfigInfoSections && (
+            <ConfigPanelDocumentation
+              documentation={component.documentation}
+              documentationUrl={component.documentationUrl}
+            />
+          )}
 
-          {isToolMode && (
+          {!hideConfigInfoSections && isToolMode && (
             <ConfigPanelToolSection
               componentName={component.name}
               componentSlug={component.slug}
@@ -298,7 +302,8 @@ export function ConfigPanel({
             onInputOverrideChange={handleInputOverrideChange}
           />
 
-          {!isToolMode &&
+          {!hideConfigInfoSections &&
+            !isToolMode &&
             !!component.toolProvider &&
             toolSchemaJson &&
             component.category !== 'mcp' && (
@@ -311,14 +316,18 @@ export function ConfigPanel({
               </CollapsibleSection>
             )}
 
-          {component.category === 'mcp' && component.toolProvider?.name && (
-            <ConfigPanelMcpServer
-              toolProviderName={component.toolProvider.name}
-              toolProviderDescription={component.toolProvider.description}
-            />
-          )}
+          {!hideConfigInfoSections &&
+            component.category === 'mcp' &&
+            component.toolProvider?.name && (
+              <ConfigPanelMcpServer
+                toolProviderName={component.toolProvider.name}
+                toolProviderDescription={component.toolProvider.description}
+              />
+            )}
 
-          <ConfigPanelOutputs componentOutputs={componentOutputs} isToolMode={isToolMode} />
+          {!hideConfigInfoSections && (
+            <ConfigPanelOutputs componentOutputs={componentOutputs} isToolMode={isToolMode} />
+          )}
 
           {isEntryPointComponent && (
             <ConfigPanelSchedules
@@ -338,7 +347,7 @@ export function ConfigPanel({
             />
           )}
 
-          <ConfigPanelExamples exampleItems={exampleItems} />
+          {!hideConfigInfoSections && <ConfigPanelExamples exampleItems={exampleItems} />}
         </div>
       </div>
 

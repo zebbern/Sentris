@@ -1,3 +1,5 @@
+import 'reflect-metadata';
+
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
@@ -11,7 +13,7 @@ import { OrganizationSettingsService } from '../organization-settings.service';
 import { SecurityAnalyticsService } from '../security-analytics.service';
 
 describe('Analytics HTTP contract', () => {
-  let app: INestApplication;
+  let app: INestApplication | undefined;
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -51,11 +53,12 @@ describe('Analytics HTTP contract', () => {
   }, 30_000);
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   }, 30_000);
 
   it('returns HTTP 200 for idempotent tenant ensure success', async () => {
-    const response = await request(app.getHttpServer())
+    expect(app).toBeDefined();
+    const response = await request(app!.getHttpServer())
       .post('/analytics/ensure-tenant')
       .set('x-internal-token', 'analytics-http-test-token')
       .send({ organizationId: 'http-contract-org' });

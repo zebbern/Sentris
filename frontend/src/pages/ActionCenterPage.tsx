@@ -21,10 +21,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
-import { RefreshCw, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useToast } from '@/components/ui/use-toast';
-import { cn } from '@/lib/utils';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import { ActionCenterRow } from '@/pages/action-center/ActionCenterRow';
@@ -47,7 +45,6 @@ import { useAuthStore } from '@/store/authStore';
 
 export function ActionCenterPage() {
   useDocumentTitle('Action Center');
-  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'expired'>(
     'pending',
@@ -129,12 +126,8 @@ export function ActionCenterPage() {
     setResolveDialogOpen(true);
   };
 
-  const handleRefresh = async () => {
-    await invalidateHumanInputs();
-    toast({
-      title: 'Requests refreshed',
-      description: 'Latest status have been loaded.',
-    });
+  const handleRefresh = () => {
+    void invalidateHumanInputs();
   };
 
   const isActionBusy = (id: string) => Boolean(actionState[id]);
@@ -161,39 +154,28 @@ export function ActionCenterPage() {
             searchPlaceholder="Filter by title, node, or run ID"
             searchLabel="Search requests"
             filters={
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
-              >
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            }
-            actions={
-              <div className="flex items-center gap-3">
-                {lastUpdatedText && (
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+              <>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {lastUpdatedText ? (
+                  <span className="ml-auto self-center text-xs text-muted-foreground whitespace-nowrap">
                     Updated {lastUpdatedText}
                   </span>
-                )}
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                >
-                  <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-              </div>
+                ) : null}
+              </>
             }
           />
 

@@ -62,8 +62,8 @@ describe('SidebarNav', () => {
     const searchButton = screen.getByRole('button', { name: /open command palette/i });
 
     for (const target of [findingsLink, manageButton, searchButton]) {
-      expect(target.className).toContain('h-10');
-      expect(target.className).toContain('w-10');
+      expect(target.className).toContain('h-9');
+      expect(target.className).toContain('w-9');
       expect(target.className).toContain('p-0');
       expect(target.className).toContain('mx-auto');
     }

@@ -1,4 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from 'bun:test';
+import { StrictMode } from 'react';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { createDialogMock } from '@/test/mocks/dialog';
@@ -164,6 +165,19 @@ describe('CommandPalette', () => {
     renderPalette();
 
     // Should render the search input
+    expect(screen.getByLabelText('Search commands')).toBeDefined();
+  });
+
+  it('does not close on mount under StrictMode', () => {
+    render(
+      <StrictMode>
+        <MemoryRouter>
+          <CommandPalette />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    expect(mockClose).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Search commands')).toBeDefined();
   });
 

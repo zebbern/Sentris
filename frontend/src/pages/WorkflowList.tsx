@@ -22,7 +22,7 @@ import { PageToolbar } from '@/components/shared/PageToolbar';
 import { DOCS_URLS } from '@/config/docs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Workflow, Info, Download } from 'lucide-react';
+import { Workflow, Info, Download, CircleHelp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -216,7 +216,7 @@ export function WorkflowList() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="container mx-auto py-4 md:py-8 px-3 md:px-4 space-y-4 md:space-y-6">
+      <div className="container mx-auto max-w-5xl space-y-3 px-3 py-3 md:space-y-4 md:px-4 md:py-5">
         {isReadOnly && (
           <div className="rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
             You are viewing workflows with read-only access. Administrators can create and edit
@@ -231,57 +231,14 @@ export function WorkflowList() {
 
         {/* Filters */}
         <PageToolbar
-          helpUrl={DOCS_URLS.userGuide}
           searchValue={searchQuery}
           onSearchChange={setSearchQuery}
           searchLabel="Search workflows"
           searchPlaceholder="Filter by name or description"
-          actions={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={filteredWorkflows.length === 0}
-                  aria-label="Export workflows"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() =>
-                    exportTableData<WorkflowSummary>({
-                      data: filteredWorkflows,
-                      columns: WORKFLOW_EXPORT_COLUMNS,
-                      filename: 'workflows',
-                      format: 'csv',
-                    })
-                  }
-                >
-                  Download CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() =>
-                    exportTableData<WorkflowSummary>({
-                      data: filteredWorkflows,
-                      columns: WORKFLOW_EXPORT_COLUMNS,
-                      filename: 'workflows',
-                      format: 'json',
-                    })
-                  }
-                >
-                  Download JSON
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
           filters={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="h-10 w-[150px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -298,6 +255,63 @@ export function WorkflowList() {
                 onSelectedTagsChange={setSelectedTags}
                 isLoading={isTagsLoading}
               />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={DOCS_URLS.userGuide}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="View documentation"
+                    >
+                      <CircleHelp className="h-4 w-4" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>View documentation</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <div className="ml-auto">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-10 gap-1.5"
+                      disabled={filteredWorkflows.length === 0}
+                      aria-label="Export workflows"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportTableData<WorkflowSummary>({
+                          data: filteredWorkflows,
+                          columns: WORKFLOW_EXPORT_COLUMNS,
+                          filename: 'workflows',
+                          format: 'csv',
+                        })
+                      }
+                    >
+                      Download CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        exportTableData<WorkflowSummary>({
+                          data: filteredWorkflows,
+                          columns: WORKFLOW_EXPORT_COLUMNS,
+                          filename: 'workflows',
+                          format: 'json',
+                        })
+                      }
+                    >
+                      Download JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           }
         />

@@ -241,6 +241,10 @@ describe('queryKeys', () => {
     expect(queryKeys.templates.repoInfo()).toEqual(['templateRepoInfo', TEST_ORG]);
   });
 
+  it('templates.communityCatalog returns the org-scoped community catalog key', () => {
+    expect(queryKeys.templates.communityCatalog()).toEqual(['communityTemplateCatalog', TEST_ORG]);
+  });
+
   // --- Agents ---
 
   it('agents.transcript includes agent run id', () => {

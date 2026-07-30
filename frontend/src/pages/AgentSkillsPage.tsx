@@ -37,7 +37,6 @@ export function AgentSkillsPage() {
     data: discovered = [],
     isLoading: isDiscovering,
     error: discoverError,
-    refetch: refetchDiscovered,
   } = useDiscoverAgentSkills();
   const deleteMutation = useDeleteAgentSkill();
   const importDiscoveredMutation = useImportDiscoveredAgentSkills();
@@ -136,11 +135,6 @@ export function AgentSkillsPage() {
 
   return (
     <div className="container max-w-5xl py-6 space-y-6">
-      <p className="text-sm text-muted-foreground">
-        Discovered from {DISCOVERY_DIR_LABEL}. Import folders into your org library for use on agent
-        workflow nodes.
-      </p>
-
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -168,9 +162,6 @@ export function AgentSkillsPage() {
                 >
                   <Upload className="h-3.5 w-3.5 mr-1" />
                   Import zip
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void refetchDiscovered()}>
-                  Refresh
                 </Button>
                 <div className="flex items-center gap-2 ml-auto">
                   <Checkbox

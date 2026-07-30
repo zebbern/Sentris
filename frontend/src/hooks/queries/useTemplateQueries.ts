@@ -24,6 +24,10 @@ export function templateRepoInfoQueryOptions() {
   };
 }
 
+export function useTemplateRepoInfo() {
+  return useQuery(templateRepoInfoQueryOptions());
+}
+
 export function useTemplates(
   filters?: { category?: string; search?: string; tags?: string[] },
   options?: { enabled?: boolean },
@@ -46,15 +50,6 @@ export function useTemplateCategories() {
   });
 }
 
-export function useTemplateTags() {
-  return useQuery<string[]>({
-    queryKey: queryKeys.templates.tags(),
-    queryFn: () => api.templates.getTags(),
-    staleTime: Infinity,
-    gcTime: Infinity,
-  });
-}
-
 export function useSyncTemplates() {
   const qc = useQueryClient();
   return useMutation({
@@ -62,7 +57,6 @@ export function useSyncTemplates() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.templates.root() });
       qc.invalidateQueries({ queryKey: queryKeys.templates.categories() });
-      qc.invalidateQueries({ queryKey: queryKeys.templates.tags() });
     },
   });
 }

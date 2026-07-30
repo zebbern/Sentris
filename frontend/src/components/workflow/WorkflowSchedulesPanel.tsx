@@ -1,8 +1,20 @@
 import { useCallback, useState } from 'react';
-import { Loader2, Plus, ExternalLink, X, Pause, Play, Zap, Pencil, Trash2 } from 'lucide-react';
+import {
+  Loader2,
+  Plus,
+  X,
+  Pause,
+  Play,
+  Zap,
+  Pencil,
+  Trash2,
+  Clock,
+  ChevronsRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import type { WorkflowSchedule } from '@sentris/shared';
 import { formatScheduleTimestamp, scheduleStatusVariant } from './schedules-utils';
 
@@ -23,89 +35,115 @@ export function WorkflowSchedulesSummaryBar({
   onExpand,
   onViewAll,
 }: WorkflowSchedulesSummaryBarProps) {
+  const collapsed = useUserPreferencesStore((s) => s.schedulesSummaryCollapsed);
+  const setCollapsed = useUserPreferencesStore((s) => s.setSchedulesSummaryCollapsed);
   const countActive = schedules.filter((s) => s.status === 'active').length;
   const countPaused = schedules.filter((s) => s.status === 'paused').length;
   const countError = schedules.filter((s) => s.status === 'error').length;
+  const scheduleCount = schedules.length;
+
+  if (collapsed) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="pointer-events-auto relative h-10 w-10 rounded-xl border bg-background/95 shadow-sm ring-1 ring-border/60"
+              onClick={() => setCollapsed(false)}
+              aria-label="Show schedules"
+            >
+              <Clock className="h-4 w-4 text-primary" />
+              {scheduleCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                  {scheduleCount > 9 ? '9+' : scheduleCount}
+                </span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Show schedules</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   return (
-    <div className="pointer-events-auto flex items-center gap-2 md:gap-3 rounded-xl border bg-background/95 px-2 md:px-4 py-1.5 md:py-2 ring-1 ring-border/60 shadow-sm">
-      <div className="flex items-center gap-2 md:gap-3">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
-          <svg
-            className="h-4 w-4 text-primary"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <div className="space-y-0 hidden sm:block">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Schedules
+    <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border bg-background/95 px-3 py-2 ring-1 ring-border/60 shadow-sm">
+      <div className="flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Clock className="h-4 w-4 text-primary" />
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            {isLoading ? (
-              <span className="inline-flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Loading…
-              </span>
-            ) : error ? (
-              <span className="text-destructive">{error}</span>
-            ) : schedules.length === 0 ? (
-              <span>No schedules</span>
-            ) : (
-              <>
-                {countActive > 0 && <span>{countActive} active</span>}
-                {countPaused > 0 && <span className="ml-2">{countPaused} paused</span>}
-                {countError > 0 && (
-                  <span className="ml-2 text-destructive">{countError} error</span>
-                )}
-              </>
-            )}
+          <div className="min-w-0 space-y-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Schedules
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading…
+                </span>
+              ) : error ? (
+                <span className="text-destructive">{error}</span>
+              ) : schedules.length === 0 ? (
+                <span>No schedules</span>
+              ) : (
+                <>
+                  {countActive > 0 && <span>{countActive} active</span>}
+                  {countPaused > 0 && <span className="ml-2">{countPaused} paused</span>}
+                  {countError > 0 && (
+                    <span className="ml-2 text-destructive">{countError} error</span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0"
+                aria-label="Hide schedules"
+                onClick={() => setCollapsed(true)}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Hide to corner</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
-      <div className="flex items-center gap-1 md:gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="h-7 md:h-8 px-2 md:px-3 text-xs"
-          onClick={onCreate}
-        >
-          <Plus className="h-3.5 w-3.5 md:mr-1" />
-          <span className="hidden md:inline">New</span>
+      <div className="flex items-center justify-center gap-1.5">
+        <Button type="button" size="sm" className="h-7 px-2.5 text-xs" onClick={onCreate}>
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          New
         </Button>
         <Button
           type="button"
           size="sm"
           variant="secondary"
-          className="h-7 md:h-8 px-2 md:px-3 text-xs"
+          className="h-7 px-2.5 text-xs"
           onClick={onExpand}
         >
           Manage
         </Button>
-        <div className="relative group hidden md:block">
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            title="Go to schedule manager"
-            aria-label="Go to schedule manager"
-            onClick={onViewAll}
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-          <div className="pointer-events-none absolute -bottom-8 right-0 whitespace-nowrap rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground opacity-0 transition group-hover:opacity-100">
-            Go to schedule manager
-          </div>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 px-2.5 text-xs"
+          aria-label="Open schedules"
+          onClick={onViewAll}
+        >
+          Open
+        </Button>
       </div>
     </div>
   );

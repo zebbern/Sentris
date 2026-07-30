@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageToolbar } from '@/components/shared/PageToolbar';
 import {
@@ -13,9 +12,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { RefreshCw, Plus } from 'lucide-react';
 import { useSortableList } from '@/hooks/useSortableList';
-import { cn } from '@/lib/utils';
 import { humanizeApiError } from '@/lib/humanizeApiError';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -353,30 +350,6 @@ export function WebhooksPage() {
                 </div>
               </div>
             }
-            actions={
-              <div className="flex flex-col shrink-0">
-                <div className="text-xs invisible hidden lg:block">&nbsp;</div>
-                <div className="flex gap-2 mt-2 lg:mt-0">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={handleRefresh}
-                    disabled={isLoading}
-                  >
-                    <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </Button>
-                  <Button
-                    variant="default"
-                    className="gap-2"
-                    onClick={() => navigate('/webhooks/new')}
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">New webhook</span>
-                  </Button>
-                </div>
-              </div>
-            }
             className="gap-4 lg:flex-row lg:items-end"
           />
 
@@ -406,7 +379,6 @@ export function WebhooksPage() {
               onViewHistory={handleViewHistory}
               onRegeneratePath={handleRegeneratePath}
               onDelete={handleDelete}
-              onCreateNew={() => navigate('/webhooks/new')}
             />
           )}
         </div>

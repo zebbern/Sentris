@@ -1,5 +1,4 @@
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { RuntimeInputDefinition } from './scheduleTypes';
 import { normalizeRuntimeInputType } from './scheduleTypes';
+import { FieldHintLabel } from './FieldHintLabel';
 
 interface RuntimeInputsSectionProps {
   workflowId: string;
@@ -18,6 +18,15 @@ interface RuntimeInputsSectionProps {
   formSeed: number;
   onRuntimeInputChange: (input: RuntimeInputDefinition, value: unknown) => void;
   onFileUpload: (inputId: string, file: File) => void;
+}
+
+function RuntimeInputLabel({ input }: { input: RuntimeInputDefinition }) {
+  return (
+    <FieldHintLabel htmlFor={input.id} hint={input.description || undefined}>
+      {input.label}
+      {input.required ? <span className="ml-1 text-destructive">*</span> : null}
+    </FieldHintLabel>
+  );
 }
 
 function RuntimeInputField({
@@ -40,14 +49,12 @@ function RuntimeInputField({
   switch (type) {
     case 'file':
       return (
-        <div className="space-y-2">
-          <Label htmlFor={input.id} className="text-sm font-medium">
-            {input.label}
-            {input.required ? <span className="text-destructive ml-1">*</span> : null}
-          </Label>
+        <div className="space-y-1.5">
+          <RuntimeInputLabel input={input} />
           <Input
             id={input.id}
             type="file"
+            className="h-9"
             disabled={uploadingState}
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -57,32 +64,26 @@ function RuntimeInputField({
             }}
           />
           {uploadingState ? (
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <p className="flex items-center gap-1 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Uploading file…
             </p>
           ) : null}
           {currentValue && typeof currentValue === 'string' ? (
-            <p className="text-xs text-emerald-600 font-mono break-all">
+            <p className="break-all font-mono text-xs text-emerald-600">
               Stored file ID: {currentValue}
             </p>
-          ) : null}
-          {input.description ? (
-            <p className="text-xs text-muted-foreground">{input.description}</p>
           ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     case 'json':
       return (
-        <div className="space-y-2">
-          <Label htmlFor={input.id} className="text-sm font-medium">
-            {input.label}
-            {input.required ? <span className="text-destructive ml-1">*</span> : null}
-          </Label>
+        <div className="space-y-1.5">
+          <RuntimeInputLabel input={input} />
           <Textarea
             id={input.id}
-            rows={4}
+            rows={3}
             className={cn('font-mono', error && 'border-destructive')}
             defaultValue={
               typeof currentValue === 'string'
@@ -93,22 +94,16 @@ function RuntimeInputField({
             }
             onBlur={(event) => onRuntimeInputChange(input, event.target.value)}
           />
-          {input.description ? (
-            <p className="text-xs text-muted-foreground">{input.description}</p>
-          ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     case 'array':
       return (
-        <div className="space-y-2">
-          <Label htmlFor={input.id} className="text-sm font-medium">
-            {input.label}
-            {input.required ? <span className="text-destructive ml-1">*</span> : null}
-          </Label>
+        <div className="space-y-1.5">
+          <RuntimeInputLabel input={input} />
           <Textarea
             id={input.id}
-            rows={3}
+            rows={2}
             className={cn('font-mono', error && 'border-destructive')}
             placeholder='["value-1", "value-2"] or comma-separated text'
             defaultValue={
@@ -120,54 +115,39 @@ function RuntimeInputField({
             }
             onBlur={(event) => onRuntimeInputChange(input, event.target.value)}
           />
-          {input.description ? (
-            <p className="text-xs text-muted-foreground">{input.description}</p>
-          ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     case 'boolean':
       return (
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
             <Checkbox
               id={input.id}
               checked={currentValue === true}
               onCheckedChange={(checked) => onRuntimeInputChange(input, checked === true)}
             />
-            <Label htmlFor={input.id} className="text-sm font-medium">
-              {input.label}
-              {input.required ? <span className="text-destructive ml-1">*</span> : null}
-            </Label>
+            <RuntimeInputLabel input={input} />
           </div>
-          {input.description ? (
-            <p className="text-xs text-muted-foreground">{input.description}</p>
-          ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
     default:
       return (
-        <div className="space-y-2">
-          <Label htmlFor={input.id} className="text-sm font-medium">
-            {input.label}
-            {input.required ? <span className="text-destructive ml-1">*</span> : null}
-          </Label>
+        <div className="space-y-1.5">
+          <RuntimeInputLabel input={input} />
           <Input
             id={input.id}
             type={type === 'number' ? 'number' : 'text'}
+            className={cn('h-9', error && 'border-destructive')}
             defaultValue={
               typeof currentValue === 'string' || typeof currentValue === 'number'
                 ? String(currentValue)
                 : ''
             }
-            className={error ? 'border-destructive' : ''}
             placeholder={type === 'number' ? '0' : undefined}
             onBlur={(event) => onRuntimeInputChange(input, event.target.value)}
           />
-          {input.description ? (
-            <p className="text-xs text-muted-foreground">{input.description}</p>
-          ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       );
@@ -188,29 +168,28 @@ export function RuntimeInputsSection({
   const runtimeContent = (() => {
     if (!workflowId) {
       return (
-        <p className="text-sm text-muted-foreground">
-          Select a workflow above to load its Entry Point inputs.
+        <p className="text-xs text-muted-foreground">
+          Select a workflow to load Entry Point inputs.
         </p>
       );
     }
     if (workflowLoading) {
       return (
-        <p className="text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
+        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Loading Entry Point inputs…
         </p>
       );
     }
     if (runtimeInputs.length === 0) {
       return (
-        <p className="text-sm text-muted-foreground">
-          This workflow does not define runtime inputs. Scheduled runs will execute without
-          additional payload.
+        <p className="text-xs text-muted-foreground">
+          No runtime inputs defined — runs will execute without extra payload.
         </p>
       );
     }
     return (
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         {runtimeInputs.map((input) => (
           <div key={`${input.id}-${formSeed}`}>
             <RuntimeInputField
@@ -228,16 +207,18 @@ export function RuntimeInputsSection({
   })();
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold">Entry Point inputs</h3>
-          <p className="text-xs text-muted-foreground">
-            Provide the payload this schedule should reuse each time it runs.
-          </p>
-        </div>
+    <section className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <FieldHintLabel
+          as="heading"
+          hint="Provide the payload this schedule should reuse each time it runs."
+        >
+          Entry Point inputs
+        </FieldHintLabel>
         {runtimeInputs.length > 0 ? (
-          <Badge variant="outline">{runtimeInputs.length} inputs</Badge>
+          <Badge variant="outline" className="text-[11px]">
+            {runtimeInputs.length} inputs
+          </Badge>
         ) : null}
       </div>
       {runtimeContent}

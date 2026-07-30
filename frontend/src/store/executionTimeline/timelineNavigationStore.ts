@@ -43,7 +43,12 @@ export const createNavigationSlice: StateCreator<TimelineStore, [], [], Navigati
 
   // Actions
   play: () => {
-    if (get().playbackMode === 'live') return;
+    const state = get();
+    if (state.playbackMode === 'live') return;
+    // At the end there is nothing left to play — restart from the beginning.
+    if (state.totalDuration > 0 && state.currentTime >= state.totalDuration) {
+      get().seek(0);
+    }
     set({ isPlaying: true });
   },
 

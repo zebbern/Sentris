@@ -79,6 +79,9 @@ export const frontendEnvSchema = z
     VITE_DEFAULT_USER_ID: z.string().optional().default(''),
     VITE_GITHUB_TEMPLATE_REPO: z.string().optional().default(''),
     VITE_GITHUB_TEMPLATE_BRANCH: z.string().optional().default(''),
+    VITE_COMMUNITY_TEMPLATES_INDEX_URL: publicHttpUrl(
+      'https://raw.githubusercontent.com/zebbern/Sentris/main/community/template/index.json',
+    ),
   })
   .superRefine((data, ctx) => {
     // If auth provider is clerk, VITE_CLERK_PUBLISHABLE_KEY is required

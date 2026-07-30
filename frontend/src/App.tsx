@@ -117,16 +117,64 @@ function LandingPageRedirect() {
   return null;
 }
 
+function CommandPaletteLoadingShell() {
+  return (
+    <div
+      className="fixed inset-0 z-[150] flex items-start justify-center bg-black/80 pt-[20vh]"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading command palette"
+    >
+      <div className="w-full max-w-xl rounded-xl border border-border/50 bg-background/95 p-4 shadow-2xl backdrop-blur-xl">
+        <Skeleton className="h-10 w-full rounded-lg" />
+        <div className="mt-3 space-y-2">
+          <Skeleton className="h-8 w-full rounded-md" />
+          <Skeleton className="h-8 w-5/6 rounded-md" />
+          <Skeleton className="h-8 w-4/6 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   useCommandPaletteKeyboard();
   const isOpen = useCommandPaletteStore((state) => state.isOpen);
   const [hasOpened, setHasOpened] = useState(false);
 
+  // Start mounting as soon as open flips true (don't wait for useEffect).
+  if (isOpen && !hasOpened) {
+    setHasOpened(true);
+  }
+
+  // Prefetch the heavy chunk so the first click isn't a blank wait.
   useEffect(() => {
-    if (isOpen && !hasOpened) {
-      setHasOpened(true);
+    let cancelled = false;
+    const prefetch = () => {
+      if (!cancelled) {
+        void import('@/features/command-palette/CommandPalette');
+      }
+    };
+
+    let idleId: number | undefined;
+    let timeoutId: number | undefined;
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(prefetch);
+    } else {
+      timeoutId = window.setTimeout(prefetch, 1500);
     }
-  }, [isOpen, hasOpened]);
+
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -138,7 +186,7 @@ function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
             return null;
           }}
         >
-          <Suspense fallback={null}>
+          <Suspense fallback={isOpen ? <CommandPaletteLoadingShell /> : null}>
             <CommandPalette />
           </Suspense>
         </ErrorBoundary>

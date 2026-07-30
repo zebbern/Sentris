@@ -36,7 +36,6 @@ export interface LibraryPanelProps {
   libraryPanelWidth: number;
   isMobile: boolean;
   libraryContent: ReactNode;
-  onToggleLibrary: () => void;
 }
 
 export interface LibraryToggleButtonProps {

@@ -22,6 +22,11 @@ export const TEMPLATE_CATEGORIES = [
   'Automation',
   'Reporting',
   'Testing',
+  'Bug Bounty',
+  'CVE Research',
+  'Dependency Security',
+  'Security Posture',
+  'Container Security',
   'Other',
 ];
 

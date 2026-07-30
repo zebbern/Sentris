@@ -202,6 +202,10 @@ describe('useEntityCommands', () => {
     expect(cmd.type).toBe('navigation');
     expect(cmd.label).toBe('Alert Template');
     expect(cmd.category).toBe('templates');
+    if (cmd.type !== 'navigation') {
+      throw new Error('expected navigation command');
+    }
+    expect(cmd.href).toBe('/templates?id=t1');
   });
 
   it('maps schedules to navigation commands', () => {

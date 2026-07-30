@@ -60,7 +60,7 @@ export function SettingsPage() {
   return (
     <div className="flex-1 bg-background">
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <div className="flex flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
           <nav
             role="navigation"
             aria-label="Settings"

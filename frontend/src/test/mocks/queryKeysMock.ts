@@ -89,7 +89,7 @@ const DEFAULT_QUERY_KEYS = {
   templates: {
     all: stub('templates'),
     categories: stub('templateCategories'),
-    tags: stub('templateTags'),
+    repoInfo: stub('templateRepoInfo'),
   },
   workflows: {
     list: stub('workflows'),

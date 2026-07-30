@@ -1,8 +1,10 @@
 import { ThemeTransition } from '@/components/ui/ThemeTransition';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar, SidebarHeader } from '@/components/ui/sidebar';
 import { AppTopBar } from '@/components/layout/AppTopBar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Workflow,
   KeyRound,
@@ -22,21 +24,332 @@ import {
   LayoutDashboard,
   ShieldAlert,
   TrendingUp,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { hasAdminRole } from '@/utils/auth';
 import { env } from '@/config/env';
 import { cn } from '@/lib/utils';
+import { queryKeys } from '@/lib/queryKeys';
 import { useCommandPaletteStore } from '@/store/commandPaletteStore';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { usePrefetchOnIdle } from '@/hooks/usePrefetchOnIdle';
 import { prefetchIdleRoutes } from '@/lib/prefetch-routes';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
+import { useToast } from '@/components/ui/use-toast';
+import { OpenSearchTelemetryLink } from '@/components/analytics/OpenSearchTelemetryLink';
+import {
+  DEFAULT_PERIOD,
+  PeriodSelector,
+  VALID_PERIODS,
+} from '@/features/triage-analytics/PeriodSelector';
 import { SidebarContext, type SidebarContextValue } from './sidebar-context';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useIsMobile, useIsTablet } from '@/hooks/useIsMobile';
+
+const TOP_BAR_CONTROL = 'h-8';
+const TOP_BAR_BUTTON = 'h-8 gap-1.5';
+
+function ActionCenterTopBarActions() {
+  const invalidateHumanInputs = useInvalidateHumanInputs();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await invalidateHumanInputs();
+      toast({
+        title: 'Requests refreshed',
+        description: 'Latest status have been loaded.',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className={TOP_BAR_BUTTON}
+      onClick={handleRefresh}
+      disabled={isRefreshing}
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+      <span className="hidden md:inline">Refresh</span>
+    </Button>
+  );
+}
+
+function AnalyticsTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawPeriod = searchParams.get('period') ?? DEFAULT_PERIOD;
+  const period = VALID_PERIODS.has(rawPeriod) ? rawPeriod : DEFAULT_PERIOD;
+
+  const handlePeriodChange = (value: string) => {
+    setSearchParams({ period: value }, { replace: true });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <PeriodSelector value={period} onChange={handlePeriodChange} className={TOP_BAR_CONTROL} />
+      <OpenSearchTelemetryLink className={TOP_BAR_BUTTON} />
+    </div>
+  );
+}
+
+function ArtifactsTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const searchValue = searchParams.get('search') ?? '';
+
+  const handleSearchChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.artifacts.root() });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Filter by name..."
+          aria-label="Filter by name..."
+          autoComplete="off"
+          className={cn(TOP_BAR_CONTROL, 'w-40 pl-8 md:w-52')}
+        />
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={TOP_BAR_BUTTON}
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        aria-label="Refresh artifacts"
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+        <span className="hidden md:inline">Refresh</span>
+      </Button>
+    </div>
+  );
+}
+
+function SchedulesTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const searchValue = searchParams.get('search') ?? '';
+
+  const handleSearchChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.schedules.root() });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Filter schedules..."
+          aria-label="Filter by schedule or workflow"
+          autoComplete="off"
+          className={cn(TOP_BAR_CONTROL, 'w-40 pl-8 md:w-52')}
+        />
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={TOP_BAR_BUTTON}
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        aria-label="Refresh schedules"
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+        <span className="hidden md:inline">Refresh</span>
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        className={TOP_BAR_BUTTON}
+        onClick={() => {
+          const next = new URLSearchParams(searchParams);
+          next.set('create', '1');
+          navigate(`/schedules?${next.toString()}`);
+        }}
+      >
+        <Plus className="h-3.5 w-3.5" />
+        <span>
+          New <span className="hidden md:inline">schedule</span>
+        </span>
+      </Button>
+    </div>
+  );
+}
+
+function SecretsTopBarActions() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.secrets.all() });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={TOP_BAR_BUTTON}
+      onClick={handleRefresh}
+      disabled={isRefreshing}
+      aria-label="Refresh secrets"
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+      <span className="hidden md:inline">Refresh</span>
+    </Button>
+  );
+}
+
+function ApiKeysTopBarActions() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.apiKeys.all() });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={cn(TOP_BAR_CONTROL, 'w-8 px-0')}
+      onClick={handleRefresh}
+      disabled={isRefreshing}
+      aria-label="Refresh"
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+    </Button>
+  );
+}
+
+function WebhooksTopBarActions() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.webhooks.all() });
+      toast({
+        title: 'Webhooks refreshed',
+        description: 'Latest webhook configurations have been loaded.',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className={TOP_BAR_BUTTON}
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        aria-label="Refresh webhooks"
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+        <span className="hidden md:inline">Refresh</span>
+      </Button>
+      <Button onClick={() => navigate('/webhooks/new')} size="sm" className={TOP_BAR_BUTTON}>
+        <Plus className="h-3.5 w-3.5" />
+        <span>
+          New <span className="hidden md:inline">webhook</span>
+        </span>
+      </Button>
+    </div>
+  );
+}
+
+function AgentSkillsTopBarActions() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agentSkills.discovered() });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={cn(TOP_BAR_CONTROL, 'w-8 px-0')}
+      onClick={handleRefresh}
+      disabled={isRefreshing}
+      aria-label="Refresh"
+    >
+      <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+    </Button>
+  );
+}
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -139,9 +452,10 @@ export function AppLayout({ children }: AppLayoutProps) {
             navigate('/workflows/new');
           }}
           size="sm"
-          className="gap-1.5"
+          className={TOP_BAR_BUTTON}
           disabled={!canManageWorkflows}
           aria-disabled={!canManageWorkflows}
+          aria-label="New Workflow"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>
@@ -149,6 +463,49 @@ export function AppLayout({ children }: AppLayoutProps) {
           </span>
         </Button>
       );
+    }
+    if (location.pathname === '/targets') {
+      return (
+        <Button
+          onClick={() => {
+            if (!canManageWorkflows) return;
+            navigate('/targets?create=1');
+          }}
+          size="sm"
+          className={TOP_BAR_BUTTON}
+          disabled={!canManageWorkflows}
+          aria-disabled={!canManageWorkflows}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>
+            New <span className="hidden md:inline">target</span>
+          </span>
+        </Button>
+      );
+    }
+    if (location.pathname === '/webhooks') {
+      return <WebhooksTopBarActions />;
+    }
+    if (location.pathname === '/schedules') {
+      return <SchedulesTopBarActions />;
+    }
+    if (location.pathname === '/action-center') {
+      return <ActionCenterTopBarActions />;
+    }
+    if (location.pathname === '/analytics') {
+      return <AnalyticsTopBarActions />;
+    }
+    if (location.pathname === '/artifacts') {
+      return <ArtifactsTopBarActions />;
+    }
+    if (location.pathname === '/secrets') {
+      return <SecretsTopBarActions />;
+    }
+    if (location.pathname === '/api-keys') {
+      return <ApiKeysTopBarActions />;
+    }
+    if (location.pathname === '/agent-skills') {
+      return <AgentSkillsTopBarActions />;
     }
     return null;
   };
@@ -184,18 +541,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <SidebarHeader
-            className={cn(
-              'flex h-10 shrink-0 items-center border-b px-2',
-              sidebarOpen ? 'justify-between' : 'justify-center',
-            )}
-          >
+          <SidebarHeader className="relative flex h-10 shrink-0 items-center justify-center border-b px-2">
             <Link
               to="/"
-              className={cn(
-                'flex items-center min-w-0',
-                sidebarOpen ? 'gap-1.5 flex-1' : 'justify-center',
-              )}
+              className={cn('flex items-center min-w-0 justify-center', sidebarOpen && 'gap-1.5')}
               onClick={() => isMobile && setSidebarOpen(false)}
             >
               <div className="flex-shrink-0">
@@ -214,13 +563,9 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
               <span
                 className={cn(
-                  'font-bold text-sm transition-all duration-300 whitespace-nowrap overflow-hidden',
-                  sidebarOpen ? 'opacity-100 max-w-32' : 'opacity-0 max-w-0',
+                  'overflow-hidden whitespace-nowrap text-sm font-bold transition-[opacity,max-width] duration-300',
+                  sidebarOpen ? 'max-w-32 opacity-100' : 'max-w-0 opacity-0',
                 )}
-                style={{
-                  transitionDelay: sidebarOpen ? '150ms' : '0ms',
-                  transitionProperty: 'opacity, max-width',
-                }}
               >
                 Sentris Flow
               </span>
@@ -228,7 +573,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             {isMobile && sidebarOpen && (
               <button
                 onClick={closeMobileSidebar}
-                className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                className="absolute right-2 flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Close sidebar"
               >
                 <X className="h-4 w-4" />

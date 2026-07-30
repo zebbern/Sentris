@@ -139,7 +139,10 @@ describe('FindingProjectionReconciliationLockService', () => {
         },
       );
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    const deadline = Date.now() + 500;
+    while (release.mock.calls.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     expect(release).toHaveBeenCalledWith(true);
     expect(settled).toBe(false);
 

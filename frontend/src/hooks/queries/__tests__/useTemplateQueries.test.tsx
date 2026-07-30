@@ -20,7 +20,6 @@ mock.module('@/services/api', () => ({
       publish: publishMock,
       list: vi.fn(),
       getCategories: vi.fn(),
-      getTags: vi.fn(),
       listRevalidationJobs: vi.fn(),
       getRevalidationJob: vi.fn(),
       getRevalidationJobLog: vi.fn(),

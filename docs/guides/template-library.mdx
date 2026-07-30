@@ -1,10 +1,25 @@
 # Template Library
 
-The Template Library lets you browse, use, and contribute reusable workflow templates. Templates are community- or team-shared workflows stored in a GitHub repository and synced into Sentris Flow.
+The Template Library lets you browse, use, and contribute reusable workflow templates.
+
+## Official vs Community
+
+The library has two tabs (URL: `?tab=official` or `?tab=community`; default **Official**):
+
+| Tab | Source | How it appears |
+| --- | --- | --- |
+| **Official** | Sentris-maintained templates (seed + GitHub sync) | Existing grid, Sync, filters, Configure & Run |
+| **Community** | Public catalog on `main` at [`community/template/`](https://github.com/zebbern/Sentris/tree/main/community/template) | Contributor shoutout cards; Preview → **Import** (admin) → Configure & Run |
+
+Community templates are only read from `main` after a PR merge (`index.json` + each `template.json`). Import re-fetches on the server and persists a **non-official** org template — it does **not** auto-run or bind secrets.
+
+To contribute: open a PR that adds a folder under `community/template/<id>/` with `template.json` and registers it in `community/template/index.json`. See that folder’s README for the catalog schema.
+
+The Community tab loads the published catalog from GitHub raw by default (`zebbern/Sentris` `main`). Override only if needed via `VITE_COMMUNITY_TEMPLATES_INDEX_URL`.
 
 ## Browsing Templates
 
-Navigate to **Template Library** in the sidebar. Templates appear as cards in a grid, each showing the template name, description, category, author, and tags.
+Navigate to **Template Library** in the sidebar. On the Official tab, templates appear as cards in a grid, each showing the template name, description, category, author, and tags.
 
 ### Filtering
 
@@ -108,11 +123,11 @@ This syncs the disk seed templates into the active local instance, deactivates e
 
 ## Template Types
 
-| Type           | Description                                                                  |
-| -------------- | ---------------------------------------------------------------------------- |
-| **Community**  | Submitted by users via PR. Reviewed before appearing in the library.         |
-| **Official**   | Created and maintained by the Sentris team. Marked with an "Official" badge. |
-| **Enterprise** | Organization-specific templates. Private to your organization.               |
+| Type           | Description                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| **Official**   | Created and maintained by the Sentris team. Synced/seeded into the Official tab.                     |
+| **Community**  | Contributed via PR to `community/template/`. Listed in the Community tab after merge to `main`.      |
+| **Enterprise** | Organization-specific templates. Private to your organization.                                       |
 
 ## Reordering Cards
 

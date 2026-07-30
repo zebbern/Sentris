@@ -255,6 +255,10 @@ export class WorkflowRunRepository {
       conditions.push(eq(workflowRunsTable.scopeId, options.scopeId));
     }
 
+    if (options.status) {
+      conditions.push(eq(workflowRunsTable.status, options.status));
+    }
+
     if (options.onlyRoots) {
       conditions.push(sql`${workflowRunsTable.parentRunId} IS NULL`);
     }

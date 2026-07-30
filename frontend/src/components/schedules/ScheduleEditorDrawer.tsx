@@ -8,7 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { HelpCircle, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { ScheduleEditorMode, WorkflowOption } from './scheduleTypes';
 import { ScheduleFormFields } from './ScheduleFormFields';
 import { CronExpressionInput } from './CronExpressionInput';
@@ -71,13 +72,33 @@ export function ScheduleEditorDrawer(props: ScheduleEditorDrawerProps) {
         }
       }}
     >
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Create schedule' : 'Edit schedule'}</DialogTitle>
-          <DialogDescription>{ENTRY_SECTION_COPY}</DialogDescription>
+      <DialogContent className="max-h-[85vh] max-w-2xl gap-3 overflow-y-auto p-4 sm:p-5">
+        <DialogHeader className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <DialogTitle className="text-lg">
+              {mode === 'create' ? 'Create schedule' : 'Edit schedule'}
+            </DialogTitle>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                    aria-label="About schedules"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                  {ENTRY_SECTION_COPY}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <DialogDescription className="sr-only">{ENTRY_SECTION_COPY}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-8 py-2">
+        <div className="space-y-4">
           <ScheduleFormFields
             form={form}
             workflowOptions={workflowOptions}
@@ -118,17 +139,17 @@ export function ScheduleEditorDrawer(props: ScheduleEditorDrawerProps) {
           />
 
           {formError ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {formError}
             </div>
           ) : null}
         </div>
 
-        <DialogFooter className="gap-3">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting || !form.workflowId}>
+          <Button size="sm" onClick={handleSubmit} disabled={submitting || !form.workflowId}>
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />

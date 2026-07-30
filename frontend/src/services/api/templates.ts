@@ -26,6 +26,7 @@ export interface TemplateRepoInfo {
   owner: string;
   repo: string;
   branch: string;
+  url: string;
 }
 
 export interface TemplateRevalidationResponse {
@@ -108,16 +109,6 @@ export const templatesApi = {
     return response.json();
   },
 
-  getTags: async () => {
-    const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/tags`, {
-      headers,
-      credentials: 'include',
-    });
-    if (!response.ok) throw new Error('Failed to fetch tags');
-    return response.json();
-  },
-
   getRepoInfo: async (): Promise<TemplateRepoInfo> => {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/templates/repo-info`, {
@@ -182,6 +173,28 @@ export const templatesApi = {
     });
 
     if (!response.ok) throw new Error('Failed to sync templates');
+    return response.json();
+  },
+
+  importCommunity: async (data: { id?: string; templatePath?: string }) => {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_V1_URL}/templates/community/import`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: 'Failed to import community template' }));
+      throw new Error(errorData.message || 'Failed to import community template');
+    }
+
     return response.json();
   },
 

@@ -98,7 +98,6 @@ export const queryKeys = {
     root: () => ['templates', getOrgScope()] as const,
     all: (filters?: Record<string, unknown>) => [...queryKeys.templates.root(), filters] as const,
     categories: () => ['templateCategories', getOrgScope()] as const,
-    tags: () => ['templateTags', getOrgScope()] as const,
     repoInfo: () => ['templateRepoInfo', getOrgScope()] as const,
     revalidationJobsRoot: () => ['templateRevalidationJobs', getOrgScope()] as const,
     revalidationJobs: (limit?: number) =>
@@ -114,6 +113,9 @@ export const queryKeys = {
         maxBytes ?? '__default__',
       ] as const,
     submissions: () => ['templateSubmissions', getOrgScope()] as const,
+    communityCatalog: () => ['communityTemplateCatalog', getOrgScope()] as const,
+    communityTemplateJson: (templatePath: string) =>
+      ['communityTemplateJson', getOrgScope(), templatePath] as const,
   },
   agents: {
     transcript: (agentRunId: string) => ['agentTranscript', getOrgScope(), agentRunId] as const,
@@ -148,6 +150,7 @@ export const queryKeys = {
   dashboard: {
     stats: () => ['dashboard', getOrgScope(), 'stats'] as const,
     recentActivity: () => ['dashboard', getOrgScope(), 'recent-activity'] as const,
+    failedRuns: () => ['dashboard', getOrgScope(), 'failed-runs'] as const,
   },
   // Registry catalog is global (not org-scoped) — shared across all organizations
   notificationChannels: {

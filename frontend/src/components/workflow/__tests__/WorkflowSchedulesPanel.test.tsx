@@ -1,6 +1,7 @@
-import { describe, it, afterEach, expect, mock } from 'bun:test';
+import { describe, it, afterEach, expect, mock, beforeEach } from 'bun:test';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import type { WorkflowSchedule } from '@sentris/shared';
+import { createStoreMock } from '@/test/mocks/createStoreMock';
 
 // Mock the tooltip components to avoid Radix DOM issues in jsdom
 mock.module('@/components/ui/tooltip', () => ({
@@ -28,6 +29,18 @@ mock.module('../schedules-utils', () => ({
     paused: 'secondary' as const,
     error: 'destructive' as const,
   },
+}));
+
+let schedulesSummaryCollapsed = false;
+const setSchedulesSummaryCollapsed = mock((value: boolean) => {
+  schedulesSummaryCollapsed = value;
+});
+
+mock.module('@/store/userPreferencesStore', () => ({
+  useUserPreferencesStore: createStoreMock(() => ({
+    schedulesSummaryCollapsed,
+    setSchedulesSummaryCollapsed,
+  })),
 }));
 
 const { WorkflowSchedulesSummaryBar, WorkflowSchedulesSidebar } =
@@ -63,6 +76,11 @@ function createSchedule(overrides: Partial<WorkflowSchedule> = {}): WorkflowSche
 // WorkflowSchedulesSummaryBar
 // ---------------------------------------------------------------------------
 describe('WorkflowSchedulesSummaryBar', () => {
+  beforeEach(() => {
+    schedulesSummaryCollapsed = false;
+    setSchedulesSummaryCollapsed.mockClear();
+  });
+
   afterEach(() => {
     cleanup();
   });
@@ -163,6 +181,51 @@ describe('WorkflowSchedulesSummaryBar', () => {
 
     fireEvent.click(screen.getByText('Manage'));
     expect(onExpand).toHaveBeenCalled();
+  });
+
+  it('collapses to a corner chip when hide is clicked', () => {
+    const { rerender } = render(
+      <WorkflowSchedulesSummaryBar
+        schedules={[createSchedule()]}
+        isLoading={false}
+        onCreate={mock(() => {})}
+        onExpand={mock(() => {})}
+        onViewAll={mock(() => {})}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Hide schedules'));
+    expect(setSchedulesSummaryCollapsed).toHaveBeenCalledWith(true);
+
+    schedulesSummaryCollapsed = true;
+    rerender(
+      <WorkflowSchedulesSummaryBar
+        schedules={[createSchedule()]}
+        isLoading={false}
+        onCreate={mock(() => {})}
+        onExpand={mock(() => {})}
+        onViewAll={mock(() => {})}
+      />,
+    );
+
+    expect(screen.queryByText('Manage')).toBeNull();
+    expect(screen.getByLabelText('Show schedules')).toBeInTheDocument();
+  });
+
+  it('expands from the corner chip', () => {
+    schedulesSummaryCollapsed = true;
+    render(
+      <WorkflowSchedulesSummaryBar
+        schedules={[]}
+        isLoading={false}
+        onCreate={mock(() => {})}
+        onExpand={mock(() => {})}
+        onViewAll={mock(() => {})}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Show schedules'));
+    expect(setSchedulesSummaryCollapsed).toHaveBeenCalledWith(false);
   });
 });
 

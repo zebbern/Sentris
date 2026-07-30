@@ -7,9 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Target, Plus } from 'lucide-react';
+import { Target } from 'lucide-react';
 import type { Scope } from '@/types/scopes';
 import { TargetRow } from './TargetRow';
 
@@ -21,7 +20,6 @@ export interface TargetsTableProps {
   error?: boolean;
   onEdit: (scope: Scope) => void;
   onDelete: (scope: Scope) => void;
-  onCreateNew?: () => void;
 }
 
 function TableSkeleton() {
@@ -44,7 +42,6 @@ export function TargetsTable({
   error,
   onEdit,
   onDelete,
-  onCreateNew,
 }: TargetsTableProps) {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -83,14 +80,6 @@ export function TargetsTable({
           title="No targets yet"
           description="Create a target to save a scope you run templates against."
           className="py-10"
-          action={
-            canManage && onCreateNew ? (
-              <Button onClick={onCreateNew} className="gap-2">
-                <Plus className="h-4 w-4" />
-                New target
-              </Button>
-            ) : undefined
-          }
         />
       )}
     </div>

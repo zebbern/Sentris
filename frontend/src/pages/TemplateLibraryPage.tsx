@@ -1,13 +1,14 @@
-import { useCallback, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Layers, Sparkles } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useTemplates,
   useTemplateCategories,
-  useTemplateTags,
+  useTemplateRepoInfo,
   useSyncTemplates,
   type Template,
 } from '@/hooks/queries/useTemplateQueries';
@@ -25,10 +26,29 @@ import {
   CardSkeleton,
   TemplateDetailModal,
   TemplateFilters,
+  CommunityTemplatesPanel,
   compareTemplatesForActivation,
   isNoSetupTemplate,
   isRecommendedTemplate,
+  officialTemplateRepoUrl,
 } from './template-library';
+
+type LibraryTab = 'official' | 'community';
+
+function parseLibraryTab(value: string | null): LibraryTab {
+  return value === 'community' ? 'community' : 'official';
+}
+
+function clearSearchParam(
+  searchParams: URLSearchParams,
+  setSearchParams: ReturnType<typeof useSearchParams>[1],
+  key: string,
+) {
+  if (!searchParams.has(key)) return;
+  const params = new URLSearchParams(searchParams);
+  params.delete(key);
+  setSearchParams(params, { replace: true });
+}
 
 export function TemplateLibraryPage() {
   useDocumentTitle('Template Library');
@@ -38,20 +58,26 @@ export function TemplateLibraryPage() {
   const canManageWorkflows = hasAdminRole(roles);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<LibraryTab>(() =>
+    parseLibraryTab(searchParams.get('tab')),
+  );
+  const deepLinkTemplateId = searchParams.get('id');
   const [showNoSetupOnly, setShowNoSetupOnly] = useState(
     () => searchParams.get('setup') === 'none',
   );
 
+  useEffect(() => {
+    setActiveTab(parseLibraryTab(searchParams.get('tab')));
+  }, [searchParams]);
+
   const filters = useMemo(() => {
-    const f: { category?: string; search?: string; tags?: string[] } = {};
+    const f: { category?: string; search?: string } = {};
     if (selectedCategory) f.category = selectedCategory;
     if (searchQuery) f.search = searchQuery;
-    if (selectedTags.length > 0) f.tags = selectedTags;
     return Object.keys(f).length > 0 ? f : undefined;
-  }, [selectedCategory, searchQuery, selectedTags]);
+  }, [selectedCategory, searchQuery]);
 
   const { data: templates = [], isLoading, error, refetch } = useTemplates(filters);
   const visibleTemplates = useMemo(
@@ -73,7 +99,8 @@ export function TemplateLibraryPage() {
     [activationOrderedTemplates],
   );
   const { data: categoriesRaw = [] } = useTemplateCategories();
-  const { data: tags = [] } = useTemplateTags();
+  const { data: repoInfo } = useTemplateRepoInfo();
+  const officialRepoUrl = useMemo(() => officialTemplateRepoUrl(repoInfo), [repoInfo]);
 
   const categories = useMemo<{ category: string; count: number }[]>(
     () =>
@@ -88,6 +115,28 @@ export function TemplateLibraryPage() {
   const [isUseModalOpen, setIsUseModalOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
+  useEffect(() => {
+    if (!deepLinkTemplateId || isLoading) return;
+
+    const match = templates.find((template) => template.id === deepLinkTemplateId);
+    if (match) {
+      setPreviewTemplate(match);
+      return;
+    }
+
+    if (templates.length > 0) {
+      clearSearchParam(searchParams, setSearchParams, 'id');
+    }
+  }, [deepLinkTemplateId, isLoading, templates, searchParams, setSearchParams]);
+
+  const setLibraryTab = (tab: LibraryTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams);
+    if (tab === 'official') params.delete('tab');
+    else params.set('tab', tab);
+    setSearchParams(params, { replace: true });
+  };
+
   const handleSync = async () => {
     try {
       await syncMutation.mutateAsync();
@@ -100,15 +149,8 @@ export function TemplateLibraryPage() {
     setSelectedCategory(category === 'all' ? null : category);
   };
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  };
-
   const clearFilters = () => {
     setSelectedCategory(null);
-    setSelectedTags([]);
     setSearchQuery('');
     setShowNoSetupOnly(false);
     const params = new URLSearchParams(searchParams);
@@ -144,12 +186,13 @@ export function TemplateLibraryPage() {
     navigate(`/workflows/${workflowId}?launch=1`);
   };
 
+  const handleCommunityImported = (template: Template) => {
+    handleUseTemplate(template);
+  };
+
   const isSyncing = syncMutation.isPending;
-  const hasFilters = Boolean(
-    selectedCategory || selectedTags.length > 0 || searchQuery || showNoSetupOnly,
-  );
-  const libraryEmpty =
-    templates.length === 0 && !selectedCategory && !searchQuery && selectedTags.length === 0;
+  const hasFilters = Boolean(selectedCategory || searchQuery || showNoSetupOnly);
+  const libraryEmpty = templates.length === 0 && !selectedCategory && !searchQuery;
 
   const getTemplateId = useCallback((t: Template) => t.id, []);
 
@@ -167,135 +210,143 @@ export function TemplateLibraryPage() {
   });
 
   return (
-    <div className="flex-1 bg-background" aria-busy={isLoading}>
+    <div className="flex-1 bg-background" aria-busy={isLoading && activeTab === 'official'}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <TemplateFilters
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          selectedCategory={selectedCategory}
-          onCategoryChange={handleCategoryChange}
-          categories={categories}
-          tags={tags}
-          selectedTags={selectedTags}
-          onToggleTag={toggleTag}
-          hasFilters={hasFilters}
-          onClearFilters={clearFilters}
-          onSync={handleSync}
-          isSyncing={isSyncing}
-          canManageWorkflows={canManageWorkflows}
-          noSetupOnly={showNoSetupOnly}
-          onToggleNoSetupOnly={toggleNoSetupOnly}
-        />
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setLibraryTab(parseLibraryTab(value))}
+          className="mb-6"
+        >
+          <TabsList aria-label="Template library source">
+            <TabsTrigger value="official" onClick={() => setLibraryTab('official')}>
+              Official
+            </TabsTrigger>
+            <TabsTrigger value="community" onClick={() => setLibraryTab('community')}>
+              Community
+            </TabsTrigger>
+          </TabsList>
 
-        {error && (
-          <ErrorBanner message={error.message} onRetry={() => refetch()} className="mb-6" />
-        )}
+          <TabsContent value="official" className="mt-6">
+            <TemplateFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onCategoryChange={handleCategoryChange}
+              categories={categories}
+              hasFilters={hasFilters}
+              onClearFilters={clearFilters}
+              onSync={handleSync}
+              isSyncing={isSyncing}
+              canManageWorkflows={canManageWorkflows}
+              noSetupOnly={showNoSetupOnly}
+              onToggleNoSetupOnly={toggleNoSetupOnly}
+              contributeUrl={officialRepoUrl}
+            />
 
-        {isLoading && !error ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
-        ) : error && visibleTemplates.length === 0 ? null : visibleTemplates.length === 0 ? (
-          <EmptyState
-            icon={Layers}
-            title="No templates found"
-            description={
-              libraryEmpty
-                ? canManageWorkflows
-                  ? 'No templates available yet. Sync from GitHub to load the template library.'
-                  : 'No templates available yet. The library is synced from GitHub by an administrator — ask an admin to run a sync, or browse the catalog on GitHub.'
-                : "Try adjusting your filters or search query to find what you're looking for."
-            }
-            action={
-              libraryEmpty ? (
-                canManageWorkflows ? (
-                  <Button onClick={handleSync} disabled={isSyncing}>
-                    {isSyncing ? 'Syncing…' : 'Sync templates'}
-                  </Button>
-                ) : (
-                  <Button variant="outline" asChild>
-                    <a
-                      href="https://github.com/zebbern/Sentris"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Browse templates on GitHub
-                    </a>
-                  </Button>
-                )
-              ) : (
-                <Button variant="outline" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              )
-            }
-          />
-        ) : (
-          <>
-            {!hasFilters && recommendedTemplateIds.size > 0 && (
-              <div className="mb-4 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <h2 className="text-sm font-semibold">Start here</h2>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Recommended starters run with minimal setup and have been verified by Sentris.
-                  </p>
-                </div>
-              </div>
+            {error && (
+              <ErrorBanner message={error.message} onRetry={() => refetch()} className="mb-6" />
             )}
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={collisionDetection}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={orderedTemplates.map((t) => t.id)}
-                strategy={rectSortingStrategy}
+            {isLoading && !error ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <CardSkeleton key={i} />
+                ))}
+              </div>
+            ) : error && visibleTemplates.length === 0 ? null : visibleTemplates.length === 0 ? (
+              <EmptyState
+                icon={Layers}
+                title="No templates found"
+                description={
+                  libraryEmpty
+                    ? canManageWorkflows
+                      ? 'No templates available yet. Sync from GitHub to load the template library.'
+                      : 'No templates available yet. The library is synced from GitHub by an administrator — ask an admin to run a sync, or browse the catalog on GitHub.'
+                    : "Try adjusting your filters or search query to find what you're looking for."
+                }
+                action={
+                  libraryEmpty ? (
+                    canManageWorkflows ? (
+                      <Button onClick={handleSync} disabled={isSyncing}>
+                        {isSyncing ? 'Syncing…' : 'Sync templates'}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" asChild>
+                        <a href={officialRepoUrl} target="_blank" rel="noopener noreferrer">
+                          Browse templates on GitHub
+                        </a>
+                      </Button>
+                    )
+                  ) : (
+                    <Button variant="outline" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  )
+                }
+              />
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={collisionDetection}
+                onDragEnd={handleDragEnd}
               >
-                <div
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                  role="region"
-                  aria-label="Template list"
+                <SortableContext
+                  items={orderedTemplates.map((t) => t.id)}
+                  strategy={rectSortingStrategy}
                 >
-                  {orderedTemplates.map((template) => (
-                    <SortableCard
-                      key={template.id}
-                      id={template.id}
-                      disabled={isDragDisabled}
-                      className="group relative"
-                    >
-                      {({ handleProps }) => (
-                        <>
-                          <CardDragHandle {...handleProps} disabled={isDragDisabled} />
-                          <TemplateCard
-                            template={template}
-                            onUse={handleUseTemplate}
-                            onPreview={setPreviewTemplate}
-                            canUse={canManageWorkflows}
-                            recommended={recommendedTemplateIds.has(template.id)}
-                          />
-                        </>
-                      )}
-                    </SortableCard>
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </>
-        )}
+                  <div
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                    role="region"
+                    aria-label="Template list"
+                  >
+                    {orderedTemplates.map((template) => (
+                      <SortableCard
+                        key={template.id}
+                        id={template.id}
+                        disabled={isDragDisabled}
+                        className="group relative"
+                      >
+                        {({ handleProps }) => (
+                          <>
+                            <CardDragHandle {...handleProps} disabled={isDragDisabled} />
+                            <TemplateCard
+                              template={template}
+                              onUse={handleUseTemplate}
+                              onPreview={setPreviewTemplate}
+                              canUse={canManageWorkflows}
+                              recommended={recommendedTemplateIds.has(template.id)}
+                            />
+                          </>
+                        )}
+                      </SortableCard>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </TabsContent>
+
+          <TabsContent value="community" className="mt-6">
+            <CommunityTemplatesPanel
+              canImport={canManageWorkflows}
+              onImported={handleCommunityImported}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <TemplateDetailModal
         template={previewTemplate}
         open={!!previewTemplate}
         onOpenChange={(open) => {
-          if (!open) setPreviewTemplate(null);
+          if (!open) {
+            setPreviewTemplate(null);
+            clearSearchParam(searchParams, setSearchParams, 'id');
+          }
         }}
         onUse={(template) => {
           setPreviewTemplate(null);
+          clearSearchParam(searchParams, setSearchParams, 'id');
           handleUseTemplate(template);
         }}
         canUse={canManageWorkflows}

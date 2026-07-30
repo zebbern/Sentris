@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect, mock, afterAll } from 'bun:test';
 import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
-import { fireEvent, screen, cleanup } from '@testing-library/react';
+import { screen, cleanup } from '@testing-library/react';
 import type { ArtifactMetadata } from '@sentris/shared';
 import { createConfirmDialogMock } from '@/test/mocks/dialog';
 import {
@@ -194,8 +194,7 @@ describe('ArtifactLibrary', () => {
 
   it('renders without crashing', () => {
     renderPage();
-    // The page should render the search input at minimum
-    expect(screen.getByPlaceholderText('Filter by name...')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Artifacts' })).toBeInTheDocument();
   });
 
   it('omits the redundant page heading supplied by the app top bar', () => {
@@ -204,7 +203,6 @@ describe('ArtifactLibrary', () => {
     expect(
       screen.queryByRole('heading', { level: 2, name: /^Artifacts$/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Filter by name...')).toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true', () => {
@@ -244,27 +242,15 @@ describe('ArtifactLibrary', () => {
     expect(screen.getByText('10 KB')).toBeInTheDocument();
   });
 
-  it('renders Refresh button with correct aria-label', () => {
+  it('renders Download then Delete action buttons with aria-labels per artifact', () => {
     setupStore();
     renderPage();
 
-    const refreshBtn = screen.getByRole('button', { name: /Refresh artifacts/i });
-    expect(refreshBtn).toBeInTheDocument();
-  });
-
-  it('renders Delete and Download action buttons with aria-labels per artifact', () => {
-    setupStore();
-    renderPage();
-
-    // Each artifact row has a Delete and Download button with aria-label
-    expect(
-      screen.getByRole('button', { name: /Delete nmap-scan-results\.json/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Download nmap-scan-results\.json/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Delete deploy-log\.txt/i })).toBeInTheDocument();
+    const download = screen.getByRole('button', { name: /Download nmap-scan-results\.json/i });
+    const del = screen.getByRole('button', { name: /Delete nmap-scan-results\.json/i });
+    expect(download.compareDocumentPosition(del) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: /Download deploy-log\.txt/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Delete deploy-log\.txt/i })).toBeInTheDocument();
   });
 
   it('shows ErrorBanner when error is set', () => {
@@ -272,18 +258,6 @@ describe('ArtifactLibrary', () => {
     renderPage();
 
     expect(screen.getByText('Failed to load artifacts')).toBeInTheDocument();
-  });
-
-  it('search input filters artifacts by updating search query', () => {
-    setupStore();
-    renderPage();
-
-    const searchInput = screen.getByPlaceholderText('Filter by name...');
-    expect(searchInput).toBeInTheDocument();
-
-    // Typing in the search should update the input value
-    fireEvent.change(searchInput, { target: { value: 'nmap' } });
-    expect((searchInput as HTMLInputElement).value).toBe('nmap');
   });
 
   it('renders table headers when data is present', () => {

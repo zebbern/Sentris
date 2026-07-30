@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Circle, Rocket, Workflow, Play, X } from 'lucide-react';
+import { CheckCircle2, Circle, ListChecks, Rocket, Workflow, Play, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -124,7 +124,7 @@ export function OnboardingChecklist({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <Rocket className="h-5 w-5 text-primary" aria-hidden="true" />
+              <ListChecks className="h-5 w-5 text-primary" aria-hidden="true" />
             </div>
             <div>
               <h2 className="text-base font-semibold tracking-tight">

@@ -125,6 +125,37 @@ describe('timelineNavigationStore (via combined store)', () => {
     expect(useExecutionTimelineStore.getState().isPlaying).toBe(true);
   });
 
+  it('play restarts from the beginning when already at the end', () => {
+    useExecutionTimelineStore.setState({
+      totalDuration: 5000,
+      currentTime: 5000,
+      isPlaying: false,
+      events: [],
+      dataFlows: [],
+      timelineStartTime: null,
+    });
+
+    useExecutionTimelineStore.getState().play();
+
+    const state = useExecutionTimelineStore.getState();
+    expect(state.currentTime).toBe(0);
+    expect(state.isPlaying).toBe(true);
+  });
+
+  it('play does not reset currentTime when not at the end', () => {
+    useExecutionTimelineStore.setState({
+      totalDuration: 5000,
+      currentTime: 2500,
+      isPlaying: false,
+    });
+
+    useExecutionTimelineStore.getState().play();
+
+    const state = useExecutionTimelineStore.getState();
+    expect(state.currentTime).toBe(2500);
+    expect(state.isPlaying).toBe(true);
+  });
+
   it('play does nothing in live mode', () => {
     useExecutionTimelineStore.setState({ playbackMode: 'live' });
     useExecutionTimelineStore.getState().play();

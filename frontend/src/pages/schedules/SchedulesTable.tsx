@@ -8,10 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BulkActionBar } from '@/components/ui/bulk-action-bar';
-import { CalendarClock, Plus } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import { DndContext, type CollisionDetection, type SensorDescriptor } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableTableRow } from '@/components/ui/sortable';
@@ -54,9 +53,6 @@ export interface SchedulesTableProps {
 
   // Error state — when true, empty-state is suppressed (ErrorBanner shown by parent)
   error?: boolean;
-
-  // Empty state
-  onCreateNew?: () => void;
 }
 
 function TableSkeleton() {
@@ -98,7 +94,6 @@ export function SchedulesTable({
   onEdit,
   onDelete,
   error,
-  onCreateNew,
 }: SchedulesTableProps) {
   return (
     <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -174,16 +169,8 @@ export function SchedulesTable({
         <EmptyState
           icon={CalendarClock}
           title="No schedules found"
-          description='Create your first cadence with the "New schedule" button or adjust the filters above.'
+          description='Create your first cadence with the "New schedule" button in the top bar, or adjust the search filter.'
           className="py-10"
-          action={
-            onCreateNew ? (
-              <Button onClick={onCreateNew} className="gap-2">
-                <Plus className="h-4 w-4" />
-                New schedule
-              </Button>
-            ) : undefined
-          }
         />
       )}
     </div>

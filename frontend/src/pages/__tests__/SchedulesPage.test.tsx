@@ -81,9 +81,10 @@ mock.module('@/hooks/queries/useWorkflowQueries', () => ({
   }),
 }));
 
-// --- Mock ScheduleEditorDrawer as a no-op stub ---
+// --- Mock ScheduleEditorDrawer to surface open/mode for create-param tests ---
 mock.module('@/components/schedules/ScheduleEditorDrawer', () => ({
-  ScheduleEditorDrawer: () => null,
+  ScheduleEditorDrawer: ({ open, mode }: { open: boolean; mode: string }) =>
+    open ? <div role="dialog" data-mode={mode}>{`Schedule editor ${mode}`}</div> : null,
 }));
 
 // --- Auth store ---
@@ -173,7 +174,14 @@ describe('SchedulesPage', () => {
     expect(
       screen.queryByRole('heading', { level: 2, name: /^Schedules$/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New schedule/i })).toBeInTheDocument();
+  });
+
+  it('does not render page-local New schedule or Refresh controls', () => {
+    setupStore();
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /New schedule/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Refresh/i })).not.toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {
@@ -190,6 +198,15 @@ describe('SchedulesPage', () => {
     renderPage();
 
     expect(screen.getByText('No schedules found')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /New schedule/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the create drawer from the create query param', () => {
+    setupStore();
+    renderWithProviders(<SchedulesPage />, { initialEntries: ['/schedules?create=1'] });
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Schedule editor create')).toBeInTheDocument();
   });
 
   it('renders schedule rows showing name, status badge, and action buttons', () => {
@@ -275,31 +292,22 @@ describe('SchedulesPage', () => {
     expect(deleteSchedule).toHaveBeenCalledWith(baseSchedule.id);
   });
 
-  it('search input filters schedules by name', () => {
+  it('filters schedules by name via ?search= URL param', () => {
     setupStore();
-    renderPage();
+    renderWithProviders(<SchedulesPage />, {
+      initialEntries: ['/schedules?search=Nightly'],
+    });
 
-    // Both schedules present initially
-    expect(screen.getByText('Nightly Scan')).toBeInTheDocument();
-    expect(screen.getByText('Weekly Deploy')).toBeInTheDocument();
-
-    // Type in search
-    const searchInput = screen.getByPlaceholderText(/Filter by schedule or workflow/i);
-    fireEvent.change(searchInput, { target: { value: 'Nightly' } });
-
-    // Only matching schedule remains
     expect(screen.getByText('Nightly Scan')).toBeInTheDocument();
     expect(screen.queryByText('Weekly Deploy')).not.toBeInTheDocument();
   });
 
-  it('search input filters schedules by workflow name', () => {
+  it('filters schedules by workflow name via ?search= URL param', () => {
     setupStore();
-    renderPage();
+    renderWithProviders(<SchedulesPage />, {
+      initialEntries: ['/schedules?search=Deploy%20App'],
+    });
 
-    const searchInput = screen.getByPlaceholderText(/Filter by schedule or workflow/i);
-    fireEvent.change(searchInput, { target: { value: 'Deploy App' } });
-
-    // Only the schedule linked to "Deploy App" workflow remains
     expect(screen.queryByText('Nightly Scan')).not.toBeInTheDocument();
     expect(screen.getByText('Weekly Deploy')).toBeInTheDocument();
   });

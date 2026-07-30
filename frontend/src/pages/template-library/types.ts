@@ -9,6 +9,11 @@ import {
   TestTube2,
   MoreHorizontal,
   AlertTriangle,
+  Bug,
+  BookOpen,
+  Package,
+  ShieldCheck,
+  Box,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -106,6 +111,42 @@ export const CATEGORY_STYLES: Record<string, CategoryStyle> = {
     gradient: 'from-pink-500/8 via-rose-500/5 to-transparent',
     accent: 'text-pink-600 dark:text-pink-400',
   },
+  // Seed / official catalog taxonomy (hyphenated slugs)
+  'bug-bounty': {
+    icon: Bug,
+    badge:
+      'bg-orange-100 text-orange-700 border-orange-200/60 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/40',
+    gradient: 'from-orange-500/8 via-amber-500/5 to-transparent',
+    accent: 'text-orange-600 dark:text-orange-400',
+  },
+  'cve-research': {
+    icon: BookOpen,
+    badge:
+      'bg-sky-100 text-sky-700 border-sky-200/60 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-800/40',
+    gradient: 'from-sky-500/8 via-blue-500/5 to-transparent',
+    accent: 'text-sky-600 dark:text-sky-400',
+  },
+  'dependency-security': {
+    icon: Package,
+    badge:
+      'bg-violet-100 text-violet-700 border-violet-200/60 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800/40',
+    gradient: 'from-violet-500/8 via-purple-500/5 to-transparent',
+    accent: 'text-violet-600 dark:text-violet-400',
+  },
+  'security-posture': {
+    icon: ShieldCheck,
+    badge:
+      'bg-cyan-100 text-cyan-700 border-cyan-200/60 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800/40',
+    gradient: 'from-cyan-500/8 via-teal-500/5 to-transparent',
+    accent: 'text-cyan-600 dark:text-cyan-400',
+  },
+  'container-security': {
+    icon: Box,
+    badge:
+      'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200/60 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:border-fuchsia-800/40',
+    gradient: 'from-fuchsia-500/8 via-pink-500/5 to-transparent',
+    accent: 'text-fuchsia-600 dark:text-fuchsia-400',
+  },
   other: {
     icon: MoreHorizontal,
     badge:
@@ -117,9 +158,19 @@ export const CATEGORY_STYLES: Record<string, CategoryStyle> = {
 
 const DEFAULT_CATEGORY_STYLE: CategoryStyle = CATEGORY_STYLES.other;
 
+/**
+ * Resolve category chrome for publish Title Case, seed hyphenated slugs, and
+ * space-separated legacy keys (e.g. "Incident Response" / "incident-response").
+ */
 export function getCategoryStyle(category?: string | null): CategoryStyle {
   if (!category) return DEFAULT_CATEGORY_STYLE;
-  return CATEGORY_STYLES[category.toLowerCase()] || DEFAULT_CATEGORY_STYLE;
+  const key = category.toLowerCase().trim();
+  return (
+    CATEGORY_STYLES[key] ||
+    CATEGORY_STYLES[key.replace(/\s+/g, '-')] ||
+    CATEGORY_STYLES[key.replace(/-/g, ' ')] ||
+    DEFAULT_CATEGORY_STYLE
+  );
 }
 
 // ---------------------------------------------------------------------------

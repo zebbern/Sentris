@@ -528,7 +528,12 @@ function createRootTestPlan(options = {}) {
     commands: [
       { command: 'bun', args: ['test', 'scripts/__tests__'] },
       { command: 'bun', args: ['test', 'packages'] },
-      { command: 'bun', args: ['test', 'backend'] },
+      // Nest DI resolves @nestjs/* from the package cwd. Running `bun test backend`
+      // from the repo root can load duplicate ConfigService identities and break
+      // controller construction in HTTP contract specs.
+      { command: 'bun', args: ['test'], cwd: 'backend' },
+      // Keep worker rooted at the monorepo so `cleanupPaths: ['worker/dist']`
+      // remains effective and compiled dist tests are not double-executed.
       { command: 'bun', args: ['test', 'worker'] },
       { command: 'bun', args: ['test', 'e2e-tests'] },
       { command: 'bun', args: ['run', 'test'], cwd: 'frontend' },

@@ -11,6 +11,9 @@ import { prefetchRoute } from '@/lib/prefetch-routes';
 
 const footerIconButtonClass =
   'h-7 w-7 min-h-7 min-w-7 shrink-0 flex items-center justify-center rounded-md p-0';
+/** Locked pixel size — same collapsed and expanded (flex parents must not resize these). */
+const NAV_ICON_CLASS = 'pointer-events-none h-5 w-5 min-h-5 min-w-5 max-h-5 max-w-5 shrink-0';
+const NAV_ICON_SIZE = 20;
 
 export interface NavItem {
   name: string;
@@ -53,29 +56,39 @@ export function SidebarNav({
   const { isAuthenticated } = useAuth();
   const authProvider = useAuthProvider();
   const showUserButton = isAuthenticated || authProvider.name === 'clerk';
+  // Same control height open/closed so icons don't look larger when only the icon shows.
   const collapsedNavItemClass =
-    'h-10 w-10 min-h-10 min-w-10 max-w-10 shrink-0 p-0 mx-auto flex items-center justify-center gap-0';
+    'mx-auto flex h-9 w-9 min-h-9 min-w-9 max-h-9 max-w-9 shrink-0 items-center justify-center gap-0 p-0';
   const expandedNavItemClass = isCompact
-    ? 'w-full justify-start px-2.5 gap-2 py-2 md:py-1.5 min-h-[40px] md:min-h-0'
-    : 'w-full justify-start px-2.5 gap-2.5 py-2';
+    ? 'h-9 min-h-9 w-full justify-start gap-2 px-2.5 py-0'
+    : 'h-9 min-h-9 w-full justify-start gap-2.5 px-2.5 py-0';
 
   return (
     <>
       <SidebarContent className="py-0">
         <div className={cn('px-1.5 pt-1.5 pb-0.5', !sidebarOpen && 'flex justify-center')}>
           <button
+            type="button"
             onClick={onOpenCommandPalette}
+            onMouseEnter={() => {
+              void import('@/features/command-palette/CommandPalette');
+            }}
+            onFocus={() => {
+              void import('@/features/command-palette/CommandPalette');
+            }}
             className={cn(
               'flex items-center rounded-md transition-colors',
               'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground',
-              sidebarOpen ? 'w-full gap-2 py-2 justify-between px-2.5' : collapsedNavItemClass,
+              sidebarOpen
+                ? 'h-9 min-h-9 w-full justify-between gap-2 px-2.5 py-0'
+                : collapsedNavItemClass,
             )}
             aria-label="Open command palette"
           >
             {sidebarOpen ? (
               <>
                 <div className="flex items-center gap-2">
-                  <Search className="h-3.5 w-3.5 flex-shrink-0" />
+                  <Search className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
                   <NavLabel sidebarOpen={sidebarOpen} isCompact={false}>
                     Search...
                   </NavLabel>
@@ -91,7 +104,7 @@ export function SidebarNav({
                 </kbd>
               </>
             ) : (
-              <Search className="h-3.5 w-3.5 flex-shrink-0" />
+              <Search className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
             )}
           </button>
         </div>
@@ -121,9 +134,7 @@ export function SidebarNav({
                         window.open(item.href, '_blank', 'noopener,noreferrer');
                       }}
                     >
-                      <Icon
-                        className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
-                      />
+                      <Icon className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
                       <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                         {item.name}
                       </NavLabel>
@@ -154,9 +165,7 @@ export function SidebarNav({
                       onDesktopNavClick(item.href);
                     }}
                   >
-                    <Icon
-                      className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
-                    />
+                    <Icon className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
                     <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                       {item.name}
                     </NavLabel>
@@ -178,10 +187,8 @@ export function SidebarNav({
                 'hover:bg-muted/50 text-muted-foreground hover:text-foreground',
                 sidebarOpen
                   ? cn(
-                      'w-full',
-                      isCompact
-                        ? 'gap-2 py-2 justify-between px-2.5'
-                        : 'gap-2.5 py-2 justify-between px-2.5',
+                      'h-9 min-h-9 w-full justify-between px-2.5 py-0',
+                      isCompact ? 'gap-2' : 'gap-2.5',
                     )
                   : collapsedNavItemClass,
               )}
@@ -189,9 +196,7 @@ export function SidebarNav({
               {sidebarOpen ? (
                 <>
                   <div className={cn('flex items-center', isCompact ? 'gap-2' : 'gap-2.5')}>
-                    <Settings
-                      className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
-                    />
+                    <Settings className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
                     <NavLabel
                       sidebarOpen={sidebarOpen}
                       isCompact={isCompact}
@@ -202,15 +207,13 @@ export function SidebarNav({
                   </div>
                   <ChevronDown
                     className={cn(
-                      'h-4 w-4 transition-transform duration-200 flex-shrink-0',
+                      'h-4 w-4 shrink-0 transition-transform duration-200',
                       settingsOpen ? 'rotate-180' : '',
                     )}
                   />
                 </>
               ) : (
-                <Settings
-                  className={cn('flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')}
-                />
+                <Settings className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
               )}
             </button>
 
@@ -246,9 +249,7 @@ export function SidebarNav({
                         onDesktopNavClick(item.href);
                       }}
                     >
-                      <Icon
-                        className={cn('flex-shrink-0', isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
-                      />
+                      <Icon className={NAV_ICON_CLASS} size={NAV_ICON_SIZE} />
                       <NavLabel sidebarOpen={sidebarOpen} isCompact={isCompact}>
                         {item.name}
                       </NavLabel>

@@ -33,10 +33,12 @@ const mockQueryState: {
   approvals: HumanInputRequest[];
   isLoading: boolean;
   error: Error | null;
+  dataUpdatedAt: number;
 } = {
   approvals: [],
   isLoading: false,
   error: null,
+  dataUpdatedAt: Date.now(),
 };
 
 const mockInvalidateHumanInputs = mock().mockReturnValue(undefined);
@@ -46,6 +48,7 @@ mock.module('@/hooks/queries/useHumanInputQueries', () => ({
     data: mockQueryState.approvals,
     isLoading: mockQueryState.isLoading,
     error: mockQueryState.error,
+    dataUpdatedAt: mockQueryState.dataUpdatedAt,
   }),
   useInvalidateHumanInputs: () => mockInvalidateHumanInputs,
 }));
@@ -250,11 +253,10 @@ describe('ActionCenterPage', () => {
     expect(dragHandles.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders Refresh button', () => {
+  it('renders last-updated text when data has been fetched', () => {
     setupStore();
     renderPage();
 
-    const refreshButtons = screen.getAllByRole('button', { name: /Refresh/i });
-    expect(refreshButtons.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Updated /i)).toBeInTheDocument();
   });
 });

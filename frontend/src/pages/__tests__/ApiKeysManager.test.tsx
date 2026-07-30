@@ -202,6 +202,16 @@ describe('ApiKeysManager', () => {
     renderPage();
 
     expect(screen.getByText('No API keys')).toBeInTheDocument();
+    // Create lives in the toolbar only — empty state should not duplicate it
+    expect(screen.getAllByRole('button', { name: /Create new key/i })).toHaveLength(1);
+  });
+
+  it('keeps Create new key in the page toolbar without a Refresh button', () => {
+    setupStore();
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /Create new key/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Refresh$/i })).not.toBeInTheDocument();
   });
 
   it('renders API key rows showing name, key hint, status badge, and permissions badges', () => {

@@ -1,6 +1,5 @@
 import type { ScheduleOverlapPolicy } from '@sentris/shared';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -11,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { ScheduleFormState } from './scheduleTypes';
 import { OVERLAP_OPTIONS } from './scheduleTypes';
+import { FieldHintLabel } from './FieldHintLabel';
 
 interface CronExpressionInputProps {
   form: ScheduleFormState;
@@ -20,61 +20,61 @@ interface CronExpressionInputProps {
 
 export function CronExpressionInput({ form, cronError, onFieldChange }: CronExpressionInputProps) {
   return (
-    <section className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Cron expression</Label>
+    <section className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Use standard cron syntax. Temporal handles catch-up windows.">
+            Cron expression
+          </FieldHintLabel>
           <Input
             value={form.cronExpression}
             onChange={(event) => onFieldChange('cronExpression', event.target.value)}
             placeholder="0 9 * * MON-FRI"
-            className={cn('font-mono text-sm', cronError && 'border-destructive')}
+            className={cn('h-9 font-mono text-sm', cronError && 'border-destructive')}
           />
-          {cronError ? (
-            <p className="text-sm text-destructive">{cronError}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Use standard cron syntax. Temporal handles catch-up windows.
-            </p>
-          )}
+          {cronError ? <p className="text-xs text-destructive">{cronError}</p> : null}
         </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Timezone</Label>
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Provide an IANA timezone identifier (e.g. Europe/Berlin, UTC).">
+            Timezone
+          </FieldHintLabel>
           <Input
             value={form.timezone}
             onChange={(event) => onFieldChange('timezone', event.target.value)}
             placeholder="UTC or America/New_York"
+            className="h-9"
           />
-          <p className="text-xs text-muted-foreground">Provide an IANA timezone identifier.</p>
         </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Friendly label</Label>
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Optional alias shown beside the cron string.">
+            Friendly label
+          </FieldHintLabel>
           <Input
             value={form.humanLabel}
             onChange={(event) => onFieldChange('humanLabel', event.target.value)}
             placeholder="Weekday mornings"
+            className="h-9"
           />
-          <p className="text-xs text-muted-foreground">
-            Optional alias shown beside the cron string.
-          </p>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Overlap policy</Label>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="Controls what happens if a previous run is still executing when the next schedule fires.">
+            Overlap policy
+          </FieldHintLabel>
           <Select
             value={form.overlapPolicy}
             onValueChange={(value) =>
               onFieldChange('overlapPolicy', value as ScheduleOverlapPolicy)
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {OVERLAP_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-0.5 py-0.5">
                     <span className="font-medium">{option.label}</span>
                     <span className="text-xs text-muted-foreground">{option.description}</span>
                   </div>
@@ -83,17 +83,17 @@ export function CronExpressionInput({ form, cronError, onFieldChange }: CronExpr
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Catch-up window (seconds)</Label>
+        <div className="space-y-1.5">
+          <FieldHintLabel hint="How long Temporal should keep missed runs queued.">
+            Catch-up window (seconds)
+          </FieldHintLabel>
           <Input
             type="number"
             min={0}
             value={form.catchupWindowSeconds}
             onChange={(event) => onFieldChange('catchupWindowSeconds', event.target.value)}
+            className="h-9"
           />
-          <p className="text-xs text-muted-foreground">
-            How long Temporal should keep missed runs queued.
-          </p>
         </div>
       </div>
     </section>

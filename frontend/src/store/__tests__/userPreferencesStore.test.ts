@@ -15,6 +15,8 @@ describe('userPreferencesStore', () => {
       defaultLandingPage: '/',
       sidebarDensity: 'comfortable',
       showCanvasMinimap: false,
+      hideConfigInfoSections: true,
+      schedulesSummaryCollapsed: false,
     });
     localStorage.clear();
   });
@@ -24,6 +26,8 @@ describe('userPreferencesStore', () => {
     expect(state.defaultLandingPage).toBe('/');
     expect(state.sidebarDensity).toBe('comfortable');
     expect(state.showCanvasMinimap).toBe(false);
+    expect(state.hideConfigInfoSections).toBe(true);
+    expect(state.schedulesSummaryCollapsed).toBe(false);
   });
 
   it('updates defaultLandingPage', () => {
@@ -53,5 +57,15 @@ describe('userPreferencesStore', () => {
   it('updates showCanvasMinimap', () => {
     useUserPreferencesStore.getState().setShowCanvasMinimap(true);
     expect(useUserPreferencesStore.getState().showCanvasMinimap).toBe(true);
+  });
+
+  it('updates hideConfigInfoSections', () => {
+    useUserPreferencesStore.getState().setHideConfigInfoSections(false);
+    expect(useUserPreferencesStore.getState().hideConfigInfoSections).toBe(false);
+  });
+
+  it('updates schedulesSummaryCollapsed', () => {
+    useUserPreferencesStore.getState().setSchedulesSummaryCollapsed(true);
+    expect(useUserPreferencesStore.getState().schedulesSummaryCollapsed).toBe(true);
   });
 });

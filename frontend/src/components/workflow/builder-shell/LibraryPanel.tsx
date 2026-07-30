@@ -1,6 +1,3 @@
-import { PanelLeftClose, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { LibraryPanelProps } from './types';
 
@@ -10,7 +7,6 @@ export function LibraryPanel({
   libraryPanelWidth,
   isMobile,
   libraryContent,
-  onToggleLibrary,
 }: LibraryPanelProps) {
   return (
     <aside
@@ -33,33 +29,6 @@ export function LibraryPanel({
           transition: 'transform 200ms ease-in-out',
         }}
       >
-        {isLibraryVisible && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  onClick={onToggleLibrary}
-                  className={cn(
-                    'absolute z-50 top-3 md:top-4 right-3 md:right-4',
-                    'h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md',
-                    'text-xs font-medium transition-all duration-200 hover:bg-muted',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                  )}
-                  aria-expanded={true}
-                  aria-label="Hide component library"
-                >
-                  {isMobile ? (
-                    <X className="h-5 w-5" />
-                  ) : (
-                    <PanelLeftClose className="h-4 w-4 flex-shrink-0" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Hide components</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
         <div
           className={cn(
             'absolute inset-0',

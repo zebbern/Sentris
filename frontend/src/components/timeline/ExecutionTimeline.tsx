@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
-import { useWorkflowUiStore } from '@/store/workflowUiStore';
 import { clampValue } from './execution-timeline/utils';
-import { PlaybackControls } from './execution-timeline/PlaybackControls';
+import { PlaybackControls, TimelineViewToggles } from './execution-timeline/PlaybackControls';
 import { TimelineTrack } from './execution-timeline/TimelineTrack';
 import { TimelineOverview } from './execution-timeline/TimelineOverview';
-import { TimelineStatusBar } from './execution-timeline/TimelineStatusBar';
+import {
+  TimelinePlaybackState,
+  TimelineStatusCounts,
+} from './execution-timeline/TimelineStatusBar';
 
 export function ExecutionTimeline() {
   const [timelineStart, setTimelineStart] = useState(0);
@@ -37,11 +39,6 @@ export function ExecutionTimeline() {
   const timelineStartTime = useExecutionTimelineStore((state) => state.timelineStartTime);
   const agentMarkersRunId = useExecutionTimelineStore((state) => state.agentMarkersRunId);
   const agentMarkers = useExecutionTimelineStore((state) => state.agentMarkers);
-
-  const showHeatMap = useWorkflowUiStore((s) => s.showHeatMap);
-  const toggleHeatMap = useWorkflowUiStore((s) => s.toggleHeatMap);
-  const smartRouting = useWorkflowUiStore((s) => s.smartRouting);
-  const toggleSmartRouting = useWorkflowUiStore((s) => s.toggleSmartRouting);
 
   const isLiveMode = playbackMode === 'live';
   const overviewDuration = Math.max(eventDuration, totalDuration);
@@ -271,23 +268,11 @@ export function ExecutionTimeline() {
 
   return (
     <div className="border-t bg-background min-w-0">
-      <div className="min-w-0 space-y-2 px-3 py-2">
-        <PlaybackControls
-          currentTime={currentTime}
-          totalDuration={totalDuration}
-          isPlaying={isPlaying}
+      <div className="min-w-0 space-y-2.5 px-3 py-2.5">
+        <TimelineViewToggles
           playbackMode={playbackMode}
-          playbackSpeed={playbackSpeed}
           isLiveFollowing={isLiveFollowing}
-          showHeatMap={showHeatMap}
-          smartRouting={smartRouting}
-          onPlayPause={handlePlayPause}
-          onStepForward={stepForward}
-          onStepBackward={stepBackward}
-          onSpeedChange={handleSpeedChange}
           onGoLive={goLive}
-          onToggleHeatMap={toggleHeatMap}
-          onToggleSmartRouting={toggleSmartRouting}
         />
 
         <TimelineTrack
@@ -318,14 +303,30 @@ export function ExecutionTimeline() {
           />
         )}
 
-        <TimelineStatusBar
-          eventCount={events.length}
-          nodeCount={Object.keys(nodeStates).length}
-          playbackSpeed={playbackSpeed}
-          playbackMode={playbackMode}
-          isSeeking={isSeeking}
-          isPlaying={isPlaying}
-        />
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+          <TimelineStatusCounts
+            className="justify-self-start"
+            eventCount={events.length}
+            nodeCount={Object.keys(nodeStates).length}
+          />
+          <PlaybackControls
+            currentTime={currentTime}
+            totalDuration={totalDuration}
+            isPlaying={isPlaying}
+            playbackMode={playbackMode}
+            playbackSpeed={playbackSpeed}
+            onPlayPause={handlePlayPause}
+            onStepForward={stepForward}
+            onStepBackward={stepBackward}
+            onSpeedChange={handleSpeedChange}
+          />
+          <TimelinePlaybackState
+            className="justify-self-end"
+            playbackMode={playbackMode}
+            isSeeking={isSeeking}
+            isPlaying={isPlaying}
+          />
+        </div>
       </div>
     </div>
   );
