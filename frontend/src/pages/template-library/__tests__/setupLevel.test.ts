@@ -153,6 +153,38 @@ describe('template activation metadata', () => {
     expect(isRecommendedTemplate({ ...base, isOfficial: false })).toBe(false);
   });
 
+  it('recommends a reviewed official no-setup template when validation is unknown', () => {
+    expect(
+      isRecommendedTemplate({
+        ...base,
+        isOfficial: true,
+        isVerified: true,
+        validation: {
+          status: 'unknown',
+          recommendation: 'unknown',
+          rationale: 'No live validation ledger entry found for this template.',
+          isCurrent: false,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not use reviewed status to override stale live evidence', () => {
+    expect(
+      isRecommendedTemplate({
+        ...base,
+        isOfficial: true,
+        isVerified: true,
+        validation: {
+          status: 'live-verified',
+          recommendation: 'keep',
+          rationale: 'Fingerprint is stale.',
+          isCurrent: false,
+        },
+      }),
+    ).toBe(false);
+  });
+
   it('orders a proven no-setup starter ahead of a tooling-heavy template', () => {
     const needsTooling = {
       ...base,

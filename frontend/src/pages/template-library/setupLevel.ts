@@ -90,10 +90,16 @@ export function templateProducesArtifact(template: Pick<Template, 'graph'>): boo
 }
 
 export function isRecommendedTemplate(template: Rankable): boolean {
+  const hasNoLiveEvidence = !template.validation || template.validation.status === 'unknown';
+  const hasTrustedValidation = template.validation
+    ? isLiveVerifiedTemplate(template)
+    : template.isVerified;
+  const hasReviewedFallback = hasNoLiveEvidence && template.isVerified;
+
   return (
     getTemplateSetupLevel(template) === 'no-setup' &&
     template.isOfficial &&
-    (template.validation ? isLiveVerifiedTemplate(template) : template.isVerified)
+    (hasTrustedValidation || hasReviewedFallback)
   );
 }
 
