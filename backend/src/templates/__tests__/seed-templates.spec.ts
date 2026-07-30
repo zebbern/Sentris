@@ -4757,7 +4757,7 @@ describe('new seed templates', () => {
       mxStatus: 200,
     });
 
-    expect(result.report.summary.findings).toBeGreaterThanOrEqual(0);
+    expect(result.report.summary.findings).toBe(3);
     expect(result.report.nextSteps.length).toBeGreaterThan(0);
     expect(result.report.warnings).toEqual(expect.any(Array));
   });
@@ -4797,8 +4797,92 @@ describe('new seed templates', () => {
       },
     });
 
-    expect(result.report.summary.findings).toBeGreaterThanOrEqual(0);
+    expect(result.report.summary.findings).toBe(0);
     expect(result.report.nextSteps.length).toBeGreaterThan(0);
     expect(result.report.warnings).toEqual(expect.any(Array));
+  });
+
+  it('domain-email-authentication-posture does not infer missing records from unavailable DNS', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const buildNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_dns_queries',
+    );
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+    const invalidInput = runTemplateScript<{
+      domain: string;
+      validDomain: boolean;
+      rootTxtUrl: string;
+      dmarcTxtUrl: string;
+      mxUrl: string;
+    }>(buildNode.data.config.params.code, { domain: 'https://www.-invalid.example/path' });
+    const unavailable = runTemplateScript<{
+      report: {
+        findings: { title: string }[];
+        warnings: string[];
+        sourceStatuses: { rootTxt: { usable: boolean } };
+      };
+    }>(assembleNode.data.config.params.code, {
+      domain: invalidInput.domain,
+      validDomain: invalidInput.validDomain,
+      rootStatus: 503,
+      rootStatusText: 'Service Unavailable',
+      dmarcStatus: 503,
+      dmarcStatusText: 'Service Unavailable',
+      mxStatus: 503,
+      mxStatusText: 'Service Unavailable',
+    });
+
+    expect(invalidInput.validDomain).toBe(false);
+    expect([invalidInput.rootTxtUrl, invalidInput.dmarcTxtUrl, invalidInput.mxUrl]).toEqual(
+      expect.arrayContaining([expect.stringContaining('invalid.invalid')]),
+    );
+    expect(unavailable.report.sourceStatuses.rootTxt.usable).toBe(false);
+    expect(unavailable.report.findings).toEqual([]);
+    expect(unavailable.report.warnings.join(' ')).toContain('invalid');
+    expect(unavailable.report.warnings.join(' ')).toContain('no usable DNS evidence');
+  });
+
+  it('oidc-discovery-configuration-review does not infer metadata findings from unavailable or invalid inputs', () => {
+    const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const buildNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_discovery_request',
+    );
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_oidc_review',
+    );
+    const invalidInput = runTemplateScript<{
+      expectedIssuer: string;
+      validIssuer: boolean;
+      discoveryUrl: string;
+    }>(buildNode.data.config.params.code, { issuerUrl: 'http://issuer.example/path?query=1#hash' });
+    const unavailable = runTemplateScript<{
+      report: { findings: unknown[]; warnings: string[]; sourceStatus: { usable: boolean } };
+    }>(assembleNode.data.config.params.code, {
+      expectedIssuer: 'https://issuer.example',
+      validIssuer: true,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+    const invalid = runTemplateScript<{ report: { findings: unknown[]; warnings: string[] } }>(
+      assembleNode.data.config.params.code,
+      {
+        expectedIssuer: invalidInput.expectedIssuer,
+        validIssuer: invalidInput.validIssuer,
+        status: 200,
+        data: { issuer: 'https://different.example' },
+      },
+    );
+
+    expect(invalidInput.validIssuer).toBe(false);
+    expect(invalidInput.discoveryUrl).toContain('https://invalid.invalid/');
+    expect(unavailable.report.sourceStatus.usable).toBe(false);
+    expect(unavailable.report.findings).toEqual([]);
+    expect(unavailable.report.warnings.join(' ')).toContain('no usable metadata');
+    expect(invalid.report.findings).toEqual([]);
+    expect(invalid.report.warnings.join(' ')).toContain('must be an HTTPS URL');
   });
 });

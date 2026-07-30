@@ -25,7 +25,10 @@
       {
         "id": "trigger_1",
         "type": "core.workflow.entrypoint",
-        "position": { "x": 100, "y": 300 },
+        "position": {
+          "x": 100,
+          "y": 300
+        },
         "data": {
           "label": "Domain Input",
           "config": {
@@ -55,18 +58,41 @@
       {
         "id": "build_dns_queries",
         "type": "core.logic.script",
-        "position": { "x": 380, "y": 300 },
+        "position": {
+          "x": 380,
+          "y": 300
+        },
         "data": {
           "label": "Normalize Domain and Build DNS Queries",
           "config": {
             "params": {
-              "variables": [{ "name": "domain", "type": "string" }],
+              "variables": [
+                {
+                  "name": "domain",
+                  "type": "string"
+                }
+              ],
               "returns": [
-                { "name": "domain", "type": "string" },
-                { "name": "validDomain", "type": "boolean" },
-                { "name": "rootTxtUrl", "type": "string" },
-                { "name": "dmarcTxtUrl", "type": "string" },
-                { "name": "mxUrl", "type": "string" }
+                {
+                  "name": "domain",
+                  "type": "string"
+                },
+                {
+                  "name": "validDomain",
+                  "type": "boolean"
+                },
+                {
+                  "name": "rootTxtUrl",
+                  "type": "string"
+                },
+                {
+                  "name": "dmarcTxtUrl",
+                  "type": "string"
+                },
+                {
+                  "name": "mxUrl",
+                  "type": "string"
+                }
               ],
               "code": "export function script(input) {\n  const raw = String(input.domain || '').trim();\n  const candidate = raw.replace(/^[a-z][a-z0-9+.-]*:\\/\\//i, '').split(/[/?#]/, 1)[0].replace(/:\\d+$/, '').replace(/\\.+$/, '').replace(/^www\\./i, '').toLowerCase();\n  const labels = candidate.split('.');\n  const validDomain = candidate.length <= 253 && labels.length >= 2 && labels.every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));\n  const queryDomain = validDomain ? candidate : 'invalid.invalid';\n  const dohUrl = (name, type) => `https://dns.google/resolve?name=${encodeURIComponent(name)}&type=${type}`;\n  return { domain: validDomain ? candidate : '', validDomain, rootTxtUrl: dohUrl(queryDomain, 'TXT'), dmarcTxtUrl: dohUrl(`_dmarc.${queryDomain}`, 'TXT'), mxUrl: dohUrl(queryDomain, 'MX') };\n}"
             },
@@ -77,7 +103,10 @@
       {
         "id": "fetch_root_txt",
         "type": "core.http.request",
-        "position": { "x": 660, "y": 120 },
+        "position": {
+          "x": 660,
+          "y": 120
+        },
         "data": {
           "label": "Fetch Root TXT Records",
           "config": {
@@ -95,7 +124,10 @@
       {
         "id": "fetch_dmarc_txt",
         "type": "core.http.request",
-        "position": { "x": 660, "y": 300 },
+        "position": {
+          "x": 660,
+          "y": 300
+        },
         "data": {
           "label": "Fetch DMARC TXT Records",
           "config": {
@@ -113,7 +145,10 @@
       {
         "id": "fetch_mx",
         "type": "core.http.request",
-        "position": { "x": 660, "y": 480 },
+        "position": {
+          "x": 660,
+          "y": 480
+        },
         "data": {
           "label": "Fetch MX Records",
           "config": {
@@ -131,27 +166,71 @@
       {
         "id": "assemble_email_posture",
         "type": "core.logic.script",
-        "position": { "x": 980, "y": 300 },
+        "position": {
+          "x": 980,
+          "y": 300
+        },
         "data": {
           "label": "Assemble Email Authentication Posture",
           "config": {
             "params": {
               "variables": [
-                { "name": "domain", "type": "string" },
-                { "name": "validDomain", "type": "boolean" },
-                { "name": "authorizationNotes", "type": "string" },
-                { "name": "rootData", "type": "json" },
-                { "name": "rootStatus", "type": "number" },
-                { "name": "rootStatusText", "type": "string" },
-                { "name": "dmarcData", "type": "json" },
-                { "name": "dmarcStatus", "type": "number" },
-                { "name": "dmarcStatusText", "type": "string" },
-                { "name": "mxData", "type": "json" },
-                { "name": "mxStatus", "type": "number" },
-                { "name": "mxStatusText", "type": "string" }
+                {
+                  "name": "domain",
+                  "type": "string"
+                },
+                {
+                  "name": "validDomain",
+                  "type": "boolean"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                },
+                {
+                  "name": "rootData",
+                  "type": "json"
+                },
+                {
+                  "name": "rootStatus",
+                  "type": "number"
+                },
+                {
+                  "name": "rootStatusText",
+                  "type": "string"
+                },
+                {
+                  "name": "dmarcData",
+                  "type": "json"
+                },
+                {
+                  "name": "dmarcStatus",
+                  "type": "number"
+                },
+                {
+                  "name": "dmarcStatusText",
+                  "type": "string"
+                },
+                {
+                  "name": "mxData",
+                  "type": "json"
+                },
+                {
+                  "name": "mxStatus",
+                  "type": "number"
+                },
+                {
+                  "name": "mxStatusText",
+                  "type": "string"
+                }
               ],
-              "returns": [{ "name": "report", "type": "json" }],
-              "code": "export function script(input) {\n  const answersFor = (data) => Array.isArray(data?.Answer) ? data.Answer : [];\n  const unquote = (value) => String(value || '').replace(/^\\\"|\\\"$/g, '').replace(/\\\"\\s*\\\"/g, '');\n  const rootAnswers = answersFor(input.rootData);\n  const dmarcAnswers = answersFor(input.dmarcData);\n  const mxAnswers = answersFor(input.mxData);\n  const spfRecords = rootAnswers.filter(\n    (answer) => answer.type === 16 && /^v=spf1\\b/i.test(unquote(answer.data)),\n  );\n  const dmarcRecords = dmarcAnswers.filter(\n    (answer) => answer.type === 16 && /^v=dmarc1\\b/i.test(unquote(answer.data)),\n  );\n  const mxRecords = mxAnswers.filter((answer) => answer.type === 15);\n  const source = (status, statusText) => ({ status: Number(status || 0), statusText: statusText || null, ok: Number(status || 0) >= 200 && Number(status || 0) < 300 });\n  const sources = { rootTxt: source(input.rootStatus, input.rootStatusText), dmarcTxt: source(input.dmarcStatus, input.dmarcStatusText), mx: source(input.mxStatus, input.mxStatusText) };\n  const warnings = [];\n  const findings = [];\n  if (!input.validDomain) warnings.push('The supplied domain was empty or invalid; DNS requests were routed to invalid.invalid.');\n  for (const [name, value] of Object.entries(sources)) if (!value.ok) warnings.push(`${name} lookup unavailable: ${value.statusText || value.status || 'unknown error'}`);\n  if (!input.validDomain) findings.push({ severity: 'medium', title: 'Domain input is invalid', evidence: 'No valid hostname was available for DNS review.' });\n  if (spfRecords.length === 0) findings.push({ severity: 'high', title: 'No SPF record observed', evidence: 'No root TXT record started with v=spf1.' });\n  if (spfRecords.length > 1) findings.push({ severity: 'medium', title: 'Multiple SPF records observed', evidence: `Observed ${spfRecords.length} TXT records starting with v=spf1.` });\n  if (dmarcRecords.length === 0) findings.push({ severity: 'high', title: 'No DMARC record observed', evidence: 'No _dmarc TXT record started with v=DMARC1.' });\n  const dmarcText = dmarcRecords.map((answer) => unquote(answer.data)).join('; ');\n  if (/\\bp\\s*=\\s*none\\b/i.test(dmarcText)) findings.push({ severity: 'medium', title: 'DMARC policy is monitoring-only', evidence: 'Observed p=none in a DMARC record.' });\n  const pctMatch = dmarcText.match(/\\bpct\\s*=\\s*(\\d+)/i);\n  if (pctMatch && Number(pctMatch[1]) < 100) findings.push({ severity: 'medium', title: 'DMARC enforcement is partial', evidence: `Observed pct=${pctMatch[1]}.` });\n  if (mxRecords.length === 0) findings.push({ severity: 'medium', title: 'No MX records observed', evidence: 'No MX records were returned by the public resolver.' });\n  return { report: { summary: { domain: input.domain || null, findings: findings.length, spfRecordCount: spfRecords.length, dmarcRecordCount: dmarcRecords.length, mxRecordCount: mxRecords.length }, findings, warnings, sourceStatuses: sources, observedRecords: { spf: spfRecords.map((answer) => unquote(answer.data)), dmarc: dmarcRecords.map((answer) => unquote(answer.data)), mx: mxRecords.map((answer) => unquote(answer.data)) }, authorizationNotes: input.authorizationNotes || null, nextSteps: ['Publish exactly one syntactically valid SPF record when mail is sent for this domain', 'Publish a DMARC record and move from monitoring to an enforcement policy after alignment is validated', 'Set DMARC pct=100 once the enforcement rollout is complete', 'Verify MX records match the intended mail-receiving service', 'Review DKIM separately; this DNS-only workflow does not claim DKIM coverage'] } };\n}"
+              "returns": [
+                {
+                  "name": "report",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const answersFor = (data) => Array.isArray(data?.Answer) ? data.Answer : [];\n  const unquote = (value) => String(value || '').replace(/^\\\"|\\\"$/g, '').replace(/\\\"\\s*\\\"/g, '');\n  const rootAnswers = answersFor(input.rootData);\n  const dmarcAnswers = answersFor(input.dmarcData);\n  const mxAnswers = answersFor(input.mxData);\n  const spfRecords = rootAnswers.filter(\n    (answer) => answer.type === 16 && /^v=spf1\\b/i.test(unquote(answer.data)),\n  );\n  const dmarcRecords = dmarcAnswers.filter(\n    (answer) => answer.type === 16 && /^v=dmarc1\\b/i.test(unquote(answer.data)),\n  );\n  const mxRecords = mxAnswers.filter((answer) => answer.type === 15);\n  const source = (data, status, statusText) => {\n    const statusNumber = Number(status || 0);\n    const ok = statusNumber >= 200 && statusNumber < 300;\n    const hasBody = Boolean(data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length > 0);\n    return { status: statusNumber, statusText: statusText || null, ok, usable: ok && hasBody };\n  };\n  const sources = {\n    rootTxt: source(input.rootData, input.rootStatus, input.rootStatusText),\n    dmarcTxt: source(input.dmarcData, input.dmarcStatus, input.dmarcStatusText),\n    mx: source(input.mxData, input.mxStatus, input.mxStatusText)\n  };\n  const warnings = [];\n  const findings = [];\n  if (!input.validDomain) warnings.push('The supplied domain was empty or invalid; DNS requests were routed to invalid.invalid.');\n  for (const [name, value] of Object.entries(sources)) {\n    if (!value.usable) warnings.push(`${name} lookup has no usable DNS evidence: ${value.statusText || value.status || 'no response body'}`);\n  }\n  if (sources.rootTxt.usable && spfRecords.length === 0) findings.push({ severity: 'high', title: 'No SPF record observed', evidence: 'No root TXT record started with v=spf1.' });\n  if (sources.rootTxt.usable && spfRecords.length > 1) findings.push({ severity: 'medium', title: 'Multiple SPF records observed', evidence: `Observed ${spfRecords.length} TXT records starting with v=spf1.` });\n  if (sources.dmarcTxt.usable && dmarcRecords.length === 0) findings.push({ severity: 'high', title: 'No DMARC record observed', evidence: 'No _dmarc TXT record started with v=DMARC1.' });\n  const dmarcText = dmarcRecords.map((answer) => unquote(answer.data)).join('; ');\n  if (sources.dmarcTxt.usable && /\\bp\\s*=\\s*none\\b/i.test(dmarcText)) findings.push({ severity: 'medium', title: 'DMARC policy is monitoring-only', evidence: 'Observed p=none in a DMARC record.' });\n  const pctMatch = dmarcText.match(/\\bpct\\s*=\\s*(\\d+)/i);\n  if (sources.dmarcTxt.usable && pctMatch && Number(pctMatch[1]) < 100) findings.push({ severity: 'medium', title: 'DMARC enforcement is partial', evidence: `Observed pct=${pctMatch[1]}.` });\n  if (sources.mx.usable && mxRecords.length === 0) findings.push({ severity: 'medium', title: 'No MX records observed', evidence: 'No MX records were returned by the public resolver.' });\n  return { report: { summary: { domain: input.domain || null, findings: findings.length, spfRecordCount: spfRecords.length, dmarcRecordCount: dmarcRecords.length, mxRecordCount: mxRecords.length }, findings, warnings, sourceStatuses: sources, observedRecords: { spf: spfRecords.map((answer) => unquote(answer.data)), dmarc: dmarcRecords.map((answer) => unquote(answer.data)), mx: mxRecords.map((answer) => unquote(answer.data)) }, authorizationNotes: input.authorizationNotes || null, nextSteps: ['Publish exactly one syntactically valid SPF record when mail is sent for this domain', 'Publish a DMARC record and move from monitoring to an enforcement policy after alignment is validated', 'Set DMARC pct=100 once the enforcement rollout is complete', 'Verify MX records match the intended mail-receiving service', 'Review DKIM separately; this DNS-only workflow does not claim DKIM coverage'] } };\n}"
             },
             "inputOverrides": {}
           }
@@ -160,7 +239,10 @@
       {
         "id": "artifact_report",
         "type": "core.artifact.writer",
-        "position": { "x": 1300, "y": 300 },
+        "position": {
+          "x": 1300,
+          "y": 300
+        },
         "data": {
           "label": "Save Email Authentication Posture",
           "config": {
@@ -170,7 +252,9 @@
               "saveToRunArtifacts": true,
               "publishToArtifactLibrary": false
             },
-            "inputOverrides": { "artifactName": "domain-email-authentication-posture-{{date}}" }
+            "inputOverrides": {
+              "artifactName": "domain-email-authentication-posture-{{date}}"
+            }
           }
         }
       }
