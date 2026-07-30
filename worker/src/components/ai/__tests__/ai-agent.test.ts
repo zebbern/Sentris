@@ -354,6 +354,53 @@ describe('core.ai.agent (refactor)', () => {
     }
   });
 
+  test('closes the MCP client when tool discovery throws', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock: typeof fetch = async () =>
+      new Response(JSON.stringify({ token: 'gateway-token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+    const close = vi.fn(async () => {});
+    createMCPClientMock.mockResolvedValue({
+      tools: async () => {
+        throw new Error('tool discovery failed');
+      },
+      close,
+    });
+
+    try {
+      await expect(
+        runComponentWithRunner(
+          component!.runner,
+          component!.execute,
+          {
+            inputs: {
+              userInput: 'Use tools',
+              chatModel: { provider: 'openai', modelId: 'gpt-4o-mini' },
+              modelApiKey: 'sk-test',
+            },
+            params: { systemPrompt: '', temperature: 0.3, maxTokens: 64, memorySize: 3 },
+          },
+          createTestContext({
+            metadata: {
+              ...createTestContext().metadata,
+              connectedToolNodeIds: ['tool-node-1'],
+            },
+          }),
+        ),
+      ).rejects.toThrow('Connected MCP tools are required but unavailable: tool discovery failed');
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('routes gateway discovery diagnostics through the component logger', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();

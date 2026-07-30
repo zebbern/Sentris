@@ -62,6 +62,11 @@ export async function prepareAgentGatewayAccess<T = never>(
     const discovery = input.discoverTools ? await input.discoverTools(gatewayToken) : undefined;
 
     if (discovery && discovery.availableToolCount === 0) {
+      try {
+        await discovery.close?.();
+      } catch {
+        // Preserve the unavailable-tools result if cleanup itself fails.
+      }
       throw new Error('gateway discovery returned zero tools');
     }
 

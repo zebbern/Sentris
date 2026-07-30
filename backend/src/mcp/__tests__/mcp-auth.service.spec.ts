@@ -14,7 +14,10 @@ class MockRedis {
 describe('McpAuthService', () => {
   it.each([
     { requested: undefined, expected: 3600 },
+    { requested: Number.NaN, expected: 3600 },
+    { requested: 'invalid' as unknown as number, expected: 3600 },
     { requested: 30, expected: 60 },
+    { requested: 900.9, expected: 900 },
     { requested: 900, expected: 900 },
     { requested: 20000, expected: 10800 },
   ])('bounds token lifetime for requested TTL $requested', async ({ requested, expected }) => {

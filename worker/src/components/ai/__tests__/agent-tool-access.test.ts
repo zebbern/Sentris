@@ -70,13 +70,34 @@ describe('prepareAgentGatewayAccess', () => {
     });
   });
 
-  it('fails required AI SDK discovery when the gateway exposes no tools', async () => {
+  it('closes a zero-tool discovery before failing required mode', async () => {
+    const close = vi.fn(async () => {});
     await expect(
       prepareAgentGatewayAccess({
         ...baseInput,
         requestToken: async () => 'gateway-token',
-        discoverTools: async () => ({ tools: {}, availableToolCount: 0 }),
+        discoverTools: async () => ({ tools: {}, availableToolCount: 0, close }),
       }),
     ).rejects.toBeInstanceOf(ConfigurationError);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a zero-tool discovery before degrading best-effort mode', async () => {
+    const close = vi.fn(async () => {});
+
+    const result = await prepareAgentGatewayAccess({
+      ...baseInput,
+      toolAvailability: 'best-effort',
+      requestToken: async () => 'gateway-token',
+      discoverTools: async () => ({ tools: {}, availableToolCount: 0, close }),
+    });
+
+    expect(result.toolStatus).toEqual({
+      requested: true,
+      status: 'degraded',
+      connectedNodeCount: 1,
+      message: 'gateway discovery returned zero tools',
+    });
+    expect(close).toHaveBeenCalledTimes(1);
   });
 });

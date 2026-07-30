@@ -32,9 +32,13 @@ export class McpAuthService {
     allowedNodeIds?: string[],
     ttlSeconds = this.DEFAULT_TOKEN_TTL_SECONDS,
   ): Promise<string> {
+    const normalizedTtlSeconds =
+      typeof ttlSeconds === 'number' && Number.isFinite(ttlSeconds)
+        ? Math.trunc(ttlSeconds)
+        : this.DEFAULT_TOKEN_TTL_SECONDS;
     const boundedTtlSeconds = Math.min(
       this.MAX_TOKEN_TTL_SECONDS,
-      Math.max(this.MIN_TOKEN_TTL_SECONDS, ttlSeconds),
+      Math.max(this.MIN_TOKEN_TTL_SECONDS, normalizedTtlSeconds),
     );
     const token = `mcp_sk_${uuid4().replace(/-/g, '')}`;
     const expiresAt = Math.floor(Date.now() / 1000) + boundedTtlSeconds;

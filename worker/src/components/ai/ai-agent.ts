@@ -545,7 +545,17 @@ async function registerGatewayTools({
     },
   });
 
-  const tools = (await mcpClient.tools()) as ToolSet;
+  let tools: ToolSet;
+  try {
+    tools = (await mcpClient.tools()) as ToolSet;
+  } catch (error) {
+    try {
+      await mcpClient.close();
+    } catch {
+      // Preserve the tool-discovery failure if transport cleanup also fails.
+    }
+    throw error;
+  }
   logInfo?.(
     `[AGENT] Discovered ${Object.keys(tools).length} tools from gateway: ${Object.keys(tools).join(', ') || 'none'}`,
   );
