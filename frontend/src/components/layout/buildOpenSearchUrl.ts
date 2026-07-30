@@ -1,14 +1,21 @@
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex } from '@noble/hashes/utils';
+
 /**
  * Builds a fully-qualified OpenSearch Data Explorer discover URL.
  *
- * Uses `.keyword` fields for exact-match filtering and a 1-year time range
- * (run_id is unique so time filtering is unnecessary).
+ * Uses the explicitly mapped keyword fields for exact-match filtering and a
+ * one-year time range (run_id is unique, so time filtering is unnecessary).
  */
 export interface OpenSearchUrlParams {
   baseUrl: string;
   workflowId: string;
   runId?: string | null;
   orgId: string;
+}
+
+function buildOrganizationIndexKey(organizationId: string): string {
+  return `o${bytesToHex(sha256(organizationId))}`;
 }
 
 export function buildOpenSearchUrl({
@@ -20,11 +27,10 @@ export function buildOpenSearchUrl({
   const normalizedBase = baseUrl.replace(/\/+$/, '');
 
   // Filter by run_id if a specific run is selected, otherwise by workflow_id
-  const filterQuery = runId
-    ? `sentris.run_id.keyword:"${runId}"`
-    : `sentris.workflow_id.keyword:"${workflowId}"`;
+  const filterQuery = runId ? `sentris.run_id:"${runId}"` : `sentris.workflow_id:"${workflowId}"`;
 
-  const orgScopedPattern = `security-findings-${orgId.toLowerCase()}-*`;
+  const organizationKey = buildOrganizationIndexKey(orgId);
+  const orgScopedPattern = `security-findings-${organizationKey}-observations-v1`;
 
   // OpenSearch Data Explorer URL format
   const aParam = encodeURIComponent(

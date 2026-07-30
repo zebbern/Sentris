@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { EventEmitter } from 'node:events';
 
-import { AnalyticsController } from '../analytics.controller';
+import { AnalyticsController, createTenantProvisioningAbortScope } from '../analytics.controller';
 import type { SecurityAnalyticsService } from '../security-analytics.service';
 import type { OrganizationSettingsService } from '../organization-settings.service';
 import type { OpenSearchTenantService } from '../opensearch-tenant.service';
@@ -97,7 +98,7 @@ function makeConfigService(token: string = INTERNAL_TOKEN) {
 
 function makeAuditLogService() {
   return {
-    record: jest.fn(),
+    recordBestEffort: jest.fn(),
   } as unknown as AuditLogService;
 }
 
@@ -196,10 +197,10 @@ describe('AnalyticsController', () => {
       });
     });
 
-    it('records an audit log entry via auditLogService.record', async () => {
+    it('records an audit log entry via auditLogService.recordBestEffort', async () => {
       await controller.queryAnalytics(AUTH_ADMIN, { query: { match_all: {} }, size: 25, from: 5 });
 
-      expect(auditLog.record).toHaveBeenCalledWith(AUTH_ADMIN, {
+      expect(auditLog.recordBestEffort).toHaveBeenCalledWith(AUTH_ADMIN, {
         action: 'analytics.query',
         resourceType: 'analytics',
         resourceId: null,
@@ -405,7 +406,7 @@ describe('AnalyticsController', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-    it('returns securityEnabled: false when security mode is disabled', async () => {
+    it('provisions observation storage while reporting security mode as disabled', async () => {
       const tenantService = makeOpenSearchTenantService();
       (tenantService.isSecurityEnabled as ReturnType<typeof jest.fn>).mockReturnValue(false);
       const { controller } = createController({ tenantService });
@@ -416,7 +417,123 @@ describe('AnalyticsController', () => {
 
       expect(result.securityEnabled).toBe(false);
       expect(result.success).toBe(true);
-      expect(result.message).toContain('Security mode disabled');
+      expect(result.message).toContain('Observation storage provisioned');
+      expect(tenantService.ensureTenantExists).toHaveBeenCalledWith(
+        'org-456',
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('aborts provisioning when the internal HTTP request is aborted', async () => {
+      const tenantService = makeOpenSearchTenantService();
+      (tenantService.ensureTenantExists as ReturnType<typeof jest.fn>).mockImplementation(
+        (_organizationId: string, signal?: AbortSignal) => {
+          if (!signal) return Promise.reject(new Error('missing provisioning signal'));
+          return new Promise<boolean>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          });
+        },
+      );
+      const { controller } = createController({ tenantService });
+      const request = Object.assign(new EventEmitter(), { aborted: false });
+
+      const pending = controller.ensureTenant(
+        INTERNAL_TOKEN,
+        { organizationId: 'org-456' },
+        request as never,
+      );
+      request.aborted = true;
+      request.emit('aborted');
+
+      await expect(pending).rejects.toThrow('Tenant provisioning request aborted');
+    });
+
+    it('aborts provisioning when the client disconnects after its POST body completed', async () => {
+      const tenantService = makeOpenSearchTenantService();
+      (tenantService.ensureTenantExists as ReturnType<typeof jest.fn>).mockImplementation(
+        (_organizationId: string, signal?: AbortSignal) => {
+          if (!signal) return Promise.reject(new Error('missing provisioning signal'));
+          return new Promise<boolean>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+          });
+        },
+      );
+      const { controller } = createController({ tenantService });
+      const socket = Object.assign(new EventEmitter(), { destroyed: false });
+      const request = Object.assign(new EventEmitter(), {
+        aborted: false,
+        destroyed: false,
+        socket,
+      });
+
+      const pending = controller.ensureTenant(
+        INTERNAL_TOKEN,
+        { organizationId: 'org-456' },
+        request as never,
+      );
+      socket.destroyed = true;
+      socket.emit('close');
+
+      await expect(pending).rejects.toThrow('Tenant provisioning request aborted');
+      expect(request.listenerCount('aborted')).toBe(0);
+      expect(socket.listenerCount('close')).toBe(0);
+    });
+
+    it('starts with an aborted signal when the request socket is already destroyed', () => {
+      const socket = Object.assign(new EventEmitter(), { destroyed: true });
+      const request = Object.assign(new EventEmitter(), {
+        aborted: false,
+        destroyed: true,
+        socket,
+      });
+
+      const scope = createTenantProvisioningAbortScope(request as never, 5);
+      try {
+        expect(scope.signal.aborted).toBe(true);
+        expect((scope.signal.reason as Error).message).toBe('Tenant provisioning request aborted');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('keeps provisioning active when Express consumed the request stream on a live socket', () => {
+      const socket = Object.assign(new EventEmitter(), { destroyed: false });
+      const request = Object.assign(new EventEmitter(), {
+        aborted: false,
+        destroyed: true,
+        complete: true,
+        readableEnded: true,
+        socket,
+      });
+
+      const scope = createTenantProvisioningAbortScope(request as never, 50);
+      try {
+        expect(scope.signal.aborted).toBe(false);
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('bounds provisioning even while the internal HTTP request remains connected', async () => {
+      const scope = createTenantProvisioningAbortScope(undefined, 5);
+      try {
+        await new Promise<void>((resolve) => {
+          scope.signal.addEventListener('abort', () => resolve(), { once: true });
+        });
+        expect(scope.signal.aborted).toBe(true);
+        expect(scope.signal.reason).toBeInstanceOf(DOMException);
+        expect((scope.signal.reason as DOMException).name).toBe('TimeoutError');
+      } finally {
+        scope.dispose();
+      }
+    });
+
+    it('disposes the overall provisioning timer without a late abort', async () => {
+      const scope = createTenantProvisioningAbortScope(undefined, 5);
+      scope.dispose();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(scope.signal.aborted).toBe(false);
     });
 
     it('returns success: false with message when tenant provisioning fails', async () => {

@@ -68,7 +68,11 @@ function createMockDb(rows: NotificationChannelRecord[] = []) {
     },
     delete: (...args: unknown[]) => {
       calls.push({ method: 'delete', args });
-      return chainable(undefined);
+      return chainable(rows);
+    },
+    transaction: async (handler: (executor: unknown) => Promise<unknown>) => {
+      calls.push({ method: 'transaction', args: [] });
+      return handler(db);
     },
     _calls: calls,
   };
@@ -106,6 +110,53 @@ describe('NotificationChannelRepository', () => {
       expect(result).toEqual(sampleRecord);
       const insertCall = mockDb._calls.find((c: { method: string }) => c.method === 'insert');
       expect(insertCall).toBeDefined();
+    });
+
+    it('commits the mutation hook through the same transaction executor', async () => {
+      let hookExecutor: unknown;
+
+      await repo.create(
+        {
+          organizationId: 'org-1',
+          name: 'Slack Alerts',
+          type: 'slack',
+          config: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
+          events: ['run.failed'],
+          status: 'active',
+          createdBy: 'user-1',
+        },
+        async (executor) => {
+          hookExecutor = executor;
+        },
+      );
+
+      expect(mockDb._calls.some((call: { method: string }) => call.method === 'transaction')).toBe(
+        true,
+      );
+      expect(hookExecutor).toBe(mockDb);
+    });
+
+    it('propagates a mutation hook failure so the transaction is rolled back', async () => {
+      await expect(
+        repo.create(
+          {
+            organizationId: 'org-1',
+            name: 'Slack Alerts',
+            type: 'slack',
+            config: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
+            events: ['run.failed'],
+            status: 'active',
+            createdBy: 'user-1',
+          },
+          async () => {
+            throw new Error('audit outbox unavailable');
+          },
+        ),
+      ).rejects.toThrow('audit outbox unavailable');
+
+      expect(mockDb._calls.some((call: { method: string }) => call.method === 'transaction')).toBe(
+        true,
+      );
     });
   });
 
@@ -154,10 +205,24 @@ describe('NotificationChannelRepository', () => {
   });
 
   describe('delete', () => {
-    it('calls delete on the db', async () => {
-      await repo.delete('ch-1', { organizationId: 'org-1' });
+    it('returns true when a scoped row is deleted', async () => {
+      const deleted = await repo.delete('ch-1', { organizationId: 'org-1' });
       const deleteCall = mockDb._calls.find((c: { method: string }) => c.method === 'delete');
       expect(deleteCall).toBeDefined();
+      expect(deleted).toBe(true);
+    });
+
+    it('returns false and skips the mutation hook when a concurrent delete won the race', async () => {
+      const emptyDb = createMockDb([]);
+      const emptyRepo = new NotificationChannelRepository(emptyDb);
+      let hookCalls = 0;
+
+      const deleted = await emptyRepo.delete('ch-1', { organizationId: 'org-1' }, async () => {
+        hookCalls += 1;
+      });
+
+      expect(deleted).toBe(false);
+      expect(hookCalls).toBe(0);
     });
   });
 

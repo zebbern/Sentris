@@ -3,8 +3,10 @@ import type { ExecutionContext } from '@sentris/component-sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
+import { MCP_DOCKER_PROXY_AUTH_HEADER } from './mcp-docker-proxy';
 import { IsolatedContainerVolume } from '../../utils/isolated-volume';
 import { mcpDiagnosticLog } from './mcp-diagnostics';
+import { resolveBackendApiBaseUrl } from '../../common/backend-url';
 
 /**
  * Schema for MCP Group Templates (code-defined)
@@ -37,6 +39,7 @@ export type McpGroupTemplate = z.infer<typeof McpGroupTemplateSchema>;
  */
 export interface McpServerEndpoint {
   endpoint: string;
+  authToken: string;
   containerId: string;
   serverId: string;
 }
@@ -230,14 +233,13 @@ export async function executeMcpGroupNode(
       const uniqueNodeId = `${context.componentRef}/${serverTemplate.id}`;
       mcpDiagnosticLog(`[executeMcpGroupNode] Registering with backend...`);
       mcpDiagnosticLog(`[executeMcpGroupNode] Unique nodeId: ${uniqueNodeId}`);
-      mcpDiagnosticLog(
-        `[executeMcpGroupNode] Backend URL: ${process.env.BACKEND_URL || 'http://localhost:3211'}`,
-      );
+      mcpDiagnosticLog(`[executeMcpGroupNode] Backend API URL: ${resolveBackendApiBaseUrl()}`);
 
       await registerServerWithBackend(
         serverTemplate.id,
         result.endpoint,
         result.containerId ?? '',
+        result.authToken,
         context,
       );
 
@@ -245,6 +247,7 @@ export async function executeMcpGroupNode(
 
       endpoints.push({
         endpoint: result.endpoint,
+        authToken: result.authToken,
         containerId: result.containerId || '',
         serverId: serverTemplate.id,
       });
@@ -288,6 +291,7 @@ interface McpTool {
  */
 async function discoverToolsWithRetry(
   endpoint: string,
+  headers?: Record<string, string>,
   maxRetries = 8,
   baseDelayMs = 1000,
 ): Promise<McpTool[]> {
@@ -304,6 +308,7 @@ async function discoverToolsWithRetry(
         requestInit: {
           headers: {
             Accept: 'application/json, text/event-stream',
+            ...(headers ?? {}),
           },
         },
       });
@@ -354,10 +359,10 @@ async function registerServerWithBackend(
   serverId: string,
   endpoint: string,
   containerId: string,
+  authToken: string,
   context: ExecutionContext,
 ): Promise<void> {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
-  const internalApiUrl = `${backendUrl}/api/v1/internal/mcp`;
+  const internalApiUrl = `${resolveBackendApiBaseUrl()}/internal/mcp`;
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
   if (!internalToken) {
     throw new Error('INTERNAL_SERVICE_TOKEN environment variable is required');
@@ -373,7 +378,8 @@ async function registerServerWithBackend(
 
   // Discover tools from endpoint with retry logic
   mcpDiagnosticLog(`[registerServerWithBackend] Discovering tools from endpoint...`);
-  const discoveredTools = await discoverToolsWithRetry(endpoint);
+  const proxyHeaders = { [MCP_DOCKER_PROXY_AUTH_HEADER]: authToken };
+  const discoveredTools = await discoverToolsWithRetry(endpoint, proxyHeaders);
   mcpDiagnosticLog(`[registerServerWithBackend] Discovered ${discoveredTools.length} tools`);
 
   // Register using the new clean API
@@ -391,6 +397,7 @@ async function registerServerWithBackend(
       transport: 'stdio',
       endpoint,
       containerId,
+      headers: proxyHeaders,
       tools: discoveredTools,
     }),
   });

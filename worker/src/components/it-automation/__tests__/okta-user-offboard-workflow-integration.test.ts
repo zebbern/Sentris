@@ -78,7 +78,9 @@ describe('Okta User Offboard - Workflow Integration', () => {
 
     const traceEvents: TraceEvent[] = [];
     const trace = {
-      record: (event: TraceEvent) => traceEvents.push(event),
+      record: (event: TraceEvent) => {
+        traceEvents.push(event);
+      },
     };
 
     const workflow = createTestWorkflow({

@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, afterAll, expect, vi, mock } from 'bun:test';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { WorkflowSummary } from '@/services/api';
 import { createAlertDialogMock, createConfirmDialogMock } from '@/test/mocks/dialog';
 import {
@@ -115,6 +115,20 @@ mock.module('@/hooks/queries/useWorkflowTagQueries', () => ({
   }),
 }));
 
+mock.module('@/hooks/queries/useScopeQueries', () => ({
+  useScope: (scopeId: string) => ({
+    data:
+      scopeId === 'scope-001'
+        ? {
+            id: scopeId,
+            name: 'Contoso Ltd',
+          }
+        : undefined,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // --- Auth store ---
 mock.module('@/store/authStore', () => createAuthStoreMock());
 
@@ -176,10 +190,16 @@ const makeWorkflow = (id: string, name: string): WorkflowSummary => ({
   tags: [],
 });
 
-const renderWorkflowList = () =>
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+const renderWorkflowList = (initialEntry = '/workflows') =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <WorkflowList />
+      <LocationProbe />
     </MemoryRouter>,
   );
 
@@ -212,6 +232,20 @@ describe('WorkflowList delete workflow flow', () => {
 
     expect(screen.queryByRole('heading', { level: 2, name: /Workflows/i })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Filter by name or description/i)).toBeInTheDocument();
+  });
+
+  it('preserves a target launch request when a workflow is selected', () => {
+    const workflow = makeWorkflow('11111111-1111-4111-8111-111111111111', 'Target Scan');
+    mockWorkflows = [workflow];
+
+    renderWorkflowList('/workflows?scopeId=scope-001&launch=1');
+
+    expect(screen.getByText(/Choose a workflow to run against Contoso Ltd/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('row', { name: /Target Scan/i }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/workflows/11111111-1111-4111-8111-111111111111?scopeId=scope-001&launch=1',
+    );
   });
 
   it('opens confirmation dialog with workflow details when delete is clicked', async () => {
@@ -292,6 +326,7 @@ afterAll(() => {
     '@/features/analytics/events',
     '@/hooks/queries/useWorkflowQueries',
     '@/hooks/queries/useWorkflowTagQueries',
+    '@/hooks/queries/useScopeQueries',
     '@/hooks/useConfirmDialog',
     '@/hooks/useDocumentTitle',
     '@/hooks/useSortableList',

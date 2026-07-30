@@ -26,7 +26,7 @@ export const auditLogsApi = {
     if (query.cursor) url.searchParams.set('cursor', query.cursor);
     if (query.limit) url.searchParams.set('limit', String(query.limit));
 
-    const res = await fetch(url.toString(), { headers });
+    const res = await fetch(url.toString(), { headers, credentials: 'include' });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Failed to fetch audit logs: ${res.status} ${text}`);
@@ -50,7 +50,7 @@ export const auditLogsApi = {
     if (query.from) url.searchParams.set('from', query.from);
     if (query.to) url.searchParams.set('to', query.to);
 
-    const res = await fetch(url.toString(), { headers });
+    const res = await fetch(url.toString(), { headers, credentials: 'include' });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Failed to export audit logs: ${res.status} ${text}`);

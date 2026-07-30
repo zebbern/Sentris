@@ -57,11 +57,15 @@ describe('WorkflowTagsService', () => {
   let tagsRepo: Record<string, ReturnType<typeof vi.fn>>;
   let auditLog: Record<string, ReturnType<typeof vi.fn>>;
   let service: WorkflowTagsService;
+  const transactionExecutor = { id: 'workflow-tags-test-transaction' };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     repo = {
+      transaction: vi.fn((callback: (executor: unknown) => Promise<unknown>) =>
+        callback(transactionExecutor),
+      ),
       findById: vi.fn(),
     };
     roleRepo = {
@@ -74,6 +78,7 @@ describe('WorkflowTagsService', () => {
     };
     auditLog = {
       record: vi.fn(),
+      recordDurableWithExecutor: vi.fn(),
     };
 
     service = new WorkflowTagsService(
@@ -95,8 +100,10 @@ describe('WorkflowTagsService', () => {
       const result = await service.setWorkflowTags(authContext, 'wf-1', ['security', 'compliance']);
 
       expect(result).toEqual({ tags: ['security', 'compliance'] });
-      expect(tagsRepo.setTags).toHaveBeenCalledWith('wf-1', ['security', 'compliance']);
-      expect(auditLog.record).toHaveBeenCalledTimes(1);
+      expect(tagsRepo.setTags).toHaveBeenCalledWith('wf-1', ['security', 'compliance'], {
+        executor: transactionExecutor,
+      });
+      expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledTimes(1);
     });
 
     it('should throw ForbiddenException when organization context is missing', async () => {
@@ -146,7 +153,9 @@ describe('WorkflowTagsService', () => {
       const result = await service.setWorkflowTags(authContext, 'wf-1', []);
 
       expect(result).toEqual({ tags: [] });
-      expect(tagsRepo.setTags).toHaveBeenCalledWith('wf-1', []);
+      expect(tagsRepo.setTags).toHaveBeenCalledWith('wf-1', [], {
+        executor: transactionExecutor,
+      });
     });
   });
 

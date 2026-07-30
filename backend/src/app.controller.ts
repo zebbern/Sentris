@@ -2,6 +2,7 @@ import { Controller, Get, Logger, Post, Res, UnauthorizedException, Headers } fr
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
+import { buildFindingOrganizationIndexKey } from '@sentris/shared/finding-observation-id';
 
 import { CurrentAuth } from './auth/auth-context.decorator';
 import type { AuthContext } from './auth/types';
@@ -37,7 +38,7 @@ export class AppController {
    * Used by nginx to protect /analytics/* routes.
    *
    * Response headers (for nginx tenant isolation):
-   * - X-Auth-Organization-Id: lowercase normalized org ID (empty if no org context)
+   * - X-Auth-Organization-Id: collision-safe OpenSearch organization key
    * - X-Auth-User-Id: user identifier
    *
    * Note: SkipThrottle is required because nginx sends an auth_request
@@ -47,14 +48,18 @@ export class AppController {
   @SkipThrottle()
   @Get('/auth/validate')
   validateAuth(@CurrentAuth() auth: AuthContext | null, @Res({ passthrough: true }) res: Response) {
-    if (!auth || !auth.isAuthenticated) {
+    if (!auth || !auth.isAuthenticated || typeof auth.organizationId !== 'string') {
       throw new UnauthorizedException();
     }
 
-    // Set headers for nginx tenant isolation
-    // Canonicalize orgId to lowercase for consistent tenant naming
-    const normalizedOrgId = auth.organizationId?.toLowerCase() || '';
-    res.setHeader('X-Auth-Organization-Id', normalizedOrgId);
+    const organizationId = auth.organizationId;
+    let organizationKey: string;
+    try {
+      organizationKey = buildFindingOrganizationIndexKey(organizationId);
+    } catch {
+      throw new UnauthorizedException();
+    }
+    res.setHeader('X-Auth-Organization-Id', organizationKey);
     res.setHeader('X-Auth-User-Id', auth.userId || '');
 
     // Ensure OpenSearch tenant exists for this org (fire-and-forget, cached)
@@ -62,8 +67,8 @@ export class AppController {
     //   1. Local Map — same-instance Promise dedup (avoids Redis round-trip on every request)
     //   2. Redis "done" marker — cross-instance completion check
     //   3. Redis SETNX lock — cross-instance in-flight dedup
-    if (normalizedOrgId && !this.provisioningOrgs.has(normalizedOrgId)) {
-      this.tryProvisionOrg(normalizedOrgId);
+    if (!this.provisioningOrgs.has(organizationKey)) {
+      this.tryProvisionOrg(organizationId, organizationKey);
     }
 
     return { valid: true };
@@ -73,45 +78,45 @@ export class AppController {
    * Attempt to provision an org's OpenSearch tenant with distributed locking.
    * Fire-and-forget — errors never block auth validation.
    */
-  private tryProvisionOrg(orgId: string): void {
-    const promise = this.doProvisionOrg(orgId).then(
+  private tryProvisionOrg(orgId: string, organizationKey: string): void {
+    const promise = this.doProvisionOrg(orgId, organizationKey).then(
       (success) => {
         if (!success) {
           // Provisioning returned false or was skipped — allow retry
-          this.provisioningOrgs.delete(orgId);
+          this.provisioningOrgs.delete(organizationKey);
         }
         return success;
       },
       (err) => {
-        this.provisioningOrgs.delete(orgId);
+        this.provisioningOrgs.delete(organizationKey);
         this.logger.error(`Failed to provision OpenSearch tenant for ${orgId}: ${err}`);
         return false;
       },
     );
-    this.provisioningOrgs.set(orgId, promise);
+    this.provisioningOrgs.set(organizationKey, promise);
   }
 
   /**
    * Core provisioning logic with Redis-backed distributed lock.
    * Returns true if provisioning succeeded or was already done.
    */
-  private async doProvisionOrg(orgId: string): Promise<boolean> {
+  private async doProvisionOrg(orgId: string, organizationKey: string): Promise<boolean> {
     // Check Redis completion marker — avoids provisioning call if another instance already succeeded
-    const alreadyDone = await this.provisioningLock.isProvisioned(orgId);
+    const alreadyDone = await this.provisioningLock.isProvisioned(organizationKey);
     if (alreadyDone) return true;
 
     // Acquire distributed lock — returns false if another instance is already provisioning
-    const acquired = await this.provisioningLock.tryAcquire(orgId);
+    const acquired = await this.provisioningLock.tryAcquire(organizationKey);
     if (!acquired) return true; // Another instance is handling it — treat as success
 
     try {
       const success = await this.tenantService.ensureTenantExists(orgId);
       if (success) {
-        await this.provisioningLock.markProvisioned(orgId);
+        await this.provisioningLock.markProvisioned(organizationKey);
       }
       return success;
     } finally {
-      await this.provisioningLock.release(orgId);
+      await this.provisioningLock.release(organizationKey);
     }
   }
 

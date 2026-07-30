@@ -1,6 +1,15 @@
 import { Kafka, logLevel as KafkaLogLevel, type Producer } from 'kafkajs';
 import type { ITraceService, TraceEvent } from '@sentris/component-sdk';
 import { ConfigurationError, MAX_KAFKA_MESSAGE_BYTES } from '@sentris/component-sdk';
+import {
+  DURABLE_TELEMETRY_KAFKA_REQUEST_TIMEOUT_MS,
+  durableTelemetryKafkaProducerConfig,
+} from '@sentris/shared';
+import { createHash } from 'node:crypto';
+import {
+  publishWithDurableFallback,
+  type DurableKafkaFallback,
+} from '../common/durable-kafka-fallback';
 
 const TRACE_PREVIEW_CHARS = 12_000;
 const TRACE_FINAL_PREVIEW_CHARS = 2_000;
@@ -18,9 +27,10 @@ interface RunMetadata {
 }
 
 interface SerializedTraceEvent {
+  eventId: string;
   runId: string;
-  workflowId?: string;
-  organizationId?: string | null;
+  workflowId: string | null;
+  organizationId: string | null;
   type: TraceEvent['type'];
   nodeRef: string;
   timestamp: string;
@@ -34,13 +44,13 @@ interface SerializedTraceEvent {
 
 export class KafkaTraceAdapter implements ITraceService {
   private readonly producer: Producer;
-  private readonly connectPromise: Promise<void>;
-  private readonly sequenceByRun = new Map<string, number>();
-  private readonly metadataByRun = new Map<string, RunMetadata>();
+  private connectPromise: Promise<void> | undefined;
+  private connected = false;
 
   constructor(
     private readonly config: KafkaTraceAdapterConfig,
     private readonly logger: Pick<Console, 'log' | 'error'> = console,
+    private readonly fallback?: DurableKafkaFallback,
   ) {
     if (!config.brokers.length) {
       throw new ConfigurationError('KafkaTraceAdapter requires at least one broker', {
@@ -52,36 +62,42 @@ export class KafkaTraceAdapter implements ITraceService {
     const kafka = new Kafka({
       clientId: config.clientId ?? 'sentris-worker-events',
       brokers: config.brokers,
+      requestTimeout: DURABLE_TELEMETRY_KAFKA_REQUEST_TIMEOUT_MS,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });
 
-    this.producer = kafka.producer({
-      allowAutoTopicCreation: true,
-    });
-
-    this.connectPromise = this.producer.connect().catch((error: unknown) => {
-      this.logger.error('[KafkaTraceAdapter] Failed to connect to brokers', error);
-      throw error;
-    });
+    this.producer = kafka.producer(durableTelemetryKafkaProducerConfig());
   }
 
-  setRunMetadata(runId: string, metadata: RunMetadata): void {
-    this.metadataByRun.set(runId, metadata);
+  setRunMetadata(_runId: string, _metadata: RunMetadata): void {
+    // Compatibility hook for existing workflow histories. Trace identity is
+    // carried on every event so delivery remains correct after worker restarts.
   }
 
-  finalizeRun(runId: string): void {
-    this.metadataByRun.delete(runId);
-    this.sequenceByRun.delete(runId);
+  finalizeRun(_runId: string): void {
+    // Compatibility hook; no process-local run state is retained.
   }
 
-  record(event: TraceEvent): void {
-    const sequence = this.nextSequence(event.runId);
-    const metadata = this.metadataByRun.get(event.runId);
+  async close(): Promise<void> {
+    await this.connectPromise?.catch(() => undefined);
+    if (!this.connected) return;
+    await this.producer.disconnect();
+    this.connected = false;
+    this.connectPromise = undefined;
+  }
+
+  async record(event: TraceEvent): Promise<void> {
+    const eventId = event.eventId ?? this.fallbackEventId(event);
+    const sequence =
+      event.sequence && Number.isInteger(event.sequence) && event.sequence > 0
+        ? event.sequence
+        : this.fallbackSequence(eventId);
 
     const payload: SerializedTraceEvent = {
+      eventId,
       runId: event.runId,
-      workflowId: metadata?.workflowId,
-      organizationId: metadata?.organizationId ?? null,
+      workflowId: event.workflowId ?? null,
+      organizationId: event.organizationId ?? null,
       type: event.type,
       nodeRef: event.nodeRef,
       timestamp: event.timestamp,
@@ -95,30 +111,59 @@ export class KafkaTraceAdapter implements ITraceService {
 
     const message = this.serializeForKafka(payload);
 
-    void this.connectPromise
-      .then(() =>
-        this.producer.send({
+    try {
+      await publishWithDurableFallback({
+        publish: async () => {
+          await this.ensureConnected();
+          await this.producer.send({
+            topic: this.config.topic,
+            messages: [
+              {
+                key: event.runId,
+                value: message,
+              },
+            ],
+          });
+        },
+        fallback: this.fallback,
+        publication: {
           topic: this.config.topic,
-          messages: [
-            {
-              value: message,
-            },
-          ],
-        }),
-      )
-      .catch((error: unknown) => {
-        this.logger.error(
-          '[KafkaTraceAdapter] CRITICAL: Failed to send trace event — messages may be lost. Check Kafka broker connectivity and topic configuration.',
-          error,
-        );
+          key: event.runId,
+          value: message,
+          organizationId: event.organizationId ?? null,
+        },
+        source: 'KafkaTraceAdapter',
+        logger: this.logger,
       });
+    } catch (error: unknown) {
+      this.logger.error(
+        '[KafkaTraceAdapter] CRITICAL: Failed to send trace event after producer retries.',
+        error,
+      );
+      throw error;
+    }
   }
 
-  private nextSequence(runId: string): number {
-    const current = this.sequenceByRun.get(runId) ?? 0;
-    const next = current + 1;
-    this.sequenceByRun.set(runId, next);
-    return next;
+  private fallbackEventId(event: TraceEvent): string {
+    const logicalEvent = JSON.stringify({
+      runId: event.runId,
+      workflowId: event.workflowId ?? null,
+      organizationId: event.organizationId ?? null,
+      nodeRef: event.nodeRef,
+      activityId: event.context?.activityId ?? null,
+      type: event.type,
+      timestamp: event.timestamp,
+      level: event.level ?? 'info',
+      message: event.message ?? null,
+      error: event.error ?? null,
+      outputSummary: event.outputSummary ?? null,
+      data: event.data ?? null,
+    });
+    return `trace:${createHash('sha256').update(logicalEvent).digest('hex')}`;
+  }
+
+  private fallbackSequence(eventId: string): number {
+    return (createHash('sha256').update(eventId).digest().readUInt32BE(0) % 2_147_483_646) + 1;
   }
 
   private serializeForKafka(payload: SerializedTraceEvent): string {
@@ -252,5 +297,24 @@ export class KafkaTraceAdapter implements ITraceService {
     }
 
     return packed;
+  }
+
+  private async ensureConnected(): Promise<void> {
+    if (!this.connectPromise) {
+      const attempt = this.producer.connect();
+      this.connectPromise = attempt;
+      try {
+        await attempt;
+        this.connected = true;
+      } catch (error: unknown) {
+        if (this.connectPromise === attempt) {
+          this.connectPromise = undefined;
+        }
+        this.logger.error('[KafkaTraceAdapter] Failed to connect to brokers', error);
+        throw error;
+      }
+      return;
+    }
+    await this.connectPromise;
   }
 }

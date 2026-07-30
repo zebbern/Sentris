@@ -107,7 +107,7 @@ describe('KafkaAgentTracePublisher', () => {
       expect(callOrder).toEqual(['connect', 'send']);
     });
 
-    it('catches and logs send errors without re-throwing', async () => {
+    it('logs and propagates send errors to callers that await publication', async () => {
       const errorLogger = { log: () => {}, error: vi.fn() };
       const publisher = new KafkaAgentTracePublisher(defaultConfig, errorLogger);
 
@@ -122,11 +122,55 @@ describe('KafkaAgentTracePublisher', () => {
         part: { type: 'text', content: 'Failing' },
       };
 
-      // Should NOT throw
-      await publisher.publish(event);
+      await expect(publisher.publish(event)).rejects.toThrow('Kafka broker unavailable');
 
       expect(errorLogger.error).toHaveBeenCalledTimes(1);
       expect(errorLogger.error.mock.calls[0][0]).toContain('Failed to send agent trace event');
+    });
+
+    it('queues the stable agent event when Kafka retries are exhausted', async () => {
+      const fallback = { enqueue: vi.fn(async () => undefined) };
+      const publisher = new KafkaAgentTracePublisher(defaultConfig, noopLogger, fallback);
+      mockSend.mockRejectedValueOnce(new Error('Kafka broker unavailable'));
+      const event: AgentTraceEvent = {
+        eventId: 'agent-run-4:1',
+        agentRunId: 'agent-run-4',
+        workflowRunId: 'wf-run-4',
+        workflowId: 'workflow-1',
+        organizationId: 'org-1',
+        nodeRef: 'node.agent',
+        sequence: 1,
+        timestamp: '2026-07-29T10:00:00.000Z',
+        part: { type: 'text', content: 'Fallback' },
+      };
+
+      await expect(publisher.publish(event)).resolves.toBeUndefined();
+
+      expect(fallback.enqueue).toHaveBeenCalledWith({
+        topic: 'agent-trace-events',
+        key: 'agent-run-4',
+        value: JSON.stringify(event),
+        organizationId: 'org-1',
+      });
+    });
+  });
+
+  describe('shutdown', () => {
+    it('disconnects a producer that was connected by the fast path', async () => {
+      const publisher = new KafkaAgentTracePublisher(defaultConfig, noopLogger);
+
+      await publisher.publish({
+        eventId: 'agent-shutdown:1',
+        agentRunId: 'agent-shutdown',
+        workflowRunId: 'run-shutdown',
+        nodeRef: 'node.agent',
+        sequence: 1,
+        timestamp: '2026-07-29T10:00:00.000Z',
+        part: { type: 'text', content: 'done' },
+      });
+      await publisher.close();
+
+      expect(mockDisconnect).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 
 import { FindingTriageController } from '../finding-triage.controller';
 import type { FindingTriageService } from '../finding-triage.service';
@@ -38,6 +39,7 @@ const TRIAGE_RESPONSE = {
   slaDeadline: null,
   createdAt: '2026-03-04T00:00:00.000Z',
   updatedAt: '2026-03-04T12:00:00.000Z',
+  projectionVersion: 1,
 };
 
 const BULK_RESPONSE = {
@@ -76,6 +78,7 @@ function makeTriageService() {
     enrichWithTriageState: mock(() => Promise.resolve([])),
     getTriageByStatus: mock(() => Promise.resolve([])),
     getAllTriagedIds: mock(() => Promise.resolve([])),
+    getTriageRecord: mock(() => Promise.resolve({ id: 'triage-1' })),
   } as unknown as FindingTriageService;
 }
 
@@ -90,6 +93,25 @@ function makeTicketingService(): TicketingService {
 // ---------------------------------------------------------------------------
 
 describe('FindingTriageController', () => {
+  it('publishes every object-bound finding ID as an OpenAPI path parameter', () => {
+    for (const handler of [
+      FindingTriageController.prototype.updateTriage,
+      FindingTriageController.prototype.getHistory,
+      FindingTriageController.prototype.getTicket,
+    ]) {
+      const parameters = Reflect.getMetadata(DECORATORS.API_PARAMETERS, handler);
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'id',
+            in: 'path',
+            required: true,
+          }),
+        ]),
+      );
+    }
+  });
+
   let controller: FindingTriageController;
   let service: FindingTriageService;
   let ticketingService: TicketingService;
@@ -277,6 +299,42 @@ describe('FindingTriageController', () => {
 
       const calledLimit = (service.getHistory as any).mock.calls[0][2];
       expect(calledLimit).toBe(10);
+    });
+  });
+
+  describe('GET /:id/ticket', () => {
+    it('presents an ambiguous ticket intent without a clickable placeholder URL', async () => {
+      (ticketingService.getTicketLink as any).mockResolvedValue({
+        id: 'ac145d3c-99e6-47b2-bda6-2cab2023f565',
+        findingTriageId: '3cfde7c0-dfaf-4a6b-87fd-b92b688c4f48',
+        organizationId: 'org-1',
+        provider: 'jira',
+        externalId: 'sentris-pending:3cfde7c0-dfaf-4a6b-87fd-b92b688c4f48',
+        externalUrl: '',
+        syncStatus: 'unknown',
+        lastSyncedAt: null,
+        metadata: {},
+        createdAt: new Date('2026-07-26T11:00:00.000Z'),
+      });
+
+      const result = await controller.getTicket(AUTH, { id: FINDING_ID });
+
+      expect(result).toMatchObject({
+        externalId: null,
+        externalUrl: null,
+        syncStatus: 'unknown',
+        reconciliationRequired: true,
+      });
+    });
+
+    it('publishes the nullable ticket-link response contract to OpenAPI', () => {
+      const responses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        FindingTriageController.prototype.getTicket,
+      );
+
+      expect(responses?.[200]?.schema?.nullable).toBe(true);
+      expect(responses?.[200]?.schema?.allOf?.[0]?.$ref).toContain('TicketLinkResponseDto');
     });
   });
 });

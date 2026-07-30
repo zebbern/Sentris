@@ -177,7 +177,13 @@ Scripts that mutate or inspect local Postgres data are instance-aware. They reso
 
 These scripts intentionally do **not** use plain `DATABASE_URL` by default. `DATABASE_URL` belongs to the running app process, production Drizzle runs, and app env files; using it for local maintenance scripts can accidentally target the legacy `sentris` database instead of `sentris_instance_N`.
 
-Local Drizzle migrations are covered by the same rule. `bun --cwd backend run migration:push` targets the active instance by default, ignores stale `backend/.env` `DATABASE_URL` values, and initializes `.sentris-instance` to `0` if needed. Use `DRIZZLE_DATABASE_URL` only when intentionally migrating a different database. In production (`NODE_ENV=production` or `SENTRIS_ENV=production`), Drizzle uses `DATABASE_URL`.
+Checked migrations are covered by the same rule. `bun run migrate` (or `bun --cwd=backend run migration:run`) validates and applies the immutable SQL files in `backend/migrations`, targets the active instance by default, ignores stale `backend/.env` `DATABASE_URL` values, and initializes `.sentris-instance` to `0` if needed. Use `DRIZZLE_DATABASE_URL` only when intentionally migrating a different database. In production (`NODE_ENV=production` or `SENTRIS_ENV=production`), the runner uses `DATABASE_URL`.
+
+The runner serializes concurrent starters with a PostgreSQL advisory lock and verifies an exact checksum ledger before applying each pending file in its own transaction. Backend startup also compares the live schema with the current canonical contract even when the ledger is complete, so out-of-band changes to defaults, generated/identity columns, constraints, indexes, enums, sequences, views, policies, roles, or RLS state fail closed. A database with existing schema objects but no checked ledger is refused. The only adoption path is `bun --cwd=backend run migration:run --adopt v1.0.0`, which first requires the complete generated v1.0.0 contract, records that baseline, and then applies the current delta.
+
+`backend/drizzle` is retained as non-authoritative history. New reviewed artifacts are generated into `backend/migrations` with `bun --cwd=backend run migration:generate -- --name <name>`. The wrapper validates the existing sealed prefix, runs Drizzle only against the configured authoritative paths, and appends canonical SQL, snapshot, and schema-contract hashes to `backend/migrations/manifest.json`; it refuses a generation result that rewrites any sealed entry. The Sentris manifest stays outside `migrations/meta`, because Drizzle reserves every JSON file in that directory for its own snapshot format.
+
+`migration:push:dev-only` is not an exemption from migration policy. It invokes a guard that rejects `production`/`staging`, requires `SENTRIS_ALLOW_DISPOSABLE_SCHEMA_PUSH=true`, resolves the database with the shared local-script runtime, rejects Drizzle config/credential arguments that could override that resolved target, and prints the redacted target before invoking Drizzle. Use it only when data loss on the selected development database is acceptable; it is not an operational migration path.
 
 Scripts that start or inspect Temporal workflows resolve namespace and task queue in this order:
 
@@ -192,26 +198,29 @@ These scripts intentionally do **not** use plain `TEMPORAL_NAMESPACE` / `TEMPORA
 Every maintenance script should print its target database and/or Temporal target before mutating data or starting workflows:
 
 ```bash
-bun --cwd backend scripts/seed-templates.ts --dry-run
+bun --cwd=backend scripts/seed-templates.ts --dry-run
 # Seed templates dry run: no database writes will be performed.
 # Target database: sentris_instance_0 via file:.sentris-instance
 
-bun --cwd backend scripts/seed-templates.ts
+bun --cwd=backend scripts/seed-templates.ts
 # Target database: sentris_instance_0 via file:.sentris-instance
 
-SENTRIS_INSTANCE=2 bun --cwd backend scripts/seed-templates.ts
+SENTRIS_INSTANCE=2 bun --cwd=backend scripts/seed-templates.ts
 # Target database: sentris_instance_2 via env:SENTRIS_INSTANCE
 
-TEMPLATE_SEED_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd backend scripts/seed-templates.ts
+TEMPLATE_SEED_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd=backend scripts/seed-templates.ts
 # Target database: custom_db via env:TEMPLATE_SEED_DATABASE_URL
 
-bun --cwd backend run migration:push
-# Drizzle targets the active instance database
+bun --cwd=backend run migration:run
+# Applies checked migrations to the active instance database
 
-DRIZZLE_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd backend run migration:push
-# Drizzle targets custom_db intentionally
+DRIZZLE_DATABASE_URL=postgresql://sentris:sentris@localhost:5433/custom_db bun --cwd=backend run migration:run
+# The checked runner targets custom_db intentionally
 
-bun --cwd worker scripts/workflow-runner.ts --workflow <workflow-id>
+SENTRIS_INSTANCE=2 bun --cwd=backend run migration:smoke:fresh
+# Live smoke hooks require an explicit instance (or MIGRATION_SMOKE_DATABASE_URL)
+
+bun --cwd=worker scripts/workflow-runner.ts --workflow <workflow-id>
 # Target Temporal: namespace=sentris-dev-0, taskQueue=sentris-dev-0 via file:.sentris-instance
 ```
 

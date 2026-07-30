@@ -3,26 +3,37 @@ title: "Product Analytics (PostHog)"
 description: "PostHog integration for product analytics and session recording"
 ---
 
-Sentris Flow uses PostHog for product analytics and session recording in the frontend. The integration is gated so local clones without environment variables continue to work without errors.
+Sentris Flow can use PostHog for server product events plus browser analytics
+and session recording. Both paths are opt-in runtime configuration, so local
+clones and generic release images collect nothing when the values are absent.
 
 ---
 
 ## Environment Variables
 
-Frontend variables (set in your hosting provider):
+Runtime variables:
 
 | Variable | Description |
 |----------|-------------|
+| `POSTHOG_API_KEY` | Backend project API key |
+| `POSTHOG_HOST` | Backend PostHog host |
+| `DISABLE_ANALYTICS` | Explicit backend kill switch |
 | `VITE_PUBLIC_POSTHOG_KEY` | Project API key |
 | `VITE_PUBLIC_POSTHOG_HOST` | PostHog host (e.g., `https://us.i.posthog.com`) |
+| `VITE_DISABLE_ANALYTICS` | Explicit browser kill switch |
 
-See `frontend/.env.example` for a template. If these are not set, analytics is fully disabled at runtime (no client init, helpers no-op).
+See `backend/.env.example` and `frontend/.env.example` for templates. Each path
+is disabled unless its key and host are both set, and either kill switch takes
+precedence. Values are injected when containers start; they are not embedded in
+published images.
 
 ---
 
 ## Initialization
 
-`frontend/src/main.tsx` initializes the global `posthog` client via `posthog.init(...)` and mounts `PostHogProvider` when both variables are present.
+`frontend/src/components/AnalyticsWrapper.tsx` reads the validated runtime
+configuration, lazily loads the PostHog client, initializes it, and mounts
+`PostHogProvider` only when both public variables are present.
 
 Configuration:
 - Session recording enabled with privacy defaults

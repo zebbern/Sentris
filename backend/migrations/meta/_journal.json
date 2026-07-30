@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785070004576,
+      "tag": "0000_v1_0_0",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785070006001,
+      "tag": "0001_current_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785077875822,
+      "tag": "0002_add_durable_outbox_projection",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785082252983,
+      "tag": "0003_finding_projection_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785087697054,
+      "tag": "0004_finding_triage_reconciliation_keyset_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785088792247,
+      "tag": "0005_finding_scope_run_keyset_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785089502520,
+      "tag": "0006_finding_projection_health_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785328209089,
+      "tag": "0007_jira_webhook_registration_durability",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785329230904,
+      "tag": "0008_backfill_jira_webhook_registration",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785336249342,
+      "tag": "0009_platform_readiness_integrity",
+      "breakpoints": true
+    }
+  ]
+}

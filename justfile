@@ -399,36 +399,24 @@ prod-images action="start":
             echo "✅  Production stopped"
             ;;
         build-test)
-            echo "🔨 Building test images with PostHog analytics..."
-            if [ -z "${POSTHOG_API_KEY:-}" ] || [ -z "${POSTHOG_HOST:-}" ]; then
-                echo "❌  POSTHOG_API_KEY and POSTHOG_HOST must be set in your environment for this command"
-                exit 1
-            fi
-
-            # Build with PostHog keys (debug version - non-minified)
+            echo "🔨 Building generic local test images..."
             DOCKER_BUILDKIT=1 docker build \
-                --target frontend-debug \
-                --build-arg VITE_PUBLIC_POSTHOG_KEY=$POSTHOG_API_KEY \
-                --build-arg VITE_PUBLIC_POSTHOG_HOST=$POSTHOG_HOST \
+                --target frontend \
                 -t ghcr.io/zebbern/sentris-frontend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target backend \
-                --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
-                --build-arg POSTHOG_HOST=$POSTHOG_HOST \
                 -t ghcr.io/zebbern/sentris-backend:latest \
                 .
 
             DOCKER_BUILDKIT=1 docker build \
                 --target worker \
-                --build-arg POSTHOG_API_KEY=$POSTHOG_API_KEY \
-                --build-arg POSTHOG_HOST=$POSTHOG_HOST \
                 -t ghcr.io/zebbern/sentris-worker:latest \
                 .
 
-            echo "✅  Test images built with PostHog analytics"
-            echo "   Run: just prod-images start"
+            echo "✅  Generic test images built"
+            echo "   Set optional analytics variables at runtime, then run: just prod-images start"
             ;;
         logs)
             docker compose -f docker/docker-compose.full.yml logs -f
@@ -527,10 +515,7 @@ status:
 
 # Reset database (drops all data)
 db-reset:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    INST="$(./scripts/active-instance.sh get)"
-    ./scripts/db-reset-instance.sh "$INST"
+    bun run db:reset
 
 # Build production images without starting
 build:

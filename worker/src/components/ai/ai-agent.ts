@@ -782,6 +782,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         agentRunId,
       };
     } finally {
+      await agentStream.settleWithoutChangingExecution();
       if (closeDiscovery) {
         await closeDiscovery();
       }

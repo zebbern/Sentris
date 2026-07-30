@@ -20,6 +20,7 @@ describe('ExecutionContext', () => {
 
   it('should inject storage service', () => {
     const mockStorage: IFileStorageService = {
+      forOrganization: () => mockStorage,
       downloadFile: async (id: string) => ({
         buffer: Buffer.from('test'),
         metadata: { id, fileName: 'test.txt', mimeType: 'text/plain', size: 4 },
@@ -45,6 +46,7 @@ describe('ExecutionContext', () => {
 
   it('should inject secrets service', () => {
     const mockSecrets: ISecretsService = {
+      forOrganization: () => mockSecrets,
       get: async (key: string) => ({ value: `secret-${key}`, version: 1 }),
       list: async () => ['key1', 'key2'],
     };
@@ -70,6 +72,9 @@ describe('ExecutionContext', () => {
     const context = createExecutionContext({
       runId: 'test-run-789',
       componentRef: 'progress.test',
+      workflowId: 'wf-1',
+      organizationId: 'org-1',
+      metadata: { activityId: '7' },
       trace: mockTrace,
     });
 
@@ -86,8 +91,18 @@ describe('ExecutionContext', () => {
     });
     expect(recordedEvents[0].message).toBe('Processing step 1');
     expect(recordedEvents[0].level).toBe('info');
+    expect(recordedEvents[0]).toMatchObject({
+      eventId: 'trace:test-run-789:7:1',
+      sequence: 70_001,
+      workflowId: 'wf-1',
+      organizationId: 'org-1',
+    });
     expect(recordedEvents[1].message).toBe('Processing step 2');
     expect(recordedEvents[1].level).toBe('info');
+    expect(recordedEvents[1]).toMatchObject({
+      eventId: 'trace:test-run-789:7:2',
+      sequence: 70_002,
+    });
   });
 
   it('does not mirror progress events to console.log by default', () => {

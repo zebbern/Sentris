@@ -51,4 +51,40 @@ describe('terminal demo component', () => {
     expect(result.stepsCompleted).toBeGreaterThanOrEqual(0);
     expect(result.rawOutput).toBeTruthy();
   });
+
+  it('keeps the Docker runner alive beyond the maximum supported demo duration', async () => {
+    const component = componentRegistry.get<TerminalDemoInputZod, TerminalDemoOutputZod>(
+      'sentris.security.terminal-demo',
+    );
+    if (!component) throw new Error('Component not registered');
+
+    const context = sdk.createExecutionContext({
+      runId: 'long-demo-run',
+      componentRef: 'terminal-demo',
+    });
+    const spy = vi
+      .spyOn(sdk, 'runComponentWithRunner')
+      .mockResolvedValue('Long demo completed successfully');
+
+    const result = component.outputs.parse(
+      await component.execute(
+        {
+          inputs: {},
+          params: {
+            message: 'Long-running crash recovery probe',
+            durationSeconds: 300,
+          },
+        },
+        context,
+      ),
+    );
+
+    const runner = spy.mock.calls[0]?.[0];
+    expect(runner?.kind).toBe('docker');
+    if (!runner || runner.kind !== 'docker') {
+      throw new Error('Terminal demo did not invoke the Docker runner');
+    }
+    expect(runner.timeoutSeconds).toBeGreaterThan(300);
+    expect(result.durationSeconds).toBe(300);
+  });
 });

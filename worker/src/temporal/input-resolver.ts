@@ -1,4 +1,4 @@
-import { isSpilledDataMarker } from '@sentris/component-sdk';
+import { isSpilledDataMarker } from '@sentris/component-sdk/constants';
 import type { ConnectionType } from '@sentris/component-sdk/types';
 import type { WorkflowAction, WorkflowJoinStrategy } from './types';
 

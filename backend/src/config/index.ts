@@ -7,7 +7,7 @@ export type { AuthConfig } from './auth.config';
 export { databaseConfig } from './database.config';
 export type { DatabaseConfig } from './database.config';
 
-export { ingestConfig } from './ingest.config';
+export { areIngestServicesEnabled, ingestConfig } from './ingest.config';
 export type { IngestConfig } from './ingest.config';
 
 export { integrationsEnvConfig } from './integrations.config';

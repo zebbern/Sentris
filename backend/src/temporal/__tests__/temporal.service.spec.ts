@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import { status as grpcStatus } from '@grpc/grpc-js';
+import { ScheduleNotFoundError } from '@temporalio/client';
 
 import { TemporalService } from '../temporal.service';
 import type {
@@ -23,6 +24,7 @@ function makeMockWorkflowHandle(overrides: Record<string, unknown> = {}) {
       taskQueue: 'sentris',
     }),
     result: vi.fn().mockResolvedValue({ ok: true }),
+    cancel: vi.fn().mockResolvedValue(undefined),
     terminate: vi.fn().mockResolvedValue(undefined),
     signal: vi.fn().mockResolvedValue(undefined),
     query: vi.fn().mockResolvedValue({ count: 42 }),
@@ -231,13 +233,14 @@ describe('TemporalService', () => {
 
   // ── cancelWorkflow ──────────────────────────────────────────────
   describe('cancelWorkflow', () => {
-    it('terminates workflow with reason message', async () => {
+    it('requests cooperative cancellation without force-terminating the workflow', async () => {
       await service.cancelWorkflow({ workflowId: 'wf-123', runId: 'run-abc' });
-      expect(mockWorkflowHandle.terminate).toHaveBeenCalledWith('User requested stop');
+      expect(mockWorkflowHandle.cancel).toHaveBeenCalledTimes(1);
+      expect(mockWorkflowHandle.terminate).not.toHaveBeenCalled();
     });
 
-    it('propagates errors from terminate', async () => {
-      mockWorkflowHandle.terminate.mockRejectedValueOnce(
+    it('propagates errors from cancellation', async () => {
+      mockWorkflowHandle.cancel.mockRejectedValueOnce(
         makeGrpcError(grpcStatus.NOT_FOUND, 'workflow not found'),
       );
       await expect(service.cancelWorkflow({ workflowId: 'gone' })).rejects.toThrow(
@@ -369,6 +372,14 @@ describe('TemporalService', () => {
       await service.deleteSchedule('sched-daily');
       expect(mockScheduleClient.getHandle).toHaveBeenCalledWith('sched-daily');
       expect(mockScheduleHandle.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats an already-absent schedule as an idempotent deletion', async () => {
+      mockScheduleHandle.delete.mockRejectedValueOnce(
+        new ScheduleNotFoundError('schedule not found', 'sched-missing'),
+      );
+
+      await expect(service.deleteSchedule('sched-missing')).resolves.toBeUndefined();
     });
 
     it('pauseSchedule uses default note', async () => {

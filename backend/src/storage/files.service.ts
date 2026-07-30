@@ -89,8 +89,15 @@ export class FilesService {
     const organizationId = this.resolveOrganizationId(auth);
     const file = await this.getFileById(auth, id);
 
-    // Delete from MinIO
-    await this.storageService.deleteFile(file.storageKey);
+    // Delete from MinIO. A missing object is an idempotent retry; an actual
+    // outage must leave metadata intact so the deletion can be retried.
+    try {
+      await this.storageService.deleteFile(file.storageKey);
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        throw error;
+      }
+    }
 
     // Delete from database
     await this.filesRepository.delete(id, { organizationId });

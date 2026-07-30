@@ -1,17 +1,47 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { resolve } from 'path';
 import { Pool } from 'pg';
 import type { AppConfig } from '../config';
+import {
+  compareSchemaFingerprint,
+  loadMigrationPlan,
+  validateLedgerPrefix,
+  type AppliedMigration,
+  type MigrationPlan,
+  type SchemaFingerprint,
+} from './migrations/checked-migrations';
+import { PostgresMigrationDatabase } from './migrations/postgres-migration-database';
 
-const REQUIRED_TABLES = [
-  'workflows',
-  'workflow_runs',
-  'files',
-  'artifacts',
-  'workflow_log_streams',
-  'workflow_traces',
-  'organization_settings',
-];
+export interface MigrationLedgerReader {
+  hasLedger(): Promise<boolean>;
+  readLedger(): Promise<AppliedMigration[]>;
+  inspectPublicSchema(expected?: SchemaFingerprint): Promise<SchemaFingerprint>;
+}
+
+export async function assertDatabaseMigrationsCurrent(
+  database: MigrationLedgerReader,
+  plan: MigrationPlan,
+): Promise<number> {
+  if (!(await database.hasLedger())) {
+    throw new Error('Database has no checked migration ledger. Run `bun run migrate`.');
+  }
+
+  const appliedCount = validateLedgerPrefix(plan, await database.readLedger());
+  if (appliedCount !== plan.migrations.length) {
+    throw new Error(
+      `Database migration ledger is behind: ${appliedCount} of ${plan.migrations.length} migrations applied. Run \`bun run migrate\`.`,
+    );
+  }
+
+  const expectedSchema = plan.migrations.at(-1)!.schema;
+  const actualSchema = await database.inspectPublicSchema(expectedSchema);
+  const differences = compareSchemaFingerprint(expectedSchema, actualSchema);
+  if (differences.length > 0) {
+    throw new Error(`Database schema drift detected: ${differences.slice(0, 10).join('; ')}`);
+  }
+  return appliedCount;
+}
 
 @Injectable()
 export class MigrationGuard implements OnModuleInit {
@@ -32,29 +62,17 @@ export class MigrationGuard implements OnModuleInit {
     const client = await this.pool.connect();
 
     try {
-      const { rows } = await client.query<{ table_name: string }>(
-        `select table_name
-           from information_schema.tables
-          where table_schema = 'public'
-            and table_name = any($1::text[])`,
-        [REQUIRED_TABLES],
+      const plan = loadMigrationPlan(resolve(process.cwd(), 'migrations'));
+      const appliedCount = await assertDatabaseMigrationsCurrent(
+        new PostgresMigrationDatabase(client),
+        plan,
       );
-
-      const present = new Set(rows.map((row) => row.table_name));
-      const missing = REQUIRED_TABLES.filter((table) => !present.has(table));
-
-      if (missing.length > 0) {
-        const message =
-          `Database schema incomplete: missing tables [${missing.join(', ')}]. ` +
-          'Run `bun run migrate` (alias for `bun --cwd backend x drizzle-kit push`) before starting the backend.';
-        this.logger.error(message);
-        throw new Error(message);
-      }
-
-      this.logger.log('Database schema check passed – required tables are present.');
+      this.logger.log(
+        `Database migration and schema-contract check passed – ${appliedCount} checksum-verified migration(s) applied.`,
+      );
     } catch (error) {
       this.logger.error(
-        'Failed to verify database schema. Run `bun run migrate` to ensure migrations are applied.',
+        'Failed to verify the checked migration ledger and live schema contract. Run `bun run migrate` before starting the backend.',
         error instanceof Error ? error.stack : undefined,
       );
       throw error;

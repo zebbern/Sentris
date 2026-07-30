@@ -47,19 +47,60 @@ describe('SecretsService', () => {
   };
   let auditLogService: {
     record: ReturnType<typeof vi.fn>;
+    recordDurable: ReturnType<typeof vi.fn>;
+    recordDurableWithExecutor: ReturnType<typeof vi.fn>;
   };
+  let mutationExecutor: { insert: ReturnType<typeof vi.fn> };
   let service: SecretsService;
 
   beforeEach(() => {
+    mutationExecutor = { insert: vi.fn() };
     repository = {
       listSecrets: vi.fn(),
       findById: vi.fn(),
       findByName: vi.fn(),
-      createSecret: vi.fn(),
-      rotateSecret: vi.fn(),
+      createSecret: vi.fn(
+        async (
+          _secret: unknown,
+          _version: unknown,
+          onMutated?: (executor: unknown, result: SecretSummary) => Promise<void>,
+        ) => {
+          await onMutated?.(mutationExecutor, sampleSummary);
+          return sampleSummary;
+        },
+      ),
+      rotateSecret: vi.fn(
+        async (
+          _id: unknown,
+          _version: unknown,
+          _options: unknown,
+          onMutated?: (executor: unknown, result: SecretSummary) => Promise<void>,
+        ) => {
+          await onMutated?.(mutationExecutor, sampleSummary);
+          return sampleSummary;
+        },
+      ),
       findValueBySecretId: vi.fn(),
-      updateSecret: vi.fn(),
-      deleteSecret: vi.fn(),
+      updateSecret: vi.fn(
+        async (
+          _id: unknown,
+          _updates: unknown,
+          _options: unknown,
+          onMutated?: (executor: unknown, result: SecretSummary) => Promise<void>,
+        ) => {
+          await onMutated?.(mutationExecutor, sampleSummary);
+          return sampleSummary;
+        },
+      ),
+      deleteSecret: vi.fn(
+        async (
+          _id: unknown,
+          _options: unknown,
+          onMutated?: (executor: unknown) => Promise<void>,
+        ) => {
+          await onMutated?.(mutationExecutor);
+        },
+      ),
     };
 
     encryption = {
@@ -69,6 +110,8 @@ describe('SecretsService', () => {
 
     auditLogService = {
       record: vi.fn(),
+      recordDurable: vi.fn(async () => undefined),
+      recordDurableWithExecutor: vi.fn(async () => undefined),
     };
 
     service = new SecretsService(
@@ -107,8 +150,6 @@ describe('SecretsService', () => {
       authTag: 'tag',
       keyId: 'master-key',
     });
-    repository.createSecret.mockResolvedValue(sampleSummary);
-
     const result = await service.createSecret(authContext, {
       name: 'database-password',
       description: 'Primary database credentials',
@@ -134,6 +175,12 @@ describe('SecretsService', () => {
         createdBy: 'alice@example.com',
         organizationId: DEFAULT_ORGANIZATION_ID,
       },
+      expect.any(Function),
+    );
+    expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({ action: 'secret.create', resourceId: sampleSummary.id }),
     );
   });
 
@@ -144,8 +191,6 @@ describe('SecretsService', () => {
       authTag: 'tag',
       keyId: 'master-key',
     });
-    repository.createSecret.mockResolvedValue(sampleSummary);
-
     await service.createSecret(authContext, { name: 'api-key', value: 'value' });
 
     expect(repository.createSecret).toHaveBeenCalledWith(
@@ -159,7 +204,27 @@ describe('SecretsService', () => {
         createdBy: null,
         organizationId: DEFAULT_ORGANIZATION_ID,
       }),
+      expect.any(Function),
     );
+  });
+
+  it('rejects secret creation when durable audit scheduling fails', async () => {
+    encryption.encrypt.mockResolvedValue({
+      ciphertext: 'ciphertext',
+      iv: 'iv',
+      authTag: 'tag',
+      keyId: 'master-key',
+    });
+    auditLogService.recordDurableWithExecutor.mockRejectedValueOnce(
+      new Error('audit outbox unavailable'),
+    );
+
+    await expect(
+      service.createSecret(authContext, {
+        name: 'database-password',
+        value: 'super-secret-value',
+      }),
+    ).rejects.toThrow('audit outbox unavailable');
   });
 
   it('rotates a secret using encrypted material', async () => {
@@ -169,8 +234,6 @@ describe('SecretsService', () => {
       authTag: 'newtag',
       keyId: 'master-key',
     });
-    repository.rotateSecret.mockResolvedValue(sampleSummary);
-
     const result = await service.rotateSecret(authContext, 'secret-1', {
       value: 'another-secret',
       createdBy: 'bob@example.com',
@@ -189,6 +252,12 @@ describe('SecretsService', () => {
         organizationId: DEFAULT_ORGANIZATION_ID,
       },
       { organizationId: DEFAULT_ORGANIZATION_ID },
+      expect.any(Function),
+    );
+    expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({ action: 'secret.rotate', resourceId: sampleSummary.id }),
     );
   });
 
@@ -199,8 +268,6 @@ describe('SecretsService', () => {
       authTag: 'tag',
       keyId: 'master-key',
     });
-    repository.rotateSecret.mockResolvedValue(sampleSummary);
-
     await service.rotateSecret(authContext, 'secret-1', { value: 'value' });
 
     expect(repository.rotateSecret).toHaveBeenCalledWith(
@@ -214,6 +281,7 @@ describe('SecretsService', () => {
         organizationId: DEFAULT_ORGANIZATION_ID,
       },
       { organizationId: DEFAULT_ORGANIZATION_ID },
+      expect.any(Function),
     );
   });
 
@@ -245,6 +313,13 @@ describe('SecretsService', () => {
       version: 2,
       value: 'decrypted-value',
     });
+    expect(auditLogService.recordDurable).toHaveBeenCalledWith(
+      authContext,
+      expect.objectContaining({
+        action: 'secret.access',
+        resourceId: 'secret-1',
+      }),
+    );
   });
 
   it('requests a specific version when provided', async () => {
@@ -272,8 +347,6 @@ describe('SecretsService', () => {
 
   it('normalizes and forwards update payload to the repository', async () => {
     repository.findById.mockResolvedValue(sampleSummary);
-    repository.updateSecret.mockResolvedValue(sampleSummary);
-
     const result = await service.updateSecret(authContext, 'secret-1', {
       name: '  db-password  ',
       description: 'Primary DB password',
@@ -288,14 +361,18 @@ describe('SecretsService', () => {
         tags: ['prod', 'critical'],
       },
       { organizationId: DEFAULT_ORGANIZATION_ID },
+      expect.any(Function),
     );
     expect(result).toBe(sampleSummary);
+    expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({ action: 'secret.update', resourceId: sampleSummary.id }),
+    );
   });
 
   it('allows clearing optional metadata when updating', async () => {
     repository.findById.mockResolvedValue(sampleSummary);
-    repository.updateSecret.mockResolvedValue(sampleSummary);
-
     await service.updateSecret(authContext, 'secret-1', {
       name: 'database-password',
       description: null,
@@ -310,6 +387,7 @@ describe('SecretsService', () => {
         tags: null,
       },
       { organizationId: DEFAULT_ORGANIZATION_ID },
+      expect.any(Function),
     );
   });
 
@@ -326,9 +404,18 @@ describe('SecretsService', () => {
 
   it('deletes a secret via the repository', async () => {
     await service.deleteSecret(authContext, 'secret-1');
-    expect(repository.deleteSecret).toHaveBeenCalledWith('secret-1', {
-      organizationId: DEFAULT_ORGANIZATION_ID,
-    });
+    expect(repository.deleteSecret).toHaveBeenCalledWith(
+      'secret-1',
+      {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+      },
+      expect.any(Function),
+    );
+    expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({ action: 'secret.delete', resourceId: 'secret-1' }),
+    );
   });
 
   describe('negative auth paths', () => {

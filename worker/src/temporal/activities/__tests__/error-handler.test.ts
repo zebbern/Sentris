@@ -10,6 +10,7 @@ function createMockContext(overrides: Record<string, unknown> = {}) {
     activityId: 'act-1',
     attempt: 1,
     runId: 'run-1',
+    organizationId: 'org-a',
     streamId: 'stream-1',
     joinStrategy: undefined,
     triggeredBy: undefined,
@@ -140,6 +141,7 @@ describe('handleComponentError', () => {
     expect(ioCall.errorMessage).toBe('io fail');
     expect(ioCall.nodeRef).toBe('node-1');
     expect(ioCall.runId).toBe('run-1');
+    expect(ioCall.organizationId).toBe('org-a');
   });
 
   it('handles a non-Error thrown value gracefully', async () => {

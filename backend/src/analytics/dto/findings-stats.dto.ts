@@ -1,5 +1,11 @@
 import { createZodDto } from 'nestjs-zod';
+import { FindingDataAvailabilitySchema } from '@sentris/shared';
 import { z } from 'zod';
+import {
+  FindingFilterSchema,
+  FindingProjectionHealthSchema,
+  FindingSchemaCoverageSchema,
+} from './findings-query.dto';
 
 export const SeverityCountSchema = z.object({
   severity: z.string(),
@@ -9,19 +15,15 @@ export const SeverityCountSchema = z.object({
 export const FindingsStatsResponseSchema = z.object({
   severityCounts: z.array(SeverityCountSchema),
   total: z.number().int().nonnegative(),
+  availability: FindingDataAvailabilitySchema,
+  projectionHealth: FindingProjectionHealthSchema.optional(),
+  schemaCoverage: FindingSchemaCoverageSchema,
 });
 
 export type FindingsStatsResponse = z.infer<typeof FindingsStatsResponseSchema>;
 
 export class FindingsStatsResponseDto extends createZodDto(FindingsStatsResponseSchema) {}
 
-export const FindingsStatsQuerySchema = z.object({
-  severity: z.enum(['critical', 'high', 'medium', 'low', 'info']).optional(),
-  search: z.string().max(200).optional(),
-  workflowId: z.string().max(200).optional(),
-  componentId: z.string().max(200).optional(),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
-});
+export const FindingsStatsQuerySchema = FindingFilterSchema;
 
 export class FindingsStatsQueryDto extends createZodDto(FindingsStatsQuerySchema) {}

@@ -13,6 +13,10 @@
     "./template-validation-fingerprint": {
       "types": "./src/template-validation-fingerprint.ts",
       "import": "./src/template-validation-fingerprint.ts"
+    },
+    "./finding-observation-id": {
+      "types": "./src/findings/findingObservationId.ts",
+      "import": "./src/findings/findingObservationId.ts"
     }
   },
   "license": "MIT",

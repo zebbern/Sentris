@@ -16,8 +16,32 @@ type ClerkJwt = JwtPayload & {
   org_id?: string;
   organization_id?: string;
   org_role?: string;
-  o?: { id?: string };
+  o?: { id?: string; rol?: string };
 };
+
+export function resolveClerkRoles(
+  clerkRole: string | undefined,
+  organizationId: string,
+  userId: string,
+): AuthRole[] {
+  if (organizationId === `workspace-${userId}`) {
+    return ['ADMIN'];
+  }
+
+  const normalizedRole = clerkRole
+    ?.trim()
+    .toUpperCase()
+    .replace(/^ORG[:_]/, '');
+
+  if (normalizedRole === 'ADMIN') {
+    return ['ADMIN'];
+  }
+  if (normalizedRole === 'MEMBER') {
+    return ['MEMBER'];
+  }
+
+  throw new UnauthorizedException('Clerk organization role is missing or unsupported');
+}
 
 @Injectable()
 export class ClerkAuthProvider implements AuthProviderStrategy {
@@ -80,7 +104,7 @@ export class ClerkAuthProvider implements AuthProviderStrategy {
       })) as ClerkJwt;
 
       this.logger.log(
-        `[AUTH] Token verified - User ID: ${payload.sub}, Org: ${payload.o?.id || payload.org_id || 'none'}, Role: ${payload.org_role || 'none'}`,
+        `[AUTH] Token verified - User ID: ${payload.sub}, Org: ${payload.o?.id || payload.org_id || 'none'}, Role: ${payload.o?.rol || payload.org_role || 'none'}`,
       );
 
       return payload;
@@ -189,34 +213,9 @@ export class ClerkAuthProvider implements AuthProviderStrategy {
   private resolveRoles(payload: ClerkJwt, organizationId: string, userId: string): AuthRole[] {
     const userWorkspace = `workspace-${userId}`;
     this.logger.log(
-      `[AUTH] Resolving roles - Org: ${organizationId}, Workspace: ${userWorkspace}, JWT org_role: ${payload.org_role || 'none'}, JWT org_id: ${payload.o?.id || payload.org_id || 'none'}`,
+      `[AUTH] Resolving roles - Org: ${organizationId}, Workspace: ${userWorkspace}, JWT role: ${payload.o?.rol || payload.org_role || 'none'}, JWT org_id: ${payload.o?.id || payload.org_id || 'none'}`,
     );
 
-    // Check if user is in their own workspace
-    if (organizationId === userWorkspace) {
-      this.logger.log(`[AUTH] User is in their own workspace, granting ADMIN role`);
-      return ['ADMIN'];
-    }
-
-    // Check Clerk organization role from JWT
-    const clerkRole = payload.org_role?.toUpperCase();
-    if (clerkRole === 'ADMIN' || clerkRole === 'ORG_ADMIN') {
-      this.logger.log(`[AUTH] User has ADMIN role in Clerk organization`);
-      return ['ADMIN'];
-    }
-
-    // If JWT doesn't have org_role, this likely means the JWT template isn't configured
-    // to include organization roles. As a fallback, grant ADMIN access.
-    // NOTE: In production, configure Clerk JWT template to include org_role for proper RBAC
-    if (!payload.org_role) {
-      this.logger.log(
-        `[AUTH] JWT missing org_role field. Granting ADMIN as fallback (configure JWT template to include roles for proper RBAC)`,
-      );
-      return ['ADMIN'];
-    }
-
-    // If org_role exists but is not ADMIN, default to MEMBER
-    this.logger.log(`[AUTH] Defaulting to MEMBER role`);
-    return ['MEMBER'];
+    return resolveClerkRoles(payload.o?.rol ?? payload.org_role, organizationId, userId);
   }
 }

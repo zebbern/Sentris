@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 
 /**
  * Generate a cryptographically random webhook secret suitable for URL-path
- * authentication and HMAC signing.
+ * authentication and optional HMAC verification when Jira supplies a signature.
  *
  * The resulting string is 64 hex characters (256 bits of entropy).
  */

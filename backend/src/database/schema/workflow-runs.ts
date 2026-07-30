@@ -61,6 +61,11 @@ export const workflowRunsTable = pgTable(
       table.scopeId,
       table.createdAt,
     ),
+    orgScopeRunIdIdx: index('workflow_runs_org_scope_run_id_idx').on(
+      table.organizationId,
+      table.scopeId,
+      table.runId,
+    ),
   }),
 );
 

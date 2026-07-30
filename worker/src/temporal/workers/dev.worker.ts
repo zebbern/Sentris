@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { webcrypto } from 'node:crypto';
+import { randomBytes, webcrypto } from 'node:crypto';
 import { Worker, NativeConnection } from '@temporalio/worker';
 import { status as grpcStatus } from '@grpc/grpc-js';
 import Long from 'long';
@@ -18,7 +18,10 @@ import {
   initializeHumanInputActivity,
   expireHumanInputRequestActivity,
 } from '../activities/human-input.activity';
-import { prepareRunPayloadActivity } from '../activities/run-dispatcher.activity';
+import {
+  markRunStartedActivity,
+  prepareRunPayloadActivity,
+} from '../activities/run-dispatcher.activity';
 import { recordTraceEventActivity, initializeTraceActivity } from '../activities/trace.activity';
 import {
   registerComponentToolActivity,
@@ -36,7 +39,24 @@ import {
 import { executeWebhookParsingScriptActivity } from '../activities/webhook-parsing.activity';
 import { logHeartbeat } from '../../utils/debug-logger';
 import { validateWorkerEnv } from '../../config/env.validate';
-import { startHealthServer, type HealthServerHandle } from '../../health/health-server';
+import {
+  createCachedReadinessEvaluator,
+  startHealthServer,
+  type HealthServerHandle,
+} from '../../health/health-server';
+import {
+  createWorkerReadinessChecks,
+  type WorkerReadinessState,
+} from '../../health/readiness-checks';
+import { resolveBackendApiBaseUrl } from '../../common/backend-url';
+import {
+  createDockerOrphanResourceClient,
+  createTemporalRunActivityResolver,
+  reconcileOrphanedRunResources,
+  startOrphanReconciler,
+  type OrphanReconcilerHandle,
+  type ReconciliationReport,
+} from '../../utils/orphan-reconciler';
 import {
   createDatabasePool,
   createMinioClient,
@@ -44,6 +64,13 @@ import {
   createKafkaAdapters,
 } from './service-factory';
 import { createBundlerOptions } from './worker-config';
+import { resolveSentrisTrustProfile } from '@sentris/shared';
+import { notifyBackendRunFinalized } from '../../common/run-finalizer';
+import {
+  initializeMcpDockerProxy,
+  startMcpDockerProxy,
+} from '../../components/core/mcp-docker-proxy';
+import { drainAllRequiredPublications } from '../utils/required-publication-tracker';
 
 // Load environment variables from instance-specific env if set, otherwise fall back
 // to the worker's default `.env`.
@@ -54,7 +81,7 @@ const instanceEnvPath = instanceNum
   : undefined;
 
 config({ path: instanceEnvPath ?? join(workerRoot, '.env') });
-validateWorkerEnv(process.env);
+const workerConfig = validateWorkerEnv(process.env);
 
 if (typeof globalThis.crypto === 'undefined') {
   Object.defineProperty(globalThis, 'crypto', {
@@ -78,6 +105,7 @@ async function main() {
   console.log(`   - Task Queue: ${taskQueue}`);
   console.log(`   - Workflows Path: ${workflowsPath}`);
   console.log(`   - Node ENV: ${process.env.NODE_ENV}`);
+  console.log(`   - Trust Profile: ${resolveSentrisTrustProfile(process.env)}`);
 
   // Create connection first
   console.log(`🔗 Establishing connection to Temporal...`);
@@ -89,7 +117,12 @@ async function main() {
   const { pool, db } = createDatabasePool();
   const minio = createMinioClient();
   const adapters = createServiceAdapters(minio, db);
-  const kafka = createKafkaAdapters(adapters.storage);
+  const workerState: WorkerReadinessState = { acceptingTasks: false };
+  const onRequiredTelemetryFailure = (message: string) => {
+    workerState.telemetryError = message;
+    console.error(`❌ Required telemetry durability failed: ${message}`);
+  };
+  const kafka = createKafkaAdapters(adapters.storage, pool, onRequiredTelemetryFailure);
 
   // Initialize global services for activities
   initializeComponentActivityServices({
@@ -101,17 +134,50 @@ async function main() {
     artifacts: adapters.artifacts.factory(),
     terminalStream: kafka.terminalStream,
     agentTracePublisher: kafka.agentTrace,
+    runFinalizer: notifyBackendRunFinalized,
+    onRequiredTelemetryFailure,
   });
 
-  const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:3211';
-  initializeHumanInputActivity({ database: db, trace: kafka.trace, baseUrl: backendUrl });
+  initializeHumanInputActivity({
+    database: db,
+    trace: kafka.trace,
+    publicBaseUrl: workerConfig.SENTRIS_PUBLIC_API_BASE_URL,
+  });
   initializeTraceActivity({ trace: kafka.trace });
   console.log(`✅ Service adapters initialized`);
 
-  // Start the HTTP health server
-  const healthServer: HealthServerHandle = await startHealthServer({
-    temporalConnection: connection,
-    terminalRedis: kafka.terminalRedis,
+  const orphanResourceClient = createDockerOrphanResourceClient({
+    exchangeRoot: workerConfig.SENTRIS_DOCKER_SHARED_IO_ROOT,
+    commandTimeoutMs: workerConfig.WORKER_ORPHAN_DOCKER_TIMEOUT_MS,
+    maxInventoryResources: workerConfig.WORKER_ORPHAN_MAX_INVENTORY,
+  });
+  const isRunActive = createTemporalRunActivityResolver(connection, namespace);
+  const reconcileOrphans = async (): Promise<ReconciliationReport> => {
+    const report = await reconcileOrphanedRunResources({
+      client: orphanResourceClient,
+      isRunActive,
+      minAgeMs: workerConfig.WORKER_ORPHAN_MIN_AGE_MS,
+      maxResources: workerConfig.WORKER_ORPHAN_MAX_RESOURCES,
+      runStateTimeoutMs: workerConfig.WORKER_ORPHAN_RUN_STATE_TIMEOUT_MS,
+    });
+    const removed =
+      report.removed.containers + report.removed.volumes + report.removed.exchangeDirectories;
+    console.log(
+      `🧹 Orphan reconciliation examined=${report.examined} removed=${removed} ` +
+        `active=${report.preservedActive} young=${report.preservedYoung} ` +
+        `remaining=${report.remainingEligible}`,
+    );
+    return report;
+  };
+  const orphanReconciler: OrphanReconcilerHandle = await startOrphanReconciler({
+    reconcile: reconcileOrphans,
+    intervalMs: workerConfig.WORKER_ORPHAN_INTERVAL_MS,
+    onHealthChange: (message) => {
+      workerState.maintenanceError = message;
+      if (message) {
+        console.error(`❌ Periodic orphan reconciliation failed: ${message}`);
+      }
+    },
   });
 
   // Create worker
@@ -120,6 +186,7 @@ async function main() {
     setRunMetadataActivity,
     finalizeRunActivity,
     prepareRunPayloadActivity,
+    markRunStartedActivity,
     createHumanInputRequestActivity,
     cancelHumanInputRequestActivity,
     expireHumanInputRequestActivity,
@@ -154,6 +221,42 @@ async function main() {
     `🚛 Temporal worker ready (namespace=${namespace}, taskQueue=${taskQueue}, workflowsPath=${workflowsPath})`,
   );
 
+  const mcpDockerProxy = await startMcpDockerProxy({
+    port: workerConfig.MCP_DOCKER_PROXY_PORT,
+    publicBaseUrl:
+      workerConfig.MCP_DOCKER_PROXY_PUBLIC_BASE_URL ??
+      `http://127.0.0.1:${workerConfig.MCP_DOCKER_PROXY_PORT}`,
+    authToken: workerConfig.MCP_DOCKER_PROXY_TOKEN ?? randomBytes(32).toString('base64url'),
+  });
+  initializeMcpDockerProxy(mcpDockerProxy);
+  console.log(
+    `🔀 Docker MCP proxy ready (port=${mcpDockerProxy.port}, publicBase=${workerConfig.MCP_DOCKER_PROXY_PUBLIC_BASE_URL ?? 'local'})`,
+  );
+
+  const backendReadinessConfigured = Boolean(
+    process.env.BACKEND_URL ||
+    process.env.SENTRIS_API_BASE_URL ||
+    process.env.API_BASE_URL ||
+    process.env.INTERNAL_SERVICE_TOKEN,
+  );
+  const readiness = createCachedReadinessEvaluator(
+    createWorkerReadinessChecks({
+      temporalConnection: connection,
+      databasePool: pool,
+      minio,
+      redis: kafka.terminalRedis,
+      kafka: kafka.readiness,
+      backend: backendReadinessConfigured
+        ? {
+            apiBaseUrl: resolveBackendApiBaseUrl(),
+            internalToken: process.env.INTERNAL_SERVICE_TOKEN,
+          }
+        : undefined,
+      workerState,
+    }),
+  );
+  const healthServer: HealthServerHandle = await startHealthServer({ readiness });
+
   // Set up periodic heartbeat logging (file-based only)
   const heartbeatInterval = setInterval(() => {
     logHeartbeat(taskQueue);
@@ -163,6 +266,7 @@ async function main() {
   // PM2 sends SIGINT on restart; container orchestrators send SIGTERM.
   const handleShutdown = (signal: string) => {
     console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+    workerState.acceptingTasks = false;
     worker.shutdown();
   };
   process.on('SIGTERM', () => handleShutdown('SIGTERM'));
@@ -170,10 +274,29 @@ async function main() {
 
   console.log(`🚀 Starting worker.run() - this will block and listen for tasks...`);
   try {
-    await worker.run();
+    const runPromise = worker.run();
+    workerState.acceptingTasks = true;
+    await runPromise;
   } finally {
     console.log('🧹 Cleaning up resources...');
+    workerState.acceptingTasks = false;
     clearInterval(heartbeatInterval);
+    await orphanReconciler
+      .close()
+      .catch((e: unknown) => console.error('Failed to close orphan reconciler', e));
+    await drainAllRequiredPublications();
+    const producerShutdowns = await Promise.allSettled([
+      kafka.trace.close(),
+      kafka.agentTrace.close(),
+      kafka.nodeIO.close(),
+      kafka.logs.close(),
+    ]);
+    for (const [index, result] of producerShutdowns.entries()) {
+      if (result.status === 'rejected') {
+        const producer = ['trace', 'agent-trace', 'node-io', 'log'][index] ?? 'unknown';
+        console.error(`Failed to close Kafka ${producer} producer`, result.reason);
+      }
+    }
     await pool.end().catch((e: unknown) => console.error('Failed to close DB pool', e));
     await connection
       .close()
@@ -183,9 +306,15 @@ async function main() {
         .quit()
         .catch((e: unknown) => console.error('Failed to close terminal Redis', e));
     }
+    await kafka.readiness
+      .close()
+      .catch((e: unknown) => console.error('Failed to close Kafka readiness client', e));
     await healthServer
       .close()
       .catch((e: unknown) => console.error('Failed to close health server', e));
+    await mcpDockerProxy
+      .close()
+      .catch((e: unknown) => console.error('Failed to close Docker MCP proxy', e));
     console.log('✅ Worker shutdown complete');
   }
 }

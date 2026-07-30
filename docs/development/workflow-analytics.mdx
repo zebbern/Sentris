@@ -1,6 +1,6 @@
 ---
-title: "Workflow Analytics"
-description: "Index security findings into OpenSearch for dashboards, queries, and alerting"
+title: 'Workflow Analytics'
+description: 'Index security findings into OpenSearch for dashboards, queries, and alerting'
 ---
 
 Sentris Flow includes a workflow analytics system that indexes security findings into OpenSearch. This enables real-time dashboards, historical trend analysis, and alerting on security data.
@@ -13,7 +13,7 @@ The analytics system consists of:
 
 1. **Analytics Sink component** - Indexes workflow output data into OpenSearch
 2. **Results output port** - Structured findings from security scanners
-3. **OpenSearch storage** - Time-series index for querying and visualization
+3. **OpenSearch storage** - Stable observation indexes for querying and visualization
 4. **View Analytics button** - Quick access to filtered dashboards
 
 ---
@@ -55,36 +55,59 @@ Indexed documents follow this structure:
 ```json
 {
   "check_id": "DB_RLS_DISABLED",
-  "severity": "CRITICAL",
+  "severity": "critical",
+  "sentris_normalized_severity": "critical",
   "title": "RLS Disabled on Table: users",
   "resource": "public.users",
-  "metadata": "{\"schema\":\"public\",\"table\":\"users\"}",
+  "metadata": {
+    "schema": "public",
+    "table": "users"
+  },
   "scanner": "supabase-scanner",
   "asset_key": "abcdefghij1234567890",
   "finding_hash": "a1b2c3d4e5f67890",
+  "contract": "sentris.finding-observation",
+  "schema_version": 1,
+  "finding_id": "fo_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "observed_at": "2026-01-21T10:30:00.000Z",
+  "description": "Row-level security is disabled.",
+  "evidence": null,
+  "source": {
+    "scanner": "supabase-scanner",
+    "finding_hash": "a1b2c3d4e5f67890"
+  },
   "sentris": {
     "organization_id": "org_123",
     "run_id": "sentris-run-xxx",
     "workflow_id": "d1d33161-929f-4af4-9a64-xxx",
     "workflow_name": "Supabase Security Audit",
+    "scope_id": null,
     "component_id": "core.analytics.sink",
-    "node_ref": "analytics-sink-1"
+    "node_ref": "analytics-sink-1",
+    "asset_key": "abcdefghij1234567890",
+    "contract_validated": true,
+    "contract_source_validated": true,
+    "contract_document_id": "fo_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   },
-  "@timestamp": "2025-01-21T10:30:00.000Z"
+  "@timestamp": "2026-01-21T10:30:00.000Z"
 }
 ```
 
 ### Field Categories
 
-| Category | Fields | Description |
-|----------|--------|-------------|
-| Finding data | `check_id`, `severity`, `title`, etc. | Scanner-specific fields at root level |
-| Asset tracking | `scanner`, `asset_key`, `finding_hash` | Required fields for analytics |
-| Workflow context | `sentris.*` | Automatic metadata from the workflow |
-| Timestamp | `@timestamp` | Indexing timestamp |
+| Category         | Fields                                   | Description                                      |
+| ---------------- | ---------------------------------------- | ------------------------------------------------ |
+| Finding data     | `severity`, `title`, `description`, etc. | Canonical searchable fields plus raw source data |
+| Normalized data  | `sentris_normalized_severity`            | Indexed lower-case severity used by reads        |
+| Asset tracking   | `scanner`, `asset_key`, `finding_hash`   | Indexed fields for analytics                     |
+| Workflow context | `sentris.*`                              | Trusted metadata from workflow execution         |
+| Timestamp        | `@timestamp`                             | Observation timestamp                            |
 
 <Note>
-  Nested objects in findings are automatically serialized to JSON strings to prevent OpenSearch field explosion (1000 field limit).
+  Canonical observation mappings use `dynamic: false`. Arbitrary scanner fields remain unchanged in
+  `_source` for API/detail display but do not create mappings. `evidence` and `source` are also
+  retained as JSON with indexing disabled, so nested payloads do not create mapping conflicts or
+  field explosion. Query fields must be part of the canonical mapping.
 </Note>
 
 ---
@@ -93,15 +116,18 @@ Indexed documents follow this structure:
 
 The Analytics Sink automatically adds workflow context under the `sentris` namespace:
 
-| Field | Description |
-|-------|-------------|
-| `organization_id` | Organization that owns the workflow |
-| `run_id` | Unique identifier for this workflow execution |
-| `workflow_id` | ID of the workflow definition |
-| `workflow_name` | Human-readable workflow name |
-| `component_id` | Component type (always `core.analytics.sink`) |
-| `node_ref` | Node reference in the workflow graph |
-| `asset_key` | Auto-detected or specified asset identifier |
+| Field                       | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `organization_id`           | Organization that owns the workflow                        |
+| `run_id`                    | Unique identifier for this workflow execution              |
+| `workflow_id`               | ID of the workflow definition                              |
+| `workflow_name`             | Human-readable workflow name                               |
+| `component_id`              | Component type (always `core.analytics.sink`)              |
+| `node_ref`                  | Node reference in the workflow graph                       |
+| `asset_key`                 | Auto-detected or specified asset identifier                |
+| `contract_validated`        | Shared contract validation completed by the trusted writer |
+| `contract_source_validated` | Identity came from authorized execution context            |
+| `contract_document_id`      | Canonical ID bound to the OpenSearch document ID           |
 
 ---
 
@@ -120,11 +146,11 @@ The `finding_hash` is a stable 16-character identifier that enables tracking fin
 
 Each scanner generates the hash from key identifying fields:
 
-| Scanner | Hash Fields |
-|---------|-------------|
-| Nuclei | `templateId + host + matchedAt` |
-| TruffleHog | `DetectorType + Redacted + filePath` |
-| Supabase Scanner | `check_id + projectRef + resource` |
+| Scanner          | Hash Fields                          |
+| ---------------- | ------------------------------------ |
+| Nuclei           | `templateId + host + matchedAt`      |
+| TruffleHog       | `DetectorType + Redacted + filePath` |
+| Supabase Scanner | `check_id + projectRef + resource`   |
 
 Fields are normalized (lowercase, trimmed) and hashed with SHA-256, truncated to 16 hex characters.
 
@@ -139,7 +165,7 @@ Fields are normalized (lowercase, trimmed) and hashed with SHA-256, truncated to
 asset_key: "api.example.com"
 
 # Filter by severity
-severity: "CRITICAL" OR severity: "HIGH"
+sentris_normalized_severity: "critical" OR sentris_normalized_severity: "high"
 
 # Filter by scanner
 scanner: "nuclei"
@@ -166,13 +192,13 @@ finding_hash: "a1b2c3d4e5f67890"
 
 ### Common Aggregations
 
-| Aggregation | Use Case |
-|-------------|----------|
-| `terms` on `severity` | Count findings by severity |
-| `terms` on `scanner` | Count findings by scanner |
-| `terms` on `asset_key` | Most vulnerable assets |
-| `date_histogram` on `@timestamp` | Findings over time |
-| `cardinality` on `finding_hash` | Unique findings count |
+| Aggregation                              | Use Case                   |
+| ---------------------------------------- | -------------------------- |
+| `terms` on `sentris_normalized_severity` | Count findings by severity |
+| `terms` on `scanner`                     | Count findings by scanner  |
+| `terms` on `asset_key`                   | Most vulnerable assets     |
+| `date_histogram` on `@timestamp`         | Findings over time         |
+| `cardinality` on `finding_hash`          | Unique findings count      |
 
 ---
 
@@ -204,15 +230,31 @@ docker compose -f docker/docker-compose.infra.yml up -d opensearch opensearch-da
 
 ### Index Pattern
 
-After indexing data, create an index pattern in OpenSearch Dashboards:
+On first use, the worker asks the backend to install the content-addressed
+findings ingest pipeline, the exact per-organization observation template, and
+the stable observation index, then reads them back and hash-verifies the
+pipeline, template, index setting, and mapping. This data-plane provisioning
+runs in both security-disabled trusted-local mode and secured deployments. A
+verification mismatch is reported as degraded instead of being cached as a
+successful first use. The global `security-findings-o*-observations-v1`
+template remains a bootstrap fallback while that idempotent request completes.
+
+When OpenSearch Security is enabled, tenant provisioning creates the
+organization's exact observation index pattern automatically. For a
+security-disabled local environment, an administrator can create a development
+pattern:
 
 1. Go to **Dashboards Management** > **Index Patterns**
-2. Create pattern: `security-findings-*`
+2. Create pattern: `security-findings-o*-observations-v1`
 3. Select `@timestamp` as the time field
 4. Click **Create index pattern**
 
+The development wildcard spans every organization and is not a tenant boundary.
+Do not expose a security-disabled Dashboards instance to untrusted users.
+
 <Warning>
-  If you don't see `sentris.*` fields in Available Fields after indexing, refresh the index pattern field list in Dashboards Management.
+  If you don't see `sentris.*` fields in Available Fields after indexing, refresh the index pattern
+  field list in Dashboards Management.
 </Warning>
 
 ---
@@ -248,16 +290,17 @@ Omit fields you don’t want to change. The backend validates retention days onl
 
 ### Component Parameters
 
-| Parameter | Description |
-|-----------|-------------|
-| **Index Suffix** | Custom suffix for the index name. Defaults to slugified workflow name. |
-| **Asset Key Field** | Field to use as asset identifier. Auto-detect checks: asset_key > host > domain > subdomain > url > ip > asset > target |
-| **Custom Field Name** | Custom field when Asset Key Field is "custom" |
-| **Fail on Error** | When enabled, workflow stops if indexing fails. Default: fire-and-forget. |
+| Parameter             | Description                                                                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Index Suffix**      | Optional custom suffix for non-finding analytics. Leave empty for canonical findings; canonical and legacy date suffixes are reserved. |
+| **Asset Key Field**   | Field to use as asset identifier. Auto-detect checks: asset_key > host > domain > subdomain > url > ip > asset > target                |
+| **Custom Field Name** | Custom field when Asset Key Field is "custom"                                                                                          |
+| **Fail on Error**     | When enabled, workflow stops if indexing fails. Default: fire-and-forget.                                                              |
 
 ### Fire-and-Forget Mode
 
 By default, Analytics Sink operates in fire-and-forget mode:
+
 - Indexing errors are logged but don't stop the workflow
 - Useful for non-critical analytics that shouldn't block security scans
 - Enable "Fail on Error" for strict indexing requirements
@@ -278,14 +321,25 @@ The button only appears when `VITE_OPENSEARCH_DASHBOARDS_URL` is configured.
 
 ## Index Naming
 
-Indexes follow the pattern: `security-findings-{orgId}-{suffix}`
+Canonical finding observations use:
+`security-findings-o{sha256(exactOrgId)}-observations-v1`.
 
-| Component | Value |
-|-----------|-------|
-| `orgId` | Organization ID from workflow context |
-| `suffix` | Custom suffix parameter, or date (`YYYY.MM.DD`) |
+| Component               | Value                                                              |
+| ----------------------- | ------------------------------------------------------------------ |
+| `o{sha256(exactOrgId)}` | SHA-256 of the exact UTF-8 organization ID, including case/spacing |
+| `observations-v1`       | Stable, versioned observation index suffix                         |
 
-Example: `security-findings-org_abc123-2025.01.21`
+Example for `org_abc123`:
+`security-findings-od12423efcee5b1b72255baf2fc2e5a226bdd9db9be3eb4155d8e9ee74006c863-observations-v1`.
+
+The stable name and deterministic document ID make retries idempotent across
+UTC midnight. Explicit custom suffixes remain available for non-finding
+analytics use cases, except `observations-v1` and normalized `YYYY.MM.DD`
+suffixes. Canonical writes are create-only: replay preserves the original
+observation content and timestamps as well as any newer projected triage.
+Custom analytics indexes use the same hashed organization namespace but do not
+inherit the finding pipeline or canonical mapping. Legacy daily findings indexes
+are upgraded non-destructively with `bun run migrate:findings-index`.
 
 ---
 
@@ -293,21 +347,21 @@ Example: `security-findings-org_abc123-2025.01.21`
 
 ### Recommended Visualizations
 
-| Visualization | Description |
-|---------------|-------------|
-| **Findings Over Time** | Line chart with `@timestamp` on X-axis, count on Y-axis |
-| **Severity Distribution** | Pie chart with `terms` on `severity` |
-| **Top Vulnerable Assets** | Bar chart with `terms` on `asset_key` |
-| **Findings by Scanner** | Bar chart with `terms` on `scanner` |
-| **New vs Recurring** | Use `finding_hash` cardinality vs total count |
+| Visualization             | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| **Findings Over Time**    | Line chart with `@timestamp` on X-axis, count on Y-axis |
+| **Severity Distribution** | Pie chart with `terms` on `sentris_normalized_severity` |
+| **Top Vulnerable Assets** | Bar chart with `terms` on `asset_key`                   |
+| **Findings by Scanner**   | Bar chart with `terms` on `scanner`                     |
+| **New vs Recurring**      | Use `finding_hash` cardinality vs total count           |
 
 ### Alert Examples
 
-| Alert | Query |
-|-------|-------|
-| Critical finding detected | `severity: "CRITICAL"` |
-| New secrets exposed | `scanner: "trufflehog"` |
-| RLS disabled | `check_id: "DB_RLS_DISABLED"` |
+| Alert                     | Query                                     |
+| ------------------------- | ----------------------------------------- |
+| Critical finding detected | `sentris_normalized_severity: "critical"` |
+| New secrets exposed       | `scanner: "trufflehog"`                   |
+| RLS disabled              | `check_id: "DB_RLS_DISABLED"`             |
 
 ---
 
@@ -323,8 +377,17 @@ Example: `security-findings-org_abc123-2025.01.21`
 ### Field mapping errors
 
 If you see "Limit of total fields [1000] has been exceeded":
-1. Delete the problematic index: `curl -X DELETE "http://localhost:9200/security-findings-*"`
-2. Re-run the workflow (new index will use correct schema)
+
+1. Identify the exact affected index with
+   `curl -s "http://localhost:9200/_cat/indices/security-findings-*?h=index,docs.count,store.size"`.
+2. If it is a legacy finding index, inspect and run
+   `bun run migrate:findings-index -- --organization <exact-organization-id>`.
+3. If it is a custom analytics index, define a controlled mapping or use a new
+   explicit suffix before re-running the workflow.
+
+The findings migration uses exact `sentris.organization_id` ownership,
+create-only reindexing, and never deletes source indexes. Never use a broad
+`security-findings-*` delete while recovering one tenant.
 
 ### sentris fields not visible
 
@@ -348,13 +411,14 @@ pm2 start pm2.config.cjs --only sentris-worker
 ### Do
 
 - Connect `results` ports (not `rawOutput`) to Analytics Sink
-- Use meaningful index suffixes for organization
+- Leave the index suffix empty for security findings; use meaningful custom
+  suffixes only for generic analytics data
 - Monitor index size and implement retention policies
 - Create saved searches for common queries
 
 ### Don't
 
-- Don't connect deeply nested JSON (causes field explosion)
+- Don't expect arbitrary `_source`, `evidence`, or `source` JSON fields to be searchable
 - Don't rely on analytics for critical workflow logic
 - Don't store PII or secrets in indexed findings
 

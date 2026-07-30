@@ -33,3 +33,21 @@ export class HealthController {
     return this.probes.readiness();
   }
 }
+
+/**
+ * Worker-to-backend reachability/authentication probe.
+ *
+ * This controller intentionally has no @Public decorator, so the global
+ * AuthGuard requires the worker's x-internal-token. It is process-only and
+ * does not recursively probe dependencies that the worker already checks.
+ */
+@Controller('internal/health')
+export class InternalHealthController {
+  constructor(private readonly probes: HealthProbeService) {}
+
+  @SkipThrottle()
+  @Get('worker-ready')
+  workerReady(): { status: string; service: string; timestamp: string } {
+    return this.probes.liveness();
+  }
+}

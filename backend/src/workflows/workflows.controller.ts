@@ -323,7 +323,7 @@ export class WorkflowsController {
   ) {
     try {
       const idempotencyKey = this.extractIdempotencyKey(headers);
-      const prepared = await this.workflowsService.prepareRunPayload(
+      return await this.workflowsService.run(
         id,
         {
           inputs: body.inputs,
@@ -334,8 +334,6 @@ export class WorkflowsController {
         auth,
         { idempotencyKey },
       );
-
-      return await this.workflowsService.startPreparedRun(prepared);
     } catch (error: unknown) {
       if (error instanceof HttpException) throw error;
 

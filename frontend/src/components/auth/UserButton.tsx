@@ -165,9 +165,6 @@ export const UserButton: React.FC<UserButtonProps> = ({
         <AvatarImage src={user.imageUrl} alt={user.username || user.email} />
         <AvatarFallback>{userInitials}</AvatarFallback>
       </Avatar>
-      {integratedNotifications && unreadCount > 0 && (
-        <NotificationCountBadge compact={compact} count={unreadCount} onClick={openNotifications} />
-      )}
     </div>
   );
 
@@ -276,22 +273,39 @@ export const UserButton: React.FC<UserButtonProps> = ({
   if (integratedNotifications) {
     return (
       <NotificationsPopover open={notificationsOpen} onOpenChange={setNotificationsOpen} side="top">
-        <DropdownMenu
-          open={userMenuOpen}
-          onOpenChange={(open) => {
-            setUserMenuOpen(open);
-            if (open) {
-              setNotificationsOpen(false);
-            }
-          }}
-        >
-          <DropdownMenuTrigger asChild>
-            <PopoverAnchor asChild>{userMenuTrigger}</PopoverAnchor>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            {userMenuItems}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <PopoverAnchor asChild>
+          <div className={cn('relative', sidebarCollapsed ? 'mx-auto w-fit' : 'min-w-0 flex-1')}>
+            <DropdownMenu
+              open={userMenuOpen}
+              onOpenChange={(open) => {
+                setUserMenuOpen(open);
+                if (open) {
+                  setNotificationsOpen(false);
+                }
+              }}
+            >
+              <DropdownMenuTrigger asChild>{userMenuTrigger}</DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                {userMenuItems}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {unreadCount > 0 && (
+              <div
+                className={cn(
+                  'pointer-events-none absolute',
+                  compact ? 'left-0.5 top-0.5 h-7 w-7' : 'left-2 top-2 h-8 w-8',
+                )}
+              >
+                <NotificationCountBadge
+                  compact={compact}
+                  count={unreadCount}
+                  className="pointer-events-auto"
+                  onClick={openNotifications}
+                />
+              </div>
+            )}
+          </div>
+        </PopoverAnchor>
       </NotificationsPopover>
     );
   }

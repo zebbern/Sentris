@@ -59,6 +59,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   const headers = await getApiAuthHeaders();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       ...headers,
       'Content-Type': 'application/json',
@@ -163,6 +164,7 @@ export function useImportAgentSkillZip() {
         method: 'POST',
         headers,
         body: formData,
+        credentials: 'include',
       });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: 'Import failed' }));

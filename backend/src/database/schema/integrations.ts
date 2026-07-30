@@ -3,6 +3,7 @@ import {
   jsonb,
   pgTable,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -13,6 +14,7 @@ export const integrationTokens = pgTable(
   'integration_tokens',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: varchar('organization_id', { length: 191 }),
     userId: varchar('user_id', { length: 191 }).notNull(),
     provider: varchar('provider', { length: 64 }).notNull(),
     scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
@@ -39,11 +41,10 @@ export const integrationTokens = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    userProviderIdx: index('integration_tokens_user_idx').on(table.userId),
-    userProviderUnique: uniqueIndex('integration_tokens_user_provider_uidx').on(
-      table.userId,
-      table.provider,
-    ),
+    orgUserIdx: index('integration_tokens_org_user_idx').on(table.organizationId, table.userId),
+    orgUserProviderUnique: unique('integration_tokens_org_user_provider_uidx')
+      .on(table.organizationId, table.userId, table.provider)
+      .nullsNotDistinct(),
   }),
 );
 
@@ -52,6 +53,7 @@ export const integrationOAuthStates = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     state: text('state').notNull(),
+    organizationId: varchar('organization_id', { length: 191 }),
     userId: varchar('user_id', { length: 191 }).notNull(),
     provider: varchar('provider', { length: 64 }).notNull(),
     codeVerifier: text('code_verifier'),
@@ -62,20 +64,29 @@ export const integrationOAuthStates = pgTable(
   }),
 );
 
-export const integrationProviderConfigs = pgTable('integration_provider_configs', {
-  provider: varchar('provider', { length: 64 }).primaryKey(),
-  clientId: varchar('client_id', { length: 191 }).notNull(),
-  clientSecret: jsonb('client_secret')
-    .$type<{
-      ciphertext: string;
-      iv: string;
-      authTag: string;
-      keyId: string;
-    }>()
-    .notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const integrationProviderConfigs = pgTable(
+  'integration_provider_configs',
+  {
+    organizationId: varchar('organization_id', { length: 191 }),
+    provider: varchar('provider', { length: 64 }).notNull(),
+    clientId: varchar('client_id', { length: 191 }).notNull(),
+    clientSecret: jsonb('client_secret')
+      .$type<{
+        ciphertext: string;
+        iv: string;
+        authTag: string;
+        keyId: string;
+      }>()
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    orgProviderUnique: unique('integration_provider_configs_org_provider_uidx')
+      .on(table.organizationId, table.provider)
+      .nullsNotDistinct(),
+  }),
+);
 
 export type IntegrationTokenRecord = typeof integrationTokens.$inferSelect;
 export type NewIntegrationTokenRecord = typeof integrationTokens.$inferInsert;

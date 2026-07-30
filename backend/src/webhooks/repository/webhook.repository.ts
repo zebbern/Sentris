@@ -8,6 +8,9 @@ import {
   type WebhookConfigurationInsert,
   webhookConfigurationsTable,
 } from '../../database/schema';
+import type { OutboxExecutor } from '../../outbox/enqueue-outbox-event';
+
+type WebhookMutationHook<T = void> = (executor: OutboxExecutor, result: T) => Promise<void>;
 
 export interface WebhookRepositoryFilters {
   workflowId?: string;
@@ -24,25 +27,37 @@ export class WebhookRepository {
 
   async create(
     values: Omit<WebhookConfigurationInsert, 'id'>,
+    onMutated?: WebhookMutationHook<WebhookConfigurationRecord>,
   ): Promise<WebhookConfigurationRecord> {
-    const [record] = await this.db.insert(webhookConfigurationsTable).values(values).returning();
-    return record;
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert'>) => {
+      const [record] = await executor.insert(webhookConfigurationsTable).values(values).returning();
+      await onMutated?.(executor, record);
+      return record;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
   async update(
     id: string,
     values: Partial<WebhookConfigurationInsert>,
     options: { organizationId?: string | null } = {},
+    onMutated?: WebhookMutationHook<WebhookConfigurationRecord>,
   ): Promise<WebhookConfigurationRecord | undefined> {
-    const [record] = await this.db
-      .update(webhookConfigurationsTable)
-      .set({
-        ...values,
-        updatedAt: new Date(),
-      })
-      .where(this.buildIdFilter(id, options.organizationId))
-      .returning();
-    return record;
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'update'>) => {
+      const [record] = await executor
+        .update(webhookConfigurationsTable)
+        .set({
+          ...values,
+          updatedAt: new Date(),
+        })
+        .where(this.buildIdFilter(id, options.organizationId))
+        .returning();
+      if (record) {
+        await onMutated?.(executor, record);
+      }
+      return record;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
   async findById(
@@ -66,10 +81,18 @@ export class WebhookRepository {
     return record;
   }
 
-  async delete(id: string, options: { organizationId?: string | null } = {}): Promise<void> {
-    await this.db
-      .delete(webhookConfigurationsTable)
-      .where(this.buildIdFilter(id, options.organizationId));
+  async delete(
+    id: string,
+    options: { organizationId?: string | null } = {},
+    onMutated?: WebhookMutationHook,
+  ): Promise<void> {
+    const mutate = async (executor: Pick<NodePgDatabase, 'delete' | 'insert'>) => {
+      await executor
+        .delete(webhookConfigurationsTable)
+        .where(this.buildIdFilter(id, options.organizationId));
+      await onMutated?.(executor, undefined);
+    };
+    await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
   }
 
   async list(filters: WebhookRepositoryFilters = {}): Promise<WebhookConfigurationRecord[]> {

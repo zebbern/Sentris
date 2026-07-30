@@ -7,15 +7,18 @@ import { OpenSearchTenantService } from './opensearch-tenant.service';
 import { AnalyticsController } from './analytics.controller';
 import { FindingsController } from './findings.controller';
 import { FindingTriageModule } from '../findings/finding-triage.module';
+import { DatabaseModule } from '../database/database.module';
+import { ScopesRepository } from '../scopes/scopes.repository';
 
 @Module({
-  imports: [ConfigModule, forwardRef(() => FindingTriageModule)],
+  imports: [ConfigModule, DatabaseModule, forwardRef(() => FindingTriageModule)],
   controllers: [AnalyticsController, FindingsController],
   providers: [
     AnalyticsService,
     SecurityAnalyticsService,
     OrganizationSettingsService,
     OpenSearchTenantService,
+    ScopesRepository,
   ],
   exports: [
     AnalyticsService,

@@ -54,6 +54,8 @@ export interface CreateContextOptions {
   workflowId?: string;
   workflowName?: string;
   organizationId?: string | null;
+  scopeId?: string | null;
+  signal?: AbortSignal;
 }
 
 export function createExecutionContext(options: CreateContextOptions): ExecutionContext {
@@ -71,9 +73,13 @@ export function createExecutionContext(options: CreateContextOptions): Execution
     workflowId,
     workflowName,
     organizationId,
+    scopeId,
+    signal,
   } = options;
   const metadata = createMetadata(runId, componentRef, metadataInput);
-  const scopedTrace = trace ? createScopedTrace(trace, metadata) : undefined;
+  const scopedTrace = trace
+    ? createScopedTrace(trace, metadata, workflowId ?? null, organizationId ?? null)
+    : undefined;
 
   const pushLog = (
     stream: LogEventInput['stream'],
@@ -175,6 +181,8 @@ export function createExecutionContext(options: CreateContextOptions): Execution
     workflowId,
     workflowName,
     organizationId,
+    scopeId,
+    signal,
     http: undefined as unknown as ExecutionContext['http'],
   };
 
@@ -261,18 +269,56 @@ function createMetadata(
 function createScopedTrace(
   trace: ITraceService,
   metadata: ExecutionContextMetadata,
+  workflowId: string | null,
+  organizationId: string | null,
 ): IScopedTraceService {
+  let ordinal = 0;
+
   return {
     record(event: TraceEventInput) {
+      const eventOrdinal = ++ordinal;
+      const identityScope = metadata.activityId ?? `component:${metadata.componentRef}`;
+      const eventId = event.eventId ?? `trace:${metadata.runId}:${identityScope}:${eventOrdinal}`;
       const enriched: TraceEvent = {
         timestamp: new Date().toISOString(),
         ...event,
+        eventId,
+        sequence: event.sequence ?? stableTraceSequence(metadata.activityId, eventOrdinal, eventId),
         runId: metadata.runId,
+        workflowId: event.workflowId ?? workflowId,
+        organizationId: event.organizationId ?? organizationId,
         nodeRef: metadata.componentRef,
         context: metadata,
       } as TraceEvent;
 
-      trace.record(enriched);
+      void Promise.resolve(trace.record(enriched)).catch((error: unknown) => {
+        console.error(
+          `[Trace] Failed to publish component trace event ${eventId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
     },
   };
+}
+
+function stableTraceSequence(
+  activityId: string | undefined,
+  ordinal: number,
+  eventId: string,
+): number {
+  if (activityId && /^\d+$/.test(activityId)) {
+    const activitySequence = Number(activityId);
+    const sequence = activitySequence * 10_000 + ordinal;
+    if (Number.isSafeInteger(sequence) && sequence > 0 && sequence <= 2_147_483_647) {
+      return sequence;
+    }
+  }
+
+  let hash = 2_166_136_261;
+  for (let index = 0; index < eventId.length; index += 1) {
+    hash ^= eventId.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return ((hash >>> 0) % 2_147_483_646) + 1;
 }

@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { resolveSentrisTrustProfile, type SentrisTrustProfile } from '@sentris/shared';
 
 export interface AppConfig {
   port: number;
@@ -9,6 +10,7 @@ export interface AppConfig {
   versionCheckTimeoutMs: number;
   versionCheckVersion: string | undefined;
   skipMigrationCheck: boolean;
+  trustProfile: SentrisTrustProfile;
 }
 
 export const appConfig = registerAs<AppConfig>('app', () => ({
@@ -20,4 +22,5 @@ export const appConfig = registerAs<AppConfig>('app', () => ({
   versionCheckTimeoutMs: Number(process.env.SENTRIS_VERSION_CHECK_TIMEOUT_MS ?? '5000'),
   versionCheckVersion: process.env.SENTRIS_VERSION_CHECK_VERSION,
   skipMigrationCheck: process.env.SENTRIS_SKIP_MIGRATION_CHECK === 'true',
+  trustProfile: resolveSentrisTrustProfile(process.env),
 }));

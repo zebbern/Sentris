@@ -28,7 +28,7 @@ export class TerminalArchiveService {
   async archiveRun(auth: AuthContext | null, runId: string): Promise<WorkflowTerminalRecord[]> {
     const acquired = await this.archivingLockService.tryAcquire(runId);
     if (!acquired) {
-      return [];
+      throw new Error(`Terminal archive already in progress for run ${runId}`);
     }
 
     try {
@@ -37,14 +37,15 @@ export class TerminalArchiveService {
       const archivedKeys = new Set(existing.map((record) => `${record.nodeRef}:${record.stream}`));
       const streams = await this.terminalStreamService.listStreams(runId);
       const results: WorkflowTerminalRecord[] = [];
+      const failures: unknown[] = [];
 
       for (const { nodeRef, stream } of streams) {
-        const dedupeKey = `${nodeRef}:${stream}`;
+        const normalizedStream: 'stdout' | 'stderr' | 'pty' =
+          stream === 'stdout' || stream === 'stderr' || stream === 'pty' ? stream : 'pty';
+        const dedupeKey = `${nodeRef}:${normalizedStream}`;
         if (archivedKeys.has(dedupeKey)) {
           continue;
         }
-        const normalizedStream: 'stdout' | 'stderr' | 'pty' =
-          stream === 'stdout' || stream === 'stderr' || stream === 'pty' ? stream : 'pty';
         try {
           const result = await this.archiveWithContext(auth, run, organizationId, runId, {
             nodeRef,
@@ -54,12 +55,18 @@ export class TerminalArchiveService {
           archivedKeys.add(dedupeKey);
         } catch (error: unknown) {
           this.logger.warn(`Failed to archive terminal for ${runId}/${nodeRef}/${stream}`, error);
+          failures.push(error);
         }
       }
-      if (results.length > 0) {
-        await this.terminalStreamService.deleteStreams(runId).catch((error) => {
-          this.logger.warn(`Failed to delete Redis terminal streams for run ${runId}`, error);
-        });
+
+      if (failures.length === 1) {
+        throw failures[0];
+      }
+      if (failures.length > 1) {
+        throw new AggregateError(failures, `Failed to archive ${failures.length} terminal streams`);
+      }
+      if (streams.length > 0) {
+        await this.terminalStreamService.deleteStreams(runId);
       }
       return results;
     } finally {

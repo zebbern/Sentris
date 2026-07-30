@@ -88,8 +88,20 @@ export class TerminalStreamService implements OnModuleDestroy {
     pipeline.del(trackingKey);
     const results = await pipeline.exec();
 
+    if (!results || results.length !== 2) {
+      throw new Error('Redis terminal stream deletion failed: incomplete pipeline response');
+    }
+    const commandErrors = results
+      .map(([error]) => error)
+      .filter((error): error is Error => error !== null);
+    if (commandErrors.length > 0) {
+      // Either partial result is safe to retry: an absent tracking SET falls
+      // back to SCAN, while dangling tracked keys are removed on the retry.
+      throw new AggregateError(commandErrors, 'Redis terminal stream deletion failed');
+    }
+
     // Return the count from the first DEL (the stream keys)
-    return (results?.[0]?.[1] as number) ?? 0;
+    return Number(results[0][1] ?? 0);
   }
 
   async fetchChunks(

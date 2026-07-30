@@ -5,6 +5,10 @@ import { type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { workflowTagsTable } from '../../database/schema/workflow-tags';
 import { workflowsTable } from '../../database/schema/workflows';
 import { DRIZZLE_TOKEN } from '../../database/database.module';
+import type {
+  WorkflowTransactionExecutor,
+  WorkflowTransactionOptions,
+} from './workflow-transaction-executor';
 
 export interface TagWithCount {
   name: string;
@@ -22,26 +26,36 @@ export class WorkflowTagsRepository {
    * Replace all tags for a workflow within a transaction.
    * Deletes existing tags and inserts new ones atomically.
    */
-  async setTags(workflowId: string, tags: string[]): Promise<string[]> {
-    return this.db.transaction(async (tx) => {
-      await tx.delete(workflowTagsTable).where(eq(workflowTagsTable.workflowId, workflowId));
+  async setTags(
+    workflowId: string,
+    tags: string[],
+    options: WorkflowTransactionOptions = {},
+  ): Promise<string[]> {
+    const replace = async (executor: WorkflowTransactionExecutor) => {
+      await executor.delete(workflowTagsTable).where(eq(workflowTagsTable.workflowId, workflowId));
 
       if (tags.length === 0) {
         return [];
       }
 
       const rows = tags.map((name) => ({ workflowId, name }));
-      await tx.insert(workflowTagsTable).values(rows);
+      await executor.insert(workflowTagsTable).values(rows);
 
       return tags;
-    });
+    };
+
+    return options.executor ? replace(options.executor) : this.db.transaction((tx) => replace(tx));
   }
 
   /**
    * Get all tag names for a specific workflow.
    */
-  async getTagsByWorkflowId(workflowId: string): Promise<string[]> {
-    const rows = await this.db
+  async getTagsByWorkflowId(
+    workflowId: string,
+    options: WorkflowTransactionOptions = {},
+  ): Promise<string[]> {
+    const executor = options.executor ?? this.db;
+    const rows = await executor
       .select({ name: workflowTagsTable.name })
       .from(workflowTagsTable)
       .where(eq(workflowTagsTable.workflowId, workflowId))

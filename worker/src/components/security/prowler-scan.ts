@@ -416,6 +416,7 @@ const definition = defineComponent({
     ...SECURITY_DOCKER_RESOURCE_HEAVY,
     image: 'prowlercloud/prowler:latest',
     platform: 'linux/amd64',
+    network: 'bridge',
     command: [], // Placeholder - actual command built dynamically in execute()
   },
   inputs: inputSchema,

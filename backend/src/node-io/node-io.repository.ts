@@ -4,6 +4,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { nodeIOTable, type NodeIORecord, type NodeIOInsert } from '../database/schema';
 import { DRIZZLE_TOKEN } from '../database/database.module';
+import { enqueueOutboxEvent, type OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface NodeIOData {
   runId: string;
@@ -19,7 +20,38 @@ export interface NodeIOData {
   errorMessage?: string;
 }
 
-import { KAFKA_SPILL_THRESHOLD_BYTES, createSpilledMarker } from '@sentris/component-sdk';
+import { createSpilledMarker } from '@sentris/component-sdk';
+
+interface NodeIOStartData {
+  runId: string;
+  nodeRef: string;
+  workflowId?: string;
+  organizationId?: string | null;
+  componentId: string;
+  inputs?: Record<string, unknown>;
+  inputsSpilled?: boolean;
+  inputsStorageRef?: string | null;
+  inputsSize?: number;
+  startedAt?: Date;
+}
+
+interface NodeIOCompletionData {
+  runId: string;
+  nodeRef: string;
+  componentId?: string;
+  organizationId?: string | null;
+  outputs: Record<string, unknown>;
+  status: 'completed' | 'failed' | 'skipped';
+  errorMessage?: string;
+  outputsSpilled?: boolean;
+  outputsStorageRef?: string | null;
+  outputsSize?: number;
+  completedAt?: Date;
+  completionEventId?: string;
+  projectAssets?: boolean;
+}
+
+export type NodeIOTransactionExecutor = OutboxExecutor & Pick<NodePgDatabase, 'select'>;
 
 @Injectable()
 export class NodeIORepository {
@@ -31,25 +63,22 @@ export class NodeIORepository {
   /**
    * Record node execution start (inputs captured)
    */
-  async recordStart(data: {
-    runId: string;
-    nodeRef: string;
-    workflowId?: string;
-    organizationId?: string | null;
-    componentId: string;
-    inputs?: Record<string, unknown>;
-    inputsSpilled?: boolean;
-    inputsStorageRef?: string | null;
-    inputsSize?: number;
-  }): Promise<void> {
+  async recordStart(data: NodeIOStartData): Promise<void> {
+    await this.recordStartWithExecutor(this.db, data);
+  }
+
+  async recordStartWithExecutor(executor: OutboxExecutor, data: NodeIOStartData): Promise<void> {
     const inputsJson = data.inputs ? JSON.stringify(data.inputs) : null;
     const computedInputsSize = inputsJson ? Buffer.byteLength(inputsJson, 'utf8') : 0;
 
-    // Favor provided spilled info from worker, fallback to local calculation
     const inputsSize = data.inputsSize ?? computedInputsSize;
-    const inputsSpilled = data.inputsSpilled ?? inputsSize > KAFKA_SPILL_THRESHOLD_BYTES;
-    // Use the storage ref provided by worker (UUID), or generate a path-based fallback
-    const inputsStorageRef = data.inputsStorageRef ?? null;
+    const inputsStorageRef = data.inputsStorageRef?.trim() || null;
+    const inputsSpilled =
+      data.inputsSpilled === true ||
+      (data.inputsSpilled === undefined && inputsStorageRef !== null);
+    if (inputsSpilled && !inputsStorageRef) {
+      throw new Error('Spilled node inputs require a storage reference');
+    }
 
     const insert: NodeIOInsert = {
       runId: data.runId,
@@ -57,17 +86,15 @@ export class NodeIORepository {
       workflowId: data.workflowId ?? null,
       organizationId: data.organizationId ?? null,
       componentId: data.componentId,
-      inputs: inputsSpilled
-        ? createSpilledMarker(inputsStorageRef ?? 'unknown', inputsSize)
-        : data.inputs,
+      inputs: inputsSpilled ? createSpilledMarker(inputsStorageRef!, inputsSize) : data.inputs,
       inputsSize,
       inputsSpilled,
       inputsStorageRef,
-      startedAt: new Date(),
+      startedAt: data.startedAt ?? new Date(),
       status: 'running',
     };
 
-    await this.db
+    await executor
       .insert(nodeIOTable)
       .values(insert)
       .onConflictDoUpdate({
@@ -80,6 +107,15 @@ export class NodeIORepository {
           THEN ${nodeIOTable.status} 
           ELSE ${insert.status} 
         END`,
+          durationMs: sql`CASE
+          WHEN ${nodeIOTable.status} IN ('completed', 'failed', 'skipped')
+            AND ${nodeIOTable.completedAt} IS NOT NULL
+          THEN GREATEST(
+            0,
+            FLOOR(EXTRACT(EPOCH FROM (${nodeIOTable.completedAt} - ${insert.startedAt})) * 1000)
+          )::integer
+          ELSE ${nodeIOTable.durationMs}
+        END`,
           updatedAt: new Date(),
         },
       });
@@ -88,30 +124,41 @@ export class NodeIORepository {
   /**
    * Update node execution with outputs (completion)
    */
-  async recordCompletion(data: {
-    runId: string;
-    nodeRef: string;
-    componentId?: string;
-    outputs: Record<string, unknown>;
-    status: 'completed' | 'failed' | 'skipped';
-    errorMessage?: string;
-    outputsSpilled?: boolean;
-    outputsStorageRef?: string | null;
-    outputsSize?: number;
-  }): Promise<void> {
+  async recordCompletion(data: NodeIOCompletionData): Promise<void> {
+    if (data.projectAssets) {
+      await this.db.transaction(async (tx) => {
+        await this.recordCompletionWithExecutor(tx, data);
+      });
+      return;
+    }
+
+    await this.recordCompletionWithExecutor(this.db, data);
+  }
+
+  async recordCompletionWithExecutor(
+    executor: NodeIOTransactionExecutor,
+    data: NodeIOCompletionData,
+  ): Promise<void> {
     const outputsJson = JSON.stringify(data.outputs);
     const computedOutputsSize = Buffer.byteLength(outputsJson, 'utf8');
 
-    // Favor provided spilled info from worker, fallback to local calculation
     const outputsSize = data.outputsSize ?? computedOutputsSize;
-    const outputsSpilled = data.outputsSpilled ?? outputsSize > KAFKA_SPILL_THRESHOLD_BYTES;
-    // Use the storage ref provided by worker (UUID), or generate a path-based fallback
-    const outputsStorageRef = data.outputsStorageRef ?? null;
+    const outputsStorageRef = data.outputsStorageRef?.trim() || null;
+    const outputsSpilled =
+      data.outputsSpilled === true ||
+      (data.outputsSpilled === undefined && outputsStorageRef !== null);
+    if (outputsSpilled && !outputsStorageRef) {
+      throw new Error('Spilled node outputs require a storage reference');
+    }
 
-    const completedAt = new Date();
+    const completedAt = data.completedAt ?? new Date();
 
     // Get existing record to calculate duration BEFORE upserting
-    const existing = await this.findByRunAndNode(data.runId, data.nodeRef);
+    const [existing] = await executor
+      .select()
+      .from(nodeIOTable)
+      .where(and(eq(nodeIOTable.runId, data.runId), eq(nodeIOTable.nodeRef, data.nodeRef)))
+      .limit(1);
     const durationMs = existing?.startedAt
       ? completedAt.getTime() - new Date(existing.startedAt).getTime()
       : null;
@@ -119,10 +166,9 @@ export class NodeIORepository {
     const insert: NodeIOInsert = {
       runId: data.runId,
       nodeRef: data.nodeRef,
+      organizationId: data.organizationId ?? existing?.organizationId ?? null,
       componentId: data.componentId || existing?.componentId || 'unknown',
-      outputs: outputsSpilled
-        ? createSpilledMarker(outputsStorageRef ?? 'unknown', outputsSize)
-        : data.outputs,
+      outputs: outputsSpilled ? createSpilledMarker(outputsStorageRef!, outputsSize) : data.outputs,
       outputsSize,
       outputsSpilled,
       outputsStorageRef,
@@ -132,7 +178,7 @@ export class NodeIORepository {
       errorMessage: data.errorMessage ?? null,
     };
 
-    await this.db
+    await executor
       .insert(nodeIOTable)
       .values(insert)
       .onConflictDoUpdate({
@@ -149,6 +195,23 @@ export class NodeIORepository {
           updatedAt: new Date(),
         },
       });
+
+    if (data.projectAssets) {
+      const componentId = data.componentId || existing?.componentId || 'unknown';
+      const completionEventId = data.completionEventId ?? completedAt.toISOString();
+      await enqueueOutboxEvent(executor, {
+        eventType: 'asset.nodeio.completed',
+        organizationId: data.organizationId ?? existing?.organizationId ?? null,
+        aggregateType: 'node_io',
+        aggregateId: `${data.runId}:${data.nodeRef}`,
+        dedupeKey: `asset.nodeio.completed:${data.runId}:${data.nodeRef}:${completionEventId}`,
+        payload: {
+          runId: data.runId,
+          nodeRef: data.nodeRef,
+          componentId,
+        },
+      });
+    }
   }
 
   /**

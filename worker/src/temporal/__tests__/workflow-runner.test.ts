@@ -18,6 +18,52 @@ import type { WorkflowDefinition, WorkflowLogEntry, WorkflowLogSink } from '../t
 // Ensure built-in components are registered for workflow execution
 import '../../components';
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function expectPromisePending(promise: Promise<unknown>): Promise<void> {
+  let settled = false;
+  void promise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(settled).toBe(false);
+}
+
+function singleNodeWorkflow(componentId: string, value: unknown): WorkflowDefinition {
+  return {
+    version: 1,
+    title: 'Publication drain',
+    entrypoint: { ref: 'node-1' },
+    config: { environment: 'test', timeoutSeconds: 30 },
+    nodes: { 'node-1': { ref: 'node-1' } },
+    edges: [],
+    dependencyCounts: { 'node-1': 0 },
+    actions: [
+      {
+        ref: 'node-1',
+        componentId,
+        params: {},
+        inputOverrides: { value },
+        dependsOn: [],
+        inputMappings: {},
+      },
+    ],
+  };
+}
+
 describe('executeWorkflow', () => {
   beforeAll(() => {
     if (!componentRegistry.has('test.echo')) {
@@ -59,6 +105,61 @@ describe('executeWorkflow', () => {
       };
 
       componentRegistry.register(component);
+    }
+
+    if (!componentRegistry.has('test.storage.scope')) {
+      componentRegistry.register({
+        id: 'test.storage.scope',
+        label: 'Storage Scope',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({}),
+        outputs: outputs({
+          value: withPortMeta(z.string(), { label: 'Value' }),
+        }),
+        async execute(_input, context) {
+          const file = await context.storage?.downloadFile('spill-ref');
+          return { value: file?.buffer.toString('utf8') ?? 'missing' };
+        },
+      });
+    }
+
+    if (!componentRegistry.has('test.telemetry.echo')) {
+      componentRegistry.register({
+        id: 'test.telemetry.echo',
+        label: 'Telemetry Echo',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          value: withPortMeta(z.string(), { label: 'Value' }),
+        }),
+        outputs: outputs({
+          echoed: withPortMeta(z.string(), { label: 'Echoed' }),
+        }),
+        async execute({ inputs }, context) {
+          context.logger.info('legacy log publication');
+          return { echoed: inputs.value };
+        },
+      });
+    }
+
+    if (!componentRegistry.has('test.telemetry.failure')) {
+      componentRegistry.register({
+        id: 'test.telemetry.failure',
+        label: 'Telemetry Failure',
+        category: 'transform',
+        runner: { kind: 'inline' },
+        inputs: inputs({
+          value: withPortMeta(z.string(), { label: 'Value' }),
+        }),
+        outputs: outputs({
+          echoed: withPortMeta(z.string(), { label: 'Echoed' }),
+        }),
+        async execute(_input, context) {
+          context.logger.error('legacy component failure');
+          throw new Error('legacy failure retained');
+        },
+      });
     }
   });
 
@@ -108,6 +209,166 @@ describe('executeWorkflow', () => {
       }
       logSpy.mockRestore();
     }
+  });
+
+  it('drains legacy trace and log publications before successful execution settles', async () => {
+    const tracePublication = deferred<undefined>();
+    const logPublication = deferred<undefined>();
+    const completedTraceObserved = deferred<undefined>();
+    const logObserved = deferred<undefined>();
+    const trace = {
+      record: vi.fn((event: TraceEvent) => {
+        if (event.type === 'NODE_COMPLETED') {
+          completedTraceObserved.resolve(undefined);
+        }
+        return tracePublication.promise;
+      }),
+    };
+    const logs: WorkflowLogSink = {
+      append: vi.fn(() => {
+        logObserved.resolve(undefined);
+        return logPublication.promise;
+      }),
+    };
+
+    const execution = executeWorkflow(
+      singleNodeWorkflow('test.telemetry.echo', 'retained'),
+      {},
+      { runId: 'legacy-success-drain', trace, logs },
+    );
+    await completedTraceObserved.promise;
+    await logObserved.promise;
+    await expectPromisePending(execution);
+
+    tracePublication.resolve(undefined);
+    logPublication.resolve(undefined);
+
+    const result = await execution;
+    expect(result.success).toBe(true);
+    expect(result.outputs?.['node-1']).toEqual({ echoed: 'retained' });
+  });
+
+  it('drains legacy trace publication when validation fails before component execution', async () => {
+    const tracePublication = deferred<undefined>();
+    const startedTraceObserved = deferred<undefined>();
+    const trace = {
+      record: vi.fn((event: TraceEvent) => {
+        if (event.type === 'NODE_STARTED') {
+          startedTraceObserved.resolve(undefined);
+        }
+        return tracePublication.promise;
+      }),
+    };
+
+    const execution = executeWorkflow(singleNodeWorkflow('test.echo', 42), {}, { trace });
+    await startedTraceObserved.promise;
+    await expectPromisePending(execution);
+
+    tracePublication.resolve(undefined);
+
+    const result = await execution;
+    expect(result.success).toBe(false);
+  });
+
+  it('drains legacy failed trace and log publications without replacing the component error', async () => {
+    const tracePublication = deferred<undefined>();
+    const logPublication = deferred<undefined>();
+    const failedTraceObserved = deferred<undefined>();
+    const logObserved = deferred<undefined>();
+    const trace = {
+      record: vi.fn((event: TraceEvent) => {
+        if (event.type === 'NODE_FAILED') {
+          failedTraceObserved.resolve(undefined);
+        }
+        return tracePublication.promise;
+      }),
+    };
+    const logs: WorkflowLogSink = {
+      append: vi.fn(() => {
+        logObserved.resolve(undefined);
+        return logPublication.promise;
+      }),
+    };
+
+    const execution = executeWorkflow(
+      singleNodeWorkflow('test.telemetry.failure', 'failure'),
+      {},
+      { trace, logs },
+    );
+    await failedTraceObserved.promise;
+    await logObserved.promise;
+    await expectPromisePending(execution);
+
+    tracePublication.resolve(undefined);
+    logPublication.resolve(undefined);
+
+    const result = await execution;
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('One or more workflow actions failed');
+    expect(
+      trace.record.mock.calls.some(
+        ([event]) =>
+          event.type === 'NODE_FAILED' &&
+          typeof event.error === 'object' &&
+          event.error?.message === 'legacy failure retained',
+      ),
+    ).toBe(true);
+  });
+
+  it('binds storage to the workflow organization before component file access', async () => {
+    const scopedStorage = {
+      forOrganization: vi.fn(),
+      downloadFile: vi.fn(async () => ({
+        buffer: Buffer.from('scoped'),
+        metadata: {
+          id: 'spill-ref',
+          fileName: 'spill.json',
+          mimeType: 'application/json',
+          size: 6,
+        },
+      })),
+      getFileMetadata: vi.fn(),
+      uploadFile: vi.fn(),
+    };
+    scopedStorage.forOrganization.mockReturnValue(scopedStorage);
+    const storage = {
+      forOrganization: vi.fn(),
+      downloadFile: vi.fn(async () => {
+        throw new Error('unscoped storage access');
+      }),
+      getFileMetadata: vi.fn(),
+      uploadFile: vi.fn(),
+    };
+    storage.forOrganization.mockReturnValue(scopedStorage);
+
+    const result = await executeWorkflow(
+      {
+        version: 1,
+        title: 'Scoped file access',
+        entrypoint: { ref: 'node-1' },
+        config: { environment: 'test', timeoutSeconds: 30 },
+        nodes: { 'node-1': { ref: 'node-1' } },
+        edges: [],
+        dependencyCounts: { 'node-1': 0 },
+        actions: [
+          {
+            ref: 'node-1',
+            componentId: 'test.storage.scope',
+            params: {},
+            inputOverrides: {},
+            dependsOn: [],
+            inputMappings: {},
+          },
+        ],
+      },
+      {},
+      { runId: 'scoped-storage-run', organizationId: 'org-a', storage },
+    );
+
+    expect(result.success).toBe(true);
+    expect(storage.forOrganization).toHaveBeenCalledWith('org-a');
+    expect(scopedStorage.downloadFile).toHaveBeenCalledWith('spill-ref');
+    expect(storage.downloadFile).not.toHaveBeenCalled();
   });
 
   it('records trace events with explicit levels in order of execution', async () => {
@@ -175,6 +436,8 @@ describe('executeWorkflow', () => {
       {},
       {
         runId: 'trace-run',
+        workflowId: 'workflow-1',
+        organizationId: 'org-1',
         trace,
         logs,
       },
@@ -195,6 +458,19 @@ describe('executeWorkflow', () => {
       'NODE_PROGRESS',
       'NODE_COMPLETED',
     ]);
+    expect(executionEvents.every((event) => typeof event.eventId === 'string')).toBe(true);
+    expect(new Set(executionEvents.map((event) => event.eventId)).size).toBe(
+      executionEvents.length,
+    );
+    expect(executionEvents[0]?.eventId).toStartWith('trace:trace-run:legacy:');
+    expect(executionEvents[1]?.eventId).toBe('trace:trace-run:component:node-1:1');
+    expect(executionEvents[2]?.eventId).toStartWith('trace:trace-run:legacy:');
+    expect(executionEvents[3]?.eventId).toStartWith('trace:trace-run:legacy:');
+    expect(executionEvents[4]?.eventId).toBe('trace:trace-run:component:node-2:1');
+    expect(executionEvents[5]?.eventId).toStartWith('trace:trace-run:legacy:');
+    expect(executionEvents.every((event) => Number.isInteger(event.sequence))).toBe(true);
+    expect(executionEvents.every((event) => event.workflowId === 'workflow-1')).toBe(true);
+    expect(executionEvents.every((event) => event.organizationId === 'org-1')).toBe(true);
 
     const startedEvents = executionEvents.filter((event) => event.type === 'NODE_STARTED');
     startedEvents.forEach((event) => {
@@ -418,6 +694,10 @@ describe('executeWorkflow', () => {
     };
 
     const normalizeEvent = (event: TraceEvent) => ({
+      eventId: event.eventId,
+      sequence: event.sequence,
+      workflowId: event.workflowId,
+      organizationId: event.organizationId,
       type: event.type,
       nodeRef: event.nodeRef,
       level: event.level,
@@ -455,6 +735,8 @@ describe('executeWorkflow', () => {
         {},
         {
           runId,
+          workflowId: 'workflow-deterministic',
+          organizationId: 'org-deterministic',
           trace,
           nodeIO,
         },
@@ -475,8 +757,8 @@ describe('executeWorkflow', () => {
       return events.map(normalizeEvent);
     };
 
-    const firstSequence = await runWithTrace('determinism-run-1');
-    const secondSequence = await runWithTrace('determinism-run-2');
+    const firstSequence = await runWithTrace('determinism-run');
+    const secondSequence = await runWithTrace('determinism-run');
 
     expect(secondSequence).toEqual(firstSequence);
   });

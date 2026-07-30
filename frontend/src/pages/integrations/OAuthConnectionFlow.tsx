@@ -12,16 +12,11 @@ import {
 import type { IntegrationProvider, IntegrationConnection } from './utils';
 
 interface UseOAuthConnectionOptions {
-  userId: string;
   providers: IntegrationProvider[];
   buildRequestedScopes: (provider: IntegrationProvider) => string[];
 }
 
-export function useOAuthConnection({
-  userId,
-  providers,
-  buildRequestedScopes,
-}: UseOAuthConnectionOptions) {
+export function useOAuthConnection({ providers, buildRequestedScopes }: UseOAuthConnectionOptions) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const refreshConnectionMutation = useRefreshConnection();
@@ -36,7 +31,6 @@ export function useOAuthConnection({
     try {
       const redirectUri = `${window.location.origin}/integrations/callback/${provider.id}`;
       const response = await api.integrations.startOAuth(provider.id, {
-        userId,
         redirectUri,
         scopes: buildRequestedScopes(provider),
       });
@@ -64,7 +58,7 @@ export function useOAuthConnection({
   const handleRefresh = async (connection: IntegrationConnection) => {
     setRefreshingConnectionId(connection.id);
     try {
-      await refreshConnectionMutation.mutateAsync({ id: connection.id, userId });
+      await refreshConnectionMutation.mutateAsync({ id: connection.id });
       toast({
         title: 'Token refreshed',
         description: `${connection.providerName} token has been refreshed.`,
@@ -84,7 +78,7 @@ export function useOAuthConnection({
   const handleDisconnect = async (connection: IntegrationConnection) => {
     setDeletingConnectionId(connection.id);
     try {
-      await disconnectMutation.mutateAsync({ id: connection.id, userId });
+      await disconnectMutation.mutateAsync({ id: connection.id });
       toast({
         title: 'Connection removed',
         description: `${connection.providerName} credentials have been deleted.`,

@@ -27,14 +27,13 @@ afterAll(() => {
     organizationId: undefined,
     userId: undefined,
   });
+  mock.module('@/store/authStore', () => realAuthModule);
 });
 
 // Import after mocking
 import { queryKeys } from '../queryKeys';
 
 const TEST_ORG = DEFAULT_AUTH_ORG_ID;
-const TEST_USER = 'user-1';
-
 describe('queryKeys', () => {
   // --- Structure ---
 
@@ -211,15 +210,13 @@ describe('queryKeys', () => {
 
   // --- Integrations ---
 
-  it('integrations.connections includes userId or default scope', () => {
-    const key = queryKeys.integrations.connections();
-    expect(key[0]).toBe('integrationConnections');
-    expect(key).toContain(TEST_USER);
-  });
+  it('integrations.connections separates users in the same authenticated organization', () => {
+    const firstUserKey = queryKeys.integrations.connections('user-1');
+    const secondUserKey = queryKeys.integrations.connections('user-2');
 
-  it('integrations.connections with explicit userId uses that', () => {
-    const key = queryKeys.integrations.connections('other-user');
-    expect(key).toContain('other-user');
+    expect(firstUserKey).toEqual(['integrationConnections', TEST_ORG, 'user-1']);
+    expect(secondUserKey).toEqual(['integrationConnections', TEST_ORG, 'user-2']);
+    expect(firstUserKey).not.toEqual(secondUserKey);
   });
 
   // --- Templates ---

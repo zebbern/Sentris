@@ -250,6 +250,7 @@ export const PreparedRunPayloadSchema = z.object({
   workflowVersionId: z.string().uuid(),
   workflowVersion: z.number().int().positive(),
   organizationId: z.string(),
+  scopeId: z.string().nullable().default(null),
   definition: z.unknown(),
   inputs: z.record(z.string(), z.unknown()).default({}),
   trigger: ExecutionTriggerMetadataSchema,

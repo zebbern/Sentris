@@ -40,6 +40,9 @@ export function createMockExecutionContext(
 
 export function createMockSecretsService(secrets: Record<string, string> = {}): ISecretsService {
   return {
+    forOrganization() {
+      return this;
+    },
     get: vi.fn().mockImplementation((secretId: string) => {
       const secretValue = secrets[secretId];
       return secretValue ? Promise.resolve({ value: secretValue }) : Promise.resolve(null);

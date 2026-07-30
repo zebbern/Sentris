@@ -10,8 +10,13 @@ out/
 
 # Development files
 .env
-.env.local
-.env.*.local
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.docker
+!**/.env.example
+!**/.env.docker
 *.log
 
 # IDE files

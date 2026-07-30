@@ -39,6 +39,13 @@ export class KafkaTopicResolver {
     return `${baseTopic}.instance-${this.instanceId}`;
   }
 
+  resolveClientId(baseClientId: string): string {
+    if (!this.enableInstanceSuffix || !this.instanceId) {
+      return baseClientId;
+    }
+    return `${baseClientId}-${this.instanceId}`;
+  }
+
   /**
    * Get logs topic
    */

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "incremental": false
+  },
+  "include": [
+    "scripts/findings-opensearch-acceptance.ts",
+    "scripts/__tests__/findings-opensearch-acceptance.test.ts"
+  ]
+}

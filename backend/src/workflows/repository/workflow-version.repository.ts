@@ -9,6 +9,7 @@ import {
   type WorkflowVersionRecord,
 } from '../../database/schema';
 import { WorkflowDefinition } from '../../dsl/types';
+import type { WorkflowTransactionOptions } from './workflow-transaction-executor';
 
 interface CreateWorkflowVersionInput {
   workflowId: string;
@@ -22,6 +23,10 @@ interface FindByWorkflowVersionInput {
   organizationId?: string | null;
 }
 
+interface WorkflowVersionRepositoryOptions extends WorkflowTransactionOptions {
+  organizationId?: string | null;
+}
+
 @Injectable()
 export class WorkflowVersionRepository {
   constructor(
@@ -29,13 +34,18 @@ export class WorkflowVersionRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async create(input: CreateWorkflowVersionInput): Promise<WorkflowVersionRecord> {
+  async create(
+    input: CreateWorkflowVersionInput,
+    options: WorkflowTransactionOptions = {},
+  ): Promise<WorkflowVersionRecord> {
     const latest = await this.findLatestByWorkflowId(input.workflowId, {
       organizationId: input.organizationId ?? null,
+      executor: options.executor,
     });
     const nextVersion = latest ? latest.version + 1 : 1;
 
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .insert(workflowVersionsTable)
       .values({
         workflowId: input.workflowId,
@@ -50,9 +60,10 @@ export class WorkflowVersionRepository {
 
   async findLatestByWorkflowId(
     workflowId: string,
-    options: { organizationId?: string | null } = {},
+    options: WorkflowVersionRepositoryOptions = {},
   ): Promise<WorkflowVersionRecord | undefined> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .select()
       .from(workflowVersionsTable)
       .where(this.buildWorkflowFilter(workflowId, options.organizationId))
@@ -157,9 +168,10 @@ export class WorkflowVersionRepository {
   async setCompiledDefinition(
     id: string,
     definition: WorkflowDefinition,
-    options: { organizationId?: string | null } = {},
+    options: WorkflowVersionRepositoryOptions = {},
   ): Promise<WorkflowVersionRecord | undefined> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .update(workflowVersionsTable)
       .set({
         compiledDefinition: definition,

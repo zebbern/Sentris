@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { WebhookConfigurationRecord, WebhookDeliveryRecord } from '../../database/schema';
 import type { AuthContext } from '../../auth/types';
 import type { WorkflowDefinition } from '../../dsl/types';
@@ -97,8 +97,12 @@ class InMemoryWebhookRepository implements Partial<WebhookRepository> {
   private records = new Map<string, WebhookConfigurationRecord>();
   private pathIndex = new Map<string, string>();
   private seq = 0;
+  readonly mutationExecutor = { insert: () => undefined };
 
-  async create(values: Partial<WebhookConfigurationRecord>): Promise<WebhookConfigurationRecord> {
+  async create(
+    values: Partial<WebhookConfigurationRecord>,
+    onMutated?: (executor: never, record: WebhookConfigurationRecord) => Promise<void>,
+  ): Promise<WebhookConfigurationRecord> {
     this.seq += 1;
     const record = makeWebhookRecord({
       ...values,
@@ -108,6 +112,7 @@ class InMemoryWebhookRepository implements Partial<WebhookRepository> {
     });
     this.records.set(record.id, record);
     this.pathIndex.set(record.webhookPath, record.id);
+    await onMutated?.(this.mutationExecutor as never, record);
     return record;
   }
 
@@ -115,6 +120,7 @@ class InMemoryWebhookRepository implements Partial<WebhookRepository> {
     id: string,
     values: Partial<WebhookConfigurationRecord>,
     options: { organizationId?: string | null } = {},
+    onMutated?: (executor: never, record: WebhookConfigurationRecord) => Promise<void>,
   ): Promise<WebhookConfigurationRecord | undefined> {
     const existing = await this.findById(id, options);
     if (!existing) {
@@ -131,6 +137,7 @@ class InMemoryWebhookRepository implements Partial<WebhookRepository> {
       this.pathIndex.delete(existing.webhookPath);
       this.pathIndex.set(values.webhookPath, id);
     }
+    await onMutated?.(this.mutationExecutor as never, updated);
     return updated;
   }
 
@@ -156,11 +163,16 @@ class InMemoryWebhookRepository implements Partial<WebhookRepository> {
     return this.records.get(id);
   }
 
-  async delete(id: string, options: { organizationId?: string | null } = {}): Promise<void> {
+  async delete(
+    id: string,
+    options: { organizationId?: string | null } = {},
+    onMutated?: (executor: never) => Promise<void>,
+  ): Promise<void> {
     const record = await this.findById(id, options);
     if (record) {
       this.records.delete(id);
       this.pathIndex.delete(record.webhookPath);
+      await onMutated?.(this.mutationExecutor as never);
     }
   }
 
@@ -314,6 +326,8 @@ describe('WebhooksService', () => {
 
   const auditLogService = {
     record: () => {},
+    recordDurable: mock(async () => undefined),
+    recordDurableWithExecutor: mock(async () => undefined),
   };
 
   beforeEach(() => {
@@ -336,6 +350,8 @@ describe('WebhooksService', () => {
     startPreparedRunCalls.length = 0;
     temporalStartCalls.length = 0;
     temporalResultCalls.length = 0;
+    auditLogService.recordDurable.mockClear();
+    auditLogService.recordDurableWithExecutor.mockClear();
   });
 
   describe('list', () => {
@@ -420,6 +436,11 @@ describe('WebhooksService', () => {
       expect(result.webhookPath).toMatch(/^wh_/);
       expect(ensureWorkflowAdminAccessCalls.length).toBe(1);
       expect(ensureWorkflowAdminAccessCalls[0]![0]!).toBe('workflow-1');
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        repository.mutationExecutor,
+        authContext,
+        expect.objectContaining({ action: 'webhook.create', resourceId: result.id }),
+      );
     });
 
     it('validates expected inputs against workflow entry point', async () => {
@@ -433,6 +454,24 @@ describe('WebhooksService', () => {
           ],
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects webhook creation when durable audit scheduling fails', async () => {
+      auditLogService.recordDurableWithExecutor.mockRejectedValueOnce(
+        new Error('audit outbox unavailable'),
+      );
+
+      await expect(
+        service.create(authContext, {
+          workflowId: 'workflow-1',
+          name: 'Audited Webhook',
+          parsingScript: 'export async function script(input) { return input; }',
+          expectedInputs: [
+            { id: 'prTitle', label: 'PR Title', type: 'text', required: true },
+            { id: 'prNumber', label: 'PR Number', type: 'number', required: true },
+          ],
+        }),
+      ).rejects.toThrow('audit outbox unavailable');
     });
 
     it('allows required workflow inputs with defaults to be omitted from expected inputs', async () => {
@@ -494,6 +533,11 @@ describe('WebhooksService', () => {
       });
 
       expect(result?.name).toBe('Updated Name');
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        repository.mutationExecutor,
+        authContext,
+        expect.objectContaining({ action: 'webhook.update', resourceId: webhook.id }),
+      );
     });
 
     it('throws NotFoundException for non-existent webhook', async () => {
@@ -519,6 +563,11 @@ describe('WebhooksService', () => {
 
       const result = await repository.findById(webhook.id, { organizationId: 'org-1' });
       expect(result).toBeUndefined();
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        repository.mutationExecutor,
+        authContext,
+        expect.objectContaining({ action: 'webhook.delete', resourceId: webhook.id }),
+      );
     });
 
     it('throws NotFoundException for non-existent webhook', async () => {
@@ -545,6 +594,11 @@ describe('WebhooksService', () => {
 
       const updated = await repository.findById(webhook.id);
       expect(updated?.webhookPath).toBe(result.webhookPath);
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        repository.mutationExecutor,
+        authContext,
+        expect.objectContaining({ action: 'webhook.regenerate_path', resourceId: webhook.id }),
+      );
     });
   });
 
@@ -564,6 +618,13 @@ describe('WebhooksService', () => {
 
       expect(result.webhookPath).toBe('wh_test123');
       expect(result.url).toContain('wh_test123');
+      expect(auditLogService.recordDurable).toHaveBeenCalledWith(
+        authContext,
+        expect.objectContaining({
+          action: 'webhook.url_access',
+          resourceId: webhook.id,
+        }),
+      );
     });
   });
 

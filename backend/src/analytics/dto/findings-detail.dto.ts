@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { FindingDataAvailabilitySchema } from '@sentris/shared';
 import { z } from 'zod';
 
 import { FindingItemSchema } from './findings-query.dto';
@@ -11,6 +12,7 @@ export class FindingIdParamDto extends createZodDto(FindingIdParamSchema) {}
 
 export const FindingDetailResponseSchema = FindingItemSchema.extend({
   raw: z.record(z.string(), z.unknown()),
+  availability: FindingDataAvailabilitySchema,
 });
 
 export type FindingDetailResponse = z.infer<typeof FindingDetailResponseSchema>;

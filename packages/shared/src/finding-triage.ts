@@ -14,7 +14,7 @@ export const FINDING_TRIAGE_STATUSES = [
 export const FindingTriageStatusSchema = z.enum(FINDING_TRIAGE_STATUSES);
 export type FindingTriageStatus = z.infer<typeof FindingTriageStatusSchema>;
 
-export const SEVERITY_VALUES = ['critical', 'high', 'medium', 'low', 'info'] as const;
+export const SEVERITY_VALUES = ['critical', 'high', 'medium', 'low', 'info', 'none'] as const;
 export const SeveritySchema = z.enum(SEVERITY_VALUES);
 export type Severity = z.infer<typeof SeveritySchema>;
 
@@ -23,7 +23,7 @@ export type Severity = z.infer<typeof SeveritySchema>;
 export const UpdateFindingTriageSchema = z
   .object({
     status: FindingTriageStatusSchema.optional(),
-    assigneeUserId: z.string().max(191).optional(),
+    assigneeUserId: z.string().min(1).max(191).nullable().optional(),
     severityOverride: SeveritySchema.optional().nullable(),
     notes: z.string().max(10_000).optional().nullable(),
     comment: z.string().max(2_000).optional(),
@@ -34,15 +34,25 @@ export const UpdateFindingTriageSchema = z
       data.assigneeUserId !== undefined ||
       data.severityOverride !== undefined ||
       data.notes !== undefined,
-    { message: 'At least one of status, assigneeUserId, severityOverride, or notes must be provided' },
+    {
+      message:
+        'At least one of status, assigneeUserId, severityOverride, or notes must be provided',
+    },
   );
 export type UpdateFindingTriage = z.infer<typeof UpdateFindingTriageSchema>;
 
 export const BulkTriageSchema = z
   .object({
-    findingIds: z.array(z.string().max(512)).min(1).max(100),
+    findingIds: z
+      .array(z.string().min(1).max(512))
+      .min(1)
+      .max(100)
+      .refine((findingIds) => new Set(findingIds).size === findingIds.length, {
+        message: 'Finding IDs must be unique',
+      })
+      .meta({ uniqueItems: true }),
     status: FindingTriageStatusSchema.optional(),
-    assigneeUserId: z.string().max(191).optional(),
+    assigneeUserId: z.string().min(1).max(191).nullable().optional(),
     comment: z.string().max(2_000).optional(),
   })
   .refine((data) => data.status !== undefined || data.assigneeUserId !== undefined, {
@@ -62,6 +72,7 @@ export const FindingTriageResponseSchema = z.object({
   slaDeadline: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  projectionVersion: z.number().int().nonnegative(),
 });
 export type FindingTriageResponse = z.infer<typeof FindingTriageResponseSchema>;
 

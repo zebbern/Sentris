@@ -1,8 +1,16 @@
 import { Controller, Post, Param, Body, Headers, Logger, RawBody } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiInternalServerErrorResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { Public } from '../../auth/public.decorator';
+import { JiraWebhookResponseDto, TicketingErrorResponseDto } from '../dto/ticketing.dto';
 import { JiraWebhookService } from './jira-webhook.service';
 
 @ApiTags('ticketing')
@@ -32,8 +40,15 @@ export class JiraWebhookController {
     name: 'secret',
     description: 'The webhook secret included in the registered callback URL',
   })
-  @ApiResponse({ status: 200, description: 'Webhook processed' })
-  @ApiResponse({ status: 401, description: 'Invalid webhook signature' })
+  @ApiOkResponse({ type: JiraWebhookResponseDto, description: 'Webhook processed' })
+  @ApiUnauthorizedResponse({
+    type: TicketingErrorResponseDto,
+    description: 'Invalid webhook signature',
+  })
+  @ApiInternalServerErrorResponse({
+    type: TicketingErrorResponseDto,
+    description: 'Webhook processing failed; Jira should retry the delivery',
+  })
   async receive(
     @Param('secret') secret: string,
     @Body() body: unknown,

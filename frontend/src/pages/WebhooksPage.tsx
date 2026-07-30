@@ -31,7 +31,7 @@ import {
 import { useWorkflowsSummary } from '@/hooks/queries/useWorkflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { env } from '@/config/env';
+import { API_V1_URL } from '@/config/api-url';
 import { useAuthStore } from '@/store/authStore';
 import {
   getWorkflowName,
@@ -54,7 +54,6 @@ const STATUS_VARIANTS: Record<string, BadgeVariant> = {
   error: 'destructive',
 };
 
-const WEBHOOK_BASE_URL = env.VITE_API_URL || 'http://localhost:3211';
 const EMPTY_WORKFLOWS: { id: string; name: string }[] = [];
 
 export function WebhooksPage() {
@@ -178,7 +177,7 @@ export function WebhooksPage() {
   };
 
   const handleCopyUrl = async (webhook: WebhookConfiguration) => {
-    const url = `${WEBHOOK_BASE_URL}/webhooks/inbound/${webhook.webhookPath}`;
+    const url = `${API_V1_URL}/webhooks/inbound/${webhook.webhookPath}`;
     await copy(url, {
       successTitle: 'Webhook URL copied',
       successDescription: 'The webhook URL has been copied to your clipboard.',

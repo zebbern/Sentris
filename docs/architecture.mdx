@@ -1,6 +1,6 @@
 ---
-title: "Architecture"
-description: "System design and module responsibilities for Sentris Flow"
+title: 'Architecture'
+description: 'System design and module responsibilities for Sentris Flow'
 ---
 
 ## What is Sentris Flow?
@@ -71,12 +71,12 @@ Sentris Flow is an open-source, no-code security workflow orchestration platform
 
 ## Technology Stack
 
-| Layer | Stack |
-|-------|-------|
-| **Frontend** | React 19, TypeScript, Vite, TailwindCSS, Radix UI, ReactFlow, xterm.js, Zustand |
-| **Backend** | NestJS, TypeScript, Bun, Drizzle ORM, Clerk Auth |
-| **Worker** | Node.js, TypeScript, Temporal SDK, Docker |
-| **Infrastructure** | PostgreSQL 16, Temporal, MinIO, Redis, Redpanda (Kafka), Loki |
+| Layer              | Stack                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| **Frontend**       | React 19, TypeScript, Vite, TailwindCSS, Radix UI, ReactFlow, xterm.js, Zustand                       |
+| **Backend**        | NestJS, TypeScript, Bun, Drizzle ORM, Clerk Auth                                                      |
+| **Worker**         | Node.js, TypeScript, Temporal SDK, Docker                                                             |
+| **Infrastructure** | PostgreSQL 16, Temporal, MinIO, Redis, Redpanda (Kafka), Loki, OpenSearch, dedicated Docker-in-Docker |
 
 ---
 
@@ -95,43 +95,63 @@ To keep this guide concise, complicated subsystems are documented in their own d
 
 Components are the building blocks of workflows:
 
-| Category | Description | Examples |
-|----------|-------------|----------|
-| **security** | Security scanning and enumeration tools (23 components) | Subfinder, DNSX, Nuclei, Naabu, HTTPx, TruffleHog, Trivy, Semgrep, Katana, AbuseIPDB, VirusTotal, YARA |
-| **ai** | AI/ML and agent components | LLM Generate, AI Agent, OpenCode Agent, MCP Providers |
-| **core** | Utility and data processing | HTTP Request, File Loader, Logic Script, Text Splitter |
-| **mcp** | Model Context Protocol servers | MCP Library, AWS MCP Group |
-| **it_ops** | IT operations and user management | Atlassian Offboarding, Google Workspace License Unassign, Okta User Offboard |
-| **notification** | Alerts and messaging | Slack, Discord (text, embeds, file attachments), Jira |
-| **manual_action** | Human-in-the-loop | Approvals, Forms, Selection |
-| **github** | GitHub integrations | Connection Provider, Remove Org Membership |
-| **input** | Data sources, triggers, and credential access | Manual Trigger, Text Block, Secret Loader |
-| **transform** | Data processing and text manipulation | Deduplicator, Workflow Call, Logic Script |
-| **output** | Data export and storage destinations | Artifact Writer, Destination S3, File Writer |
-| **process** | Routing and workflow orchestration | Conditional Router |
+| Category          | Description                                             | Examples                                                                                               |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **security**      | Security scanning and enumeration tools (23 components) | Subfinder, DNSX, Nuclei, Naabu, HTTPx, TruffleHog, Trivy, Semgrep, Katana, AbuseIPDB, VirusTotal, YARA |
+| **ai**            | AI/ML and agent components                              | LLM Generate, AI Agent, OpenCode Agent, MCP Providers                                                  |
+| **core**          | Utility and data processing                             | HTTP Request, File Loader, Logic Script, Text Splitter                                                 |
+| **mcp**           | Model Context Protocol servers                          | MCP Library, AWS MCP Group                                                                             |
+| **it_ops**        | IT operations and user management                       | Atlassian Offboarding, Google Workspace License Unassign, Okta User Offboard                           |
+| **notification**  | Alerts and messaging                                    | Slack, Discord (text, embeds, file attachments), Jira                                                  |
+| **manual_action** | Human-in-the-loop                                       | Approvals, Forms, Selection                                                                            |
+| **github**        | GitHub integrations                                     | Connection Provider, Remove Org Membership                                                             |
+| **input**         | Data sources, triggers, and credential access           | Manual Trigger, Text Block, Secret Loader                                                              |
+| **transform**     | Data processing and text manipulation                   | Deduplicator, Workflow Call, Logic Script                                                              |
+| **output**        | Data export and storage destinations                    | Artifact Writer, Destination S3, File Writer                                                           |
+| **process**       | Routing and workflow orchestration                      | Conditional Router                                                                                     |
 
 ---
 
 ## Security Architecture
 
 ### Authentication & Multi-tenancy
-- **Clerk Integration** — Production-ready authentication for hosted environments.
-- **Local Auth** — Default for local setup using `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
-- **Organization Isolation** — All data scoped by `organization_id`.
+
+- **Explicit trust profile** — `trusted-local` supports a single administrator; `hardened` requires Clerk and an active organization.
+- **Local Auth** — Uses an HTTP-only session cookie and explicit `ADMIN_USERNAME` / `ADMIN_PASSWORD`; production does not ship a default password.
+- **Organization Isolation** — User-facing resource access is constrained by authenticated organization ownership. Worker file, secret, integration, MCP, and API-key paths use the same boundary.
+- **Fail-closed roles** — Unknown Clerk organization roles do not become a default member role.
 
 ### Secrets Management
+
 - **AES-256-GCM** encryption at rest.
 - **Versioned secrets** with active/inactive tracking.
 - **Master key** via `SECRET_STORE_MASTER_KEY` environment variable.
 
 ### Container Isolation
-- **IsolatedContainerVolume** — Per-tenant, per-run Docker volumes. See **[Isolated Volumes](/development/isolated-volumes)**.
-- **Network isolation** — Components run with `network: none` or `bridge`.
-- **Automatic cleanup** — Volumes destroyed after execution.
-- **No shell execution** — All Docker commands use `execFile()` to prevent command injection.
+
+- **Dedicated DIND** — The unprivileged worker reaches a dedicated privileged Docker daemon over mTLS. The host Docker socket and daemon storage are not mounted into the worker.
+- **Run-scoped I/O** — The worker and DIND share only an outer exchange volume; each inner container receives its own opaque run directory.
+- **Network capability** — Components declare `network: none` or `bridge`. Public scanners retain egress; non-network components remain isolated.
+- **Automatic cleanup** — Normal completion removes run resources. Bounded, active-run-aware reconciliation handles cancellation or worker failure and reports failures through readiness.
+- **No host-shell interpolation** — Docker CLI arguments are passed as arrays. A tool may deliberately invoke a shell inside its isolated container when its component contract requires one.
 
 ### SSRF Protection
-- **`validateUrlForSsrf()`** — The `component-sdk` validates every outbound URL before HTTP requests. Blocks RFC 1918 addresses, link-local (`169.254.x.x`), loopback (`127.x.x.x`), Carrier-Grade NAT (`100.64.x.x`), Docker internal hostnames, and DNS rebinding attacks.
+
+- **`validateUrlForSsrf()`** — SDK HTTP call paths can validate destinations and re-check DNS results. It blocks RFC 1918, link-local, loopback, CGN, Docker hostnames, and DNS rebinding.
+- **Intentional scanner egress** — Raw scanner containers are not represented as a universally SSRF-safe HTTP client. Their bridge-network capability is explicit because discovery tools must reach operator-selected public targets.
+
+### Worker capabilities
+
+The backend authorizes a run and carries immutable organization/run context
+through Temporal. Worker adapters are bound once with `forOrganization()` and
+cannot be rebound. Components receive scoped file, secret, artifact, and
+callback capabilities rather than application-wide database credentials,
+master keys, or the worker's complete environment.
+
+Host stdio MCP is disabled unless a trusted-local operator explicitly enables
+`MCP_DISCOVERY_TRUSTED_LOCAL_STDIO`. Hardened discovery uses authenticated
+remote/container paths. See [Self-hosting](/self-hosting) for the profile and
+egress matrix.
 
 ---
 
@@ -139,17 +159,103 @@ Components are the building blocks of workflows:
 
 Notification channels deliver alerts to external services when workflow runs reach a terminal state.
 
-### Event Dispatch
+### Durable event dispatch
 
-The backend uses **EventEmitter2** (via `@nestjs/event-emitter`) to emit a `run.status.terminal` event whenever a run completes, fails, is cancelled, or times out. The event is fire-and-forget and non-blocking — it does not delay the API response to the client.
+The worker finalizes a run through an authenticated backend callback. A
+periodic backend reconciler closes the gap after callback or worker failure.
+The terminal database transition and a deduplicated `run.status.terminal`
+outbox row commit in one transaction, so lifecycle side effects do not depend
+on a browser polling the status endpoint.
+
+The outbox dispatcher claims rows with leases, emits them to in-process
+listeners, and marks them complete only after every listener succeeds.
+Failures use bounded exponential retry and eventually become visible
+dead-letter rows. EventEmitter2 remains the local listener mechanism; the
+PostgreSQL outbox is the durability boundary.
+
+### Audit durability
+
+Security-relevant database mutations commit their state and
+`audit.log.persist.v1` outbox event through the same PostgreSQL transaction. If
+the audit event cannot be enqueued, the mutation rolls back. Actions that cross
+an external boundary, such as starting a Temporal run, changing a Temporal
+schedule, or explicitly resending a notification, first persist an awaited
+`phase: requested` audit event and only then invoke the external service. This
+records truthful operator intent without pretending PostgreSQL can atomically
+commit a remote side effect.
+
+High-volume read telemetry (`analytics.query` and findings list/detail/stats)
+remains best effort and writes directly to the audit table so read latency does
+not depend on the durable mutation path. Findings exports and audit exports are
+awaited durable actions. Retried audit outbox events carry a stable audit ID and
+therefore do not duplicate their final record. Organization administrators can
+inspect and requeue dead-letter events through the operator endpoints
+documented in [Self-hosting](/self-hosting).
+
+### Required telemetry delivery
+
+Workflow traces, agent traces, node I/O, and logs use instance-scoped Kafka
+topics. The healthy producer path performs no PostgreSQL write. Only after
+bounded Kafka connection/send retries are exhausted does the worker
+store the exact serialized topic, key, and value as a deduplicated
+`telemetry.kafka.publish.v1` PostgreSQL outbox event.
+Component trace, log, and terminal calls remain asynchronous on the execution
+hot path, but a per-execution tracker retains their promises and settles them
+from the outer activity/legacy-runner `finally`. Graceful worker shutdown drains
+the process-wide set of retained publications before disconnecting producers.
+
+The backend replay listener accepts only its configured telemetry topics and
+uses the shared leased retry/dead-letter dispatcher. Consumers validate each
+message before projection. A valid logical event commits its ingest receipt and
+PostgreSQL projection in one transaction; within the configured receipt-retention
+window, this suppresses a direct delivery that is replayed from the fallback
+after an ambiguous Kafka result. Log lines
+reach Loki before the receipt transaction, where Loki's exact
+labels/timestamp/line identity makes the retry idempotent. Malformed messages
+become non-dispatched poison records with payload hash, byte length, and error
+instead of being acknowledged as valid telemetry. A null Kafka value on these
+required, non-compacted topics is also poison evidence: it is recorded with the
+exact topic/partition/offset identity and an empty payload buffer.
+
+Each backend ingest stream has a shared lifecycle supervisor that marks
+readiness failed before cleanup, then recreates the consumer with indefinite,
+bounded exponential backoff and jitter. Repeated short-lived runtime crashes
+increase that backoff; a sustained heartbeat period resets it. A heartbeat
+watchdog detects KafkaJS stalls that occur before its `CRASH` event, and
+disconnect cleanup is bounded. Normally cleanup finishes before replacement.
+If it does not, the platform deliberately favors telemetry availability: a new
+member of the same consumer group starts while the unreachable generation may
+still finish one in-flight handler. This is an at-least-once overlap, not a
+strict single-generation guarantee; transactional ingest receipts suppress
+replays within their retention window, while stable Loki identities remain
+idempotent. Loki pushes also have a bounded request
+deadline so a peer that accepts a connection but never responds cannot hold a
+handler indefinitely. Backend readiness requires all four enabled consumers
+to be running; deployments that explicitly disable ingest services do not
+require Kafka and retain any replay work until Kafka is available.
+
+Completed ingest receipts and completed fallback publications are deleted in
+bounded batches after the configured receipt-retention window. Pending,
+processing, and dead rows are retained for reconciliation. Worker readiness
+reports Kafka, maintenance, and a sticky required-telemetry failure separately,
+including a terminal Redis append that cannot be recovered.
+If both Kafka and the PostgreSQL fallback fail, the platform preserves an
+already completed side-effecting component result instead of rerunning the
+scanner merely to recreate telemetry; that observation can be lost and the
+worker remains unhealthy for operator intervention. Graceful worker shutdown
+drains retained publications and then disconnects all four producers. A hard
+process kill cannot execute that drain, so the small interval between a
+component side effect and durable telemetry publication remains an explicit
+residual risk.
 
 ### Dispatcher & Adapters
 
-`NotificationDispatcherService` listens for `run.status.terminal` events with `@OnEvent('run.status.terminal', { async: true })`. For each event it:
+`NotificationDispatcherService` listens for the durable terminal event. For each event it:
 
 1. Resolves all active channels whose subscribed events match the run status.
-2. Dispatches in parallel via `Promise.allSettled`, delegating to a type-specific adapter (e.g., `SlackNotificationAdapter`, `DiscordNotificationAdapter`).
-3. Records each dispatch in the `notification_deliveries` table with status `pending`, then updates to `sent` or `failed`.
+2. Creates or finds one delivery reservation per channel and outbox event.
+3. Atomically claims the reservation before network I/O, then delegates to a type-specific adapter.
+4. Records a definitive `sent`/`failed` result or an `unknown` result when the remote service may have accepted the request.
 
 New channel types (email, PagerDuty) are added by implementing the `NotificationAdapter` abstract class.
 
@@ -161,15 +267,29 @@ Workflow graphs can also send curated reports with the **Run Report → Discord*
 
 ### Delivery Tracking
 
-The `notification_deliveries` table stores every dispatch attempt with channel reference, run ID, event type, status (`pending` → `sent` | `failed`), error message, and timestamps. Indexed by `(channel_id, created_at)` and `run_id` for efficient queries.
+The `notification_deliveries` table stores channel, run, event, outbox identity,
+status (`pending` → `sending` → `sent` | `failed` | `unknown`), response
+metadata, error, send-start time, and terminal timestamps. A unique
+channel/outbox constraint makes restart replay idempotent. Test deliveries use
+the same persisted claim path, so operator-visible history includes tests as
+well as lifecycle events. Bounded retention removes only old resolved rows
+whose outbox work is complete; ambiguous and recoverable rows remain.
 
 ### Response Metadata Capture
 
 Notification adapters return response metadata (`durationMs`, `responseStatus`, `responseBody`) alongside success or error status. The dispatcher captures timing around each adapter call and persists all response fields to the `notification_deliveries` table. This enables full request/response inspection in the frontend delivery detail panel.
 
-### Delivery Resend
+### Delivery resend
 
-Failed deliveries can be resent through the same dispatch path. The resend endpoint creates a new `notification_deliveries` record and invokes the channel's adapter with the original payload. Because resends flow through the same adapter layer, all SSRF protections (domain allowlist, DNS IP validation) remain enforced. Resends are rate limited to 10 requests per channel per minute.
+Deterministic failures can be retried automatically. A connection loss after
+send is marked `unknown` and is not automatically duplicated. An operator can
+explicitly resend a failed or unknown delivery; the resend receives a new
+delivery identity and still uses the same URL and SSRF checks. Resends are rate
+limited to 10 requests per channel per minute. A durable parent reservation
+points to that child delivery, allowing crash recovery to reconcile a confirmed
+send without creating another webhook call. Fresh `sending` children remain
+in-flight; only a later explicit operator action can convert a stale child to
+`unknown`.
 
 ---
 
@@ -181,24 +301,53 @@ The VLM subsystem manages mutable triage state for security findings while keepi
 
 Findings are stored in two systems, each owning a different concern:
 
-| System | Data Owned | Characteristics |
-|--------|-----------|----------------|
-| **OpenSearch** | Immutable finding data (severity, source, raw output, metadata) | Fast full-text search, aggregations |
+| System         | Data Owned                                                        | Characteristics                         |
+| -------------- | ----------------------------------------------------------------- | --------------------------------------- |
+| **OpenSearch** | Immutable finding data (severity, source, raw output, metadata)   | Fast full-text search, aggregations     |
 | **PostgreSQL** | Mutable triage state (status, assignee, severity override, notes) | ACID transactions, relational integrity |
 
 This split avoids reindexing OpenSearch on every triage change and keeps write-heavy lifecycle operations in PostgreSQL.
 
-### Query Enrichment
+### Versioned observation and read projection
 
-The `FindingTriageService.enrichWithTriageState()` method merges the two data sources:
+`packages/shared` owns the versioned observation envelope and deterministic
+finding identity used by the worker and backend. Authorized execution context,
+not an arbitrary component field, supplies organization, run, scope, and
+component ownership.
 
-1. The findings list is fetched from OpenSearch (search, filter, paginate).
-2. The resulting OpenSearch IDs are batch-fetched from the `finding_triage` table in PostgreSQL.
-3. Triage records are mapped by `finding_opensearch_id` and merged into each finding result.
+PostgreSQL remains authoritative for mutable triage and its append-only event
+history. The triage transaction increments a projection version and enqueues a
+deduplicated projection event. OpenSearch stores that version beside the
+finding and rejects out-of-order updates.
 
-This batch approach avoids N+1 queries — a single PostgreSQL query fetches triage state for the entire page of results.
+The observation index uses a final ingest pipeline that overwrites
+caller-supplied storage attestations with a versioned
+`canonical`/`legacy`/`invalid` classification. Versioned observations are
+validated against the shared contract and rejected when their source identity
+does not match the OpenSearch `_id`. Aggregate coverage filters those indexed
+attestations; hot reads do not run source-validation scripts.
 
-For **status filtering**, the flow is reversed: PostgreSQL is queried first to resolve OpenSearch IDs matching the target statuses, then those IDs are passed as a filter to the OpenSearch query.
+`finding_projection_reconciliation` persists an organization-scoped keyset
+cursor, cycle cutoff, repair counters, and completed watermark. The reconciler
+can resume after restart without a total-row cap. On completion it writes a
+watermark bound to the current observation-index UUID; a rebuilt or missing
+projection therefore reports degraded until PostgreSQL triage has been
+replayed.
+
+Existing observation classifications are backfilled with point-in-time,
+`search_after` pagination and optimistic sequence-number/primary-term updates.
+They are refreshed before a separate storage-integrity watermark is published.
+That watermark is bound to the index UUID and the current pipeline, template,
+schema, and classification versions; absent or stale integrity degrades
+nonzero aggregate responses without adding a full-index scan to each read.
+
+Lists, details, combined filters, totals, charts, scope counts, and exports use
+one normalized OpenSearch query model with projected triage fields. Exports use
+point-in-time plus `search_after` pagination instead of a 10,000-row ID cap.
+Lists and stats report structural canonical/legacy/invalid schema coverage.
+Responses expose `available`, `degraded`, or `unavailable`; partial shards,
+invalid versioned documents, or projection failure are not returned as a
+successful zero.
 
 ### State Machine
 
@@ -216,11 +365,79 @@ accepted_risk → triaged
 
 The frontend uses this map to enable/disable drag-drop targets in the Kanban view. The backend enforces it before persisting any transition.
 
+### Bidirectional Jira synchronization
+
+The versioned `finding.triage.changed` outbox event drives Jira creation and
+status updates. Ticket reservations are unique per finding and tenant. A
+definite rejection releases the reservation for retry; a network-ambiguous
+create remains `unknown` and is never automatically duplicated.
+
+Outbound mappings store both the Jira transition name and the status expected
+after that transition. Legacy string mappings normalize to the same value for
+both fields. If a replay cannot find the transition, it performs one bounded
+issue lookup and acknowledges only when Jira already reports the configured
+resulting status.
+
+Inbound callbacks are authenticated by an organization connection's
+unguessable URL secret; an HMAC is also verified when the delivery includes a
+signature. The webhook payload is only a wake-up signal. Sentris performs one
+authoritative Jira issue lookup per delivery, reverse-maps the issue's current
+status, and fans it out to every tenant-scoped finding link for that issue.
+Linked triage records are loaded in one set query and processed in bounded
+batches without truncating the link set. A partial failure returns non-2xx, so a
+replay converges links that did not finish while already-converged links remain
+idempotent. The `jira_webhook` source prevents circular outbound updates.
+
+OAuth completion does not make Jira webhook registration a best-effort side
+effect. The encrypted connection, a monotonically versioned `pending`
+registration state, and a deduplicated
+`ticketing.jira.webhook.register.v1` outbox event commit in one transaction.
+The asynchronous listener uses the normal token-refresh path, registers the
+current callback, and stores the Jira webhook ID with a version-and-secret CAS.
+Before creating one, it performs a bounded, complete listing of the OAuth app's
+dynamic webhooks and reuses an exact callback/event/filter match. Listing is
+limited to ten 100-item pages; an incomplete or non-progressing listing fails
+closed into outbox retry before any new webhook is created. This makes a retry
+after a process crash converge on the webhook Jira already created instead of
+creating another. An ambiguous CAS response is resolved by a tenant-scoped
+reread; the candidate is never deleted unless the reread proves it is not the
+active winner. Stale reconnect events no-op before Jira access, while a
+candidate that loses the CAS to a newer version remains reusable by that
+version.
+
+Registration failures retry through the shared outbox and become tenant-scoped
+dead letters that an administrator can inspect and requeue. Duplicate and
+superseded webhook cleanup is bounded and best-effort after the active
+registration is durable. A cleanup failure is logged and leaves a safe,
+convergent residual that Jira expires, so cleanup availability does not disable
+ticket creation or status synchronization.
+
+Jira dynamic webhooks expire after 30 days. A ticketing-local scanner runs at
+backend startup and every six hours, claims at most 100 registrations per tick
+with `FOR UPDATE SKIP LOCKED`, and queues renewal once `registeredAt` is 20 days
+old. Full batches continue on later ticks, giving each registration a
+conservative ten-day retry window. Claiming, version increment, and deduplicated
+outbox insertion are one transaction, so multiple backend instances cannot
+double-version the same row. The pending renewal state retains the existing
+secret and webhook ID, so its callback remains usable while the handler lists
+and refreshes that exact webhook. Missing or expired webhooks fall back to the
+same crash-safe registration path.
+
+An unresolved creation is presented without a clickable placeholder ID or URL.
+An organization administrator must either attach a Jira issue verified through
+the tenant's connection or explicitly confirm that no issue exists. Clear and
+retry atomically removes the placeholder and recovers the oldest blocked
+aggregate event only when it is a `finding.triage.changed` event. If the oldest
+dead predecessor has a different event type, the transaction rolls back; the
+administrator must recover that predecessor through tenant-scoped dead-letter
+controls before retrying reconciliation.
+
 ### Database Tables
 
 **`finding_triage`** — One record per (organization, OpenSearch finding) pair. Stores current triage status, assignee, severity override, notes, and SLA deadline.
 
 Indexes:
+
 - `finding_triage_org_finding_idx` (unique) — `(organization_id, finding_opensearch_id)`
 - `finding_triage_status_idx` — `(organization_id, status)`
 - `finding_triage_assignee_idx` — `(organization_id, assignee_user_id)`
@@ -228,19 +445,50 @@ Indexes:
 **`finding_triage_events`** — Append-only audit log of every triage change. Each event records the event type, field changed, old/new values, acting user, optional comment, and timestamp. Cascades on deletion of the parent triage record.
 
 Indexes:
+
 - `finding_triage_events_triage_idx` — `(finding_triage_id, created_at)`
+
+### Target-centered read model
+
+A scope is the target boundary used by the operator journey. Scoped runs retain
+their scope ID in run history and observations. Node-I/O completion commits an
+idempotent asset projection event, and the asset read model records source
+runs. Comparable-run coverage distinguishes:
+
+- **observed** — scanned and present in the current run;
+- **not observed** — the relevant surface was scanned but the prior asset was absent;
+- **not scanned** — the current run did not cover that surface.
+
+Surface equivalence binds the component ID and stable workflow node reference to
+the canonical masked effective input-port values recorded in node I/O. The
+run's workflow-version graph separates input ports from operational and output
+filter parameters, so changing a concurrency or result filter does not pretend
+the target surface changed. A changed target input or a different node
+reference is not comparable, even when the same component type completed.
+Legacy runs without graph metadata use the full recorded input payload as a
+conservative fallback. Spilled input or output data must be readable for a
+comparison; missing observation data is unavailable rather than a false
+not-observed result.
+
+Target rows and detail pages can launch zero-input scoped workflows, page
+through run history, inspect assets by type/source run, deep-link to
+scope-filtered findings, and rescan.
 
 ---
 
 ## Health Checks
 
-| Service | Endpoint | Type | Indicators |
-|---------|----------|------|------------|
-| **Backend** | `GET /health` | Liveness | — |
-| **Backend** | `GET /health/ready` | Readiness | Postgres, Redis, Temporal |
-| **Worker** | `GET :9100+N*100/health` | Liveness | — |
+| Service     | Endpoint                       | Type      | Indicators                                                                                                   |
+| ----------- | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------ |
+| **Backend** | `GET /health`                  | Liveness  | —                                                                                                            |
+| **Backend** | `GET /health/ready`            | Readiness | Postgres, Redis, Temporal, enabled Kafka ingest consumers                                                    |
+| **Worker**  | `GET :9100+N*100/health`       | Liveness  | Process                                                                                                      |
+| **Worker**  | `GET :9100+N*100/health/ready` | Readiness | Worker acceptance, maintenance, required telemetry, Temporal, Docker, Postgres, MinIO, Kafka, Redis, backend |
 
-The backend uses [Terminus](https://docs.nestjs.com/recipes/terminus) for health checks. The worker exposes a lightweight HTTP server on port `9100 + N*100` (where N is the instance number).
+The backend uses [Terminus](https://docs.nestjs.com/recipes/terminus) for health
+checks. The worker exposes a lightweight HTTP server on port `9100 + N*100`
+(where N is the instance number). Production Compose checks worker readiness,
+not process-only liveness.
 
 ---
 
@@ -270,18 +518,19 @@ Every inbound HTTP request receives a unique `X-Request-Id` (generated by middle
 
 All application services are accessible through nginx on port 80:
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost/ |
-| Backend API | http://localhost/api/ |
-| Analytics | http://localhost/analytics/ |
-| Temporal UI | http://localhost:8081 |
-| MinIO Console | http://localhost:9001 |
-| Redpanda Console | http://localhost:8082 |
-| Loki | http://localhost:3100 |
+| Service          | URL                         |
+| ---------------- | --------------------------- |
+| Frontend         | http://localhost/           |
+| Backend API      | http://localhost/api/       |
+| Analytics        | http://localhost/analytics/ |
+| Temporal UI      | http://localhost:8081       |
+| MinIO Console    | http://localhost:9001       |
+| Redpanda Console | http://localhost:8082       |
+| Loki             | http://localhost:3100       |
 
 <Note>
-  Individual service ports (5173, 3211, 5601) are available for debugging but should not be used in normal development. All traffic flows through nginx on port 80.
+  Individual service ports (5173, 3211, 5601) are available for debugging but should not be used in
+  normal development. All traffic flows through nginx on port 80.
 </Note>
 
 ---
@@ -289,4 +538,5 @@ All application services are accessible through nginx on port 80:
 ## Learn More
 
 - **Component Development**: `/development/component-development`
-- **Getting Started**: `/getting-started`
+- **Self-hosting**: `/self-hosting`
+- **Getting Started**: `/quickstart`

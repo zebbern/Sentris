@@ -49,6 +49,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...restOptions,
     signal,
+    credentials: 'include',
     headers: {
       ...headers,
       'Content-Type': 'application/json',

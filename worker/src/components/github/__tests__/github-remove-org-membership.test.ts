@@ -61,6 +61,7 @@ describe('github.org.membership.remove component', () => {
     const context = createExecutionContext({
       runId: 'test-run',
       componentRef: 'github-remove',
+      organizationId: 'org-1',
     });
 
     const executePayload = {
@@ -84,6 +85,8 @@ describe('github.org.membership.remove component', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'X-Internal-Token': 'test-internal-token',
+          'X-Organization-Id': 'org-1',
+          'X-Run-Id': 'test-run',
         }),
       }),
     );

@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { screen, cleanup } from '@testing-library/react';
+import { screen, cleanup, fireEvent } from '@testing-library/react';
 import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -31,10 +31,17 @@ mock.module('@/hooks/queries/useFindingsQueries', () => ({
       refetch: mock(),
     };
   },
+  useBulkTriageMutation: () => ({ mutate: mock(), isPending: false }),
+  useOrgMembersQuery: () => ({ data: { members: [] } }),
 }));
 
 // --- Auth store ---
 mock.module('@/store/authStore', () => createAuthStoreMock());
+
+mock.module('@/features/findings/FindingDetailSheet', () => ({
+  FindingDetailSheet: ({ findingId, isOpen }: { findingId: string | null; isOpen: boolean }) =>
+    isOpen ? <div role="dialog">detail:{findingId}</div> : null,
+}));
 
 // Import component AFTER all mock.module() calls
 import { FindingsPage } from '@/pages/FindingsPage';
@@ -69,6 +76,23 @@ const POPULATED_RESPONSE: FindingsResponse = {
   total: 2,
   page: 1,
   pageSize: 25,
+  availability: 'available',
+  paginationMode: 'cursor',
+  currentCursor: 'pit-1-start',
+  nextCursor: null,
+  schemaCoverage: { canonical: 2, legacy: 0, invalid: 0 },
+};
+
+const EMPTY_RESPONSE: FindingsResponse = {
+  items: [],
+  total: 0,
+  page: 1,
+  pageSize: 25,
+  availability: 'available',
+  paginationMode: 'cursor',
+  currentCursor: 'pit-empty-start',
+  nextCursor: null,
+  schemaCoverage: { canonical: 0, legacy: 0, invalid: 0 },
 };
 
 // --- Helpers ---
@@ -116,7 +140,7 @@ describe('FindingsPage', () => {
   });
 
   it('renders empty state when data has zero items', () => {
-    setupStore({ data: { items: [], total: 0, page: 1, pageSize: 25 } });
+    setupStore({ data: EMPTY_RESPONSE });
     renderPage();
 
     expect(screen.getByText('No findings found')).toBeInTheDocument();
@@ -168,10 +192,111 @@ describe('FindingsPage', () => {
     expect(screen.getByText(/Page 1 of 1/)).toBeInTheDocument();
   });
 
+  it('uses the signed backend cursor for the next table page', () => {
+    setupStore({
+      data: {
+        ...POPULATED_RESPONSE,
+        total: 10_001,
+        paginationMode: 'cursor',
+        nextCursor: 'opaque-page-2',
+      },
+    });
+    renderPage();
+
+    let latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.paginationMode).toBe('cursor');
+    expect(latestParams?.cursor).toBeUndefined();
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+
+    latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.page).toBe(2);
+    expect(latestParams?.cursor).toBe('opaque-page-2');
+  });
+
+  it('returns to page 1 and moves forward on the same signed PIT history', () => {
+    setupStore({
+      data: {
+        ...POPULATED_RESPONSE,
+        total: 26,
+        paginationMode: 'cursor',
+        currentCursor: 'pit-1-start',
+        nextCursor: 'pit-1-page-2',
+      },
+    });
+    const view = renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    let latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.page).toBe(2);
+    expect(latestParams?.cursor).toBe('pit-1-page-2');
+
+    mockQueryState.data = {
+      ...POPULATED_RESPONSE,
+      total: 26,
+      page: 2,
+      currentCursor: 'pit-1-page-2',
+      nextCursor: null,
+    };
+    view.rerender(<FindingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Previous/i }));
+    latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.page).toBe(1);
+    expect(latestParams?.cursor).toBe('pit-1-start');
+
+    mockQueryState.data = {
+      ...POPULATED_RESPONSE,
+      total: 26,
+      page: 1,
+      currentCursor: 'pit-1-start',
+      nextCursor: 'pit-1-page-2',
+    };
+    view.rerender(<FindingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.page).toBe(2);
+    expect(latestParams?.cursor).toBe('pit-1-page-2');
+  });
+
+  it('tracks select-all against the current cursor page instead of selection count alone', () => {
+    setupStore({
+      data: {
+        ...POPULATED_RESPONSE,
+        total: 4,
+        nextCursor: 'opaque-page-2',
+      },
+    });
+    renderPage();
+
+    const selectAll = screen.getByRole('checkbox', {
+      name: 'Select all findings on this page',
+    });
+    fireEvent.click(selectAll);
+    expect(selectAll).toBeChecked();
+
+    mockQueryState.data = {
+      ...POPULATED_RESPONSE,
+      items: [
+        makeFinding({ id: 'finding-003', name: 'Third finding' }),
+        makeFinding({ id: 'finding-004', name: 'Fourth finding' }),
+      ],
+      total: 4,
+      page: 2,
+      nextCursor: null,
+    };
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Select all findings on this page',
+      }),
+    ).not.toBeChecked();
+  });
+
   it('shows empty state message for filtered results', () => {
     // The empty state checks if hasFilters — but since we can't set filter state
     // externally in this test, just verify the default empty state message
-    setupStore({ data: { items: [], total: 0, page: 1, pageSize: 25 } });
+    setupStore({ data: EMPTY_RESPONSE });
     renderPage();
 
     expect(
@@ -192,13 +317,60 @@ describe('FindingsPage', () => {
     expect(screen.getByText('Run ID')).toBeInTheDocument();
   });
 
-  it('uses the backend maximum page size in Kanban view', () => {
-    setupStore({ data: POPULATED_RESPONSE });
+  it('uses signed cursor pagination and discloses Kanban page completeness', () => {
+    setupStore({
+      data: {
+        ...POPULATED_RESPONSE,
+        total: 250,
+        pageSize: 100,
+        nextCursor: 'opaque-kanban-page-2',
+      },
+    });
     renderPage('/findings?view=kanban');
 
-    const latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    let latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
     expect(screen.getByRole('region', { name: /Kanban board/i })).toBeInTheDocument();
     expect(latestParams?.page).toBe(1);
     expect(latestParams?.pageSize).toBe(100);
+    expect(latestParams?.paginationMode).toBe('cursor');
+    expect(screen.getByText(/Showing 1–2 of 250/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+
+    latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.page).toBe(2);
+    expect(latestParams?.cursor).toBe('opaque-kanban-page-2');
+  });
+
+  it('surfaces degraded projection and schema coverage instead of presenting full trust', () => {
+    setupStore({
+      data: {
+        ...POPULATED_RESPONSE,
+        availability: 'degraded',
+        projectionHealth: {
+          availability: 'degraded',
+          completedAt: null,
+          reconciledThrough: '2026-07-26T12:00:00.000Z',
+          reason: 'projection_events_pending',
+        },
+        schemaCoverage: { canonical: 1, legacy: 0, invalid: 1 },
+      },
+    });
+
+    renderPage();
+
+    const status = screen.getByRole('status', { name: /Findings data quality/i });
+    expect(status).toHaveTextContent(/degraded/i);
+    expect(status).toHaveTextContent(/projection events pending/i);
+    expect(status).toHaveTextContent(/1 canonical, 0 legacy, 1 invalid/i);
+  });
+
+  it('applies a URL target scope and opens a URL-addressed finding', async () => {
+    setupStore({ data: POPULATED_RESPONSE });
+    renderPage('/findings?scopeId=scope-001&findingId=finding-001');
+
+    const latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+    expect(latestParams?.scopeId).toBe('scope-001');
+    expect(await screen.findByRole('dialog')).toHaveTextContent('detail:finding-001');
   });
 });

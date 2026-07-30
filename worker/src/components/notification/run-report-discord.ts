@@ -28,6 +28,7 @@ import {
   normalizeDiscordAttachments,
   validateDiscordWebhookUrl,
 } from './discord.js';
+import { resolveBackendApiBaseUrl } from '../../common/backend-url';
 
 const DISCORD_CONTENT_MAX_LENGTH = 2000;
 const DISCORD_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
@@ -103,9 +104,7 @@ const outputSchema = outputs({
 });
 
 function resolveApiBaseUrl(): string {
-  const raw =
-    process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
-  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+  return resolveBackendApiBaseUrl();
 }
 
 function getInternalApiHostname(): string | undefined {

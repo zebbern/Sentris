@@ -105,6 +105,7 @@ function makeProviderConfigRecord(
   overrides: Partial<IntegrationProviderConfigRecord> = {},
 ): IntegrationProviderConfigRecord {
   return {
+    organizationId: null,
     provider: 'github',
     clientId: 'override-client-id',
     clientSecret: MOCK_ENCRYPTED as any,

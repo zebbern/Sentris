@@ -41,8 +41,8 @@ When introducing new node visuals, extend `nodeStyles.ts` first and keep Lucide 
 
 Before shipping UI changes:
 
-1. `bun --cwd frontend run lint` (includes Tailwind ordering rules).
-2. `bun --cwd frontend run test` – ensure component snapshots/hooks pass.
+1. `bun --cwd=frontend run lint` (includes Tailwind ordering rules).
+2. `bun --cwd=frontend run test` – ensure component snapshots/hooks pass.
 3. Manual run through: load workflow, execute, verify logs stream and timeline updates.
 4. Update screenshots or add a brief “Validation” note in the PR if behaviour changes.
 

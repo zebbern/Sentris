@@ -7,8 +7,6 @@ type ProviderConfigurationResponse = components['schemas']['ProviderConfiguratio
 type OAuthStartResponseDto = components['schemas']['OAuthStartResponseDto'];
 type StartOAuthRequest = components['schemas']['StartOAuthDto'];
 type CompleteOAuthRequest = components['schemas']['CompleteOAuthDto'];
-type RefreshConnectionRequest = components['schemas']['RefreshConnectionDto'];
-type DisconnectConnectionRequest = components['schemas']['DisconnectConnectionDto'];
 type UpsertProviderConfigRequest = components['schemas']['UpsertProviderConfigDto'];
 
 export type IntegrationProvider = IntegrationProviderResponse;
@@ -23,8 +21,8 @@ export const integrationsApi = {
     return (response.data ?? []) as IntegrationProvider[];
   },
 
-  listConnections: async (userId: string): Promise<IntegrationConnection[]> => {
-    const response = await apiClient.listIntegrationConnections(userId);
+  listConnections: async (): Promise<IntegrationConnection[]> => {
+    const response = await apiClient.listIntegrationConnections();
     if (response.error) throw new Error('Failed to load integrations');
     return (response.data ?? []) as IntegrationConnection[];
   },
@@ -47,18 +45,16 @@ export const integrationsApi = {
     return response.data;
   },
 
-  refreshConnection: async (id: string, userId: string): Promise<IntegrationConnection> => {
-    const payload: RefreshConnectionRequest = { userId };
-    const response = await apiClient.refreshIntegrationConnection(id, payload);
+  refreshConnection: async (id: string): Promise<IntegrationConnection> => {
+    const response = await apiClient.refreshIntegrationConnection(id);
     if (response.error || !response.data) {
       throw new Error('Failed to refresh integration connection');
     }
     return response.data;
   },
 
-  disconnect: async (id: string, userId: string): Promise<void> => {
-    const payload: DisconnectConnectionRequest = { userId };
-    const response = await apiClient.disconnectIntegrationConnection(id, payload);
+  disconnect: async (id: string): Promise<void> => {
+    const response = await apiClient.disconnectIntegrationConnection(id);
     if (response.error) throw new Error('Failed to disconnect integration');
   },
 

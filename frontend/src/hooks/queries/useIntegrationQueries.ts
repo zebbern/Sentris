@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
+import { useAuthStore } from '@/store/authStore';
 import type { components } from '@sentris/backend-client';
 
 type IntegrationProvider = components['schemas']['IntegrationProviderResponse'];
@@ -24,10 +25,11 @@ export function useIntegrationProviders() {
   });
 }
 
-export function useIntegrationConnections(userId: string | undefined) {
+export function useIntegrationConnections() {
+  const userId = useAuthStore((state) => state.userId);
   return useQuery({
     queryKey: queryKeys.integrations.connections(userId),
-    queryFn: userId ? () => api.integrations.listConnections(userId) : skipToken,
+    queryFn: () => api.integrations.listConnections(),
     staleTime: 60_000,
     select: sortConnections,
   });
@@ -46,8 +48,7 @@ export function useProviderConfig(providerId: string | undefined, enabled = true
 export function useRefreshConnection() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, userId }: { id: string; userId: string }) =>
-      api.integrations.refreshConnection(id, userId),
+    mutationFn: ({ id }: { id: string }) => api.integrations.refreshConnection(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.integrations.connections() });
     },
@@ -57,8 +58,7 @@ export function useRefreshConnection() {
 export function useDisconnectIntegration() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, userId }: { id: string; userId: string }) =>
-      api.integrations.disconnect(id, userId),
+    mutationFn: ({ id }: { id: string }) => api.integrations.disconnect(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.integrations.connections() });
     },

@@ -6,7 +6,8 @@ const originalFetch = globalThis.fetch;
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
 
 const mockStartMcpDockerServer = vi.fn(async () => ({
-  endpoint: 'http://127.0.0.1:4100/mcp',
+  endpoint: 'http://worker:9101/containers/container-123/mcp',
+  authToken: 'worker-proxy-token',
   containerId: 'container-123',
 }));
 
@@ -63,9 +64,11 @@ describe('mcp-group-runtime', () => {
   });
 
   test('does not mirror successful group runtime diagnostics to console.log by default', async () => {
-    const fetchMock: typeof fetch = async (input: string | URL | Request) => {
+    let registrationBody: Record<string, unknown> | undefined;
+    const fetchMock: typeof fetch = async (input: string | URL | Request, init?: RequestInit) => {
       const url = input instanceof Request ? input.url : String(input);
       if (url.endsWith('/api/v1/internal/mcp/register-mcp-server')) {
+        registrationBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -118,7 +121,8 @@ describe('mcp-group-runtime', () => {
 
     expect(result.endpoints).toEqual([
       {
-        endpoint: 'http://127.0.0.1:4100/mcp',
+        endpoint: 'http://worker:9101/containers/container-123/mcp',
+        authToken: 'worker-proxy-token',
         containerId: 'container-123',
         serverId: 'cloudtrail',
       },
@@ -127,5 +131,18 @@ describe('mcp-group-runtime', () => {
     expect(mockStartMcpDockerServer).toHaveBeenCalledTimes(1);
     expect(mockConnect).toHaveBeenCalledTimes(1);
     expect(mockListTools).toHaveBeenCalledTimes(1);
+    expect(mockTransport).toHaveBeenCalledWith(
+      new URL('http://worker:9101/containers/container-123/mcp'),
+      expect.objectContaining({
+        requestInit: expect.objectContaining({
+          headers: expect.objectContaining({
+            'x-sentris-mcp-proxy-token': 'worker-proxy-token',
+          }),
+        }),
+      }),
+    );
+    expect(registrationBody?.headers).toEqual({
+      'x-sentris-mcp-proxy-token': 'worker-proxy-token',
+    });
   });
 });

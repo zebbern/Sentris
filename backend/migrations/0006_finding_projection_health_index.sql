@@ -1,0 +1,1 @@
+CREATE INDEX "finding_triage_org_updated_at_idx" ON "finding_triage" USING btree ("organization_id","updated_at");

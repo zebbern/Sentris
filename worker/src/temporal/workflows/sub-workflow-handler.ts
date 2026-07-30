@@ -15,6 +15,8 @@ import {
   getExternalWorkflowHandle,
 } from '@temporalio/workflow';
 import type {
+  MarkRunStartedActivityInput,
+  MarkRunStartedActivityOutput,
   RunWorkflowActivityInput,
   RunWorkflowActivityOutput,
   WorkflowAction,
@@ -29,6 +31,9 @@ import type { PreparedRunPayload } from '@sentris/shared';
 
 export interface SubWorkflowActivities {
   prepareRunPayloadActivity: (input: PrepareRunPayloadActivityInput) => Promise<PreparedRunPayload>;
+  markRunStartedActivity: (
+    input: MarkRunStartedActivityInput,
+  ) => Promise<MarkRunStartedActivityOutput>;
   recordTraceEventActivity: (event: Record<string, unknown>) => Promise<void>;
 }
 
@@ -44,6 +49,8 @@ export interface SubWorkflowHandlerParams {
   activities: SubWorkflowActivities;
   /** Main workflow function reference, needed for startChild. */
   workflowFn: (input: RunWorkflowActivityInput) => Promise<RunWorkflowActivityOutput>;
+  /** False only while replaying executions whose histories predate the started callback. */
+  persistStartedRun: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,8 +84,9 @@ export async function handleSubWorkflowCall(
     depth,
     callChain,
     results,
-    activities: { prepareRunPayloadActivity, recordTraceEventActivity },
+    activities: { prepareRunPayloadActivity, markRunStartedActivity, recordTraceEventActivity },
     workflowFn,
+    persistStartedRun,
   } = params;
 
   // --- Depth guard ---
@@ -201,6 +209,7 @@ export async function handleSubWorkflowCall(
         label: `Sub-workflow from ${input.workflowId}:${action.ref}`,
       },
       organizationId: input.organizationId ?? null,
+      scopeId: input.scopeId ?? null,
       runId: childRunId,
       parentRunId: input.runId,
       parentNodeRef: action.ref,
@@ -231,6 +240,7 @@ export async function handleSubWorkflowCall(
         workflowVersionId: prepared.workflowVersionId,
         workflowVersion: prepared.workflowVersion,
         organizationId: prepared.organizationId,
+        scopeId: prepared.scopeId ?? null,
         parentRunId: input.runId,
         parentNodeRef: action.ref,
         depth: depth + 1,
@@ -239,6 +249,14 @@ export async function handleSubWorkflowCall(
     ],
     workflowId: prepared.runId,
   });
+
+  if (persistStartedRun) {
+    await markRunStartedActivity({
+      runId: prepared.runId,
+      temporalRunId: child.firstExecutionRunId,
+      organizationId: prepared.organizationId,
+    });
+  }
 
   // --- Wait for result with timeout ---
   const timeoutMs = timeoutSeconds * 1000;

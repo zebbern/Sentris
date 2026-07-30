@@ -13,6 +13,8 @@ function parseArgs(argv) {
   const extraArgs = [];
   let cloud = false;
   let dryRun = false;
+  let requireExplicitInstance = false;
+  let strictServices = false;
   let afterSeparator = false;
 
   for (const arg of argv) {
@@ -26,6 +28,14 @@ function parseArgs(argv) {
     }
     if (!afterSeparator && arg === '--dry-run') {
       dryRun = true;
+      continue;
+    }
+    if (!afterSeparator && arg === '--require-explicit-instance') {
+      requireExplicitInstance = true;
+      continue;
+    }
+    if (!afterSeparator && arg === '--strict-services') {
+      strictServices = true;
       continue;
     }
     if (!afterSeparator && arg.startsWith('--')) {
@@ -42,6 +52,8 @@ function parseArgs(argv) {
   return {
     cloud,
     dryRun,
+    requireExplicitInstance,
+    strictServices,
     targets: targets.length > 0 ? targets : ['e2e-tests'],
     extraArgs,
   };
@@ -56,6 +68,11 @@ function main() {
     return 1;
   }
 
+  if (options.requireExplicitInstance && !process.env.SENTRIS_INSTANCE?.trim()) {
+    console.error('SENTRIS_INSTANCE must be set explicitly for this E2E release gate');
+    return 1;
+  }
+
   const instance = resolveActiveE2eInstance();
   const command = createE2eTestCommand({
     instance,
@@ -63,6 +80,9 @@ function main() {
     extraArgs: options.extraArgs,
     cloud: options.cloud,
   });
+  if (options.strictServices) {
+    command.env.E2E_STRICT_SERVICES = 'true';
+  }
   const loadedEnv = readE2eEnvFile();
   const env = { ...(loadedEnv?.values ?? {}), ...process.env, ...command.env };
 

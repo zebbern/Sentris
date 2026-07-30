@@ -4,6 +4,7 @@ import {
   isAgentCallable,
   getToolMetadata,
   ServiceError,
+  resolveDockerResourceScope,
 } from '@sentris/component-sdk';
 import { ApplicationFailure } from '@temporalio/activity';
 import {
@@ -19,22 +20,17 @@ import {
   isMcpStdioHostProxyId,
   stopMcpStdioHostProxy,
 } from '../../components/core/mcp-stdio-host-proxy';
-
-const DEFAULT_API_BASE_URL =
-  process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
-
-function normalizeBaseUrl(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
-}
-
-function normalizeVersionedApiBaseUrl(url: string): string {
-  const baseUrl = normalizeBaseUrl(url);
-  return baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
-}
+import { buildBackendApiUrl } from '../../common/backend-url';
+import { cleanupManagedRunResources } from '../../utils/run-resource-cleanup';
+import {
+  MCP_DOCKER_PROXY_AUTH_HEADER,
+  removeMcpDockerProxyRunTargets,
+} from '../../components/core/mcp-docker-proxy';
 
 export function buildInternalMcpUrl(baseUrl: string, path: string): string {
-  const normalizedPath = path.replace(/^\/+/, '');
-  return `${normalizeVersionedApiBaseUrl(baseUrl)}/internal/mcp/${normalizedPath}`;
+  return buildBackendApiUrl(`internal/mcp/${path}`, {
+    SENTRIS_API_BASE_URL: baseUrl,
+  });
 }
 
 async function callInternalApi(path: string, body: any) {
@@ -46,7 +42,7 @@ async function callInternalApi(path: string, body: any) {
     );
   }
 
-  const url = buildInternalMcpUrl(DEFAULT_API_BASE_URL, path);
+  const url = buildBackendApiUrl(`internal/mcp/${path}`);
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -102,6 +98,7 @@ export async function registerLocalMcpActivity(
     transport: 'stdio' as const,
     endpoint,
     containerId,
+    ...(input.authToken ? { headers: { [MCP_DOCKER_PROXY_AUTH_HEADER]: input.authToken } } : {}),
   });
 }
 
@@ -135,108 +132,20 @@ export async function cleanupRunResourcesActivity(
   };
   const registryContainerIds = Array.isArray(response?.containerIds) ? response.containerIds : [];
 
-  // Fallback: Find containers by name pattern (catches orphaned containers)
-  // MCP containers follow the pattern: mcp-server-{image}-{timestamp}
-  let namePatternContainerIds: string[] = [];
-  try {
-    const { stdout } = await execFileAsync('docker', [
-      'ps',
-      '-a',
-      '--filter',
-      'name=mcp-server-',
-      '--format',
-      '{{.Names}}',
-    ]);
-    namePatternContainerIds = stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    workflowDiagnosticLog(
-      `[MCP Cleanup] Found ${namePatternContainerIds.length} containers matching name pattern`,
-    );
-  } catch (error: unknown) {
-    console.warn(`[MCP Cleanup] Failed to list containers by name pattern:`, error);
-  }
-
-  // Combine both sources and deduplicate
-  const allContainerIds = Array.from(
-    new Set([...registryContainerIds, ...namePatternContainerIds]),
-  );
-
+  const report = await cleanupManagedRunResources({
+    command: async (args) => execFileAsync('docker', args),
+    runId: input.runId,
+    resourceScope: resolveDockerResourceScope(),
+    registryContainerIds,
+    isHostProxyId: isMcpStdioHostProxyId,
+    stopHostProxy: stopMcpStdioHostProxy,
+  });
+  const proxyTargetsRemoved = removeMcpDockerProxyRunTargets(input.runId);
   workflowDiagnosticLog(
-    `[MCP Cleanup] Cleaning up ${allContainerIds.length} containers for run ${input.runId} ` +
-      `(${registryContainerIds.length} from registry, ${namePatternContainerIds.length} from name pattern)`,
+    `[MCP Cleanup] Removed ${report.containersRemoved} container(s), ` +
+      `${report.volumesRemoved} volume(s), and ${report.hostProxiesStopped} host proxy process(es) ` +
+      `and ${proxyTargetsRemoved} Docker MCP proxy target(s) for run ${input.runId}`,
   );
-
-  if (allContainerIds.length === 0) {
-    workflowDiagnosticLog(`[MCP Cleanup] No containers to clean up for run ${input.runId}`);
-  } else {
-    await Promise.all(
-      allContainerIds.map(async (containerId: string) => {
-        if (!containerId || typeof containerId !== 'string') return;
-        if (!/^[a-zA-Z0-9_.-]+$/.test(containerId)) {
-          console.warn(`[MCP Cleanup] Skipping container with unsafe id: ${containerId}`);
-          return;
-        }
-        if (isMcpStdioHostProxyId(containerId)) {
-          const stopped = await stopMcpStdioHostProxy(containerId);
-          workflowDiagnosticLog(
-            `[MCP Cleanup] ${stopped ? 'Stopped' : 'Host proxy already gone'}: ${containerId}`,
-          );
-          return;
-        }
-        try {
-          await execFileAsync('docker', ['rm', '-f', containerId]);
-          workflowDiagnosticLog(`[MCP Cleanup] Removed container: ${containerId}`);
-        } catch (error: unknown) {
-          console.warn(`[MCP Cleanup] Failed to remove container ${containerId}:`, error);
-        }
-      }),
-    );
-  }
-
-  if (!/^[a-zA-Z0-9_.-]+$/.test(input.runId)) {
-    console.warn(`[MCP Cleanup] Skipping volume cleanup with unsafe runId: ${input.runId}`);
-    return;
-  }
-
-  try {
-    const { stdout } = await execFileAsync('docker', [
-      'volume',
-      'ls',
-      '--filter',
-      'label=studio.managed=true',
-      '--filter',
-      `label=studio.run=${input.runId}`,
-      '--format',
-      '{{.Name}}',
-    ]);
-    const volumeNames = stdout
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    if (volumeNames.length === 0) {
-      return;
-    }
-
-    await Promise.all(
-      volumeNames.map(async (volumeName) => {
-        if (!/^[a-zA-Z0-9_.-]+$/.test(volumeName)) {
-          console.warn(`[MCP Cleanup] Skipping volume with unsafe name: ${volumeName}`);
-          return;
-        }
-        try {
-          await execFileAsync('docker', ['volume', 'rm', volumeName]);
-        } catch (error: unknown) {
-          console.warn(`[MCP Cleanup] Failed to remove volume ${volumeName}:`, error);
-        }
-      }),
-    );
-  } catch (error: unknown) {
-    console.warn(`[MCP Cleanup] Failed to list volumes for run ${input.runId}:`, error);
-  }
 }
 
 export async function areAllToolsReadyActivity(

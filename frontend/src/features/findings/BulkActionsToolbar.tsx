@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, UserX } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ export function BulkActionsToolbar({ selectedIds, onClearSelection }: BulkAction
     setStatusOpen(false);
   };
 
-  const handleAssign = (userId: string) => {
+  const handleAssign = (userId: string | null) => {
     bulkTriage.mutate(
       { findingIds, assigneeUserId: userId },
       { onSuccess: () => onClearSelection() },
@@ -121,6 +121,14 @@ export function BulkActionsToolbar({ selectedIds, onClearSelection }: BulkAction
             autoComplete="off"
           />
           <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+            <button
+              type="button"
+              className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-muted transition-colors text-left"
+              onClick={() => handleAssign(null)}
+            >
+              <UserX className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Unassigned</span>
+            </button>
             {filteredMembers.length === 0 && (
               <p className="text-xs text-muted-foreground text-center py-3">No members found</p>
             )}

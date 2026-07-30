@@ -212,41 +212,44 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
 
     this.ensureOrganizationAdmin(auth);
     const organizationId = requireOrganizationId(auth);
-    const record = await this.repository.create(input, { organizationId });
-    let version: WorkflowVersionRecord;
-    try {
-      version = await this.versionRepository.create({
-        workflowId: record.id,
-        graph: input,
-        organizationId,
-      });
-      if (auth?.userId) {
-        await this.roleRepository.upsert({
+    const { response, version } = await this.repository.transaction(async (executor) => {
+      const record = await this.repository.create(input, { organizationId, executor });
+      const createdVersion = await this.versionRepository.create(
+        {
           workflowId: record.id,
-          userId: auth.userId,
-          role: 'ADMIN',
+          graph: input,
           organizationId,
-        });
+        },
+        { executor },
+      );
+      if (auth?.userId) {
+        await this.roleRepository.upsert(
+          {
+            workflowId: record.id,
+            userId: auth.userId,
+            role: 'ADMIN',
+            organizationId,
+          },
+          { executor },
+        );
       }
-    } catch (error: unknown) {
-      await this.repository.delete(record.id, { organizationId });
-      throw error;
-    }
-    const response = this.buildWorkflowResponse(record, version);
+      const createdResponse = this.buildWorkflowResponse(record, createdVersion);
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.create',
+        resourceType: 'workflow',
+        resourceId: createdResponse.id,
+        resourceName: createdResponse.name,
+        metadata: {
+          nodeCount: input.nodes.length,
+          edgeCount: input.edges.length,
+          version: createdVersion.version,
+        },
+      });
+      return { response: createdResponse, version: createdVersion };
+    });
     this.logger.log(
       `Created workflow ${response.id} version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
     );
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.create',
-      resourceType: 'workflow',
-      resourceId: response.id,
-      resourceName: response.name,
-      metadata: {
-        nodeCount: input.nodes.length,
-        edgeCount: input.edges.length,
-        version: version.version,
-      },
-    });
     return response;
   }
 
@@ -268,27 +271,33 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     }
 
     const organizationId = await this.requireWorkflowAdmin(id, auth);
-    const record = await this.repository.update(id, input, { organizationId });
-    const version = await this.versionRepository.create({
-      workflowId: record.id,
-      graph: input,
-      organizationId,
+    const { response, version } = await this.repository.transaction(async (executor) => {
+      const record = await this.repository.update(id, input, { organizationId, executor });
+      const createdVersion = await this.versionRepository.create(
+        {
+          workflowId: record.id,
+          graph: input,
+          organizationId,
+        },
+        { executor },
+      );
+      const updatedResponse = this.buildWorkflowResponse(record, createdVersion);
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.update',
+        resourceType: 'workflow',
+        resourceId: updatedResponse.id,
+        resourceName: updatedResponse.name,
+        metadata: {
+          nodeCount: input.nodes.length,
+          edgeCount: input.edges.length,
+          version: createdVersion.version,
+        },
+      });
+      return { response: updatedResponse, version: createdVersion };
     });
-    const response = this.buildWorkflowResponse(record, version);
     this.logger.log(
       `Updated workflow ${response.id} to version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
     );
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.update',
-      resourceType: 'workflow',
-      resourceId: response.id,
-      resourceName: response.name,
-      metadata: {
-        nodeCount: input.nodes.length,
-        edgeCount: input.edges.length,
-        version: version.version,
-      },
-    });
     return response;
   }
 
@@ -298,23 +307,29 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     auth?: AuthContext | null,
   ): Promise<ServiceWorkflowResponse> {
     const organizationId = await this.requireWorkflowAdmin(id, auth);
-    const record = await this.repository.updateMetadata(
-      id,
-      { name: dto.name, description: dto.description ?? null },
-      { organizationId },
-    );
-    const version = await this.versionRepository.findLatestByWorkflowId(id, { organizationId });
-    const response = this.buildWorkflowResponse(record, version ?? null);
-    this.logger.log(`Updated workflow ${response.id} metadata (name=${dto.name})`);
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.update_metadata',
-      resourceType: 'workflow',
-      resourceId: response.id,
-      resourceName: response.name,
-      metadata: {
-        name: dto.name,
-      },
+    const response = await this.repository.transaction(async (executor) => {
+      const record = await this.repository.updateMetadata(
+        id,
+        { name: dto.name, description: dto.description ?? null },
+        { organizationId, executor },
+      );
+      const version = await this.versionRepository.findLatestByWorkflowId(id, {
+        organizationId,
+        executor,
+      });
+      const updatedResponse = this.buildWorkflowResponse(record, version ?? null);
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.update_metadata',
+        resourceType: 'workflow',
+        resourceId: updatedResponse.id,
+        resourceName: updatedResponse.name,
+        metadata: {
+          name: dto.name,
+        },
+      });
+      return updatedResponse;
     });
+    this.logger.log(`Updated workflow ${response.id} metadata (name=${dto.name})`);
     return response;
   }
 
@@ -483,15 +498,19 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
 
   async delete(id: string, auth?: AuthContext | null): Promise<void> {
     const organizationId = await this.requireWorkflowAdmin(id, auth);
-    const existing = await this.repository.findById(id, { organizationId }).catch(() => null);
-    await this.repository.delete(id, { organizationId });
-    this.logger.log(`Deleted workflow ${id}`);
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.delete',
-      resourceType: 'workflow',
-      resourceId: id,
-      resourceName: existing?.name ?? null,
+    await this.repository.transaction(async (executor) => {
+      const existing = await this.repository
+        .findById(id, { organizationId, executor })
+        .catch(() => null);
+      await this.repository.delete(id, { organizationId, executor });
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.delete',
+        resourceType: 'workflow',
+        resourceId: id,
+        resourceName: existing?.name ?? null,
+      });
     });
+    this.logger.log(`Deleted workflow ${id}`);
   }
 
   async list(

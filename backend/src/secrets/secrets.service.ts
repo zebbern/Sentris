@@ -73,14 +73,14 @@ export class SecretsService {
         createdBy: input.createdBy ?? null,
         organizationId,
       },
+      (executor, secret) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'secret.create',
+          resourceType: 'secret',
+          resourceId: secret.id,
+          resourceName: secret.name,
+        }),
     );
-
-    this.auditLogService.record(auth, {
-      action: 'secret.create',
-      resourceType: 'secret',
-      resourceId: created.id,
-      resourceName: created.name,
-    });
 
     return created;
   }
@@ -104,14 +104,14 @@ export class SecretsService {
         organizationId,
       },
       { organizationId },
+      (executor, secret) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'secret.rotate',
+          resourceType: 'secret',
+          resourceId: secret.id,
+          resourceName: secret.name,
+        }),
     );
-
-    this.auditLogService.record(auth, {
-      action: 'secret.rotate',
-      resourceType: 'secret',
-      resourceId: rotated.id,
-      resourceName: rotated.name,
-    });
 
     return rotated;
   }
@@ -125,7 +125,14 @@ export class SecretsService {
     const organizationId = requireOrganizationId(auth);
     const record = await this.repository.findValueBySecretId(secretId, version, { organizationId });
 
-    this.auditLogService.record(auth, {
+    const value = await this.encryption.decrypt({
+      ciphertext: record.encryptedValue,
+      iv: record.iv,
+      authTag: record.authTag,
+      keyId: record.encryptionKeyId,
+    });
+
+    await this.auditLogService.recordDurable(auth, {
       action: 'secret.access',
       resourceType: 'secret',
       resourceId: record.secretId,
@@ -134,13 +141,6 @@ export class SecretsService {
         requestedVersion: version ?? null,
         resolvedVersion: record.version,
       },
-    });
-
-    const value = await this.encryption.decrypt({
-      ciphertext: record.encryptedValue,
-      iv: record.iv,
-      authTag: record.authTag,
-      keyId: record.encryptionKeyId,
     });
 
     return {
@@ -206,16 +206,21 @@ export class SecretsService {
       return this.repository.findById(secretId, { organizationId });
     }
 
-    const updated = await this.repository.updateSecret(secretId, updates, { organizationId });
-    this.auditLogService.record(auth, {
-      action: 'secret.update',
-      resourceType: 'secret',
-      resourceId: updated.id,
-      resourceName: updated.name,
-      metadata: {
-        updatedFields: Object.keys(updates),
-      },
-    });
+    const updated = await this.repository.updateSecret(
+      secretId,
+      updates,
+      { organizationId },
+      (executor, secret) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'secret.update',
+          resourceType: 'secret',
+          resourceId: secret.id,
+          resourceName: secret.name,
+          metadata: {
+            updatedFields: Object.keys(updates),
+          },
+        }),
+    );
     return updated;
   }
 
@@ -227,12 +232,13 @@ export class SecretsService {
     } catch {
       existing = null;
     }
-    await this.repository.deleteSecret(secretId, { organizationId });
-    this.auditLogService.record(auth, {
-      action: 'secret.delete',
-      resourceType: 'secret',
-      resourceId: secretId,
-      resourceName: existing?.name ?? null,
-    });
+    await this.repository.deleteSecret(secretId, { organizationId }, (executor) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'secret.delete',
+        resourceType: 'secret',
+        resourceId: secretId,
+        resourceName: existing?.name ?? null,
+      }),
+    );
   }
 }

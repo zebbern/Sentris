@@ -8,13 +8,14 @@ import { DRIZZLE_TOKEN } from '../database/database.module';
 import type { TraceEventType } from './types';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const WORKFLOW_RUN_ID_PATTERN = new RegExp(`^(?:sentris-run-)?${UUID_PATTERN}$`, 'i');
 
 export interface PersistedTraceEvent {
   runId: string;
-  workflowId?: string;
+  workflowId?: string | null;
   organizationId?: string | null;
   type: TraceEventType;
   nodeRef: string;
@@ -94,8 +95,15 @@ export class TraceRepository implements OnModuleDestroy {
   }
 
   async append(event: PersistedTraceEvent): Promise<void> {
-    await this.db.insert(workflowTracesTable).values(this.mapToInsert(event));
+    await this.appendWithExecutor(this.db, event);
+    await this.notifyAppended(event);
+  }
 
+  async appendWithExecutor(executor: OutboxExecutor, event: PersistedTraceEvent): Promise<void> {
+    await executor.insert(workflowTracesTable).values(this.mapToInsert(event));
+  }
+
+  async notifyAppended(event: PersistedTraceEvent): Promise<void> {
     // Notify subscribers of the new trace event
     try {
       const payload = JSON.stringify({

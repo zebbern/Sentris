@@ -33,6 +33,7 @@ describe('agentsApi.getParts', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3211/api/v1/agents/agent-run-1/parts',
       {
+        credentials: 'include',
         headers: { Authorization: 'Bearer test-token' },
       },
     );

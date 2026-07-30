@@ -38,7 +38,7 @@ export const workflowsApi = {
     }
     const qs = params.toString();
     const url = `${API_V1_URL}/workflows/summary${qs ? `?${qs}` : ''}`;
-    const response = await fetch(url, { headers });
+    const response = await fetch(url, { headers, credentials: 'include' });
     if (!response.ok) throw new Error('Failed to fetch workflow summaries');
     return response.json();
   },

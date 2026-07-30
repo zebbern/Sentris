@@ -20,6 +20,7 @@ export const agentsApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/agents/${encodeURIComponent(agentRunId)}/parts`, {
       headers,
+      credentials: 'include',
     });
     if (!response.ok) {
       throw new Error(`Failed to load agent trace for ${agentRunId}`);

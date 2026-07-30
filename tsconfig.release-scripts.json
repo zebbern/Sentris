@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun-types"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true
+  },
+  "include": [
+    "scripts/performance-budget.ts",
+    "scripts/release-benchmark.ts",
+    "scripts/release-performance-pair.ts",
+    "scripts/lib/performance-budget.ts",
+    "scripts/lib/release-benchmark.ts"
+  ]
+}

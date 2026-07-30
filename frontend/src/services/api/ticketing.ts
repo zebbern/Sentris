@@ -1,7 +1,8 @@
-import type {
-  TicketingConnectionStatus,
-  TicketLinkResponse,
-  ConfigureTicketing,
+import {
+  TicketLinkResponseSchema,
+  type TicketingConnectionStatus,
+  type TicketLinkResponse,
+  type ConfigureTicketing,
 } from '@sentris/shared';
 import { httpGet, httpPost, httpPut, httpDel } from './client';
 
@@ -53,6 +54,8 @@ export const ticketingApi = {
     httpGet<JiraIssueType[]>(`${BASE}/issue-types/${encodeURIComponent(projectKey)}`),
 
   /** Get linked ticket for a finding. */
-  getFindingTicket: (findingId: string) =>
-    httpGet<TicketLinkResponse>(`/findings/${encodeURIComponent(findingId)}/ticket`),
+  getFindingTicket: async (findingId: string): Promise<TicketLinkResponse | null> => {
+    const ticket = await httpGet<unknown>(`/findings/${encodeURIComponent(findingId)}/ticket`);
+    return ticket === null ? null : TicketLinkResponseSchema.parse(ticket);
+  },
 };

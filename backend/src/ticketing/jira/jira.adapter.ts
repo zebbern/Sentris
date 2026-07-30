@@ -38,6 +38,14 @@ export interface JiraTransition {
   to: { id: string; name: string };
 }
 
+export interface JiraDynamicWebhook {
+  id: string;
+  url: string;
+  events: string[];
+  jqlFilter?: string;
+  expirationDate?: string;
+}
+
 export interface CreateIssueInput {
   projectKey: string;
   issueTypeId: string;
@@ -66,6 +74,8 @@ function assertSafeUrl(url: string): void {
 // ---------------------------------------------------------------------------
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const WEBHOOK_LIST_PAGE_SIZE = 100;
+const MAX_WEBHOOK_LIST_PAGES = 10;
 
 @Injectable()
 export class JiraAdapter {
@@ -195,11 +205,26 @@ export class JiraAdapter {
     accessToken: string,
     issueKey: string,
     transitionName: string,
+    resultingStatus?: string,
   ): Promise<boolean> {
     const transitions = await this.getTransitions(cloudId, accessToken, issueKey);
     const match = transitions.find((t) => t.name.toLowerCase() === transitionName.toLowerCase());
 
     if (!match) {
+      if (resultingStatus) {
+        const issue = await this.getIssue(cloudId, accessToken, issueKey);
+        const fields = issue.fields as Record<string, unknown> | undefined;
+        const status = fields?.status as { name?: unknown } | undefined;
+        if (
+          typeof status?.name === 'string' &&
+          status.name.toLowerCase() === resultingStatus.toLowerCase()
+        ) {
+          this.logger.log(
+            `Jira issue ${issueKey} is already at status '${resultingStatus}'; treating the transition as applied`,
+          );
+          return true;
+        }
+      }
       this.logger.warn(
         `No transition named '${transitionName}' found for issue ${issueKey}. ` +
           `Available: ${transitions.map((t) => t.name).join(', ')}`,
@@ -271,11 +296,11 @@ export class JiraAdapter {
     assertSafeUrl(url);
 
     const body = {
+      url: callbackUrl,
       webhooks: [
         {
           jqlFilter: '*',
           events: ['jira:issue_updated'],
-          url: callbackUrl,
         },
       ],
     };
@@ -293,6 +318,112 @@ export class JiraAdapter {
     }
 
     return webhookId;
+  }
+
+  /**
+   * List this OAuth app's dynamic webhooks using a bounded, complete pagination pass.
+   *
+   * Registration recovery must see every matching callback before creating another
+   * webhook. If Jira cannot make progress or the app owns more than the bounded
+   * reconciliation window, fail closed and let the durable outbox retry.
+   */
+  async listWebhooks(cloudId: string, accessToken: string): Promise<JiraDynamicWebhook[]> {
+    const webhooks: JiraDynamicWebhook[] = [];
+    let startAt = 0;
+
+    for (let pageNumber = 0; pageNumber < MAX_WEBHOOK_LIST_PAGES; pageNumber += 1) {
+      const url =
+        `${this.baseUrl(cloudId)}/rest/api/3/webhook` +
+        `?startAt=${startAt}&maxResults=${WEBHOOK_LIST_PAGE_SIZE}`;
+      assertSafeUrl(url);
+
+      const page = (await this.request(url, {
+        method: 'GET',
+        headers: this.headers(accessToken),
+      })) as {
+        startAt?: number;
+        maxResults?: number;
+        total?: number;
+        isLast?: boolean;
+        values?: {
+          id?: number | string;
+          url?: string;
+          events?: string[];
+          jqlFilter?: string;
+          expirationDate?: string;
+        }[];
+      };
+
+      const values = page.values ?? [];
+      for (const webhook of values) {
+        if (webhook.id === undefined || typeof webhook.url !== 'string') {
+          continue;
+        }
+        webhooks.push({
+          id: String(webhook.id),
+          url: webhook.url,
+          events: Array.isArray(webhook.events) ? webhook.events : [],
+          ...(typeof webhook.jqlFilter === 'string' ? { jqlFilter: webhook.jqlFilter } : {}),
+          ...(typeof webhook.expirationDate === 'string'
+            ? { expirationDate: webhook.expirationDate }
+            : {}),
+        });
+      }
+
+      const pageStart = Number.isSafeInteger(page.startAt) ? page.startAt! : startAt;
+      const nextStart = pageStart + values.length;
+      const hasTotal = Number.isSafeInteger(page.total) && page.total! >= 0;
+      const total = hasTotal ? page.total! : undefined;
+      if (page.isLast === true) {
+        if (total !== undefined && nextStart < total) {
+          throw new Error('Jira returned contradictory webhook pagination metadata');
+        }
+        return webhooks;
+      }
+      if (nextStart <= startAt) {
+        throw new Error('Unable to make bounded progress while listing Jira webhooks');
+      }
+      if (page.isLast === false) {
+        if (total !== undefined && nextStart >= total) {
+          throw new Error('Jira returned contradictory webhook pagination metadata');
+        }
+        startAt = nextStart;
+        continue;
+      }
+      if (total === undefined) {
+        throw new Error('Jira omitted webhook pagination completeness metadata');
+      }
+      if (nextStart >= total) {
+        return webhooks;
+      }
+      startAt = nextStart;
+    }
+
+    throw new Error(
+      `Jira webhook listing exceeded the ${MAX_WEBHOOK_LIST_PAGES * WEBHOOK_LIST_PAGE_SIZE}-webhook reconciliation bound`,
+    );
+  }
+
+  /**
+   * Extend one dynamic webhook's Jira-managed 30-day lifetime.
+   */
+  async refreshWebhook(cloudId: string, accessToken: string, webhookId: string): Promise<string> {
+    const numericWebhookId = Number(webhookId);
+    if (!Number.isSafeInteger(numericWebhookId) || numericWebhookId < 1) {
+      throw new Error(`Invalid Jira webhook ID '${webhookId}'`);
+    }
+    const url = `${this.baseUrl(cloudId)}/rest/api/3/webhook/refresh`;
+    assertSafeUrl(url);
+
+    const response = (await this.request(url, {
+      method: 'PUT',
+      headers: this.headers(accessToken),
+      body: JSON.stringify({ webhookIds: [numericWebhookId] }),
+    })) as { expirationDate?: unknown };
+    if (typeof response.expirationDate !== 'string' || !response.expirationDate) {
+      throw new Error('Jira webhook refresh did not return an expiration date');
+    }
+    return response.expirationDate;
   }
 
   /**

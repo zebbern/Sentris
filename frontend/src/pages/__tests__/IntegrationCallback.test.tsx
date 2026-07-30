@@ -154,12 +154,12 @@ describe('IntegrationCallback', () => {
 
     const callArgs = mockCompleteOAuth.mock.calls[0] as any[];
     expect(callArgs[0]).toBe('github');
-    expect(callArgs[1]).toMatchObject({
-      userId: 'test-user-id',
+    expect(callArgs[1]).toEqual({
       code: 'test-code',
       state: 'test-state',
+      redirectUri: expect.stringContaining('/integrations/callback/github'),
     });
-    expect((callArgs[1] as any).redirectUri).toContain('/integrations/callback/github');
+    expect(callArgs[1]).not.toHaveProperty('userId');
   });
 
   it('shows success message on successful exchange', async () => {

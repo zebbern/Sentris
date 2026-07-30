@@ -67,6 +67,7 @@ const toastMock = vi.fn();
 // Must import AFTER mock.module
 import { ExportButton } from '../ExportButton';
 import { SeverityChart } from '../SeverityChart';
+import { buildSeverityChartData } from '../severityChartData';
 import { FindingDetailSheet } from '../FindingDetailSheet';
 
 // ---------------------------------------------------------------------------
@@ -128,7 +129,14 @@ describe('ExportButton', () => {
   });
 
   it('calls exportFindings with csv format when CSV option is clicked', async () => {
-    exportMock.mockResolvedValueOnce(new Blob(['test'], { type: 'text/csv' }));
+    exportMock.mockResolvedValueOnce({
+      blob: new Blob(['test'], { type: 'text/csv' }),
+      availability: 'available',
+      projectionHealthReason: null,
+      projectionReconciledThrough: null,
+      schemaCoverage: { canonical: 1, legacy: 0, invalid: 0 },
+      headers: new Headers(),
+    });
 
     // Mock createObjectURL and revokeObjectURL
     const originalCreateObjectURL = URL.createObjectURL;
@@ -136,7 +144,9 @@ describe('ExportButton', () => {
     URL.createObjectURL = vi.fn(() => 'blob:test-url');
     URL.revokeObjectURL = vi.fn();
 
-    render(<ExportButton severity="high" search="test" />, { wrapper: Wrapper });
+    render(<ExportButton severity="high" search="test" triageStatus="fixed" />, {
+      wrapper: Wrapper,
+    });
 
     fireEvent.click(screen.getByText('Export'));
 
@@ -151,7 +161,66 @@ describe('ExportButton', () => {
         format: 'csv',
         severity: 'high',
         search: 'test',
+        triageStatus: 'fixed',
       });
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+  });
+
+  it('warns when the downloaded export was produced from degraded data', async () => {
+    exportMock.mockResolvedValueOnce({
+      blob: new Blob(['test'], { type: 'application/json' }),
+      availability: 'degraded',
+      projectionHealthReason: 'projection_events_pending',
+      projectionReconciledThrough: null,
+      schemaCoverage: { canonical: 1, legacy: 0, invalid: 1 },
+      headers: new Headers(),
+    });
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => 'blob:test-url');
+    URL.revokeObjectURL = vi.fn();
+
+    render(<ExportButton />, { wrapper: Wrapper });
+    fireEvent.click(screen.getByText('Export as JSON'));
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Export completed with degraded data',
+        }),
+      );
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+  });
+
+  it('warns when export data-quality headers are unavailable', async () => {
+    exportMock.mockResolvedValueOnce({
+      blob: new Blob(['test'], { type: 'text/csv' }),
+      availability: 'unknown',
+      projectionHealthReason: null,
+      projectionReconciledThrough: null,
+      schemaCoverage: null,
+      headers: new Headers(),
+    });
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => 'blob:test-url');
+    URL.revokeObjectURL = vi.fn();
+
+    render(<ExportButton />, { wrapper: Wrapper });
+    fireEvent.click(screen.getByText('Export as CSV'));
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Export data quality unknown',
+        }),
+      );
     });
 
     URL.createObjectURL = originalCreateObjectURL;
@@ -171,6 +240,8 @@ describe('SeverityChart', () => {
         { severity: 'high', count: 0 },
       ],
       total: 0,
+      availability: 'available',
+      schemaCoverage: { canonical: 0, legacy: 0, invalid: 0 },
     });
 
     const { container } = render(<SeverityChart />, { wrapper: Wrapper });
@@ -199,6 +270,8 @@ describe('SeverityChart', () => {
         { severity: 'medium', count: 20 },
       ],
       total: 35,
+      availability: 'available',
+      schemaCoverage: { canonical: 35, legacy: 0, invalid: 0 },
     });
 
     const { container } = render(<SeverityChart />, { wrapper: Wrapper });
@@ -206,6 +279,51 @@ describe('SeverityChart', () => {
     await waitFor(() => {
       expect(container.querySelector('.recharts-responsive-container')).not.toBeNull();
     });
+  });
+
+  it('surfaces an unavailable chart query instead of rendering an empty chart', async () => {
+    getStatsMock.mockRejectedValueOnce(new Error('Findings data is unavailable'));
+
+    render(<SeverityChart />, { wrapper: Wrapper });
+
+    expect(await screen.findByText('Findings data is unavailable')).toBeTruthy();
+  });
+
+  it('marks chart values as degraded with projection and schema context', async () => {
+    getStatsMock.mockResolvedValueOnce({
+      severityCounts: [{ severity: 'high', count: 2 }],
+      total: 2,
+      availability: 'degraded',
+      projectionHealth: {
+        availability: 'degraded',
+        completedAt: null,
+        reconciledThrough: null,
+        reason: 'projection_events_pending',
+      },
+      schemaCoverage: { canonical: 1, legacy: 0, invalid: 1 },
+    });
+
+    render(<SeverityChart />, { wrapper: Wrapper });
+
+    const status = await screen.findByRole('status', { name: /Severity data quality/i });
+    expect(status.textContent).toContain('projection events pending');
+    expect(status.textContent).toContain('1 invalid');
+  });
+
+  it('renders the canonical none severity bucket instead of dropping it', () => {
+    expect(buildSeverityChartData([{ severity: 'none', count: 4 }])).toEqual([
+      { severity: 'None', count: 4, key: 'none' },
+    ]);
+  });
+
+  it('sums legacy case variants into the canonical severity bucket', () => {
+    expect(
+      buildSeverityChartData([
+        { severity: 'HIGH', count: 2 },
+        { severity: 'high', count: 3 },
+        { severity: 'High', count: 5 },
+      ]),
+    ).toEqual([{ severity: 'High', count: 10, key: 'high' }]);
   });
 });
 
@@ -226,6 +344,8 @@ describe('FindingDetailSheet', () => {
     component_id: 'comp-1',
     node_ref: 'node-1',
     raw: { '@timestamp': '2025-06-15T12:00:00.000Z', severity: 'high', custom: 'data' },
+    availability: 'available' as const,
+    schemaCompatibility: 'canonical' as const,
   };
 
   it('renders sheet with title when isOpen is true', async () => {
@@ -238,6 +358,22 @@ describe('FindingDetailSheet', () => {
     await waitFor(() => {
       expect(screen.getByText('Finding Details')).toBeTruthy();
     });
+  });
+
+  it('surfaces degraded detail availability and invalid schema compatibility', async () => {
+    getMock.mockResolvedValueOnce({
+      ...mockFinding,
+      availability: 'degraded',
+      schemaCompatibility: 'invalid',
+    });
+
+    render(<FindingDetailSheet findingId="finding-1" isOpen={true} onClose={vi.fn()} />, {
+      wrapper: Wrapper,
+    });
+
+    const status = await screen.findByRole('status', { name: /Finding data quality/i });
+    expect(status.textContent).toContain('degraded');
+    expect(status.textContent).toContain('invalid');
   });
 
   it('shows loading skeleton while query is pending', () => {

@@ -206,9 +206,6 @@ export class WorkflowRunStreamController {
           lastStatusSignature = signature;
           send('status', status);
           if (TERMINAL_COMPLETION_STATUSES.has(status.status)) {
-            this.terminalArchiveService.archiveRun(auth, runId).catch((error) => {
-              this.logger.warn(`Failed to archive terminal for run ${runId}`, error);
-            });
             send('complete', { runId, status: status.status });
             cleanup();
           }

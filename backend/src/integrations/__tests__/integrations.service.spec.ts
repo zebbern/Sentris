@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'bun:test';
 
 import { IntegrationsService } from '../integrations.service';
@@ -10,9 +10,17 @@ import type {
   IntegrationOAuthStateRecord,
   IntegrationProviderConfigRecord,
 } from '../../database/schema';
+import type { AuthContext } from '../../auth/types';
 
 // ── Constants ───────────────────────────────────────────────────────
 const now = new Date('2024-06-01T00:00:00.000Z');
+const auth: AuthContext = {
+  userId: 'user-1',
+  organizationId: 'org-1',
+  roles: ['MEMBER'],
+  isAuthenticated: true,
+  provider: 'test',
+};
 
 const MOCK_ENCRYPTED: SecretEncryptionMaterial = {
   ciphertext: 'enc-ct',
@@ -26,6 +34,7 @@ const MOCK_ENCRYPTED: SecretEncryptionMaterial = {
 function makeTokenRecord(overrides: Partial<IntegrationTokenRecord> = {}): IntegrationTokenRecord {
   return {
     id: 'conn-1',
+    organizationId: null,
     userId: 'user-1',
     provider: 'github',
     scopes: ['repo', 'read:user'],
@@ -46,6 +55,7 @@ function makeOAuthStateRecord(
   return {
     id: 'state-id-1',
     state: 'test-state-abc',
+    organizationId: null,
     userId: 'user-1',
     provider: 'github',
     codeVerifier: null,
@@ -58,6 +68,7 @@ function makeProviderConfigRecord(
   overrides: Partial<IntegrationProviderConfigRecord> = {},
 ): IntegrationProviderConfigRecord {
   return {
+    organizationId: null,
     provider: 'github',
     clientId: 'override-client-id',
     clientSecret: MOCK_ENCRYPTED as any,
@@ -125,8 +136,10 @@ function createMocks() {
     listConnections: vi.fn().mockResolvedValue([]),
     findById: vi.fn(),
     findByProvider: vi.fn(),
+    runBelongsToOrganization: vi.fn().mockResolvedValue(true),
     upsertConnection: vi.fn().mockImplementation(async (input: any) => ({
       id: 'conn-1',
+      organizationId: input.organizationId ?? null,
       userId: input.userId,
       provider: input.provider,
       scopes: input.scopes,
@@ -174,7 +187,12 @@ function createMocks() {
     }),
   };
 
-  return { repo, encryption, configSvc };
+  const auditLogService: Record<string, ReturnType<typeof vi.fn>> = {
+    recordDurable: vi.fn().mockResolvedValue(undefined),
+    recordDurableWithExecutor: vi.fn().mockResolvedValue(undefined),
+  };
+
+  return { repo, encryption, configSvc, auditLogService };
 }
 
 function mockFetchSuccess(payload: Record<string, any>) {
@@ -183,6 +201,19 @@ function mockFetchSuccess(payload: Record<string, any>) {
     status: 200,
     text: vi.fn().mockResolvedValue(JSON.stringify(payload)),
   });
+}
+
+async function captureHttpException(operation: () => Promise<unknown>): Promise<HttpException> {
+  try {
+    await operation();
+  } catch (error) {
+    if (error instanceof HttpException) {
+      return error;
+    }
+    throw error;
+  }
+
+  throw new Error('Expected operation to throw an HttpException');
 }
 
 function mockFetchError(status: number, payload: Record<string, any>) {
@@ -198,6 +229,7 @@ describe('IntegrationsService', () => {
   let repo: Record<string, ReturnType<typeof vi.fn>>;
   let encryption: Record<string, ReturnType<typeof vi.fn>>;
   let configSvc: Record<string, ReturnType<typeof vi.fn>>;
+  let auditLogService: Record<string, ReturnType<typeof vi.fn>>;
   let service: IntegrationsService;
 
   beforeEach(() => {
@@ -206,12 +238,14 @@ describe('IntegrationsService', () => {
     repo = mocks.repo;
     encryption = mocks.encryption;
     configSvc = mocks.configSvc;
+    auditLogService = mocks.auditLogService;
 
     service = new IntegrationsService(
       repo as unknown as IntegrationsRepository,
       encryption as unknown as TokenEncryptionService,
       configSvc as any,
       null,
+      auditLogService as any,
     );
   });
 
@@ -269,11 +303,15 @@ describe('IntegrationsService', () => {
         clientSecret: 'new-secret',
       });
       expect(encryption.encrypt).toHaveBeenCalledWith('new-secret');
-      expect(repo.upsertProviderConfig).toHaveBeenCalledWith({
-        provider: 'github',
-        clientId: 'new-id',
-        clientSecret: MOCK_ENCRYPTED,
-      });
+      expect(repo.upsertProviderConfig).toHaveBeenCalledWith(
+        {
+          organizationId: null,
+          provider: 'github',
+          clientId: 'new-id',
+          clientSecret: MOCK_ENCRYPTED,
+        },
+        expect.any(Function),
+      );
     });
 
     it('reuses previous secret when none provided', async () => {
@@ -283,6 +321,7 @@ describe('IntegrationsService', () => {
       expect(encryption.encrypt).not.toHaveBeenCalled();
       expect(repo.upsertProviderConfig).toHaveBeenCalledWith(
         expect.objectContaining({ clientId: 'updated-id', clientSecret: MOCK_ENCRYPTED }),
+        expect.any(Function),
       );
     });
 
@@ -305,14 +344,14 @@ describe('IntegrationsService', () => {
       repo.listProviderConfigs.mockResolvedValue([makeProviderConfigRecord()]);
       await service.onModuleInit();
       await service.deleteProviderConfiguration('github');
-      expect(repo.deleteProviderConfig).toHaveBeenCalledWith('github');
+      expect(repo.deleteProviderConfig).toHaveBeenCalledWith(null, 'github', expect.any(Function));
       const result = await service.getProviderConfiguration('github');
       expect(result.configuredBy).toBe('environment');
     });
 
     it('is idempotent for non-existent config', async () => {
       await service.deleteProviderConfiguration('github');
-      expect(repo.deleteProviderConfig).toHaveBeenCalledWith('github');
+      expect(repo.deleteProviderConfig).toHaveBeenCalledWith(null, 'github', expect.any(Function));
     });
   });
 
@@ -401,6 +440,7 @@ describe('IntegrationsService', () => {
           userId: 'user-1',
           provider: 'github',
         }),
+        expect.any(Function),
       );
     });
 
@@ -455,18 +495,42 @@ describe('IntegrationsService', () => {
       expect(result.userId).toBe('user-1');
     });
 
-    it('throws when OAuth state is missing', async () => {
-      repo.consumeOAuthState.mockResolvedValue(undefined);
-      await expect(
-        service.completeOAuthSession('github', { ...oauthInput, state: 'bad' }),
-      ).rejects.toThrow('OAuth state is missing');
+    it('redeems OAuth state using authenticated user and provider ownership', async () => {
+      repo.consumeOAuthState.mockImplementation(
+        async (state: string, userId: string, provider: string) =>
+          state === oauthInput.state && userId === oauthInput.userId && provider === 'github'
+            ? makeOAuthStateRecord()
+            : undefined,
+      );
+
+      const result = await service.completeOAuthSession('github', oauthInput);
+
+      expect(result.id).toBe('conn-1');
     });
 
-    it('throws when state userId does not match', async () => {
-      repo.consumeOAuthState.mockResolvedValue(makeOAuthStateRecord({ userId: 'other' }));
-      await expect(service.completeOAuthSession('github', oauthInput)).rejects.toThrow(
-        'does not match the requesting user',
+    it('returns the same generic not-found response for missing and foreign-owned OAuth state', async () => {
+      repo.consumeOAuthState
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(makeOAuthStateRecord({ userId: 'other' }));
+
+      const missing = await captureHttpException(() =>
+        service.completeOAuthSession('github', { ...oauthInput, state: 'missing-state' }),
       );
+      const foreign = await captureHttpException(() =>
+        service.completeOAuthSession('github', oauthInput),
+      );
+      const expectedResponse = {
+        message: 'OAuth state was not found',
+        error: 'Not Found',
+        statusCode: 404,
+      };
+
+      expect(missing).toBeInstanceOf(NotFoundException);
+      expect(missing.getStatus()).toBe(404);
+      expect(missing.getResponse()).toEqual(expectedResponse);
+      expect(foreign).toBeInstanceOf(NotFoundException);
+      expect(foreign.getStatus()).toBe(404);
+      expect(foreign.getResponse()).toEqual(expectedResponse);
     });
 
     it('throws when state provider does not match', async () => {
@@ -527,21 +591,110 @@ describe('IntegrationsService', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
       expect(result.accessToken).toBe('decrypted-value');
     });
+
+    it('does not refresh or decrypt a provider token when durable issuance audit fails', async () => {
+      repo.findByProvider.mockResolvedValue(makeTokenRecord({ organizationId: 'org-1' }));
+      auditLogService.recordDurable.mockRejectedValue(new Error('audit outbox unavailable'));
+      globalThis.fetch = vi.fn() as never;
+
+      await expect(service.getProviderToken('github', 'user-1', 'org-1', auth)).rejects.toThrow(
+        'audit outbox unavailable',
+      );
+
+      expect(auditLogService.recordDurable).toHaveBeenCalledWith(
+        auth,
+        expect.objectContaining({
+          action: 'integration.token.issue',
+          resourceId: 'conn-1',
+          metadata: expect.objectContaining({ selection: 'provider' }),
+        }),
+        undefined,
+        'org-1',
+      );
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
   });
 
   // ── getConnectionToken ──────────────────────────────────────────
   describe('getConnectionToken', () => {
-    it('returns a decrypted token for a specific connection', async () => {
-      repo.findById.mockResolvedValue(makeTokenRecord());
-      const result = await service.getConnectionToken('conn-1');
-      expect(repo.findById).toHaveBeenCalledWith('conn-1');
+    it('returns a decrypted token only for a connection and run in the same organization', async () => {
+      repo.findById.mockResolvedValue(makeTokenRecord({ organizationId: 'org-1' }));
+      const result = await service.getConnectionToken('conn-1', 'org-1', auth, 'run-1');
+      expect(repo.findById).toHaveBeenCalledWith('conn-1', 'org-1');
+      expect(repo.runBelongsToOrganization).toHaveBeenCalledWith('run-1', 'org-1');
+      expect(auditLogService.recordDurable).toHaveBeenCalledWith(
+        auth,
+        expect.objectContaining({
+          action: 'integration.token.issue',
+          metadata: expect.objectContaining({ runId: 'run-1' }),
+        }),
+        undefined,
+        'org-1',
+      );
       expect(encryption.decrypt).toHaveBeenCalled();
       expect(result.accessToken).toBe('decrypted-value');
     });
 
-    it('throws NotFoundException when connection missing', async () => {
+    it('returns the same not-found response for a missing connection and foreign-org run', async () => {
       repo.findById.mockResolvedValue(undefined);
-      await expect(service.getConnectionToken('missing')).rejects.toThrow(NotFoundException);
+      const missingConnection = await captureHttpException(() =>
+        service.getConnectionToken('missing', 'org-1', auth, 'run-1'),
+      );
+      repo.findById.mockResolvedValue(makeTokenRecord({ organizationId: 'org-1' }));
+      repo.runBelongsToOrganization.mockResolvedValue(false);
+      const foreignRun = await captureHttpException(() =>
+        service.getConnectionToken('conn-1', 'org-1', auth, 'run-foreign'),
+      );
+
+      expect(missingConnection).toBeInstanceOf(NotFoundException);
+      expect(foreignRun).toBeInstanceOf(NotFoundException);
+      expect(missingConnection.getResponse()).toEqual(foreignRun.getResponse());
+      expect(auditLogService.recordDurable).not.toHaveBeenCalled();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('does not release the same connection id through another organization context', async () => {
+      repo.findById.mockResolvedValue(undefined);
+      repo.runBelongsToOrganization.mockResolvedValue(true);
+
+      await expect(
+        service.getConnectionToken(
+          'conn-1',
+          'org-2',
+          {
+            ...auth,
+            organizationId: 'org-2',
+          },
+          'run-org-2',
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(repo.findById).toHaveBeenCalledWith('conn-1', 'org-2');
+      expect(auditLogService.recordDurable).not.toHaveBeenCalled();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('rejects a missing run identifier before looking up or releasing credentials', async () => {
+      await expect(service.getConnectionToken('conn-1', 'org-1', auth)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(repo.findById).not.toHaveBeenCalled();
+      expect(repo.runBelongsToOrganization).not.toHaveBeenCalled();
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('does not refresh or decrypt a run-bound token when durable audit fails', async () => {
+      repo.findById.mockResolvedValue(makeTokenRecord({ organizationId: 'org-1' }));
+      auditLogService.recordDurable.mockRejectedValue(new Error('audit outbox unavailable'));
+      globalThis.fetch = vi.fn() as never;
+
+      await expect(service.getConnectionToken('conn-1', 'org-1', auth, 'run-1')).rejects.toThrow(
+        'audit outbox unavailable',
+      );
+
+      expect(encryption.decrypt).not.toHaveBeenCalled();
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 
@@ -566,16 +719,27 @@ describe('IntegrationsService', () => {
       expect(result.provider).toBe('github');
     });
 
-    it('throws NotFoundException when connection missing', async () => {
-      repo.findById.mockResolvedValue(undefined);
-      await expect(service.refreshConnection('x', 'user-1')).rejects.toThrow(NotFoundException);
-    });
+    it('returns the same complete not-found response for missing and foreign connections', async () => {
+      repo.findById
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(makeTokenRecord({ userId: 'other' }));
 
-    it('throws when connection belongs to another user', async () => {
-      repo.findById.mockResolvedValue(makeTokenRecord({ userId: 'other' }));
-      await expect(service.refreshConnection('conn-1', 'user-1')).rejects.toThrow(
-        NotFoundException,
+      const missing = await captureHttpException(() => service.refreshConnection('x', 'user-1'));
+      const foreign = await captureHttpException(() =>
+        service.refreshConnection('conn-1', 'user-1'),
       );
+      const expectedResponse = {
+        message: 'Connection was not found',
+        error: 'Not Found',
+        statusCode: 404,
+      };
+
+      expect(missing).toBeInstanceOf(NotFoundException);
+      expect(missing.getStatus()).toBe(404);
+      expect(missing.getResponse()).toEqual(expectedResponse);
+      expect(foreign).toBeInstanceOf(NotFoundException);
+      expect(foreign.getStatus()).toBe(404);
+      expect(foreign.getResponse()).toEqual(expectedResponse);
     });
 
     it('throws when no refresh token is stored', async () => {
@@ -589,8 +753,33 @@ describe('IntegrationsService', () => {
   // ── disconnect ──────────────────────────────────────────────────
   describe('disconnect', () => {
     it('removes the connection record', async () => {
+      repo.deleteConnection.mockResolvedValue(true);
       await service.disconnect('conn-1', 'user-1');
-      expect(repo.deleteConnection).toHaveBeenCalledWith('conn-1', 'user-1');
+      expect(repo.deleteConnection).toHaveBeenCalledWith(
+        'conn-1',
+        'user-1',
+        null,
+        expect.any(Function),
+      );
+    });
+
+    it('returns the same complete not-found response for missing and foreign connections', async () => {
+      repo.deleteConnection.mockResolvedValue(false);
+
+      const missing = await captureHttpException(() => service.disconnect('missing', 'user-1'));
+      const foreign = await captureHttpException(() => service.disconnect('conn-1', 'user-1'));
+      const expectedResponse = {
+        message: 'Connection was not found',
+        error: 'Not Found',
+        statusCode: 404,
+      };
+
+      expect(missing).toBeInstanceOf(NotFoundException);
+      expect(missing.getStatus()).toBe(404);
+      expect(missing.getResponse()).toEqual(expectedResponse);
+      expect(foreign).toBeInstanceOf(NotFoundException);
+      expect(foreign.getStatus()).toBe(404);
+      expect(foreign.getResponse()).toEqual(expectedResponse);
     });
   });
 

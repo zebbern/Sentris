@@ -1,80 +1,21 @@
 #!/usr/bin/env bash
-# Reset database for a specific instance
+# Backward-compatible Unix entrypoint for the cross-platform reset command.
 # Usage: ./scripts/db-reset-instance.sh [instance_number]
 
 set -euo pipefail
 
-INSTANCE=${1:-0}
-DB_NAME="sentris_instance_$INSTANCE"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log_info() {
-  echo -e "${BLUE}ℹ${NC} $*"
-}
-
-log_success() {
-  echo -e "${GREEN}✅${NC} $*"
-}
-
-log_error() {
-  echo -e "${RED}❌${NC} $*"
-}
-
-validate_instance() {
-  if [[ ! "$1" =~ ^[0-9]+$ ]] || [ "$1" -lt 0 ] || [ "$1" -gt 9 ]; then
-    log_error "Instance must be an integer from 0 to 9. Got: $1"
+case "$#" in
+  0)
+    exec bun "$ROOT_DIR/scripts/db-reset-instance.ts"
+    ;;
+  1)
+    exec bun "$ROOT_DIR/scripts/db-reset-instance.ts" --instance "$1"
+    ;;
+  *)
+    echo "Usage: ./scripts/db-reset-instance.sh [instance_number]" >&2
     exit 1
-  fi
-}
-
-validate_instance "$INSTANCE"
-
-log_info "Resetting database for instance $INSTANCE..."
-echo ""
-
-if ! docker ps --filter "name=sentris-postgres" --format "{{.Names}}" | grep -q "^sentris-postgres$"; then
-  log_error "PostgreSQL container not found for instance $INSTANCE"
-  log_error "Is the shared infra running? Try: SENTRIS_INSTANCE=$INSTANCE bun run dev"
-  exit 1
-fi
-
-log_info "Found PostgreSQL container: sentris-postgres"
-
-# Drop and recreate database
-log_info "Dropping database $DB_NAME..."
-docker exec sentris-postgres \
-  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
-  -c "DROP DATABASE IF EXISTS \"$DB_NAME\";" || true
-
-log_info "Creating database $DB_NAME..."
-docker exec sentris-postgres \
-  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
-  -c "CREATE DATABASE \"$DB_NAME\" OWNER sentris;"
-
-docker exec sentris-postgres \
-  psql -v ON_ERROR_STOP=1 -U sentris -d postgres \
-  -c "GRANT ALL PRIVILEGES ON DATABASE \"$DB_NAME\" TO sentris;"
-
-# Run migrations
-log_info "Running migrations for instance $INSTANCE..."
-export SENTRIS_INSTANCE="$INSTANCE"
-export DATABASE_URL="postgresql://sentris:sentris@localhost:5433/$DB_NAME"
-
-if bun --cwd backend run migration:push > /dev/null 2>&1; then
-  log_success "Migrations completed"
-else
-  log_error "Migrations failed"
-  log_error "Check backend logs: just dev $INSTANCE logs"
-  exit 1
-fi
-
-echo ""
-log_success "Database reset for instance $INSTANCE"
-log_info "Database: $DB_NAME"
-log_info "Connection: postgresql://sentris:sentris@localhost:5433/$DB_NAME"
+    ;;
+esac

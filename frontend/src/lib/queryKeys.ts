@@ -1,7 +1,8 @@
 import { useAuthStore } from '@/store/authStore';
 
 const getOrgScope = () => useAuthStore.getState().organizationId || '__no-org__';
-const getUserScope = () => useAuthStore.getState().userId || '__no-user__';
+const getUserScope = (userId?: string | null) =>
+  userId || useAuthStore.getState().userId || '__no-user__';
 
 export const queryKeys = {
   secrets: {
@@ -27,6 +28,9 @@ export const queryKeys = {
     detail: (id: string) => ['targets', getOrgScope(), id] as const,
     runs: (id: string) => ['targets', getOrgScope(), id, 'runs'] as const,
     assets: (id: string) => ['targets', getOrgScope(), id, 'assets'] as const,
+    findings: (id: string) => ['targets', getOrgScope(), id, 'findings'] as const,
+    assetComparison: (id: string, baselineRunId: string, currentRunId: string) =>
+      ['targets', getOrgScope(), id, 'asset-comparison', baselineRunId, currentRunId] as const,
   },
   mcpServers: {
     all: () => ['mcpServers', getOrgScope()] as const,
@@ -48,8 +52,8 @@ export const queryKeys = {
   integrations: {
     providers: () => ['integrationProviders', getOrgScope()] as const,
     connectionsRoot: () => ['integrationConnections', getOrgScope()] as const,
-    connections: (userId?: string) =>
-      ['integrationConnections', getOrgScope(), userId || getUserScope()] as const,
+    connections: (userId?: string | null) =>
+      ['integrationConnections', getOrgScope(), getUserScope(userId)] as const,
     providerConfig: (providerId: string) => ['providerConfig', getOrgScope(), providerId] as const,
   },
   apiKeys: {

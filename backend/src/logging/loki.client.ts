@@ -3,6 +3,7 @@ export interface LokiLogClientConfig {
   tenantId?: string;
   username?: string;
   password?: string;
+  timeoutMs?: number;
 }
 
 export interface LokiStreamLine {
@@ -10,8 +11,13 @@ export interface LokiStreamLine {
   timestamp: Date;
 }
 
+type LokiFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
 export class LokiLogClient {
-  constructor(private readonly config: LokiLogClientConfig) {}
+  constructor(
+    private readonly config: LokiLogClientConfig,
+    private readonly fetchImpl: LokiFetch = fetch,
+  ) {}
 
   async push(labels: Record<string, string>, lines: LokiStreamLine[]): Promise<void> {
     if (lines.length === 0) {
@@ -43,15 +49,35 @@ export class LokiLogClient {
       ],
     });
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body,
-    });
+    const timeoutMs = Math.max(1, this.config.timeoutMs ?? 10_000);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Loki push failed: ${response.status} ${response.statusText} - ${errorText}`);
+    try {
+      const response = await this.fetchImpl(url, {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Loki push failed: ${response.status} ${response.statusText} - ${errorText}`,
+        );
+      }
+    } catch (error: unknown) {
+      if (timedOut) {
+        throw new Error(`Loki push timed out after ${timeoutMs}ms`, { cause: error });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

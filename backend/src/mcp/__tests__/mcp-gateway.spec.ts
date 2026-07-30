@@ -179,6 +179,40 @@ describe('McpGatewayService Unit Tests', () => {
       );
     });
 
+    it('forwards encrypted registry headers to the persistent MCP client', async () => {
+      const callTool = jest.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'proxied' }],
+      });
+      const getOrCreateExternalClient = jest.fn().mockResolvedValue({ callTool });
+      (service as any).getOrCreateExternalClient = getOrCreateExternalClient;
+      (toolRegistry.getToolCredentials as any).mockResolvedValue({
+        'x-sentris-mcp-proxy-token': 'worker-proxy-token',
+      });
+      const source = {
+        nodeId: 'mcp-node',
+        toolName: 'Docker MCP',
+        type: 'mcp-server',
+        endpoint: 'http://worker:9101/containers/mcp-node/mcp',
+        status: 'ready',
+      };
+
+      await (service as any).proxyCallToExternal('run-1', 'run-1:mcp-node', source, 'scan', {
+        target: 'example.com',
+      });
+
+      expect(toolRegistry.getToolCredentials).toHaveBeenCalledWith('run-1', 'mcp-node');
+      expect(getOrCreateExternalClient).toHaveBeenCalledWith(
+        'run-1',
+        'run-1:mcp-node',
+        source.endpoint,
+        { 'x-sentris-mcp-proxy-token': 'worker-proxy-token' },
+      );
+      expect(callTool).toHaveBeenCalledWith({
+        name: 'scan',
+        arguments: { target: 'example.com' },
+      });
+    });
+
     it('throws NotFoundException if run not found', async () => {
       (workflowRunRepository.findByRunId as any).mockResolvedValue(null);
 

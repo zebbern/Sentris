@@ -10,14 +10,87 @@ on:
         description: 'Version tag (e.g., v1.0.0)'
         required: true
         type: string
+      performance_baseline_ref:
+        description: 'Previous release tag or full commit SHA used as the performance baseline'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/sentris
 
 jobs:
+  resolve-performance-baseline:
+    name: Resolve Performance Baseline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      baseline_revision: ${{ steps.resolve.outputs.baseline_revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve exact ancestor revision
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_BASELINE_REF: ${{ github.event.inputs.performance_baseline_ref }}
+        run: |
+          set -euo pipefail
+          candidate_revision="$(git rev-parse HEAD)"
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            baseline_ref="$MANUAL_BASELINE_REF"
+            if [ -z "$baseline_ref" ]; then
+              echo "::error::Manual releases require a performance baseline ref."
+              exit 1
+            fi
+          else
+            baseline_ref="$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 "${candidate_revision}^" 2>/dev/null || true)"
+            if [ -z "$baseline_ref" ]; then
+              echo "::error::No previous reachable release tag exists for the performance baseline."
+              exit 1
+            fi
+          fi
+
+          if ! baseline_revision="$(git rev-parse --verify --end-of-options "${baseline_ref}^{commit}" 2>/dev/null)"; then
+            echo "::error::Performance baseline ref does not resolve to a commit."
+            exit 1
+          fi
+          baseline_revision="${baseline_revision,,}"
+          candidate_revision="${candidate_revision,,}"
+
+          if [[ ! "$baseline_revision" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Resolved performance baseline is not a full 40-character commit SHA."
+            exit 1
+          fi
+          if [ "$baseline_revision" = "$candidate_revision" ]; then
+            echo "::error::Performance baseline and candidate must be different revisions."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$baseline_revision" "$candidate_revision"; then
+            echo "::error::Performance baseline must be an ancestor of the release candidate."
+            exit 1
+          fi
+
+          echo "baseline_revision=$baseline_revision" >> "$GITHUB_OUTPUT"
+
+  readiness:
+    name: Full Readiness Gate
+    needs: resolve-performance-baseline
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      performance_baseline_revision: ${{ needs.resolve-performance-baseline.outputs.baseline_revision }}
+    secrets: inherit
+
   build-and-push:
     name: Build and Push Docker Images
+    needs: readiness
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -44,16 +117,39 @@ jobs:
 
       - name: Extract version from tag
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$MANUAL_VERSION"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
-          # Remove 'v' prefix if present for Docker tags
-          VERSION_CLEAN=$(echo "$VERSION" | sed 's/^v//')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "version_clean=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid release version; expected vMAJOR.MINOR.PATCH with an optional safe prerelease suffix."
+            exit 1
+          fi
+
+          VERSION_CLEAN="${VERSION#v}"
+          if [ "${#VERSION_CLEAN}" -gt 128 ]; then
+            echo "::error::Invalid release version; Docker tags are limited to 128 characters."
+            exit 1
+          fi
+
+          if git show-ref --verify --quiet "refs/tags/$VERSION"; then
+            TAG_COMMIT="$(git rev-list -n 1 "$VERSION")"
+            CANDIDATE_COMMIT="$(git rev-parse HEAD)"
+            if [ "$TAG_COMMIT" != "$CANDIDATE_COMMIT" ]; then
+              echo "::error::Release tag $VERSION does not identify the checked-out candidate."
+              exit 1
+            fi
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_clean=$VERSION_CLEAN" >> "$GITHUB_OUTPUT"
           echo "Extracted version: $VERSION (clean: $VERSION_CLEAN)"
 
       - name: Determine if this is latest
@@ -61,7 +157,12 @@ jobs:
         run: |
           # Check if this is the latest tag (highest semver)
           CURRENT_TAG="${{ steps.version.outputs.version_clean }}"
-          LATEST_TAG=$(git tag -l 'v*.*.*' | sort -V | tail -1 | sed 's/^v//')
+          LATEST_TAG=$(
+            {
+              git tag -l 'v*.*.*' | sed 's/^v//'
+              printf '%s\n' "$CURRENT_TAG"
+            } | sort -V | tail -1
+          )
 
           if [ "$CURRENT_TAG" = "$LATEST_TAG" ]; then
             echo "is_latest=true" >> $GITHUB_OUTPUT
@@ -120,10 +221,6 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.tags.outputs.backend_tags }}
-          build-args: |
-            VITE_GIT_SHA=${{ steps.git_sha.outputs.sha }}
-            POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
-            POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -136,10 +233,6 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.tags.outputs.worker_tags }}
-          build-args: |
-            VITE_GIT_SHA=${{ steps.git_sha.outputs.sha }}
-            POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
-            POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -154,10 +247,6 @@ jobs:
           tags: ${{ steps.tags.outputs.frontend_tags }}
           build-args: |
             VITE_GIT_SHA=${{ steps.git_sha.outputs.sha }}
-            VITE_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_API_KEY }}
-            VITE_PUBLIC_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
-            POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
-            POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -222,6 +311,7 @@ jobs:
             echo "Creating new release $VERSION..."
             gh release create "$VERSION" \
               --repo "${{ github.repository }}" \
+              --target "$GITHUB_SHA" \
               --title "Release $VERSION" \
               --notes-file CHANGELOG.md \
               $PRERELEASE_FLAG
@@ -294,9 +384,6 @@ jobs:
 
           git fetch origin main
 
-          # Clean up any existing bump branch for this version
-          git push origin --delete "chore/bump-version-${VERSION_CLEAN}" 2>/dev/null || true
-
           git checkout -b "$BRANCH" origin/main
 
           # Update the root package.json version
@@ -307,7 +394,7 @@ jobs:
             echo "package.json already at version ${VERSION_CLEAN}, skipping."
           else
             git add package.json
-            git commit -m "chore: bump version to ${VERSION_CLEAN} [skip ci]"
+            git commit -s -m "chore: bump version to ${VERSION_CLEAN} [skip ci]"
             git push origin "$BRANCH"
 
             # Create PR and enable auto-merge

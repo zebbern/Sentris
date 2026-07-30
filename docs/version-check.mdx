@@ -4,7 +4,7 @@ Sentris Flow performs a version compatibility check whenever the backend boots. 
 
 ## When it runs
 
-- **Backend bootstrap** – `backend/src/main.ts` invokes the version check before Nest starts listening. Any path that launches the backend (PM2, Docker, `bun --cwd backend run dev`, etc.) hits the endpoint once during startup.
+- **Backend bootstrap** – `backend/src/main.ts` invokes the version check before Nest starts listening. Any path that launches the backend (PM2, Docker, `bun --cwd=backend run dev`, etc.) hits the endpoint once during startup.
 - **CLI startup summary** – At the end of `just dev`, `just prod`, and `just prod build` commands, a colored version status box is displayed.
 
 If the endpoint reports `is_supported=false`, the backend logs an error and continues in fail-open mode. `should_upgrade=true` prints a warning without blocking. Network failures log a warning and allow the workflow to continue (fail-open).

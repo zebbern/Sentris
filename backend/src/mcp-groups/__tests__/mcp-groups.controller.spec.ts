@@ -75,3 +75,39 @@ describe('McpGroupsController.importTemplate', () => {
     );
   });
 });
+
+describe('McpGroupsController relationship mutations', () => {
+  let controller: McpGroupsController;
+  let service: McpGroupsService;
+
+  beforeEach(() => {
+    service = makeService();
+    controller = new McpGroupsController(service);
+  });
+
+  it('passes the actor context to add, update, and remove operations', async () => {
+    const addBody = {
+      serverId: 'server-1',
+      recommended: true,
+      defaultSelected: false,
+    };
+    const updateBody = { recommended: false };
+
+    await controller.addServerToGroup(AUTH_WITH_ORG, 'group-1', addBody);
+    await controller.updateServerInGroup(AUTH_WITH_ORG, 'group-1', 'server-1', updateBody);
+    await controller.removeServerFromGroup(AUTH_WITH_ORG, 'group-1', 'server-1');
+
+    expect(service.addServerToGroup).toHaveBeenCalledWith(AUTH_WITH_ORG, 'group-1', addBody);
+    expect(service.updateServerInGroup).toHaveBeenCalledWith(
+      AUTH_WITH_ORG,
+      'group-1',
+      'server-1',
+      updateBody,
+    );
+    expect(service.removeServerFromGroup).toHaveBeenCalledWith(
+      AUTH_WITH_ORG,
+      'group-1',
+      'server-1',
+    );
+  });
+});

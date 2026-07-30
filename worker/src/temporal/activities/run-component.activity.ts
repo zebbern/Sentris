@@ -28,12 +28,16 @@ import { validateRequiredInputs } from './input-validator';
 import { handleComponentError } from './error-handler';
 import { RedisTerminalStreamAdapter } from '../../adapters';
 import type {
+  FinalizeRunActivityInput,
   RunComponentActivityInput,
   RunComponentActivityOutput,
   WorkflowLogSink,
 } from '../types';
 import type { ArtifactServiceFactory } from '../artifact-factory';
 import { isTraceMetadataAware } from '../utils/trace-metadata';
+import type { RunFinalizationCallback } from '../../common/run-finalizer';
+import { recordNodeIoWithoutChangingExecution } from '../utils/node-io-delivery';
+import { RequiredPublicationTracker } from '../utils/required-publication-tracker';
 
 interface ComponentActivityServices {
   storage: IFileStorageService | undefined;
@@ -44,6 +48,8 @@ interface ComponentActivityServices {
   logs: WorkflowLogSink | undefined;
   terminal: RedisTerminalStreamAdapter | undefined;
   agentTracePublisher: AgentTracePublisher | undefined;
+  runFinalizer: ((input: RunFinalizationCallback) => Promise<void>) | undefined;
+  onRequiredTelemetryFailure: ((message: string) => void) | undefined;
 }
 
 let componentServices: ComponentActivityServices | null = null;
@@ -57,6 +63,8 @@ export function initializeComponentActivityServices(options: {
   logs?: WorkflowLogSink;
   terminalStream?: RedisTerminalStreamAdapter;
   agentTracePublisher?: AgentTracePublisher;
+  runFinalizer?: (input: RunFinalizationCallback) => Promise<void>;
+  onRequiredTelemetryFailure?: (message: string) => void;
 }) {
   if (componentServices !== null) {
     throw new Error('Component activity services already initialized');
@@ -70,6 +78,8 @@ export function initializeComponentActivityServices(options: {
     logs: options.logs,
     terminal: options.terminalStream,
     agentTracePublisher: options.agentTracePublisher,
+    runFinalizer: options.runFinalizer,
+    onRequiredTelemetryFailure: options.onRequiredTelemetryFailure,
   });
 }
 
@@ -99,10 +109,17 @@ export async function setRunMetadataActivity(input: {
   }
 }
 
-export async function finalizeRunActivity(input: { runId: string }): Promise<void> {
-  const { trace } = getComponentServices();
+export async function finalizeRunActivity(input: FinalizeRunActivityInput): Promise<void> {
+  const { trace, runFinalizer } = getComponentServices();
   if (isTraceMetadataAware(trace) && typeof trace.finalizeRun === 'function') {
     trace.finalizeRun(input.runId);
+  }
+  if (runFinalizer && input.status && input.organizationId) {
+    await runFinalizer({
+      ...input,
+      organizationId: input.organizationId,
+      status: input.status,
+    });
   }
 }
 
@@ -130,6 +147,25 @@ export async function runComponentActivity(
   const connectedToolNodeIds = nodeMetadata.connectedToolNodeIds;
   const correlationId = `${input.runId}:${action.ref}:${activityInfo.activityId}`;
   const svc = getComponentServices();
+  const publications = new RequiredPublicationTracker();
+  const organizationId = input.organizationId ?? null;
+  const storage = svc.storage?.forOrganization(organizationId);
+  const secrets = svc.secrets?.forOrganization(organizationId);
+  const trace = svc.trace;
+  const logs = svc.logs;
+  const terminal = svc.terminal;
+  const trackedTrace: ITraceService | undefined = trace
+    ? {
+        record(event) {
+          publications.track(
+            () => trace.record(event),
+            (error: unknown) => {
+              console.error('[Trace] Failed to publish component trace event', error);
+            },
+          );
+        },
+      }
+    : undefined;
 
   const scopedArtifacts = svc.artifacts
     ? svc.artifacts({
@@ -138,222 +174,261 @@ export async function runComponentActivity(
         workflowVersionId: input.workflowVersionId ?? null,
         componentId: action.componentId,
         componentRef: action.ref,
-        organizationId: input.organizationId ?? null,
+        organizationId,
       })
     : undefined;
 
   const allowSecrets = component.requiresSecrets === true;
 
-  const context = createExecutionContext({
-    runId: input.runId,
-    componentRef: action.ref,
-    workflowId: input.workflowId,
-    workflowName: input.workflowName,
-    organizationId: input.organizationId ?? null,
-    metadata: {
-      activityId: activityInfo.activityId,
-      attempt: activityInfo.attempt,
-      correlationId,
-      streamId,
-      joinStrategy,
-      triggeredBy,
-      failure,
-      connectedToolNodeIds,
-      organizationId: input.organizationId ?? undefined,
-    } as any,
-    storage: svc.storage,
-    secrets: allowSecrets ? svc.secrets : undefined,
-    artifacts: scopedArtifacts,
-    trace: svc.trace,
-    logCollector: svc.logs
-      ? (entry) => {
-          void svc.logs
-            ?.append({
-              runId: entry.runId,
-              nodeRef: entry.nodeRef,
-              stream: entry.stream,
-              level: entry.level,
-              message: entry.message,
-              timestamp: new Date(entry.timestamp),
-              metadata: entry.metadata,
-              organizationId: input.organizationId ?? null,
-            })
-            .catch((error: unknown) => {
-              console.error('[Logs] Failed to append log entry', error);
-            });
-        }
-      : undefined,
-    terminalCollector: svc.terminal
-      ? (chunk) => {
-          void svc.terminal?.append(chunk).catch((error: unknown) => {
-            console.error('[Terminal] Failed to append chunk', error);
-          });
-        }
-      : undefined,
-    agentTracePublisher: svc.agentTracePublisher,
-  });
-
-  // Record node I/O start (using raw inputs/params from workflow)
-  await svc.nodeIO?.recordStart({
-    runId: input.runId,
-    nodeRef: action.ref,
-    workflowId: input.workflowId,
-    organizationId: input.organizationId,
-    componentId: action.componentId,
-    inputs: maskSecretInputs(component, { ...inputs, ...params }) as Record<string, unknown>,
-  });
-
-  context.trace?.record({
-    type: 'NODE_STARTED',
-    timestamp: new Date().toISOString(),
-    level: 'info',
-  });
-
-  const warningsToReport = [...warnings];
-
-  // Resolve spilled inputs and params if necessary
-  const spilledObjectsCache = new Map<string, any>();
-  const resolvedParams = { ...params };
-  const resolvedInputs = { ...inputs };
-
-  await unspill(resolvedParams, 'Parameter', svc.storage, spilledObjectsCache, warningsToReport);
-  await unspill(resolvedInputs, 'Input', svc.storage, spilledObjectsCache, warningsToReport);
-  ctx.heartbeat('inputs-resolved');
-
-  // Resolve secret references for input overrides
-  await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
-    secrets: svc.secrets,
-    component,
-    resolvedParams,
-  });
-
-  await resolveLlmProviderModelOverrides(resolvedInputs, {
-    secrets: svc.secrets,
-    componentId: action.componentId,
-  });
-
-  // Also resolve secret references in params (for params with editor: 'secret')
-  await resolveSecretParams(resolvedParams, input.rawParams ?? {}, {
-    secrets: svc.secrets,
-    component,
-  });
-  ctx.heartbeat('secrets-resolved');
-
-  // Validate required inputs and log warnings
-  validateRequiredInputs(warningsToReport, component, resolvedParams, context.trace, action.ref);
-
-  // For components with dynamic ports (resolvePorts), resolve the actual input schemas
-  let inputsSchema = component.inputs;
-  if (typeof component.resolvePorts === 'function') {
-    const resolved = component.resolvePorts(params);
-    if (resolved?.inputs) {
-      inputsSchema = resolved.inputs;
-    }
-  }
-
-  const parsedInputs = inputsSchema.parse(resolvedInputs);
-  const parsedParams = component.parameters
-    ? component.parameters.parse(resolvedParams)
-    : resolvedParams;
-  ctx.heartbeat('validated');
-
   try {
-    // Execute the component logic directly so that any
-    // normalisation/parsing inside `execute` runs.
-    // Docker/remote execution should be invoked from within
-    // the component via `runComponentWithRunner`.
-    //
-    // Send periodic heartbeats during execution so long-running
-    // Docker containers (e.g. testssl.sh, trivy) don't exceed
-    // the Temporal heartbeat timeout.
-    const heartbeatInterval = setInterval(() => {
-      ctx.heartbeat('executing');
-    }, 15_000);
-    let output: Awaited<ReturnType<typeof component.execute>>;
-    try {
-      output = await component.execute({ inputs: parsedInputs, params: parsedParams }, context);
-    } finally {
-      clearInterval(heartbeatInterval);
-    }
-    ctx.heartbeat('execution-complete');
-
-    // Check if component requested suspension (e.g. approval gate)
-    const isSuspended =
-      output &&
-      typeof output === 'object' &&
-      'pending' in output &&
-      (output as any).pending === true;
-
-    // Extract activeOutputPorts if component returned them (for conditional execution)
-    const activeOutputPorts =
-      output && typeof output === 'object' && 'activeOutputPorts' in output
-        ? ((output as any).activeOutputPorts as string[])
-        : undefined;
-
-    if (!isSuspended) {
-      // 1. Check for payload size and spill if necessary
-      if (output) {
-        try {
-          const outputStr = JSON.stringify(output);
-          const size = Buffer.byteLength(outputStr, 'utf8');
-
-          if (size > TEMPORAL_SPILL_THRESHOLD_BYTES && svc.storage) {
-            const fileId = crypto.randomUUID();
-
-            await svc.storage.uploadFile(
-              fileId,
-              'output.json',
-              Buffer.from(outputStr),
-              'application/json',
+    const context = createExecutionContext({
+      runId: input.runId,
+      componentRef: action.ref,
+      workflowId: input.workflowId,
+      workflowName: input.workflowName,
+      organizationId,
+      scopeId: input.scopeId ?? null,
+      signal: ctx.cancellationSignal,
+      metadata: {
+        activityId: activityInfo.activityId,
+        attempt: activityInfo.attempt,
+        correlationId,
+        streamId,
+        joinStrategy,
+        triggeredBy,
+        failure,
+        connectedToolNodeIds,
+        organizationId: input.organizationId ?? undefined,
+      } as any,
+      storage,
+      secrets: allowSecrets ? secrets : undefined,
+      artifacts: scopedArtifacts,
+      trace: trackedTrace,
+      logCollector: logs
+        ? (entry) => {
+            publications.track(
+              () =>
+                logs.append({
+                  runId: entry.runId,
+                  nodeRef: entry.nodeRef,
+                  stream: entry.stream,
+                  level: entry.level,
+                  message: entry.message,
+                  timestamp: new Date(entry.timestamp),
+                  metadata: entry.metadata,
+                  organizationId: input.organizationId ?? null,
+                }),
+              (error: unknown) => {
+                console.error('[Logs] Failed to append log entry', error);
+              },
             );
-
-            // Replace output with standardized spilled marker
-            output = {
-              __spilled__: true,
-              storageRef: fileId,
-              originalSize: size,
-            };
           }
-        } catch (err: unknown) {
-          console.warn('[Activity] Failed to check/spill output size', err);
-          // Continue with original output - if it fails in Temporal, it fails.
-        }
-      }
+        : undefined,
+      terminalCollector: terminal
+        ? (chunk) => {
+            publications.track(
+              () => terminal.append(chunk),
+              (error: unknown) => {
+                console.error('[Terminal] Failed to append chunk', error);
+                const detail = error instanceof Error ? error.message : String(error);
+                svc.onRequiredTelemetryFailure?.(
+                  `Required terminal telemetry publication failed: ${detail}`,
+                );
+              },
+            );
+          }
+        : undefined,
+      agentTracePublisher: svc.agentTracePublisher,
+    });
 
-      // Record node I/O completion
-      await svc.nodeIO?.recordCompletion({
+    // Record node I/O start (using raw inputs/params from workflow)
+    await recordNodeIoWithoutChangingExecution(() =>
+      svc.nodeIO?.recordStart({
         runId: input.runId,
         nodeRef: action.ref,
+        workflowId: input.workflowId,
+        organizationId: input.organizationId,
         componentId: action.componentId,
-        outputs: maskSecretOutputs(component, output) as Record<string, unknown>,
-        status: 'completed',
-      });
+        inputs: maskSecretInputs(component, { ...inputs, ...params }) as Record<string, unknown>,
+      }),
+    );
 
-      context.trace?.record({
-        type: 'NODE_COMPLETED',
-        timestamp: new Date().toISOString(),
-        outputSummary: createLightweightSummary(component, output),
-        data: activeOutputPorts ? { activatedPorts: activeOutputPorts } : undefined,
-        level: 'info',
-      });
+    context.trace?.record({
+      type: 'NODE_STARTED',
+      timestamp: new Date().toISOString(),
+      level: 'info',
+    });
+
+    const warningsToReport = [...warnings];
+
+    // Resolve spilled inputs and params if necessary
+    const spilledObjectsCache = new Map<string, any>();
+    const resolvedParams = { ...params };
+    const resolvedInputs = { ...inputs };
+
+    await unspill(
+      resolvedParams,
+      'Parameter',
+      storage,
+      spilledObjectsCache,
+      warningsToReport,
+      organizationId,
+    );
+    await unspill(
+      resolvedInputs,
+      'Input',
+      storage,
+      spilledObjectsCache,
+      warningsToReport,
+      organizationId,
+    );
+    ctx.heartbeat('inputs-resolved');
+
+    // Resolve secret references for input overrides
+    await resolveSecretInputOverrides(resolvedInputs, input.inputOverrides ?? {}, {
+      secrets,
+      component,
+      resolvedParams,
+      organizationId,
+    });
+
+    await resolveLlmProviderModelOverrides(resolvedInputs, {
+      secrets,
+      componentId: action.componentId,
+      organizationId,
+    });
+
+    // Also resolve secret references in params (for params with editor: 'secret')
+    await resolveSecretParams(resolvedParams, input.rawParams ?? {}, {
+      secrets,
+      component,
+      organizationId,
+    });
+    ctx.heartbeat('secrets-resolved');
+
+    // Validate required inputs and log warnings
+    validateRequiredInputs(warningsToReport, component, resolvedParams, context.trace, action.ref);
+
+    // For components with dynamic ports (resolvePorts), resolve the actual input schemas
+    let inputsSchema = component.inputs;
+    if (typeof component.resolvePorts === 'function') {
+      const resolved = component.resolvePorts(params);
+      if (resolved?.inputs) {
+        inputsSchema = resolved.inputs;
+      }
     }
 
-    return { output, activeOutputPorts };
-  } catch (error: unknown) {
-    return await handleComponentError(error, {
-      actionRef: action.ref,
-      componentId: action.componentId,
-      activityId: activityInfo.activityId,
-      attempt: activityInfo.attempt,
-      runId: input.runId,
-      streamId,
-      joinStrategy,
-      triggeredBy,
-      failure,
-      trace: context.trace,
-      nodeIO: svc.nodeIO,
-    });
+    const parsedInputs = inputsSchema.parse(resolvedInputs);
+    const parsedParams = component.parameters
+      ? component.parameters.parse(resolvedParams)
+      : resolvedParams;
+    ctx.heartbeat('validated');
+
+    try {
+      // Execute the component logic directly so that any
+      // normalisation/parsing inside `execute` runs.
+      // Docker/remote execution should be invoked from within
+      // the component via `runComponentWithRunner`.
+      //
+      // Send periodic heartbeats during execution so long-running
+      // Docker containers (e.g. testssl.sh, trivy) don't exceed
+      // the Temporal heartbeat timeout.
+      const heartbeatInterval = setInterval(() => {
+        ctx.heartbeat('executing');
+      }, 15_000);
+      let output: Awaited<ReturnType<typeof component.execute>>;
+      try {
+        output = await component.execute({ inputs: parsedInputs, params: parsedParams }, context);
+      } finally {
+        clearInterval(heartbeatInterval);
+      }
+      ctx.heartbeat('execution-complete');
+
+      // Check if component requested suspension (e.g. approval gate)
+      const isSuspended =
+        output &&
+        typeof output === 'object' &&
+        'pending' in output &&
+        (output as any).pending === true;
+
+      // Extract activeOutputPorts if component returned them (for conditional execution)
+      const activeOutputPorts =
+        output && typeof output === 'object' && 'activeOutputPorts' in output
+          ? ((output as any).activeOutputPorts as string[])
+          : undefined;
+
+      if (!isSuspended) {
+        // 1. Check for payload size and spill if necessary
+        if (output) {
+          try {
+            const outputStr = JSON.stringify(output);
+            const size = Buffer.byteLength(outputStr, 'utf8');
+
+            if (size > TEMPORAL_SPILL_THRESHOLD_BYTES && storage) {
+              const fileId = crypto.randomUUID();
+
+              await storage.uploadFile(
+                fileId,
+                'output.json',
+                Buffer.from(outputStr),
+                'application/json',
+              );
+
+              // Replace output with standardized spilled marker
+              output = {
+                __spilled__: true,
+                storageRef: fileId,
+                originalSize: size,
+              };
+            }
+          } catch (err: unknown) {
+            console.warn('[Activity] Failed to check/spill output size', err);
+            // Continue with original output - if it fails in Temporal, it fails.
+          }
+        }
+
+        // Record node I/O completion
+        await recordNodeIoWithoutChangingExecution(() =>
+          svc.nodeIO?.recordCompletion({
+            runId: input.runId,
+            nodeRef: action.ref,
+            organizationId,
+            componentId: action.componentId,
+            outputs: maskSecretOutputs(component, output) as Record<string, unknown>,
+            status: 'completed',
+          }),
+        );
+
+        context.trace?.record({
+          type: 'NODE_COMPLETED',
+          timestamp: new Date().toISOString(),
+          outputSummary: createLightweightSummary(component, output),
+          data: activeOutputPorts ? { activatedPorts: activeOutputPorts } : undefined,
+          level: 'info',
+        });
+      }
+
+      return { output, activeOutputPorts };
+    } catch (error: unknown) {
+      if (ctx.cancellationSignal.aborted) {
+        throw ctx.cancellationSignal.reason ?? error;
+      }
+      return await handleComponentError(error, {
+        actionRef: action.ref,
+        componentId: action.componentId,
+        activityId: activityInfo.activityId,
+        attempt: activityInfo.attempt,
+        runId: input.runId,
+        organizationId,
+        streamId,
+        joinStrategy,
+        triggeredBy,
+        failure,
+        trace: context.trace,
+        nodeIO: svc.nodeIO,
+      });
+    }
   } finally {
-    // Do not finalize run here; lifecycle is managed by workflow orchestration.
+    await publications.drain();
   }
 }

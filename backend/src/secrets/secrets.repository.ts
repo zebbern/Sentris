@@ -6,6 +6,7 @@ import { DRIZZLE_TOKEN } from '../database/database.module';
 import { secrets, secretVersions, type NewSecret, type NewSecretVersion } from '../database/schema';
 import { DEFAULT_ORGANIZATION_ID } from '../auth/constants';
 import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface SecretSummary {
   id: string;
@@ -40,6 +41,8 @@ export interface SecretUpdateData {
 export interface SecretQueryOptions {
   organizationId?: string | null;
 }
+
+type SecretMutationHook = (executor: OutboxExecutor, secret: SecretSummary) => Promise<void>;
 
 @Injectable()
 export class SecretsRepository {
@@ -125,6 +128,14 @@ export class SecretsRepository {
   }
 
   async findById(secretId: string, options: SecretQueryOptions = {}): Promise<SecretSummary> {
+    return this.findByIdWithExecutor(this.db, secretId, options);
+  }
+
+  private async findByIdWithExecutor(
+    executor: Pick<NodePgDatabase, 'select'>,
+    secretId: string,
+    options: SecretQueryOptions = {},
+  ): Promise<SecretSummary> {
     const conditions: SQL[] = [eq(secrets.id, secretId)];
     if (options.organizationId) {
       conditions.push(eq(secrets.organizationId, options.organizationId));
@@ -132,7 +143,7 @@ export class SecretsRepository {
 
     const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-    const rows = await this.db
+    const rows = await executor
       .select({
         id: secrets.id,
         name: secrets.name,
@@ -202,6 +213,7 @@ export class SecretsRepository {
   async createSecret(
     secretData: Omit<NewSecret, 'id' | 'createdAt' | 'updatedAt'>,
     versionData: Omit<NewSecretVersion, 'id' | 'secretId' | 'version' | 'createdAt' | 'isActive'>,
+    onMutated?: SecretMutationHook,
   ): Promise<SecretSummary> {
     try {
       return await this.db.transaction(async (tx) => {
@@ -233,7 +245,7 @@ export class SecretsRepository {
           .where(eq(secrets.id, secret.id))
           .returning();
 
-        return this.mapSummary({
+        const summary = this.mapSummary({
           id: updatedSecret.id,
           name: updatedSecret.name,
           description: updatedSecret.description,
@@ -245,6 +257,8 @@ export class SecretsRepository {
           versionCreatedAt: insertedVersion.createdAt,
           versionCreatedBy: insertedVersion.createdBy,
         });
+        await onMutated?.(tx, summary);
+        return summary;
       });
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
@@ -258,6 +272,7 @@ export class SecretsRepository {
     secretId: string,
     versionData: Omit<NewSecretVersion, 'secretId' | 'version' | 'createdAt' | 'isActive'>,
     options: SecretQueryOptions = {},
+    onMutated?: SecretMutationHook,
   ): Promise<SecretSummary> {
     return this.db.transaction(async (tx) => {
       const orgId = options.organizationId ?? DEFAULT_ORGANIZATION_ID;
@@ -304,7 +319,7 @@ export class SecretsRepository {
         .where(eq(secrets.id, secretId))
         .returning();
 
-      return this.mapSummary({
+      const summary = this.mapSummary({
         id: updatedSecret.id,
         name: updatedSecret.name,
         description: updatedSecret.description,
@@ -316,6 +331,8 @@ export class SecretsRepository {
         versionCreatedAt: insertedVersion.createdAt,
         versionCreatedBy: insertedVersion.createdBy,
       });
+      await onMutated?.(tx, summary);
+      return summary;
     });
   }
 
@@ -323,9 +340,8 @@ export class SecretsRepository {
     secretId: string,
     updates: SecretUpdateData,
     options: SecretQueryOptions = {},
+    onMutated?: SecretMutationHook,
   ): Promise<SecretSummary> {
-    await this.ensureSecretExists(secretId, options);
-
     const updatePayload: Partial<Omit<NewSecret, 'id' | 'createdAt' | 'updatedAt'>> = {};
 
     if (updates.name !== undefined) {
@@ -345,42 +361,60 @@ export class SecretsRepository {
     }
 
     try {
-      const conditions: SQL[] = [eq(secrets.id, secretId)];
-      if (options.organizationId) {
-        conditions.push(eq(secrets.organizationId, options.organizationId));
-      }
+      const mutate = async (
+        executor: Pick<NodePgDatabase, 'insert' | 'select' | 'update'>,
+      ): Promise<SecretSummary> => {
+        await this.ensureSecretExistsWithExecutor(executor, secretId, options);
 
-      await this.db
-        .update(secrets)
-        .set({
-          ...updatePayload,
-          updatedAt: sql`now()`,
-        })
-        .where(and(...conditions));
+        const conditions: SQL[] = [eq(secrets.id, secretId)];
+        if (options.organizationId) {
+          conditions.push(eq(secrets.organizationId, options.organizationId));
+        }
+
+        await executor
+          .update(secrets)
+          .set({
+            ...updatePayload,
+            updatedAt: sql`now()`,
+          })
+          .where(and(...conditions));
+
+        const summary = await this.findByIdWithExecutor(executor, secretId, options);
+        await onMutated?.(executor, summary);
+        return summary;
+      };
+
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION && updates.name) {
         throw new ConflictException(`Secret name '${updates.name}' already exists`);
       }
       throw error;
     }
-
-    return this.findById(secretId, options);
   }
 
-  async deleteSecret(secretId: string, options: SecretQueryOptions = {}): Promise<void> {
+  async deleteSecret(
+    secretId: string,
+    options: SecretQueryOptions = {},
+    onMutated?: (executor: OutboxExecutor) => Promise<void>,
+  ): Promise<void> {
     const conditions: SQL[] = [eq(secrets.id, secretId)];
     if (options.organizationId) {
       conditions.push(eq(secrets.organizationId, options.organizationId));
     }
 
-    const deleted = await this.db
-      .delete(secrets)
-      .where(and(...conditions))
-      .returning({ id: secrets.id });
+    const mutate = async (executor: Pick<NodePgDatabase, 'delete' | 'insert'>) => {
+      const deleted = await executor
+        .delete(secrets)
+        .where(and(...conditions))
+        .returning({ id: secrets.id });
 
-    if (deleted.length === 0) {
-      throw new NotFoundException(`Secret ${secretId} not found`);
-    }
+      if (deleted.length === 0) {
+        throw new NotFoundException(`Secret ${secretId} not found`);
+      }
+      await onMutated?.(executor);
+    };
+    await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
   }
 
   private mapSummary(row: {
@@ -414,7 +448,8 @@ export class SecretsRepository {
     };
   }
 
-  private async ensureSecretExists(
+  private async ensureSecretExistsWithExecutor(
+    executor: Pick<NodePgDatabase, 'select'>,
     secretId: string,
     options: SecretQueryOptions = {},
   ): Promise<void> {
@@ -424,7 +459,11 @@ export class SecretsRepository {
     }
     const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-    const rows = await this.db.select({ id: secrets.id }).from(secrets).where(whereClause).limit(1);
+    const rows = await executor
+      .select({ id: secrets.id })
+      .from(secrets)
+      .where(whereClause)
+      .limit(1);
     if (rows.length === 0) {
       throw new NotFoundException(`Secret ${secretId} not found`);
     }

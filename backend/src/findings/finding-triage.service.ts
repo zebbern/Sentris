@@ -1,41 +1,36 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import type { FindingTriageRecord } from '../database/schema';
 import type { AuthContext } from '../auth/types';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
 import { SecurityAnalyticsService } from '../analytics/security-analytics.service';
+import { findingsUnavailable } from '../analytics/findings-unavailable';
 import { OrgMembersService } from '../org/org-members.service';
-import { FindingTriageRepository } from './finding-triage.repository';
+import {
+  FindingTriageRepository,
+  FindingTriageWriteConflictError,
+} from './finding-triage.repository';
 import { validateTransition } from './triage-state-machine';
 import type { FindingTriageStatus } from './dto/triage-update.dto';
 import type { BulkTriageResponse } from './dto/bulk-triage.dto';
 import type { TriageHistoryResponse } from './dto/triage-history.dto';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 interface TriageUpdateInput {
   status?: FindingTriageStatus;
-  assigneeUserId?: string;
+  assigneeUserId?: string | null;
   severityOverride?: string | null;
   notes?: string | null;
   comment?: string;
-}
-
-/** Payload emitted on the `finding.triage.changed` event. */
-export interface FindingTriageChangedEvent {
-  findingTriageId: string;
-  findingOpensearchId: string;
-  organizationId: string;
-  status: string;
-  previousStatus: string;
-  /** Origin of the change — used for circular-sync prevention. */
-  source: string;
 }
 
 export interface TriageResponseDto {
@@ -48,6 +43,7 @@ export interface TriageResponseDto {
   slaDeadline: string | null;
   createdAt: string;
   updatedAt: string;
+  projectionVersion: number;
 }
 
 export interface TriageData {
@@ -56,6 +52,25 @@ export interface TriageData {
   severityOverride: string | null;
   notes: string | null;
   updatedAt: string;
+  projectionVersion: number;
+}
+
+export type FindingProjectionHealthReason =
+  | 'not_reconciled'
+  | 'reconciliation_in_progress'
+  | 'reconciliation_failed'
+  | 'authoritative_updates_pending'
+  | 'watermark_missing'
+  | 'observation_index_rebuilt'
+  | 'watermark_mismatch'
+  | 'projection_events_pending'
+  | 'health_check_failed';
+
+export interface FindingProjectionHealth {
+  availability: 'available' | 'degraded';
+  completedAt: string | null;
+  reconciledThrough: string | null;
+  reason: FindingProjectionHealthReason | null;
 }
 
 @Injectable()
@@ -67,7 +82,6 @@ export class FindingTriageService {
     private readonly auditLogService: AuditLogService,
     private readonly securityAnalyticsService: SecurityAnalyticsService,
     private readonly orgMembersService: OrgMembersService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -105,51 +119,38 @@ export class FindingTriageService {
       }
     }
 
-    if (input.assigneeUserId) {
+    if (input.assigneeUserId !== undefined && input.assigneeUserId !== null) {
       const members = await this.orgMembersService.listMembers(organizationId);
       if (!members.some((m) => m.userId === input.assigneeUserId)) {
         throw new BadRequestException('Assignee must be a member of the organization');
       }
     }
 
-    const record = await this.repository.upsert(organizationId, findingOpensearchId, {
-      status: input.status,
-      assigneeUserId: input.assigneeUserId,
-      severityOverride: input.severityOverride,
-      notes: input.notes,
-    });
-
-    const events = this.buildEvents(existing, input, record.id, userId);
-    if (events.length > 0) {
-      await this.repository.addEvents(events);
-    }
-
-    this.auditLogService.record(auth, {
-      action: 'findings.triage',
-      resourceType: 'finding_triage',
-      resourceId: findingOpensearchId,
-      resourceName: null,
-      metadata: {
-        findingOpensearchId,
-        changes: Object.fromEntries(
-          events.map((e) => [e.fieldChanged, { old: e.oldValue, new: e.newValue }]),
-        ),
+    const { record } = await this.commitWithRetry(
+      organizationId,
+      findingOpensearchId,
+      input,
+      source,
+      userId,
+      existing,
+      async (executor, events) => {
+        await this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'findings.triage',
+          resourceType: 'finding_triage',
+          resourceId: findingOpensearchId,
+          resourceName: null,
+          metadata: {
+            findingOpensearchId,
+            changes: Object.fromEntries(
+              events.map((event) => [
+                event.fieldChanged,
+                { old: event.oldValue, new: event.newValue },
+              ]),
+            ),
+          },
+        });
       },
-    });
-
-    try {
-      this.eventEmitter.emit('finding.triage.changed', {
-        findingTriageId: record.id,
-        findingOpensearchId,
-        organizationId,
-        status: record.status,
-        previousStatus: currentStatus,
-        source,
-        userId: auth.userId,
-      } satisfies FindingTriageChangedEvent & { userId: string | null });
-    } catch (err) {
-      this.logger.warn(`Failed to emit finding.triage.changed event: ${err}`);
-    }
+    );
 
     return this.toResponse(record);
   }
@@ -165,21 +166,18 @@ export class FindingTriageService {
     const organizationId = requireOrganizationId(auth);
     const userId = auth.userId!;
 
+    if (input.assigneeUserId !== undefined && input.assigneeUserId !== null) {
+      const members = await this.orgMembersService.listMembers(organizationId);
+      if (!members.some((member) => member.userId === input.assigneeUserId)) {
+        throw new BadRequestException('Assignee must be a member of the organization');
+      }
+    }
+
     const existingRecords =
       findingIds.length > 0 ? await this.repository.findByIds(organizationId, findingIds) : [];
     const existingMap = new Map(existingRecords.map((r) => [r.findingOpensearchId, r]));
 
     const results: { findingId: string; success: boolean; error?: string }[] = [];
-    const allEvents: {
-      findingTriageId: string;
-      eventType: string;
-      fieldChanged: string | null;
-      oldValue: string | null;
-      newValue: string | null;
-      userId: string;
-      comment: string | null;
-    }[] = [];
-
     for (const findingId of findingIds) {
       // Validate finding exists in OpenSearch
       try {
@@ -207,50 +205,50 @@ export class FindingTriageService {
         }
       }
 
-      const record = await this.repository.upsert(organizationId, findingId, {
-        status: input.status,
-        assigneeUserId: input.assigneeUserId,
-      });
-
-      const events = this.buildEvents(existing, input, record.id, userId);
-      allEvents.push(...events);
-      results.push({ findingId, success: true });
-
       try {
-        this.eventEmitter.emit('finding.triage.changed', {
-          findingTriageId: record.id,
-          findingOpensearchId: findingId,
+        await this.commitWithRetry(
           organizationId,
-          status: record.status,
-          previousStatus: currentStatus,
-          source: 'user',
+          findingId,
+          input,
+          'user',
           userId,
-        });
-      } catch (err) {
-        this.logger.warn(`Failed to emit finding.triage.changed event for ${findingId}: ${err}`);
+          existing,
+          async (executor, events) => {
+            await this.auditLogService.recordDurableWithExecutor(executor, auth, {
+              action: 'findings.bulk_triage',
+              resourceType: 'finding_triage',
+              resourceId: findingId,
+              resourceName: null,
+              metadata: {
+                findingOpensearchId: findingId,
+                requestedStatus: input.status ?? null,
+                requestedAssigneeUserId: input.assigneeUserId ?? null,
+                changes: Object.fromEntries(
+                  events.map((event) => [
+                    event.fieldChanged,
+                    { old: event.oldValue, new: event.newValue },
+                  ]),
+                ),
+              },
+            });
+          },
+        );
+        results.push({ findingId, success: true });
+      } catch (error) {
+        if (error instanceof ConflictException || error instanceof BadRequestException) {
+          results.push({
+            findingId,
+            success: false,
+            error: error.message,
+          });
+          continue;
+        }
+        throw error;
       }
-    }
-
-    if (allEvents.length > 0) {
-      await this.repository.addEvents(allEvents);
     }
 
     const successCount = results.filter((r) => r.success).length;
     const failureCount = results.filter((r) => !r.success).length;
-
-    this.auditLogService.record(auth, {
-      action: 'findings.bulk_triage',
-      resourceType: 'finding_triage',
-      resourceId: null,
-      resourceName: null,
-      metadata: {
-        findingIds,
-        status: input.status ?? null,
-        assigneeUserId: input.assigneeUserId ?? null,
-        successCount,
-        failureCount,
-      },
-    });
 
     return { results, successCount, failureCount };
   }
@@ -322,47 +320,187 @@ export class FindingTriageService {
               severityOverride: record.severityOverride,
               notes: record.notes,
               updatedAt: record.updatedAt.toISOString(),
+              projectionVersion: record.projectionVersion,
             }
           : null,
       };
     });
   }
 
-  /**
-   * Get OpenSearch IDs matching the given triage statuses.
-   */
-  async getTriageByStatus(
-    organizationId: string,
-    statuses: FindingTriageStatus[],
-  ): Promise<string[]> {
-    return this.repository.findByStatus(organizationId, statuses);
-  }
+  async getProjectionHealth(organizationId: string): Promise<FindingProjectionHealth> {
+    try {
+      if (!(await this.repository.hasTriageRecords(organizationId))) {
+        return {
+          availability: 'available',
+          completedAt: null,
+          reconciledThrough: null,
+          reason: null,
+        };
+      }
 
-  /**
-   * Get all OpenSearch IDs that have any triage record.
-   * Used for triageStatus=new filter (findings NOT in PG).
-   */
-  async getAllTriagedIds(organizationId: string): Promise<string[]> {
-    return this.repository.getAllTriagedIds(organizationId);
+      const state = await this.repository.getProjectionReconciliationState(organizationId);
+      if (!state?.lastCompletedAt || !state.reconciledThrough) {
+        return this.degradedProjectionHealth(state, 'not_reconciled');
+      }
+      if (state.cursor || state.cycleStartedAt || state.cycleCutoff) {
+        return this.degradedProjectionHealth(state, 'reconciliation_in_progress');
+      }
+      if (state.failed > 0) {
+        return this.degradedProjectionHealth(state, 'reconciliation_failed');
+      }
+      if (
+        await this.repository.hasAuthoritativeChangesAfter(organizationId, state.reconciledThrough)
+      ) {
+        return this.degradedProjectionHealth(state, 'authoritative_updates_pending');
+      }
+
+      const watermark =
+        await this.securityAnalyticsService.getFindingTriageProjectionWatermark(organizationId);
+      if (!watermark) {
+        return this.degradedProjectionHealth(state, 'watermark_missing');
+      }
+      if (!watermark.matchesCurrentObservationIndex) {
+        return this.degradedProjectionHealth(state, 'observation_index_rebuilt');
+      }
+      if (
+        watermark.completedAt !== state.lastCompletedAt.toISOString() ||
+        watermark.reconciledThrough !== state.reconciledThrough.toISOString() ||
+        watermark.checked !== state.checked ||
+        watermark.repaired !== state.repaired ||
+        watermark.failed !== state.failed
+      ) {
+        return this.degradedProjectionHealth(state, 'watermark_mismatch');
+      }
+
+      return {
+        availability: 'available',
+        completedAt: state.lastCompletedAt.toISOString(),
+        reconciledThrough: state.reconciledThrough.toISOString(),
+        reason: null,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Unable to establish finding projection health for ${organizationId}: ${error}`,
+      );
+      return {
+        availability: 'degraded',
+        completedAt: null,
+        reconciledThrough: null,
+        reason: 'health_check_failed',
+      };
+    }
   }
 
   // -----------------------------------------------------------------------
   // Private helpers
   // -----------------------------------------------------------------------
 
+  private degradedProjectionHealth(
+    state:
+      | {
+          lastCompletedAt: Date | null;
+          reconciledThrough: Date | null;
+        }
+      | null
+      | undefined,
+    reason: FindingProjectionHealthReason,
+  ): FindingProjectionHealth {
+    return {
+      availability: 'degraded',
+      completedAt: state?.lastCompletedAt?.toISOString() ?? null,
+      reconciledThrough: state?.reconciledThrough?.toISOString() ?? null,
+      reason,
+    };
+  }
+
+  private async commitWithRetry(
+    organizationId: string,
+    findingOpensearchId: string,
+    input: TriageUpdateInput,
+    source: string,
+    userId: string,
+    initialExisting: FindingTriageRecord | null,
+    onCommitted: (
+      executor: OutboxExecutor,
+      events: ReturnType<FindingTriageService['buildEvents']>,
+    ) => Promise<void>,
+  ): Promise<{
+    record: FindingTriageRecord;
+    events: ReturnType<FindingTriageService['buildEvents']>;
+  }> {
+    let existing = initialExisting;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const currentStatus: FindingTriageStatus = (existing?.status as FindingTriageStatus) ?? 'new';
+      if (input.status && input.status !== currentStatus) {
+        const transition = validateTransition(currentStatus, input.status);
+        if (!transition.valid) {
+          throw new UnprocessableEntityException({
+            message: `Invalid status transition from '${currentStatus}' to '${input.status}'`,
+            currentStatus,
+            validTransitions: transition.allowedTransitions,
+          });
+        }
+      }
+
+      const triageId = existing?.id ?? randomUUID();
+      const events = this.buildEvents(existing, input, triageId, userId);
+      if (events.length === 0) {
+        if (existing) return { record: existing, events };
+        throw new BadRequestException('Triage update does not change state');
+      }
+
+      try {
+        const record = await this.repository.transaction(async (executor) => {
+          const committedRecord = await this.repository.commitChange(
+            {
+              organizationId,
+              findingOpensearchId,
+              triageId,
+              expectedVersion: existing?.projectionVersion ?? 0,
+              previousStatus: currentStatus,
+              source,
+              userId,
+              data: {
+                status: input.status,
+                assigneeUserId: input.assigneeUserId,
+                severityOverride: input.severityOverride,
+                notes: input.notes,
+              },
+              events: events.map(
+                ({ findingTriageId: _findingTriageId, userId: _userId, ...event }) => event,
+              ),
+            },
+            executor,
+          );
+          await onCommitted(executor, events);
+          return committedRecord;
+        });
+        return { record, events };
+      } catch (error) {
+        if (!(error instanceof FindingTriageWriteConflictError) || attempt === 1) {
+          if (error instanceof FindingTriageWriteConflictError) {
+            throw new ConflictException('Finding triage changed concurrently; retry the update');
+          }
+          throw error;
+        }
+        existing = await this.repository.findByOrgAndFindingId(organizationId, findingOpensearchId);
+      }
+    }
+
+    throw new ConflictException('Finding triage changed concurrently; retry the update');
+  }
+
   private async assertFindingExists(
     organizationId: string,
     findingOpensearchId: string,
   ): Promise<void> {
     if (!this.securityAnalyticsService.isAvailable()) {
-      this.logger.warn(
-        `OpenSearch unavailable — skipping finding existence check for ${findingOpensearchId}`,
-      );
-      return;
+      throw findingsUnavailable('Finding data is unavailable');
     }
 
     try {
-      const result = await this.securityAnalyticsService.query(organizationId, {
+      const result = await this.securityAnalyticsService.queryFindings(organizationId, {
         query: { ids: { values: [findingOpensearchId] } },
         size: 1,
       });
@@ -373,6 +511,7 @@ export class FindingTriageService {
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       this.logger.warn(`OpenSearch query failed during finding check: ${error}`);
+      throw findingsUnavailable('Finding data is unavailable');
     }
   }
 
@@ -476,6 +615,7 @@ export class FindingTriageService {
       slaDeadline: record.slaDeadline?.toISOString() ?? null,
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
+      projectionVersion: record.projectionVersion,
     };
   }
 }

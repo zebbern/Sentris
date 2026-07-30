@@ -1,5 +1,13 @@
-import { Client } from '@opensearch-project/opensearch';
+/* eslint-disable no-console -- This setup CLI reports provisioning progress and failures. */
+import { Client, type API } from '@opensearch-project/opensearch';
 import { config } from 'dotenv';
+import { buildAllFindingObservationIndexPattern } from '@sentris/shared/finding-observation-id';
+import {
+  FINDINGS_FINAL_INGEST_PIPELINE_ID,
+  FINDINGS_INDEX_TEMPLATE_VERSION,
+  buildFindingsFinalIngestPipeline,
+  buildFindingsIndexTemplate,
+} from '../src/analytics/findings-index-template';
 
 // Load environment variables
 config();
@@ -29,55 +37,39 @@ async function main() {
     const healthCheck = await client.cluster.health();
     console.log(`✅ Connected to OpenSearch cluster (status: ${healthCheck.body.status})`);
 
-    // Create index template for security-findings-*
+    // Apply finding invariants only to canonical observation indexes. Custom
+    // analytics suffixes intentionally retain their generic OpenSearch shape.
     const templateName = 'security-findings-template';
+    const observationIndexPattern = buildAllFindingObservationIndexPattern();
     console.log(`\n📋 Creating index template: ${templateName}`);
+
+    await client.ingest.putPipeline({
+      id: FINDINGS_FINAL_INGEST_PIPELINE_ID,
+      // The client declarations require mutable arrays even though request
+      // serialization never mutates this deterministic builder output.
+      body: buildFindingsFinalIngestPipeline() as unknown as API.Ingest_PutPipeline_RequestBody,
+    });
 
     await client.indices.putIndexTemplate({
       name: templateName,
-      body: {
-        index_patterns: ['security-findings-*'],
-        template: {
-          settings: {
-            number_of_shards: 1,
-            number_of_replicas: 1,
-          },
-          mappings: {
-            properties: {
-              '@timestamp': { type: 'date' },
-              // Root-level analytics fields
-              scanner: { type: 'keyword' },
-              severity: { type: 'keyword' },
-              finding_hash: { type: 'keyword' },
-              asset_key: { type: 'keyword' },
-              // Workflow context under sentris namespace
-              sentris: {
-                type: 'object',
-                dynamic: 'true',
-                properties: {
-                  organization_id: { type: 'keyword' },
-                  run_id: { type: 'keyword' },
-                  workflow_id: { type: 'keyword' },
-                  workflow_name: { type: 'keyword' },
-                  component_id: { type: 'keyword' },
-                  node_ref: { type: 'keyword' },
-                  asset_key: { type: 'keyword' },
-                },
-              },
-            },
-          },
-        },
-      },
+      // OpenSearch accepts boolean `dynamic`; the generated client declaration
+      // is narrower than the wire contract used by the verified template.
+      body: buildFindingsIndexTemplate([
+        observationIndexPattern,
+      ]) as unknown as API.Indices_PutIndexTemplate_RequestBody,
     });
 
     console.log(`✅ Index template '${templateName}' created successfully`);
     console.log('\n📊 Template configuration:');
-    console.log('  - Index pattern: security-findings-*');
+    console.log(`  - Index pattern: ${observationIndexPattern}`);
     console.log('  - Shards: 1, Replicas: 1');
-    console.log('  - Mappings: @timestamp (date)');
-    console.log('              root: scanner, severity, finding_hash, asset_key (keyword)');
+    console.log(`  - Template version: ${FINDINGS_INDEX_TEMPLATE_VERSION}`);
+    console.log('  - Mappings: canonical observation fields and exact sentris.triage fields');
+    console.log(
+      '              root: scanner, severity, finding_hash, finding_id, contract, asset_key',
+    );
     console.log('              sentris.*: organization_id, run_id, workflow_id, workflow_name,');
-    console.log('                         component_id, node_ref, asset_key (keyword)');
+    console.log('                         scope_id, component_id, node_ref, asset_key (keyword)');
     console.log('\n🎉 OpenSearch setup completed successfully!');
   } catch (error) {
     console.error('❌ OpenSearch setup failed');

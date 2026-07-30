@@ -5,7 +5,7 @@ describe('FindingsExportQuerySchema', () => {
   it('applies correct defaults for empty input', () => {
     const result = FindingsExportQuerySchema.parse({});
     expect(result.format).toBe('json');
-    expect(result.limit).toBe(1000);
+    expect(result.limit).toBeUndefined();
     expect(result.sortOrder).toBe('desc');
     expect(result.severity).toBeUndefined();
     expect(result.search).toBeUndefined();
@@ -39,17 +39,17 @@ describe('FindingsExportQuerySchema', () => {
     expect(result.limit).toBe(1);
   });
 
-  it('accepts limit at maximum boundary (10000)', () => {
-    const result = FindingsExportQuerySchema.parse({ limit: 10000 });
-    expect(result.limit).toBe(10000);
+  it('accepts an explicit limit above the old 10,000-result cap', () => {
+    const result = FindingsExportQuerySchema.parse({ limit: 10001 });
+    expect(result.limit).toBe(10001);
   });
 
   it('rejects limit below range (0)', () => {
     expect(() => FindingsExportQuerySchema.parse({ limit: 0 })).toThrow();
   });
 
-  it('rejects limit above range (10001)', () => {
-    expect(() => FindingsExportQuerySchema.parse({ limit: 10001 })).toThrow();
+  it('rejects limits above the documented operational ceiling', () => {
+    expect(() => FindingsExportQuerySchema.parse({ limit: 1_000_001 })).toThrow();
   });
 
   it('inherits severity validation from common fields', () => {
@@ -86,5 +86,16 @@ describe('FindingsExportQuerySchema', () => {
     });
     expect(result.dateFrom).toBe('2025-01-01T00:00:00Z');
     expect(result.dateTo).toBe('2025-12-31T23:59:59Z');
+  });
+
+  it('accepts the same projected triage filters as list and stats', () => {
+    const result = FindingsExportQuerySchema.parse({
+      triageStatus: 'triaged,fixed',
+      assigneeUserId: 'user-1',
+    });
+
+    expect(result.triageStatus).toBe('triaged,fixed');
+    expect(result.assigneeUserId).toBe('user-1');
+    expect(() => FindingsExportQuerySchema.parse({ triageStatus: 'fixed,fixed' })).toThrow();
   });
 });

@@ -3,6 +3,8 @@ import { useAuth, useAuthProvider } from './auth-context';
 import { useAuthStore } from '../store/authStore';
 import { queryClient } from '@/lib/queryClient';
 import { logger } from '@/lib/logger';
+import { toSupportedRole } from '@/utils/auth';
+import { env } from '@/config/env';
 
 /**
  * Hook to integrate the new auth system with the existing Zustand store
@@ -16,8 +18,9 @@ export function useAuthStoreIntegration() {
   // state object each time.
   const setAuthContext = useAuthStore((s) => s.setAuthContext);
   const clearStore = useAuthStore((s) => s.clear);
-  const organizationId = useAuthStore((s) => s.organizationId);
-  const prevOrgRef = useRef(organizationId);
+  const storedOrganizationId = useAuthStore((s) => s.organizationId);
+  const storedUserId = useAuthStore((s) => s.userId);
+  const localSessionAuthenticated = useAuthStore((s) => s.localSessionAuthenticated);
   // Track whether the auth provider has been established at least once.
   // On the very first render the GlobalAuthContext has no provider, so useAuth()
   // returns the fallback with isAuthenticated=false / isLoading=true. We must NOT
@@ -35,21 +38,12 @@ export function useAuthStoreIntegration() {
     }
   }, [isAuthenticated, isLoading]);
 
-  // Clear query cache on org change
-  useEffect(() => {
-    if (prevOrgRef.current !== organizationId) {
-      queryClient.cancelQueries();
-      queryClient.clear();
-      prevOrgRef.current = organizationId;
-    }
-  }, [organizationId]);
-
   useEffect(() => {
     if (isLoading) {
       return; // Don't update store while loading
     }
 
-    if (isAuthenticated && user && token) {
+    if (isAuthenticated && user && (token || authProvider.name === 'local')) {
       // User is authenticated - update store with auth data
       const providerForStore =
         authProvider.name === 'clerk'
@@ -59,49 +53,41 @@ export function useAuthStoreIntegration() {
             : 'custom';
 
       // For Clerk: use selected org, or "user's workspace" if no org
-      let organizationId: string | undefined;
+      let nextOrganizationId: string | undefined;
       let roles: string[];
 
       if (authProvider.name === 'clerk') {
-        organizationId = user.organizationId || `workspace-${user.id}`;
+        nextOrganizationId = user.organizationId || `workspace-${user.id}`;
 
         // If user is in their own workspace, they are ADMIN by default
-        if (organizationId === `workspace-${user.id}`) {
+        if (nextOrganizationId === `workspace-${user.id}`) {
           roles = ['ADMIN'];
         } else {
-          // If user has an organization role, use it
-          // Otherwise, grant ADMIN as fallback (matches backend logic when JWT template doesn't include roles)
-          if (user.organizationRole) {
-            // Normalize Clerk role format (e.g., "org:admin" -> "ADMIN", "org_member" -> "MEMBER")
-            let roleUpper = user.organizationRole.toUpperCase();
-            // Remove "ORG:" prefix if present
-            if (roleUpper.startsWith('ORG:')) {
-              roleUpper = roleUpper.substring(4);
-            }
-            // Remove "ORG_" prefix if present
-            if (roleUpper.startsWith('ORG_')) {
-              roleUpper = roleUpper.substring(4);
-            }
-            roles = [roleUpper];
-          } else {
-            // No org_role in Clerk user object - grant ADMIN as fallback
-            // This matches the backend behavior when JWT doesn't include org_role
-            roles = ['ADMIN'];
-          }
+          // Organization roles are allowlisted and unknown or missing values fail closed.
+          const supportedRole = toSupportedRole(user.organizationRole);
+          roles = supportedRole ? [supportedRole] : [];
         }
       } else {
-        organizationId = user.organizationId || undefined;
-        roles = user.organizationRole ? [user.organizationRole.toUpperCase()] : ['MEMBER'];
+        nextOrganizationId = user.organizationId || undefined;
+        const supportedRole = toSupportedRole(user.organizationRole);
+        roles = supportedRole ? [supportedRole] : [];
+      }
+
+      const identityScopeChanged =
+        storedUserId !== user.id || storedOrganizationId !== nextOrganizationId;
+      if (identityScopeChanged) {
+        void queryClient.cancelQueries();
+        queryClient.clear();
       }
 
       setAuthContext({
-        token: token.token,
+        token: token?.token ?? null,
         userId: user.id,
-        organizationId,
+        organizationId: nextOrganizationId,
         roles,
         provider: providerForStore,
       });
-    } else if (!isAuthenticated) {
+    } else if (!isAuthenticated && !(authProvider.name === 'local' && localSessionAuthenticated)) {
       // User is not authenticated - clear store but keep basic defaults
       clearStore();
     }
@@ -119,6 +105,9 @@ export function useAuthStoreIntegration() {
     error,
     setAuthContext,
     clearStore,
+    localSessionAuthenticated,
+    storedOrganizationId,
+    storedUserId,
   ]);
 
   return {
@@ -139,9 +128,8 @@ export function useAuthProviderSync() {
 
   useEffect(() => {
     // Check if frontend and backend auth providers are aligned
-    const configuredFrontendProvider = (import.meta.env.VITE_AUTH_PROVIDER ||
-      providerForStore) as string;
-    const backendProvider = import.meta.env.VITE_API_AUTH_PROVIDER || configuredFrontendProvider;
+    const configuredFrontendProvider = env.VITE_AUTH_PROVIDER || providerForStore;
+    const backendProvider = env.VITE_API_AUTH_PROVIDER || configuredFrontendProvider;
 
     if (configuredFrontendProvider !== backendProvider) {
       logger.warn(

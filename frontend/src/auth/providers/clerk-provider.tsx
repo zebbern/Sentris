@@ -22,15 +22,51 @@ interface ClerkAppearance {
 import type { FrontendAuthProvider, FrontendAuthUser, FrontendAuthToken } from '../types';
 import { registerClerkTokenGetter } from '../../utils/clerk-token';
 import { logger } from '@/lib/logger';
+import { env } from '@/config/env';
 
 const clerkConfig = {
-  publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '',
-  jwtTemplate: (import.meta.env.VITE_CLERK_JWT_TEMPLATE || '').trim() || undefined,
+  publishableKey: env.VITE_CLERK_PUBLISHABLE_KEY,
+  jwtTemplate: env.VITE_CLERK_JWT_TEMPLATE.trim() || undefined,
 };
 
 interface ClerkProviderProps {
   children: React.ReactNode;
   onProviderChange?: (provider: FrontendAuthProvider | null) => void;
+}
+
+interface ClerkOrganizationMembership {
+  organization: {
+    id: string;
+    name: string;
+  };
+  role: string;
+}
+
+export function resolveActiveClerkOrganization(
+  activeOrganizationId: string | null | undefined,
+  activeOrganizationRole: string | null | undefined,
+  memberships: readonly ClerkOrganizationMembership[],
+): {
+  organizationId: string | undefined;
+  organizationName: string | undefined;
+  organizationRole: string | undefined;
+} {
+  if (!activeOrganizationId) {
+    return {
+      organizationId: undefined,
+      organizationName: undefined,
+      organizationRole: undefined,
+    };
+  }
+
+  const activeMembership = memberships.find(
+    (membership) => membership.organization.id === activeOrganizationId,
+  );
+  return {
+    organizationId: activeOrganizationId,
+    organizationName: activeMembership?.organization.name,
+    organizationRole: activeOrganizationRole ?? activeMembership?.role,
+  };
 }
 
 export const ClerkAuthProvider: React.FC<ClerkProviderProps> = ({ children, onProviderChange }) => {
@@ -50,7 +86,7 @@ export const ClerkAuthProvider: React.FC<ClerkProviderProps> = ({ children, onPr
 function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
   const { openSignIn, openSignUp, signOut } = useClerk();
   const { user } = useUser();
-  const { isLoaded, isSignedIn, getToken, sessionId } = useClerkAuth();
+  const { isLoaded, isSignedIn, getToken, sessionId, orgId, orgRole } = useClerkAuth();
   const [token, setToken] = useState<FrontendAuthToken | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,8 +160,11 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
       return null;
     }
 
-    const primaryOrg = user.organizationMemberships?.[0]?.organization;
-    const primaryRole = user.organizationMemberships?.[0]?.role;
+    const activeOrganization = resolveActiveClerkOrganization(
+      orgId,
+      orgRole,
+      user.organizationMemberships,
+    );
 
     return {
       id: user.id,
@@ -134,12 +173,10 @@ function ClerkAuthBridge({ children, onProviderChange }: ClerkProviderProps) {
       firstName: user.firstName,
       lastName: user.lastName,
       imageUrl: user.imageUrl,
-      organizationId: primaryOrg?.id,
-      organizationName: primaryOrg?.name,
-      organizationRole: primaryRole ?? undefined,
+      ...activeOrganization,
       publicMetadata: user.publicMetadata ?? undefined,
     };
-  }, [user]);
+  }, [orgId, orgRole, user]);
 
   const context = useMemo(
     () => ({

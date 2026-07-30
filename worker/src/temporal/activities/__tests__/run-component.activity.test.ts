@@ -12,6 +12,7 @@ import {
 
 // ── Mock @temporalio/activity ────────────────────────────────────────────────
 const mockHeartbeat = vi.fn();
+let mockCancellationSignal = new AbortController().signal;
 
 mock.module('@temporalio/activity', () => ({
   Context: {
@@ -21,6 +22,7 @@ mock.module('@temporalio/activity', () => ({
         attempt: 1,
       },
       heartbeat: mockHeartbeat,
+      cancellationSignal: mockCancellationSignal,
     }),
   },
 }));
@@ -38,11 +40,22 @@ import type { RunComponentActivityInput } from '../../types';
 // ── Test helpers ─────────────────────────────────────────────────────────────
 
 function createMockStorage() {
-  return {
+  const scoped = {
     downloadFile: vi.fn(),
     uploadFile: vi.fn().mockResolvedValue(undefined),
     getFileMetadata: vi.fn(),
+    forOrganization: vi.fn(),
   };
+  scoped.forOrganization.mockReturnValue(scoped);
+  const storage = {
+    downloadFile: vi.fn().mockRejectedValue(new Error('unscoped storage access')),
+    uploadFile: vi.fn().mockRejectedValue(new Error('unscoped storage access')),
+    getFileMetadata: vi.fn().mockRejectedValue(new Error('unscoped storage access')),
+    forOrganization: vi.fn(),
+    scoped,
+  };
+  storage.forOrganization.mockReturnValue(scoped);
+  return storage;
 }
 
 function createMockTrace() {
@@ -60,6 +73,30 @@ function createMockNodeIO() {
     recordStart: vi.fn().mockResolvedValue(undefined),
     recordCompletion: vi.fn().mockResolvedValue(undefined),
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function expectPromisePending(promise: Promise<unknown>): Promise<void> {
+  let settled = false;
+  void promise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(settled).toBe(false);
 }
 
 // Shared execute function that tests can swap per-test
@@ -190,9 +227,59 @@ describe('finalizeRunActivity', () => {
       trace: trace as any,
     });
 
-    await finalizeRunActivity({ runId: 'run-1' });
+    await finalizeRunActivity({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      status: 'COMPLETED',
+    });
 
     expect(trace.finalizeRun).toHaveBeenCalledWith('run-1');
+  });
+
+  it('reports the terminal status to the backend after flushing trace metadata', async () => {
+    const trace = createMockTrace();
+    const order: string[] = [];
+    trace.finalizeRun.mockImplementation(() => {
+      order.push('trace');
+    });
+    const runFinalizer = vi.fn(async () => {
+      order.push('backend');
+    });
+    initializeComponentActivityServices({
+      storage: createMockStorage() as any,
+      trace: trace as any,
+      runFinalizer,
+    });
+
+    await finalizeRunActivity({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      status: 'FAILED',
+      completedAt: '2026-07-26T12:00:00.000Z',
+    });
+
+    expect(runFinalizer).toHaveBeenCalledWith({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      status: 'FAILED',
+      completedAt: '2026-07-26T12:00:00.000Z',
+    });
+    expect(order).toEqual(['trace', 'backend']);
+  });
+
+  it('keeps legacy in-flight finalize activities capability-preserving', async () => {
+    const trace = createMockTrace();
+    const runFinalizer = vi.fn(async () => {});
+    initializeComponentActivityServices({
+      storage: createMockStorage() as any,
+      trace: trace as any,
+      runFinalizer,
+    });
+
+    await finalizeRunActivity({ runId: 'legacy-run' } as any);
+
+    expect(trace.finalizeRun).toHaveBeenCalledWith('legacy-run');
+    expect(runFinalizer).not.toHaveBeenCalled();
   });
 });
 
@@ -228,6 +315,7 @@ describe('runComponentActivity', () => {
 
     resetComponentActivityServices();
     mockHeartbeat.mockClear();
+    mockCancellationSignal = new AbortController().signal;
 
     storage = createMockStorage();
     trace = createMockTrace();
@@ -249,6 +337,237 @@ describe('runComponentActivity', () => {
     const result = await runComponentActivity(input);
 
     expect(result.output).toEqual({ result: 'echoed: hello' });
+  });
+
+  it('drains trace, log, and terminal publications before a successful activity settles', async () => {
+    const tracePublication = deferred<undefined>();
+    const logPublication = deferred<undefined>();
+    const terminalPublication = deferred<undefined>();
+    const completedTraceObserved = deferred<undefined>();
+    const executionObserved = deferred<undefined>();
+    const trackedTrace = createMockTrace();
+    trackedTrace.record.mockImplementation((event: any) => {
+      trackedTrace.events.push(event);
+      if (event.type === 'NODE_COMPLETED') {
+        completedTraceObserved.resolve(undefined);
+      }
+      return tracePublication.promise;
+    });
+    const logs = {
+      append: vi.fn(() => logPublication.promise),
+    };
+    const terminal = {
+      append: vi.fn(() => terminalPublication.promise),
+    };
+
+    resetComponentActivityServices();
+    initializeComponentActivityServices({
+      storage: storage as any,
+      trace: trackedTrace as any,
+      nodeIO: nodeIO as any,
+      logs: logs as any,
+      terminalStream: terminal as any,
+    });
+    currentExecuteFn = async ({ context }) => {
+      context.logger.info('publication must be retained');
+      context.terminalCollector?.({
+        runId: 'test-run-1',
+        nodeRef: 'node-1',
+        stream: 'stdout',
+        chunkIndex: 0,
+        payload: 'scanner output',
+        recordedAt: new Date().toISOString(),
+        deltaMs: 0,
+      });
+      executionObserved.resolve(undefined);
+      return { result: 'done' };
+    };
+
+    const activity = runComponentActivity(createBaseActivityInput());
+    await executionObserved.promise;
+    await completedTraceObserved.promise;
+    await expectPromisePending(activity);
+
+    tracePublication.resolve(undefined);
+    logPublication.resolve(undefined);
+    terminalPublication.resolve(undefined);
+
+    await expect(activity).resolves.toEqual({
+      output: { result: 'done' },
+      activeOutputPorts: undefined,
+    });
+    expect(logs.append).toHaveBeenCalledTimes(1);
+    expect(terminal.append).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a successful component result and marks sticky readiness on terminal loss', async () => {
+    const workerState: { telemetryError?: string } = {};
+    const terminal = {
+      append: vi.fn(async () => {
+        throw new Error('WRONGTYPE terminal stream key');
+      }),
+    };
+
+    resetComponentActivityServices();
+    initializeComponentActivityServices({
+      storage: storage as any,
+      trace: trace as any,
+      nodeIO: nodeIO as any,
+      terminalStream: terminal as any,
+      onRequiredTelemetryFailure: (message) => {
+        workerState.telemetryError = message;
+      },
+    });
+    currentExecuteFn = async ({ context }) => {
+      context.terminalCollector?.({
+        runId: 'test-run-1',
+        nodeRef: 'node-1',
+        stream: 'stdout',
+        chunkIndex: 0,
+        payload: 'scanner output',
+        recordedAt: new Date().toISOString(),
+        deltaMs: 0,
+      });
+      return { result: 'side effect completed' };
+    };
+
+    await expect(runComponentActivity(createBaseActivityInput())).resolves.toEqual({
+      output: { result: 'side effect completed' },
+      activeOutputPorts: undefined,
+    });
+    expect(terminal.append).toHaveBeenCalledTimes(1);
+    expect(workerState.telemetryError).toContain('Required terminal telemetry publication failed');
+    expect(workerState.telemetryError).toContain('WRONGTYPE terminal stream key');
+  });
+
+  it('drains started trace publication when input validation fails', async () => {
+    const tracePublication = deferred<undefined>();
+    const startedTraceObserved = deferred<undefined>();
+    const trackedTrace = createMockTrace();
+    trackedTrace.record.mockImplementation((event: any) => {
+      trackedTrace.events.push(event);
+      if (event.type === 'NODE_STARTED') {
+        startedTraceObserved.resolve(undefined);
+      }
+      return tracePublication.promise;
+    });
+    resetComponentActivityServices();
+    initializeComponentActivityServices({
+      storage: storage as any,
+      trace: trackedTrace as any,
+      nodeIO: nodeIO as any,
+    });
+
+    const activity = runComponentActivity(
+      createBaseActivityInput({ inputs: { value: 42 as unknown as string } }),
+    );
+    await startedTraceObserved.promise;
+    await expectPromisePending(activity);
+
+    tracePublication.resolve(undefined);
+    await expect(activity).rejects.toThrow();
+  });
+
+  it('drains failed trace publication without replacing a component failure', async () => {
+    const tracePublication = deferred<undefined>();
+    const failedTraceObserved = deferred<undefined>();
+    const trackedTrace = createMockTrace();
+    trackedTrace.record.mockImplementation((event: any) => {
+      trackedTrace.events.push(event);
+      if (event.type === 'NODE_FAILED') {
+        failedTraceObserved.resolve(undefined);
+      }
+      return tracePublication.promise;
+    });
+    resetComponentActivityServices();
+    initializeComponentActivityServices({
+      storage: storage as any,
+      trace: trackedTrace as any,
+      nodeIO: nodeIO as any,
+    });
+    currentExecuteFn = async () => {
+      throw new Error('component failure retained');
+    };
+
+    const activity = runComponentActivity(createBaseActivityInput());
+    await failedTraceObserved.promise;
+    await expectPromisePending(activity);
+
+    tracePublication.resolve(undefined);
+    await expect(activity).rejects.toThrow('component failure retained');
+  });
+
+  it('drains started trace publication before propagating cancellation', async () => {
+    const tracePublication = deferred<undefined>();
+    const executionObserved = deferred<undefined>();
+    const trackedTrace = createMockTrace();
+    trackedTrace.record.mockImplementation((event: any) => {
+      trackedTrace.events.push(event);
+      return tracePublication.promise;
+    });
+    const controller = new AbortController();
+    const cancellation = new Error('cancelled with telemetry in flight');
+    controller.abort(cancellation);
+    mockCancellationSignal = controller.signal;
+    resetComponentActivityServices();
+    initializeComponentActivityServices({
+      storage: storage as any,
+      trace: trackedTrace as any,
+      nodeIO: nodeIO as any,
+    });
+    currentExecuteFn = async ({ context }) => {
+      executionObserved.resolve(undefined);
+      context.signal.throwIfAborted();
+      return { result: 'unreachable' };
+    };
+
+    const activity = runComponentActivity(createBaseActivityInput());
+    await executionObserved.promise;
+    await expectPromisePending(activity);
+
+    tracePublication.resolve(undefined);
+    await expect(activity).rejects.toBe(cancellation);
+  });
+
+  it('exposes the authoritative scope identity to component execution', async () => {
+    let capturedScopeId: string | null | undefined;
+    currentExecuteFn = async ({ context }) => {
+      capturedScopeId = context.scopeId;
+      return { result: 'done' };
+    };
+
+    await runComponentActivity(createBaseActivityInput({ scopeId: 'scope-1' }));
+
+    expect(capturedScopeId).toBe('scope-1');
+  });
+
+  it('propagates the Temporal activity cancellation signal into component execution', async () => {
+    let capturedSignal: AbortSignal | undefined;
+    currentExecuteFn = async ({ context }) => {
+      capturedSignal = context.signal;
+      return { result: 'done' };
+    };
+
+    await runComponentActivity(createBaseActivityInput());
+
+    expect(capturedSignal).toBe(mockCancellationSignal);
+  });
+
+  it('preserves activity cancellation instead of converting it to a failed component', async () => {
+    const controller = new AbortController();
+    const cancellation = new Error('Temporal activity cancelled');
+    controller.abort(cancellation);
+    mockCancellationSignal = controller.signal;
+    currentExecuteFn = async ({ context }) => {
+      context.signal.throwIfAborted();
+      return { result: 'unreachable' };
+    };
+
+    await expect(runComponentActivity(createBaseActivityInput())).rejects.toBe(cancellation);
+    expect(nodeIO.recordCompletion).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' }),
+    );
+    expect(trace.events.some((event) => event.type === 'NODE_FAILED')).toBe(false);
   });
 
   it('records NODE_STARTED and NODE_COMPLETED trace events', async () => {
@@ -297,7 +616,7 @@ describe('runComponentActivity', () => {
       throw new Error('component execution failed');
     };
 
-    const input = createBaseActivityInput();
+    const input = createBaseActivityInput({ organizationId: 'org-a' });
 
     try {
       await runComponentActivity(input);
@@ -305,6 +624,34 @@ describe('runComponentActivity', () => {
     } catch (error: any) {
       expect(error.message).toContain('component execution failed');
     }
+
+    expect(nodeIO.recordCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: 'test-run-1',
+        status: 'failed',
+        organizationId: 'org-a',
+      }),
+    );
+  });
+
+  it('normalizes a missing organization to null on failed completion', async () => {
+    currentExecuteFn = async () => {
+      throw new Error('trusted-local failure');
+    };
+
+    try {
+      await runComponentActivity(createBaseActivityInput({ organizationId: undefined }));
+      expect.unreachable('should have thrown');
+    } catch (error: any) {
+      expect(error.message).toContain('trusted-local failure');
+    }
+
+    expect(nodeIO.recordCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        organizationId: null,
+      }),
+    );
   });
 
   it('sends heartbeats during execution', async () => {
@@ -326,7 +673,7 @@ describe('runComponentActivity', () => {
     // spilled marker. The schema expects a string, so the resolved value
     // must be a plain string.
     const resolvedValue = 'resolved big payload data';
-    storage.downloadFile.mockResolvedValue({
+    storage.scoped.downloadFile.mockResolvedValue({
       buffer: Buffer.from(JSON.stringify(resolvedValue), 'utf8'),
       metadata: {
         id: 'spill-ref',
@@ -341,6 +688,7 @@ describe('runComponentActivity', () => {
     };
 
     const input = createBaseActivityInput({
+      organizationId: 'org-a',
       inputs: {
         value: {
           __spilled__: true,
@@ -352,7 +700,9 @@ describe('runComponentActivity', () => {
 
     await runComponentActivity(input);
 
-    expect(storage.downloadFile).toHaveBeenCalledWith('spill-ref');
+    expect(storage.forOrganization).toHaveBeenCalledWith('org-a');
+    expect(storage.scoped.downloadFile).toHaveBeenCalledWith('spill-ref');
+    expect(storage.downloadFile).not.toHaveBeenCalled();
   });
 
   it('spills output larger than threshold to storage', async () => {
@@ -362,7 +712,8 @@ describe('runComponentActivity', () => {
     const input = createBaseActivityInput();
     const result = await runComponentActivity(input);
 
-    expect(storage.uploadFile).toHaveBeenCalled();
+    expect(storage.scoped.uploadFile).toHaveBeenCalled();
+    expect(storage.uploadFile).not.toHaveBeenCalled();
 
     const output = result.output as Record<string, unknown>;
     expect(output.__spilled__).toBe(true);
@@ -376,7 +727,7 @@ describe('runComponentActivity', () => {
     const input = createBaseActivityInput();
     const result = await runComponentActivity(input);
 
-    expect(storage.uploadFile).not.toHaveBeenCalled();
+    expect(storage.scoped.uploadFile).not.toHaveBeenCalled();
     expect((result.output as any).__spilled__).toBeUndefined();
   });
 

@@ -1,3 +1,5 @@
+import { escapeCsvCell } from '@sentris/shared';
+
 /**
  * Reusable CSV / JSON table-data export utility.
  *
@@ -23,18 +25,6 @@ export interface ExportTableDataOptions<T extends object = Record<string, unknow
 // ---------------------------------------------------------------------------
 // RFC 4180 CSV helpers
 // ---------------------------------------------------------------------------
-
-/** Characters that require the cell to be quoted. */
-const CSV_SPECIAL = /[",\r\n]/;
-
-function escapeCsvCell(value: unknown): string {
-  const str = value == null ? '' : String(value);
-  if (CSV_SPECIAL.test(str)) {
-    // Double any existing double-quotes, then wrap in double-quotes.
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
 
 function buildCsv(data: readonly Record<string, unknown>[], columns: ExportColumn[]): string {
   const headerRow = columns.map((c) => escapeCsvCell(c.header)).join(',');

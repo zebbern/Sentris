@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { AuthContext } from '../../auth/types';
 import type { NotificationChannelRecord, NotificationDeliveryRecord } from '../../database/schema';
+import type { OutboxRepository } from '../../outbox/outbox.repository';
 import type { NotificationChannelRepository } from '../repository/notification-channel.repository';
 import type { NotificationDeliveryRepository } from '../repository/notification-delivery.repository';
 import type { SlackNotificationAdapter } from '../adapters/slack.adapter';
@@ -71,7 +72,9 @@ function makeDeliveryRecord(
     durationMs: overrides.durationMs ?? null,
     responseStatus: overrides.responseStatus ?? null,
     responseBody: overrides.responseBody ?? null,
+    outboxEventId: overrides.outboxEventId ?? null,
     createdAt: overrides.createdAt ?? now,
+    sendingStartedAt: overrides.sendingStartedAt ?? null,
     sentAt: overrides.sentAt ?? now,
   };
 }
@@ -83,8 +86,12 @@ function makeDeliveryRecord(
 class InMemoryChannelRepository implements Partial<NotificationChannelRepository> {
   private records = new Map<string, NotificationChannelRecord>();
   private seq = 0;
+  readonly mutationExecutor = { insert: () => undefined };
 
-  async create(values: Partial<NotificationChannelRecord>): Promise<NotificationChannelRecord> {
+  async create(
+    values: Partial<NotificationChannelRecord>,
+    onMutated?: (executor: never, record: NotificationChannelRecord) => Promise<void>,
+  ): Promise<NotificationChannelRecord> {
     this.seq += 1;
     const record = makeChannelRecord({
       ...values,
@@ -93,6 +100,7 @@ class InMemoryChannelRepository implements Partial<NotificationChannelRepository
       updatedAt: new Date(),
     });
     this.records.set(record.id, record);
+    await onMutated?.(this.mutationExecutor as never, record);
     return record;
   }
 
@@ -116,17 +124,28 @@ class InMemoryChannelRepository implements Partial<NotificationChannelRepository
     id: string,
     values: Partial<NotificationChannelRecord>,
     options: { organizationId?: string } = {},
+    onMutated?: (executor: never, record: NotificationChannelRecord) => Promise<void>,
   ): Promise<NotificationChannelRecord | undefined> {
     const existing = await this.findById(id, options);
     if (!existing) return undefined;
     const updated = { ...existing, ...values, updatedAt: new Date() };
     this.records.set(id, updated);
+    await onMutated?.(this.mutationExecutor as never, updated);
     return updated;
   }
 
-  async delete(id: string, options: { organizationId?: string } = {}): Promise<void> {
+  async delete(
+    id: string,
+    options: { organizationId?: string } = {},
+    onMutated?: (executor: never) => Promise<void>,
+  ): Promise<boolean> {
     const rec = await this.findById(id, options);
-    if (rec) this.records.delete(id);
+    if (!rec) {
+      return false;
+    }
+    this.records.delete(id);
+    await onMutated?.(this.mutationExecutor as never);
+    return true;
   }
 
   async findActiveByEventType(
@@ -145,6 +164,7 @@ class InMemoryChannelRepository implements Partial<NotificationChannelRepository
 class InMemoryDeliveryRepository implements Partial<NotificationDeliveryRepository> {
   private records = new Map<string, NotificationDeliveryRecord>();
   private seq = 0;
+  readonly mutationExecutor = { insert: () => undefined };
 
   async create(values: Partial<NotificationDeliveryRecord>): Promise<NotificationDeliveryRecord> {
     this.seq += 1;
@@ -155,6 +175,30 @@ class InMemoryDeliveryRepository implements Partial<NotificationDeliveryReposito
     });
     this.records.set(record.id, record);
     return record;
+  }
+
+  async createWithHook(
+    values: Partial<NotificationDeliveryRecord>,
+    onCreated: (executor: never, record: NotificationDeliveryRecord) => Promise<void>,
+  ): Promise<NotificationDeliveryRecord> {
+    const record = await this.create(values);
+    await onCreated(this.mutationExecutor as never, record);
+    return record;
+  }
+
+  async findById(id: string): Promise<NotificationDeliveryRecord | undefined> {
+    return this.records.get(id);
+  }
+
+  async update(
+    id: string,
+    values: Partial<NotificationDeliveryRecord>,
+  ): Promise<NotificationDeliveryRecord | undefined> {
+    const existing = this.records.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...values };
+    this.records.set(id, updated);
+    return updated;
   }
 
   async listByChannelId(channelId: string): Promise<NotificationDeliveryRecord[]> {
@@ -175,6 +219,8 @@ describe('NotificationsService', () => {
   let slackAdapterSend: ReturnType<typeof mock>;
   let discordAdapterSend: ReturnType<typeof mock>;
   let auditRecordCalls: unknown[][];
+  let durableAuditExecutors: unknown[];
+  let durableAuditError: Error | null;
 
   beforeEach(() => {
     channelRepo = new InMemoryChannelRepository();
@@ -182,6 +228,8 @@ describe('NotificationsService', () => {
     slackAdapterSend = mock(() => Promise.resolve({ success: true }));
     discordAdapterSend = mock(() => Promise.resolve({ success: true }));
     auditRecordCalls = [];
+    durableAuditExecutors = [];
+    durableAuditError = null;
 
     const slackAdapter = { send: slackAdapterSend } as unknown as SlackNotificationAdapter;
     const discordAdapter = {
@@ -189,9 +237,30 @@ describe('NotificationsService', () => {
     } as unknown as import('../adapters/discord.adapter').DiscordNotificationAdapter;
     const dispatcherService = {
       dispatchToChannel: mock(() => Promise.resolve('del-1')),
+      dispatchPendingDelivery: mock(
+        async (channel: NotificationChannelRecord, deliveryId: string) => {
+          if (channel.type === 'slack') {
+            await slackAdapterSend();
+          } else if (channel.type === 'discord') {
+            await discordAdapterSend();
+          }
+          await deliveryRepo.update(deliveryId, {
+            status: 'sent',
+            sentAt: new Date(),
+          });
+          return deliveryId;
+        },
+      ),
     } as unknown as NotificationDispatcherService;
     const auditLogService = {
       record: (...args: unknown[]) => {
+        auditRecordCalls.push(args);
+      },
+      recordDurableWithExecutor: async (executor: unknown, ...args: unknown[]) => {
+        if (durableAuditError) {
+          throw durableAuditError;
+        }
+        durableAuditExecutors.push(executor);
         auditRecordCalls.push(args);
       },
     };
@@ -203,6 +272,7 @@ describe('NotificationsService', () => {
       discordAdapter,
       auditLogService as any,
       dispatcherService,
+      { requeueDeadLetter: mock() } as unknown as OutboxRepository,
     );
   });
 
@@ -319,6 +389,20 @@ describe('NotificationsService', () => {
       });
       expect(auditRecordCalls.length).toBe(1);
       expect((auditRecordCalls[0]![1] as any).action).toBe('notification_channel.create');
+      expect(durableAuditExecutors).toEqual([channelRepo.mutationExecutor]);
+    });
+
+    it('rejects channel creation when durable audit scheduling fails', async () => {
+      durableAuditError = new Error('audit outbox unavailable');
+
+      await expect(
+        service.create(authContext, {
+          name: 'Audit',
+          type: 'slack',
+          config: { webhookUrl: 'https://hooks.slack.com/T/B/audit123' },
+          events: ['run.failed'],
+        }),
+      ).rejects.toThrow('audit outbox unavailable');
     });
 
     it('throws BadRequestException for missing webhookUrl', async () => {
@@ -393,6 +477,7 @@ describe('NotificationsService', () => {
         ([, d]: unknown[]) => (d as any).action === 'notification_channel.update',
       );
       expect(updateAudit).toBeDefined();
+      expect(durableAuditExecutors).toEqual([channelRepo.mutationExecutor]);
     });
 
     it('throws NotFoundException for non-existent channel', async () => {
@@ -441,6 +526,21 @@ describe('NotificationsService', () => {
         ([, d]: unknown[]) => (d as any).action === 'notification_channel.delete',
       );
       expect(delAudit).toBeDefined();
+      expect(durableAuditExecutors).toEqual([channelRepo.mutationExecutor]);
+    });
+
+    it('reports not found and does not audit when another delete wins after the pre-read', async () => {
+      const rec = await channelRepo.create({
+        organizationId: 'org-1',
+        name: 'Racing delete',
+        type: 'slack',
+        config: { webhookUrl: 'https://hooks.slack.com/T/B/x' },
+        events: ['run.failed'],
+      });
+      channelRepo.delete = mock(async () => false);
+
+      await expect(service.delete(authContext, rec.id)).rejects.toThrow(NotFoundException);
+      expect(auditRecordCalls).toHaveLength(0);
     });
 
     it('throws NotFoundException for non-existent channel', async () => {
@@ -460,6 +560,23 @@ describe('NotificationsService', () => {
       const result = await service.testChannel(authContext, rec.id);
       expect(result.success).toBe(true);
       expect(slackAdapterSend).toHaveBeenCalledTimes(1);
+      const deliveries = await deliveryRepo.listByChannelId(rec.id);
+      expect(deliveries).toHaveLength(1);
+      expect(deliveries[0]).toEqual(
+        expect.objectContaining({
+          eventType: 'notification.test',
+          status: 'sent',
+        }),
+      );
+      expect(
+        auditRecordCalls.some(
+          ([, event]) =>
+            (event as { action?: string; metadata?: { phase?: string } }).action ===
+              'notification_channel.test' &&
+            (event as { metadata?: { phase?: string } }).metadata?.phase === 'requested',
+        ),
+      ).toBe(true);
+      expect(durableAuditExecutors).toContain(deliveryRepo.mutationExecutor);
     });
 
     it('calls Discord adapter and returns result', async () => {

@@ -13,6 +13,7 @@ import {
   type McpGroupTemplate,
 } from './mcp-group-templates';
 import { SyncTemplatesResponse, GroupTemplateDto } from './dto/mcp-groups.dto';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 /**
  * Result of syncing a single template
@@ -24,6 +25,8 @@ export interface TemplateSyncResult {
   serversSynced: number;
   templateHash: string;
 }
+
+type TemplateMutationHook = (executor: OutboxExecutor, result: TemplateSyncResult) => Promise<void>;
 
 /**
  * Service for seeding MCP group templates into the database
@@ -124,6 +127,7 @@ export class McpGroupsSeedingService {
     slug: string,
     force = false,
     organizationId: string | null = null,
+    onMutated?: TemplateMutationHook,
   ): Promise<TemplateSyncResult> {
     const template = MCP_GROUP_TEMPLATES[slug];
     if (!template) {
@@ -135,7 +139,7 @@ export class McpGroupsSeedingService {
 
     if (!existingGroup) {
       // Create new group from template
-      return this.createGroupFromTemplate(template, templateHash, organizationId);
+      return this.createGroupFromTemplate(template, templateHash, organizationId, onMutated);
     }
 
     // Check if update is needed
@@ -152,7 +156,13 @@ export class McpGroupsSeedingService {
     }
 
     // Update existing group
-    return this.updateGroupFromTemplate(existingGroup.id, template, templateHash, organizationId);
+    return this.updateGroupFromTemplate(
+      existingGroup.id,
+      template,
+      templateHash,
+      organizationId,
+      onMutated,
+    );
   }
 
   /**
@@ -162,6 +172,7 @@ export class McpGroupsSeedingService {
     template: McpGroupTemplate,
     templateHash: string,
     organizationId: string | null,
+    onMutated?: TemplateMutationHook,
   ): Promise<TemplateSyncResult> {
     this.logger.log(`Creating group '${template.slug}' from template...`);
 
@@ -191,13 +202,15 @@ export class McpGroupsSeedingService {
 
       this.logger.log(`Created group '${template.slug}' with ${serversSynced} servers`);
 
-      return {
+      const result: TemplateSyncResult = {
         slug: template.slug,
         action: 'created',
         groupId: group.id,
         serversSynced,
         templateHash,
       };
+      await onMutated?.(tx, result);
+      return result;
     });
   }
 
@@ -209,6 +222,7 @@ export class McpGroupsSeedingService {
     template: McpGroupTemplate,
     templateHash: string,
     organizationId: string | null,
+    onMutated?: TemplateMutationHook,
   ): Promise<TemplateSyncResult> {
     this.logger.log(`Updating group '${template.slug}' from template...`);
 
@@ -321,13 +335,15 @@ export class McpGroupsSeedingService {
 
       this.logger.log(`Updated group '${template.slug}' with ${serversSynced} servers`);
 
-      return {
+      const result: TemplateSyncResult = {
         slug: template.slug,
         action: 'updated',
         groupId,
         serversSynced,
         templateHash,
       };
+      await onMutated?.(tx, result);
+      return result;
     });
   }
 

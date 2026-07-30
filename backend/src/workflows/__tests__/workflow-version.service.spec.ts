@@ -105,11 +105,15 @@ describe('WorkflowVersionService', () => {
   let versionRepo: Record<string, ReturnType<typeof vi.fn>>;
   let auditLog: Record<string, ReturnType<typeof vi.fn>>;
   let service: WorkflowVersionService;
+  const transactionExecutor = { id: 'workflow-version-test-transaction' };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     repo = {
+      transaction: vi.fn((callback: (executor: unknown) => Promise<unknown>) =>
+        callback(transactionExecutor),
+      ),
       findById: vi.fn(),
       saveCompiledDefinition: vi.fn(),
     };
@@ -125,6 +129,7 @@ describe('WorkflowVersionService', () => {
     };
     auditLog = {
       record: vi.fn(),
+      recordDurableWithExecutor: vi.fn(),
     };
 
     service = new WorkflowVersionService(
@@ -151,11 +156,13 @@ describe('WorkflowVersionService', () => {
       expect(result.entrypoint.ref).toBe('trigger');
       expect(repo.saveCompiledDefinition).toHaveBeenCalledWith('wf-1', result, {
         organizationId: TEST_ORG,
+        executor: transactionExecutor,
       });
       expect(versionRepo.setCompiledDefinition).toHaveBeenCalledWith('ver-1', result, {
         organizationId: TEST_ORG,
+        executor: transactionExecutor,
       });
-      expect(auditLog.record).toHaveBeenCalledTimes(1);
+      expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledTimes(1);
     });
 
     it('should throw ForbiddenException when org context is missing', async () => {

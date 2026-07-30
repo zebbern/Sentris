@@ -24,19 +24,10 @@ function createTraceEvent(overrides: Partial<TraceEvent> = {}): TraceEvent {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('recordTraceEventActivity', () => {
-  it('skips recording when trace is not initialized', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    // Call without initializing — should not throw, just warn
-    const event = createTraceEvent();
-    await recordTraceEventActivity(event);
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Trace service not initialized'),
-      expect.anything(),
+  it('fails closed when the required trace publisher is not initialized', async () => {
+    await expect(recordTraceEventActivity(createTraceEvent())).rejects.toThrow(
+      'Trace service not initialized',
     );
-
-    consoleSpy.mockRestore();
   });
 
   it('records trace event via the trace service when initialized', async () => {
@@ -62,6 +53,28 @@ describe('recordTraceEventActivity', () => {
         process.env.SENTRIS_DEBUG_WORKFLOW = previousDebugValue;
       }
     }
+  });
+
+  it('waits for durable publication before the Temporal activity completes', async () => {
+    let releaseRecord: (() => void) | undefined;
+    const recordGate = new Promise<void>((resolve) => {
+      releaseRecord = resolve;
+    });
+    const trace = {
+      record: vi.fn(async () => recordGate),
+    };
+    initializeTraceActivity({ trace });
+    let completed = false;
+
+    const activity = recordTraceEventActivity(createTraceEvent()).then(() => {
+      completed = true;
+    });
+    await Promise.resolve();
+
+    expect(completed).toBe(false);
+    releaseRecord?.();
+    await activity;
+    expect(completed).toBe(true);
   });
 
   it('records different event types correctly', async () => {

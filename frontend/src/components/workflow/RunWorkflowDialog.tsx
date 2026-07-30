@@ -60,6 +60,7 @@ interface RunWorkflowDialogProps {
   runtimeInputs: RuntimeInputDefinition[];
   onRun: (inputs: Record<string, unknown>, scopeId?: string | null) => void;
   initialValues?: Record<string, unknown>;
+  initialScopeId?: string | null;
 }
 
 export function RunWorkflowDialog({
@@ -68,13 +69,18 @@ export function RunWorkflowDialog({
   runtimeInputs,
   onRun,
   initialValues = {},
+  initialScopeId = null,
 }: RunWorkflowDialogProps) {
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formSeed, setFormSeed] = useState(0);
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(null);
-  const { data: scopes = [] } = useScopes();
+  const { data: scopes = [], isLoading: isLoadingScopes, error: scopesError } = useScopes();
+  const requestedScope = initialScopeId
+    ? scopes.find((scope) => scope.id === initialScopeId)
+    : undefined;
+  const isRequestedScopeUnavailable = Boolean(initialScopeId && !requestedScope);
 
   // Reset inputs when dialog opens
   useEffect(() => {
@@ -92,13 +98,15 @@ export function RunWorkflowDialog({
           unwrapped[input.id] = value[0];
         }
       }
-      setInputs(unwrapped);
+      setInputs(
+        requestedScope ? mergeScopeValues(unwrapped, requestedScope, runtimeInputs) : unwrapped,
+      );
       setUploading({});
       setErrors({});
       setFormSeed((seed) => seed + 1);
-      setSelectedScopeId(null);
+      setSelectedScopeId(initialScopeId ?? null);
     }
-  }, [initialValues, open, runtimeInputs]);
+  }, [initialScopeId, initialValues, open, requestedScope, runtimeInputs]);
 
   const handleFileUpload = async (inputId: string, file: File) => {
     setUploading((prev) => ({ ...prev, [inputId]: true }));
@@ -186,6 +194,10 @@ export function RunWorkflowDialog({
   };
 
   const handleRun = () => {
+    if (isRequestedScopeUnavailable) {
+      return;
+    }
+
     // Validate required inputs
     const newErrors: Record<string, string> = {};
     for (const input of runtimeInputs) {
@@ -429,9 +441,26 @@ export function RunWorkflowDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {runtimeInputs.length > 0 && scopes.length > 0 && (
+        {initialScopeId && !requestedScope && (
+          <div
+            role={isLoadingScopes ? 'status' : 'alert'}
+            className="rounded-md border border-destructive/40 p-3 text-sm"
+          >
+            {isLoadingScopes
+              ? 'Resolving launch target…'
+              : `Launch target is unavailable: ${
+                  scopesError instanceof Error
+                    ? scopesError.message
+                    : 'the requested target was not found'
+                }`}
+          </div>
+        )}
+
+        {scopes.length > 0 && (
           <div className="space-y-2 pt-2">
-            <Label htmlFor="prefill-from-target">Prefill from target</Label>
+            <Label htmlFor="prefill-from-target">
+              {runtimeInputs.length > 0 ? 'Prefill from target' : 'Run against target'}
+            </Label>
             <Select value={selectedScopeId ?? ''} onValueChange={handlePrefillFromScope}>
               <SelectTrigger id="prefill-from-target">
                 <SelectValue placeholder="Prefill from a saved target…" />
@@ -445,7 +474,9 @@ export function RunWorkflowDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Fill matching inputs (domains, repos, IPs) from a saved target.
+              {runtimeInputs.length > 0
+                ? 'Fill matching inputs (domains, repos, IPs) from a saved target.'
+                : 'Associate this run with a saved target for history, assets, and findings.'}
             </p>
           </div>
         )}
@@ -462,7 +493,7 @@ export function RunWorkflowDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleRun} className="gap-2">
+          <Button onClick={handleRun} className="gap-2" disabled={isRequestedScopeUnavailable}>
             <Play className="h-4 w-4" />
             Run Workflow
           </Button>

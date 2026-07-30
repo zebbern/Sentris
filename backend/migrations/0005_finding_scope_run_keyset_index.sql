@@ -1,0 +1,1 @@
+CREATE INDEX "workflow_runs_org_scope_run_id_idx" ON "workflow_runs" USING btree ("organization_id","scope_id","run_id");

@@ -3,6 +3,7 @@
  * This is used by the API client to fetch fresh tokens before each request
  */
 import { logger } from '@/lib/logger';
+import { env } from '@/config/env';
 
 let clerkGetToken: ((options?: { template?: string }) => Promise<string | null>) | null = null;
 
@@ -25,7 +26,7 @@ export async function getFreshClerkToken(): Promise<string | null> {
   }
 
   try {
-    const jwtTemplate = (import.meta.env.VITE_CLERK_JWT_TEMPLATE || '').trim() || undefined;
+    const jwtTemplate = env.VITE_CLERK_JWT_TEMPLATE.trim() || undefined;
     const token = await clerkGetToken(jwtTemplate ? { template: jwtTemplate } : undefined);
     return token;
   } catch (error: unknown) {

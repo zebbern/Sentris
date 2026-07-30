@@ -43,6 +43,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { McpModule } from './mcp/mcp.module';
 import { StudioMcpModule } from './studio-mcp/studio-mcp.module';
 import { AuditModule } from './audit/audit.module';
+import { AuditRequestContextMiddleware } from './audit/audit-request-context';
 
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
@@ -67,6 +68,7 @@ import { PROVISIONING_REDIS } from './common/redis/redis.tokens';
 import { ProvisioningLockService } from './common/redis/provisioning-lock.service';
 import { InstanceHeartbeatModule } from './common/redis/instance-heartbeat.module';
 import { AdminInstancesController } from './common/redis/admin-instances.controller';
+import { OutboxModule } from './outbox/outbox.module';
 
 const coreModules = [
   AgentsModule,
@@ -98,6 +100,7 @@ const coreModules = [
   ScopesModule,
   AssetsModule,
   AiModule,
+  OutboxModule,
 ];
 
 const testingModules = process.env.NODE_ENV === 'production' ? [] : [TestingSupportModule];
@@ -207,6 +210,6 @@ function getEnvFilePaths(): string[] {
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+    consumer.apply(CorrelationIdMiddleware, AuditRequestContextMiddleware).forRoutes('*');
   }
 }

@@ -1,4 +1,11 @@
-import { Injectable, BadRequestException, Logger, Inject, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -186,6 +193,13 @@ export class McpServersService {
     // Validate transport-specific requirements
     this.validateTransportConfig(input);
 
+    // A discovery cache token is a bearer capability. Resolve and authorize it
+    // before any database mutation so a foreign token cannot create a partial server.
+    const cachedDiscovery =
+      input.cacheToken && this.redis
+        ? await this.getCachedDiscovery(input.cacheToken, organizationId)
+        : null;
+
     // Encrypt headers if provided
     let encryptedHeaders: {
       ciphertext: string;
@@ -213,59 +227,52 @@ export class McpServersService {
       );
     }
 
-    const server = await this.repository.create({
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      transportType: input.transportType,
-      endpoint: input.endpoint || null,
-      command: input.command || null,
-      args: input.args || null,
-      headers: encryptedHeaders,
-      healthCheckUrl: input.healthCheckUrl || null,
-      enabled: input.enabled ?? true,
-      organizationId,
-      createdBy: auth?.userId || null,
-    });
+    const server = await this.repository.create(
+      {
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        transportType: input.transportType,
+        endpoint: input.endpoint || null,
+        command: input.command || null,
+        args: input.args || null,
+        headers: encryptedHeaders,
+        healthCheckUrl: input.healthCheckUrl || null,
+        enabled: input.enabled ?? true,
+        organizationId,
+        createdBy: auth?.userId || null,
+      },
+      (executor, created) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_server.create',
+          resourceType: 'mcp_server',
+          resourceId: created.id,
+          resourceName: created.name,
+          metadata: { transportType: created.transportType },
+        }),
+    );
 
-    // If cacheToken provided, check Redis for cached discovery results
-    if (input.cacheToken && this.redis) {
-      try {
-        const cached = await this.getCachedDiscovery(input.cacheToken);
-        if (cached) {
-          if (cached.tools.length > 0) {
-            this.logger.log(
-              `Creating server ${server.id} with ${cached.tools.length} cached tools`,
-            );
-            await this.repository.upsertTools(
-              server.id,
-              cached.tools.map((tool) => ({
-                toolName: tool.name,
-                description: tool.description ?? null,
-                inputSchema: tool.inputSchema ?? null,
-              })),
-            );
-          }
-          // Mark healthy when discovery completed (even if tool count is 0)
-          await this.repository.updateHealthStatus(server.id, 'healthy', { organizationId });
-          // Delete cache after use
-          await this.redis.del(`mcp-discovery:${input.cacheToken}`);
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to load cached discovery for ${input.cacheToken}:`, error);
-        // Don't fail server creation if cache is invalid
+    if (cachedDiscovery && input.cacheToken && this.redis) {
+      if (cachedDiscovery.tools.length > 0) {
+        this.logger.log(
+          `Creating server ${server.id} with ${cachedDiscovery.tools.length} cached tools`,
+        );
+        await this.repository.upsertTools(
+          server.id,
+          cachedDiscovery.tools.map((tool) => ({
+            toolName: tool.name,
+            description: tool.description ?? null,
+            inputSchema: tool.inputSchema ?? null,
+          })),
+        );
       }
+      // Mark healthy when discovery completed (even if tool count is 0)
+      await this.repository.updateHealthStatus(server.id, 'healthy', { organizationId });
+      // Delete cache after use
+      await this.redis.del(`mcp-discovery:${input.cacheToken}`);
     }
 
     // Return header keys from input (we know the keys since we just created with them)
     const headerKeys = input.headers ? Object.keys(input.headers) : null;
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_server.create',
-      resourceType: 'mcp_server',
-      resourceId: server.id,
-      resourceName: server.name,
-      metadata: { transportType: server.transportType },
-    });
 
     return this.mapServerToResponse(server, headerKeys);
   }
@@ -273,7 +280,10 @@ export class McpServersService {
   /**
    * Get cached discovery results from Redis
    */
-  private async getCachedDiscovery(cacheToken: string): Promise<{
+  private async getCachedDiscovery(
+    cacheToken: string,
+    organizationId: string,
+  ): Promise<{
     tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
     toolCount: number;
   } | null> {
@@ -285,13 +295,26 @@ export class McpServersService {
     if (!value) {
       return null;
     }
-    const cached = JSON.parse(value);
+    let cached: {
+      status?: string;
+      organizationId?: string;
+      tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+      toolCount?: number;
+    };
+    try {
+      cached = JSON.parse(value) as typeof cached;
+    } catch {
+      throw new ForbiddenException('Discovery cache access denied');
+    }
+    if (cached.organizationId !== organizationId) {
+      throw new ForbiddenException('Discovery cache access denied');
+    }
     if (cached.status !== 'completed') {
       return null;
     }
     return {
-      tools: cached.tools,
-      toolCount: cached.toolCount,
+      tools: cached.tools ?? [],
+      toolCount: cached.toolCount ?? cached.tools?.length ?? 0,
     };
   }
 
@@ -379,7 +402,19 @@ export class McpServersService {
       return this.mapServerToResponse(current, headerKeys);
     }
 
-    const server = await this.repository.update(id, updates, { organizationId });
+    const server = await this.repository.update(
+      id,
+      updates,
+      { organizationId },
+      (executor, updated) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_server.update',
+          resourceType: 'mcp_server',
+          resourceId: updated.id,
+          resourceName: updated.name,
+          metadata: { transportType: updated.transportType },
+        }),
+    );
 
     // Determine header keys for response
     let headerKeys: string[] | null = null;
@@ -391,14 +426,6 @@ export class McpServersService {
       headerKeys = await this.extractHeaderKeys(server.headers);
     }
 
-    this.auditLogService.record(auth, {
-      action: 'mcp_server.update',
-      resourceType: 'mcp_server',
-      resourceId: server.id,
-      resourceName: server.name,
-      metadata: { transportType: server.transportType },
-    });
-
     return this.mapServerToResponse(server, headerKeys);
   }
 
@@ -409,15 +436,15 @@ export class McpServersService {
       id,
       { enabled: !current.enabled },
       { organizationId },
+      (executor, updated) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_server.toggle',
+          resourceType: 'mcp_server',
+          resourceId: updated.id,
+          resourceName: updated.name,
+          metadata: { enabled: updated.enabled },
+        }),
     );
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_server.toggle',
-      resourceType: 'mcp_server',
-      resourceId: server.id,
-      resourceName: server.name,
-      metadata: { enabled: server.enabled },
-    });
 
     return this.mapServerToResponse(server);
   }
@@ -425,15 +452,15 @@ export class McpServersService {
   async deleteServer(auth: AuthContext | null, id: string): Promise<void> {
     const organizationId = requireOrganizationId(auth);
     const server = await this.repository.findById(id, { organizationId });
-    await this.repository.delete(id, { organizationId });
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_server.delete',
-      resourceType: 'mcp_server',
-      resourceId: server.id,
-      resourceName: server.name,
-      metadata: { transportType: server.transportType },
-    });
+    await this.repository.delete(id, { organizationId }, (executor) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'mcp_server.delete',
+        resourceType: 'mcp_server',
+        resourceId: server.id,
+        resourceName: server.name,
+        metadata: { transportType: server.transportType },
+      }),
+    );
   }
 
   async getServerWithDecryptedHeaders(
@@ -494,7 +521,19 @@ export class McpServersService {
     const organizationId = requireOrganizationId(auth);
     // Verify server belongs to organization
     const server = await this.repository.findById(serverId, { organizationId });
-    const tool = await this.repository.toggleToolEnabled(toolId);
+    const tool = await this.repository.toggleToolEnabled(serverId, toolId, (executor, toggled) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'mcp_server.tool_toggle',
+        resourceType: 'mcp_server',
+        resourceId: server.id,
+        resourceName: server.name,
+        metadata: {
+          toolId: toggled.id,
+          toolName: toggled.toolName,
+          enabled: toggled.enabled,
+        },
+      }),
+    );
     return this.mapToolToResponse(tool, server.name);
   }
 

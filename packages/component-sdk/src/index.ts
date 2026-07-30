@@ -18,6 +18,7 @@ export * from './constants';
 export * from './registry';
 export * from './context';
 export * from './runner';
+export * from './docker-resource-scope';
 export * from './errors';
 export * from './tool-helpers';
 export * from './http/types';

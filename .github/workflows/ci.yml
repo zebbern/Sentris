@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
+    inputs:
+      performance_baseline_revision:
+        description: Exact clean commit SHA used as the same-host release performance baseline
+        required: false
+        type: string
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -76,7 +83,14 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Typecheck
-        run: bun run typecheck
+        run: |
+          bun run typecheck
+          bun --cwd=backend run typecheck:scripts
+          bun --cwd=backend run migration:typecheck
+          bun run typecheck:e2e
+          bun run typecheck:release-scripts
+          bun run smoke:findings-opensearch:typecheck
+          bun run smoke:telemetry-durability:typecheck
 
   # ──────────────────────────────────────────────
   # Unit Tests — bun test across the workspace
@@ -107,8 +121,52 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Run release harness tests
+        run: bun test scripts/__tests__
+
       - name: Run tests
         run: bun run test
+
+  # ──────────────────────────────────────────────
+  # Tenant boundaries — named negative proof for the release gate
+  # ──────────────────────────────────────────────
+  tenant-boundaries:
+    name: Cross-Tenant Boundary Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Backend ownership and redemption boundaries
+        run: >-
+          bun --cwd=backend test
+          src/api-keys/__tests__/api-keys.http.spec.ts
+          src/api-keys/__tests__/api-keys.service.spec.ts
+          src/integrations/__tests__/integrations.http.spec.ts
+          src/integrations/__tests__/integrations.repository.spec.ts
+          src/integrations/__tests__/integrations.service.spec.ts
+          src/mcp-servers/__tests__/mcp-servers.service.spec.ts
+
+      - name: Worker secret and file ownership boundaries
+        run: >-
+          bun --cwd=worker test
+          src/adapters/__tests__/secrets.adapter.test.ts
+          src/adapters/__tests__/file-storage.adapter.test.ts
 
   # ──────────────────────────────────────────────
   # Build — validate production build compiles
@@ -140,8 +198,17 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Build shared package
+        run: bun --cwd=packages/shared run build
+
       - name: Build backend
         run: bun --cwd=backend run build
+
+      - name: Build worker
+        run: bun --cwd=worker run build
+
+      - name: Build frontend
+        run: bun --cwd=frontend run build
 
   # ──────────────────────────────────────────────
   # API Contract — ensure OpenAPI spec is up to date
@@ -175,10 +242,234 @@ jobs:
       - name: Generate OpenAPI spec
         run: bun --cwd=backend run generate:openapi
 
-      - name: Check for uncommitted OpenAPI changes
+      - name: Generate backend client
+        run: bun --cwd=packages/backend-client run generate
+
+      - name: Typecheck generated backend client
+        run: bun --cwd=packages/backend-client run typecheck
+
+      - name: Check for uncommitted API contract changes
         run: |
-          if ! git diff --exit-code openapi.json; then
+          if ! git diff --exit-code -- openapi.json packages/backend-client/src/client.ts; then
             echo ""
-            echo "::error::OpenAPI spec is out of date. Run 'bun --cwd=backend run generate:openapi' and commit the result."
+            echo "::error::OpenAPI or generated client is out of date. Regenerate both and commit the result."
             exit 1
           fi
+
+  # ──────────────────────────────────────────────
+  # Checked migrations — fresh, previous-release upgrade, and concurrent startup
+  # ──────────────────────────────────────────────
+  migration-smoke:
+    name: Checked Migration Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sentris_fresh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sentris_fresh"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify checked migration artifacts
+        run: bun --cwd=backend run migration:check
+
+      - name: Fresh database migration
+        env:
+          MIGRATION_SMOKE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sentris_fresh
+        run: bun --cwd=backend run migration:smoke:fresh
+
+      - name: Fresh database parity
+        env:
+          MIGRATION_SMOKE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sentris_fresh
+        run: bun --cwd=backend run migration:smoke:parity
+
+      - name: Create isolated upgrade database
+        run: >-
+          bun --cwd=backend -e "import pg from 'pg';
+          const client = new pg.Client('postgres://postgres:postgres@127.0.0.1:5432/postgres');
+          await client.connect();
+          await client.query('CREATE DATABASE sentris_upgrade');
+          await client.end();"
+
+      - name: Previous-release upgrade migration
+        env:
+          MIGRATION_SMOKE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sentris_upgrade
+        run: bun --cwd=backend run migration:smoke:upgrade
+
+      - name: Upgrade database parity
+        env:
+          MIGRATION_SMOKE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sentris_upgrade
+        run: bun --cwd=backend run migration:smoke:parity
+
+      - name: Create isolated concurrent-start database
+        run: >-
+          bun --cwd=backend -e "import pg from 'pg';
+          const client = new pg.Client('postgres://postgres:postgres@127.0.0.1:5432/postgres');
+          await client.connect();
+          await client.query('CREATE DATABASE sentris_concurrent');
+          await client.end();"
+
+      - name: Concurrent backend migration startup
+        env:
+          MIGRATION_SMOKE_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/sentris_concurrent
+        run: bun --cwd=backend run migration:smoke:concurrent
+
+  # ──────────────────────────────────────────────
+  # Production topology — real Temporal, DIND, telemetry, and target journey
+  # ──────────────────────────────────────────────
+  production-smoke:
+    name: Production Compose Release Smoke (${{ matrix.trust-profile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    needs: [lint, typecheck, test-unit, tenant-boundaries, build, api-contract, migration-smoke]
+    strategy:
+      fail-fast: false
+      matrix:
+        trust-profile: [trusted-local, hardened]
+    env:
+      CI: true
+      SENTRIS_INSTANCE: '0'
+      SENTRIS_TRUST_PROFILE: ${{ matrix.trust-profile }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium for trusted-local browser journey
+        if: matrix.trust-profile == 'trusted-local'
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run clean production topology and critical-journey smoke
+        run: bun run smoke:production-compose
+
+  # ──────────────────────────────────────────────
+  # Performance — same host, exact clean baseline/candidate revisions
+  # ──────────────────────────────────────────────
+  performance-pair:
+    name: Release Performance Pair
+    if: ${{ inputs.performance_baseline_revision != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 210
+    needs: [lint, typecheck, test-unit, tenant-boundaries, build, api-contract, migration-smoke]
+    env:
+      CI: 'true'
+      SENTRIS_INSTANCE: '0'
+      SENTRIS_TRUST_PROFILE: trusted-local
+      PERFORMANCE_BASELINE_REVISION: ${{ inputs.performance_baseline_revision }}
+      RELEASE_BENCHMARK_ADMIN_USERNAME: performance-admin
+      RELEASE_BENCHMARK_SAMPLE_COUNT: '10'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-store-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Prepare isolated benchmark credentials
+        shell: bash
+        run: |
+          password="$(openssl rand -hex 32)"
+          token="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          echo "::add-mask::$token"
+          echo "RELEASE_BENCHMARK_ADMIN_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "RELEASE_BENCHMARK_INTERNAL_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Resolve exact candidate revision
+        id: candidate
+        shell: bash
+        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare exact baseline worktree
+        shell: bash
+        run: |
+          if [[ ! "$PERFORMANCE_BASELINE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Performance baseline must be a full 40-character commit SHA."
+            exit 1
+          fi
+          git worktree add --detach \
+            "$RUNNER_TEMP/sentris-baseline" \
+            "$PERFORMANCE_BASELINE_REVISION"
+
+      - name: Collect and compare release performance
+        shell: bash
+        env:
+          CANDIDATE_REVISION: ${{ steps.candidate.outputs.revision }}
+        run: |
+          bun run performance:pair -- \
+            --baseline-root "$RUNNER_TEMP/sentris-baseline" \
+            --baseline-revision "$PERFORMANCE_BASELINE_REVISION" \
+            --candidate-root "$GITHUB_WORKSPACE" \
+            --candidate-revision "$CANDIDATE_REVISION" \
+            --output-dir "$RUNNER_TEMP/sentris-performance-pair"
+
+      - name: Upload performance evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-performance-pair
+          path: ${{ runner.temp }}/sentris-performance-pair/*.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -10,28 +10,50 @@ describe('FindingsStatsResponseSchema', () => {
         { severity: 'medium', count: 100 },
       ],
       total: 147,
+      availability: 'available',
+      schemaCoverage: { canonical: 147, legacy: 0, invalid: 0 },
     };
     const result = FindingsStatsResponseSchema.parse(data);
     expect(result.severityCounts).toHaveLength(3);
     expect(result.total).toBe(147);
+    expect(result.availability).toBe('available');
   });
 
   it('accepts empty severityCounts array', () => {
-    const result = FindingsStatsResponseSchema.parse({ severityCounts: [], total: 0 });
+    const result = FindingsStatsResponseSchema.parse({
+      severityCounts: [],
+      total: 0,
+      availability: 'available',
+      schemaCoverage: { canonical: 0, legacy: 0, invalid: 0 },
+    });
     expect(result.severityCounts).toHaveLength(0);
     expect(result.total).toBe(0);
   });
 
+  it('requires an explicit availability state', () => {
+    expect(() => FindingsStatsResponseSchema.parse({ severityCounts: [], total: 0 })).toThrow();
+  });
+
   it('rejects missing severityCounts field', () => {
-    expect(() => FindingsStatsResponseSchema.parse({ total: 0 })).toThrow();
+    expect(() =>
+      FindingsStatsResponseSchema.parse({ total: 0, availability: 'available' }),
+    ).toThrow();
   });
 
   it('rejects missing total field', () => {
-    expect(() => FindingsStatsResponseSchema.parse({ severityCounts: [] })).toThrow();
+    expect(() =>
+      FindingsStatsResponseSchema.parse({ severityCounts: [], availability: 'available' }),
+    ).toThrow();
   });
 
   it('rejects negative total', () => {
-    expect(() => FindingsStatsResponseSchema.parse({ severityCounts: [], total: -1 })).toThrow();
+    expect(() =>
+      FindingsStatsResponseSchema.parse({
+        severityCounts: [],
+        total: -1,
+        availability: 'available',
+      }),
+    ).toThrow();
   });
 
   it('rejects negative count in severity entry', () => {
@@ -39,6 +61,7 @@ describe('FindingsStatsResponseSchema', () => {
       FindingsStatsResponseSchema.parse({
         severityCounts: [{ severity: 'high', count: -5 }],
         total: 0,
+        availability: 'available',
       }),
     ).toThrow();
   });
@@ -48,6 +71,7 @@ describe('FindingsStatsResponseSchema', () => {
       FindingsStatsResponseSchema.parse({
         severityCounts: [{ severity: 'high', count: 3.5 }],
         total: 0,
+        availability: 'available',
       }),
     ).toThrow();
   });
@@ -57,6 +81,7 @@ describe('FindingsStatsResponseSchema', () => {
       FindingsStatsResponseSchema.parse({
         severityCounts: [{ severity: 123, count: 5 }],
         total: 5,
+        availability: 'available',
       }),
     ).toThrow();
   });
@@ -89,5 +114,26 @@ describe('FindingsStatsQuerySchema', () => {
     });
     expect(result.workflowId).toBe('wf-1');
     expect(result.componentId).toBe('comp-1');
+  });
+
+  it('requires explicit schema coverage for aggregate trust', () => {
+    expect(() =>
+      FindingsStatsResponseSchema.parse({
+        severityCounts: [],
+        total: 0,
+        availability: 'available',
+      }),
+    ).toThrow();
+  });
+
+  it('accepts the same projected triage filters as the findings list', () => {
+    const result = FindingsStatsQuerySchema.parse({
+      triageStatus: 'new,in_progress',
+      assigneeUserId: 'user-1',
+    });
+
+    expect(result.triageStatus).toBe('new,in_progress');
+    expect(result.assigneeUserId).toBe('user-1');
+    expect(() => FindingsStatsQuerySchema.parse({ triageStatus: 'new,unknown' })).toThrow();
   });
 });

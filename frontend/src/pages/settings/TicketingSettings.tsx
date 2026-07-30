@@ -38,7 +38,12 @@ import {
 import {
   DEFAULT_JIRA_STATUS_MAPPING,
   FINDING_TRIAGE_STATUSES,
+  normalizeJiraStatusMappingEntry,
   type FindingTriageStatus,
+  type JiraStatusMapping,
+  type JiraStatusMappingTarget,
+  type TicketingConnectionConfig,
+  type TicketingConnectionStatus,
 } from '@sentris/shared';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +63,23 @@ const STATUS_LABELS: Record<string, string> = {
 const MAPPABLE_STATUSES = FINDING_TRIAGE_STATUSES.filter(
   (s): s is Exclude<FindingTriageStatus, 'new'> => s !== 'new',
 );
+
+function normalizeStatusMapping(
+  mapping: JiraStatusMapping,
+): Record<string, JiraStatusMappingTarget> {
+  const defaults = Object.fromEntries(
+    Object.entries(DEFAULT_JIRA_STATUS_MAPPING).map(([status, entry]) => [
+      status,
+      normalizeJiraStatusMappingEntry(entry),
+    ]),
+  );
+  return Object.fromEntries(
+    MAPPABLE_STATUSES.map((status) => [
+      status,
+      mapping[status] ? normalizeJiraStatusMappingEntry(mapping[status]) : defaults[status],
+    ]),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -93,6 +115,7 @@ export function TicketingSettings() {
             isConnected={isConnected}
             cloudId={connection.cloudId}
             createdAt={connection.createdAt}
+            webhookRegistration={connection.webhookRegistration}
           />
           {!isConnected && <ConnectButton />}
           {isConnected && (
@@ -115,14 +138,16 @@ function ConnectionStatusCard({
   isConnected,
   cloudId,
   createdAt,
+  webhookRegistration,
 }: {
   isConnected: boolean;
   cloudId: string | null;
   createdAt: string | null;
+  webhookRegistration: TicketingConnectionStatus['webhookRegistration'];
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-lg border p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
+    <div className="flex items-start gap-4 rounded-lg border p-4">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
         <svg
           viewBox="0 0 24 24"
           className="h-6 w-6 text-blue-600 dark:text-blue-400"
@@ -155,7 +180,63 @@ function ConnectionStatusCard({
             Connected {new Date(createdAt).toLocaleDateString()}
           </p>
         )}
+        {isConnected && webhookRegistration && (
+          <WebhookRegistrationDetails registration={webhookRegistration} />
+        )}
       </div>
+    </div>
+  );
+}
+
+type WebhookRegistration = NonNullable<TicketingConnectionStatus['webhookRegistration']>;
+
+const WEBHOOK_REGISTRATION_CONTENT: Record<
+  WebhookRegistration['status'],
+  {
+    label: string;
+    description: string;
+    variant: 'success' | 'warning' | 'destructive' | 'secondary';
+    recovery?: string;
+  }
+> = {
+  registered: {
+    label: 'Webhook registered',
+    description: 'Inbound Jira status synchronization is active.',
+    variant: 'success',
+  },
+  pending: {
+    label: 'Webhook registration pending',
+    description: 'Registration is queued and will retry automatically.',
+    variant: 'warning',
+  },
+  dead: {
+    label: 'Webhook registration failed',
+    description: 'Inbound Jira status synchronization is not active.',
+    variant: 'destructive',
+    recovery:
+      'Fix Jira credentials or network access, then requeue the registration event from the admin dead-letter queue, or reconnect Jira.',
+  },
+  unregistered: {
+    label: 'Webhook unregistered',
+    description: 'Reconnect Jira to register inbound status synchronization.',
+    variant: 'secondary',
+  },
+};
+
+function WebhookRegistrationDetails({ registration }: { registration: WebhookRegistration }) {
+  const content = WEBHOOK_REGISTRATION_CONTENT[registration.status];
+
+  return (
+    <div className="mt-3 space-y-1.5 rounded-md border bg-muted/30 p-3">
+      <Badge variant={content.variant}>{content.label}</Badge>
+      <p className="text-xs text-muted-foreground">{content.description}</p>
+      {registration.lastError && (
+        <div className="space-y-0.5" role="alert">
+          <p className="text-xs font-medium text-destructive">Last registration error</p>
+          <p className="text-xs text-destructive">{registration.lastError}</p>
+        </div>
+      )}
+      {content.recovery && <p className="text-xs text-muted-foreground">{content.recovery}</p>}
     </div>
   );
 }
@@ -251,23 +332,16 @@ function DisconnectSection() {
 // Configuration Form
 // ---------------------------------------------------------------------------
 
-interface FormConfig {
-  projectKey: string;
-  issueTypeId: string;
-  statusMapping: Record<string, string>;
-  autoCreateOnStatuses: string[];
-}
-
-function ConfigurationForm({ initialConfig }: { initialConfig?: FormConfig }) {
+function ConfigurationForm({ initialConfig }: { initialConfig?: TicketingConnectionConfig }) {
   const { toast } = useToast();
   const updateMutation = useUpdateTicketingConfigMutation();
 
   const [projectKey, setProjectKey] = useState(initialConfig?.projectKey ?? '');
   const [issueTypeId, setIssueTypeId] = useState(initialConfig?.issueTypeId ?? '');
-  const [statusMapping, setStatusMapping] = useState<Record<string, string>>(
-    initialConfig?.statusMapping ?? { ...DEFAULT_JIRA_STATUS_MAPPING },
+  const [statusMapping, setStatusMapping] = useState<Record<string, JiraStatusMappingTarget>>(
+    normalizeStatusMapping(initialConfig?.statusMapping ?? DEFAULT_JIRA_STATUS_MAPPING),
   );
-  const [autoCreate, setAutoCreate] = useState<string[]>(
+  const [autoCreate, setAutoCreate] = useState<FindingTriageStatus[]>(
     initialConfig?.autoCreateOnStatuses ?? ['triaged'],
   );
 
@@ -275,7 +349,7 @@ function ConfigurationForm({ initialConfig }: { initialConfig?: FormConfig }) {
     if (initialConfig) {
       setProjectKey(initialConfig.projectKey);
       setIssueTypeId(initialConfig.issueTypeId);
-      setStatusMapping(initialConfig.statusMapping);
+      setStatusMapping(normalizeStatusMapping(initialConfig.statusMapping));
       setAutoCreate(initialConfig.autoCreateOnStatuses);
     }
   }, [initialConfig]);
@@ -295,7 +369,11 @@ function ConfigurationForm({ initialConfig }: { initialConfig?: FormConfig }) {
       projectKey.length > 0 &&
       issueTypeId.length > 0 &&
       autoCreate.length > 0 &&
-      MAPPABLE_STATUSES.every((s) => (statusMapping[s] ?? '').trim().length > 0),
+      MAPPABLE_STATUSES.every(
+        (s) =>
+          statusMapping[s]?.transitionName.trim().length > 0 &&
+          statusMapping[s]?.resultingStatus.trim().length > 0,
+      ),
     [projectKey, issueTypeId, autoCreate, statusMapping],
   );
 
@@ -305,8 +383,8 @@ function ConfigurationForm({ initialConfig }: { initialConfig?: FormConfig }) {
       {
         projectKey,
         issueTypeId,
-        statusMapping: statusMapping as Record<FindingTriageStatus, string>,
-        autoCreateOnStatuses: autoCreate as FindingTriageStatus[],
+        statusMapping,
+        autoCreateOnStatuses: autoCreate,
       },
       {
         onSuccess: () => toast({ title: 'Configuration saved', variant: 'success' }),
@@ -409,25 +487,51 @@ function ConfigurationForm({ initialConfig }: { initialConfig?: FormConfig }) {
       <div className="space-y-2">
         <label className="text-sm font-medium">Status Mapping</label>
         <p className="text-xs text-muted-foreground">
-          Map each finding status to a Jira transition name.
+          Configure the outbound Jira transition and the status Jira reports after it succeeds.
         </p>
         <div className="rounded-md border">
-          <div className="grid grid-cols-2 gap-px bg-muted text-xs font-medium uppercase tracking-wider">
+          <div className="grid grid-cols-3 gap-px bg-muted text-xs font-medium uppercase tracking-wider">
             <div className="bg-background px-3 py-2">Finding Status</div>
-            <div className="bg-background px-3 py-2">Jira Status</div>
+            <div className="bg-background px-3 py-2">Jira Transition</div>
+            <div className="bg-background px-3 py-2">Resulting Jira Status</div>
           </div>
           {MAPPABLE_STATUSES.map((s) => (
-            <div key={s} className="grid grid-cols-2 gap-px border-t bg-muted">
+            <div key={s} className="grid grid-cols-3 gap-px border-t bg-muted">
               <div className="bg-background px-3 py-2 text-sm flex items-center">
                 {STATUS_LABELS[s] ?? s}
               </div>
               <div className="bg-background px-3 py-1">
                 <Input
-                  value={statusMapping[s] ?? ''}
-                  onChange={(e) => setStatusMapping((prev) => ({ ...prev, [s]: e.target.value }))}
+                  value={statusMapping[s]?.transitionName ?? ''}
+                  onChange={(e) =>
+                    setStatusMapping((prev) => ({
+                      ...prev,
+                      [s]: {
+                        ...prev[s],
+                        transitionName: e.target.value,
+                      },
+                    }))
+                  }
                   placeholder="Jira transition name"
                   className="h-8 text-sm border-0 shadow-none focus-visible:ring-1"
-                  aria-label={`Jira status for ${STATUS_LABELS[s]}`}
+                  aria-label={`Jira transition for ${STATUS_LABELS[s]}`}
+                />
+              </div>
+              <div className="bg-background px-3 py-1">
+                <Input
+                  value={statusMapping[s]?.resultingStatus ?? ''}
+                  onChange={(e) =>
+                    setStatusMapping((prev) => ({
+                      ...prev,
+                      [s]: {
+                        ...prev[s],
+                        resultingStatus: e.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="Resulting Jira status"
+                  className="h-8 text-sm border-0 shadow-none focus-visible:ring-1"
+                  aria-label={`Resulting Jira status for ${STATUS_LABELS[s]}`}
                 />
               </div>
             </div>

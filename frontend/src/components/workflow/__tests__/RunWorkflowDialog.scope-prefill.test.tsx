@@ -56,12 +56,14 @@ const exampleScope: Scope = {
 };
 
 let mockScopes: Scope[] = [exampleScope];
+let mockScopesLoading = false;
+let mockScopesError: Error | null = null;
 
 mock.module('@/hooks/queries/useScopeQueries', () => ({
   useScopes: () => ({
     data: mockScopes,
-    isLoading: false,
-    error: null,
+    isLoading: mockScopesLoading,
+    error: mockScopesError,
   }),
 }));
 
@@ -90,6 +92,8 @@ describe('RunWorkflowDialog scope prefill', () => {
   afterEach(() => {
     cleanup();
     mockScopes = [exampleScope];
+    mockScopesLoading = false;
+    mockScopesError = null;
   });
 
   it('shows the "Prefill from target" selector when scopes and runtime inputs exist', () => {
@@ -117,11 +121,51 @@ describe('RunWorkflowDialog scope prefill', () => {
     expect(screen.queryByText('Prefill from target')).not.toBeInTheDocument();
   });
 
-  it('hides the selector when there are no runtime inputs', () => {
-    const props = createDefaultProps({ runtimeInputs: [] });
+  it('keeps a zero-input workflow bound to its launch target', () => {
+    const onRun = mock(() => {});
+    const props = createDefaultProps({ runtimeInputs: [], initialScopeId: 's1', onRun });
     render(<RunWorkflowDialog {...props} />);
 
-    expect(screen.queryByText('Prefill from target')).not.toBeInTheDocument();
+    expect(screen.getByText('Run against target')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Example Corp' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const runButtons = screen.getAllByText('Run Workflow');
+    fireEvent.click(runButtons[runButtons.length - 1]);
+
+    expect(onRun).toHaveBeenCalledWith({}, 's1');
+  });
+
+  it('cannot silently submit an unscoped run while its launch target is loading', () => {
+    mockScopes = [];
+    mockScopesLoading = true;
+    const onRun = mock(() => {});
+    const props = createDefaultProps({ runtimeInputs: [], initialScopeId: 's1', onRun });
+    render(<RunWorkflowDialog {...props} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Resolving launch target');
+    const runButton = screen.getByRole('button', { name: /run workflow/i });
+    expect(runButton).toBeDisabled();
+    fireEvent.click(runButton);
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it('cannot silently submit an unscoped run when its launch target is unavailable', () => {
+    mockScopes = [];
+    mockScopesError = new Error('target service offline');
+    const onRun = mock(() => {});
+    const props = createDefaultProps({ runtimeInputs: [], initialScopeId: 's1', onRun });
+    render(<RunWorkflowDialog {...props} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Launch target is unavailable: target service offline',
+    );
+    const runButton = screen.getByRole('button', { name: /run workflow/i });
+    expect(runButton).toBeDisabled();
+    fireEvent.click(runButton);
+    expect(onRun).not.toHaveBeenCalled();
   });
 
   it('prefills matching inputs from the selected target and runs with the merged values', () => {

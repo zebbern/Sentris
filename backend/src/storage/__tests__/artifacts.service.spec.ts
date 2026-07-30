@@ -55,7 +55,10 @@ describe('ArtifactsService', () => {
       downloadFile: vi.fn(),
       deleteFile: vi.fn(),
     };
-    auditLog = { record: vi.fn() };
+    auditLog = {
+      recordDurable: vi.fn(async () => undefined),
+      recordDurableWithExecutor: vi.fn(async () => undefined),
+    };
 
     service = new ArtifactsService(
       repo as unknown as ArtifactsRepository,
@@ -110,10 +113,24 @@ describe('ArtifactsService', () => {
 
     expect(result.buffer).toBe(buf);
     expect(filesService.downloadFile).toHaveBeenCalledWith(authContext, 'file-1');
-    expect(auditLog.record).toHaveBeenCalledWith(
+    expect(auditLog.recordDurable).toHaveBeenCalledWith(
       authContext,
-      expect.objectContaining({ action: 'artifact.download' }),
+      expect.objectContaining({
+        action: 'artifact.download',
+        metadata: expect.objectContaining({ phase: 'requested' }),
+      }),
     );
+  });
+
+  it('does not read artifact bytes when durable download audit acceptance fails', async () => {
+    repo.findById.mockResolvedValue(makeArtifact());
+    auditLog.recordDurable.mockRejectedValue(new Error('audit outbox unavailable'));
+
+    await expect(service.downloadArtifact(authContext, 'artifact-1')).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+
+    expect(filesService.downloadFile).not.toHaveBeenCalled();
   });
 
   it('downloads an artifact scoped to a run', async () => {
@@ -128,6 +145,13 @@ describe('ArtifactsService', () => {
     expect(repo.findByIdForRun).toHaveBeenCalledWith('artifact-1', 'run-1', {
       organizationId: 'org-1',
     });
+    expect(auditLog.recordDurable).toHaveBeenCalledWith(
+      authContext,
+      expect.objectContaining({
+        action: 'artifact.download',
+        metadata: expect.objectContaining({ phase: 'requested' }),
+      }),
+    );
   });
 
   it('throws when run-scoped artifact is not found', async () => {
@@ -140,36 +164,50 @@ describe('ArtifactsService', () => {
   // ── Delete ────────────────────────────────────────────────────────
   it('deletes an artifact and its file', async () => {
     repo.findById.mockResolvedValue(makeArtifact());
-    repo.delete.mockResolvedValue(true);
     filesService.deleteFile.mockResolvedValue(undefined);
 
     await service.deleteArtifact(authContext, 'artifact-1');
 
-    expect(filesService.deleteFile).toHaveBeenCalledWith(authContext, 'file-1');
-    expect(repo.delete).toHaveBeenCalledWith('artifact-1', { organizationId: 'org-1' });
-    expect(auditLog.record).toHaveBeenCalledWith(
+    expect(auditLog.recordDurable).toHaveBeenCalledWith(
       authContext,
-      expect.objectContaining({ action: 'artifact.delete' }),
+      expect.objectContaining({
+        action: 'artifact.delete',
+        metadata: expect.objectContaining({ phase: 'requested' }),
+      }),
     );
+    expect(filesService.deleteFile).toHaveBeenCalledWith(authContext, 'file-1');
+    expect(repo.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not touch storage when durable audit enqueueing fails', async () => {
+    repo.findById.mockResolvedValue(makeArtifact());
+    auditLog.recordDurable.mockRejectedValue(new Error('audit outbox unavailable'));
+    filesService.deleteFile.mockResolvedValue(undefined);
+
+    await expect(service.deleteArtifact(authContext, 'artifact-1')).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+
+    expect(filesService.deleteFile).not.toHaveBeenCalled();
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException when deleting non-existent artifact', async () => {
-    repo.findById.mockResolvedValue(makeArtifact());
-    repo.delete.mockResolvedValue(false);
-    filesService.deleteFile.mockResolvedValue(undefined);
+    repo.findById.mockResolvedValue(null);
     await expect(service.deleteArtifact(authContext, 'artifact-1')).rejects.toThrow(
       NotFoundException,
     );
+    expect(filesService.deleteFile).not.toHaveBeenCalled();
   });
 
-  it('continues deletion even if file delete fails', async () => {
+  it('propagates a storage outage and retains the artifact retry anchor', async () => {
     repo.findById.mockResolvedValue(makeArtifact());
-    repo.delete.mockResolvedValue(true);
     filesService.deleteFile.mockRejectedValue(new Error('storage unavailable'));
 
-    // Should not throw — file deletion failure is caught and logged
-    await service.deleteArtifact(authContext, 'artifact-1');
-    expect(repo.delete).toHaveBeenCalled();
+    await expect(service.deleteArtifact(authContext, 'artifact-1')).rejects.toThrow(
+      'storage unavailable',
+    );
+    expect(repo.delete).not.toHaveBeenCalled();
   });
 
   // ── Organization context ──────────────────────────────────────────

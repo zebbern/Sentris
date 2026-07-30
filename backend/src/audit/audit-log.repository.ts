@@ -3,7 +3,13 @@ import { and, desc, eq, gte, lt, lte, or, sql, inArray, type SQL } from 'drizzle
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
-import { auditLogsTable, type AuditLogInsert, type AuditLogRecord } from '../database/schema';
+import {
+  auditLogsTable,
+  type AuditLogInsert,
+  type AuditLogRecord,
+  type AuditResourceType,
+} from '../database/schema';
+import { enqueueOutboxEvent, type OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface ListAuditLogFilters {
   organizationId: string;
@@ -27,8 +33,40 @@ export class AuditLogRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async insert(values: Omit<AuditLogInsert, 'id' | 'createdAt'>): Promise<void> {
-    await this.db.insert(auditLogsTable).values(values);
+  async enqueue(
+    values: Required<Pick<AuditLogInsert, 'id' | 'createdAt'>> & AuditLogInsert,
+    executor: OutboxExecutor = this.db,
+  ): Promise<void> {
+    await enqueueOutboxEvent(executor, {
+      eventType: 'audit.log.persist.v1',
+      organizationId: values.organizationId ?? null,
+      aggregateType: 'audit_log',
+      aggregateId: values.id,
+      dedupeKey: `audit.log:${values.id}`,
+      payload: {
+        auditId: values.id,
+        organizationId: values.organizationId ?? null,
+        actorId: values.actorId ?? null,
+        actorType: values.actorType,
+        actorDisplay: values.actorDisplay ?? null,
+        action: values.action,
+        resourceType: values.resourceType,
+        resourceId: values.resourceId ?? null,
+        resourceName: values.resourceName ?? null,
+        metadata: values.metadata ?? null,
+        ip: values.ip ?? null,
+        userAgent: values.userAgent ?? null,
+        correlationId: values.correlationId ?? null,
+        occurredAt: values.createdAt.toISOString(),
+      },
+    });
+  }
+
+  async insert(values: AuditLogInsert): Promise<void> {
+    await this.db
+      .insert(auditLogsTable)
+      .values(values)
+      .onConflictDoNothing({ target: auditLogsTable.id });
   }
 
   async list(filters: ListAuditLogFilters): Promise<AuditLogRecord[]> {
@@ -40,10 +78,12 @@ export class AuditLogRepository {
     if (filters.resourceType) {
       if (Array.isArray(filters.resourceType)) {
         if (filters.resourceType.length > 0) {
-          conditions.push(inArray(auditLogsTable.resourceType, filters.resourceType as any[]));
+          conditions.push(
+            inArray(auditLogsTable.resourceType, filters.resourceType as AuditResourceType[]),
+          );
         }
       } else {
-        conditions.push(eq(auditLogsTable.resourceType, filters.resourceType as any));
+        conditions.push(eq(auditLogsTable.resourceType, filters.resourceType as AuditResourceType));
       }
     }
     if (filters.resourceId) {

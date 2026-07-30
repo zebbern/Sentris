@@ -47,7 +47,7 @@ describe('human input activity diagnostics', () => {
     initializeHumanInputActivity({
       database: database.db as unknown as NodePgDatabase<typeof schema>,
       trace: trace as unknown as ITraceService,
-      baseUrl: 'https://sentris.test',
+      publicBaseUrl: 'https://sentris.test',
     });
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -66,6 +66,14 @@ describe('human input activity diagnostics', () => {
       expect(database.db.insert).toHaveBeenCalledWith(schema.humanInputRequestsTable);
       expect(database.values).toHaveBeenCalledTimes(1);
       expect(trace.record).toHaveBeenCalledTimes(1);
+      expect(trace.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: `trace:run-1:human-input:${result.requestId}`,
+          sequence: expect.any(Number),
+          workflowId: 'workflow-1',
+          organizationId: 'org-1',
+        }),
+      );
       expect(consoleLogSpy).not.toHaveBeenCalled();
     } finally {
       consoleLogSpy.mockRestore();

@@ -84,7 +84,7 @@ This checks the live-validation ledger and catalog-quality guardrails. It should
 - `Low-value/static candidates: 0`.
 - `Seed/API catalog gaps: 0`.
 
-If `Seed/API catalog gaps` is non-zero, run the seed step for the active instance before validation; the harness cannot validate templates that are present on disk but absent from the API catalog. Use `bun --cwd backend scripts/seed-templates.ts --dry-run` first when you only need to confirm the target database and seed file count without writing. Do not rerun templates that are already current in the ledger. If the preflight reports a missing, stale, or degraded template, run only the affected workflow with the targeted audit flags:
+If `Seed/API catalog gaps` is non-zero, run the seed step for the active instance before validation; the harness cannot validate templates that are present on disk but absent from the API catalog. Use `bun --cwd=backend scripts/seed-templates.ts --dry-run` first when you only need to confirm the target database and seed file count without writing. Do not rerun templates that are already current in the ledger. If the preflight reports a missing, stale, or degraded template, run only the affected workflow with the targeted audit flags:
 
 ```bash
 bun run template-library:audit -- --name "Template Name"

@@ -9,7 +9,7 @@ const databaseTarget = getDrizzleDatabaseTarget({
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/database/schema',
-  out: './drizzle',
+  out: './migrations',
   dbCredentials: {
     url: databaseTarget.connectionString,
   },

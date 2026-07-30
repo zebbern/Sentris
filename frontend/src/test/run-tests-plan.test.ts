@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { collectTestFiles, planFrontendTestRuns, usesMockModule } from './run-tests-plan';
+import {
+  collectTestFiles,
+  planExplicitFrontendTestRuns,
+  planFrontendTestRuns,
+  usesMockModule,
+} from './run-tests-plan';
 
 describe('frontend test runner planning', () => {
   let tempDir: string | null = null;
@@ -91,5 +96,39 @@ describe('frontend test runner planning', () => {
         isolated: false,
       },
     ]);
+  });
+
+  it('applies mock isolation to explicit focused test-file arguments', () => {
+    const plan = planExplicitFrontendTestRuns(
+      [
+        '--test-name-pattern',
+        'cursor history',
+        'src/plain.test.ts',
+        'src/findings.test.tsx',
+        'src/target.test.tsx',
+      ],
+      (file) => file !== 'src/plain.test.ts',
+    );
+
+    expect(plan).toEqual({
+      passthroughArgs: ['--test-name-pattern', 'cursor history'],
+      runs: [
+        {
+          label: 'batch 1 (1 file)',
+          files: ['src/plain.test.ts'],
+          isolated: false,
+        },
+        {
+          label: 'src/findings.test.tsx',
+          files: ['src/findings.test.tsx'],
+          isolated: true,
+        },
+        {
+          label: 'src/target.test.tsx',
+          files: ['src/target.test.tsx'],
+          isolated: true,
+        },
+      ],
+    });
   });
 });

@@ -1,7 +1,4 @@
-import { createSentrisClient } from '@sentris/backend-client';
 import type { RunArtifactsResponse } from '@sentris/shared';
-import { useAuthStore } from '@/store/authStore';
-import { getFreshClerkToken } from '@/utils/clerk-token';
 import { apiClient, getAuthHeaders, API_BASE_URL, API_V1_URL, type ApiResponse } from './client';
 
 export interface TerminalChunkResponse {
@@ -110,7 +107,7 @@ export const executionsApi = {
     if (params?.cursor) url.searchParams.set('cursor', params.cursor);
     if (params?.startTime) url.searchParams.set('startTime', params.startTime.toISOString());
     if (params?.endTime) url.searchParams.set('endTime', params.endTime.toISOString());
-    const response = await fetch(url.toString(), { headers });
+    const response = await fetch(url.toString(), { headers, credentials: 'include' });
     if (!response.ok) {
       throw new Error('Failed to fetch terminal chunks');
     }
@@ -133,7 +130,7 @@ export const executionsApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_BASE_URL}/api/v1/workflows/runs/${executionId}/artifacts/${artifactId}/download`,
-      { headers },
+      { headers, credentials: 'include' },
     );
     if (!response.ok) {
       throw new Error('Failed to download artifact');
@@ -153,23 +150,6 @@ export const executionsApi = {
     // Use fetch-based SSE client that supports custom headers (including Authorization)
     const { FetchEventSource } = await import('@/utils/sse-client');
 
-    const storeState = useAuthStore.getState();
-    let token = storeState.token;
-    const organizationId = storeState.organizationId;
-
-    // For Clerk auth, fetch a fresh token
-    if (storeState.provider === 'clerk') {
-      try {
-        const freshToken = await getFreshClerkToken();
-        if (freshToken) {
-          token = freshToken;
-          storeState.setToken(freshToken);
-        }
-      } catch (_error: unknown) {
-        // Ignore token fetch errors for SSE, will fallback to existing
-      }
-    }
-
     // Build URL with query params
     const params = new URLSearchParams();
     if (options?.cursor) params.set('cursor', options.cursor);
@@ -179,21 +159,9 @@ export const executionsApi = {
     const query = params.toString();
     const url = `${API_V1_URL}/workflows/runs/${executionId}/stream${query ? `?${query}` : ''}`;
 
-    // Build auth headers
-    const headers: Record<string, string> = {};
-    // For local auth with admin credentials, use Basic Auth
-    if (storeState.provider === 'local' && storeState.adminUsername && storeState.adminPassword) {
-      const credentials = btoa(`${storeState.adminUsername}:${storeState.adminPassword}`);
-      headers['Authorization'] = `Basic ${credentials}`;
-    } else if (token && token.trim().length > 0) {
-      const headerValue = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-      headers['Authorization'] = headerValue;
-    }
-    if (organizationId && organizationId.trim().length > 0) {
-      headers['X-Organization-Id'] = organizationId;
-    }
+    const headers = await getAuthHeaders();
 
-    return new FetchEventSource(url, { headers });
+    return new FetchEventSource(url, { headers, withCredentials: true });
   },
 
   cancel: async (executionId: string) => {
@@ -251,23 +219,7 @@ export const executionsApi = {
       endTime?: string;
     },
   ) => {
-    const client = createSentrisClient({
-      baseUrl: API_BASE_URL,
-      middleware: {
-        async onRequest({ request }) {
-          const headers = await getAuthHeaders();
-          if (headers['Authorization']) {
-            request.headers.set('Authorization', headers['Authorization']);
-          }
-          if (headers['X-Organization-Id']) {
-            request.headers.set('X-Organization-Id', headers['X-Organization-Id']);
-          }
-          return request;
-        },
-      },
-    });
-
-    const response = await client.getWorkflowRunLogs(runId, options);
+    const response = await apiClient.getWorkflowRunLogs(runId, options);
     if (response.error) {
       throw new Error('Failed to fetch logs');
     }

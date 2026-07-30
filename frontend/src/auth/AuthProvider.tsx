@@ -4,15 +4,17 @@ import type { FrontendAuthProvider, FrontendAuthProviderComponent } from './type
 import { useAuthStore } from '../store/authStore';
 import { GlobalAuthContext } from './auth-context-def';
 import { logger } from '@/lib/logger';
+import { env } from '@/config/env';
+import { buildFrontendApiUrl } from '@/config/api-url';
 
 // Auth provider registry - easy to add new providers
 // Determine which provider to use based on environment
 function getAuthProviderName(): string {
   // Priority: explicit env var > dev mode default (local) > auto-detect
-  const envProvider = import.meta.env.VITE_AUTH_PROVIDER;
+  const envProvider = env.VITE_AUTH_PROVIDER;
   const hasClerkKey =
-    typeof import.meta.env.VITE_CLERK_PUBLISHABLE_KEY === 'string' &&
-    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY.trim().length > 0;
+    typeof env.VITE_CLERK_PUBLISHABLE_KEY === 'string' &&
+    env.VITE_CLERK_PUBLISHABLE_KEY.trim().length > 0;
 
   // In dev mode, default to local auth unless VITE_AUTH_PROVIDER is explicitly set
   if (import.meta.env.DEV && !envProvider) {
@@ -58,34 +60,54 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
   children,
   onProviderChange,
 }: ProviderComponentProps) => {
-  // Access auth store state
-  const adminUsername = useAuthStore((state) => state.adminUsername);
-  const adminPassword = useAuthStore((state) => state.adminPassword);
+  const localSessionAuthenticated = useAuthStore((state) => state.localSessionAuthenticated);
+  const setLocalSessionAuthenticated = useAuthStore((state) => state.setLocalSessionAuthenticated);
   const userId = useAuthStore((state) => state.userId);
   const organizationId = useAuthStore((state) => state.organizationId);
+  const [isValidatingSession, setIsValidatingSession] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetch(buildFrontendApiUrl('/api/v1/auth/validate'), {
+      credentials: 'include',
+    })
+      .then((response) => {
+        if (!cancelled) {
+          setLocalSessionAuthenticated(response.ok);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocalSessionAuthenticated(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsValidatingSession(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setLocalSessionAuthenticated]);
 
   // Create provider that reacts to store state
   const localProvider = useMemo<FrontendAuthProvider>(() => {
-    const hasCredentials = !!(adminUsername && adminPassword);
-
     return {
       name: 'local',
       context: {
-        user: hasCredentials
+        user: localSessionAuthenticated
           ? {
               id: userId || 'admin',
               organizationId: organizationId || 'local-dev',
               organizationRole: 'ADMIN',
             }
           : null,
-        token: hasCredentials
-          ? {
-              token: `basic-${btoa(`${adminUsername}:${adminPassword}`)}`,
-              expiresAt: undefined,
-            }
-          : null,
-        isLoading: false,
-        isAuthenticated: hasCredentials,
+        token: null,
+        isLoading: isValidatingSession,
+        isAuthenticated: localSessionAuthenticated,
         error: null,
       },
       signIn: () => {
@@ -96,16 +118,15 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
       },
       signOut: async () => {
         // Clear session cookie via backend logout endpoint
-        // Use relative path to ensure we hit the same origin as login
         try {
-          await fetch('/api/v1/auth/logout', {
+          await fetch(buildFrontendApiUrl('/api/v1/auth/logout'), {
             method: 'POST',
             credentials: 'include',
           });
         } catch (error: unknown) {
           logger.warn('Failed to clear session cookie:', error);
         }
-        // Clear admin credentials from store
+        setLocalSessionAuthenticated(false);
         useAuthStore.getState().clear();
       },
       SignInComponent: () => <div>Sign in not available in local dev mode</div>,
@@ -119,7 +140,13 @@ const LocalAuthProvider: FrontendAuthProviderComponent = ({
         // No cleanup needed for local auth
       },
     };
-  }, [adminUsername, adminPassword, userId, organizationId]);
+  }, [
+    isValidatingSession,
+    localSessionAuthenticated,
+    organizationId,
+    setLocalSessionAuthenticated,
+    userId,
+  ]);
 
   useEffect(() => {
     localProvider.initialize();

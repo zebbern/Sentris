@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE_TOKEN } from '../../database/database.module';
 import { workflowRolesTable, type WorkflowRoleRecord } from '../../database/schema';
 import type { AuthRole } from '../../auth/types';
+import type { WorkflowTransactionOptions } from './workflow-transaction-executor';
 
 export interface WorkflowRoleUpsertInput {
   workflowId: string;
@@ -27,9 +28,13 @@ export class WorkflowRoleRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async upsert(input: WorkflowRoleUpsertInput): Promise<void> {
+  async upsert(
+    input: WorkflowRoleUpsertInput,
+    options: WorkflowTransactionOptions = {},
+  ): Promise<void> {
     const now = new Date();
-    await this.db
+    const executor = options.executor ?? this.db;
+    await executor
       .insert(workflowRolesTable)
       .values({
         workflowId: input.workflowId,

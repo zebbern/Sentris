@@ -12,7 +12,15 @@ import {
   createSpilledMarker,
   isSpilledDataMarker,
 } from '@sentris/component-sdk';
+import {
+  DURABLE_TELEMETRY_KAFKA_REQUEST_TIMEOUT_MS,
+  durableTelemetryKafkaProducerConfig,
+} from '@sentris/shared';
 import { randomUUID } from 'node:crypto';
+import {
+  publishWithDurableFallback,
+  type DurableKafkaFallback,
+} from '../common/durable-kafka-fallback';
 
 interface KafkaNodeIOAdapterConfig {
   brokers: string[];
@@ -22,6 +30,7 @@ interface KafkaNodeIOAdapterConfig {
 }
 
 interface SerializedNodeIOEvent {
+  eventId: string;
   type: 'NODE_IO_START' | 'NODE_IO_COMPLETION';
   runId: string;
   nodeRef: string;
@@ -47,12 +56,14 @@ interface SerializedNodeIOEvent {
  */
 export class KafkaNodeIOAdapter implements INodeIOService {
   private readonly producer: Producer;
-  private readonly connectPromise: Promise<void>;
+  private connectPromise: Promise<void> | undefined;
+  private connected = false;
 
   constructor(
     private readonly config: KafkaNodeIOAdapterConfig,
     private readonly storage?: IFileStorageService,
     private readonly logger: Pick<Console, 'log' | 'error'> = console,
+    private readonly fallback?: DurableKafkaFallback,
   ) {
     if (!config.brokers.length) {
       throw new ConfigurationError('KafkaNodeIOAdapter requires at least one broker', {
@@ -64,21 +75,16 @@ export class KafkaNodeIOAdapter implements INodeIOService {
     const kafka = new Kafka({
       clientId: config.clientId ?? 'sentris-worker-nodeio',
       brokers: config.brokers,
+      requestTimeout: DURABLE_TELEMETRY_KAFKA_REQUEST_TIMEOUT_MS,
       logLevel: config.logLevel ? KafkaLogLevel[config.logLevel] : KafkaLogLevel.NOTHING,
     });
 
-    this.producer = kafka.producer({
-      allowAutoTopicCreation: true,
-    });
-
-    this.connectPromise = this.producer.connect().catch((error: unknown) => {
-      this.logger.error('[KafkaNodeIOAdapter] Failed to connect to brokers', error);
-      throw error;
-    });
+    this.producer = kafka.producer(durableTelemetryKafkaProducerConfig());
   }
 
   async recordStart(data: NodeIOStartEvent): Promise<void> {
     const payload: SerializedNodeIOEvent = {
+      eventId: `node-io:${randomUUID()}`,
       type: 'NODE_IO_START',
       runId: data.runId,
       nodeRef: data.nodeRef,
@@ -94,9 +100,11 @@ export class KafkaNodeIOAdapter implements INodeIOService {
 
   async recordCompletion(data: NodeIOCompletionEvent): Promise<void> {
     const payload: SerializedNodeIOEvent = {
+      eventId: `node-io:${randomUUID()}`,
       type: 'NODE_IO_COMPLETION',
       runId: data.runId,
       nodeRef: data.nodeRef,
+      organizationId: data.organizationId ?? null,
       componentId: data.componentId,
       outputs: data.outputs,
       status: data.status,
@@ -107,18 +115,27 @@ export class KafkaNodeIOAdapter implements INodeIOService {
     return this.processAndSend(payload);
   }
 
+  async close(): Promise<void> {
+    await this.connectPromise?.catch(() => undefined);
+    if (!this.connected) return;
+    await this.producer.disconnect();
+    this.connected = false;
+    this.connectPromise = undefined;
+  }
+
   private async processAndSend(payload: SerializedNodeIOEvent): Promise<void> {
     try {
+      const storage = this.storage?.forOrganization(payload.organizationId ?? null);
       // 1. Handle Spilling if necessary
       if (payload.inputs) {
         const inputsStr = JSON.stringify(payload.inputs);
         const size = Buffer.byteLength(inputsStr, 'utf8');
         payload.inputsSize = size;
 
-        if (size > KAFKA_SPILL_THRESHOLD_BYTES && this.storage) {
+        if (size > KAFKA_SPILL_THRESHOLD_BYTES && storage) {
           const fileId = randomUUID();
 
-          await this.storage.uploadFile(
+          await storage.uploadFile(
             fileId,
             'inputs.json',
             Buffer.from(inputsStr),
@@ -156,10 +173,10 @@ export class KafkaNodeIOAdapter implements INodeIOService {
           const size = Buffer.byteLength(outputsStr, 'utf8');
           payload.outputsSize = size;
 
-          if (size > KAFKA_SPILL_THRESHOLD_BYTES && this.storage) {
+          if (size > KAFKA_SPILL_THRESHOLD_BYTES && storage) {
             const fileId = randomUUID();
 
-            await this.storage.uploadFile(
+            await storage.uploadFile(
               fileId,
               'outputs.json',
               Buffer.from(outputsStr),
@@ -193,24 +210,65 @@ export class KafkaNodeIOAdapter implements INodeIOService {
             : { _truncated: true, _originalSize: messageSize },
         };
 
-        await this.sendRaw(payload.runId, JSON.stringify(truncated));
+        await this.sendRaw(
+          payload.runId,
+          JSON.stringify(truncated),
+          payload.organizationId ?? null,
+        );
         return;
       }
 
-      await this.sendRaw(payload.runId, message);
+      await this.sendRaw(payload.runId, message, payload.organizationId ?? null);
     } catch (error: unknown) {
       this.logger.error(
-        '[KafkaNodeIOAdapter] CRITICAL: Failed to process or send node I/O event — messages may be lost. Check Kafka broker connectivity and topic configuration.',
+        '[KafkaNodeIOAdapter] CRITICAL: Idempotent Kafka delivery retries were exhausted for a node I/O event.',
         error,
       );
+      throw error;
     }
   }
 
-  private async sendRaw(key: string, message: string): Promise<void> {
-    await this.connectPromise;
-    await this.producer.send({
-      topic: this.config.topic,
-      messages: [{ key, value: message }],
+  private async sendRaw(
+    key: string,
+    message: string,
+    organizationId: string | null,
+  ): Promise<void> {
+    await publishWithDurableFallback({
+      publish: async () => {
+        await this.ensureConnected();
+        await this.producer.send({
+          topic: this.config.topic,
+          messages: [{ key, value: message }],
+        });
+      },
+      fallback: this.fallback,
+      publication: {
+        topic: this.config.topic,
+        key,
+        value: message,
+        organizationId,
+      },
+      source: 'KafkaNodeIOAdapter',
+      logger: this.logger,
     });
+  }
+
+  private async ensureConnected(): Promise<void> {
+    if (!this.connectPromise) {
+      const attempt = this.producer.connect();
+      this.connectPromise = attempt;
+      try {
+        await attempt;
+        this.connected = true;
+      } catch (error: unknown) {
+        if (this.connectPromise === attempt) {
+          this.connectPromise = undefined;
+        }
+        this.logger.error('[KafkaNodeIOAdapter] Failed to connect to brokers', error);
+        throw error;
+      }
+      return;
+    }
+    await this.connectPromise;
   }
 }

@@ -125,6 +125,7 @@ const defaultOptions = {
   navigate: mockNavigate,
   mostRecentRunId: null as string | null,
   setIsLoading: mockSetIsLoading,
+  requestedScopeId: null as string | null,
 };
 
 function renderRunner(overrides: Partial<typeof defaultOptions> = {}) {
@@ -261,6 +262,20 @@ describe('useWorkflowRunner', () => {
     });
 
     expect(mockStartExecution).toHaveBeenCalledTimes(1);
+  });
+
+  it('handleRun opens the dialog for a scoped zero-input launch', async () => {
+    mockResolveRuntimeInputDefinitions.mockReturnValue([]);
+
+    const { result } = renderRunner({ requestedScopeId: 'scope-1' });
+
+    await act(async () => {
+      await result.current.handleRun();
+    });
+
+    expect(result.current.runDialogOpen).toBe(true);
+    expect(result.current.runtimeInputs).toEqual([]);
+    expect(mockStartExecution).not.toHaveBeenCalled();
   });
 
   // --- executeWorkflow: isDirty ---

@@ -71,6 +71,7 @@ const mockState: {
   isLoadingRuns: boolean;
   assets: Asset[];
   isLoadingAssets: boolean;
+  assetsError: Error | null;
 } = {
   scope: undefined,
   isLoadingScope: false,
@@ -78,12 +79,25 @@ const mockState: {
   isLoadingRuns: false,
   assets: [],
   isLoadingAssets: false,
+  assetsError: null,
 };
 
 mock.module('@/hooks/queries/useScopeQueries', () => ({
   useScope: () => ({ data: mockState.scope, isLoading: mockState.isLoadingScope, error: null }),
-  useScopeRuns: () => ({ data: mockState.runs, isLoading: mockState.isLoadingRuns }),
-  useTargetAssets: () => ({ data: mockState.assets, isLoading: mockState.isLoadingAssets }),
+  useScopeRuns: () => ({ data: mockState.runs, isLoading: mockState.isLoadingRuns, error: null }),
+  useTargetAssets: () => ({
+    data: mockState.assets,
+    isLoading: mockState.isLoadingAssets,
+    error: mockState.assetsError,
+  }),
+  useAssetRunComparison: () => ({ data: undefined, isLoading: false, error: null }),
+  useTargetFindings: () => ({
+    data: [],
+    isLoading: false,
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    fetchNextPage: mock(),
+  }),
 }));
 
 // Import AFTER mocks
@@ -130,6 +144,7 @@ const setup = (o: Partial<typeof mockState> = {}) => {
   mockState.isLoadingRuns = o.isLoadingRuns ?? false;
   mockState.assets = o.assets ?? [];
   mockState.isLoadingAssets = o.isLoadingAssets ?? false;
+  mockState.assetsError = o.assetsError ?? null;
 };
 
 const renderPage = () =>
@@ -158,7 +173,11 @@ describe('TargetDetailPage assets tab', () => {
     renderPage();
     fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
     expect(screen.getByText('api.contoso.com')).toBeInTheDocument();
-    expect(screen.getByText('subdomain')).toBeInTheDocument();
+    expect(screen.getAllByText('subdomain').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('link', { name: /open source run run-001/i })).toHaveAttribute(
+      'href',
+      '/runs/run-001',
+    );
   });
 
   it('shows "No assets yet" empty state when there are no assets', () => {
@@ -166,5 +185,38 @@ describe('TargetDetailPage assets tab', () => {
     renderPage();
     fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
     expect(screen.getByText('No assets yet')).toBeInTheDocument();
+  });
+
+  it('shows an asset query failure as unavailable instead of an empty asset list', () => {
+    setup({ assets: [], assetsError: new Error('asset service offline') });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /Assets are unavailable: asset service offline/i,
+    );
+    expect(screen.queryByText('No assets yet')).not.toBeInTheDocument();
+  });
+
+  it('filters the asset view by type', () => {
+    setup({
+      assets: [
+        makeAsset(),
+        makeAsset({
+          id: 'asset-002',
+          assetType: 'ip-address',
+          assetValue: '203.0.113.10',
+        }),
+      ],
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('tab', { name: /assets/i }));
+
+    fireEvent.change(screen.getByRole('combobox', { name: /filter assets by type/i }), {
+      target: { value: 'ip-address' },
+    });
+
+    expect(screen.queryByText('api.contoso.com')).not.toBeInTheDocument();
+    expect(screen.getByText('203.0.113.10')).toBeInTheDocument();
   });
 });

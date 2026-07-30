@@ -189,6 +189,9 @@ describe('WorkflowsController', () => {
   const now = new Date().toISOString();
 
   const repositoryStub: Partial<WorkflowRepository> = {
+    async transaction(callback) {
+      return callback(repositoryStub as never);
+    },
     async create(input, options: RepositoryOptions = {}) {
       const { organizationId = TEST_ORG } = options;
       const id = `wf-${repositoryStore.size + 1}`;
@@ -290,28 +293,83 @@ describe('WorkflowsController', () => {
     resetVersions();
 
     const runRepositoryStub = {
-      async upsert(data: {
-        runId: string;
-        workflowId: string;
-        workflowVersionId: string;
-        workflowVersion: number;
-        temporalRunId: string;
-        totalActions: number;
-        organizationId?: string | null;
-      }) {
+      async prepare(
+        data: {
+          runId: string;
+          workflowId: string;
+          workflowVersionId: string;
+          workflowVersion: number;
+          totalActions: number;
+          inputs?: Record<string, unknown>;
+          organizationId?: string | null;
+          triggerType?: string;
+          triggerSource?: string | null;
+          triggerLabel?: string | null;
+          inputPreview?: Record<string, unknown>;
+          parentRunId?: string | null;
+          parentNodeRef?: string | null;
+          scopeId?: string | null;
+        },
+        onPrepared?: (executor: unknown, record: any) => Promise<void>,
+      ) {
+        const existing = runStore.get(data.runId);
+        if (existing) {
+          return { record: existing, created: false };
+        }
         const record = {
           runId: data.runId,
           workflowId: data.workflowId,
           workflowVersionId: data.workflowVersionId,
           workflowVersion: data.workflowVersion,
-          temporalRunId: data.temporalRunId,
+          temporalRunId: null,
           totalActions: data.totalActions,
+          inputs: data.inputs ?? {},
           createdAt: new Date(now),
           updatedAt: new Date(now),
           organizationId: data.organizationId ?? TEST_ORG,
+          triggerType: data.triggerType ?? 'manual',
+          triggerSource: data.triggerSource ?? null,
+          triggerLabel: data.triggerLabel ?? null,
+          inputPreview: data.inputPreview ?? { runtimeInputs: {}, nodeOverrides: {} },
+          parentRunId: data.parentRunId ?? null,
+          parentNodeRef: data.parentNodeRef ?? null,
+          scopeId: data.scopeId ?? null,
         };
         runStore.set(data.runId, record);
-        return record;
+        await onPrepared?.({}, record);
+        return { record, created: true };
+      },
+      async markStarted(
+        data: {
+          runId: string;
+          workflowId: string;
+          organizationId: string | null;
+          temporalRunId: string;
+        },
+        onTransition?: (executor: unknown, record: any) => Promise<void>,
+      ) {
+        const existing = runStore.get(data.runId);
+        if (
+          !existing ||
+          existing.workflowId !== data.workflowId ||
+          existing.organizationId !== data.organizationId
+        ) {
+          throw new Error('Prepared workflow run not found');
+        }
+        if (existing.temporalRunId) {
+          if (existing.temporalRunId !== data.temporalRunId) {
+            throw new Error('Workflow run points at a different Temporal execution');
+          }
+          return { record: existing, transitioned: false };
+        }
+        const record = {
+          ...existing,
+          temporalRunId: data.temporalRunId,
+          updatedAt: new Date(now),
+        };
+        runStore.set(data.runId, record);
+        await onTransition?.({}, record);
+        return { record, transitioned: true };
       },
       async findByRunId(runId: string, options: { organizationId?: string | null } = {}) {
         const record = runStore.get(runId);
@@ -325,6 +383,9 @@ describe('WorkflowsController', () => {
       },
       async hasPendingInputs() {
         return false;
+      },
+      async scopeBelongsToOrganization() {
+        return true;
       },
     };
 
@@ -398,7 +459,11 @@ describe('WorkflowsController', () => {
       },
     };
 
-    const auditLogMock = { record: vi.fn() } as any;
+    const auditLogMock = {
+      record: vi.fn(),
+      recordDurable: vi.fn().mockResolvedValue(undefined),
+      recordDurableWithExecutor: vi.fn().mockResolvedValue(undefined),
+    } as any;
     const workflowVersionService = new WorkflowVersionService(
       repositoryStub as WorkflowRepository,
       workflowRoleRepositoryStub as any,
@@ -414,7 +479,6 @@ describe('WorkflowsController', () => {
       analyticsServiceMock as any,
       auditLogMock,
       workflowVersionService,
-      { emit: vi.fn() } as any,
     );
     const workflowsService = new WorkflowsService(
       repositoryStub as WorkflowRepository,
@@ -446,26 +510,6 @@ describe('WorkflowsController', () => {
     const _terminalStreamService = {
       fetchChunks: vi.fn().mockResolvedValue({ cursor: '{}', chunks: [] }),
     };
-    const terminalArchiveService = {
-      archive: vi.fn().mockResolvedValue({
-        id: 1,
-        runId: 'sentris-run-controller',
-        workflowId: 'workflow',
-        workflowVersionId: 'version',
-        nodeRef: 'node-1',
-        stream: 'pty',
-        fileId: 'file-1',
-        chunkCount: 0,
-        durationMs: 0,
-        organizationId: 'org',
-        createdAt: new Date(),
-      }),
-      list: vi.fn().mockResolvedValue([]),
-      download: vi.fn().mockResolvedValue({
-        buffer: Buffer.from(''),
-        file: { mimeType: 'text/plain', fileName: 'terminal.cast', size: 0 },
-      }),
-    };
     const nodeIOService = {
       listDetails: vi.fn().mockResolvedValue([]),
       getNodeIO: vi.fn().mockResolvedValue(null),
@@ -486,9 +530,7 @@ describe('WorkflowsController', () => {
         analyticsServiceMock as any,
         auditLogMock,
         workflowVersionService,
-        { emit: vi.fn() } as any,
       ),
-      terminalArchiveService as any,
     );
     observabilityController = new WorkflowRunObservabilityController(
       traceService,

@@ -1,4 +1,11 @@
-import { Injectable, Logger, BadRequestException, Inject, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type Redis from 'ioredis';
 
@@ -12,6 +19,11 @@ import type {
   GroupDiscoveryStatusDto,
 } from './dto/mcp-discovery.dto';
 import { MCP_DISCOVERY_REDIS } from './mcp.tokens';
+import type { AuthContext } from '../auth/types';
+import { requireOrganizationId } from '../common/auth/require-organization-id';
+
+const DISCOVERY_CACHE_TTL_SECONDS = 300;
+const DISCOVERY_OWNER_TTL_SECONDS = 60 * 60;
 
 @Injectable()
 export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
@@ -31,7 +43,77 @@ export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
     }
   }
 
-  async startDiscovery(input: DiscoveryInputDto): Promise<DiscoveryStartResponseDto> {
+  private requireDiscoveryAdmin(auth: AuthContext | null): string {
+    const organizationId = requireOrganizationId(auth);
+    if (!auth?.isAuthenticated || !auth.roles.includes('ADMIN')) {
+      throw new ForbiddenException('Administrator role required');
+    }
+    return organizationId;
+  }
+
+  private ownerKey(workflowId: string): string {
+    return `mcp-discovery:workflow:${workflowId}`;
+  }
+
+  private cacheKey(cacheToken: string): string {
+    return `mcp-discovery:${cacheToken}`;
+  }
+
+  private async deleteGeneratedKeys(keys: string[], originalFailure: unknown): Promise<void> {
+    try {
+      await this.redis.del(...keys);
+    } catch (cleanupFailure) {
+      throw new AggregateError(
+        [originalFailure, cleanupFailure],
+        'MCP discovery startup failed and Redis compensation was incomplete',
+      );
+    }
+  }
+
+  private async storePendingRecords(
+    records: { key: string; ttlSeconds: number; value: string }[],
+  ): Promise<string[]> {
+    const keys = records.map(({ key }) => key);
+    const writes = await Promise.allSettled(
+      records.map(({ key, ttlSeconds, value }) =>
+        Promise.resolve().then(() => this.redis.setex(key, ttlSeconds, value)),
+      ),
+    );
+    const failedWrite = writes.find(
+      (write): write is PromiseRejectedResult => write.status === 'rejected',
+    );
+    if (failedWrite) {
+      await this.deleteGeneratedKeys(keys, failedWrite.reason);
+      throw failedWrite.reason;
+    }
+    return keys;
+  }
+
+  private async assertWorkflowOwner(workflowId: string, auth: AuthContext | null): Promise<void> {
+    const organizationId = this.requireDiscoveryAdmin(auth);
+    const value = await this.redis.get(this.ownerKey(workflowId));
+    if (!value) {
+      throw new ForbiddenException('Discovery workflow access denied');
+    }
+
+    try {
+      const owner = JSON.parse(value) as { organizationId?: string };
+      if (owner.organizationId !== organizationId) {
+        throw new ForbiddenException('Discovery workflow access denied');
+      }
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      throw new ForbiddenException('Discovery workflow access denied');
+    }
+  }
+
+  async startDiscovery(
+    input: DiscoveryInputDto,
+    auth: AuthContext | null,
+  ): Promise<DiscoveryStartResponseDto> {
+    const organizationId = this.requireDiscoveryAdmin(auth);
     const workflowId = randomUUID();
     const cacheToken = randomUUID();
 
@@ -40,24 +122,37 @@ export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
     );
 
     // Store cache token in Redis (worker populates final result); expire in 5 minutes.
-    await this.redis.setex(
-      `mcp-discovery:${cacheToken}`,
-      300,
-      JSON.stringify({ status: 'pending', workflowId }),
-    );
+    const generatedKeys = await this.storePendingRecords([
+      {
+        key: this.cacheKey(cacheToken),
+        ttlSeconds: DISCOVERY_CACHE_TTL_SECONDS,
+        value: JSON.stringify({ status: 'pending', workflowId, organizationId }),
+      },
+      {
+        key: this.ownerKey(workflowId),
+        ttlSeconds: DISCOVERY_OWNER_TTL_SECONDS,
+        value: JSON.stringify({ organizationId }),
+      },
+    ]);
 
-    await this.temporalService.startWorkflow({
-      workflowType: 'mcpDiscoveryWorkflow',
-      workflowId,
-      taskQueue: this.temporalService.getDefaultTaskQueue(),
-      args: [{ ...input, cacheToken }],
-    });
+    try {
+      await this.temporalService.startWorkflow({
+        workflowType: 'mcpDiscoveryWorkflow',
+        workflowId,
+        taskQueue: this.temporalService.getDefaultTaskQueue(),
+        args: [{ ...input, cacheToken }],
+      });
+    } catch (error) {
+      await this.deleteGeneratedKeys(generatedKeys, error);
+      throw error;
+    }
 
     return { workflowId, cacheToken, status: 'started' };
   }
 
-  async getStatus(workflowId: string): Promise<DiscoveryStatusDto> {
+  async getStatus(workflowId: string, auth: AuthContext | null): Promise<DiscoveryStatusDto> {
     this.logger.debug(`Querying MCP discovery status for workflow ${workflowId}`);
+    await this.assertWorkflowOwner(workflowId, auth);
 
     const result = await this.temporalService.queryWorkflow<{
       status: 'running' | 'completed' | 'failed';
@@ -86,7 +181,9 @@ export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
 
   async startGroupDiscovery(
     input: GroupDiscoveryInputDto,
+    auth: AuthContext | null,
   ): Promise<GroupDiscoveryStartResponseDto> {
+    const organizationId = this.requireDiscoveryAdmin(auth);
     const workflowId = randomUUID();
     const cacheTokens: Record<string, string> = {};
 
@@ -104,28 +201,40 @@ export class McpDiscoveryOrchestratorService implements OnModuleDestroy {
       `Starting MCP group discovery workflow ${workflowId} for ${input.servers.length} server(s)`,
     );
 
-    await Promise.all(
-      Object.values(cacheTokens).map((cacheToken) =>
-        this.redis.setex(
-          `mcp-discovery:${cacheToken}`,
-          300,
-          JSON.stringify({ status: 'pending', workflowId }),
-        ),
-      ),
-    );
+    const generatedKeys = await this.storePendingRecords([
+      ...Object.values(cacheTokens).map((cacheToken) => ({
+        key: this.cacheKey(cacheToken),
+        ttlSeconds: DISCOVERY_CACHE_TTL_SECONDS,
+        value: JSON.stringify({ status: 'pending', workflowId, organizationId }),
+      })),
+      {
+        key: this.ownerKey(workflowId),
+        ttlSeconds: DISCOVERY_OWNER_TTL_SECONDS,
+        value: JSON.stringify({ organizationId }),
+      },
+    ]);
 
-    await this.temporalService.startWorkflow({
-      workflowType: 'mcpGroupDiscoveryWorkflow',
-      workflowId,
-      taskQueue: this.temporalService.getDefaultTaskQueue(),
-      args: [{ ...input, cacheTokens }],
-    });
+    try {
+      await this.temporalService.startWorkflow({
+        workflowType: 'mcpGroupDiscoveryWorkflow',
+        workflowId,
+        taskQueue: this.temporalService.getDefaultTaskQueue(),
+        args: [{ ...input, cacheTokens }],
+      });
+    } catch (error) {
+      await this.deleteGeneratedKeys(generatedKeys, error);
+      throw error;
+    }
 
     return { workflowId, cacheTokens, status: 'started' };
   }
 
-  async getGroupStatus(workflowId: string): Promise<GroupDiscoveryStatusDto> {
+  async getGroupStatus(
+    workflowId: string,
+    auth: AuthContext | null,
+  ): Promise<GroupDiscoveryStatusDto> {
     this.logger.debug(`Querying MCP group discovery status for workflow ${workflowId}`);
+    await this.assertWorkflowOwner(workflowId, auth);
 
     const result = await this.temporalService.queryWorkflow<{
       status: 'running' | 'completed' | 'failed';

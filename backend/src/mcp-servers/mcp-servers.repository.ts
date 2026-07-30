@@ -13,6 +13,7 @@ import {
   type NewMcpServerToolRecord,
 } from '../database/schema';
 import { DEFAULT_ORGANIZATION_ID } from '../auth/constants';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface McpServerQueryOptions {
   organizationId?: string | null;
@@ -37,6 +38,8 @@ export interface McpServerUpdateData {
   lastHealthCheck?: Date;
   lastHealthStatus?: string;
 }
+
+type McpServerMutationHook<T = void> = (executor: OutboxExecutor, result: T) => Promise<void>;
 
 @Injectable()
 export class McpServersRepository {
@@ -148,17 +151,21 @@ export class McpServersRepository {
 
   async create(
     data: Omit<NewMcpServerRecord, 'id' | 'createdAt' | 'updatedAt'>,
+    onMutated?: McpServerMutationHook<McpServerRecord>,
   ): Promise<McpServerRecord> {
     try {
-      const [server] = await this.db
-        .insert(mcpServers)
-        .values({
-          ...data,
-          organizationId: data.organizationId ?? DEFAULT_ORGANIZATION_ID,
-        })
-        .returning();
-
-      return server;
+      const mutate = async (executor: Pick<NodePgDatabase, 'insert'>) => {
+        const [server] = await executor
+          .insert(mcpServers)
+          .values({
+            ...data,
+            organizationId: data.organizationId ?? DEFAULT_ORGANIZATION_ID,
+          })
+          .returning();
+        await onMutated?.(executor, server);
+        return server;
+      };
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
@@ -171,6 +178,7 @@ export class McpServersRepository {
     id: string,
     data: McpServerUpdateData,
     options: McpServerQueryOptions = {},
+    onMutated?: McpServerMutationHook<McpServerRecord>,
   ): Promise<McpServerRecord> {
     const conditions: (SQL | undefined)[] = [eq(mcpServers.id, id)];
     if (options.organizationId) {
@@ -183,20 +191,23 @@ export class McpServersRepository {
     }
 
     try {
-      const [updated] = await this.db
-        .update(mcpServers)
-        .set({
-          ...data,
-          updatedAt: sql`now()`,
-        })
-        .where(and(...conditions.filter((c): c is SQL => c !== undefined)))
-        .returning();
+      const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'update'>) => {
+        const [updated] = await executor
+          .update(mcpServers)
+          .set({
+            ...data,
+            updatedAt: sql`now()`,
+          })
+          .where(and(...conditions.filter((c): c is SQL => c !== undefined)))
+          .returning();
 
-      if (!updated) {
-        throw new NotFoundException(`MCP server ${id} not found`);
-      }
-
-      return updated;
+        if (!updated) {
+          throw new NotFoundException(`MCP server ${id} not found`);
+        }
+        await onMutated?.(executor, updated);
+        return updated;
+      };
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION && data.name) {
         throw new ConflictException(`MCP server name '${data.name}' already exists`);
@@ -230,7 +241,11 @@ export class McpServersRepository {
       .where(and(...conditions.filter((c): c is SQL => c !== undefined)));
   }
 
-  async delete(id: string, options: McpServerQueryOptions = {}): Promise<void> {
+  async delete(
+    id: string,
+    options: McpServerQueryOptions = {},
+    onMutated?: McpServerMutationHook,
+  ): Promise<void> {
     const conditions: (SQL | undefined)[] = [eq(mcpServers.id, id)];
     if (options.organizationId) {
       conditions.push(
@@ -241,14 +256,18 @@ export class McpServersRepository {
       );
     }
 
-    const deleted = await this.db
-      .delete(mcpServers)
-      .where(and(...conditions.filter((c): c is SQL => c !== undefined)))
-      .returning({ id: mcpServers.id });
+    const mutate = async (executor: Pick<NodePgDatabase, 'delete' | 'insert'>) => {
+      const deleted = await executor
+        .delete(mcpServers)
+        .where(and(...conditions.filter((c): c is SQL => c !== undefined)))
+        .returning({ id: mcpServers.id });
 
-    if (deleted.length === 0) {
-      throw new NotFoundException(`MCP server ${id} not found`);
-    }
+      if (deleted.length === 0) {
+        throw new NotFoundException(`MCP server ${id} not found`);
+      }
+      await onMutated?.(executor, undefined);
+    };
+    await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
   }
 
   // Tool management methods
@@ -293,26 +312,35 @@ export class McpServersRepository {
     return rows;
   }
 
-  async toggleToolEnabled(toolId: string): Promise<McpServerToolRecord> {
-    // First get current state
-    const [current] = await this.db
-      .select()
-      .from(mcpServerTools)
-      .where(eq(mcpServerTools.id, toolId))
-      .limit(1);
+  async toggleToolEnabled(
+    serverId: string,
+    toolId: string,
+    onMutated?: McpServerMutationHook<McpServerToolRecord>,
+  ): Promise<McpServerToolRecord> {
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'select' | 'update'>) => {
+      // Read and write on the same transaction executor so concurrent toggles
+      // cannot separate the configuration change from its audit outbox entry.
+      const [current] = await executor
+        .select()
+        .from(mcpServerTools)
+        .where(and(eq(mcpServerTools.id, toolId), eq(mcpServerTools.serverId, serverId)))
+        .limit(1);
 
-    if (!current) {
-      throw new NotFoundException(`Tool ${toolId} not found`);
-    }
+      if (!current) {
+        throw new NotFoundException(`Tool ${toolId} not found`);
+      }
 
-    // Toggle the enabled state
-    const [updated] = await this.db
-      .update(mcpServerTools)
-      .set({ enabled: !current.enabled })
-      .where(eq(mcpServerTools.id, toolId))
-      .returning();
+      const [updated] = await executor
+        .update(mcpServerTools)
+        .set({ enabled: !current.enabled })
+        .where(eq(mcpServerTools.id, toolId))
+        .returning();
 
-    return updated;
+      await onMutated?.(executor, updated);
+      return updated;
+    };
+
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
   async upsertTools(

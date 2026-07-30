@@ -158,6 +158,27 @@ describe('LinkedTicket', () => {
     expect(screen.getByText('Pending')).toBeTruthy();
   });
 
+  it('renders an unresolved ticket intent without a clickable placeholder link', () => {
+    mockTicketData = {
+      id: 'link-1',
+      findingTriageId: 'triage-1',
+      provider: 'jira',
+      externalId: null,
+      externalUrl: null,
+      syncStatus: 'unknown',
+      reconciliationRequired: true,
+      lastSyncedAt: null,
+      createdAt: '2025-01-01T11:00:00Z',
+    };
+
+    const { container } = render(<LinkedTicket findingId="finding-1" />);
+
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
+    expect(screen.getByText('Reconciliation required')).toBeTruthy();
+    expect(screen.getByText('Unknown')).toBeTruthy();
+  });
+
   // -----------------------------------------------------------------------
   // No ticket linked
   // -----------------------------------------------------------------------

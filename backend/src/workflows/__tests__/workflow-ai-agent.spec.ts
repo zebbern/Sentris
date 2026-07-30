@@ -126,6 +126,9 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
     let savedDefinition: WorkflowDefinition | null = null;
 
     const repositoryMock: Partial<WorkflowRepository> = {
+      async transaction(callback) {
+        return callback(repositoryMock as never);
+      },
       async findById(id: string) {
         if (id !== workflowId) {
           return undefined;
@@ -251,6 +254,7 @@ describe('Workflow d177b3c0-644e-40f0-8aa2-7b4f2c13a3af', () => {
 
     const auditLogServiceMock = {
       record: vi.fn(),
+      recordDurableWithExecutor: vi.fn().mockResolvedValue(undefined),
     };
 
     const workflowVersionService = new WorkflowVersionService(

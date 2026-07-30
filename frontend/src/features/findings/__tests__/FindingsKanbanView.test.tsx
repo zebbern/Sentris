@@ -332,6 +332,23 @@ describe('BulkActionsToolbar', () => {
     expect(screen.getByText('Set Status')).toBeTruthy();
     expect(screen.getByText('Assign To')).toBeTruthy();
   });
+
+  it('sends null when bulk-unassigning selected findings', () => {
+    render(
+      <BulkActionsToolbar selectedIds={new Set(['f-1', 'f-2'])} onClearSelection={vi.fn()} />,
+      { wrapper: Wrapper },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unassigned' }));
+
+    expect(bulkTriageMutateMock).toHaveBeenCalledWith(
+      {
+        findingIds: ['f-1', 'f-2'],
+        assigneeUserId: null,
+      },
+      expect.any(Object),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -397,5 +414,21 @@ describe('FindingTriageControls', () => {
 
     const textarea = screen.getByPlaceholderText('Add triage notes…') as HTMLTextAreaElement;
     expect(textarea.value).toBe('Existing note');
+  });
+
+  it('sends null rather than an empty string when clearing an assignee', () => {
+    render(<FindingTriageControls {...defaultProps} assigneeUserId="user-1" />, {
+      wrapper: Wrapper,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unassigned' }));
+
+    expect(updateTriageMutateMock).toHaveBeenCalledWith(
+      {
+        findingId: 'f-1',
+        data: { assigneeUserId: null },
+      },
+      expect.any(Object),
+    );
   });
 });

@@ -1,7 +1,14 @@
 import { spawn, execFile as execFileCallback } from 'child_process';
 import { basename, dirname } from 'node:path';
 import { promisify } from 'util';
-import { ValidationError, ConfigurationError, ContainerError } from '@sentris/component-sdk';
+import {
+  ValidationError,
+  ConfigurationError,
+  ContainerError,
+  createManagedDockerLabels,
+  resolveDockerResourceScope,
+  type DockerResourceScope,
+} from '@sentris/component-sdk';
 
 const execFile = promisify(execFileCallback);
 
@@ -24,6 +31,27 @@ export interface IsolatedContainerVolumeOptions {
   persist?: boolean;
   /** Attach to an existing volume instead of creating a new one. */
   attachTo?: string;
+}
+
+export function buildManagedVolumeCreateArgs(input: {
+  tenantId: string;
+  runId: string;
+  volumeName: string;
+  createdAt: string;
+  resourceScope?: DockerResourceScope;
+}): string[] {
+  const labels = createManagedDockerLabels(
+    input.runId,
+    input.resourceScope ?? resolveDockerResourceScope(),
+  );
+  return [
+    '--label',
+    `studio.tenant=${input.tenantId}`,
+    '--label',
+    `studio.created=${input.createdAt}`,
+    ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
+    input.volumeName,
+  ];
 }
 
 export class IsolatedContainerVolume {
@@ -125,17 +153,16 @@ export class IsolatedContainerVolume {
 
     try {
       // Create the volume with labels for tracking
-      await this.executeDockerCommand('volume', 'create', [
-        '--label',
-        `studio.tenant=${this.tenantId}`,
-        '--label',
-        `studio.run=${this.runId}`,
-        '--label',
-        `studio.created=${new Date().toISOString()}`,
-        '--label',
-        'studio.managed=true',
-        this.volumeName,
-      ]);
+      await this.executeDockerCommand(
+        'volume',
+        'create',
+        buildManagedVolumeCreateArgs({
+          tenantId: this.tenantId,
+          runId: this.runId,
+          volumeName: this.volumeName,
+          createdAt: new Date().toISOString(),
+        }),
+      );
 
       // Populate files if provided
       if (Object.keys(files).length > 0) {

@@ -481,7 +481,7 @@ export class McpGatewayService {
           this.logger.debug(
             `[registerTools]   FALLBACK: Discovering tools from endpoint: ${source.endpoint}`,
           );
-          tools = await this.discoverToolsFromEndpoint(runId, cacheKey, source.endpoint);
+          tools = await this.discoverToolsFromEndpoint(runId, cacheKey, source);
           this.logger.debug(
             `[registerTools]   FALLBACK result: discovered ${tools.length} tools from ${source.toolName}`,
           );
@@ -606,6 +606,7 @@ export class McpGatewayService {
     runId: string,
     cacheKey: string,
     endpoint: string,
+    headers: Record<string, string> = {},
   ): Promise<Client> {
     const clientKey = this.getExternalClientKey(runId, endpoint);
     this.rememberExternalClientOwner(cacheKey, clientKey);
@@ -619,6 +620,7 @@ export class McpGatewayService {
     const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
       requestInit: {
         headers: {
+          ...headers,
           Accept: 'application/json, text/event-stream',
         },
       },
@@ -633,6 +635,30 @@ export class McpGatewayService {
     this.externalClients.set(clientKey, client);
     this.logger.debug(`[getOrCreateExternalClient] Client connected and cached for ${endpoint}`);
     return client;
+  }
+
+  private async getExternalRequestHeaders(
+    runId: string,
+    source: RegisteredTool,
+  ): Promise<Record<string, string>> {
+    const credentials = await this.toolRegistry.getToolCredentials(runId, source.nodeId);
+    if (!credentials) return {};
+
+    if (typeof credentials.authToken === 'string' && Object.keys(credentials).length === 1) {
+      return { Authorization: `Bearer ${credentials.authToken}` };
+    }
+
+    const headers: Record<string, string> = {};
+    for (const [name, value] of Object.entries(credentials)) {
+      if (typeof value !== 'string') {
+        throw new Error(`MCP request header "${name}" must be a string`);
+      }
+      // Let the platform Headers implementation reject invalid names/values
+      // before a persistent client is created.
+      new Headers([[name, value]]);
+      headers[name] = value;
+    }
+    return headers;
   }
 
   private getExternalClientKey(runId: string, endpoint: string): string {
@@ -659,12 +685,15 @@ export class McpGatewayService {
   private async discoverToolsFromEndpoint(
     runId: string,
     cacheKey: string,
-    endpoint: string,
+    source: RegisteredTool,
   ): Promise<DiscoveredTool[]> {
+    const endpoint = source.endpoint;
+    if (!endpoint) return [];
     try {
       this.logger.debug(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
 
-      const client = await this.getOrCreateExternalClient(runId, cacheKey, endpoint);
+      const headers = await this.getExternalRequestHeaders(runId, source);
+      const client = await this.getOrCreateExternalClient(runId, cacheKey, endpoint, headers);
       const res = await client.listTools();
 
       const tools = res.tools ?? [];
@@ -706,10 +735,16 @@ export class McpGatewayService {
     const TIMEOUT_MS = 30000;
     const MAX_RETRIES = 3;
     let lastError: unknown;
+    const headers = await this.getExternalRequestHeaders(runId, source);
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const client = await this.getOrCreateExternalClient(runId, cacheKey, source.endpoint);
+        const client = await this.getOrCreateExternalClient(
+          runId,
+          cacheKey,
+          source.endpoint,
+          headers,
+        );
 
         const result = await Promise.race([
           client.callTool({

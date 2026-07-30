@@ -11,6 +11,7 @@ mock.module('bcryptjs', () => ({
 }));
 
 import { ApiKeysService } from '../api-keys.service';
+import { CreateApiKeySchema } from '../dto/api-key.dto';
 import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../../auth/types';
 
@@ -82,8 +83,12 @@ describe('ApiKeysService', () => {
     insert: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
+    transaction: ReturnType<typeof vi.fn>;
   };
-  let auditLogService: { record: ReturnType<typeof vi.fn> };
+  let auditLogService: {
+    record: ReturnType<typeof vi.fn>;
+    recordDurableWithExecutor: ReturnType<typeof vi.fn>;
+  };
   let service: ApiKeysService;
 
   beforeEach(() => {
@@ -97,9 +102,13 @@ describe('ApiKeysService', () => {
       insert: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      transaction: vi.fn(async (handler: (executor: unknown) => Promise<unknown>) => handler(db)),
     };
 
-    auditLogService = { record: vi.fn() };
+    auditLogService = {
+      record: vi.fn(),
+      recordDurableWithExecutor: vi.fn(async () => undefined),
+    };
 
     service = new ApiKeysService(db as any, auditLogService as any);
   });
@@ -122,7 +131,8 @@ describe('ApiKeysService', () => {
       expect(result.apiKey).toEqual(sampleApiKey);
       expect(mockBcryptHash).toHaveBeenCalledWith(result.plainKey, 10);
       expect(db.insert).toHaveBeenCalled();
-      expect(auditLogService.record).toHaveBeenCalledWith(
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        db,
         authContext,
         expect.objectContaining({
           action: 'api_key.create',
@@ -137,6 +147,21 @@ describe('ApiKeysService', () => {
       await expect(service.create(noOrgAuth, createDto as any)).rejects.toThrow(
         InternalServerErrorException,
       );
+    });
+
+    it('uses the authenticated organization when a caller supplies another organization', async () => {
+      db.insert.mockReturnValue(createChain([sampleApiKey]));
+
+      await service.create(authContext, { ...createDto, organizationId: 'foreign-org' } as any);
+
+      const values = db.insert.mock.results[0].value.values as ReturnType<typeof vi.fn>;
+      expect(values).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org-1' }));
+    });
+
+    it('rejects a client-selected organization', () => {
+      expect(
+        CreateApiKeySchema.safeParse({ ...createDto, organizationId: 'foreign-org' }).success,
+      ).toBe(false);
     });
   });
 
@@ -206,7 +231,8 @@ describe('ApiKeysService', () => {
       const result = await service.update(authContext, 'key-1', { name: 'Renamed' } as any);
 
       expect(result).toEqual(updated);
-      expect(auditLogService.record).toHaveBeenCalledWith(
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        db,
         authContext,
         expect.objectContaining({ action: 'api_key.update' }),
       );
@@ -217,7 +243,8 @@ describe('ApiKeysService', () => {
 
       await service.update(authContext, 'key-1', { isActive: false } as any);
 
-      expect(auditLogService.record).toHaveBeenCalledWith(
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        db,
         authContext,
         expect.objectContaining({ action: 'api_key.revoke' }),
       );
@@ -228,7 +255,8 @@ describe('ApiKeysService', () => {
 
       await service.update(authContext, 'key-1', { isActive: true } as any);
 
-      expect(auditLogService.record).toHaveBeenCalledWith(
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        db,
         authContext,
         expect.objectContaining({ action: 'api_key.reactivate' }),
       );
@@ -253,7 +281,8 @@ describe('ApiKeysService', () => {
       await service.delete(authContext, 'key-1');
 
       expect(db.delete).toHaveBeenCalled();
-      expect(auditLogService.record).toHaveBeenCalledWith(
+      expect(auditLogService.recordDurableWithExecutor).toHaveBeenCalledWith(
+        db,
         authContext,
         expect.objectContaining({
           action: 'api_key.delete',

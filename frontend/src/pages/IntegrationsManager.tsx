@@ -5,7 +5,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { getCurrentUserId } from '@/lib/currentUser';
 
 import {
   useIntegrationProviders,
@@ -24,7 +23,6 @@ export function IntegrationsManager() {
   useDocumentTitle('Connections');
   const navigate = useNavigate();
   const location = useLocation();
-  const userId = getCurrentUserId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -37,7 +35,7 @@ export function IntegrationsManager() {
     data: connections = [],
     isLoading: loadingConnections,
     error: connectionsError,
-  } = useIntegrationConnections(userId);
+  } = useIntegrationConnections();
 
   const error = providersError?.message ?? connectionsError?.message ?? null;
 
@@ -72,7 +70,7 @@ export function IntegrationsManager() {
     handleManualReconnect,
     handleProviderConfigCompleted,
     handleConnectionComplete,
-  } = useOAuthConnection({ userId, providers, buildRequestedScopes });
+  } = useOAuthConnection({ providers, buildRequestedScopes });
 
   useEffect(() => {
     if (!error) return;
@@ -124,7 +122,7 @@ export function IntegrationsManager() {
             onRetry={() => {
               queryClient.invalidateQueries({ queryKey: queryKeys.integrations.providers() });
               queryClient.invalidateQueries({
-                queryKey: queryKeys.integrations.connections(userId),
+                queryKey: queryKeys.integrations.connections(),
               });
             }}
             className="mb-4 md:mb-6"

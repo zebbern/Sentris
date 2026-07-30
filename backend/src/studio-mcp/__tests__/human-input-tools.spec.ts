@@ -138,7 +138,7 @@ describe('Human-Input Tools', () => {
     expect(dto.responseData.status).toBe('rejected');
   });
 
-  it('resolve_human_input includes respondedBy: auth.userId', async () => {
+  it('resolve_human_input delegates actor identity to the trusted auth context', async () => {
     const server = service.createServer(mockAuth);
     const tools = getRegisteredTools(server);
 
@@ -147,8 +147,10 @@ describe('Human-Input Tools', () => {
       action: 'approve',
     });
 
-    const [, dto] = humanInputsService.resolve.mock.calls[0];
-    expect(dto.respondedBy).toBe(mockAuth.userId);
+    const [, dto, organizationId, auth] = humanInputsService.resolve.mock.calls[0];
+    expect(dto.respondedBy).toBeUndefined();
+    expect(organizationId).toBe(mockAuth.organizationId);
+    expect(auth).toBe(mockAuth);
   });
 
   it('human-inputs.resolve = false → denied', async () => {

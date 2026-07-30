@@ -4,6 +4,9 @@ import { ApiTags, ApiOperation, ApiResponse as SwaggerApiResponse } from '@nestj
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
+import { CurrentAuth } from '../auth/auth-context.decorator';
+import { Roles } from '../auth/roles.decorator';
+import type { AuthContext } from '../auth/types';
 import {
   DiscoveryInputDto,
   DiscoveryInputSchema,
@@ -21,6 +24,7 @@ export class McpDiscoveryController {
   constructor(private readonly orchestrator: McpDiscoveryOrchestratorService) {}
 
   @Post('discover')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Start MCP tool discovery',
@@ -37,9 +41,10 @@ export class McpDiscoveryController {
     description: 'Invalid input parameters',
   })
   async discover(
+    @CurrentAuth() auth: AuthContext | null,
     @Body(new ZodValidationPipe(DiscoveryInputSchema)) input: DiscoveryInputDto,
   ): Promise<DiscoveryStartResponseDto> {
-    return this.orchestrator.startDiscovery(input);
+    return this.orchestrator.startDiscovery(input, auth);
   }
 
   @Get('discover/:workflowId')
@@ -57,11 +62,16 @@ export class McpDiscoveryController {
     status: HttpStatus.NOT_FOUND,
     description: 'Workflow not found',
   })
-  async getStatus(@Param('workflowId') workflowId: string): Promise<DiscoveryStatusDto> {
-    return this.orchestrator.getStatus(workflowId);
+  @Roles('ADMIN')
+  async getStatus(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('workflowId') workflowId: string,
+  ): Promise<DiscoveryStatusDto> {
+    return this.orchestrator.getStatus(workflowId, auth);
   }
 
   @Post('discover-group')
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Start MCP group tool discovery',
@@ -74,9 +84,10 @@ export class McpDiscoveryController {
     type: GroupDiscoveryStartResponseDto,
   })
   async discoverGroup(
+    @CurrentAuth() auth: AuthContext | null,
     @Body(new ZodValidationPipe(GroupDiscoveryInputSchema)) input: GroupDiscoveryInputDto,
   ): Promise<GroupDiscoveryStartResponseDto> {
-    return this.orchestrator.startGroupDiscovery(input);
+    return this.orchestrator.startGroupDiscovery(input, auth);
   }
 
   @Get('discover-group/:workflowId')
@@ -90,7 +101,11 @@ export class McpDiscoveryController {
     description: 'Group discovery status retrieved successfully',
     type: GroupDiscoveryStatusDto,
   })
-  async getGroupStatus(@Param('workflowId') workflowId: string): Promise<GroupDiscoveryStatusDto> {
-    return this.orchestrator.getGroupStatus(workflowId);
+  @Roles('ADMIN')
+  async getGroupStatus(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param('workflowId') workflowId: string,
+  ): Promise<GroupDiscoveryStatusDto> {
+    return this.orchestrator.getGroupStatus(workflowId, auth);
   }
 }

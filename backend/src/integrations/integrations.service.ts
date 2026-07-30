@@ -6,6 +6,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SecretEncryptionMaterial } from '@sentris/shared';
@@ -23,6 +24,8 @@ import { IntegrationsRepository } from './integrations.repository';
 import { TokenEncryptionService } from './token.encryption';
 import { INTEGRATION_CACHE_REDIS } from './integrations.tokens';
 import type { IntegrationTokenRecord } from '../database/schema';
+import { AuditLogService } from '../audit/audit-log.service';
+import type { AuthContext } from '../auth/types';
 
 export interface OAuthStartResponse {
   provider: string;
@@ -69,6 +72,11 @@ const VERSION_POLL_INTERVAL_MS = 30_000; // 30 seconds
 /** Redis key for the monotonic version counter */
 const PROVIDER_OVERRIDES_VERSION_KEY = 'sentris:provider-overrides:version';
 
+const NOOP_AUDIT_LOG_SERVICE = {
+  recordDurable: async () => undefined,
+  recordDurableWithExecutor: async () => undefined,
+} as unknown as AuditLogService;
+
 interface TokenRequestOptions {
   grantType: 'authorization_code' | 'refresh_token';
   code?: string;
@@ -80,6 +88,7 @@ interface TokenRequestOptions {
 }
 
 interface ProviderCredentialOverride {
+  organizationId: string | null;
   provider: string;
   clientId: string;
   clientSecret: SecretEncryptionMaterial;
@@ -102,6 +111,8 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     private readonly encryption: TokenEncryptionService,
     private readonly configService: ConfigService,
     @Inject(INTEGRATION_CACHE_REDIS) private readonly redis: Redis | null,
+    @Optional()
+    private readonly auditLogService: AuditLogService = NOOP_AUDIT_LOG_SERVICE,
   ) {
     const intConfig = this.configService.get('integrations')!;
     this.providers = loadIntegrationProviders(intConfig);
@@ -178,9 +189,9 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  listProviders(): IntegrationProviderSummary[] {
+  listProviders(organizationId: string | null = null): IntegrationProviderSummary[] {
     return Object.values(this.providers).map((config) =>
-      summarizeProvider(this.mergeProviderConfig(config)),
+      summarizeProvider(this.mergeProviderConfig(config, organizationId)),
     );
   }
 
@@ -188,8 +199,9 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     const records = await this.repository.listProviderConfigs();
     this.providerOverrides = new Map(
       records.map((record) => [
-        record.provider,
+        this.providerOverrideKey(record.organizationId, record.provider),
         {
+          organizationId: record.organizationId,
           provider: record.provider,
           clientId: record.clientId,
           clientSecret: record.clientSecret as SecretEncryptionMaterial,
@@ -199,8 +211,13 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private mergeProviderConfig(config: IntegrationProviderConfig): IntegrationProviderConfig {
-    const override = this.providerOverrides.get(config.id);
+  private mergeProviderConfig(
+    config: IntegrationProviderConfig,
+    organizationId: string | null,
+  ): IntegrationProviderConfig {
+    const override = this.providerOverrides.get(
+      this.providerOverrideKey(organizationId, config.id),
+    );
     if (!override) {
       return config;
     }
@@ -212,7 +229,10 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getProviderConfiguration(providerId: string): Promise<{
+  async getProviderConfiguration(
+    providerId: string,
+    organizationId: string | null = null,
+  ): Promise<{
     provider: string;
     clientId: string | null;
     hasClientSecret: boolean;
@@ -220,7 +240,9 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     updatedAt: Date | null;
   }> {
     const base = this.requireProvider(providerId);
-    const override = this.providerOverrides.get(providerId);
+    const override = this.providerOverrides.get(
+      this.providerOverrideKey(organizationId, providerId),
+    );
 
     if (override) {
       return {
@@ -251,6 +273,8 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       clientId: string;
       clientSecret?: string;
     },
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
   ): Promise<void> {
     this.requireProvider(providerId);
 
@@ -259,7 +283,9 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('clientId is required');
     }
 
-    const override = this.providerOverrides.get(providerId);
+    const override = this.providerOverrides.get(
+      this.providerOverrideKey(organizationId, providerId),
+    );
     const providedSecret = input.clientSecret?.trim();
 
     let secretMaterial: SecretEncryptionMaterial | null = null;
@@ -273,13 +299,30 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('clientSecret is required');
     }
 
-    const record = await this.repository.upsertProviderConfig({
-      provider: providerId,
-      clientId: trimmedClientId,
-      clientSecret: secretMaterial,
-    });
+    const record = await this.repository.upsertProviderConfig(
+      {
+        organizationId,
+        provider: providerId,
+        clientId: trimmedClientId,
+        clientSecret: secretMaterial,
+      },
+      (executor) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          auth,
+          {
+            action: 'integration.provider_config.upsert',
+            resourceType: 'integration',
+            resourceId: providerId,
+            metadata: { phase: 'completed' },
+          },
+          undefined,
+          organizationId,
+        ),
+    );
 
-    this.providerOverrides.set(providerId, {
+    this.providerOverrides.set(this.providerOverrideKey(organizationId, providerId), {
+      organizationId,
       provider: record.provider,
       clientId: record.clientId,
       clientSecret: record.clientSecret as SecretEncryptionMaterial,
@@ -289,25 +332,52 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     await this.incrementVersion();
   }
 
-  async deleteProviderConfiguration(providerId: string): Promise<void> {
+  async deleteProviderConfiguration(
+    providerId: string,
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
+  ): Promise<void> {
     this.requireProvider(providerId);
 
-    await this.repository.deleteProviderConfig(providerId);
-    this.providerOverrides.delete(providerId);
+    await this.repository.deleteProviderConfig(organizationId, providerId, (executor) =>
+      this.auditLogService.recordDurableWithExecutor(
+        executor,
+        auth,
+        {
+          action: 'integration.provider_config.delete',
+          resourceType: 'integration',
+          resourceId: providerId,
+          metadata: { phase: 'completed' },
+        },
+        undefined,
+        organizationId,
+      ),
+    );
+    this.providerOverrides.delete(this.providerOverrideKey(organizationId, providerId));
 
     await this.incrementVersion();
   }
 
-  async listConnections(userId: string): Promise<IntegrationConnection[]> {
-    const records = await this.repository.listConnections(userId);
+  async listConnections(
+    userId: string,
+    organizationId: string | null = null,
+  ): Promise<IntegrationConnection[]> {
+    const records = await this.repository.listConnections(userId, organizationId);
     return records.map((record) => this.toConnection(record));
   }
 
   async startOAuthSession(
     providerId: string,
-    input: { userId: string; redirectUri: string; scopes?: string[] },
+    input: {
+      organizationId?: string | null;
+      userId: string;
+      redirectUri: string;
+      scopes?: string[];
+      auth?: AuthContext | null;
+    },
   ): Promise<OAuthStartResponse> {
-    const provider = await this.resolveProviderForAuth(providerId);
+    const organizationId = input.organizationId ?? null;
+    const provider = await this.resolveProviderForAuth(providerId, organizationId);
 
     const state = generateState();
     const scopes = this.normalizeScopes(input.scopes, provider);
@@ -335,12 +405,28 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    await this.repository.createOAuthState({
-      state,
-      userId: input.userId,
-      provider: providerId,
-      codeVerifier,
-    });
+    await this.repository.createOAuthState(
+      {
+        state,
+        organizationId,
+        userId: input.userId,
+        provider: providerId,
+        codeVerifier,
+      },
+      (executor) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          input.auth ?? null,
+          {
+            action: 'integration.oauth.start',
+            resourceType: 'integration',
+            resourceId: providerId,
+            metadata: { phase: 'requested' },
+          },
+          undefined,
+          organizationId,
+        ),
+    );
 
     // OAuth states are short-lived (5 minutes) but we rely on DB TTL/cleanup.
     return {
@@ -354,21 +440,43 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
   async completeOAuthSession(
     providerId: string,
     input: {
+      organizationId?: string | null;
       userId: string;
       state: string;
       code: string;
       redirectUri: string;
       scopes?: string[];
+      auth?: AuthContext | null;
     },
   ): Promise<IntegrationConnection> {
-    const provider = await this.resolveProviderForAuth(providerId);
-    const stateRecord = await this.repository.consumeOAuthState(input.state);
+    const organizationId = input.organizationId ?? null;
+    const provider = await this.resolveProviderForAuth(providerId, organizationId);
+    const stateRecord = await this.repository.consumeOAuthState(
+      input.state,
+      input.userId,
+      providerId,
+      organizationId,
+      (executor) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          input.auth ?? null,
+          {
+            action: 'integration.oauth.exchange',
+            resourceType: 'integration',
+            resourceId: providerId,
+            metadata: { phase: 'requested' },
+          },
+          undefined,
+          organizationId,
+        ),
+    );
 
-    if (!stateRecord) {
-      throw new BadRequestException('OAuth state is missing or has already been used');
-    }
-    if (stateRecord.userId !== input.userId) {
-      throw new BadRequestException('OAuth state does not match the requesting user');
+    if (
+      !stateRecord ||
+      stateRecord.userId !== input.userId ||
+      stateRecord.organizationId !== organizationId
+    ) {
+      throw new NotFoundException('OAuth state was not found');
     }
     if (stateRecord.provider !== providerId) {
       throw new BadRequestException('OAuth state does not match the provider');
@@ -385,38 +493,91 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     });
 
     const persisted = await this.persistTokenResponse({
+      organizationId,
       userId: input.userId,
       provider,
       scopes,
       rawResponse,
-      previous: await this.repository.findByProvider(input.userId, providerId),
+      previous: await this.repository.findByProvider(input.userId, providerId, organizationId),
+      auth: input.auth ?? null,
     });
 
     return this.toConnection(persisted);
   }
 
-  async refreshConnection(id: string, userId: string): Promise<IntegrationConnection> {
-    const record = await this.repository.findById(id);
+  async refreshConnection(
+    id: string,
+    userId: string,
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
+  ): Promise<IntegrationConnection> {
+    const record = await this.repository.findById(id, organizationId);
     if (!record || record.userId !== userId) {
-      throw new NotFoundException(`Connection ${id} was not found for user ${userId}`);
+      throw new NotFoundException('Connection was not found');
     }
 
-    const refreshed = await this.refreshTokenRecord(record);
+    const refreshed = await this.refreshTokenRecord(record, auth);
     return this.toConnection(refreshed);
   }
 
-  async disconnect(id: string, userId: string): Promise<void> {
-    await this.repository.deleteConnection(id, userId);
+  async disconnect(
+    id: string,
+    userId: string,
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
+  ): Promise<void> {
+    const deleted = await this.repository.deleteConnection(
+      id,
+      userId,
+      organizationId,
+      (executor, record) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          auth,
+          {
+            action: 'integration.oauth.disconnect',
+            resourceType: 'integration',
+            resourceId: record.id,
+            metadata: { provider: record.provider, phase: 'completed' },
+          },
+          undefined,
+          organizationId,
+        ),
+    );
+    if (!deleted) {
+      throw new NotFoundException('Connection was not found');
+    }
   }
 
-  async getProviderToken(providerId: string, userId: string): Promise<ProviderTokenResponse> {
-    const record = await this.repository.findByProvider(userId, providerId);
+  async getProviderToken(
+    providerId: string,
+    userId: string,
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
+  ): Promise<ProviderTokenResponse> {
+    const record = await this.repository.findByProvider(userId, providerId, organizationId);
     if (!record) {
       throw new NotFoundException(`No credentials found for provider ${providerId}`);
     }
 
+    await this.auditLogService.recordDurable(
+      auth,
+      {
+        action: 'integration.token.issue',
+        resourceType: 'integration',
+        resourceId: record.id,
+        metadata: {
+          provider: providerId,
+          selection: 'provider',
+          phase: 'requested',
+        },
+      },
+      undefined,
+      organizationId,
+    );
+
     const provider = this.requireProvider(providerId);
-    const hydratedRecord = await this.ensureFreshToken(record, provider);
+    const hydratedRecord = await this.ensureFreshToken(record, provider, auth);
 
     const accessToken = await this.encryption.decrypt(
       hydratedRecord.accessToken as SecretEncryptionMaterial,
@@ -432,14 +593,43 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async getConnectionToken(connectionId: string): Promise<ProviderTokenResponse> {
-    const record = await this.repository.findById(connectionId);
-    if (!record) {
-      throw new NotFoundException(`Connection ${connectionId} was not found`);
+  async getConnectionToken(
+    connectionId: string,
+    organizationId: string | null = null,
+    auth: AuthContext | null = null,
+    runId?: string,
+  ): Promise<ProviderTokenResponse> {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      throw new NotFoundException('Connection or workflow run was not found');
     }
 
+    const [record, runBelongsToOrganization] = await Promise.all([
+      this.repository.findById(connectionId, organizationId),
+      this.repository.runBelongsToOrganization(normalizedRunId, organizationId),
+    ]);
+    if (!record || !runBelongsToOrganization) {
+      throw new NotFoundException('Connection or workflow run was not found');
+    }
+
+    await this.auditLogService.recordDurable(
+      auth,
+      {
+        action: 'integration.token.issue',
+        resourceType: 'integration',
+        resourceId: connectionId,
+        metadata: {
+          provider: record.provider,
+          runId: normalizedRunId,
+          phase: 'requested',
+        },
+      },
+      undefined,
+      organizationId,
+    );
+
     const provider = this.requireProvider(record.provider);
-    const hydratedRecord = await this.ensureFreshToken(record, provider);
+    const hydratedRecord = await this.ensureFreshToken(record, provider, auth);
 
     const accessToken = await this.encryption.decrypt(
       hydratedRecord.accessToken as SecretEncryptionMaterial,
@@ -474,9 +664,14 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     return this.cleanScopes(source);
   }
 
-  private async resolveProviderForAuth(providerId: string): Promise<ResolvedProviderConfig> {
+  private async resolveProviderForAuth(
+    providerId: string,
+    organizationId: string | null,
+  ): Promise<ResolvedProviderConfig> {
     const base = this.requireProvider(providerId);
-    const override = this.providerOverrides.get(providerId);
+    const override = this.providerOverrides.get(
+      this.providerOverrideKey(organizationId, providerId),
+    );
 
     const clientId = (override?.clientId ?? base.clientId ?? '').trim();
     const decryptedSecret = override
@@ -629,11 +824,13 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async persistTokenResponse(input: {
+    organizationId: string | null;
     userId: string;
     provider: IntegrationProviderConfig;
     scopes: string[];
     rawResponse: Record<string, any>;
     previous?: IntegrationTokenRecord | undefined;
+    auth: AuthContext | null;
   }): Promise<IntegrationTokenRecord> {
     const accessToken = this.extractToken(input.rawResponse.access_token, 'access_token');
     const refreshToken = this.extractOptionalToken(input.rawResponse.refresh_token);
@@ -658,22 +855,39 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       lastGrantType: 'authorization_code',
     });
 
-    return this.repository.upsertConnection({
-      userId: input.userId,
-      provider: input.provider.id,
-      scopes: grantedScopes,
-      accessToken: accessMaterial,
-      refreshToken: refreshMaterial,
-      tokenType,
-      expiresAt,
-      metadata,
-    });
+    return this.repository.upsertConnection(
+      {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        provider: input.provider.id,
+        scopes: grantedScopes,
+        accessToken: accessMaterial,
+        refreshToken: refreshMaterial,
+        tokenType,
+        expiresAt,
+        metadata,
+      },
+      (executor, record) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          input.auth,
+          {
+            action: 'integration.oauth.connected',
+            resourceType: 'integration',
+            resourceId: record.id,
+            metadata: { provider: record.provider, phase: 'completed' },
+          },
+          undefined,
+          input.organizationId,
+        ),
+    );
   }
 
   private async refreshTokenRecord(
     record: IntegrationTokenRecord,
+    auth: AuthContext | null,
   ): Promise<IntegrationTokenRecord> {
-    const provider = await this.resolveProviderForAuth(record.provider);
+    const provider = await this.resolveProviderForAuth(record.provider, record.organizationId);
 
     if (!provider.supportsRefresh) {
       throw new BadRequestException(`${provider.name} tokens cannot be refreshed`);
@@ -684,6 +898,18 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
 
     const refreshToken = await this.encryption.decrypt(
       record.refreshToken as SecretEncryptionMaterial,
+    );
+
+    await this.auditLogService.recordDurable(
+      auth,
+      {
+        action: 'integration.oauth.refresh',
+        resourceType: 'integration',
+        resourceId: record.id,
+        metadata: { provider: record.provider, phase: 'requested' },
+      },
+      undefined,
+      record.organizationId,
     );
 
     const payload = await this.requestTokens(provider, {
@@ -716,16 +942,32 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
       lastGrantType: 'refresh_token',
     });
 
-    return this.repository.upsertConnection({
-      userId: record.userId,
-      provider: record.provider,
-      scopes: grantedScopes,
-      accessToken: accessMaterial,
-      refreshToken: refreshMaterial,
-      tokenType,
-      expiresAt,
-      metadata,
-    });
+    return this.repository.upsertConnection(
+      {
+        organizationId: record.organizationId,
+        userId: record.userId,
+        provider: record.provider,
+        scopes: grantedScopes,
+        accessToken: accessMaterial,
+        refreshToken: refreshMaterial,
+        tokenType,
+        expiresAt,
+        metadata,
+      },
+      (executor, refreshed) =>
+        this.auditLogService.recordDurableWithExecutor(
+          executor,
+          auth,
+          {
+            action: 'integration.oauth.refresh',
+            resourceType: 'integration',
+            resourceId: refreshed.id,
+            metadata: { provider: refreshed.provider, phase: 'completed' },
+          },
+          undefined,
+          record.organizationId,
+        ),
+    );
   }
 
   private extractToken(value: unknown, field: string): string {
@@ -787,9 +1029,10 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
   private async ensureFreshToken(
     record: IntegrationTokenRecord,
     provider: IntegrationProviderConfig,
+    auth: AuthContext | null,
   ): Promise<IntegrationTokenRecord> {
     if (this.shouldRefreshToken(record, provider)) {
-      return this.refreshTokenRecord(record);
+      return this.refreshTokenRecord(record, auth);
     }
     return record;
   }
@@ -825,5 +1068,9 @@ export class IntegrationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     return new Date(timestamp);
+  }
+
+  private providerOverrideKey(organizationId: string | null, providerId: string): string {
+    return `${organizationId ?? '<trusted-local>'}\u0000${providerId}`;
   }
 }

@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -41,6 +42,7 @@ export const findingTriageTable = pgTable(
     severityOverride: varchar('severity_override', { length: 32 }),
     notes: text('notes'),
     slaDeadline: timestamp('sla_deadline', { withTimezone: true }),
+    projectionVersion: integer('projection_version').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -48,6 +50,11 @@ export const findingTriageTable = pgTable(
     orgFindingIdx: uniqueIndex('finding_triage_org_finding_idx').on(
       table.organizationId,
       table.findingOpensearchId,
+    ),
+    orgIdIdx: index('finding_triage_org_id_idx').on(table.organizationId, table.id),
+    orgUpdatedAtIdx: index('finding_triage_org_updated_at_idx').on(
+      table.organizationId,
+      table.updatedAt,
     ),
     statusIdx: index('finding_triage_status_idx').on(table.organizationId, table.status),
     assigneeIdx: index('finding_triage_assignee_idx').on(

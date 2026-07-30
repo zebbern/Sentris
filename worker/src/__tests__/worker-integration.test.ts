@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 
 import { FileStorageAdapter } from '../adapters/file-storage.adapter';
 import * as schema from '../adapters/schema';
+import type { IFileStorageService } from '@sentris/component-sdk';
 import '../components'; // Register all components
 import {
   formatDatabaseTarget,
@@ -32,7 +33,7 @@ workerDescribe('Worker Integration Tests', () => {
   let temporalClient: Client;
   let minioClient: MinioClient;
   let pool: Pool;
-  let fileStorageAdapter: FileStorageAdapter;
+  let fileStorageAdapter: IFileStorageService;
   let db: NodePgDatabase<typeof schema>;
 
   // Use the test task queue - tests submit workflows to the test worker (pm2: sentris-test-worker)
@@ -78,7 +79,7 @@ workerDescribe('Worker Integration Tests', () => {
 
     // Initialize adapters
     const bucketName = process.env.MINIO_BUCKET_NAME || 'sentris-files';
-    fileStorageAdapter = new FileStorageAdapter(minioClient, db, bucketName);
+    fileStorageAdapter = new FileStorageAdapter(minioClient, db, bucketName).forOrganization(null);
 
     // Ensure bucket exists
     const bucketExists = await minioClient.bucketExists(bucketName);

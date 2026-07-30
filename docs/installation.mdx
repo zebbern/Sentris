@@ -122,7 +122,22 @@ cd backend
 bun run setup:opensearch
 ```
 
-This creates the `security-findings-*` index template with proper mappings for workflow execution data.
+This installs the versioned findings final ingest pipeline and creates the
+`security-findings-*` index template with canonical mappings and indexed
+contract-classification fields. The final pipeline validates new versioned
+observations and overwrites caller-provided classification attestations.
+
+Upgrades from a release that used daily findings indexes require an explicit,
+per-organization dry run and apply step so existing documents are classified
+and the integrity watermark is established. The migration is non-destructive:
+
+```bash
+bun run migrate:findings-index -- --organization <organization-id>
+bun run migrate:findings-index -- --organization <organization-id> --apply
+```
+
+Keep the old daily indexes until the reported counts and representative
+findings have been verified.
 
 ### Using Analytics
 
@@ -256,7 +271,7 @@ just dev logs
 just dev status
 
 # Start manually if needed
-bun --cwd frontend dev
+bun --cwd=frontend dev
 ```
 
 ### Temporal namespace missing

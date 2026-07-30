@@ -1,6 +1,6 @@
 ---
-title: "Isolated Volumes"
-description: "Docker-in-Docker file mounting solution for multi-tenant security"
+title: 'Isolated Volumes'
+description: 'Docker-in-Docker file mounting solution for multi-tenant security'
 ---
 
 ## Problem Summary
@@ -13,7 +13,18 @@ In a Docker-in-Docker (DinD) setup where the worker container runs inside Docker
 
 ---
 
-## Solution: Isolated Named Volumes
+## Solution: Two DIND-Compatible Exchange Paths
+
+The generic component runner uses a shared outer named volume mounted at the
+same absolute `/sentris-docker-io` path in the worker and DIND daemon. Every
+execution receives an independent directory and managed metadata record. Only
+that run directory is mounted into the scanner container, and no helper
+container is needed.
+
+Scanner implementations that need reusable inputs, multiple mount points, or
+large file bundles continue to use isolated inner named volumes.
+
+### Scanner-Specific Isolated Named Volumes
 
 Use unique Docker named volumes created per `tenantId + runId + timestamp`:
 
@@ -62,19 +73,19 @@ tenant-${tenantId}-run-${runId}-${timestamp}
 
 ## Security Benefits
 
-| Aspect | Old Approach | Isolated Volumes |
-|--------|-------------|------------------|
-| **Tenant Isolation** | ❌ Shared volume or stdin | ✅ Unique volume per tenant+run |
-| **Path Traversal** | ⚠️ Possible with file mounts | ✅ Validated filenames |
-| **Data Leakage** | ❌ Files persist in shared space | ✅ Immediate cleanup |
-| **Audit Trail** | ❌ None | ✅ Volume labels track tenant/run |
-| **DinD Compatible** | ❌ File mounts don't work | ✅ Named volumes work perfectly |
+| Aspect               | Old Approach                     | Isolated Volumes                  |
+| -------------------- | -------------------------------- | --------------------------------- |
+| **Tenant Isolation** | ❌ Shared volume or stdin        | ✅ Unique volume per tenant+run   |
+| **Path Traversal**   | ⚠️ Possible with file mounts     | ✅ Validated filenames            |
+| **Data Leakage**     | ❌ Files persist in shared space | ✅ Immediate cleanup              |
+| **Audit Trail**      | ❌ None                          | ✅ Volume labels track tenant/run |
+| **DinD Compatible**  | ❌ File mounts don't work        | ✅ Named volumes work perfectly   |
 
 ---
 
 ## Implementation
 
-### Before: File Mounting (Broken in DinD)
+### Before: Worker-Only File Mounting (Broken in DIND)
 
 ```typescript
 // ❌ WRONG - Breaks in DinD, no tenant isolation
@@ -82,13 +93,30 @@ const hostInputDir = await mkdtemp(path.join(tmpdir(), 'dnsx-input-'));
 await writeFile(path.join(hostInputDir, 'file.txt'), data);
 
 const runnerConfig: DockerRunnerConfig = {
-  volumes: [
-    { source: hostInputDir, target: '/inputs', readOnly: true }
-  ]
+  volumes: [{ source: hostInputDir, target: '/inputs', readOnly: true }],
 };
 ```
 
-### After: Isolated Volumes (DinD Compatible)
+### Generic Runner: Run-Scoped Shared Exchange
+
+The generic runner selects this automatically when
+`SENTRIS_DOCKER_SHARED_IO_ROOT` is configured. Production compose mounts the
+`dind_io` volume at that same path in worker and DIND:
+
+```text
+/sentris-docker-io/
+  runs/<resource-id>/
+    input.json
+    result.json
+  metadata/<resource-id>.json
+```
+
+This is still a bind mount from the inner daemon's perspective, but the source
+exists in DIND because the outer named volume is mounted into both application
+containers. Independent run directories avoid cross-run mounts and global
+serialization.
+
+### Scanner Components: Isolated Volumes
 
 ```typescript
 // ✅ CORRECT - DinD compatible, tenant isolated
@@ -118,15 +146,13 @@ try {
 
 ## Comparison: All Approaches
 
-| Feature | File Mounts | stdin Approach | Isolated Volumes |
-|---------|-------------|----------------|------------------|
-| **DinD Compatible** | ❌ No | ✅ Yes | ✅ Yes |
-| **File-based tools** | ✅ Yes | ❌ No | ✅ Yes |
-| **Config files** | ✅ Yes | ❌ No | ✅ Yes |
-| **Output files** | ❌ Hard to read | ❌ No | ✅ Yes |
-| **Binary files** | ✅ Yes | ❌ No | ✅ Yes |
-| **Large files** | ✅ Yes | ⚠️ Memory limits | ✅ Yes |
-| **Tenant isolation** | ❌ No | ⚠️ Process-level | ✅ Volume-level |
+| Feature                     | Worker-only bind | Shared run directory | stdin           | Isolated inner volume  |
+| --------------------------- | ---------------- | -------------------- | --------------- | ---------------------- |
+| **DIND compatible**         | ❌ No            | ✅ Yes               | ✅ Yes          | ✅ Yes                 |
+| **Extra helper containers** | None             | None                 | None            | Used for populate/read |
+| **File-based tools**        | ✅ Yes           | ✅ Yes               | ❌ No           | ✅ Yes                 |
+| **Binary/large files**      | ✅ Yes           | ✅ Yes               | ⚠️ Memory-bound | ✅ Yes                 |
+| **Scope**                   | Worker path      | Per-run directory    | Process         | Per-tenant/run volume  |
 
 ---
 
@@ -139,11 +165,11 @@ const volume = new IsolatedContainerVolume(tenantId, runId);
 
 try {
   await volume.initialize({
-    'targets.txt': targets.join('\n')
+    'targets.txt': targets.join('\n'),
   });
 
   const config = {
-    volumes: [volume.getVolumeConfig('/inputs', true)]
+    volumes: [volume.getVolumeConfig('/inputs', true)],
   };
 
   await runTool(config);
@@ -159,19 +185,18 @@ const volume = new IsolatedContainerVolume(tenantId, runId);
 
 try {
   await volume.initialize({
-    'config.yaml': yamlConfig
+    'config.yaml': yamlConfig,
   });
 
   const config = {
     command: ['--input', '/data/config.yaml', '--output', '/data/results.json'],
-    volumes: [volume.getVolumeConfig('/data', false)] // Read-write
+    volumes: [volume.getVolumeConfig('/data', false)], // Read-write
   };
 
   await runTool(config);
 
   const outputs = await volume.readFiles(['results.json', 'summary.txt']);
   return JSON.parse(outputs['results.json']);
-
 } finally {
   await volume.cleanup();
 }
@@ -190,19 +215,15 @@ try {
   const config = {
     volumes: [
       inputVol.getVolumeConfig('/inputs', true),
-      outputVol.getVolumeConfig('/outputs', false)
-    ]
+      outputVol.getVolumeConfig('/outputs', false),
+    ],
   };
 
   await runTool(config);
 
   const results = await outputVol.readFiles(['output.json']);
-
 } finally {
-  await Promise.all([
-    inputVol.cleanup(),
-    outputVol.cleanup()
-  ]);
+  await Promise.all([inputVol.cleanup(), outputVol.cleanup()]);
 }
 ```
 
@@ -218,7 +239,7 @@ try {
 
 ### Automatic Cleanup
 
-Volumes are always cleaned up via `finally` blocks:
+Normal completion cleans volumes through `finally` blocks:
 
 ```typescript
 try {
@@ -231,15 +252,24 @@ try {
 
 ### Orphan Cleanup
 
-For volumes that weren't cleaned up (e.g., worker crash):
+The production worker reconciles labeled containers, inner named volumes, and
+shared exchange directories once at startup and periodically. It applies age,
+inventory, and per-pass removal bounds and asks Temporal whether each run is
+still active before deleting anything. If Temporal state is unknown, cleanup
+fails closed. Reconciliation failure is surfaced through worker readiness.
+
+Operators can inspect the inventory without deleting it:
 
 ```bash
 # List studio-managed volumes
 docker volume ls --filter "label=studio.managed=true"
 
-# Remove old volumes
-docker volume prune --filter "label=studio.managed=true"
+# List managed component containers
+docker ps -a --filter "label=sentris.runId"
 ```
+
+Do not use a blind `docker volume prune` as routine cleanup: age alone cannot
+prove that a volume is not attached to an active workflow.
 
 ---
 
@@ -248,6 +278,7 @@ docker volume prune --filter "label=studio.managed=true"
 ### Tenant Isolation
 
 Every execution gets a unique volume:
+
 ```
 tenant-{tenantId}-run-{runId}-{timestamp}
 ```
@@ -258,10 +289,10 @@ Example: `tenant-acme-run-wf-abc123-1732150000`
 
 ```typescript
 // Input files should be read-only
-volume.getVolumeConfig('/inputs', true)  // ✅ read-only
+volume.getVolumeConfig('/inputs', true); // ✅ read-only
 
 // Only make writable if tool needs to write
-volume.getVolumeConfig('/outputs', false)  // ⚠️ read-write
+volume.getVolumeConfig('/outputs', false); // ⚠️ read-write
 ```
 
 ### Nonroot Container Support
@@ -276,11 +307,13 @@ After files are written to the volume, permissions are set to `777` to allow any
 ```
 
 **Why this is needed:**
+
 - Files are written to volumes using Alpine containers (running as root)
 - Distroless nonroot images run as uid 65532
 - Without permission changes, nonroot containers can't write output files
 
 **This is safe because:**
+
 - Each volume is isolated per tenant + run
 - Volumes are cleaned up after execution
 - No cross-tenant access is possible
@@ -293,13 +326,13 @@ Filenames are automatically validated:
 // ✅ OK
 await volume.initialize({
   'file.txt': data,
-  'subdir/file.txt': data  // Subdirs OK
+  'subdir/file.txt': data, // Subdirs OK
 });
 
 // ❌ Rejected (security)
 await volume.initialize({
-  '../file.txt': data,     // Path traversal blocked
-  '/etc/passwd': data      // Absolute paths blocked
+  '../file.txt': data, // Path traversal blocked
+  '/etc/passwd': data, // Absolute paths blocked
 });
 ```
 
@@ -307,40 +340,40 @@ await volume.initialize({
 
 ## Security Guarantees
 
-| Security Feature | How It Works |
-|-----------------|--------------|
-| **Tenant Isolation** | Volume name includes tenant ID |
-| **No Collisions** | Timestamp prevents conflicts |
-| **Path Safety** | Filenames validated (no `..` or `/`) |
-| **Automatic Cleanup** | Finally blocks guarantee removal |
-| **Audit Trail** | Volumes labeled `studio.managed=true` |
-| **DinD Compatible** | Named volumes work in nested Docker |
+| Security Feature     | How It Works                                               |
+| -------------------- | ---------------------------------------------------------- |
+| **Tenant Isolation** | Volume name includes tenant ID                             |
+| **No Collisions**    | Timestamp prevents conflicts                               |
+| **Path Safety**      | Filenames validated (no `..` or `/`)                       |
+| **Cleanup**          | Normal-path `finally` plus active-run-aware reconciliation |
+| **Audit Trail**      | Volumes labeled `studio.managed=true`                      |
+| **DinD Compatible**  | Named volumes work in nested Docker                        |
 
 ---
 
 ## Performance
 
-### Volume Creation Overhead
+### Exchange Overhead
 
-- **Creation**: ~50-100ms per volume
-- **File writes**: ~10-50ms per file (depends on size)
-- **Cleanup**: ~50-100ms per volume
-
-**Total overhead**: ~100-250ms per execution
-
-This is acceptable for security tools that typically run for seconds/minutes.
+The generic shared-exchange path adds directory creation and one small metadata
+write but no helper-container launch. Scanner-specific inner volumes retain
+their existing helper-container behavior. Representative median and p95
+startup overhead has not yet been measured for the production DIND topology;
+see the production DIND ADR before making a performance-readiness claim.
 
 ### Optimization Tips
 
 1. **Batch file writes**: Write all files in one `initialize()` call
 2. **Reuse volumes**: For sequential operations in same run, reuse the volume
-3. **Lazy cleanup**: Clean up volumes in background job if latency-sensitive
+3. **Keep cleanup synchronous on the normal path**: The reconciler is for
+   crash recovery, not routine latency hiding.
 
 ---
 
 ## When to Use Each Approach
 
 ### Use Isolated Volumes When:
+
 - ✅ Running in DinD environment
 - ✅ Need multi-tenant isolation
 - ✅ Tool requires file-based config
@@ -348,15 +381,17 @@ This is acceptable for security tools that typically run for seconds/minutes.
 - ✅ Handling binary/large files
 
 ### Use stdin/stdout When:
+
 - ✅ Tool supports stdin input
 - ✅ Single-tenant or dev environment
 - ✅ Small text-only inputs
 - ✅ Don't need output files
 
-### Use File Mounts When:
-- ✅ NOT running in DinD (direct Docker)
+### Use Worker-Only File Mounts When:
+
+- ✅ Using a local Docker daemon that resolves the same host paths
 - ✅ Development/testing only
-- ✅ Quick prototyping
+- ❌ Never for the supported production DIND topology
 
 ---
 

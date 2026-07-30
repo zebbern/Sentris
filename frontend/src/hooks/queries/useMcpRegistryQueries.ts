@@ -28,6 +28,7 @@ async function registryRequest<T>(path: string, options: RequestInit = {}): Prom
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...restOptions,
     signal,
+    credentials: 'include',
     headers: {
       ...headers,
       'Content-Type': 'application/json',

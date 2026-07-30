@@ -1,16 +1,25 @@
 import {
+  BadRequestException,
   Controller,
   Get,
-  InternalServerErrorException,
+  HttpException,
   Logger,
   NotFoundException,
   Param,
   Query,
   Res,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiProduces,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
+import { escapeCsvCell, type FindingDataAvailability } from '@sentris/shared';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
@@ -23,6 +32,7 @@ import {
   FindingsQueryDto,
   FindingsQuerySchema,
   FindingsResponseDto,
+  FindingItemDto,
   type FindingItem,
 } from './dto/findings-query.dto';
 import { FindingDetailResponseDto, FindingIdParamSchema } from './dto/findings-detail.dto';
@@ -32,10 +42,36 @@ import {
   FindingsStatsQuerySchema,
   FindingsStatsResponseDto,
 } from './dto/findings-stats.dto';
-import { FindingTriageService } from '../findings/finding-triage.service';
-import { type FindingTriageStatus } from '../findings/dto/triage-update.dto';
+import {
+  FindingTriageService,
+  type FindingProjectionHealth,
+} from '../findings/finding-triage.service';
+import { FINDING_TRIAGE_PROJECTION_EVENT } from '../findings/finding-triage.events';
+import { OutboxRepository } from '../outbox/outbox.repository';
+import { FINDINGS_NORMALIZED_SEVERITY_FIELD } from './findings-index-template';
+import {
+  buildFindingFilter,
+  buildFindingSchemaCoverageAggregation,
+  FINDING_SCHEMA_COVERAGE_AGGREGATION_KEY,
+  isFindingSchemaCoverageComplete,
+  mapFindingHitWithCompatibility,
+  parseExactFindingSeverityCounts,
+  readFindingSchemaCoverage,
+} from './finding-query';
+import { findingsUnavailable } from './findings-unavailable';
+import { InvalidFindingPageCursorError } from './finding-pagination';
+import { ScopesRepository } from '../scopes/scopes.repository';
+
+const SCOPE_RUN_ID_PAGE_SIZE = 1_000;
+const FINDING_ENRICHMENT_BATCH_SIZE = 5_000;
+
+interface FindingStorageIdIntegrityHealth {
+  availability: FindingDataAvailability;
+  reason: string | null;
+}
 
 @ApiTags('findings')
+@ApiExtraModels(FindingItemDto)
 @Controller('findings')
 export class FindingsController {
   private readonly logger = new Logger(FindingsController.name);
@@ -44,72 +80,9 @@ export class FindingsController {
     private readonly securityAnalyticsService: SecurityAnalyticsService,
     private readonly auditLogService: AuditLogService,
     private readonly findingTriageService: FindingTriageService,
+    private readonly outboxRepository: OutboxRepository,
+    private readonly scopesRepository: ScopesRepository,
   ) {}
-
-  /**
-   * Build OpenSearch DSL filter clauses from common query parameters.
-   * Reused across list, export, and stats endpoints.
-   */
-  private buildFindingsFilter(query: {
-    severity?: string;
-    search?: string;
-    workflowId?: string;
-    componentId?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }): Record<string, unknown> {
-    const mustClauses: Record<string, unknown>[] = [];
-
-    if (query.severity) {
-      mustClauses.push({ term: { severity: query.severity } });
-    }
-
-    if (query.search) {
-      mustClauses.push({
-        multi_match: {
-          query: query.search,
-          fields: ['name', 'title', 'asset_key', 'workflow_name', 'host', 'domain', 'url'],
-          type: 'phrase_prefix',
-        },
-      });
-    }
-
-    if (query.workflowId) {
-      mustClauses.push({ term: { workflow_id: query.workflowId } });
-    }
-
-    if (query.componentId) {
-      mustClauses.push({ term: { component_id: query.componentId } });
-    }
-
-    if (query.dateFrom || query.dateTo) {
-      const range: Record<string, string> = {};
-      if (query.dateFrom) range.gte = query.dateFrom;
-      if (query.dateTo) range.lte = query.dateTo;
-      mustClauses.push({ range: { '@timestamp': range } });
-    }
-
-    return mustClauses.length > 0 ? { bool: { must: mustClauses } } : { match_all: {} };
-  }
-
-  /**
-   * Map a raw OpenSearch hit to a FindingItem shape.
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- OpenSearch hit source is untyped
-  private mapHitToFindingItem(hit: { _id: string; _source: Record<string, any> }): FindingItem {
-    return {
-      id: hit._id,
-      timestamp: (hit._source['@timestamp'] as string) || new Date().toISOString(),
-      severity: (hit._source.severity as string) || undefined,
-      name: (hit._source.name as string) || (hit._source.title as string) || undefined,
-      asset_key: (hit._source.asset_key as string) || undefined,
-      workflow_name: (hit._source.workflow_name as string) || undefined,
-      workflow_id: (hit._source.workflow_id as string) || undefined,
-      run_id: (hit._source.run_id as string) || undefined,
-      component_id: (hit._source.component_id as string) || undefined,
-      node_ref: (hit._source.node_ref as string) || undefined,
-    };
-  }
 
   /**
    * Require authenticated user with an organization context.
@@ -126,6 +99,129 @@ export class FindingsController {
     }
   }
 
+  private throwUnavailable(operation: string, error: unknown): never {
+    this.logger.error(`${operation}: ${error}`);
+    if (error instanceof InvalidFindingPageCursorError) {
+      throw new BadRequestException('Invalid or expired findings cursor');
+    }
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw findingsUnavailable('Findings data is unavailable');
+  }
+
+  private async hasProjectionEventLag(organizationId: string): Promise<boolean> {
+    try {
+      return await this.outboxRepository.hasOutstandingEvent(
+        organizationId,
+        FINDING_TRIAGE_PROJECTION_EVENT,
+      );
+    } catch (error) {
+      this.logger.warn(`Unable to establish finding projection health: ${error}`);
+      return true;
+    }
+  }
+
+  private async getProjectionHealth(organizationId: string): Promise<FindingProjectionHealth> {
+    try {
+      const [health, projectionEventLag] = await Promise.all([
+        this.findingTriageService.getProjectionHealth(organizationId),
+        this.hasProjectionEventLag(organizationId),
+      ]);
+      if (!projectionEventLag) return health;
+      return {
+        ...health,
+        availability: 'degraded',
+        reason: 'projection_events_pending',
+      };
+    } catch (error) {
+      this.logger.warn(`Unable to establish finding projection health: ${error}`);
+      return {
+        availability: 'degraded',
+        completedAt: null,
+        reconciledThrough: null,
+        reason: 'health_check_failed',
+      };
+    }
+  }
+
+  private async getStorageIdIntegrityHealth(
+    organizationId: string,
+  ): Promise<FindingStorageIdIntegrityHealth> {
+    try {
+      const watermark =
+        await this.securityAnalyticsService.getFindingStorageIdIntegrityWatermark(organizationId);
+      if (!watermark) {
+        return { availability: 'degraded', reason: 'storage_id_integrity_unverified' };
+      }
+      if (!watermark.matchesCurrentObservationIndex) {
+        return { availability: 'degraded', reason: 'storage_id_integrity_stale' };
+      }
+      if (!watermark.matchesCurrentInvariant) {
+        return { availability: 'degraded', reason: 'storage_id_integrity_invariant_stale' };
+      }
+      if (watermark.mismatched > 0) {
+        return { availability: 'degraded', reason: 'storage_id_integrity_mismatch' };
+      }
+      return { availability: 'available', reason: null };
+    } catch (error) {
+      this.logger.warn(`Unable to establish finding storage ID integrity: ${error}`);
+      return { availability: 'degraded', reason: 'storage_id_integrity_unavailable' };
+    }
+  }
+
+  private async resolveOwnedScopeRunIds(
+    organizationId: string,
+    scopeId: string | undefined,
+  ): Promise<string[] | undefined> {
+    if (!scopeId) return undefined;
+
+    try {
+      const scope = await this.scopesRepository.findById(scopeId, organizationId);
+      if (!scope) {
+        throw new NotFoundException('Scope not found');
+      }
+
+      const runIds: string[] = [];
+      let afterRunId: string | undefined;
+      while (true) {
+        const page = await this.scopesRepository.listRunIdsPage(
+          scopeId,
+          organizationId,
+          afterRunId,
+          SCOPE_RUN_ID_PAGE_SIZE,
+        );
+        runIds.push(...page);
+        if (page.length < SCOPE_RUN_ID_PAGE_SIZE) break;
+        afterRunId = page.at(-1);
+      }
+      return runIds;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`Unable to resolve finding scope ownership: ${error}`);
+      throw findingsUnavailable('Scope ownership data is unavailable');
+    }
+  }
+
+  private async enrichFindingItems(
+    organizationId: string,
+    items: FindingItem[],
+  ): Promise<FindingItem[]> {
+    const enriched: FindingItem[] = [];
+    for (let start = 0; start < items.length; start += FINDING_ENRICHMENT_BATCH_SIZE) {
+      const batch = items.slice(start, start + FINDING_ENRICHMENT_BATCH_SIZE);
+      const enrichedBatch = await this.findingTriageService.enrichWithTriageState(
+        organizationId,
+        batch,
+      );
+      if (enrichedBatch.length !== batch.length) {
+        throw new Error('Authoritative triage enrichment returned an incomplete batch');
+      }
+      enriched.push(...enrichedBatch);
+    }
+    return enriched;
+  }
+
   @Get()
   @Throttle({ default: { limit: 100, ttl: 60000 } })
   @ApiOperation({ summary: 'List security findings with pagination and filters' })
@@ -140,14 +236,20 @@ export class FindingsController {
     this.requireAuth(auth);
 
     if (!this.securityAnalyticsService.isAvailable()) {
-      throw new ServiceUnavailableException('Analytics service is not available');
+      throw findingsUnavailable('Analytics service is not available');
     }
 
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const from = (page - 1) * pageSize;
+    const paginationMode = query.paginationMode ?? 'offset';
+    if (paginationMode === 'offset' && from + pageSize > 10_000) {
+      throw new BadRequestException(
+        'Offset pagination is limited to the first 10,000 findings; use paginationMode=cursor',
+      );
+    }
 
-    this.auditLogService.record(auth, {
+    this.auditLogService.recordBestEffort(auth, {
       action: 'findings.list',
       resourceType: 'analytics',
       resourceId: null,
@@ -160,104 +262,115 @@ export class FindingsController {
       },
     });
 
-    const opensearchQuery = this.buildFindingsFilter(query);
+    const ownedScopeRunIds = await this.resolveOwnedScopeRunIds(auth.organizationId, query.scopeId);
+    const opensearchQuery = buildFindingFilter(query, { ownedScopeRunIds });
+    const schemaCoverageAggregations = {
+      [FINDING_SCHEMA_COVERAGE_AGGREGATION_KEY]: buildFindingSchemaCoverageAggregation(),
+    };
+    const projectionHealthPromise = this.getProjectionHealth(auth.organizationId);
+    const storageIdIntegrityPromise = this.getStorageIdIntegrityHealth(auth.organizationId);
 
     try {
-      // Handle triage status filtering
-      let additionalIdFilter: string[] | null = null;
-      let excludeIds: string[] | null = null;
-      const hasTriageStatusFilter = !!query.triageStatus;
-      const hasAssigneeFilter = !!query.assigneeUserId;
-      let hasNewFilter = false;
-      let nonNewStatuses: FindingTriageStatus[] = [];
+      const resultPromise =
+        paginationMode === 'cursor'
+          ? this.securityAnalyticsService.queryFindingPage(auth.organizationId, {
+              query: opensearchQuery,
+              pageSize,
+              sortOrder: query.sortOrder ?? 'desc',
+              aggs: schemaCoverageAggregations,
+              ...(query.cursor && { cursor: query.cursor }),
+            })
+          : this.securityAnalyticsService.queryFindings(auth.organizationId, {
+              query: opensearchQuery,
+              size: pageSize,
+              from,
+              sort: [{ '@timestamp': query.sortOrder ?? 'desc' }],
+              aggs: schemaCoverageAggregations,
+            });
+      const [result, projectionHealth, storageIdIntegrity] = await Promise.all([
+        resultPromise,
+        projectionHealthPromise,
+        storageIdIntegrityPromise,
+      ]);
 
-      if (hasTriageStatusFilter) {
-        const requestedStatuses = query
-          .triageStatus!.split(',')
-          .map((s) => s.trim()) as FindingTriageStatus[];
-        hasNewFilter = requestedStatuses.includes('new');
-        nonNewStatuses = requestedStatuses.filter((s) => s !== 'new') as FindingTriageStatus[];
-
-        if (hasNewFilter && nonNewStatuses.length === 0) {
-          // Only "new" — exclude all findings that have triage records
-          excludeIds = await this.findingTriageService.getAllTriagedIds(auth.organizationId);
-        } else if (hasNewFilter && nonNewStatuses.length > 0) {
-          // "new" + other statuses — get IDs for non-new statuses, but don't filter by ID
-          // (we can't easily combine "has ID in list OR not in triage table")
-          // Strategy: query normally, then post-filter
-          additionalIdFilter = null;
-        } else {
-          // Only non-new statuses
-          const matchingIds = await this.findingTriageService.getTriageByStatus(
-            auth.organizationId,
-            nonNewStatuses,
-          );
-          if (matchingIds.length === 0) {
-            return { items: [], total: 0, page, pageSize };
-          }
-          additionalIdFilter = matchingIds;
-        }
+      const mappedHits = result.hits.map((hit) => mapFindingHitWithCompatibility(hit));
+      const items: FindingItem[] = mappedHits.map(({ item }) => item);
+      const schemaCoverage = readFindingSchemaCoverage(result.aggregations, result.total);
+      let availability: FindingDataAvailability = result.availability ?? 'available';
+      const degradedReasons = new Set<string>();
+      if (availability === 'degraded') {
+        degradedReasons.add('analytics_degraded');
       }
-
-      // Build the final query
-      let finalQuery = opensearchQuery;
-
-      if (additionalIdFilter) {
-        finalQuery = {
-          bool: {
-            must: [opensearchQuery],
-            filter: [{ ids: { values: additionalIdFilter } }],
-          },
-        };
+      if (storageIdIntegrity.availability === 'degraded') {
+        availability = 'degraded';
+        degradedReasons.add(storageIdIntegrity.reason ?? 'storage_id_integrity_degraded');
       }
-
-      if (excludeIds && excludeIds.length > 0) {
-        finalQuery = {
-          bool: {
-            must: [opensearchQuery],
-            must_not: [{ ids: { values: excludeIds } }],
-          },
-        };
+      if (!schemaCoverage) {
+        availability = 'degraded';
+        degradedReasons.add('schema_coverage_unavailable');
+      } else if (!isFindingSchemaCoverageComplete(schemaCoverage, result.total)) {
+        availability = 'degraded';
+        degradedReasons.add('schema_coverage_incomplete');
       }
-
-      const result = await this.securityAnalyticsService.query(auth.organizationId, {
-        query: finalQuery,
-        size: pageSize,
-        from,
-      });
-
-      const items: FindingItem[] = result.hits.map((hit) => this.mapHitToFindingItem(hit));
+      if (
+        (schemaCoverage?.invalid ?? 0) > 0 ||
+        mappedHits.some(({ compatibility }) => compatibility === 'invalid')
+      ) {
+        availability = 'degraded';
+        degradedReasons.add('invalid_schema_documents');
+      }
 
       // Enrich with triage state from PG
-      const enrichedItems = await this.findingTriageService.enrichWithTriageState(
-        auth.organizationId,
-        items,
-      );
-
-      // Post-filter by assignee if specified
-      let finalItems = enrichedItems;
-
-      // Post-filter for new + non-new triage status combo
-      if (hasNewFilter && nonNewStatuses.length > 0) {
-        const nonNewSet = new Set<string>(nonNewStatuses);
-        finalItems = finalItems.filter(
-          (item) =>
-            (item.triage === null && hasNewFilter) ||
-            (item.triage?.status != null && nonNewSet.has(item.triage.status)),
-        );
+      let enrichedItems: FindingItem[];
+      try {
+        enrichedItems = await this.enrichFindingItems(auth.organizationId, items);
+      } catch (error) {
+        this.logger.warn(`Triage enrichment unavailable; returning observation data: ${error}`);
+        availability = 'degraded';
+        degradedReasons.add('triage_enrichment_unavailable');
+        enrichedItems = items;
+      }
+      if (
+        enrichedItems.some((item, index) => {
+          const projectedVersion = items[index]?.triage?.projectionVersion ?? 0;
+          const authoritativeVersion = item.triage?.projectionVersion ?? 0;
+          return projectedVersion !== authoritativeVersion;
+        })
+      ) {
+        availability = 'degraded';
+        degradedReasons.add('triage_projection_stale');
+      }
+      if (projectionHealth?.availability === 'degraded') {
+        availability = 'degraded';
+        degradedReasons.add(projectionHealth.reason ?? 'projection_health_degraded');
       }
 
-      if (hasAssigneeFilter) {
-        finalItems = enrichedItems.filter(
-          (item) => item.triage?.assigneeUserId === query.assigneeUserId,
-        );
-      }
-
-      return { items: finalItems, total: result.total, page, pageSize };
+      return {
+        items: enrichedItems,
+        total: result.total,
+        page,
+        pageSize,
+        availability,
+        paginationMode,
+        currentCursor:
+          'currentCursor' in result && typeof result.currentCursor === 'string'
+            ? result.currentCursor
+            : null,
+        nextCursor:
+          'nextCursor' in result &&
+          (typeof result.nextCursor === 'string' || result.nextCursor === null)
+            ? result.nextCursor
+            : null,
+        projectionHealth,
+        degradedReasons: [...degradedReasons],
+        schemaCoverage: schemaCoverage ?? {
+          canonical: 0,
+          legacy: 0,
+          invalid: 0,
+        },
+      };
     } catch (error) {
-      this.logger.error(`Failed to query findings: ${error}`);
-      // Return empty results on OpenSearch errors (graceful degradation)
-      return { items: [], total: 0, page, pageSize };
+      this.throwUnavailable('Failed to query findings', error);
     }
   }
 
@@ -275,10 +388,10 @@ export class FindingsController {
     this.requireAuth(auth);
 
     if (!this.securityAnalyticsService.isAvailable()) {
-      throw new ServiceUnavailableException('Analytics service is not available');
+      throw findingsUnavailable('Analytics service is not available');
     }
 
-    this.auditLogService.record(auth, {
+    this.auditLogService.recordBestEffort(auth, {
       action: 'findings.stats',
       resourceType: 'analytics',
       resourceId: null,
@@ -286,36 +399,106 @@ export class FindingsController {
       metadata: null,
     });
 
-    const opensearchQuery = this.buildFindingsFilter(query);
+    const ownedScopeRunIds = await this.resolveOwnedScopeRunIds(auth.organizationId, query.scopeId);
+    const opensearchQuery = buildFindingFilter(query, { ownedScopeRunIds });
+    const usesProjection = Boolean(query.triageStatus || query.assigneeUserId);
+    const [projectionHealth, storageIdIntegrity] = await Promise.all([
+      usesProjection ? this.getProjectionHealth(auth.organizationId) : undefined,
+      this.getStorageIdIntegrityHealth(auth.organizationId),
+    ]);
 
     try {
-      const result = await this.securityAnalyticsService.query(auth.organizationId, {
+      const result = await this.securityAnalyticsService.queryFindings(auth.organizationId, {
         query: opensearchQuery,
         size: 0,
         aggs: {
           severity_counts: {
-            terms: { field: 'severity', size: 10 },
+            terms: { field: FINDINGS_NORMALIZED_SEVERITY_FIELD, size: 10 },
           },
+          [FINDING_SCHEMA_COVERAGE_AGGREGATION_KEY]: buildFindingSchemaCoverageAggregation(),
         },
       });
 
-      const buckets = result.aggregations?.severity_counts?.buckets ?? [];
-      const severityCounts = buckets.map((bucket: { key: string; doc_count: number }) => ({
-        severity: bucket.key,
-        count: bucket.doc_count,
-      }));
+      const severityCounts = parseExactFindingSeverityCounts(result.aggregations, result.total);
+      const schemaCoverage = readFindingSchemaCoverage(result.aggregations, result.total);
 
-      return { severityCounts, total: result.total };
+      return {
+        severityCounts,
+        total: result.total,
+        availability:
+          projectionHealth?.availability === 'degraded' ||
+          storageIdIntegrity.availability === 'degraded' ||
+          !isFindingSchemaCoverageComplete(schemaCoverage, result.total) ||
+          schemaCoverage.invalid > 0
+            ? 'degraded'
+            : 'available',
+        ...(projectionHealth && { projectionHealth }),
+        schemaCoverage: schemaCoverage ?? {
+          canonical: 0,
+          legacy: 0,
+          invalid: 0,
+        },
+      };
     } catch (error) {
-      this.logger.error(`Failed to query findings stats: ${error}`);
-      // Graceful degradation — same pattern as listFindings
-      return { severityCounts: [], total: 0 };
+      this.throwUnavailable('Failed to query findings stats', error);
     }
   }
 
   @Get('export')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @ApiOperation({ summary: 'Export security findings as CSV or JSON' })
+  @ApiProduces('application/json', 'text/csv')
+  @ApiOkResponse({
+    description: 'Finding export in the requested format',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'array',
+          items: { $ref: getSchemaPath(FindingItemDto) },
+        },
+      },
+      'text/csv': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+    headers: {
+      'Content-Disposition': {
+        description: 'Attachment filename',
+        schema: { type: 'string' },
+      },
+      'X-Sentris-Availability': {
+        description: 'Trust state for the exported finding data',
+        schema: { type: 'string', enum: ['available', 'degraded'] },
+      },
+      'X-Sentris-Degraded-Reasons': {
+        description: 'Comma-separated reasons the export is degraded, when present',
+        schema: { type: 'string' },
+      },
+      'X-Sentris-Projection-Health-Reason': {
+        description: 'Projection degradation reason, when present',
+        schema: { type: 'string' },
+      },
+      'X-Sentris-Projection-Reconciled-Through': {
+        description: 'Latest reconciled projection timestamp, when present',
+        schema: { type: 'string', format: 'date-time' },
+      },
+      'X-Sentris-Schema-Canonical': {
+        description: 'Canonical observations included in the export',
+        schema: { type: 'integer', minimum: 0 },
+      },
+      'X-Sentris-Schema-Legacy': {
+        description: 'Legacy observations included in the export',
+        schema: { type: 'integer', minimum: 0 },
+      },
+      'X-Sentris-Schema-Invalid': {
+        description: 'Invalid versioned observations included in the export',
+        schema: { type: 'integer', minimum: 0 },
+      },
+    },
+  })
   async exportFindings(
     @CurrentAuth() auth: AuthContext | null,
     @Query(new ZodValidationPipe(FindingsExportQuerySchema)) query: FindingsExportQueryDto,
@@ -324,37 +507,96 @@ export class FindingsController {
     this.requireAuth(auth);
 
     if (!this.securityAnalyticsService.isAvailable()) {
-      throw new ServiceUnavailableException('Analytics service is not available');
+      throw findingsUnavailable('Analytics service is not available');
     }
 
-    const limit = query.limit ?? 1000;
+    const limit = query.limit;
     const format = query.format ?? 'json';
-    const opensearchQuery = this.buildFindingsFilter(query);
+    const ownedScopeRunIds = await this.resolveOwnedScopeRunIds(auth.organizationId, query.scopeId);
+    const opensearchQuery = buildFindingFilter(query, { ownedScopeRunIds });
+    const [projectionHealth, storageIdIntegrity] = await Promise.all([
+      this.getProjectionHealth(auth.organizationId),
+      this.getStorageIdIntegrityHealth(auth.organizationId),
+    ]);
 
     try {
-      const result = await this.securityAnalyticsService.query(auth.organizationId, {
+      const hits = await this.securityAnalyticsService.scanFindings(auth.organizationId, {
         query: opensearchQuery,
-        size: limit,
-        from: 0,
+        sortOrder: query.sortOrder ?? 'desc',
+        limit,
       });
 
-      const items = result.hits.map((hit) => this.mapHitToFindingItem(hit));
+      const mappedHits = hits.map((hit) => mapFindingHitWithCompatibility(hit));
+      const projectedItems = mappedHits.map(({ item }) => item);
+      const degradedReasons = new Set<string>();
+      let items: FindingItem[];
+      try {
+        items = await this.enrichFindingItems(auth.organizationId, projectedItems);
+      } catch (error) {
+        this.logger.warn(
+          `Export triage enrichment unavailable; returning observation data: ${error}`,
+        );
+        degradedReasons.add('triage_enrichment_unavailable');
+        items = projectedItems;
+      }
+      if (
+        items.some((item, index) => {
+          const projectedVersion = projectedItems[index]?.triage?.projectionVersion ?? 0;
+          const authoritativeVersion = item.triage?.projectionVersion ?? 0;
+          return projectedVersion !== authoritativeVersion;
+        })
+      ) {
+        degradedReasons.add('triage_projection_stale');
+      }
+      if (projectionHealth.availability === 'degraded') {
+        degradedReasons.add(projectionHealth.reason ?? 'projection_health_degraded');
+      }
+      if (storageIdIntegrity.availability === 'degraded') {
+        degradedReasons.add(storageIdIntegrity.reason ?? 'storage_id_integrity_degraded');
+      }
+      if (mappedHits.some(({ compatibility }) => compatibility === 'invalid')) {
+        degradedReasons.add('invalid_schema_documents');
+      }
+      const availability: FindingDataAvailability =
+        degradedReasons.size > 0 ? 'degraded' : 'available';
+      const exportSchemaCoverage = mappedHits.reduce(
+        (coverage, hit) => {
+          coverage[hit.compatibility] += 1;
+          return coverage;
+        },
+        { canonical: 0, legacy: 0, invalid: 0 },
+      );
 
-      this.auditLogService.record(auth, {
+      await this.auditLogService.recordDurable(auth, {
         action: 'findings.export',
         resourceType: 'analytics',
         resourceId: null,
         resourceName: null,
         metadata: {
           format,
-          limit,
+          limit: limit ?? null,
           resultCount: items.length,
+          availability,
+          degradedReasons: [...degradedReasons],
           severity: query.severity ?? null,
           search: query.search ?? null,
         },
       });
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      res.set('X-Sentris-Availability', availability);
+      if (degradedReasons.size > 0) {
+        res.set('X-Sentris-Degraded-Reasons', [...degradedReasons].join(','));
+      }
+      res.set('X-Sentris-Schema-Canonical', String(exportSchemaCoverage.canonical));
+      res.set('X-Sentris-Schema-Legacy', String(exportSchemaCoverage.legacy));
+      res.set('X-Sentris-Schema-Invalid', String(exportSchemaCoverage.invalid));
+      if (projectionHealth.reason) {
+        res.set('X-Sentris-Projection-Health-Reason', projectionHealth.reason);
+      }
+      if (projectionHealth.reconciledThrough) {
+        res.set('X-Sentris-Projection-Reconciled-Through', projectionHealth.reconciledThrough);
+      }
 
       if (format === 'csv') {
         const csv = this.generateCsv(items);
@@ -369,8 +611,7 @@ export class FindingsController {
           .json(items);
       }
     } catch (error) {
-      this.logger.error(`Failed to export findings: ${error}`);
-      throw new InternalServerErrorException('Failed to export findings');
+      this.throwUnavailable('Failed to export findings', error);
     }
   }
 
@@ -381,6 +622,12 @@ export class FindingsController {
     description: 'Single security finding detail',
     type: FindingDetailResponseDto,
   })
+  @ApiParam({
+    name: 'id',
+    description: 'OpenSearch finding document identifier',
+    required: true,
+    schema: { type: 'string', minLength: 1, maxLength: 512 },
+  })
   async getFinding(
     @CurrentAuth() auth: AuthContext | null,
     @Param(new ZodValidationPipe(FindingIdParamSchema)) params: { id: string },
@@ -390,10 +637,10 @@ export class FindingsController {
     const { id } = params;
 
     if (!this.securityAnalyticsService.isAvailable()) {
-      throw new ServiceUnavailableException('Analytics service is not available');
+      throw findingsUnavailable('Analytics service is not available');
     }
 
-    this.auditLogService.record(auth, {
+    this.auditLogService.recordBestEffort(auth, {
       action: 'findings.detail',
       resourceType: 'analytics',
       resourceId: id,
@@ -402,7 +649,7 @@ export class FindingsController {
     });
 
     try {
-      const result = await this.securityAnalyticsService.query(auth.organizationId, {
+      const result = await this.securityAnalyticsService.queryFindings(auth.organizationId, {
         query: { term: { _id: id } },
         size: 1,
       });
@@ -412,16 +659,39 @@ export class FindingsController {
       }
 
       const hit = result.hits[0];
+      const mapped = mapFindingHitWithCompatibility(hit);
+      const projected = mapped.item;
+      let item = projected;
+      let availability: FindingDataAvailability =
+        mapped.compatibility === 'invalid' ? 'degraded' : 'available';
+      try {
+        const [authoritative] = await this.findingTriageService.enrichWithTriageState(
+          auth.organizationId,
+          [projected],
+        );
+        item = authoritative ?? projected;
+        if (
+          authoritative?.triage &&
+          authoritative.triage.projectionVersion !== projected.triage?.projectionVersion
+        ) {
+          availability = 'degraded';
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Triage enrichment unavailable for finding ${id}; returning projection: ${error}`,
+        );
+        availability = 'degraded';
+      }
       return {
-        ...this.mapHitToFindingItem(hit),
+        ...item,
         raw: hit._source,
+        availability,
       };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      this.logger.error(`Failed to get finding ${id}: ${error}`);
-      throw new InternalServerErrorException('Failed to retrieve finding');
+      this.throwUnavailable(`Failed to get finding ${id}`, error);
     }
   }
 
@@ -438,6 +708,7 @@ export class FindingsController {
       'workflow_name',
       'workflow_id',
       'run_id',
+      'scope_id',
       'component_id',
       'node_ref',
     ] as const;
@@ -445,27 +716,9 @@ export class FindingsController {
     const header = columns.join(',');
 
     const rows = items.map((item) =>
-      columns.map((col) => this.escapeCsvField(item[col] ?? '')).join(','),
+      columns.map((col) => escapeCsvCell(item[col] ?? '')).join(','),
     );
 
     return [header, ...rows].join('\r\n');
-  }
-
-  /**
-   * Escape a CSV field value per RFC 4180.
-   * Wraps in double quotes if the value contains commas, double quotes, or newlines.
-   */
-  private escapeCsvField(value: string): string {
-    const needsPrefix = /^[=+\-@\t\r]/.test(value);
-    const escaped = needsPrefix ? `'${value}` : value;
-    if (
-      escaped.includes(',') ||
-      escaped.includes('"') ||
-      escaped.includes('\n') ||
-      escaped.includes('\r')
-    ) {
-      return `"${escaped.replace(/"/g, '""')}"`;
-    }
-    return escaped;
   }
 }

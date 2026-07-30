@@ -124,6 +124,8 @@ services:
       - --node-id=0
       - --check=false
       - --advertise-kafka-addr=localhost:9092
+      - --set
+      - redpanda.log_retention_ms=604800000
     expose:
       - '9092'
       - '9644'

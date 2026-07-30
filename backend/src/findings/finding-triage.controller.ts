@@ -9,7 +9,14 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiExtraModels,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -21,8 +28,11 @@ import { TriageUpdateDto, TriageUpdateSchema } from './dto/triage-update.dto';
 import { BulkTriageDto, BulkTriageSchema } from './dto/bulk-triage.dto';
 import { TriageHistoryQueryDto, TriageHistoryQuerySchema } from './dto/triage-history.dto';
 import { FindingIdParamSchema } from '../analytics/dto/findings-detail.dto';
+import { presentTicketLink } from '../ticketing/ticket-link.presenter';
+import { TicketLinkResponseDto } from '../ticketing/dto/ticketing.dto';
 
 @ApiTags('findings')
+@ApiExtraModels(TicketLinkResponseDto)
 @Controller('findings')
 export class FindingTriageController {
   private readonly logger = new Logger(FindingTriageController.name);
@@ -35,6 +45,12 @@ export class FindingTriageController {
   @Patch(':id/triage')
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: 'Update triage state for a finding' })
+  @ApiParam({
+    name: 'id',
+    description: 'OpenSearch finding document identifier',
+    required: true,
+    schema: { type: 'string', minLength: 1, maxLength: 512 },
+  })
   async updateTriage(
     @CurrentAuth() auth: AuthContext | null,
     @Param(new ZodValidationPipe(FindingIdParamSchema)) params: { id: string },
@@ -62,6 +78,12 @@ export class FindingTriageController {
   @Get(':id/history')
   @Throttle({ default: { limit: 100, ttl: 60000 } })
   @ApiOperation({ summary: 'Get triage event history for a finding' })
+  @ApiParam({
+    name: 'id',
+    description: 'OpenSearch finding document identifier',
+    required: true,
+    schema: { type: 'string', minLength: 1, maxLength: 512 },
+  })
   async getHistory(
     @CurrentAuth() auth: AuthContext | null,
     @Param(new ZodValidationPipe(FindingIdParamSchema)) params: { id: string },
@@ -74,6 +96,18 @@ export class FindingTriageController {
   @Get(':id/ticket')
   @Throttle({ default: { limit: 100, ttl: 60000 } })
   @ApiOperation({ summary: 'Get linked ticket for a finding' })
+  @ApiParam({
+    name: 'id',
+    description: 'OpenSearch finding document identifier',
+    required: true,
+    schema: { type: 'string', minLength: 1, maxLength: 512 },
+  })
+  @ApiOkResponse({
+    schema: {
+      nullable: true,
+      allOf: [{ $ref: getSchemaPath(TicketLinkResponseDto) }],
+    },
+  })
   async getTicket(
     @CurrentAuth() auth: AuthContext | null,
     @Param(new ZodValidationPipe(FindingIdParamSchema)) params: { id: string },
@@ -84,20 +118,11 @@ export class FindingTriageController {
     if (!triage) {
       return null;
     }
-    const link = await this.ticketingService.getTicketLink(triage.id);
+    const link = await this.ticketingService.getTicketLink(organizationId, triage.id);
     if (!link) {
       return null;
     }
-    return {
-      id: link.id,
-      findingTriageId: link.findingTriageId,
-      provider: link.provider,
-      externalId: link.externalId,
-      externalUrl: link.externalUrl,
-      syncStatus: link.syncStatus,
-      lastSyncedAt: link.lastSyncedAt?.toISOString() ?? null,
-      createdAt: link.createdAt.toISOString(),
-    };
+    return presentTicketLink(link);
   }
 
   /**

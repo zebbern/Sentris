@@ -36,32 +36,35 @@ export class ApiKeysService {
     const { key: plainKey, id: keyId } = this.generateKeyWithId();
     const keyHash = await bcrypt.hash(plainKey, 10);
 
-    const [apiKey] = await this.db
-      .insert(apiKeys)
-      .values({
-        name: dto.name,
-        description: dto.description,
-        keyHash,
-        keyPrefix: KEY_PREFIX,
-        keyHint: keyId,
-        permissions: dto.permissions,
-        organizationId: dto.organizationId ?? auth.organizationId,
-        createdBy: auth.userId || 'system',
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
-        rateLimit: dto.rateLimit,
-        isActive: true,
-      })
-      .returning();
+    const apiKey = await this.db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(apiKeys)
+        .values({
+          name: dto.name,
+          description: dto.description,
+          keyHash,
+          keyPrefix: KEY_PREFIX,
+          keyHint: keyId,
+          permissions: dto.permissions,
+          organizationId: auth.organizationId!,
+          createdBy: auth.userId || 'system',
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+          rateLimit: dto.rateLimit,
+          isActive: true,
+        })
+        .returning();
 
-    this.auditLogService.record(auth, {
-      action: 'api_key.create',
-      resourceType: 'api_key',
-      resourceId: apiKey.id,
-      resourceName: apiKey.name,
-      metadata: {
-        isActive: apiKey.isActive,
-        expiresAt: apiKey.expiresAt?.toISOString() ?? null,
-      },
+      await this.auditLogService.recordDurableWithExecutor(tx, auth, {
+        action: 'api_key.create',
+        resourceType: 'api_key',
+        resourceId: created.id,
+        resourceName: created.name,
+        metadata: {
+          isActive: created.isActive,
+          expiresAt: created.expiresAt?.toISOString() ?? null,
+        },
+      });
+      return created;
     });
 
     return { apiKey, plainKey };
@@ -109,37 +112,39 @@ export class ApiKeysService {
       throw new NotFoundException('API key not found');
     }
 
-    const [apiKey] = await this.db
-      .update(apiKeys)
-      .set({
-        ...dto,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId)))
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [apiKey] = await tx
+        .update(apiKeys)
+        .set({
+          ...dto,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId!)))
+        .returning();
 
-    if (!apiKey) {
-      throw new NotFoundException('API key not found');
-    }
+      if (!apiKey) {
+        throw new NotFoundException('API key not found');
+      }
 
-    const action =
-      dto.isActive === false
-        ? 'api_key.revoke'
-        : dto.isActive === true
-          ? 'api_key.reactivate'
-          : 'api_key.update';
-    this.auditLogService.record(auth, {
-      action,
-      resourceType: 'api_key',
-      resourceId: apiKey.id,
-      resourceName: apiKey.name,
-      metadata: {
-        updatedFields: Object.keys(dto),
-        isActive: apiKey.isActive,
-      },
+      const action =
+        dto.isActive === false
+          ? 'api_key.revoke'
+          : dto.isActive === true
+            ? 'api_key.reactivate'
+            : 'api_key.update';
+      await this.auditLogService.recordDurableWithExecutor(tx, auth, {
+        action,
+        resourceType: 'api_key',
+        resourceId: apiKey.id,
+        resourceName: apiKey.name,
+        metadata: {
+          updatedFields: Object.keys(dto),
+          isActive: apiKey.isActive,
+        },
+      });
+
+      return apiKey;
     });
-
-    return apiKey;
   }
 
   async delete(auth: AuthContext, id: string) {
@@ -147,26 +152,28 @@ export class ApiKeysService {
       throw new NotFoundException('API key not found');
     }
 
-    const existing = await this.db
-      .select()
-      .from(apiKeys)
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId)))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
+    await this.db.transaction(async (tx) => {
+      const existing = await tx
+        .select()
+        .from(apiKeys)
+        .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId!)))
+        .limit(1)
+        .then((rows) => rows[0] ?? null);
 
-    const result = await this.db
-      .delete(apiKeys)
-      .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId)));
+      const result = await tx
+        .delete(apiKeys)
+        .where(and(eq(apiKeys.id, id), eq(apiKeys.organizationId, auth.organizationId!)));
 
-    if (result.rowCount === 0) {
-      throw new NotFoundException('API key not found');
-    }
+      if (result.rowCount === 0) {
+        throw new NotFoundException('API key not found');
+      }
 
-    this.auditLogService.record(auth, {
-      action: 'api_key.delete',
-      resourceType: 'api_key',
-      resourceId: id,
-      resourceName: existing?.name ?? null,
+      await this.auditLogService.recordDurableWithExecutor(tx, auth, {
+        action: 'api_key.delete',
+        resourceType: 'api_key',
+        resourceId: id,
+        resourceName: existing?.name ?? null,
+      });
     });
   }
 

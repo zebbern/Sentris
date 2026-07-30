@@ -21,7 +21,12 @@ export default tseslint.config(
         ...globals.es2024,
       },
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.scripts.json'],
+        project: [
+          './tsconfig.json',
+          './tsconfig.scripts.json',
+          './tsconfig.script-tests.json',
+          './tsconfig.findings-opensearch-smoke.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },

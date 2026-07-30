@@ -127,6 +127,47 @@ describe('JiraAdapter', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('treats a missing transition as success when the issue is already at the resulting status', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            transitions: [
+              {
+                id: '11',
+                name: 'Start work',
+                to: { id: '3', name: 'In Progress' },
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: '12345',
+            key: 'SEC-42',
+            fields: { status: { id: '5', name: 'Done' } },
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const result = await adapter.transitionIssue(
+        CLOUD_ID,
+        ACCESS_TOKEN,
+        'SEC-42',
+        'Resolve issue',
+        'Done',
+      );
+
+      expect(result).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(
+        fetchSpy.mock.calls.some((call: unknown[]) => (call[1] as RequestInit).method === 'POST'),
+      ).toBe(false);
+    });
+
     it('matches transition name case-insensitively', async () => {
       fetchSpy.mockResolvedValueOnce(
         new Response(
@@ -282,7 +323,153 @@ describe('JiraAdapter', () => {
 
       const [, init] = fetchSpy.mock.calls[0]! as [string, RequestInit];
       const body = JSON.parse(init.body as string);
+      expect(body.url).toBe('https://app.example.com/api/v1/ticketing/jira/webhook/secret123');
       expect(body.webhooks[0].events).toContain('jira:issue_updated');
+      expect(body.webhooks[0].url).toBeUndefined();
+    });
+  });
+
+  describe('listWebhooks', () => {
+    it('paginates registered webhooks within a fixed reconciliation bound', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            startAt: 0,
+            maxResults: 1,
+            total: 2,
+            isLast: false,
+            values: [
+              {
+                id: 42,
+                url: 'https://app.example.com/api/v1/ticketing/jira/webhook/secret123',
+                events: ['jira:issue_updated'],
+                jqlFilter: '*',
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            startAt: 1,
+            maxResults: 1,
+            total: 2,
+            isLast: true,
+            values: [
+              {
+                id: 43,
+                url: 'https://app.example.com/api/v1/ticketing/jira/webhook/secret123',
+                events: ['jira:issue_updated'],
+                jqlFilter: '*',
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const result = await adapter.listWebhooks(CLOUD_ID, ACCESS_TOKEN);
+
+      expect(result.map((webhook) => webhook.id)).toEqual(['42', '43']);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy.mock.calls[1]![0]).toContain('startAt=1');
+    });
+
+    it('continues when Jira says more pages exist without returning a total', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            startAt: 0,
+            maxResults: 1,
+            isLast: false,
+            values: [
+              {
+                id: 42,
+                url: 'https://app.example.com/api/v1/ticketing/jira/webhook/secret123',
+                events: ['jira:issue_updated'],
+                jqlFilter: '*',
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            startAt: 1,
+            maxResults: 1,
+            isLast: true,
+            values: [
+              {
+                id: 43,
+                url: 'https://app.example.com/api/v1/ticketing/jira/webhook/secret123',
+                events: ['jira:issue_updated'],
+                jqlFilter: '*',
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const result = await adapter.listWebhooks(CLOUD_ID, ACCESS_TOKEN);
+
+      expect(result.map((webhook) => webhook.id)).toEqual(['42', '43']);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(fetchSpy.mock.calls[1]![0]).toContain('startAt=1');
+    });
+
+    it('fails closed when Jira cannot be fully listed inside the reconciliation bound', async () => {
+      fetchSpy.mockImplementation(async () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              startAt: 0,
+              maxResults: 0,
+              total: 1,
+              isLast: false,
+              values: [],
+            }),
+            { status: 200 },
+          ),
+        ),
+      );
+
+      await expect(adapter.listWebhooks(CLOUD_ID, ACCESS_TOKEN)).rejects.toThrow(
+        'Unable to make bounded progress while listing Jira webhooks',
+      );
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('refreshWebhook', () => {
+    it('extends the exact webhook and returns Jira expiration time', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            expirationDate: '2026-08-28T12:00:00.000+0000',
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const expirationDate = await adapter.refreshWebhook(CLOUD_ID, ACCESS_TOKEN, '42');
+
+      expect(expirationDate).toBe('2026-08-28T12:00:00.000+0000');
+      const [, init] = fetchSpy.mock.calls[0]! as [string, RequestInit];
+      expect(init.method).toBe('PUT');
+      expect(JSON.parse(init.body as string)).toEqual({ webhookIds: [42] });
+    });
+
+    it('rejects a refresh response without a confirmed expiration date', async () => {
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 200 }));
+
+      await expect(adapter.refreshWebhook(CLOUD_ID, ACCESS_TOKEN, '42')).rejects.toThrow(
+        'did not return an expiration date',
+      );
     });
   });
 });

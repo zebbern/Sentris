@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/types';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -23,8 +23,6 @@ interface ListArtifactFilters {
 
 @Injectable()
 export class ArtifactsService {
-  private readonly logger = new Logger(ArtifactsService.name);
-
   constructor(
     private readonly repository: ArtifactsRepository,
     private readonly filesService: FilesService,
@@ -68,17 +66,19 @@ export class ArtifactsService {
 
   async downloadArtifact(auth: AuthContext | null, artifactId: string) {
     const artifact = await this.getArtifactRecord(auth, artifactId);
-    this.auditLogService.record(auth, {
+    const auditEvent = {
       action: 'artifact.download',
-      resourceType: 'artifact',
+      resourceType: 'artifact' as const,
       resourceId: artifact.id,
       resourceName: artifact.name,
       metadata: {
         fileId: artifact.fileId,
         workflowId: artifact.workflowId,
         runId: artifact.runId ?? null,
+        phase: 'requested',
       },
-    });
+    };
+    await this.auditLogService.recordDurable(auth, auditEvent);
     const download = await this.filesService.downloadFile(auth, artifact.fileId);
     return {
       artifact: this.toMetadata(artifact),
@@ -93,17 +93,19 @@ export class ArtifactsService {
     if (!artifact) {
       throw new NotFoundException(`Artifact ${artifactId} not found for run ${runId}`);
     }
-    this.auditLogService.record(auth, {
+    const auditEvent = {
       action: 'artifact.download',
-      resourceType: 'artifact',
+      resourceType: 'artifact' as const,
       resourceId: artifact.id,
       resourceName: artifact.name,
       metadata: {
         fileId: artifact.fileId,
         workflowId: artifact.workflowId,
         runId,
+        phase: 'requested',
       },
-    });
+    };
+    await this.auditLogService.recordDurable(auth, auditEvent);
     const download = await this.filesService.downloadFile(auth, artifact.fileId);
     return {
       artifact: this.toMetadata(artifact),
@@ -114,26 +116,7 @@ export class ArtifactsService {
 
   async deleteArtifact(auth: AuthContext | null, artifactId: string): Promise<void> {
     const artifact = await this.getArtifactRecord(auth, artifactId);
-    const organizationId = requireOrganizationId(auth);
-
-    // Delete the associated file first
-    try {
-      await this.filesService.deleteFile(auth, artifact.fileId);
-    } catch (error) {
-      // Log but don't fail if file is already deleted
-      this.logger.warn(
-        `Failed to delete file ${artifact.fileId} for artifact ${artifactId}:`,
-        error,
-      );
-    }
-
-    // Delete the artifact record
-    const deleted = await this.repository.delete(artifactId, { organizationId });
-    if (!deleted) {
-      throw new NotFoundException(`Artifact ${artifactId} not found`);
-    }
-
-    this.auditLogService.record(auth, {
+    await this.auditLogService.recordDurable(auth, {
       action: 'artifact.delete',
       resourceType: 'artifact',
       resourceId: artifactId,
@@ -142,8 +125,14 @@ export class ArtifactsService {
         fileId: artifact.fileId,
         workflowId: artifact.workflowId,
         runId: artifact.runId ?? null,
+        phase: 'requested',
       },
     });
+
+    // Deleting file metadata cascades the artifact row through the schema FK.
+    // FilesService treats an absent object as idempotent but preserves the
+    // database retry anchor when storage is genuinely unavailable.
+    await this.filesService.deleteFile(auth, artifact.fileId);
   }
 
   private toMetadata(record: ArtifactRecord): ArtifactMetadataDto {

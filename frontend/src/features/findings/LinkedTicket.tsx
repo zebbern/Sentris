@@ -37,6 +37,7 @@ const SYNC_STATUS_VARIANTS: Record<string, { className: string; label: string }>
   synced: { className: 'bg-green-600 hover:bg-green-600 text-white', label: 'Synced' },
   pending: { className: 'bg-yellow-500 hover:bg-yellow-500 text-white', label: 'Pending' },
   error: { className: 'bg-red-600 hover:bg-red-600 text-white', label: 'Error' },
+  unknown: { className: 'bg-amber-600 hover:bg-amber-600 text-white', label: 'Unknown' },
 };
 
 // ---------------------------------------------------------------------------
@@ -69,15 +70,21 @@ export function LinkedTicket({ findingId }: LinkedTicketProps) {
         Linked Ticket
       </label>
       <div className="flex items-center gap-2 flex-wrap">
-        <a
-          href={ticket.externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {ticket.externalId}
-          <ExternalLink className="h-3 w-3" />
-        </a>
+        {ticket.reconciliationRequired ? (
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+            Reconciliation required
+          </span>
+        ) : (
+          <a
+            href={ticket.externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            {ticket.externalId}
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
         <Badge variant="default" className={`text-xs ${syncVariant.className}`}>
           {syncVariant.label}
         </Badge>

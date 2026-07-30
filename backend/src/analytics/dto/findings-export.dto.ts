@@ -1,16 +1,13 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { FindingFilterSchema } from './findings-query.dto';
 
-export const FindingsExportQuerySchema = z.object({
-  severity: z.enum(['critical', 'high', 'medium', 'low', 'info']).optional(),
-  search: z.string().max(200).optional(),
+export const FindingsExportQuerySchema = FindingFilterSchema.extend({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   format: z.enum(['csv', 'json']).default('json'),
-  limit: z.coerce.number().int().min(1).max(10000).default(1000),
-  workflowId: z.string().max(200).optional(),
-  componentId: z.string().max(200).optional(),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
+  // No implicit result cap. Callers may set an explicit bounded limit; PIT
+  // pagination handles complete exports beyond OpenSearch's 10k result window.
+  limit: z.coerce.number().int().min(1).max(1_000_000).optional(),
 });
 
 export class FindingsExportQueryDto extends createZodDto(FindingsExportQuerySchema) {}

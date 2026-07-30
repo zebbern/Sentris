@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { SEVERITY_VALUES as SHARED_SEVERITY_VALUES } from '@sentris/shared';
 import { z } from 'zod';
 
 export const FINDING_TRIAGE_STATUSES = [
@@ -13,12 +14,12 @@ export const FINDING_TRIAGE_STATUSES = [
 
 export type FindingTriageStatus = (typeof FINDING_TRIAGE_STATUSES)[number];
 
-export const SEVERITY_VALUES = ['critical', 'high', 'medium', 'low', 'info'] as const;
+export const SEVERITY_VALUES = SHARED_SEVERITY_VALUES;
 
 export const TriageUpdateSchema = z
   .object({
     status: z.enum(FINDING_TRIAGE_STATUSES).optional(),
-    assigneeUserId: z.string().max(191).optional(),
+    assigneeUserId: z.string().min(1).max(191).nullable().optional(),
     severityOverride: z.enum(SEVERITY_VALUES).optional().nullable(),
     notes: z.string().max(10_000).optional().nullable(),
     comment: z.string().max(2_000).optional(),
@@ -47,6 +48,7 @@ export const TriageResponseSchema = z.object({
   slaDeadline: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  projectionVersion: z.number().int().nonnegative(),
 });
 
 export type TriageResponse = z.infer<typeof TriageResponseSchema>;

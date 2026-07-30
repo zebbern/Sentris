@@ -21,6 +21,8 @@ export type AgentStreamPart =
 export class AgentStreamRecorder {
   private sequence = 0;
   private activeTextId: string | null = null;
+  private pendingPublication = Promise.resolve();
+  private publicationError: unknown;
 
   constructor(
     private readonly context: ExecutionContext,
@@ -103,16 +105,24 @@ export class AgentStreamRecorder {
     const timestamp = new Date().toISOString();
     const sequence = ++this.sequence;
     const envelope: AgentTraceEvent = {
+      eventId: `${this.agentRunId}:${sequence}`,
       agentRunId: this.agentRunId,
       workflowRunId: this.context.runId,
+      workflowId: this.context.workflowId ?? null,
+      organizationId: this.context.organizationId ?? null,
       nodeRef: this.context.componentRef,
       sequence,
       timestamp,
       part,
     };
 
-    if (this.context.agentTracePublisher) {
-      void this.context.agentTracePublisher.publish(envelope);
+    const publisher = this.context.agentTracePublisher;
+    if (publisher) {
+      this.pendingPublication = this.pendingPublication
+        .then(() => Promise.resolve(publisher.publish(envelope)))
+        .catch((error: unknown) => {
+          this.publicationError ??= error;
+        });
       return;
     }
 
@@ -121,5 +131,31 @@ export class AgentStreamRecorder {
       message: `[AgentTraceFallback] ${part.type}`,
       data: envelope,
     });
+  }
+
+  async flush(): Promise<void> {
+    await this.pendingPublication;
+    if (this.publicationError !== undefined) {
+      throw this.publicationError;
+    }
+  }
+
+  async settleWithoutChangingExecution(): Promise<void> {
+    try {
+      await this.flush();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.context.logger.error(
+        `[AgentTrace] Idempotent Kafka delivery retries were exhausted: ${message}`,
+      );
+      this.context.emitProgress({
+        level: 'warn',
+        message: 'Agent replay stream delivery failed after Kafka retries were exhausted.',
+        data: {
+          agentRunId: this.agentRunId,
+          deliveryError: message,
+        },
+      });
+    }
   }
 }

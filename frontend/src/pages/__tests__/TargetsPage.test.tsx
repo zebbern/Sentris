@@ -173,6 +173,10 @@ describe('TargetsPage', () => {
     expect(screen.getByText('Contoso Ltd')).toBeInTheDocument();
     expect(screen.getByText('Fabrikam Inc')).toBeInTheDocument();
     expect(screen.getByText('2 domains · 1 repo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /run contoso ltd/i })).toHaveAttribute(
+      'href',
+      '/workflows?scopeId=scope-001&launch=1',
+    );
   });
 
   it('shows the empty state with "No targets yet" and an admin "New target" action', () => {
@@ -194,6 +198,17 @@ describe('TargetsPage', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Create target')).toBeInTheDocument();
+  });
+
+  it('associates every target editor label with its form control', () => {
+    setupStore();
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /New target/i })[0]!);
+
+    for (const accessibleName of ['Name', 'Description', 'Domains', 'Repos', 'IP ranges']) {
+      expect(screen.getByRole('textbox', { name: accessibleName })).toBeInTheDocument();
+    }
   });
 
   it('submitting the editor with a name calls create', async () => {

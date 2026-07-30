@@ -1,5 +1,7 @@
 import {
+  check,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -8,6 +10,8 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import type { JiraStatusMapping } from '@sentris/shared';
 
 import { findingTriageTable } from './finding-triage';
 
@@ -27,9 +31,11 @@ export interface EncryptedField {
 export interface TicketingConnectionConfig {
   projectKey: string;
   issueTypeId: string;
-  statusMapping: Record<string, string>;
+  statusMapping: JiraStatusMapping;
   autoCreateOnStatuses: string[];
 }
+
+export type JiraWebhookRegistrationStatus = 'unregistered' | 'pending' | 'registered';
 
 // ---------------------------------------------------------------------------
 // ticketing_connections
@@ -52,12 +58,20 @@ export const ticketingConnectionsTable = pgTable(
 
     // Connection-specific configuration
     config: jsonb('config')
-      .$type<TicketingConnectionConfig>()
+      .$type<TicketingConnectionConfig | null>()
       .notNull()
       .default({} as TicketingConnectionConfig),
 
-    // HMAC verification secret for inbound webhooks
+    // Unguessable callback-path credential; also verifies HMAC when Jira supplies a signature
     webhookSecret: varchar('webhook_secret', { length: 256 }),
+    webhookId: varchar('webhook_id', { length: 128 }),
+    webhookCloudId: varchar('webhook_cloud_id', { length: 128 }),
+    webhookRegistrationStatus: varchar('webhook_registration_status', { length: 16 })
+      .$type<JiraWebhookRegistrationStatus>()
+      .notNull()
+      .default('unregistered'),
+    webhookRegistrationVersion: integer('webhook_registration_version').notNull().default(0),
+    webhookRegisteredAt: timestamp('webhook_registered_at', { withTimezone: true }),
 
     createdBy: varchar('created_by', { length: 191 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -69,6 +83,14 @@ export const ticketingConnectionsTable = pgTable(
       table.provider,
     ),
     orgIdx: index('ticketing_connections_org_idx').on(table.organizationId),
+    webhookRegistrationStatusCheck: check(
+      'ticketing_connections_webhook_registration_status_check',
+      sql`${table.webhookRegistrationStatus} IN ('unregistered', 'pending', 'registered')`,
+    ),
+    webhookRegistrationVersionCheck: check(
+      'ticketing_connections_webhook_registration_version_check',
+      sql`${table.webhookRegistrationVersion} >= 0`,
+    ),
   }),
 );
 
@@ -99,6 +121,11 @@ export const ticketLinksTable = pgTable(
     ),
     orgProviderIdx: index('ticket_links_org_provider_idx').on(table.organizationId, table.provider),
     externalIdIdx: index('ticket_links_external_id_idx').on(table.externalId),
+    orgProviderExternalIdIdx: index('ticket_links_org_provider_external_id_idx').on(
+      table.organizationId,
+      table.provider,
+      table.externalId,
+    ),
   }),
 );
 

@@ -1,11 +1,12 @@
 import { spawn } from 'child_process';
-import { mkdtemp, rm, readFile, writeFile, access, constants } from 'fs/promises';
+import { randomUUID } from 'node:crypto';
+import { readFile, writeFile, access, constants } from 'fs/promises';
 
-import { tmpdir } from 'os';
-import { join } from 'path';
 import type { ExecutionContext, RunnerConfig, DockerRunnerConfig } from './types';
 import { createTerminalChunkEmitter } from './terminal';
 import { ContainerError, TimeoutError, ValidationError, ConfigurationError } from './errors';
+import { createDockerIoWorkspace } from './docker-io-workspace';
+import { createManagedDockerLabels, resolveDockerResourceScope } from './docker-resource-scope';
 
 /**
  * Strip ANSI escape codes from text.
@@ -25,6 +26,16 @@ const OUTPUT_FILENAME = 'result.json';
 type PtySpawn = (typeof import('node-pty'))['spawn'];
 let cachedPtySpawn: PtySpawn | null = null;
 let cachedDockerPath: string | null = null;
+
+function cancellationReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error ? signal.reason : new Error('Execution cancelled');
+}
+
+function throwIfCancelled(context: ExecutionContext): void {
+  if (context.signal?.aborted) {
+    throw cancellationReason(context.signal);
+  }
+}
 
 export async function resolveDockerPath(context?: ExecutionContext): Promise<string> {
   if (cachedDockerPath) return cachedDockerPath;
@@ -139,6 +150,7 @@ async function runDockerSetupCommand(
   context: ExecutionContext,
   timeoutSeconds: number,
 ): Promise<{ stdout: string; stderr: string }> {
+  throwIfCancelled(context);
   const dockerPath = await resolveDockerPath(context);
 
   return new Promise((resolve, reject) => {
@@ -149,7 +161,11 @@ async function runDockerSetupCommand(
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });
-
+    const onAbort = () => {
+      clearTimeout(timeout);
+      proc.kill();
+      reject(cancellationReason(context.signal!));
+    };
     const timeout = setTimeout(() => {
       proc.kill();
       reject(
@@ -160,6 +176,8 @@ async function runDockerSetupCommand(
         ),
       );
     }, timeoutSeconds * 1000);
+    context.signal?.addEventListener('abort', onAbort, { once: true });
+    if (context.signal?.aborted) onAbort();
 
     proc.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -171,6 +189,7 @@ async function runDockerSetupCommand(
 
     proc.on('error', (error) => {
       clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
       reject(
         new ContainerError(`Failed to run Docker setup command: ${error.message}`, {
           cause: error,
@@ -181,6 +200,11 @@ async function runDockerSetupCommand(
 
     proc.on('close', (code) => {
       clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
+      if (context.signal?.aborted) {
+        reject(cancellationReason(context.signal));
+        return;
+      }
       if (code !== 0) {
         reject(
           new ContainerError(`Docker setup command failed with exit code ${code}`, {
@@ -206,6 +230,7 @@ async function ensureDockerImageAvailable(
     await runDockerSetupCommand(inspectArgs, context, setupTimeoutSeconds);
     return;
   } catch {
+    throwIfCancelled(context);
     context.emitProgress(`Pulling Docker image: ${runner.image}`);
   }
 
@@ -218,6 +243,7 @@ async function ensureDockerImageAvailable(
   try {
     await runDockerSetupCommand(pullArgs, context, setupTimeoutSeconds);
   } catch (error) {
+    throwIfCancelled(context);
     throw new ContainerError(`Failed to pull Docker image: ${runner.image}`, {
       cause: error instanceof Error ? error : undefined,
       details: { image: runner.image },
@@ -246,6 +272,7 @@ async function runComponentInDocker<I, O>(
   params: I,
   context: ExecutionContext,
 ): Promise<O> {
+  throwIfCancelled(context);
   const {
     image,
     command,
@@ -261,19 +288,31 @@ async function runComponentInDocker<I, O>(
   const memoryLimit = runner.memoryLimit ?? '512m';
   const cpuLimit = runner.cpuLimit ?? '1';
   const pidsLimit = runner.pidsLimit ?? 256;
+  const resourceScope = resolveDockerResourceScope();
+  const effectiveContainerName =
+    containerName ?? `sentris-component-${randomUUID().replaceAll('-', '')}`;
 
   context.logger.info(`[Docker] Running ${image} with command: ${formatArgs(command)}`);
   context.emitProgress(`Starting Docker container: ${image}`);
 
-  // Create temp directory for output and input
-  const outputDir = await mkdtemp(join(tmpdir(), 'sentris-run-'));
-  const hostOutputPath = join(outputDir, OUTPUT_FILENAME);
-  const hostInputPath = join(outputDir, 'input.json');
+  // A local daemon can mount the worker's OS temp directory directly. The
+  // production DIND topology configures an identical path backed by an outer
+  // named volume mounted into both worker and daemon, so the inner container
+  // never depends on a worker-host-only path.
+  const ioWorkspace = await createDockerIoWorkspace({
+    runId: context.runId,
+    sharedRoot: process.env.SENTRIS_DOCKER_SHARED_IO_ROOT,
+    resourceScope,
+  });
+  const outputDir = ioWorkspace.mountSource;
+  const hostOutputPath = ioWorkspace.outputPath;
+  const hostInputPath = ioWorkspace.inputPath;
 
   try {
     // Write inputs to file instead of passing via env or stdin
     await writeFile(hostInputPath, JSON.stringify(params));
     await ensureDockerImageAvailable(runner, context);
+    throwIfCancelled(context);
 
     const dockerArgs = [
       'run',
@@ -287,18 +326,19 @@ async function runComponentInDocker<I, O>(
       cpuLimit,
       '--pids-limit',
       String(pidsLimit),
-      '--label',
-      `sentris.runId=${context.runId}`,
+      ...Object.entries(createManagedDockerLabels(context.runId, resourceScope)).flatMap(
+        ([key, value]) => ['--label', `${key}=${value}`],
+      ),
       '--label',
       `sentris.nodeRef=${context.componentRef}`,
+      '--label',
+      `sentris.ioResource=${ioWorkspace.resourceId}`,
+      '--name',
+      effectiveContainerName,
       // Mount the directory containing both input and output
       '-v',
       `${outputDir}:${CONTAINER_OUTPUT_PATH}`,
     ];
-
-    if (containerName) {
-      dockerArgs.push('--name', containerName);
-    }
 
     if (platform && platform.trim().length > 0) {
       dockerArgs.push('--platform', platform);
@@ -314,7 +354,10 @@ async function runComponentInDocker<I, O>(
 
     if (runner.ports) {
       for (const [hostPort, containerPort] of Object.entries(runner.ports)) {
-        dockerArgs.push('-p', `${hostPort}:${containerPort}`);
+        dockerArgs.push(
+          '-p',
+          hostPort === 'auto' ? String(containerPort) : `${hostPort}:${containerPort}`,
+        );
       }
     }
 
@@ -353,6 +396,7 @@ async function runComponentInDocker<I, O>(
         runner.stdinJson,
         true,
         spawnEnv,
+        effectiveContainerName,
       );
 
       // In detached mode, we return the container ID as part of a specialized output
@@ -376,6 +420,7 @@ async function runComponentInDocker<I, O>(
         context,
         timeoutSeconds,
         spawnEnv,
+        effectiveContainerName,
       );
     } else {
       capturedStdout = await runDockerWithStandardIO(
@@ -386,14 +431,14 @@ async function runComponentInDocker<I, O>(
         runner.stdinJson,
         false,
         spawnEnv,
+        effectiveContainerName,
       );
     }
 
     // Read output from file (with stdout fallback for legacy components)
     return await readOutputFromFile<O>(hostOutputPath, capturedStdout, context);
   } finally {
-    // Cleanup temp directory
-    await rm(outputDir, { recursive: true, force: true }).catch((err) => {
+    await ioWorkspace.cleanup().catch((err) => {
       context.logger.warn(`[Docker] Failed to cleanup temp directory ${outputDir}: ${err.message}`);
     });
   }
@@ -471,15 +516,39 @@ async function runDockerWithStandardIO<I, O>(
   stdinJson?: boolean,
   detached?: boolean,
   spawnEnv: NodeJS.ProcessEnv = process.env,
+  containerName?: string,
 ): Promise<string> {
+  throwIfCancelled(context);
   const dockerPath = await resolveDockerPath(context);
   return new Promise<string>((resolve, reject) => {
     const stdoutEmitter = createTerminalChunkEmitter(context, 'stdout');
     const stderrEmitter = createTerminalChunkEmitter(context, 'stderr');
-
-    const timeout = setTimeout(() => {
+    let settled = false;
+    const proc = spawn(dockerPath, dockerArgs, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: spawnEnv,
+    });
+    const cleanupContainer = async () => {
+      if (!containerName) return;
+      await removeDockerContainerAfterInterrupt(containerName, context).catch((error) => {
+        context.logger.warn(
+          `[Docker] Failed to remove cancelled container ${containerName}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+    };
+    const rejectAfterCleanup = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
       proc.kill();
-      reject(
+      void cleanupContainer().finally(() => reject(error));
+    };
+    const onAbort = () => rejectAfterCleanup(cancellationReason(context.signal!));
+    const timeout = setTimeout(() => {
+      rejectAfterCleanup(
         new TimeoutError(
           `Docker container timed out after ${timeoutSeconds}s`,
           timeoutSeconds * 1000,
@@ -489,11 +558,8 @@ async function runDockerWithStandardIO<I, O>(
         ),
       );
     }, timeoutSeconds * 1000);
-
-    const proc = spawn(dockerPath, dockerArgs, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: spawnEnv,
-    });
+    context.signal?.addEventListener('abort', onAbort, { once: true });
+    if (context.signal?.aborted) onAbort();
 
     let stdout = '';
     let stderr = '';
@@ -550,7 +616,10 @@ async function runDockerWithStandardIO<I, O>(
     });
 
     proc.on('error', (error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
       context.logger.error(`[Docker] Failed to start: ${error.message}`);
       reject(
         new ContainerError(`Failed to start Docker container: ${error.message}`, {
@@ -561,7 +630,10 @@ async function runDockerWithStandardIO<I, O>(
     });
 
     proc.on('close', (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
 
       if (code !== 0) {
         context.logger.error(`[Docker] Exited with code ${code}`);
@@ -596,9 +668,7 @@ async function runDockerWithStandardIO<I, O>(
         proc.stdin.write(input);
         proc.stdin.end();
       } catch (e) {
-        clearTimeout(timeout);
-        proc.kill();
-        reject(
+        rejectAfterCleanup(
           new ValidationError(`Failed to write input to Docker container: ${e}`, {
             cause: e as Error,
             details: { inputType: typeof params },
@@ -612,6 +682,44 @@ async function runDockerWithStandardIO<I, O>(
   });
 }
 
+async function runDockerCleanupCommand(args: string[], context: ExecutionContext): Promise<void> {
+  const dockerPath = await resolveDockerPath(context);
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(dockerPath, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    });
+    let stderr = '';
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Docker cleanup exited with code ${code}: ${stderr}`));
+    });
+  });
+}
+
+async function removeDockerContainerAfterInterrupt(
+  containerName: string,
+  context: ExecutionContext,
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await runDockerCleanupCommand(['rm', '-f', containerName], context);
+      return;
+    } catch (error: unknown) {
+      lastError = error;
+      if (attempt < 4) {
+        await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Run Docker container with PTY (pseudo-terminal).
  * Used when terminal streaming is enabled for interactive output.
@@ -623,13 +731,24 @@ async function runDockerWithPty<I, O>(
   context: ExecutionContext,
   timeoutSeconds: number,
   spawnEnv: NodeJS.ProcessEnv = process.env,
+  containerName?: string,
 ): Promise<string> {
+  throwIfCancelled(context);
   const spawnPty = await loadPtySpawn();
   if (!spawnPty) {
     context.logger.warn('[Docker][PTY] node-pty unavailable; falling back to standard IO');
     // Remove -t flag before falling back to standard IO (stdin is not a TTY)
     const argsWithoutTty = dockerArgs.filter((arg) => arg !== '-t');
-    return runDockerWithStandardIO(argsWithoutTty, params, context, timeoutSeconds, undefined, false, spawnEnv);
+    return runDockerWithStandardIO(
+      argsWithoutTty,
+      params,
+      context,
+      timeoutSeconds,
+      undefined,
+      false,
+      spawnEnv,
+      containerName,
+    );
   }
 
   const dockerPath = await resolveDockerPath(context);
@@ -684,6 +803,7 @@ async function runDockerWithPty<I, O>(
           undefined,
           false,
           spawnEnv,
+          containerName,
         ),
       );
       return;
@@ -691,6 +811,7 @@ async function runDockerWithPty<I, O>(
 
     const timeout = setTimeout(() => {
       ptyProcess.kill();
+      if (containerName) void removeDockerContainerAfterInterrupt(containerName, context);
       reject(
         new TimeoutError(
           `Docker container timed out after ${timeoutSeconds}s`,
@@ -701,6 +822,20 @@ async function runDockerWithPty<I, O>(
         ),
       );
     }, timeoutSeconds * 1000);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      ptyProcess.kill();
+      const reason = cancellationReason(context.signal!);
+      if (containerName) {
+        void removeDockerContainerAfterInterrupt(containerName, context).finally(() =>
+          reject(reason),
+        );
+      } else {
+        reject(reason);
+      }
+    };
+    context.signal?.addEventListener('abort', onAbort, { once: true });
+    if (context.signal?.aborted) onAbort();
 
     // NEVER write JSON to stdin in PTY mode - it pollutes the terminal output
     // Components should use environment variables or command-line arguments instead
@@ -712,6 +847,8 @@ async function runDockerWithPty<I, O>(
 
     ptyProcess.onExit(({ exitCode }) => {
       clearTimeout(timeout);
+      context.signal?.removeEventListener('abort', onAbort);
+      if (context.signal?.aborted) return;
       if (exitCode !== 0) {
         context.logger.error(`[Docker][PTY] Exited with code ${exitCode}`);
 

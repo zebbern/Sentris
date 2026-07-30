@@ -47,3 +47,37 @@ export interface Asset {
   createdAt: string;
   updatedAt: string;
 }
+
+export type AssetObservationStatus = 'observed' | 'not-observed' | 'not-scanned';
+export type AssetComparisonChange = 'new' | 'unchanged' | 'missing';
+
+export interface AssetRunComparisonItem {
+  assetType: AssetType;
+  assetValue: string;
+  sourceComponentIds: string[];
+  baselineObserved: boolean;
+  currentObserved: boolean;
+  observationStatus: AssetObservationStatus;
+  change: AssetComparisonChange;
+}
+
+export interface AssetRunComparison {
+  scopeId: string;
+  workflowId: string;
+  baselineRunId: string;
+  currentRunId: string;
+  baselineCoverage: {
+    completedComponents: string[];
+    failedComponents: string[];
+  };
+  currentCoverage: {
+    completedComponents: string[];
+    failedComponents: string[];
+  };
+  summary: {
+    observed: number;
+    notObserved: number;
+    notScanned: number;
+  };
+  items: AssetRunComparisonItem[];
+}

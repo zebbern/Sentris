@@ -20,6 +20,7 @@ export const AuditLogEntrySchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable(),
   ip: z.string().nullable(),
   userAgent: z.string().nullable(),
+  correlationId: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 

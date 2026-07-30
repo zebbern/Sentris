@@ -15,7 +15,14 @@
         "groups": [
           {
             "group": "Getting Started",
-            "pages": ["index", "quickstart", "installation", "command-reference", "user-guide"]
+            "pages": [
+              "index",
+              "quickstart",
+              "installation",
+              "self-hosting",
+              "command-reference",
+              "user-guide"
+            ]
           },
           {
             "group": "Architecture",

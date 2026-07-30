@@ -17,6 +17,7 @@ export const componentsApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/components/${id}/resolve-ports`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         ...headers,
         'Content-Type': 'application/json',

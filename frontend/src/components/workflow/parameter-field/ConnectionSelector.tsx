@@ -5,7 +5,6 @@ import { queryKeys } from '@/lib/queryKeys';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/logger';
 import { useIntegrationConnections } from '@/hooks/queries/useIntegrationQueries';
-import { getCurrentUserId } from '@/lib/currentUser';
 import { env } from '@/config/env';
 
 interface ConnectionSelectorProps {
@@ -32,12 +31,11 @@ export function ConnectionSelector({
   const queryClient = useQueryClient();
   const autoSelectedConnectionRef = useRef(false);
 
-  const currentUserId = useMemo(() => getCurrentUserId(), []);
   const {
     data: integrationConnections = [],
     isLoading: integrationLoading,
     error: integrationQueryError,
-  } = useIntegrationConnections(currentUserId);
+  } = useIntegrationConnections();
   const integrationError = integrationQueryError?.message ?? null;
 
   const githubConnections = useMemo(

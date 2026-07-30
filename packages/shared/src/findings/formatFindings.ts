@@ -1,13 +1,7 @@
 import type { Finding, FindingSeverity } from './normalizeFindings.js';
+import { escapeCsvCell } from '../csv.js';
 
 const SEVERITY_LABELS: FindingSeverity[] = ['critical', 'high', 'medium', 'low', 'info'];
-
-function escapeCSV(value: string): string {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
 
 export function severityCounts(findings: Finding[]): Record<FindingSeverity, number> {
   const counts: Record<FindingSeverity, number> = {
@@ -27,7 +21,7 @@ export function formatFindingsCsv(findings: Finding[]): string {
   const header = 'Severity,Type,Finding,Source Node,Source Component';
   const rows = findings.map((finding) =>
     [finding.severity, finding.type, finding.finding, finding.sourceNode, finding.sourceComponent]
-      .map(escapeCSV)
+      .map(escapeCsvCell)
       .join(','),
   );
   return [header, ...rows].join('\n');
@@ -47,7 +41,8 @@ export function formatFindingsMarkdown(findings: Finding[], runId: string | null
     '| Severity | Count |',
     '|----------|-------|',
     ...SEVERITY_LABELS.map(
-      (severity) => `| ${severity.charAt(0).toUpperCase() + severity.slice(1)} | ${counts[severity]} |`,
+      (severity) =>
+        `| ${severity.charAt(0).toUpperCase() + severity.slice(1)} | ${counts[severity]} |`,
     ),
     '',
   ];

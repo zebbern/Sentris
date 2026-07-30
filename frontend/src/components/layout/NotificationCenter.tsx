@@ -72,12 +72,16 @@ export function NotificationPanelContent({ onClose }: NotificationPanelContentPr
         ) : (
           <ul className="list-none divide-y">
             {notifications.map((notification) => (
-              <li key={notification.id}>
+              <li
+                key={notification.id}
+                className={cn(
+                  'flex w-full items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50',
+                  !notification.read && 'bg-muted/30',
+                )}
+              >
                 <button
-                  className={cn(
-                    'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50',
-                    !notification.read && 'bg-muted/30',
-                  )}
+                  type="button"
+                  className="flex min-w-0 flex-1 items-start gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="mt-0.5 flex-shrink-0">
@@ -119,32 +123,27 @@ export function NotificationPanelContent({ onClose }: NotificationPanelContentPr
                       })}
                     </p>
                   </div>
-
-                  <div className="flex flex-shrink-0 items-center gap-1">
-                    {!notification.read && (
-                      <button
-                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markRead(notification.id);
-                        }}
-                        aria-label="Mark as read"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <button
-                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismiss(notification.id);
-                      }}
-                      aria-label="Dismiss notification"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
                 </button>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  {!notification.read && (
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      onClick={() => markRead(notification.id)}
+                      aria-label="Mark as read"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={() => dismiss(notification.id)}
+                    aria-label="Dismiss notification"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

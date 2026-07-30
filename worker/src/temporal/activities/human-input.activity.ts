@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ITraceService } from '@sentris/component-sdk';
@@ -35,7 +35,7 @@ export interface CreateHumanInputRequestResult {
 // Service instances will be injected at runtime
 let db: NodePgDatabase<typeof schema> | undefined;
 let trace: ITraceService | undefined;
-let baseUrl = 'http://localhost:3211';
+let publicBaseUrl = 'http://localhost:3211';
 
 /**
  * Initialize the human input activity with database connection and trace service
@@ -43,12 +43,12 @@ let baseUrl = 'http://localhost:3211';
 export function initializeHumanInputActivity(options: {
   database: NodePgDatabase<typeof schema>;
   trace?: ITraceService;
-  baseUrl?: string;
+  publicBaseUrl?: string;
 }) {
   db = options.database;
   trace = options.trace;
-  if (options.baseUrl) {
-    baseUrl = options.baseUrl;
+  if (options.publicBaseUrl) {
+    publicBaseUrl = options.publicBaseUrl.replace(/\/+$/, '');
   }
 }
 
@@ -103,27 +103,41 @@ export async function createHumanInputRequestActivity(
   );
 
   // Emit AWAITING_INPUT trace event so the UI shows the node as awaiting input
-  trace?.record({
-    type: 'AWAITING_INPUT',
-    runId: input.runId,
-    nodeRef: input.nodeRef,
-    timestamp: new Date().toISOString(),
-    level: 'info',
-    data: {
-      requestId,
-      inputType: input.inputType,
-      title: input.title,
-      description: input.description,
-      timeoutAt: timeoutAt?.toISOString(),
-    },
-    context: {
+  const eventId = `trace:${input.runId}:human-input:${requestId}`;
+  const sequence =
+    (createHash('sha256').update(eventId).digest().readUInt32BE(0) % 2_147_483_646) + 1;
+  try {
+    const publication = trace?.record({
+      type: 'AWAITING_INPUT',
       runId: input.runId,
-      componentRef: input.nodeRef,
-    },
-  });
+      workflowId: input.workflowId,
+      organizationId: input.organizationId ?? null,
+      eventId,
+      sequence,
+      nodeRef: input.nodeRef,
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      data: {
+        requestId,
+        inputType: input.inputType,
+        title: input.title,
+        description: input.description,
+        timeoutAt: timeoutAt?.toISOString(),
+      },
+      context: {
+        runId: input.runId,
+        componentRef: input.nodeRef,
+      },
+    });
+    void Promise.resolve(publication).catch((error: unknown) => {
+      console.error(`[HumanInputActivity] Failed to publish trace event ${eventId}`, error);
+    });
+  } catch (error: unknown) {
+    console.error(`[HumanInputActivity] Failed to publish trace event ${eventId}`, error);
+  }
 
   // Generate public URL for resolving
-  const resolveUrl = `${baseUrl}/api/v1/human-inputs/resolve/${resolveToken}`;
+  const resolveUrl = `${publicBaseUrl}/api/v1/human-inputs/resolve/${resolveToken}`;
 
   return {
     requestId,

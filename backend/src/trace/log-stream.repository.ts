@@ -4,6 +4,18 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { workflowLogStreamsTable, type WorkflowLogStreamRecord } from '../database/schema';
 import { DRIZZLE_TOKEN } from '../database/database.module';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
+
+export interface LogStreamMetadataInput {
+  runId: string;
+  nodeRef: string;
+  stream: 'stdout' | 'stderr' | 'console';
+  labels: Record<string, string>;
+  firstTimestamp: Date;
+  lastTimestamp: Date;
+  lineCount: number;
+  organizationId?: string | null;
+}
 
 @Injectable()
 export class LogStreamRepository {
@@ -41,16 +53,14 @@ export class LogStreamRepository {
       .orderBy(workflowLogStreamsTable.firstTimestamp);
   }
 
-  async upsertMetadata(input: {
-    runId: string;
-    nodeRef: string;
-    stream: 'stdout' | 'stderr' | 'console';
-    labels: Record<string, string>;
-    firstTimestamp: Date;
-    lastTimestamp: Date;
-    lineCount: number;
-    organizationId?: string | null;
-  }): Promise<void> {
+  async upsertMetadata(input: LogStreamMetadataInput): Promise<void> {
+    await this.upsertMetadataWithExecutor(this.db, input);
+  }
+
+  async upsertMetadataWithExecutor(
+    executor: OutboxExecutor,
+    input: LogStreamMetadataInput,
+  ): Promise<void> {
     const values = {
       runId: input.runId,
       nodeRef: input.nodeRef,
@@ -63,7 +73,7 @@ export class LogStreamRepository {
       updatedAt: new Date(),
     };
 
-    await this.db
+    await executor
       .insert(workflowLogStreamsTable)
       .values(values)
       .onConflictDoUpdate({

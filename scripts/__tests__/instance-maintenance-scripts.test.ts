@@ -29,7 +29,7 @@ describe('instance maintenance scripts', () => {
     expect(devRecipe).not.toContain('INST="$(tr -d');
   });
 
-  it('routes just db-reset through the active instance reset script', () => {
+  it('routes just db-reset through the cross-platform package command', () => {
     const source = readFileSync(join(root, 'justfile'), 'utf8');
     const dbResetStart = source.indexOf('db-reset:');
     const dbResetEnd = source.indexOf('# Build production images without starting');
@@ -39,8 +39,9 @@ describe('instance maintenance scripts', () => {
 
     const dbResetRecipe = source.slice(dbResetStart, dbResetEnd);
 
-    expect(dbResetRecipe).toContain('INST="$(./scripts/active-instance.sh get)"');
-    expect(dbResetRecipe).toContain('./scripts/db-reset-instance.sh "$INST"');
+    expect(dbResetRecipe).toContain('bun run db:reset');
+    expect(dbResetRecipe).not.toContain('#!/usr/bin/env bash');
+    expect(dbResetRecipe).not.toContain('./scripts/db-reset-instance.sh');
     expect(dbResetRecipe).not.toContain('DROP DATABASE IF EXISTS sentris;');
     expect(dbResetRecipe).not.toContain('CREATE DATABASE sentris;');
   });
@@ -55,14 +56,13 @@ describe('instance maintenance scripts', () => {
     expect(source).not.toContain('local instance="${1:-0}"');
   });
 
-  it('keeps instance reset aligned with the current shared infra containers', () => {
+  it('keeps the legacy shell entrypoint as a thin delegate to the cross-platform reset', () => {
     const source = readFileSync(join(root, 'scripts', 'db-reset-instance.sh'), 'utf8');
 
-    expect(source).not.toContain('sentris-infra');
-    expect(source).not.toContain('docker compose');
-    expect(source).toContain('validate_instance "$INSTANCE"');
-    expect(source).toContain('docker ps --filter "name=sentris-postgres"');
-    expect(source).toContain('docker exec sentris-postgres');
+    expect(source).toContain('scripts/db-reset-instance.ts');
+    expect(source).not.toContain('docker ps');
+    expect(source).not.toContain('docker exec');
+    expect(source).not.toContain('psql');
   });
 
   it('keeps instance clean aligned with fixed infra container names', () => {

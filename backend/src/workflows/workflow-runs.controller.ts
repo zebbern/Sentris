@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -8,13 +8,13 @@ import {
   TemporalRunQueryDto,
   TemporalRunQuerySchema,
 } from './dto/workflow-graph.dto';
+import {
+  CancelWorkflowRunResponseDto,
+  WorkflowRunResultResponseDto,
+} from './dto/workflow-run-responses.dto';
 import { WorkflowRunService } from './workflow-run.service';
-import { TerminalArchiveService } from './terminal-archive.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
-import { TERMINAL_STATUSES } from '@sentris/shared';
-
-const TERMINAL_COMPLETION_STATUSES = new Set(TERMINAL_STATUSES);
 
 const runConfigSchema = {
   type: 'object',
@@ -34,12 +34,7 @@ const runConfigSchema = {
 @ApiTags('workflows')
 @Controller('workflows')
 export class WorkflowRunsController {
-  private readonly logger = new Logger(WorkflowRunsController.name);
-
-  constructor(
-    private readonly workflowRunService: WorkflowRunService,
-    private readonly terminalArchiveService: TerminalArchiveService,
-  ) {}
+  constructor(private readonly workflowRunService: WorkflowRunService) {}
 
   @Get('/runs')
   @ApiOperation({ summary: 'List workflow runs' })
@@ -219,19 +214,14 @@ export class WorkflowRunsController {
     @Query(new ZodValidationPipe(TemporalRunQuerySchema)) query: TemporalRunQueryDto,
     @CurrentAuth() auth: AuthContext | null,
   ) {
-    const result = await this.workflowRunService.getRunStatus(runId, query.temporalRunId, auth);
-    if (TERMINAL_COMPLETION_STATUSES.has(result.status)) {
-      this.terminalArchiveService.archiveRun(auth, runId).catch((error) => {
-        this.logger.warn(`Failed to archive terminal after status fetch for run ${runId}`, error);
-      });
-    }
-    return result;
+    return this.workflowRunService.getRunStatus(runId, query.temporalRunId, auth);
   }
 
   @Get('/runs/:runId/result')
   @ApiOperation({ summary: 'Get workflow run result' })
   @ApiOkResponse({
     description: 'Resolved workflow result payload',
+    type: WorkflowRunResultResponseDto,
   })
   async result(
     @Param('runId') runId: string,
@@ -255,7 +245,8 @@ export class WorkflowRunsController {
   @Post('/runs/:runId/cancel')
   @ApiOperation({ summary: 'Cancel a workflow run' })
   @ApiOkResponse({
-    description: 'Cancels a running workflow execution',
+    description: 'Cancellation request accepted by Temporal',
+    type: CancelWorkflowRunResponseDto,
   })
   async cancel(
     @Param('runId') runId: string,

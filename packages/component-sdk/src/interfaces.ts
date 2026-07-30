@@ -5,6 +5,14 @@
 
 export interface IFileStorageService {
   /**
+   * Bind this storage service to one organization for all subsequent resource
+   * operations. `null` is the trusted-local resource namespace, not a
+   * wildcard for every organization. A bound service may only be rebound to
+   * the same organization; rebinding to another scope must fail.
+   */
+  forOrganization(organizationId: string | null): IFileStorageService;
+
+  /**
    * Download a file by its unique identifier
    * @param fileId UUID of the file to download
    * @returns File buffer and metadata
@@ -39,15 +47,18 @@ export interface IFileStorageService {
    * @param buffer File content
    * @param mimeType MIME type of the file
    */
-  uploadFile(
-    fileId: string,
-    fileName: string,
-    buffer: Buffer,
-    mimeType: string,
-  ): Promise<void>;
+  uploadFile(fileId: string, fileName: string, buffer: Buffer, mimeType: string): Promise<void>;
 }
 
 export interface ISecretsService {
+  /**
+   * Bind this secret service to one organization for all subsequent resource
+   * operations. `null` is the trusted-local resource namespace, not a
+   * wildcard for every organization. A bound service may only be rebound to
+   * the same organization; rebinding to another scope must fail.
+   */
+  forOrganization(organizationId: string | null): ISecretsService;
+
   /**
    * Retrieve a secret value by key
    * @param key Secret identifier (typically the secret ID)
@@ -116,7 +127,7 @@ export interface ITraceService {
    * Record a trace event
    * @param event Trace event data
    */
-  record(event: TraceEvent): void;
+  record(event: TraceEvent): Promise<void> | void;
 }
 
 export type TraceEventLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -165,6 +176,10 @@ export interface TraceEventData {
 }
 
 export interface TraceEvent {
+  /** Stable logical identity used to deduplicate publication retries. */
+  eventId?: string;
+  /** Stable producer-side ordering hint. The backend assigns the canonical run cursor. */
+  sequence?: number;
   type:
     | 'NODE_STARTED'
     | 'NODE_COMPLETED'
@@ -176,17 +191,21 @@ export interface TraceEvent {
     | 'HTTP_RESPONSE_RECEIVED'
     | 'HTTP_REQUEST_ERROR';
   runId: string;
+  workflowId?: string | null;
+  organizationId?: string | null;
   nodeRef: string;
   timestamp: string;
   level?: TraceEventLevel;
   message?: string;
-  error?: string | {
-    message: string;
-    type?: string;
-    stack?: string;
-    details?: Record<string, unknown>;
-    fieldErrors?: Record<string, string[]>;
-  };
+  error?:
+    | string
+    | {
+        message: string;
+        type?: string;
+        stack?: string;
+        details?: Record<string, unknown>;
+        fieldErrors?: Record<string, string[]>;
+      };
   outputSummary?: unknown;
   data?: TraceEventData;
   context?: ExecutionContextMetadata;
@@ -220,6 +239,7 @@ export interface NodeIOStartEvent {
 export interface NodeIOCompletionEvent {
   runId: string;
   nodeRef: string;
+  organizationId?: string | null;
   componentId?: string;
   outputs: Record<string, unknown>;
   status: 'completed' | 'failed' | 'skipped';

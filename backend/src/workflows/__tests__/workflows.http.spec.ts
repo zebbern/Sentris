@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import { WorkflowRunStatusSchema, TraceStreamEnvelopeSchema } from '@sentris/shared';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 
 import { WorkflowRunsController } from '../workflow-runs.controller';
 import { WorkflowRunObservabilityController } from '../workflow-run-observability.controller';
@@ -83,10 +84,7 @@ describe('WorkflowsController contract coverage', () => {
   } as const;
 
   beforeEach(() => {
-    runsController = new WorkflowRunsController(
-      workflowService as any,
-      { archiveRun: vi.fn() } as any,
-    );
+    runsController = new WorkflowRunsController(workflowService as any);
     observabilityController = new WorkflowRunObservabilityController(
       traceService as any,
       workflowService as any,
@@ -109,6 +107,137 @@ describe('WorkflowsController contract coverage', () => {
     expect(workflowService.getRunStatus).toHaveBeenCalledWith(
       'sentris-run-123',
       undefined,
+      authContext,
+    );
+  });
+
+  it('publishes exact OpenAPI contracts for run result and cancellation responses', () => {
+    const resultResponses = Reflect.getMetadata(
+      DECORATORS.API_RESPONSE,
+      WorkflowRunsController.prototype.result,
+    );
+    const cancelResponses = Reflect.getMetadata(
+      DECORATORS.API_RESPONSE,
+      WorkflowRunsController.prototype.cancel,
+    );
+
+    expect(resultResponses?.[200]?.type?.name).toBe('WorkflowRunResultResponseDto');
+    expect(cancelResponses?.[200]?.type?.name).toBe('CancelWorkflowRunResponseDto');
+
+    const resultSchema = resultResponses?.[200]?.type?.schema;
+    const cancelSchema = cancelResponses?.[200]?.type?.schema;
+    expect(resultSchema).toBeDefined();
+    expect(cancelSchema).toBeDefined();
+
+    expect(
+      resultSchema.parse({
+        runId: 'sentris-run-123',
+        result: { success: true, outputs: {} },
+      }),
+    ).toBeDefined();
+    for (const status of ['FAILED', 'CANCELLED', 'TIMED_OUT', 'TERMINATED']) {
+      expect(
+        resultSchema.parse({
+          runId: 'sentris-run-123',
+          result: { status, result: null },
+        }),
+      ).toBeDefined();
+    }
+    expect(() =>
+      resultSchema.parse({
+        runId: 'sentris-run-123',
+        result: { status: 'FAILED', result: { stale: true } },
+      }),
+    ).toThrow();
+    expect(() =>
+      resultSchema.parse({
+        runId: 'sentris-run-123',
+        result: { status: 'COMPLETED', result: { success: true, outputs: {} } },
+      }),
+    ).toThrow();
+    expect(() =>
+      resultSchema.parse({
+        runId: 'sentris-run-123',
+        result: { success: false, outputs: {}, error: 'component failed' },
+      }),
+    ).toThrow();
+    expect(
+      cancelSchema.parse({
+        status: 'cancelled',
+        runId: 'sentris-run-123',
+      }),
+    ).toBeDefined();
+    expect(() =>
+      cancelSchema.parse({
+        status: 'terminated',
+        runId: 'sentris-run-123',
+      }),
+    ).toThrow();
+  });
+
+  it('returns the completed run-result envelope', async () => {
+    workflowService.getRunResult.mockResolvedValueOnce({
+      success: true,
+      outputs: { 'node-1': { value: 'done' } },
+    });
+
+    const response = await runsController.result(
+      'sentris-run-123',
+      { temporalRunId: undefined },
+      authContext as any,
+    );
+
+    expect(response).toEqual({
+      runId: 'sentris-run-123',
+      result: {
+        success: true,
+        outputs: { 'node-1': { value: 'done' } },
+      },
+    });
+    expect(workflowService.getRunResult).toHaveBeenCalledWith(
+      'sentris-run-123',
+      undefined,
+      authContext,
+    );
+  });
+
+  it('returns the resultless cancelled run envelope', async () => {
+    workflowService.getRunResult.mockResolvedValueOnce({
+      status: 'CANCELLED',
+      result: null,
+    });
+
+    const response = await runsController.result(
+      'sentris-run-123',
+      { temporalRunId: 'temporal-run-123' },
+      authContext as any,
+    );
+
+    expect(response).toEqual({
+      runId: 'sentris-run-123',
+      result: {
+        status: 'CANCELLED',
+        result: null,
+      },
+    });
+  });
+
+  it('returns the documented cancellation acknowledgement', async () => {
+    workflowService.cancelRun.mockResolvedValueOnce(undefined);
+
+    const response = await runsController.cancel(
+      'sentris-run-123',
+      { temporalRunId: 'temporal-run-123' },
+      authContext as any,
+    );
+
+    expect(response).toEqual({
+      status: 'cancelled',
+      runId: 'sentris-run-123',
+    });
+    expect(workflowService.cancelRun).toHaveBeenCalledWith(
+      'sentris-run-123',
+      'temporal-run-123',
       authContext,
     );
   });

@@ -34,12 +34,12 @@ const parameterSchema = parameters({
     },
   ),
   durationSeconds: param(
-    z.number().int().min(5).max(60).default(20).describe('Total duration of the demo in seconds.'),
+    z.number().int().min(5).max(300).default(20).describe('Total duration of the demo in seconds.'),
     {
       label: 'Duration (seconds)',
       editor: 'number',
       min: 5,
-      max: 60,
+      max: 300,
     },
   ),
 });
@@ -145,7 +145,7 @@ const runner: DockerRunnerConfig = {
     DURATION_SECONDS: '{{durationSeconds}}',
   },
   network: 'none',
-  timeoutSeconds: 30,
+  timeoutSeconds: 330,
 };
 
 const definition = defineComponent({

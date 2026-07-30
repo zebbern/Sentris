@@ -1,10 +1,15 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 
 import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 import { DRIZZLE_TOKEN } from '../database/database.module';
-import { scopes, type ScopeRecord, type NewScopeRecord } from '../database/schema';
+import {
+  scopes,
+  workflowRunsTable,
+  type ScopeRecord,
+  type NewScopeRecord,
+} from '../database/schema';
 
 export interface ScopeUpdateData {
   name?: string;
@@ -37,6 +42,28 @@ export class ScopesRepository {
       .where(and(eq(scopes.id, id), eq(scopes.organizationId, organizationId)))
       .limit(1);
     return rows[0] ?? null;
+  }
+
+  async listRunIdsPage(
+    scopeId: string,
+    organizationId: string,
+    afterRunId: string | undefined,
+    limit: number,
+  ): Promise<string[]> {
+    const boundedLimit = Math.max(1, Math.min(Math.trunc(limit), 2_000));
+    const rows = await this.db
+      .select({ runId: workflowRunsTable.runId })
+      .from(workflowRunsTable)
+      .where(
+        and(
+          eq(workflowRunsTable.organizationId, organizationId),
+          eq(workflowRunsTable.scopeId, scopeId),
+          afterRunId ? gt(workflowRunsTable.runId, afterRunId) : undefined,
+        ),
+      )
+      .orderBy(asc(workflowRunsTable.runId))
+      .limit(boundedLimit);
+    return rows.map((row) => row.runId);
   }
 
   async create(data: NewScopeRecord): Promise<ScopeRecord> {

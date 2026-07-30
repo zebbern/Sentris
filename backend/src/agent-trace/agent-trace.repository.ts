@@ -4,10 +4,14 @@ import { and, asc, eq, gt } from 'drizzle-orm';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import { agentTraceEventsTable, type AgentTraceEventRecord } from '../database/schema';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface AgentTraceEventInput {
+  eventId: string;
   agentRunId: string;
   workflowRunId: string;
+  workflowId?: string | null;
+  organizationId?: string | null;
   nodeRef: string;
   sequence: number;
   timestamp: string;
@@ -22,7 +26,11 @@ export class AgentTraceRepository {
   ) {}
 
   async append(event: AgentTraceEventInput): Promise<void> {
-    await this.db.insert(agentTraceEventsTable).values({
+    await this.appendWithExecutor(this.db, event);
+  }
+
+  async appendWithExecutor(executor: OutboxExecutor, event: AgentTraceEventInput): Promise<void> {
+    await executor.insert(agentTraceEventsTable).values({
       agentRunId: event.agentRunId,
       workflowRunId: event.workflowRunId,
       nodeRef: event.nodeRef,

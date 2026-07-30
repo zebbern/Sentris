@@ -44,7 +44,9 @@ function makeDeliveryRecord(
     durationMs: overrides.durationMs ?? null,
     responseStatus: overrides.responseStatus ?? null,
     responseBody: overrides.responseBody ?? null,
+    outboxEventId: overrides.outboxEventId ?? null,
     createdAt: overrides.createdAt ?? now,
+    sendingStartedAt: overrides.sendingStartedAt ?? null,
     sentAt: overrides.sentAt ?? null,
   };
 }
@@ -72,6 +74,7 @@ function createMocks() {
       deliveryUpdates.push({ id, values });
       return Promise.resolve(makeDeliveryRecord({ id, ...values }));
     }),
+    claimForSend: mock(() => Promise.resolve(true)),
   } as unknown as NotificationDeliveryRepository;
 
   const slackAdapter = {
@@ -182,7 +185,7 @@ describe('NotificationDispatcherService — response capture', () => {
   });
 
   describe('on adapter exception (throw)', () => {
-    it('stores status failed, durationMs, but responseStatus and responseBody are undefined', async () => {
+    it('stores status unknown, durationMs, but responseStatus and responseBody are undefined', async () => {
       const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
 
       (mocks.slackAdapter.send as any).mockReturnValue(
@@ -195,7 +198,7 @@ describe('NotificationDispatcherService — response capture', () => {
       const updateCall = (mocks.deliveryRepo.update as any).mock.calls[0];
       const updateValues = updateCall[1];
 
-      expect(updateValues.status).toBe('failed');
+      expect(updateValues.status).toBe('unknown');
       expect(updateValues.errorMessage).toBe('Network timeout');
       expect(typeof updateValues.durationMs).toBe('number');
       expect(updateValues.durationMs).toBeGreaterThanOrEqual(0);

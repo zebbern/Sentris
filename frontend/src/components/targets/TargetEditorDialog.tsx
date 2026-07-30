@@ -50,8 +50,11 @@ export function TargetEditorDialog(props: TargetEditorDialogProps) {
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Name</Label>
+            <Label htmlFor="target-name" className="text-sm font-medium">
+              Name
+            </Label>
             <Input
+              id="target-name"
               value={form.name}
               onChange={(event) => handleFieldChange('name', event.target.value)}
               placeholder="Example Corp"
@@ -59,8 +62,11 @@ export function TargetEditorDialog(props: TargetEditorDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Description</Label>
+            <Label htmlFor="target-description" className="text-sm font-medium">
+              Description
+            </Label>
             <Textarea
+              id="target-description"
               value={form.description}
               onChange={(event) => handleFieldChange('description', event.target.value)}
               rows={3}
@@ -69,8 +75,11 @@ export function TargetEditorDialog(props: TargetEditorDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Domains</Label>
+            <Label htmlFor="target-domains" className="text-sm font-medium">
+              Domains
+            </Label>
             <Textarea
+              id="target-domains"
               value={form.domains}
               onChange={(event) => handleFieldChange('domains', event.target.value)}
               rows={3}
@@ -79,8 +88,11 @@ export function TargetEditorDialog(props: TargetEditorDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Repos</Label>
+            <Label htmlFor="target-repos" className="text-sm font-medium">
+              Repos
+            </Label>
             <Textarea
+              id="target-repos"
               value={form.repos}
               onChange={(event) => handleFieldChange('repos', event.target.value)}
               rows={3}
@@ -89,8 +101,11 @@ export function TargetEditorDialog(props: TargetEditorDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">IP ranges</Label>
+            <Label htmlFor="target-ip-ranges" className="text-sm font-medium">
+              IP ranges
+            </Label>
             <Textarea
+              id="target-ip-ranges"
               value={form.ipRanges}
               onChange={(event) => handleFieldChange('ipRanges', event.target.value)}
               rows={3}

@@ -93,6 +93,7 @@ export interface RunComponentActivityInput {
   workflowName?: string;
   workflowVersionId?: string | null;
   organizationId?: string | null;
+  scopeId?: string | null;
   action: {
     ref: string;
     componentId: string;
@@ -145,6 +146,7 @@ export interface RunWorkflowActivityInput {
   workflowVersionId?: string | null;
   workflowVersion?: number | null;
   organizationId?: string | null;
+  scopeId?: string | null;
   parentRunId?: string | null;
   parentNodeRef?: string | null;
   depth?: number;
@@ -170,6 +172,7 @@ export interface WorkflowLogMetadata {
 }
 
 export interface WorkflowLogEntry {
+  eventId?: string;
   runId: string;
   nodeRef: string;
   stream: WorkflowLogStream;
@@ -196,8 +199,22 @@ export interface PrepareRunPayloadActivityInput {
   trigger?: ExecutionTriggerMetadata;
   runId?: string;
   organizationId?: string | null;
+  scopeId?: string | null;
   parentRunId?: string;
   parentNodeRef?: string;
+}
+
+export interface MarkRunStartedActivityInput {
+  runId: string;
+  temporalRunId: string;
+  organizationId: string | null;
+}
+
+export interface MarkRunStartedActivityOutput {
+  runId: string;
+  workflowId: string;
+  temporalRunId: string;
+  duplicate: boolean;
 }
 
 // MCP Activity types
@@ -236,6 +253,7 @@ export interface RegisterLocalMcpActivityInput {
   port: number;
   endpoint: string;
   containerId: string;
+  authToken?: string;
 }
 
 export interface PrepareAndRegisterToolActivityInput {
@@ -248,6 +266,13 @@ export interface PrepareAndRegisterToolActivityInput {
 
 export interface CleanupRunResourcesActivityInput {
   runId: string;
+}
+
+export interface FinalizeRunActivityInput {
+  runId: string;
+  organizationId?: string | null;
+  status?: 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  completedAt?: string;
 }
 
 export interface AreAllToolsReadyActivityInput {

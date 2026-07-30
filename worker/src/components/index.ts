@@ -104,6 +104,7 @@ import './test/sleep-parallel';
 import './test/live-event-heartbeat';
 import './test/simple-http-mcp';
 import './test/analytics-fixture';
+import './test/docker-echo';
 
 // Export registry for external use
 export { componentRegistry } from '@sentris/component-sdk';

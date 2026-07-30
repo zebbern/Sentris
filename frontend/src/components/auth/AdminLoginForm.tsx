@@ -8,6 +8,7 @@ import { LogIn } from 'lucide-react';
 import { logger } from '@/lib/logger';
 import { sanitizeRedirectUrl } from '@/utils/urlSecurity';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { buildFrontendApiUrl } from '@/config/api-url';
 
 export function AdminLoginForm() {
   useDocumentTitle('Login');
@@ -15,7 +16,7 @@ export function AdminLoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const setAdminCredentials = useAuthStore((state) => state.setAdminCredentials);
+  const setLocalSessionAuthenticated = useAuthStore((state) => state.setLocalSessionAuthenticated);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo');
@@ -25,10 +26,10 @@ export function AdminLoginForm() {
     setError(null);
 
     const trimmedUsername = username.trim();
-    const trimmedPassword = password.trim();
+    const submittedPassword = password;
 
     // Validate inputs
-    if (!trimmedUsername || !trimmedPassword) {
+    if (!trimmedUsername || !submittedPassword) {
       setError('Please enter both username and password');
       return;
     }
@@ -38,9 +39,8 @@ export function AdminLoginForm() {
     try {
       // Validate credentials and set session cookie via /auth/login endpoint
       // This sets an httpOnly cookie for browser navigation to protected routes (e.g., /analytics/)
-      // Use relative path to ensure cookie is set via nginx (same origin as /analytics/* routes)
-      const credentials = btoa(`${trimmedUsername}:${trimmedPassword}`);
-      const loginResponse = await fetch('/api/v1/auth/login', {
+      const credentials = btoa(`${trimmedUsername}:${submittedPassword}`);
+      const loginResponse = await fetch(buildFrontendApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: {
           Authorization: `Basic ${credentials}`,
@@ -57,8 +57,8 @@ export function AdminLoginForm() {
         throw new Error('Unable to log in. Please try again or contact your administrator.');
       }
 
-      // Store credentials for API requests (Basic auth header)
-      setAdminCredentials(trimmedUsername, trimmedPassword);
+      // Authentication continues through the httpOnly session cookie.
+      setLocalSessionAuthenticated(true);
 
       // Success - redirect to returnTo URL or home
       const safeReturnTo = sanitizeRedirectUrl(returnTo);

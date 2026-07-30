@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { TableCell } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Edit3, Trash2 } from 'lucide-react';
+import { Edit3, Play, Trash2 } from 'lucide-react';
 import type { Scope } from '@/types/scopes';
 import { formatTimeAgo } from '@/utils/timeFormat';
+import { buildTargetWorkflowSelectionPath } from '@/lib/targetNavigation';
 
 export interface TargetRowProps {
   scope: Scope;
@@ -49,6 +50,21 @@ export function TargetRow({ scope, canManage, onEdit, onDelete }: TargetRowProps
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1 md:gap-2">
+          {canManage && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                  <Link
+                    to={buildTargetWorkflowSelectionPath(scope.id)}
+                    aria-label={`Run ${scope.name}`}
+                  >
+                    <Play className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Run target</TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

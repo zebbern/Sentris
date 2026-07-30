@@ -72,7 +72,10 @@ const {
   probeDevHealthTarget: (
     target: { id: string; label: string; url: string },
     options: {
-      request: (url: string, options: { timeoutMs: number }) => Promise<{
+      request: (
+        url: string,
+        options: { timeoutMs: number },
+      ) => Promise<{
         statusCode: number;
         statusText?: string;
       }>;
@@ -97,11 +100,7 @@ const {
     dryRun: boolean;
   };
   parseE2eEnvFile: (content: string) => Record<string, string>;
-  prunePm2DevLogs: (options: {
-    instance: number;
-    pm2Home: string;
-    maxBytes: number;
-  }) => {
+  prunePm2DevLogs: (options: { instance: number; pm2Home: string; maxBytes: number }) => {
     logDir: string;
     maxBytes: number;
     files: Array<{ filePath: string; beforeBytes: number; afterBytes: number; pruned: boolean }>;
@@ -238,9 +237,7 @@ describe('dev script instance runtime', () => {
         ok: false,
         error: 'ConnectionRefused',
       }),
-    ).toBe(
-      '✗ Backend liveness: UNREACHABLE (ConnectionRefused) http://127.0.0.1:3211/health',
-    );
+    ).toBe('✗ Backend liveness: UNREACHABLE (ConnectionRefused) http://127.0.0.1:3211/health');
   });
 
   it('probes dev runtime health targets with injected request behavior', async () => {
@@ -353,9 +350,15 @@ describe('dev script instance runtime', () => {
       ]);
       expect(existsSync(join(root, '.instances', 'instance-3', 'backend.env'))).toBe(true);
 
-      const backendEnv = readFileSync(join(root, '.instances', 'instance-3', 'backend.env'), 'utf8');
+      const backendEnv = readFileSync(
+        join(root, '.instances', 'instance-3', 'backend.env'),
+        'utf8',
+      );
       const workerEnv = readFileSync(join(root, '.instances', 'instance-3', 'worker.env'), 'utf8');
-      const frontendEnv = readFileSync(join(root, '.instances', 'instance-3', 'frontend.env'), 'utf8');
+      const frontendEnv = readFileSync(
+        join(root, '.instances', 'instance-3', 'frontend.env'),
+        'utf8',
+      );
 
       expect(backendEnv).toContain('CUSTOM_BACKEND=kept');
       expect(backendEnv).toContain(
@@ -510,6 +513,7 @@ describe('dev script instance runtime', () => {
     expect(createRootTestPlan({ instance: 4 })).toEqual({
       cleanupPaths: ['worker/dist'],
       commands: [
+        { command: 'bun', args: ['test', 'scripts/__tests__'] },
         { command: 'bun', args: ['test', 'packages'] },
         { command: 'bun', args: ['test', 'backend'] },
         { command: 'bun', args: ['test', 'worker'] },

@@ -44,6 +44,10 @@ describe('MCP Activities', () => {
     // Reset env for each test
     process.env.INTERNAL_SERVICE_TOKEN = 'test-token-123';
     process.env.SENTRIS_API_BASE_URL = 'http://localhost:3211';
+    process.env.SENTRIS_DEPLOYMENT_ID = 'test-deployment';
+    process.env.SENTRIS_INSTANCE = '0';
+    process.env.TEMPORAL_NAMESPACE = 'test-namespace';
+    process.env.TEMPORAL_TASK_QUEUE = 'test-queue';
     delete process.env.SKIP_CONTAINER_CLEANUP;
 
     // Spy on global fetch — this is more resilient than replacing globalThis.fetch
@@ -72,6 +76,29 @@ describe('MCP Activities', () => {
       );
       expect(buildInternalMcpUrl('http://localhost:3211', 'cleanup')).toBe(
         'http://localhost:3211/api/v1/internal/mcp/cleanup',
+      );
+    });
+
+    it('uses BACKEND_URL for internal callbacks when API aliases are absent', async () => {
+      delete process.env.SENTRIS_API_BASE_URL;
+      delete process.env.API_BASE_URL;
+      process.env.BACKEND_URL = 'http://backend:3211';
+      (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        createMockFetchResponse({ success: true }),
+      );
+
+      await registerComponentToolActivity({
+        runId: 'run-1',
+        nodeId: 'node-1',
+        toolName: 'test-tool',
+        componentId: 'test.comp',
+        description: 'A test tool',
+        inputSchema: {},
+        credentials: {},
+      });
+
+      expect((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+        'http://backend:3211/api/v1/internal/mcp/register-component',
       );
     });
 
@@ -245,6 +272,7 @@ describe('MCP Activities', () => {
         port: 9090,
         endpoint: 'http://localhost:9090',
         containerId: 'container-abc',
+        authToken: 'worker-proxy-token',
       });
 
       const body = JSON.parse(
@@ -254,6 +282,9 @@ describe('MCP Activities', () => {
       expect(body.endpoint).toBe('http://localhost:9090');
       expect(body.containerId).toBe('container-abc');
       expect(body.serverName).toBe('local-tool');
+      expect(body.headers).toEqual({
+        'x-sentris-mcp-proxy-token': 'worker-proxy-token',
+      });
     });
 
     it('uses default port and generates containerId from image when not provided', async () => {
@@ -286,6 +317,15 @@ describe('MCP Activities', () => {
   // ── cleanupRunResourcesActivity ──────────────────────────────────────────
 
   describe('cleanupRunResourcesActivity', () => {
+    const cleanupLabels = (runId: string) => ({
+      'sentris.managed': 'true',
+      'sentris.runId': runId,
+      'sentris.deploymentId': 'test-deployment',
+      'sentris.instance': '0',
+      'sentris.temporalNamespace': 'test-namespace',
+      'sentris.temporalTaskQueue': 'test-queue',
+    });
+
     it('skips cleanup when SKIP_CONTAINER_CLEANUP is true', async () => {
       // Note: SKIP_CONTAINER_CLEANUP is read at module load time as a const,
       // so we test the conditional behavior indirectly.
@@ -310,13 +350,24 @@ describe('MCP Activities', () => {
 
       // Mock Docker ps for name pattern (returns empty)
       mockExecFile.mockImplementation(async (cmd: string, args: string[]) => {
-        if (args.includes('ps')) {
+        if (args[0] === 'ps') {
           return { stdout: '', stderr: '' };
         }
-        if (args.includes('rm')) {
+        if (args[0] === 'inspect') {
+          return {
+            stdout: JSON.stringify(
+              args.slice(1).map((id) => ({
+                Id: id,
+                Config: { Labels: cleanupLabels('run-cleanup-2') },
+              })),
+            ),
+            stderr: '',
+          };
+        }
+        if (args[0] === 'rm') {
           return { stdout: '', stderr: '' };
         }
-        if (args.includes('volume')) {
+        if (args[0] === 'volume') {
           return { stdout: '', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -336,13 +387,24 @@ describe('MCP Activities', () => {
       );
 
       mockExecFile.mockImplementation(async (cmd: string, args: string[]) => {
-        if (args.includes('ps')) {
+        if (args[0] === 'ps') {
           return { stdout: '', stderr: '' };
         }
-        if (args.includes('rm')) {
+        if (args[0] === 'inspect') {
+          return {
+            stdout: JSON.stringify([
+              {
+                Id: 'container-1',
+                Config: { Labels: cleanupLabels('run-cleanup-quiet') },
+              },
+            ]),
+            stderr: '',
+          };
+        }
+        if (args[0] === 'rm') {
           return { stdout: '', stderr: '' };
         }
-        if (args.includes('volume')) {
+        if (args[0] === 'volume') {
           return { stdout: '', stderr: '' };
         }
         return { stdout: '', stderr: '' };
@@ -359,7 +421,7 @@ describe('MCP Activities', () => {
       }
     });
 
-    it('skips containers with unsafe IDs', async () => {
+    it('rejects unsafe registry IDs before invoking Docker', async () => {
       (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
         createMockFetchResponse({ containerIds: ['valid-container', '; rm -rf /'] }),
       );
@@ -368,12 +430,12 @@ describe('MCP Activities', () => {
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      await cleanupRunResourcesActivity({ runId: 'safe-run-id' });
+      await expect(cleanupRunResourcesActivity({ runId: 'safe-run-id' })).rejects.toThrow(
+        'unsafe registry container ID',
+      );
 
-      // Only the valid container should be cleaned up
       const rmCalls = mockExecFile.mock.calls.filter((call: any[]) => call[1]?.[0] === 'rm');
-      expect(rmCalls.length).toBe(1);
-      expect(rmCalls[0][1]).toContain('valid-container');
+      expect(rmCalls.length).toBe(0);
 
       consoleSpy.mockRestore();
     });
@@ -388,7 +450,9 @@ describe('MCP Activities', () => {
 
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      await cleanupRunResourcesActivity({ runId: '; rm -rf /' });
+      await expect(cleanupRunResourcesActivity({ runId: '; rm -rf /' })).rejects.toThrow(
+        'runId is unsafe',
+      );
 
       // Should not attempt volume listing with unsafe runId
       const volumeCalls = mockExecFile.mock.calls.filter((call: any[]) =>

@@ -11,6 +11,7 @@ import { ToastProvider } from '@/components/ui/toast-provider';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AuthProvider } from '@/auth/auth-context';
 import { useAuthStoreIntegration } from '@/auth/store-integration';
+import { AuthScopeBoundary } from '@/auth/AuthScopeBoundary';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AnalyticsRouterListener } from '@/features/analytics/AnalyticsRouterListener';
 import { PostHogClerkBridge } from '@/features/analytics/PostHogClerkBridge';
@@ -21,6 +22,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { logger } from '@/lib/logger';
 import { useUserPreferencesStore } from '@/store/userPreferencesStore';
 import { AnimatedRoutes } from '@/routes';
+import { env } from '@/config/env';
 
 // Lazy-load CommandPalette — heavy component with many commands
 const CommandPalette = lazy(() =>
@@ -53,7 +55,7 @@ function PageSkeleton() {
 
 function AuthIntegration({ children }: { children: React.ReactNode }) {
   useAuthStoreIntegration();
-  return <>{children}</>;
+  return <AuthScopeBoundary>{children}</AuthScopeBoundary>;
 }
 
 /**
@@ -170,7 +172,7 @@ function App() {
               </CommandPaletteProvider>
             </BrowserRouter>
           </ToastProvider>
-          {import.meta.env.DEV && import.meta.env.VITE_DEVTOOLS === 'true' && (
+          {import.meta.env.DEV && env.VITE_DEVTOOLS && (
             <Suspense fallback={null}>
               <ReactQueryDevtools />
             </Suspense>

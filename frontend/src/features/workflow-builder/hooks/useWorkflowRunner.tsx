@@ -42,6 +42,7 @@ interface UseWorkflowRunnerOptions {
   mostRecentRunId: string | null;
   setIsLoading: (value: boolean) => void;
   workflowRoutePrefix?: string;
+  requestedScopeId?: string | null;
 }
 
 interface UseWorkflowRunnerResult {
@@ -76,6 +77,7 @@ export function useWorkflowRunner({
   mostRecentRunId,
   setIsLoading,
   workflowRoutePrefix = '/workflows',
+  requestedScopeId = null,
 }: UseWorkflowRunnerOptions): UseWorkflowRunnerResult {
   const queryClient = useQueryClient();
   const [runDialogOpen, setRunDialogOpen] = useState(false);
@@ -212,7 +214,7 @@ export function useWorkflowRunner({
     }
 
     const runtimeDefinitions = resolveRuntimeInputDefinitions();
-    if (runtimeDefinitions.length > 0) {
+    if (runtimeDefinitions.length > 0 || requestedScopeId) {
       setRuntimeInputs(runtimeDefinitions);
       // Use default values from Entry Point's __runtimeData input override
       const defaultValues = resolveRuntimeInputDefaults();
@@ -231,6 +233,7 @@ export function useWorkflowRunner({
     nodes.length,
     resolveRuntimeInputDefinitions,
     resolveRuntimeInputDefaults,
+    requestedScopeId,
     toast,
   ]);
 

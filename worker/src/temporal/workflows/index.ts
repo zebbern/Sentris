@@ -1,6 +1,9 @@
 import {
   ApplicationFailure,
+  CancellationScope,
   defineQuery,
+  isCancellation,
+  patched,
   proxyActivities,
   setHandler,
   startChild,
@@ -37,15 +40,20 @@ import type {
   RunWorkflowActivityInput,
   RunWorkflowActivityOutput,
   WorkflowAction,
+  MarkRunStartedActivityInput,
+  MarkRunStartedActivityOutput,
   PrepareRunPayloadActivityInput,
   RegisterComponentToolActivityInput,
   CleanupRunResourcesActivityInput,
+  FinalizeRunActivityInput,
   RegisterLocalMcpActivityInput,
   PrepareAndRegisterToolActivityInput,
 } from '../types';
 
 /** Claude Code and other loop-body Docker agents can exceed the default 10m activity window. */
 const FOR_EACH_BODY_ACTIVITY_TIMEOUT = '135 minutes';
+const PERSIST_CHILD_START_PATCH_ID = 'sentris-persist-child-start-v1';
+const RUN_METADATA_LIFECYCLE_PATCH_ID = 'sentris-run-metadata-lifecycle-v1';
 
 const {
   runComponentActivity: _runComponentActivity,
@@ -93,7 +101,7 @@ const {
 
 const { cleanupRunResourcesActivity, finalizeRunActivity } = proxyActivities<{
   cleanupRunResourcesActivity(input: CleanupRunResourcesActivityInput): Promise<void>;
-  finalizeRunActivity(input: { runId: string }): Promise<void>;
+  finalizeRunActivity(input: FinalizeRunActivityInput): Promise<void>;
 }>({
   startToCloseTimeout: '2 minutes',
   retry: {
@@ -103,13 +111,14 @@ const { cleanupRunResourcesActivity, finalizeRunActivity } = proxyActivities<{
   },
 });
 
-const { prepareRunPayloadActivity } = proxyActivities<{
+const { prepareRunPayloadActivity, markRunStartedActivity } = proxyActivities<{
   prepareRunPayloadActivity(input: PrepareRunPayloadActivityInput): Promise<PreparedRunPayload>;
+  markRunStartedActivity(input: MarkRunStartedActivityInput): Promise<MarkRunStartedActivityOutput>;
 }>({
   startToCloseTimeout: '2 minutes',
 });
 
-const { recordTraceEventActivity } = proxyActivities<{
+const { recordTraceEventActivity: persistTraceEventActivity } = proxyActivities<{
   recordTraceEventActivity(event: any): Promise<void>;
 }>({
   startToCloseTimeout: '1 minute',
@@ -118,6 +127,8 @@ const { recordTraceEventActivity } = proxyActivities<{
 export async function sentrisWorkflowRun(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
+  const durableTerminalFinalization = patched('sentris-durable-terminal-finalization-v1');
+  const durableRunMetadataLifecycle = patched(RUN_METADATA_LIFECYCLE_PATCH_ID);
   const results = new Map<string, unknown>();
   const actionsByRef = new Map<string, WorkflowAction>(
     input.definition.actions.map((action) => [action.ref, action]),
@@ -170,6 +181,7 @@ export async function sentrisWorkflowRun(
           workflowId: input.workflowId,
           workflowVersionId: input.workflowVersionId,
           organizationId: input.organizationId,
+          scopeId: input.scopeId ?? null,
           action: {
             ref: `tool-call:${request.callId}`,
             componentId: request.componentId,
@@ -253,17 +265,95 @@ export async function sentrisWorkflowRun(
       : [input.workflowId];
   const depth = typeof input.depth === 'number' && Number.isFinite(input.depth) ? input.depth : 0;
 
-  await setRunMetadataActivity({
-    runId: input.runId,
-    workflowId: input.workflowId,
-    organizationId: input.organizationId ?? null,
-  });
+  let terminalStatus: FinalizeRunActivityInput['status'] = 'FAILED';
 
-  // Track workflow completion for cleanup decision
-  let workflowCompletedSuccessfully = true;
+  const classifyWorkflowError = (error: unknown): unknown => {
+    if (durableTerminalFinalization && isCancellation(error)) {
+      terminalStatus = 'CANCELLED';
+      return error;
+    }
+    terminalStatus = 'FAILED';
+    const outputs = Object.fromEntries(results);
+    const normalizedError =
+      error instanceof Error
+        ? error
+        : new Error(typeof error === 'string' ? error : JSON.stringify(error));
+
+    return ApplicationFailure.nonRetryable(
+      normalizedError.message,
+      normalizedError.name ?? 'WorkflowFailure',
+      [{ outputs, error: normalizedError.message }],
+    );
+  };
+
+  const finalizeLifecycle = async (): Promise<void> => {
+    workflowDiagnosticLog(
+      `[Workflow] Cleaning up MCP containers for run ${input.runId} (status=${terminalStatus})`,
+    );
+    if (durableTerminalFinalization) {
+      await CancellationScope.nonCancellable(async () => {
+        await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
+          console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);
+        });
+        await finalizeRunActivity({
+          runId: input.runId,
+          organizationId: input.organizationId ?? null,
+          status: terminalStatus,
+          completedAt: new Date().toISOString(),
+        }).catch((err: unknown) => {
+          console.error(`[Workflow] Failed to finalize run ${input.runId}`, err);
+        });
+      });
+    } else {
+      await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
+        console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);
+      });
+      await finalizeRunActivity({ runId: input.runId }).catch((err: unknown) => {
+        console.error(`[Workflow] Failed to finalize run ${input.runId}`, err);
+      });
+    }
+  };
+
+  if (durableRunMetadataLifecycle) {
+    try {
+      await setRunMetadataActivity({
+        runId: input.runId,
+        workflowId: input.workflowId,
+        organizationId: input.organizationId ?? null,
+      });
+    } catch (error: unknown) {
+      const workflowError = classifyWorkflowError(error);
+      await finalizeLifecycle();
+      throw workflowError;
+    }
+  } else {
+    await setRunMetadataActivity({
+      runId: input.runId,
+      workflowId: input.workflowId,
+      organizationId: input.organizationId ?? null,
+    });
+  }
+
+  const durableTraceIdentity = patched('durable-trace-event-identity-v1');
+  let traceSequence = 0;
+  const recordTraceEventActivity = async (event: Record<string, unknown>): Promise<void> => {
+    if (!durableTraceIdentity) {
+      await persistTraceEventActivity(event);
+      return;
+    }
+    const sequence = ++traceSequence;
+    await persistTraceEventActivity({
+      ...event,
+      eventId: `trace:${input.runId}:workflow:${sequence}`,
+      sequence,
+      workflowId: input.workflowId,
+      organizationId: input.organizationId ?? null,
+    });
+  };
 
   try {
     await runWorkflowWithScheduler(input.definition, {
+      preserveCancellation: durableTerminalFinalization,
       onNodeSkipped: async (actionRef) => {
         workflowDiagnosticLog(`[Workflow] Node skipped: ${actionRef}`);
         await recordTraceEventActivity({
@@ -337,8 +427,13 @@ export async function sentrisWorkflowRun(
             depth,
             callChain,
             results,
-            activities: { prepareRunPayloadActivity, recordTraceEventActivity },
+            activities: {
+              prepareRunPayloadActivity,
+              markRunStartedActivity,
+              recordTraceEventActivity,
+            },
             workflowFn: sentrisWorkflowRun,
+            persistStartedRun: patched(PERSIST_CHILD_START_PATCH_ID),
           });
         }
 
@@ -380,6 +475,7 @@ export async function sentrisWorkflowRun(
           workflowName: input.definition.title,
           workflowVersionId: input.workflowVersionId ?? null,
           organizationId: input.organizationId ?? null,
+          scopeId: input.scopeId ?? null,
           action: {
             ref: action.ref,
             componentId: action.componentId,
@@ -577,33 +673,15 @@ export async function sentrisWorkflowRun(
       ]);
     }
 
+    terminalStatus = 'COMPLETED';
     return {
       outputs,
       success: true,
     };
   } catch (error: unknown) {
-    workflowCompletedSuccessfully = false;
-    const outputs = Object.fromEntries(results);
-    const normalizedError =
-      error instanceof Error
-        ? error
-        : new Error(typeof error === 'string' ? error : JSON.stringify(error));
-
-    throw ApplicationFailure.nonRetryable(
-      normalizedError.message,
-      normalizedError.name ?? 'WorkflowFailure',
-      [{ outputs, error: normalizedError.message }],
-    );
+    throw classifyWorkflowError(error);
   } finally {
-    workflowDiagnosticLog(
-      `[Workflow] Cleaning up MCP containers for run ${input.runId} (success=${workflowCompletedSuccessfully})`,
-    );
-    await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
-      console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);
-    });
-    await finalizeRunActivity({ runId: input.runId }).catch((err: unknown) => {
-      console.error(`[Workflow] Failed to finalize run ${input.runId}`, err);
-    });
+    await finalizeLifecycle();
   }
 }
 
@@ -666,10 +744,19 @@ export async function scheduleTriggerWorkflow(
         workflowVersionId: prepared.workflowVersionId,
         workflowVersion: prepared.workflowVersion,
         organizationId: prepared.organizationId,
+        scopeId: prepared.scopeId ?? null,
       },
     ],
     workflowId: prepared.runId,
   });
+
+  if (patched(PERSIST_CHILD_START_PATCH_ID)) {
+    await markRunStartedActivity({
+      runId: prepared.runId,
+      temporalRunId: child.firstExecutionRunId,
+      organizationId: prepared.organizationId,
+    });
+  }
 
   return child.result();
 }

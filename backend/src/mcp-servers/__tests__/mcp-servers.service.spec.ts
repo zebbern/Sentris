@@ -90,9 +90,25 @@ describe('McpServersService', () => {
   let auditLog: Record<string, ReturnType<typeof vi.fn>>;
   let configSvc: Record<string, ReturnType<typeof vi.fn>>;
   let redis: Record<string, ReturnType<typeof vi.fn>>;
+  let mutationExecutor: { insert: ReturnType<typeof vi.fn> };
   let service: McpServersService;
 
+  function mockMutationResult(
+    operation: ReturnType<typeof vi.fn>,
+    result: unknown,
+    hookIndex: number,
+  ): void {
+    operation.mockImplementation(async (...args: unknown[]) => {
+      const hook = args[hookIndex] as
+        | ((executor: unknown, record?: unknown) => Promise<void>)
+        | undefined;
+      await hook?.(mutationExecutor, result);
+      return result;
+    });
+  }
+
   beforeEach(() => {
+    mutationExecutor = { insert: vi.fn() };
     repo = {
       list: vi.fn(),
       listEnabled: vi.fn(),
@@ -110,7 +126,10 @@ describe('McpServersService', () => {
     };
     encryption = { encryptHeaders: vi.fn(), decryptHeaders: vi.fn() };
     secretResolver = { resolveMcpConfig: vi.fn() };
-    auditLog = { record: vi.fn() };
+    auditLog = {
+      record: vi.fn(),
+      recordDurableWithExecutor: vi.fn(async () => undefined),
+    };
     configSvc = { get: vi.fn() };
     redis = { get: vi.fn(), del: vi.fn() };
     mockMcpConnect.mockClear();
@@ -181,7 +200,7 @@ describe('McpServersService', () => {
   // ── Create ────────────────────────────────────────────────────────
   it('creates a server with http transport', async () => {
     repo.list.mockResolvedValue([]);
-    repo.create.mockResolvedValue(makeServerRecord());
+    mockMutationResult(repo.create, makeServerRecord(), 1);
     const result = await service.createServer(authContext, {
       name: 'test-mcp-server',
       transportType: 'http',
@@ -190,17 +209,35 @@ describe('McpServersService', () => {
     expect(result.id).toBe('server-1');
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'test-mcp-server', transportType: 'http' }),
+      expect.any(Function),
     );
-    expect(auditLog.record).toHaveBeenCalledWith(
+    expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
       authContext,
       expect.objectContaining({ action: 'mcp_server.create' }),
     );
   });
 
+  it('rejects server creation when durable audit scheduling fails', async () => {
+    repo.list.mockResolvedValue([]);
+    mockMutationResult(repo.create, makeServerRecord(), 1);
+    auditLog.recordDurableWithExecutor.mockRejectedValueOnce(new Error('audit outbox unavailable'));
+
+    await expect(
+      service.createServer(authContext, {
+        name: 'test-mcp-server',
+        transportType: 'http',
+        endpoint: 'https://mcp.example.test',
+      }),
+    ).rejects.toThrow('audit outbox unavailable');
+  });
+
   it('encrypts headers when creating a server', async () => {
     repo.list.mockResolvedValue([]);
-    repo.create.mockResolvedValue(
+    mockMutationResult(
+      repo.create,
       makeServerRecord({ headers: { ciphertext: 'ct', iv: 'iv', authTag: 'tag', keyId: 'k1' } }),
+      1,
     );
     encryption.encryptHeaders.mockResolvedValue({
       ciphertext: 'ct',
@@ -242,12 +279,13 @@ describe('McpServersService', () => {
 
   it('uses cached discovery tools when cacheToken is provided', async () => {
     repo.list.mockResolvedValue([]);
-    repo.create.mockResolvedValue(makeServerRecord());
+    mockMutationResult(repo.create, makeServerRecord(), 1);
     repo.upsertTools.mockResolvedValue([]);
     repo.updateHealthStatus.mockResolvedValue(undefined);
     redis.get.mockResolvedValue(
       JSON.stringify({
         status: 'completed',
+        organizationId: DEFAULT_ORGANIZATION_ID,
         tools: [{ name: 'readFile', description: 'Read' }],
         toolCount: 1,
       }),
@@ -264,16 +302,45 @@ describe('McpServersService', () => {
     expect(redis.del).toHaveBeenCalledWith('mcp-discovery:cache-123');
   });
 
+  it('rejects a foreign-organization cache token before creating a server', async () => {
+    repo.list.mockResolvedValue([]);
+    mockMutationResult(repo.create, makeServerRecord(), 1);
+    repo.upsertTools.mockResolvedValue([]);
+    repo.updateHealthStatus.mockResolvedValue(undefined);
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        status: 'completed',
+        organizationId: 'foreign-organization',
+        tools: [{ name: 'readFile', description: 'Read' }],
+        toolCount: 1,
+      }),
+    );
+
+    await expect(
+      service.createServer(authContext, {
+        name: 'test',
+        transportType: 'http',
+        endpoint: 'http://x',
+        cacheToken: 'foreign-cache',
+      }),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(repo.list).not.toHaveBeenCalled();
+    expect(repo.create).not.toHaveBeenCalled();
+    expect(repo.upsertTools).not.toHaveBeenCalled();
+  });
+
   // ── Update ────────────────────────────────────────────────────────
   it('updates server name and description', async () => {
     repo.findById.mockResolvedValue(makeServerRecord());
-    repo.update.mockResolvedValue(makeServerRecord({ name: 'renamed', description: 'new' }));
+    mockMutationResult(repo.update, makeServerRecord({ name: 'renamed', description: 'new' }), 3);
     const result = await service.updateServer(authContext, 'server-1', {
       name: 'renamed',
       description: 'new',
     });
     expect(result.name).toBe('renamed');
-    expect(auditLog.record).toHaveBeenCalledWith(
+    expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
       authContext,
       expect.objectContaining({ action: 'mcp_server.update' }),
     );
@@ -288,7 +355,7 @@ describe('McpServersService', () => {
 
   it('encrypts headers during update', async () => {
     repo.findById.mockResolvedValue(makeServerRecord());
-    repo.update.mockResolvedValue(makeServerRecord());
+    mockMutationResult(repo.update, makeServerRecord(), 3);
     encryption.encryptHeaders.mockResolvedValue({
       ciphertext: 'ct2',
       iv: 'iv2',
@@ -303,12 +370,13 @@ describe('McpServersService', () => {
     repo.findById.mockResolvedValue(
       makeServerRecord({ headers: { ciphertext: 'ct', iv: 'iv', authTag: 'tag', keyId: 'k1' } }),
     );
-    repo.update.mockResolvedValue(makeServerRecord());
+    mockMutationResult(repo.update, makeServerRecord(), 3);
     await service.updateServer(authContext, 'server-1', { headers: null });
     expect(repo.update).toHaveBeenCalledWith(
       'server-1',
       expect.objectContaining({ headers: null }),
       expect.any(Object),
+      expect.any(Function),
     );
   });
 
@@ -322,19 +390,29 @@ describe('McpServersService', () => {
   // ── Toggle & Delete ───────────────────────────────────────────────
   it('toggles server enabled state', async () => {
     repo.findById.mockResolvedValue(makeServerRecord({ enabled: true }));
-    repo.update.mockResolvedValue(makeServerRecord({ enabled: false }));
+    mockMutationResult(repo.update, makeServerRecord({ enabled: false }), 3);
     const result = await service.toggleServer(authContext, 'server-1');
     expect(result.enabled).toBe(false);
+    expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({ action: 'mcp_server.toggle' }),
+    );
   });
 
   it('deletes a server and records audit log', async () => {
     repo.findById.mockResolvedValue(makeServerRecord());
-    repo.delete.mockResolvedValue(undefined);
+    mockMutationResult(repo.delete, undefined, 2);
     await service.deleteServer(authContext, 'server-1');
-    expect(repo.delete).toHaveBeenCalledWith('server-1', {
-      organizationId: DEFAULT_ORGANIZATION_ID,
-    });
-    expect(auditLog.record).toHaveBeenCalledWith(
+    expect(repo.delete).toHaveBeenCalledWith(
+      'server-1',
+      {
+        organizationId: DEFAULT_ORGANIZATION_ID,
+      },
+      expect.any(Function),
+    );
+    expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
       authContext,
       expect.objectContaining({ action: 'mcp_server.delete' }),
     );
@@ -492,9 +570,36 @@ describe('McpServersService', () => {
 
   it('toggles tool enabled state', async () => {
     repo.findById.mockResolvedValue(makeServerRecord());
-    repo.toggleToolEnabled.mockResolvedValue(makeToolRecord({ enabled: false }));
+    const toggled = makeToolRecord({ enabled: false });
+    mockMutationResult(repo.toggleToolEnabled, toggled, 2);
+
     const result = await service.toggleToolEnabled(authContext, 'server-1', 'tool-1');
+
     expect(result.enabled).toBe(false);
+    expect(repo.toggleToolEnabled).toHaveBeenCalledWith('server-1', 'tool-1', expect.any(Function));
+    expect(auditLog.recordDurableWithExecutor).toHaveBeenCalledWith(
+      mutationExecutor,
+      authContext,
+      expect.objectContaining({
+        action: 'mcp_server.tool_toggle',
+        resourceId: 'server-1',
+        metadata: expect.objectContaining({
+          toolId: 'tool-1',
+          toolName: 'readFile',
+          enabled: false,
+        }),
+      }),
+    );
+  });
+
+  it('rejects the tool toggle when durable audit scheduling fails', async () => {
+    repo.findById.mockResolvedValue(makeServerRecord());
+    mockMutationResult(repo.toggleToolEnabled, makeToolRecord({ enabled: false }), 2);
+    auditLog.recordDurableWithExecutor.mockRejectedValueOnce(new Error('audit outbox unavailable'));
+
+    await expect(service.toggleToolEnabled(authContext, 'server-1', 'tool-1')).rejects.toThrow(
+      'audit outbox unavailable',
+    );
   });
 
   // ── Health ────────────────────────────────────────────────────────

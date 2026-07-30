@@ -54,7 +54,7 @@ bun run pm2 -- delete sentris-frontend-0 sentris-backend-0 sentris-worker-0 && d
 
 # Health checks
 curl -sf http://localhost:3211/health        # Backend liveness
-curl -sf http://localhost:3211/health/ready   # Backend readiness (Postgres/Redis/Temporal)
+curl -sf http://localhost:3211/health/ready   # Backend readiness (Postgres/Redis/Temporal/enabled Kafka ingest)
 curl -sf http://localhost:5173               # Frontend
 curl -sf http://localhost                    # Nginx (auth gate)
 
@@ -131,8 +131,8 @@ If you change instance/infra behavior (justfile/scripts/pm2 config), update `doc
 ### After Backend Route Changes
 
 ```bash
-bun --cwd backend run generate:openapi
-bun --cwd packages/backend-client run generate
+bun --cwd=backend run generate:openapi
+bun --cwd=packages/backend-client run generate
 ```
 
 ### Testing
@@ -147,9 +147,18 @@ bun run lint           # Lint
 
 ```bash
 just db-reset                              # Reset active instance database
-bun --cwd backend run migration:push       # Push schema
-bun --cwd backend run db:studio            # View data
+bun run migrate                            # Apply checksum-verified migrations
+bun --cwd=backend run migration:generate -- --name <name> # Generate + seal a reviewed artifact
+bun --cwd=backend run db:studio            # View data
 ```
+
+`backend/migrations` is authoritative. `backend/drizzle` is historical only. The
+`migration:push:dev-only` command requires
+`SENTRIS_ALLOW_DISPOSABLE_SCHEMA_PUSH=true`, resolves and prints the target
+through the shared local-script runtime, and may be used only against an
+intentionally disposable development database. It rejects production/staging
+environments and direct Drizzle config/credential target overrides, and must not
+be used in startup, reset, or other operational paths.
 
 ## Rules
 
@@ -221,7 +230,7 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 
 ### Health Checks
 
-- **Backend**: `GET /health` (liveness) and `GET /health/ready` (readiness) via Terminus. Indicators: Postgres, Redis, Temporal.
+- **Backend**: `GET /health` (liveness) and `GET /health/ready` (readiness) via Terminus. Indicators: Postgres, Redis, Temporal, and all enabled Kafka ingest consumers.
 - **Worker**: `GET :9100+N*100/health` per worker instance.
 
 ### Sticky Sessions & MCP Session Registry

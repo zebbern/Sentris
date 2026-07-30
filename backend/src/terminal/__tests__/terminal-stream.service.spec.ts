@@ -5,7 +5,10 @@ import { TerminalStreamService } from '../terminal-stream.service';
 class MockRedis {
   private trackingSets: Record<string, Set<string>> = {};
 
-  constructor(private readonly entries: Record<string, [string, string][]>) {}
+  constructor(
+    private readonly entries: Record<string, [string, string][]>,
+    private readonly pipelineResults?: [Error | null, unknown][],
+  ) {}
   private scanCalled = false;
 
   async scan(cursor: string, _matchLabel: string, pattern: string) {
@@ -62,6 +65,9 @@ class MockRedis {
         return pipe;
       },
       exec: async () => {
+        if (this.pipelineResults) {
+          return this.pipelineResults;
+        }
         const results: [Error | null, unknown][] = [];
         for (const cmd of commands) {
           const result = await (this as any)[cmd.method](...cmd.args);
@@ -191,5 +197,41 @@ describe('TerminalStreamService', () => {
     // Tracking SET should be cleaned up (second del in pipeline)
     const remainingKeys = await (redis as any).smembers('terminal:run-7:_keys');
     expect(remainingKeys).toHaveLength(0);
+  });
+
+  it('rejects command-level stream deletion errors from an otherwise resolved pipeline', async () => {
+    const redis = new MockRedis(
+      {
+        'terminal:run-8:node.a:stdout': [],
+      },
+      [
+        [new Error('stream DEL failed'), null],
+        [null, 1],
+      ],
+    );
+    redis._setTracking('terminal:run-8:_keys', ['terminal:run-8:node.a:stdout']);
+    const service = new TerminalStreamService(redis as unknown as Redis);
+
+    await expect(service.deleteStreams('run-8')).rejects.toThrow(
+      'Redis terminal stream deletion failed',
+    );
+  });
+
+  it('rejects command-level tracking deletion errors so durable cleanup retries', async () => {
+    const redis = new MockRedis(
+      {
+        'terminal:run-9:node.a:stdout': [],
+      },
+      [
+        [null, 1],
+        [new Error('tracking DEL failed'), null],
+      ],
+    );
+    redis._setTracking('terminal:run-9:_keys', ['terminal:run-9:node.a:stdout']);
+    const service = new TerminalStreamService(redis as unknown as Redis);
+
+    await expect(service.deleteStreams('run-9')).rejects.toThrow(
+      'Redis terminal stream deletion failed',
+    );
   });
 });

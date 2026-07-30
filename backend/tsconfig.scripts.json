@@ -1,14 +1,12 @@
 {
-    "extends": "./tsconfig.json",
-    "compilerOptions": {
-        "composite": false,
-        "noEmit": true,
-        "declaration": false,
-        "declarationMap": false,
-        "emitDeclarationOnly": false
-    },
-    "include": [
-        "scripts/**/*",
-        "drizzle.config.ts"
-    ]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
+  },
+  "include": ["scripts/**/*", "drizzle.config.ts"],
+  "exclude": ["node_modules", "build", "scripts/**/__tests__/**", "scripts/**/*.test.ts"]
 }

@@ -26,13 +26,60 @@ This document describes the analytics infrastructure for Sentris Flow, including
 
 ### OpenSearch (Port 9200)
 
-Time-series database for storing security findings and workflow analytics.
+Search and aggregation store for security findings and workflow analytics.
 
 **Configuration:**
 
 - Single-node deployment (dev/simple prod)
 - Security plugin disabled for development
-- Index pattern: `security-findings-{org-id}-{date}`
+- Canonical observation index:
+  `security-findings-o{sha256(exact-org-id)}-observations-v1`
+- Tenant analytics namespace: `security-findings-o{sha256(exact-org-id)}-*`
+
+Canonical observations use a stable index and deterministic document ID. This
+keeps retries idempotent across UTC midnight and lets list/export pagination use
+one point-in-time snapshot. A caller-selected custom suffix remains available
+for non-finding analytics documents, except `observations-v1` and normalized
+`YYYY.MM.DD` suffixes, which are reserved for canonical and legacy findings.
+Canonical writes use create-only semantics: a retry that resolves to the same
+document ID leaves the original observation content and timestamps intact,
+including any newer triage projection.
+
+### Upgrading daily findings indexes
+
+Older releases wrote findings to daily `security-findings-{legacy-org-key}-YYYY.MM.DD`
+indexes. Inspect the non-destructive migration plan for each organization:
+
+```bash
+OPENSEARCH_URL=http://localhost:9200 \
+bun run migrate:findings-index -- --organization <organization-id>
+```
+
+After reviewing the source and target indexes, apply it:
+
+```bash
+OPENSEARCH_URL=http://localhost:9200 \
+bun run migrate:findings-index -- --organization <organization-id> --apply
+```
+
+The command installs the content-addressed final ingest pipeline before the
+exact organization template, applies the final pipeline and additive canonical
+mappings to an existing stable index, and reindexes daily sources
+oldest-to-newest into `observations-v1` with create-only writes. Each source
+query requires the exact `sentris.organization_id`, so legacy names that
+collapsed case cannot leak one organization into another. Documents without
+that ownership field are not guessed; they require explicit operator review.
+
+The command then scans the stable index in bounded pages, backfills indexed
+contract classifications and normalized severity with optimistic concurrency,
+refreshes those writes, verifies the installed pipeline, template, and mapping
+again, and publishes a content- and index-UUID-bound integrity watermark.
+Existing stable observations—and any newer projected triage—are never
+overwritten. It rejects timed-out or failed reindex responses, classification
+write failures, invariant drift, and incomplete scans, and never deletes source
+indexes. Retain them until counts, schema coverage, and representative findings
+have been verified, then remove exact, reviewed indexes through your normal
+OpenSearch retention procedure.
 
 ### OpenSearch Dashboards (Port 5601)
 
@@ -75,20 +122,46 @@ OPENSEARCH_URL=http://opensearch:9200
 
 ```json
 {
+  "contract": "sentris.finding-observation",
+  "schema_version": 1,
+  "finding_id": "fo_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "observed_at": "2026-01-25T01:22:43.783Z",
   "@timestamp": "2026-01-25T01:22:43.783Z",
   "title": "Finding title",
   "severity": "high",
+  "sentris_normalized_severity": "high",
   "description": "...",
+  "evidence": null,
+  "source": {
+    "scanner": "nuclei"
+  },
   "sentris": {
     "organization_id": "local-dev",
     "run_id": "sentris-run-xxx",
     "workflow_id": "workflow-xxx",
     "workflow_name": "My Workflow",
+    "scope_id": null,
     "component_id": "core.analytics.sink",
-    "node_ref": "analytics-sink-123"
+    "node_ref": "analytics-sink-123",
+    "asset_key": "https://example.test",
+    "contract_validated": true,
+    "contract_source_validated": true,
+    "contract_document_id": "fo_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
   }
 }
 ```
+
+The backend treats a document as canonical only when its versioned shared
+schema, trusted-writer attestations, bound document ID, and full-query coverage
+all agree. Legacy documents remain readable through the compatibility adapter;
+invalid or incomplete coverage is surfaced as degraded rather than a successful
+zero.
+
+Canonical mappings are intentionally bounded. Known filter/search fields and
+`sentris_normalized_severity` are indexed. Arbitrary scanner fields remain
+unchanged in `_source`; `evidence` and `source` retain their JSON with indexing
+disabled. Custom-suffix analytics indexes are generic and do not receive the
+finding final pipeline or canonical mapping.
 
 ## Nginx Routing
 
@@ -123,16 +196,12 @@ location /analytics/ {
 The frontend links to OpenSearch Dashboards Discover app with pre-filtered queries:
 
 ```typescript
-const baseUrl = '/analytics';
-// Use .keyword fields for exact match filtering
-const filterQuery = `sentris.run_id.keyword:"${runId}"`;
-
-// Build Discover URL with proper state format
-const gParam = encodeURIComponent('(time:(from:now-7d,to:now))');
-const aParam = encodeURIComponent(
-  `(columns:!(_source),index:'security-findings-*',interval:auto,query:(language:kuery,query:'${filterQuery}'),sort:!('@timestamp',desc))`,
-);
-const url = `${baseUrl}/app/discover#/?_g=${gParam}&_a=${aParam}`;
+const url = buildOpenSearchUrl({
+  baseUrl: '/analytics',
+  workflowId,
+  runId,
+  orgId: exactOrganizationId,
+});
 
 // Open in new tab
 window.open(url, '_blank', 'noopener,noreferrer');
@@ -140,9 +209,11 @@ window.open(url, '_blank', 'noopener,noreferrer');
 
 **Key points:**
 
-- Use `.keyword` fields (e.g., `sentris.run_id.keyword`) for exact match filtering
+- `sentris.run_id` and `sentris.workflow_id` are already mapped as `keyword`;
+  do not add a `.keyword` suffix
+- The helper hashes the exact organization ID and selects only its canonical
+  observation index
 - Use Discover app (`/app/discover`) for viewing raw data without saved views
-- Include `index`, `columns`, `interval`, and `sort` in the `_a` param
 
 **Environment Variable:**
 
@@ -185,10 +256,15 @@ The tenant identity for OpenSearch Dashboards is determined through a proxy auth
 
 1. **Browser navigation** to `/analytics/` sends the Clerk `__session` cookie
 2. **nginx** sends an `auth_request` to the backend (`/api/v1/auth/validate`)
-3. **Backend** decodes the JWT from the cookie and resolves the organization:
-   - If the JWT contains `org_id` (active Clerk organization session) → uses `org_id` as tenant
-   - If the JWT has no `org_id` → falls back to `workspace-{userId}` (personal workspace)
-4. **nginx** forwards the resolved identity via `x-proxy-user`, `x-proxy-roles`, and `securitytenant` headers
+3. **Backend** decodes the JWT and resolves the exact organization identity:
+   - If the JWT contains `org_id` (active Clerk organization session), that
+     exact value owns the data
+   - If the JWT has no `org_id`, it falls back to
+     `workspace-{userId}` (personal workspace)
+   - The backend sends Nginx the collision-safe
+     `o{sha256(exact-organization-id)}` resource key
+4. **nginx** forwards that key via `x-proxy-user`, `x-proxy-roles`, and
+   `securitytenant` headers
 
 ### Important: Clerk Active Organization Session
 
@@ -205,34 +281,46 @@ If a user is a member of an organization but hasn't activated it (via Clerk's `O
 
 When a new `org_id` is seen during auth validation, the backend automatically provisions:
 
-- An OpenSearch **tenant** named after the org ID
-- A **role** (`customer_{orgId}_ro`) with read access to `security-findings-{orgId}-*` indices and `kibana_all_write` tenant permissions
+- An OpenSearch **tenant** named with the collision-safe organization key
+- A **role** (`customer_o{sha256(exact-org-id)}_ro`) with read access to the
+  matching `security-findings-o{sha256(exact-org-id)}-*` namespace and
+  `kibana_all_write` tenant permissions
 - A **role mapping** linking the role to the proxy auth backend role
-- An **index template** and **seed index** with field mappings so index patterns resolve correctly
-- A default **index pattern** (`security-findings-{orgId}-*`) in the tenant's saved objects
+- An exact observation **index template** and **seed index** with canonical
+  mappings
+- A default exact observation **index pattern** in the tenant's saved objects
 
 ### Security Guarantees
 
 - The JWT is cryptographically signed by Clerk — `org_id` cannot be forged
 - The backend validates `X-Organization-Id` headers against the JWT's `org_id` — cross-tenant header spoofing is rejected
+- Case- and whitespace-distinct organization IDs produce different index,
+  tenant, role, control-index, and Dashboards identities
 - Each tenant has isolated roles, index patterns, and saved objects
 - The `workspace-{userId}` fallback creates an isolated personal sandbox — no data leaks between tenants
 
 ## Troubleshooting
 
-### OpenSearch Dashboards Shows `workspace-user_...` Instead of Organization Name
+### OpenSearch Dashboards Opens an Empty Personal Workspace
 
-**Symptom:** The user profile dropdown in OpenSearch Dashboards shows `workspace-user_{clerkUserId}` instead of the organization ID (e.g., `org_...`). The dashboard appears empty because all indexed data is under the organization's tenant, not the personal workspace.
+**Symptom:** Dashboards opens an empty tenant after the user joined an
+organization. Tenant resource names are opaque `o<sha256>` keys, so the visible
+name alone does not identify whether the active identity is the organization or
+the personal `workspace-{userId}` fallback.
 
 **Expected (org tenant active):**
 
-![OpenSearch showing org ID as tenant](media/opensearch-tenant-org-id.png)
+![OpenSearch organization tenant example](media/opensearch-tenant-org-id.png)
 
 **Broken (workspace fallback):**
 
-![OpenSearch showing workspace-user fallback](media/opensearch-tenant-workspace-fallback.png)
+![OpenSearch personal workspace fallback example](media/opensearch-tenant-workspace-fallback.png)
 
-**Root Cause:** The user's Clerk session does not have an active organization. The Clerk JWT (`__session` cookie) only includes `org_id` when the organization is explicitly activated via `OrganizationSwitcher` or `clerk.setActive({ organization: orgId })`. Without an active org, the backend falls back to `workspace-{userId}`.
+**Root Cause:** The user's Clerk session does not have an active organization.
+The Clerk JWT (`__session` cookie) only includes `org_id` when the organization
+is explicitly activated via `OrganizationSwitcher` or
+`clerk.setActive({ organization: orgId })`. Without it, the backend hashes and
+provisions the personal workspace identity instead.
 
 This can happen when:
 
@@ -254,29 +342,31 @@ This can happen when:
 # Check backend logs for the auth resolution path
 docker logs sentris-backend 2>&1 | grep -E "\[AUTH\].*Resolving org|No org found|Using org"
 
-# Example log when org is missing from JWT:
-# [AUTH] Resolving org - Header: not present, JWT org: none, User: user_39ey3oxc0...
-# [AUTH] No org found, using workspace: workspace-user_39ey3oxc0...
-
-# Example log when org is correctly resolved:
-# [AUTH] Resolving org - Header: not present, JWT org: org_30cuor7xe..., User: user_abc...
-# [AUTH] Using org from JWT payload: org_30cuor7xe...
+# Confirm whether auth selected an org or the personal workspace fallback.
+# Do not infer the source identity by reversing the OpenSearch resource hash.
 ```
 
 **Solution:**
 
 1. Have the user switch to their organization using the Organization Switcher in the app UI
 2. Ensure the frontend calls `clerk.setActive({ organization: orgId })` after login when the user belongs to an organization
-3. After switching, refresh the `/analytics/` page — the tenant should now show the org ID
+3. After switching, refresh `/analytics/`; it should select the organization's
+   hashed tenant and exact observation index
 
-**Security Note:** This is a UX issue, not a security vulnerability. The `workspace-user_...` fallback creates an isolated empty sandbox. No data leaks between tenants. See the [Security Guarantees](#security-guarantees) section above.
+**Security Note:** This is a UX issue, not a security vulnerability. The
+personal workspace fallback creates a separately hashed, isolated sandbox. See
+the [Security Guarantees](#security-guarantees) section above.
 
 ### Accessing OpenSearch Dashboards as Admin (Maintenance)
 
 For maintenance tasks (managing indices, debugging tenant provisioning, viewing all tenants, etc.), you need admin-level access to OpenSearch Dashboards.
 
 **Why normal `/analytics/` access won't work as admin:**
-The nginx `/analytics/` route always injects org-scoped proxy headers (`x-proxy-user: org_<orgId>_user`). Since proxy auth (order 0) takes priority over basic auth (order 1), OpenSearch ignores any admin credentials and authenticates you as the org-scoped user instead.
+The nginx `/analytics/` route always injects hashed organization-scoped proxy
+headers (`x-proxy-user: o<sha256>` and the matching customer role). Since proxy
+auth (order 0) takes priority over basic auth (order 1), OpenSearch ignores any
+admin credentials and authenticates you as the organization-scoped user
+instead.
 
 **How to access as admin:**
 
@@ -347,20 +437,24 @@ docker logs sentris-worker 2>&1 | grep -i "analytics\|indexing"
 **Solution:**
 
 - Set time range to "Last 30 days" or wider
-- Ensure `security-findings-*` index pattern is selected
+- Ensure the tenant-provisioned
+  `security-findings-o<64-hex-digest>-observations-v1` index pattern is selected
 
 ### Query Returns No Results
 
 **Check if data exists:**
 
 ```bash
-# Count documents
-curl -s "http://localhost:9200/security-findings-*/_count" | jq '.count'
+# Use the exact index printed by the migration plan or provisioning logs.
+OBSERVATION_INDEX="security-findings-o<64-hex-digest>-observations-v1"
+
+# Count documents for one reviewed organization
+curl -s "http://localhost:9200/${OBSERVATION_INDEX}/_count" | jq '.count'
 
 # List run_ids with data
-curl -s "http://localhost:9200/security-findings-*/_search" \
+curl -s "http://localhost:9200/${OBSERVATION_INDEX}/_search" \
   -H "Content-Type: application/json" \
-  -d '{"size":0,"aggs":{"run_ids":{"terms":{"field":"sentris.run_id.keyword"}}}}' \
+  -d '{"size":0,"aggs":{"run_ids":{"terms":{"field":"sentris.run_id"}}}}' \
   | jq '.aggregations.run_ids.buckets'
 ```
 

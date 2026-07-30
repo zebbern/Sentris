@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   componentRegistry,
   createExecutionContext,
@@ -12,6 +12,7 @@ import {
   type INodeIOService,
   type ComponentPortMetadata,
   type LogEventInput,
+  type TraceEvent,
 } from '@sentris/component-sdk';
 import type {
   WorkflowDefinition,
@@ -31,6 +32,8 @@ import type { ArtifactServiceFactory } from './artifact-factory';
 import { workflowDiagnosticLog } from './workflow-diagnostics';
 import { getForEachLoopBody } from './workflows/for-each-handler';
 import { resolveInputValue } from './input-resolver';
+import { recordNodeIoWithoutChangingExecution } from './utils/node-io-delivery';
+import { RequiredPublicationTracker } from './utils/required-publication-tracker';
 
 export interface ExecuteWorkflowOptions {
   runId?: string;
@@ -43,6 +46,7 @@ export interface ExecuteWorkflowOptions {
   organizationId?: string | null;
   workflowId?: string;
   workflowVersionId?: string | null;
+  scopeId?: string | null;
   initialResults?: Map<string, unknown>;
 }
 
@@ -56,6 +60,10 @@ export async function executeWorkflow(
   options: ExecuteWorkflowOptions = {},
 ): Promise<WorkflowRunResult> {
   const runId = options.runId ?? randomUUID();
+  const publications = new RequiredPublicationTracker();
+  const organizationId = options.organizationId ?? null;
+  const storage = options.storage?.forOrganization(organizationId);
+  const secrets = options.secrets?.forOrganization(organizationId);
   workflowDiagnosticLog(`🏃 [WORKFLOW RUNNER] executeWorkflow called for runId: ${runId}`);
   workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Definition has ${definition.actions.length} actions`);
   workflowDiagnosticLog(`📋 [WORKFLOW RUNNER] Entrypoint ref: ${definition.entrypoint.ref}`);
@@ -69,18 +77,60 @@ export async function executeWorkflow(
     ? (entry) => {
         const parsed = new Date(entry.timestamp);
         const timestamp = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-        void options.logs
-          ?.append({
-            runId: entry.runId,
-            nodeRef: entry.nodeRef,
-            stream: entry.stream,
-            level: entry.level,
-            message: entry.message,
-            timestamp,
-          })
-          .catch((error: unknown) => {
+        publications.track(
+          () =>
+            options.logs!.append({
+              runId: entry.runId,
+              nodeRef: entry.nodeRef,
+              stream: entry.stream,
+              level: entry.level,
+              message: entry.message,
+              timestamp,
+            }),
+          (error: unknown) => {
             console.error('[Logs] Failed to append log entry', error);
-          });
+          },
+        );
+      }
+    : undefined;
+
+  const recordTrace = (event: TraceEvent, stableKey: string): void => {
+    if (!options.trace) return;
+
+    const stableKeyHash = createHash('sha256').update(stableKey).digest('hex').slice(0, 32);
+    const eventId = event.eventId ?? `trace:${runId}:legacy:${stableKeyHash}`;
+    const sequence =
+      event.sequence ??
+      (createHash('sha256').update(eventId).digest().readUInt32BE(0) % 2_147_483_646) + 1;
+
+    publications.track(
+      () =>
+        options.trace!.record({
+          ...event,
+          eventId,
+          sequence,
+          workflowId: event.workflowId ?? options.workflowId ?? null,
+          organizationId: event.organizationId ?? organizationId,
+        }),
+      (error: unknown) => {
+        console.error(`[WorkflowRunner] Failed to publish trace event ${eventId}`, error);
+      },
+    );
+  };
+
+  const trackedTrace: ITraceService | undefined = options.trace
+    ? {
+        record(event) {
+          publications.track(
+            () => options.trace!.record(event),
+            (error: unknown) => {
+              console.error(
+                `[WorkflowRunner] Failed to publish component trace event ${event.eventId ?? 'unknown'}`,
+                error,
+              );
+            },
+          );
+        },
       }
     : undefined;
 
@@ -121,21 +171,24 @@ export async function executeWorkflow(
       const joinStrategy = nodeMetadata?.joinStrategy ?? schedulerContext.joinStrategy;
 
       // Record trace event
-      options.trace?.record({
-        type: 'NODE_STARTED',
-        runId,
-        nodeRef: action.ref,
-        timestamp: new Date().toISOString(),
-        level: 'info',
-        context: {
+      recordTrace(
+        {
+          type: 'NODE_STARTED',
           runId,
-          componentRef: action.ref,
-          streamId,
-          joinStrategy,
-          triggeredBy,
-          failure,
+          nodeRef: action.ref,
+          timestamp: new Date().toISOString(),
+          level: 'info',
+          context: {
+            runId,
+            componentRef: action.ref,
+            streamId,
+            joinStrategy,
+            triggeredBy,
+            failure,
+          },
         },
-      });
+        `node:${action.ref}:started`,
+      );
 
       const { inputs, params, warnings, manualOverrides } = buildActionPayload(action, results, {
         componentMetadata: { inputs: inputPorts },
@@ -146,43 +199,49 @@ export async function executeWorkflow(
       });
 
       for (const override of manualOverrides) {
-        options.trace?.record({
-          type: 'NODE_PROGRESS',
-          runId,
-          nodeRef: action.ref,
-          timestamp: new Date().toISOString(),
-          level: 'debug',
-          message: `Input '${override.target}' using manual value`,
-          data: { sourceRef: 'manual' },
-          context: {
+        recordTrace(
+          {
+            type: 'NODE_PROGRESS',
             runId,
-            componentRef: action.ref,
-            streamId,
-            joinStrategy,
-            triggeredBy,
-            failure,
+            nodeRef: action.ref,
+            timestamp: new Date().toISOString(),
+            level: 'debug',
+            message: `Input '${override.target}' using manual value`,
+            data: { sourceRef: 'manual' },
+            context: {
+              runId,
+              componentRef: action.ref,
+              streamId,
+              joinStrategy,
+              triggeredBy,
+              failure,
+            },
           },
-        });
+          `node:${action.ref}:manual:${override.target}`,
+        );
       }
 
       for (const warning of warningsToReport) {
-        options.trace?.record({
-          type: 'NODE_PROGRESS',
-          runId,
-          nodeRef: action.ref,
-          timestamp: new Date().toISOString(),
-          message: `Input '${warning.target}' mapped from ${warning.sourceRef}.${warning.sourceHandle} was undefined`,
-          level: 'warn',
-          data: warning,
-          context: {
+        recordTrace(
+          {
+            type: 'NODE_PROGRESS',
             runId,
-            componentRef: action.ref,
-            streamId,
-            joinStrategy,
-            triggeredBy,
-            failure,
+            nodeRef: action.ref,
+            timestamp: new Date().toISOString(),
+            message: `Input '${warning.target}' mapped from ${warning.sourceRef}.${warning.sourceHandle} was undefined`,
+            level: 'warn',
+            data: warning,
+            context: {
+              runId,
+              componentRef: action.ref,
+              streamId,
+              joinStrategy,
+              triggeredBy,
+              failure,
+            },
           },
-        });
+          `node:${action.ref}:warning:${warning.target}:${warning.sourceRef}:${warning.sourceHandle}`,
+        );
       }
 
       // Resolve spilled inputs if necessary
@@ -191,7 +250,7 @@ export async function executeWorkflow(
 
       for (const [key, value] of Object.entries(resolvedParams)) {
         if (isSpilledDataMarker(value)) {
-          if (!options.storage) {
+          if (!storage) {
             console.warn(
               `[WorkflowRunner] Parameter '${key}' is spilled but no storage service is available`,
             );
@@ -203,7 +262,7 @@ export async function executeWorkflow(
             if (spilledObjectsCache.has(value.storageRef)) {
               fullData = spilledObjectsCache.get(value.storageRef);
             } else {
-              const content = await options.storage.downloadFile(value.storageRef);
+              const content = await storage.downloadFile(value.storageRef);
               fullData = JSON.parse(content.buffer.toString('utf8'));
               spilledObjectsCache.set(value.storageRef, fullData);
             }
@@ -272,14 +331,16 @@ export async function executeWorkflow(
       }
 
       // Record node I/O start
-      await options.nodeIO?.recordStart({
-        runId,
-        nodeRef: action.ref,
-        workflowId: options.workflowId,
-        organizationId: options.organizationId,
-        componentId: action.componentId,
-        inputs: maskSecretOutputs(inputPorts, inputs) as Record<string, unknown>,
-      });
+      await recordNodeIoWithoutChangingExecution(() =>
+        options.nodeIO?.recordStart({
+          runId,
+          nodeRef: action.ref,
+          workflowId: options.workflowId,
+          organizationId: options.organizationId,
+          componentId: action.componentId,
+          inputs: maskSecretOutputs(inputPorts, inputs) as Record<string, unknown>,
+        }),
+      );
 
       const parsedParams = component.parameters ? component.parameters.parse(params) : params;
 
@@ -358,32 +419,38 @@ export async function executeWorkflow(
         };
         results.set(action.ref, forEachOutput);
 
-        await options.nodeIO?.recordCompletion({
-          runId,
-          nodeRef: action.ref,
-          componentId: action.componentId,
-          outputs: forEachOutput as Record<string, unknown>,
-          status: 'completed',
-        });
-
-        options.trace?.record({
-          type: 'NODE_COMPLETED',
-          runId,
-          nodeRef: action.ref,
-          timestamp: new Date().toISOString(),
-          level: 'info',
-          data: {
-            iterations: cappedItems.length,
-          },
-          context: {
+        await recordNodeIoWithoutChangingExecution(() =>
+          options.nodeIO?.recordCompletion({
             runId,
-            componentRef: action.ref,
-            streamId,
-            joinStrategy,
-            triggeredBy,
-            failure,
+            nodeRef: action.ref,
+            organizationId,
+            componentId: action.componentId,
+            outputs: forEachOutput as Record<string, unknown>,
+            status: 'completed',
+          }),
+        );
+
+        recordTrace(
+          {
+            type: 'NODE_COMPLETED',
+            runId,
+            nodeRef: action.ref,
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            data: {
+              iterations: cappedItems.length,
+            },
+            context: {
+              runId,
+              componentRef: action.ref,
+              streamId,
+              joinStrategy,
+              triggeredBy,
+              failure,
+            },
           },
-        });
+          `node:${action.ref}:completed`,
+        );
 
         return { activePorts: ['results', 'iterations', 'done'] };
       }
@@ -412,14 +479,15 @@ export async function executeWorkflow(
           triggeredBy,
           failure,
         },
-        storage: options.storage,
-        secrets: allowSecrets ? options.secrets : undefined,
+        storage,
+        secrets: allowSecrets ? secrets : undefined,
         artifacts: scopedArtifacts,
-        trace: options.trace,
+        trace: trackedTrace,
         logCollector: forwardLog,
         workflowId: options.workflowId,
         workflowName: definition.title,
         organizationId: options.organizationId,
+        scopeId: options.scopeId ?? null,
       });
 
       try {
@@ -436,7 +504,7 @@ export async function executeWorkflow(
         let output = outputsSchema.parse(rawOutput);
 
         // Check for payload size and spill if necessary
-        if (output && options.storage) {
+        if (output && storage) {
           try {
             const outputStr = JSON.stringify(output);
             const size = Buffer.byteLength(outputStr, 'utf8');
@@ -444,7 +512,7 @@ export async function executeWorkflow(
             if (size > TEMPORAL_SPILL_THRESHOLD_BYTES) {
               const fileId = randomUUID();
 
-              await options.storage.uploadFile(
+              await storage.uploadFile(
                 fileId,
                 'output.json',
                 Buffer.from(outputStr),
@@ -465,30 +533,36 @@ export async function executeWorkflow(
         results.set(action.ref, output);
         workflowDiagnosticLog(`💾 [WORKFLOW RUNNER] Result stored for: ${actionRef}`);
         // Record node I/O completion
-        await options.nodeIO?.recordCompletion({
-          runId,
-          nodeRef: action.ref,
-          componentId: action.componentId,
-          outputs: maskSecretOutputs(outputPorts, output) as Record<string, unknown>,
-          status: 'completed',
-        });
-
-        options.trace?.record({
-          type: 'NODE_COMPLETED',
-          runId,
-          nodeRef: action.ref,
-          timestamp: new Date().toISOString(),
-          outputSummary: createLightweightSummary(component, output),
-          level: 'info',
-          context: {
+        await recordNodeIoWithoutChangingExecution(() =>
+          options.nodeIO?.recordCompletion({
             runId,
-            componentRef: action.ref,
-            streamId,
-            joinStrategy,
-            triggeredBy,
-            failure,
+            nodeRef: action.ref,
+            organizationId,
+            componentId: action.componentId,
+            outputs: maskSecretOutputs(outputPorts, output) as Record<string, unknown>,
+            status: 'completed',
+          }),
+        );
+
+        recordTrace(
+          {
+            type: 'NODE_COMPLETED',
+            runId,
+            nodeRef: action.ref,
+            timestamp: new Date().toISOString(),
+            outputSummary: createLightweightSummary(component, output),
+            level: 'info',
+            context: {
+              runId,
+              componentRef: action.ref,
+              streamId,
+              joinStrategy,
+              triggeredBy,
+              failure,
+            },
           },
-        });
+          `node:${action.ref}:completed`,
+        );
       } catch (error: unknown) {
         const errorMsg = error instanceof Error ? error.message : String(error);
 
@@ -534,32 +608,38 @@ export async function executeWorkflow(
           fieldErrors,
         };
 
-        options.trace?.record({
-          type: 'NODE_FAILED',
-          runId,
-          nodeRef: action.ref,
-          timestamp: new Date().toISOString(),
-          message: errorMsg,
-          error: traceError,
-          level: 'error',
-          context: {
+        recordTrace(
+          {
+            type: 'NODE_FAILED',
             runId,
-            componentRef: action.ref,
-            streamId,
-            joinStrategy,
-            triggeredBy,
-            failure,
+            nodeRef: action.ref,
+            timestamp: new Date().toISOString(),
+            message: errorMsg,
+            error: traceError,
+            level: 'error',
+            context: {
+              runId,
+              componentRef: action.ref,
+              streamId,
+              joinStrategy,
+              triggeredBy,
+              failure,
+            },
           },
-        });
+          `node:${action.ref}:failed`,
+        );
         // Record node I/O failure
-        await options.nodeIO?.recordCompletion({
-          runId,
-          nodeRef: action.ref,
-          componentId: action.componentId,
-          outputs: {}, // No successful output
-          status: 'failed',
-          errorMessage: errorMsg,
-        });
+        await recordNodeIoWithoutChangingExecution(() =>
+          options.nodeIO?.recordCompletion({
+            runId,
+            nodeRef: action.ref,
+            organizationId,
+            componentId: action.componentId,
+            outputs: {}, // No successful output
+            status: 'failed',
+            errorMessage: errorMsg,
+          }),
+        );
 
         throw error;
       }
@@ -615,6 +695,8 @@ export async function executeWorkflow(
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    await publications.drain();
   }
 }
 

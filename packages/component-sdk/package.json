@@ -8,6 +8,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
     "./interfaces": "./src/interfaces.ts",
     "./types": "./src/types.ts",
     "./registry": "./src/registry.ts",

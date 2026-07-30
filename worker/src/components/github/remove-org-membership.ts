@@ -13,6 +13,7 @@ import {
   port,
   DEFAULT_SENSITIVE_HEADERS,
 } from '@sentris/component-sdk';
+import { resolveBackendApiBaseUrl } from '../../common/backend-url';
 
 const inputSchema = inputs({
   organization: port(z.string().trim().min(1, 'Organization is required.'), {
@@ -296,10 +297,7 @@ async function fetchConnectionAccessToken(
 }> {
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
-  const baseUrl =
-    process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
-
-  const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const normalizedBase = resolveBackendApiBaseUrl();
   const allowedInternalHost = getUrlHostname(normalizedBase);
 
   if (!internalToken) {
@@ -310,22 +308,20 @@ async function fetchConnectionAccessToken(
     });
   }
 
-  const sensitiveHeaders = internalToken
-    ? Array.from(new Set([...DEFAULT_SENSITIVE_HEADERS, 'x-internal-token']))
-    : DEFAULT_SENSITIVE_HEADERS;
+  const sensitiveHeaders = Array.from(
+    new Set([...DEFAULT_SENSITIVE_HEADERS, 'x-internal-token', 'x-organization-id', 'x-run-id']),
+  );
 
   const response = await context.http.fetch(
     `${normalizedBase}/integrations/connections/${encodeURIComponent(connectionId)}/token`,
     {
       method: 'POST',
-      headers: internalToken
-        ? {
-            'Content-Type': 'application/json',
-            'X-Internal-Token': internalToken,
-          }
-        : {
-            'Content-Type': 'application/json',
-          },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(internalToken ? { 'X-Internal-Token': internalToken } : {}),
+        ...(context.organizationId ? { 'X-Organization-Id': context.organizationId } : {}),
+        'X-Run-Id': context.runId,
+      },
     },
     {
       sensitiveHeaders,

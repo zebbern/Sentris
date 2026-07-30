@@ -139,7 +139,55 @@ describe('AssetInventoryService', () => {
     expect(records[0]).toMatchObject({ assetValue: 'spilled.example.com' });
   });
 
-  it('never throws even when a dependency rejects', async () => {
+  it('propagates spilled-output failures so the projection is retried', async () => {
+    nodeIORepository.findByRunAndNode.mockResolvedValue(
+      makeSubfinderRow({
+        outputs: null,
+        outputsSpilled: true,
+        outputsStorageRef: 'ref-1',
+      }),
+    );
+    workflowRunRepository.findByRunId.mockResolvedValue({
+      organizationId: DEFAULT_ORGANIZATION_ID,
+      scopeId: 'scope-1',
+    });
+    storage.downloadFile.mockRejectedValue(new Error('object storage unavailable'));
+
+    await expect(
+      service.onNodeIoCompleted({
+        runId: 'run-1',
+        nodeRef: 'n1',
+        componentId: 'sentris.subfinder.run',
+      }),
+    ).rejects.toThrow('object storage unavailable');
+    expect(repository.upsertMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects spilled outputs without a storage reference instead of projecting a false empty result', async () => {
+    nodeIORepository.findByRunAndNode.mockResolvedValue(
+      makeSubfinderRow({
+        outputs: { __sentrisSpilled: true, storageRef: 'unknown', originalSize: 120_000 },
+        outputsSpilled: true,
+        outputsStorageRef: null,
+      }),
+    );
+    workflowRunRepository.findByRunId.mockResolvedValue({
+      organizationId: DEFAULT_ORGANIZATION_ID,
+      scopeId: 'scope-1',
+    });
+
+    await expect(
+      service.onNodeIoCompleted({
+        runId: 'run-1',
+        nodeRef: 'n1',
+        componentId: 'sentris.subfinder.run',
+      }),
+    ).rejects.toThrow('Spilled node outputs are missing a storage reference');
+    expect(storage.downloadFile).not.toHaveBeenCalled();
+    expect(repository.upsertMany).not.toHaveBeenCalled();
+  });
+
+  it('propagates dependency failures so the durable dispatcher retries the projection', async () => {
     nodeIORepository.findByRunAndNode.mockRejectedValue(new Error('db down'));
 
     await expect(
@@ -148,7 +196,7 @@ describe('AssetInventoryService', () => {
         nodeRef: 'n1',
         componentId: 'sentris.subfinder.run',
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('db down');
     expect(repository.upsertMany).not.toHaveBeenCalled();
   });
 });

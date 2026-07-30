@@ -1,6 +1,9 @@
 import { createSentrisClient } from '@sentris/backend-client';
 import { useAuthStore } from '@/store/authStore';
 import { getFreshClerkToken } from '@/utils/clerk-token';
+import { API_BASE_URL, API_V1_URL } from '@/config/api-url';
+
+export { API_BASE_URL, API_V1_URL };
 
 /**
  * Generic openapi-fetch response shape for use when generated types lack `.error`.
@@ -12,32 +15,6 @@ export interface ApiResponse<D = unknown> {
   response?: Response;
 }
 
-/**
- * API Client Configuration
- */
-type RuntimeImportMeta = ImportMeta & {
-  env?: Record<string, string | undefined>;
-};
-
-function resolveApiBaseUrl() {
-  const metaEnv = (import.meta as RuntimeImportMeta).env;
-  if (metaEnv?.VITE_API_URL && metaEnv.VITE_API_URL.trim().length > 0) {
-    return metaEnv.VITE_API_URL;
-  }
-
-  if (typeof process !== 'undefined') {
-    const nodeEnv = (process.env ?? {}).VITE_API_URL;
-    if (nodeEnv && nodeEnv.trim().length > 0) {
-      return nodeEnv;
-    }
-  }
-
-  return 'http://localhost:3211';
-}
-
-export const API_BASE_URL = resolveApiBaseUrl();
-export const API_V1_URL = `${API_BASE_URL}/api/v1`;
-
 // Helper function to get auth headers (reused by middleware and file operations)
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const storeState = useAuthStore.getState();
@@ -46,29 +23,21 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   const organizationId = storeState.provider === 'local' ? 'local-dev' : storeState.organizationId;
 
   // For Clerk auth, always fetch a fresh token on-demand to prevent expiration issues
-  // This ensures we never use a stale/expired token
+  // and organization-switch races. Never combine the current organization scope
+  // with a bearer token captured for a previous organization.
   if (storeState.provider === 'clerk') {
-    try {
-      const freshToken = await getFreshClerkToken();
-      if (freshToken) {
-        token = freshToken;
-        // Update store with fresh token so it's available for next time
-        storeState.setToken(freshToken);
-      } else {
-        // If we can't get a fresh token, fall back to store token
-      }
-    } catch (_error: unknown) {
-      // Fall back to store token if fresh token fetch fails
+    token = null;
+    const freshToken = await getFreshClerkToken();
+    if (freshToken) {
+      token = freshToken;
+      // Update store with fresh token so it's available for next time
+      storeState.setToken(freshToken);
     }
   }
 
   const headers: Record<string, string> = {};
 
-  // For local auth with admin credentials, use Basic Auth
-  if (storeState.provider === 'local' && storeState.adminUsername && storeState.adminPassword) {
-    const credentials = btoa(`${storeState.adminUsername}:${storeState.adminPassword}`);
-    headers['Authorization'] = `Basic ${credentials}`;
-  } else if (token && token.trim().length > 0) {
+  if (token && token.trim().length > 0) {
     // Use Bearer token (for Clerk)
     const headerValue = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     headers['Authorization'] = headerValue;
@@ -112,7 +81,7 @@ export const apiClient = createSentrisClient({
 // Generic HTTP methods for services not covered by the typed client
 export async function httpGet<T>(path: string): Promise<T> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_V1_URL}${path}`, { headers });
+  const response = await fetch(`${API_V1_URL}${path}`, { headers, credentials: 'include' });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: `GET ${path} failed` }));
     throw new Error(error.message || `GET ${path} failed`);
@@ -129,6 +98,7 @@ export async function httpPost<T>(path: string, body?: unknown): Promise<T> {
     method: 'POST',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: `POST ${path} failed` }));
@@ -146,6 +116,7 @@ export async function httpPut<T>(path: string, body?: unknown): Promise<T> {
     method: 'PUT',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: `PUT ${path} failed` }));
@@ -163,6 +134,7 @@ export async function httpPatch<T>(path: string, body?: unknown): Promise<T> {
     method: 'PATCH',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: `PATCH ${path} failed` }));
@@ -176,6 +148,7 @@ export async function httpDel(path: string): Promise<void> {
   const response = await fetch(`${API_V1_URL}${path}`, {
     method: 'DELETE',
     headers,
+    credentials: 'include',
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: `DELETE ${path} failed` }));

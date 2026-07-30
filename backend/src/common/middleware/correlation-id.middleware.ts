@@ -4,6 +4,17 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 
 export const CORRELATION_ID_HEADER = 'x-request-id';
+export const CORRELATION_ID_MAX_LENGTH = 191;
+
+export function normalizeCorrelationId(value: unknown): string {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (normalized.length > 0 && normalized.length <= CORRELATION_ID_MAX_LENGTH) {
+      return normalized;
+    }
+  }
+  return randomUUID();
+}
 
 /**
  * Ensures every request has a correlation ID (X-Request-Id).
@@ -17,9 +28,7 @@ export const CORRELATION_ID_HEADER = 'x-request-id';
 @Injectable()
 export class CorrelationIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
-    const incoming = req.headers[CORRELATION_ID_HEADER];
-    const correlationId =
-      typeof incoming === 'string' && incoming.length > 0 ? incoming : randomUUID();
+    const correlationId = normalizeCorrelationId(req.headers[CORRELATION_ID_HEADER]);
 
     // Attach to request for downstream use
     (req as unknown as Record<string, unknown>)['correlationId'] = correlationId;

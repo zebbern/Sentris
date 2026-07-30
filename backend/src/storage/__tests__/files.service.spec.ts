@@ -137,4 +137,25 @@ describe('FilesService', () => {
       organizationId: DEFAULT_ORGANIZATION_ID,
     });
   });
+
+  it('deletes file metadata when the storage object is already absent', async () => {
+    filesRepo.findById.mockResolvedValue(makeFileRecord());
+    storage.deleteFile.mockRejectedValue(new NotFoundException('object already absent'));
+    filesRepo.delete.mockResolvedValue(undefined);
+
+    await service.deleteFile(authContext, 'file-1');
+
+    expect(filesRepo.delete).toHaveBeenCalledWith('file-1', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
+  it('retains file metadata when storage is unavailable', async () => {
+    filesRepo.findById.mockResolvedValue(makeFileRecord());
+    storage.deleteFile.mockRejectedValue(new Error('storage unavailable'));
+
+    await expect(service.deleteFile(authContext, 'file-1')).rejects.toThrow('storage unavailable');
+
+    expect(filesRepo.delete).not.toHaveBeenCalled();
+  });
 });

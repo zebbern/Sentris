@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "idx": 0,
+      "tag": "0000_v1_0_0",
+      "sqlSha256": "ae3fceb650640367fdcf46a7f04dba5f834d16c70f0112464fe7c0b640e5e1ac",
+      "snapshotSha256": "9a891a187ba3978760b66384f753ce75f93fbcec601ffc6a8fc9a924fc4909fa",
+      "contractSha256": "bf17413fed9685c8a63463c071d8fd188deb1187eaa75b2c3ab488e40fa0464c"
+    },
+    {
+      "idx": 1,
+      "tag": "0001_current_schema",
+      "sqlSha256": "2518f5f915c1e1054b18736034c74fc766e5abe34bf706e605a94ea63b69d3ca",
+      "snapshotSha256": "8ad763652d7a0f07a6baf63de2ffe94e49e52f8fc64c28353028122591e0503b",
+      "contractSha256": "82865d025f31c56d2b1abbd6b1b89c35fb988fb52784c9a474e09f362f843719"
+    },
+    {
+      "idx": 2,
+      "tag": "0002_add_durable_outbox_projection",
+      "sqlSha256": "d132d38cf165f54befcacafad23de8afaaed2868529f4387a0c4bb43a8b14104",
+      "snapshotSha256": "4918159b6d39c60c362545518b7daa74781f48c0e628a38d23911f659510189a",
+      "contractSha256": "c2a2aec9c21f7a39af8dbddef88cc4a5e75cf1c743aaa55272a3823005ec884d"
+    },
+    {
+      "idx": 3,
+      "tag": "0003_finding_projection_reconciliation",
+      "sqlSha256": "10207bd4e3c8b5091f626c7ec05aaf17541a73307076fa1adb769ae1cd5f7f56",
+      "snapshotSha256": "82895b31ba4b91759b802aa0f2be81166d6da50bdf4e3bc5c4a86a80bffbf59d",
+      "contractSha256": "7bc757849b9a5c039a3f77f59113e1fd96bc5040dbb182c40cbff14047cb0796"
+    },
+    {
+      "idx": 4,
+      "tag": "0004_finding_triage_reconciliation_keyset_index",
+      "sqlSha256": "44503a33c94a3a1b1be64bee280252c295acd84b2e8d1ff397fabfa1f617cbac",
+      "snapshotSha256": "ca6a36d6e2c09a4e449b248bb6765ef7c1e55293a619d08d9ca94951d5eb86dc",
+      "contractSha256": "b9cd7ef210c9a5b95edad33e34d617fb34ada53354b80561ea7ee9daa56476d9"
+    },
+    {
+      "idx": 5,
+      "tag": "0005_finding_scope_run_keyset_index",
+      "sqlSha256": "f15b8e60eb6f5556f03a54a813b61c529211107a066a22614b04a65df4dab483",
+      "snapshotSha256": "58f214b114225cadc2ef792f2f9989dff15f779e38bcb434df989020bb604f01",
+      "contractSha256": "f001cfd3dceb3b24697b65d3c0cee5cf0e3caae05ef00bc666fc2fae450cf710"
+    },
+    {
+      "idx": 6,
+      "tag": "0006_finding_projection_health_index",
+      "sqlSha256": "20691ffbadf3911ca496c4ecdcb83ef161e26fc64c083b16a294ebfc7b0d5f7b",
+      "snapshotSha256": "2da04f1a8546aa8d45bb0dfdd21a0c5bb71c4520b5392aa69ea3175aa5f4df6f",
+      "contractSha256": "848fbb794b5002074ef33cd13ddea0f10c0c996c23efe0b76e3ae481a060951a"
+    },
+    {
+      "idx": 7,
+      "tag": "0007_jira_webhook_registration_durability",
+      "sqlSha256": "333f1fa8567ead025c1f6d3df7e96db0f49b47fdce894467e1daddc438a1bdab",
+      "snapshotSha256": "70488f2d9fcfb0ff83ac0e471b96cc367198e2c91d92e8cf65de17ae64f31e9a",
+      "contractSha256": "f3b4dbaa3cdb5842ddb9859112ae18e5f755d86efaf96a8ddb8b55a2ec406838"
+    },
+    {
+      "idx": 8,
+      "tag": "0008_backfill_jira_webhook_registration",
+      "sqlSha256": "28072d2154cdcdf528b2f124b3275e65b261b136a470ffae6152cdc06e73dd00",
+      "snapshotSha256": "9b94ab6db78ec4306d392cbba9fdceffa05801ac44e71e0b5549713dd49e5581",
+      "contractSha256": "f3b4dbaa3cdb5842ddb9859112ae18e5f755d86efaf96a8ddb8b55a2ec406838"
+    },
+    {
+      "idx": 9,
+      "tag": "0009_platform_readiness_integrity",
+      "sqlSha256": "253948c5b1710750d6d014c8448981481b1eb6fbfa1139e38c68a1dbcbb46469",
+      "snapshotSha256": "945c2654efd8638617df8b6081099a3e67541fdc9ea7974b2c7e2b5ade0c02a3",
+      "contractSha256": "950caa92a26be503bf751f6d3ed9246ce542c66acca80980ce6923afffa5727a"
+    }
+  ]
+}

@@ -16,10 +16,11 @@ export function initializeTraceActivity(options: { trace: ITraceService }) {
  */
 export async function recordTraceEventActivity(event: TraceEvent): Promise<void> {
   if (!trace) {
-    console.warn('[TraceActivity] Trace service not initialized, skipping event', event.type);
-    return;
+    throw new Error(
+      `Trace service not initialized; refusing to acknowledge required event ${event.type}`,
+    );
   }
 
-  trace.record(event);
+  await trace.record(event);
   workflowDiagnosticLog(`[TraceActivity] Recorded event ${event.type} for ${event.nodeRef}`);
 }

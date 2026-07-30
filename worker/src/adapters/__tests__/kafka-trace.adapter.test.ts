@@ -3,13 +3,14 @@ import { MAX_KAFKA_MESSAGE_BYTES, type TraceEvent } from '@sentris/component-sdk
 
 const mockSend = vi.fn().mockResolvedValue(undefined);
 const mockConnect = vi.fn().mockResolvedValue(undefined);
+const mockDisconnect = vi.fn().mockResolvedValue(undefined);
 
 mock.module('kafkajs', () => ({
   Kafka: vi.fn(() => ({
     producer: vi.fn(() => ({
       connect: mockConnect,
       send: mockSend,
-      disconnect: vi.fn(),
+      disconnect: mockDisconnect,
     })),
   })),
   logLevel: {
@@ -35,6 +36,7 @@ describe('KafkaTraceAdapter', () => {
   beforeEach(() => {
     mockSend.mockClear();
     mockConnect.mockClear();
+    mockDisconnect.mockClear();
   });
 
   describe('constructor', () => {
@@ -51,12 +53,12 @@ describe('KafkaTraceAdapter', () => {
   });
 
   describe('setRunMetadata / finalizeRun lifecycle', () => {
-    it('metadata is available during the run and cleaned up after finalize', async () => {
+    it('does not rely on process-local run metadata for tenant identity', async () => {
       const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
 
       adapter.setRunMetadata('run-meta-1', {
-        workflowId: 'wf-1',
-        organizationId: 'org-1',
+        workflowId: 'stale-workflow',
+        organizationId: 'stale-organization',
       });
 
       const event: TraceEvent = {
@@ -67,53 +69,131 @@ describe('KafkaTraceAdapter', () => {
         level: 'info',
       };
 
-      adapter.record(event);
-
-      // Allow the fire-and-forget promise chain to resolve
-      await new Promise((r) => setTimeout(r, 10));
+      await adapter.record(event);
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       const payload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
-      expect(payload.workflowId).toBe('wf-1');
-      expect(payload.organizationId).toBe('org-1');
+      expect(payload.workflowId).toBeNull();
+      expect(payload.organizationId).toBeNull();
 
-      // Finalize run
       adapter.finalizeRun('run-meta-1');
 
-      // Record after finalize — metadata should be gone
       mockSend.mockClear();
-      adapter.record({
+      await adapter.record({
         ...event,
         type: 'NODE_COMPLETED',
+        workflowId: 'wf-1',
+        organizationId: 'org-1',
       });
 
-      await new Promise((r) => setTimeout(r, 10));
-
       const postPayload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
-      expect(postPayload.workflowId).toBeUndefined();
-      expect(postPayload.organizationId).toBeNull();
+      expect(postPayload.workflowId).toBe('wf-1');
+      expect(postPayload.organizationId).toBe('org-1');
+    });
+  });
+
+  describe('shutdown', () => {
+    it('disconnects a producer that was connected by the fast path', async () => {
+      const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
+
+      await adapter.record({
+        type: 'NODE_STARTED',
+        runId: 'run-shutdown',
+        nodeRef: 'node.a',
+        timestamp: '2026-07-29T10:00:00.000Z',
+        level: 'info',
+      });
+      await adapter.close();
+
+      expect(mockDisconnect).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('record', () => {
-    it('serializes event with correct fields including metadata', async () => {
+    it('does not resolve durable publication until Kafka acknowledges the event', async () => {
+      let releaseSend: (() => void) | undefined;
+      const sendGate = new Promise<void>((resolve) => {
+        releaseSend = resolve;
+      });
+      mockSend.mockImplementationOnce(async () => sendGate);
       const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
-      adapter.setRunMetadata('run-rec-1', {
-        workflowId: 'wf-2',
-        organizationId: 'org-2',
+      let settled = false;
+
+      const publication = Promise.resolve(
+        adapter.record({
+          type: 'NODE_STARTED',
+          runId: 'run-durable-1',
+          workflowId: 'wf-1',
+          organizationId: 'org-1',
+          eventId: 'trace:run-durable-1:activity-7:1',
+          sequence: 70_001,
+          nodeRef: 'node.scanner',
+          timestamp: '2026-07-26T12:00:00.000Z',
+          level: 'info',
+        } as TraceEvent),
+      ).then(() => {
+        settled = true;
       });
 
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      releaseSend?.();
+      await publication;
+
+      expect(mockSend).toHaveBeenCalledWith({
+        topic: 'trace-events',
+        messages: [
+          expect.objectContaining({
+            key: 'run-durable-1',
+            value: expect.any(String),
+          }),
+        ],
+      });
+      const payload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
+      expect(payload).toMatchObject({
+        workflowId: 'wf-1',
+        organizationId: 'org-1',
+        eventId: 'trace:run-durable-1:activity-7:1',
+        sequence: 70_001,
+      });
+    });
+
+    it('derives the same fallback identity without relying on process-local counters', async () => {
+      const first = new KafkaTraceAdapter(defaultConfig, noopLogger);
+      const second = new KafkaTraceAdapter(defaultConfig, noopLogger);
+      const event: TraceEvent = {
+        type: 'NODE_STARTED',
+        runId: 'run-restarted',
+        nodeRef: 'node.scanner',
+        timestamp: '2026-07-26T12:00:00.000Z',
+        level: 'info',
+        context: { runId: 'run-restarted', componentRef: 'node.scanner', activityId: '17' },
+      };
+
+      await Promise.resolve(first.record(event));
+      await Promise.resolve(second.record(event));
+
+      const firstPayload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
+      const secondPayload = JSON.parse(mockSend.mock.calls[1][0].messages[0].value);
+      expect(firstPayload.eventId).toBeString();
+      expect(secondPayload.eventId).toBe(firstPayload.eventId);
+      expect(secondPayload.sequence).toBe(firstPayload.sequence);
+    });
+
+    it('serializes event with correct fields including metadata', async () => {
+      const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
+
       const timestamp = new Date().toISOString();
-      adapter.record({
+      await adapter.record({
         type: 'NODE_STARTED',
         runId: 'run-rec-1',
+        workflowId: 'wf-2',
+        organizationId: 'org-2',
         nodeRef: 'node.scanner',
         timestamp,
         level: 'info',
         message: 'Starting scan',
       });
-
-      await new Promise((r) => setTimeout(r, 10));
 
       expect(mockSend).toHaveBeenCalledTimes(1);
       const sentPayload = mockSend.mock.calls[0][0];
@@ -164,6 +244,7 @@ describe('KafkaTraceAdapter', () => {
         data: {
           report: 'y'.repeat(MAX_KAFKA_MESSAGE_BYTES),
         },
+        sequence: 1,
       });
 
       await new Promise((r) => setTimeout(r, 10));
@@ -182,20 +263,21 @@ describe('KafkaTraceAdapter', () => {
   });
 
   describe('sequence numbering', () => {
-    it('assigns incrementing sequence numbers for the same runId', async () => {
+    it('preserves stable producer-supplied sequence numbers', async () => {
       const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
 
-      const makeEvent = (type: TraceEvent['type']): TraceEvent => ({
+      const makeEvent = (type: TraceEvent['type'], sequence: number): TraceEvent => ({
         type,
         runId: 'run-seq-1',
         nodeRef: 'node.a',
         timestamp: new Date().toISOString(),
         level: 'info',
+        sequence,
       });
 
-      adapter.record(makeEvent('NODE_STARTED'));
-      adapter.record(makeEvent('NODE_PROGRESS'));
-      adapter.record(makeEvent('NODE_COMPLETED'));
+      adapter.record(makeEvent('NODE_STARTED', 10_001));
+      adapter.record(makeEvent('NODE_PROGRESS', 10_002));
+      adapter.record(makeEvent('NODE_COMPLETED', 10_003));
 
       await new Promise((r) => setTimeout(r, 10));
 
@@ -205,12 +287,12 @@ describe('KafkaTraceAdapter', () => {
       const seq2 = JSON.parse(mockSend.mock.calls[1][0].messages[0].value).sequence;
       const seq3 = JSON.parse(mockSend.mock.calls[2][0].messages[0].value).sequence;
 
-      expect(seq1).toBe(1);
-      expect(seq2).toBe(2);
-      expect(seq3).toBe(3);
+      expect(seq1).toBe(10_001);
+      expect(seq2).toBe(10_002);
+      expect(seq3).toBe(10_003);
     });
 
-    it('maintains independent sequence counters for different runIds', async () => {
+    it('derives positive fallback sequences for legacy events', async () => {
       const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
 
       adapter.record({
@@ -245,19 +327,21 @@ describe('KafkaTraceAdapter', () => {
       const seqB1 = JSON.parse(mockSend.mock.calls[1][0].messages[0].value).sequence;
       const seqA2 = JSON.parse(mockSend.mock.calls[2][0].messages[0].value).sequence;
 
-      expect(seqA1).toBe(1);
-      expect(seqB1).toBe(1); // Independent counter
-      expect(seqA2).toBe(2);
+      expect(seqA1).toBeGreaterThan(0);
+      expect(seqB1).toBeGreaterThan(0);
+      expect(seqA2).toBeGreaterThan(0);
+      expect(seqA2).not.toBe(seqA1);
     });
 
-    it('resets sequence counter after finalizeRun', async () => {
+    it('keeps fallback identity stable across metadata finalization', async () => {
       const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger);
+      const timestamp = '2026-07-26T12:00:00.000Z';
 
       adapter.record({
         type: 'NODE_STARTED',
         runId: 'run-reset',
         nodeRef: 'node.a',
-        timestamp: new Date().toISOString(),
+        timestamp,
         level: 'info',
       });
 
@@ -267,7 +351,7 @@ describe('KafkaTraceAdapter', () => {
         type: 'NODE_STARTED',
         runId: 'run-reset',
         nodeRef: 'node.a',
-        timestamp: new Date().toISOString(),
+        timestamp,
         level: 'info',
       });
 
@@ -276,8 +360,7 @@ describe('KafkaTraceAdapter', () => {
       const seq1 = JSON.parse(mockSend.mock.calls[0][0].messages[0].value).sequence;
       const seq2 = JSON.parse(mockSend.mock.calls[1][0].messages[0].value).sequence;
 
-      expect(seq1).toBe(1);
-      expect(seq2).toBe(1); // Reset after finalize
+      expect(seq2).toBe(seq1);
     });
   });
 
@@ -359,22 +442,50 @@ describe('KafkaTraceAdapter', () => {
   });
 
   describe('error handling', () => {
-    it('catches and logs CRITICAL send errors without re-throwing', async () => {
+    it('queues the stable trace envelope when Kafka retries are exhausted', async () => {
+      const fallback = { enqueue: vi.fn(async () => undefined) };
+      const adapter = new KafkaTraceAdapter(defaultConfig, noopLogger, fallback);
+      mockSend.mockRejectedValueOnce(new Error('Kafka broker unavailable'));
+
+      await expect(
+        adapter.record({
+          type: 'NODE_COMPLETED',
+          runId: 'run-fallback',
+          workflowId: 'workflow-1',
+          organizationId: 'org-1',
+          eventId: 'trace:run-fallback:node-1:completed',
+          sequence: 7,
+          nodeRef: 'node-1',
+          timestamp: '2026-07-29T10:00:00.000Z',
+          level: 'info',
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(fallback.enqueue).toHaveBeenCalledWith({
+        topic: 'trace-events',
+        key: 'run-fallback',
+        value: expect.stringContaining('"eventId":"trace:run-fallback:node-1:completed"'),
+        organizationId: 'org-1',
+      });
+    });
+
+    it('logs and propagates exhausted send errors to durable activity callers', async () => {
       const errorLogger = { log: () => {}, error: vi.fn() };
       const adapter = new KafkaTraceAdapter(defaultConfig, errorLogger);
 
       mockSend.mockRejectedValueOnce(new Error('Kafka down'));
 
-      adapter.record({
-        type: 'NODE_STARTED',
-        runId: 'run-err',
-        nodeRef: 'node.a',
-        timestamp: new Date().toISOString(),
-        level: 'info',
-      });
-
-      // Allow the fire-and-forget promise chain to resolve
-      await new Promise((r) => setTimeout(r, 10));
+      await expect(
+        Promise.resolve(
+          adapter.record({
+            type: 'NODE_STARTED',
+            runId: 'run-err',
+            nodeRef: 'node.a',
+            timestamp: new Date().toISOString(),
+            level: 'info',
+          }),
+        ),
+      ).rejects.toThrow('Kafka down');
 
       expect(errorLogger.error).toHaveBeenCalled();
       const errorMsg = errorLogger.error.mock.calls[0][0];

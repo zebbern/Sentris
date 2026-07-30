@@ -10,6 +10,7 @@ import { NotificationChannelRepository } from './repository/notification-channel
 import { NotificationDeliveryRepository } from './repository/notification-delivery.repository';
 import { SlackNotificationAdapter } from './adapters/slack.adapter';
 import { DiscordNotificationAdapter } from './adapters/discord.adapter';
+import { NotificationDeliveryRetentionService } from './notification-delivery-retention.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, ApiKeysModule],
@@ -21,6 +22,7 @@ import { DiscordNotificationAdapter } from './adapters/discord.adapter';
     NotificationDeliveryRepository,
     SlackNotificationAdapter,
     DiscordNotificationAdapter,
+    NotificationDeliveryRetentionService,
   ],
   exports: [NotificationsService],
 })

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { env } from '@/config/env';
 
-const DEFAULT_ORG_ENV = import.meta.env.VITE_DEFAULT_ORG;
+const DEFAULT_ORG_ENV = env.VITE_DEFAULT_ORG_ID || env.VITE_DEFAULT_ORG;
 export const DEFAULT_ORG_ID =
   typeof DEFAULT_ORG_ENV === 'string' && DEFAULT_ORG_ENV.trim().length > 0
     ? DEFAULT_ORG_ENV.trim()
@@ -15,14 +16,13 @@ interface AuthState {
   organizationId: string;
   roles: string[];
   provider: AuthProvider;
-  adminUsername: string | null;
-  adminPassword: string | null;
+  localSessionAuthenticated: boolean;
   setToken: (token: string | null) => void;
   setOrganizationId: (orgId: string) => void;
   setRoles: (roles: string[]) => void;
   setUserId: (userId: string | null) => void;
   setProvider: (provider: AuthProvider) => void;
-  setAdminCredentials: (username: string, password: string) => void;
+  setLocalSessionAuthenticated: (authenticated: boolean) => void;
   setAuthContext: (context: {
     token?: string | null;
     userId?: string | null;
@@ -50,19 +50,20 @@ export const useAuthStore = create<AuthState>()(
         set({
           organizationId: orgId && orgId.trim().length > 0 ? orgId.trim() : DEFAULT_ORG_ID,
         }),
-      setRoles: (roles) =>
-        set({ roles: Array.isArray(roles) && roles.length > 0 ? roles : ['ADMIN'] }),
+      setRoles: (roles) => set({ roles: Array.isArray(roles) ? roles : [] }),
       setProvider: (provider) => set({ provider }),
-      adminUsername: null,
-      adminPassword: null,
-      setAdminCredentials: (username, password) =>
+      localSessionAuthenticated: false,
+      setLocalSessionAuthenticated: (authenticated) =>
         set({
-          adminUsername: username.trim() || null,
-          adminPassword: password.trim() || null,
-          userId: 'admin',
-          organizationId: 'local-dev', // Lock to local-dev for local auth
-          roles: ['ADMIN'],
-          provider: 'local',
+          localSessionAuthenticated: authenticated,
+          ...(authenticated
+            ? {
+                userId: 'admin',
+                organizationId: DEFAULT_ORG_ID,
+                roles: ['ADMIN'],
+                provider: 'local' as const,
+              }
+            : {}),
         }),
       setAuthContext: (context) =>
         set((current) => {
@@ -100,12 +101,11 @@ export const useAuthStore = create<AuthState>()(
           const sanitizedRoles =
             hasRolesUpdate && Array.isArray(context.roles) && context.roles.length > 0
               ? context.roles
-              : hasRolesUpdate && context.roles === null
-                ? ['ADMIN']
+              : hasRolesUpdate
+                ? []
                 : current.roles;
 
-          const nextProvider =
-            context.provider ?? (hasTokenUpdate && !sanitizedToken ? 'local' : current.provider);
+          const nextProvider = context.provider ?? current.provider;
 
           return {
             token: sanitizedToken,
@@ -123,35 +123,34 @@ export const useAuthStore = create<AuthState>()(
           organizationId: DEFAULT_ORG_ID,
           roles: ['ADMIN'],
           provider: 'local',
-          adminUsername: null,
-          adminPassword: null,
+          localSessionAuthenticated: false,
         }),
     }),
     {
       name: 'sentris-auth',
-      version: 3,
-      migrate: (persistedState, version) => {
+      version: 4,
+      migrate: (persistedState, _version) => {
         if (!persistedState) {
           return persistedState;
         }
-        if (version < 2) {
-          const nextState = {
-            ...persistedState,
-            adminUsername: null,
-            adminPassword: null,
-          };
-          return nextState;
-        }
-        return persistedState;
+        const legacy = persistedState as Record<string, unknown>;
+        const {
+          token: _token,
+          adminUsername: _adminUsername,
+          adminPassword: _adminPassword,
+          localSessionAuthenticated: _localSessionAuthenticated,
+          ...safeState
+        } = legacy;
+        return {
+          ...safeState,
+          localSessionAuthenticated: false,
+        };
       },
       partialize: (state) => ({
-        token: state.token,
         userId: state.userId,
         organizationId: state.organizationId,
         roles: state.roles,
         provider: state.provider,
-        adminUsername: state.adminUsername,
-        adminPassword: state.adminPassword,
       }),
     },
   ),

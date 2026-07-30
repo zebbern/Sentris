@@ -10,7 +10,7 @@ import type { AuthRole } from '../../auth/types';
  *
  * buildRunSummary() and getRunStatus() both follow the same cache-first pattern:
  *   1. If run.status is a terminal status → skip Temporal, use cached data
- *   2. If run.status is NULL → call Temporal, cache terminal statuses fire-and-forget
+ *   2. If run.status is NULL → call Temporal, durably finalize terminal statuses
  *   3. If Temporal NOT_FOUND → infer status for display, do NOT cache
  */
 
@@ -64,25 +64,35 @@ class NotFoundError extends Error {
 describe('Run status caching', () => {
   let service: WorkflowRunService;
   let describeWorkflowFn: ReturnType<typeof mock>;
-  let cacheTerminalStatusFn: ReturnType<typeof mock>;
+  let finalizeTerminalRunFn: ReturnType<typeof mock>;
   let hasPendingInputsFn: ReturnType<typeof mock>;
   let countByTypeFn: ReturnType<typeof mock>;
   let findByRunIdFn: ReturnType<typeof mock>;
+  let listRunsFn: ReturnType<typeof mock>;
   let trackWorkflowCompletedFn: ReturnType<typeof mock>;
 
   beforeEach(() => {
     describeWorkflowFn = mock(() => Promise.resolve(makeTemporalDesc('RUNNING')));
-    cacheTerminalStatusFn = mock(() => Promise.resolve());
+    finalizeTerminalRunFn = mock(() =>
+      Promise.resolve({
+        record: makeRun({
+          status: 'COMPLETED',
+          closeTime: new Date('2025-01-01T12:00:00.000Z'),
+        }),
+        duplicate: false,
+      }),
+    );
     hasPendingInputsFn = mock(() => Promise.resolve(false));
     countByTypeFn = mock(() => Promise.resolve(0));
     findByRunIdFn = mock(() => Promise.resolve(makeRun()));
+    listRunsFn = mock(() => Promise.resolve([]));
     trackWorkflowCompletedFn = mock(() => {});
 
     const runRepositoryMock = {
       findByRunId: findByRunIdFn,
-      cacheTerminalStatus: cacheTerminalStatusFn,
+      finalizeTerminalRun: finalizeTerminalRunFn,
       hasPendingInputs: hasPendingInputsFn,
-      list: mock(() => Promise.resolve([])),
+      list: listRunsFn,
       upsert: mock(() => Promise.resolve(makeRun())),
       listChildren: mock(() => Promise.resolve([])),
     } as unknown as WorkflowRunRepository;
@@ -110,6 +120,18 @@ describe('Run status caching', () => {
       update: mock(() => Promise.resolve({})),
       delete: mock(() => Promise.resolve()),
       list: mock(() => Promise.resolve([])),
+      findByIds: mock((ids: string[]) =>
+        Promise.resolve(
+          ids.map((id) => ({
+            id,
+            name: 'Test Workflow',
+            graph: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+            createdAt: now,
+            updatedAt: now,
+            organizationId: TEST_ORG,
+          })),
+        ),
+      ),
       incrementRunCount: mock(() => Promise.resolve()),
     };
 
@@ -129,11 +151,15 @@ describe('Run status caching', () => {
       create: mock(() => Promise.resolve({})),
       findByWorkflowAndVersion: mock(() => Promise.resolve(undefined)),
       setCompiledDefinition: mock(() => Promise.resolve(undefined)),
+      findByIds: mock(() => Promise.resolve([])),
+      findLatestByWorkflowIds: mock(() => Promise.resolve([])),
     };
 
     const traceRepositoryMock = {
       countByType: countByTypeFn,
       getEventTimeRange: mock(() => Promise.resolve({ firstTimestamp: null, lastTimestamp: null })),
+      countByTypeForRuns: mock(() => Promise.resolve(new Map())),
+      getEventTimeRangesForRuns: mock(() => Promise.resolve(new Map())),
       list: mock(() => Promise.resolve([])),
     };
 
@@ -157,7 +183,6 @@ describe('Run status caching', () => {
       analyticsServiceMock as any,
       { record: mock(() => {}) } as any,
       {} as any,
-      { emit: mock(() => true) } as any,
     );
   });
 
@@ -182,7 +207,7 @@ describe('Run status caching', () => {
       // Instead, test buildRunSummary indirectly via listRuns
     });
 
-    it('caches terminal status on first Temporal call', async () => {
+    it('durably finalizes terminal status on the first Temporal poll', async () => {
       const closeTimeStr = '2025-01-01T12:00:00.000Z';
       findByRunIdFn.mockImplementation(() => Promise.resolve(makeRun({ status: null })));
       describeWorkflowFn.mockImplementation(() =>
@@ -194,12 +219,29 @@ describe('Run status caching', () => {
       // Should have called Temporal
       expect(describeWorkflowFn).toHaveBeenCalled();
 
-      // Should have cached the terminal status (fire-and-forget)
-      expect(cacheTerminalStatusFn).toHaveBeenCalledWith(
-        RUN_ID,
-        'COMPLETED',
-        new Date(closeTimeStr),
-      );
+      expect(finalizeTerminalRunFn).toHaveBeenCalledWith({
+        runId: RUN_ID,
+        organizationId: TEST_ORG,
+        status: 'COMPLETED',
+        completedAt: new Date(closeTimeStr),
+      });
+    });
+
+    it('durably finalizes terminal status discovered while building list summaries', async () => {
+      const closeTimeStr = '2025-01-01T12:00:00.000Z';
+      listRunsFn.mockResolvedValueOnce([makeRun({ status: null })]);
+      describeWorkflowFn.mockResolvedValueOnce(makeTemporalDesc('COMPLETED', closeTimeStr));
+
+      const result = await service.listRuns(authContext, { limit: 1 });
+
+      expect(result.runs).toHaveLength(1);
+      expect(result.runs[0]?.status).toBe('COMPLETED');
+      expect(finalizeTerminalRunFn).toHaveBeenCalledWith({
+        runId: RUN_ID,
+        organizationId: TEST_ORG,
+        status: 'COMPLETED',
+        completedAt: new Date(closeTimeStr),
+      });
     });
 
     it('does NOT cache inferred status when Temporal returns NOT_FOUND', async () => {
@@ -217,7 +259,7 @@ describe('Run status caching', () => {
       expect(describeWorkflowFn).toHaveBeenCalled();
 
       // Should NOT have cached — inferred statuses are display-only
-      expect(cacheTerminalStatusFn).not.toHaveBeenCalled();
+      expect(finalizeTerminalRunFn).not.toHaveBeenCalled();
     });
   });
 
@@ -260,7 +302,7 @@ describe('Run status caching', () => {
       expect(describeWorkflowFn).toHaveBeenCalled();
       expect(result.status).toBe('RUNNING');
       // Should NOT cache running status
-      expect(cacheTerminalStatusFn).not.toHaveBeenCalled();
+      expect(finalizeTerminalRunFn).not.toHaveBeenCalled();
     });
 
     it('does NOT cache AWAITING_INPUT status', async () => {
@@ -271,7 +313,7 @@ describe('Run status caching', () => {
       const result = await service.getRunStatus(RUN_ID, undefined, authContext);
 
       expect(result.status).toBe('AWAITING_INPUT');
-      expect(cacheTerminalStatusFn).not.toHaveBeenCalled();
+      expect(finalizeTerminalRunFn).not.toHaveBeenCalled();
     });
 
     it('returns correct closeTime on first cache miss for terminal', async () => {
@@ -288,20 +330,19 @@ describe('Run status caching', () => {
       expect(result.completedAt).toBe(closeTimeStr);
     });
 
-    it('still returns correctly when cache write fails', async () => {
+    it('returns Temporal status without making a failed finalization ineligible for reconciliation', async () => {
       findByRunIdFn.mockImplementation(() => Promise.resolve(makeRun({ status: null })));
       describeWorkflowFn.mockImplementation(() =>
         Promise.resolve(makeTemporalDesc('COMPLETED', '2025-01-01T00:00:00.000Z')),
       );
-      cacheTerminalStatusFn.mockImplementation(() =>
+      finalizeTerminalRunFn.mockImplementation(() =>
         Promise.reject(new Error('DB connection lost')),
       );
 
-      // Should not throw even though cache write failed
       const result = await service.getRunStatus(RUN_ID, undefined, authContext);
 
       expect(result.status).toBe('COMPLETED');
-      expect(cacheTerminalStatusFn).toHaveBeenCalled();
+      expect(finalizeTerminalRunFn).toHaveBeenCalled();
     });
   });
 });

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "incremental": false
+  },
+  "include": [
+    "scripts/telemetry-durability-smoke.ts",
+    "scripts/__tests__/telemetry-durability-smoke.test.ts"
+  ]
+}

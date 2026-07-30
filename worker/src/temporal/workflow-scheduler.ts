@@ -1,3 +1,5 @@
+import { isCancellation } from '@temporalio/workflow';
+
 import type { WorkflowDefinition, WorkflowJoinStrategy, WorkflowEdge } from './types';
 
 export class WorkflowSchedulerError extends Error {
@@ -27,6 +29,7 @@ export interface WorkflowSchedulerOptions {
     context: WorkflowSchedulerRunContext,
   ) => Promise<{ activePorts?: string[] } | null>;
   onNodeSkipped?: (actionRef: string) => Promise<void>;
+  preserveCancellation?: boolean;
 }
 
 interface NodeState {
@@ -180,6 +183,15 @@ export async function runWorkflowWithScheduler(
     );
 
     settled.sort((a, b) => a.completedAt - b.completedAt);
+
+    if (options.preserveCancellation) {
+      const cancellation = settled.find(
+        (outcome) => outcome.status === 'rejected' && isCancellation(outcome.reason),
+      );
+      if (cancellation?.status === 'rejected') {
+        throw cancellation.reason;
+      }
+    }
 
     for (const outcome of settled) {
       const { ref, context } = outcome;

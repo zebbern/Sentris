@@ -90,6 +90,7 @@ export async function runWorkflowActivity(
         artifacts: svc.artifacts,
         workflowId: input.workflowId,
         workflowVersionId: input.workflowVersionId ?? null,
+        scopeId: input.scopeId ?? null,
       },
     );
     const duration = Date.now() - startTime;

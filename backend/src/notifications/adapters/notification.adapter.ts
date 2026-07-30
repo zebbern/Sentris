@@ -3,6 +3,7 @@ import type { RunLifecycleEvent } from '@sentris/shared';
 
 export interface NotificationAdapterResult {
   success: boolean;
+  outcome?: 'accepted' | 'rejected' | 'unknown';
   error?: string;
   responseStatus?: number;
   responseBody?: string;

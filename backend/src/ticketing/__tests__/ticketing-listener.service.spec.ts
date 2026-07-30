@@ -52,6 +52,7 @@ function makeEvent(overrides: Partial<FindingTriageChangedEvent> = {}): FindingT
     findingTriageId: 'triage-1',
     findingOpensearchId: 'f-1',
     organizationId: ORG_ID,
+    projectionVersion: 1,
     status: 'triaged',
     previousStatus: 'new',
     source: 'user',
@@ -68,6 +69,7 @@ describe('TicketingListenerService', () => {
   let serviceMock: {
     createTicket: ReturnType<typeof mock>;
     updateTicketStatus: ReturnType<typeof mock>;
+    registerPendingWebhook: ReturnType<typeof mock>;
   };
   let repoMock: {
     findConnectionByOrg: ReturnType<typeof mock>;
@@ -78,6 +80,7 @@ describe('TicketingListenerService', () => {
     serviceMock = {
       createTicket: mock(() => Promise.resolve(makeTicketLink())),
       updateTicketStatus: mock(() => Promise.resolve()),
+      registerPendingWebhook: mock(() => Promise.resolve()),
     };
 
     repoMock = {
@@ -105,6 +108,7 @@ describe('TicketingListenerService', () => {
     expect(orgId).toBe(ORG_ID);
     expect(triageId).toBe('triage-1');
     expect(findingData.findingOpensearchId).toBe('f-1');
+    expect(serviceMock.createTicket.mock.calls[0]![3]).toBe(1);
   });
 
   // -----------------------------------------------------------------------
@@ -116,8 +120,27 @@ describe('TicketingListenerService', () => {
 
     await listener.handleFindingTriageChanged(makeEvent({ status: 'in_progress' }));
 
+    expect(repoMock.findTicketLinkByTriageId).toHaveBeenCalledWith('triage-1', ORG_ID);
     expect(serviceMock.updateTicketStatus).toHaveBeenCalledTimes(1);
-    expect(serviceMock.updateTicketStatus).toHaveBeenCalledWith(ORG_ID, 'triage-1', 'in_progress');
+    expect(serviceMock.updateTicketStatus).toHaveBeenCalledWith(
+      ORG_ID,
+      'triage-1',
+      'in_progress',
+      1,
+    );
+    expect(serviceMock.createTicket).not.toHaveBeenCalled();
+  });
+
+  it('skips a stale or replayed event after a newer projection version was applied', async () => {
+    repoMock.findTicketLinkByTriageId.mockResolvedValue(
+      makeTicketLink({ metadata: { lastAppliedProjectionVersion: 2 } }),
+    );
+
+    await listener.handleFindingTriageChanged(
+      makeEvent({ status: 'in_progress', projectionVersion: 1 }),
+    );
+
+    expect(serviceMock.updateTicketStatus).not.toHaveBeenCalled();
     expect(serviceMock.createTicket).not.toHaveBeenCalled();
   });
 
@@ -131,6 +154,16 @@ describe('TicketingListenerService', () => {
     expect(serviceMock.createTicket).not.toHaveBeenCalled();
     expect(serviceMock.updateTicketStatus).not.toHaveBeenCalled();
     expect(repoMock.findConnectionByOrg).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid projection version instead of acknowledging malformed ordering data', async () => {
+    await expect(
+      listener.handleFindingTriageChanged(makeEvent({ projectionVersion: 0 })),
+    ).rejects.toThrow('projectionVersion');
+
+    expect(repoMock.findConnectionByOrg).not.toHaveBeenCalled();
+    expect(serviceMock.createTicket).not.toHaveBeenCalled();
+    expect(serviceMock.updateTicketStatus).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -177,23 +210,54 @@ describe('TicketingListenerService', () => {
   // Error handling
   // -----------------------------------------------------------------------
 
-  it('handles adapter errors gracefully (does not throw)', async () => {
+  it('propagates adapter errors so the durable outbox retries', async () => {
     repoMock.findTicketLinkByTriageId.mockResolvedValue(undefined);
     serviceMock.createTicket.mockRejectedValue(new Error('Jira API rate limit'));
 
-    // Should not throw — listener catches errors internally
-    await listener.handleFindingTriageChanged(makeEvent({ status: 'triaged' }));
+    await expect(
+      listener.handleFindingTriageChanged(makeEvent({ status: 'triaged' })),
+    ).rejects.toThrow('Jira API rate limit');
 
     expect(serviceMock.createTicket).toHaveBeenCalledTimes(1);
   });
 
-  it('handles updateTicketStatus errors gracefully', async () => {
+  it('propagates update errors so the durable outbox retries', async () => {
     repoMock.findTicketLinkByTriageId.mockResolvedValue(makeTicketLink());
     serviceMock.updateTicketStatus.mockRejectedValue(new Error('Network error'));
 
-    // Should not throw
-    await listener.handleFindingTriageChanged(makeEvent({ status: 'in_progress' }));
+    await expect(
+      listener.handleFindingTriageChanged(makeEvent({ status: 'in_progress' })),
+    ).rejects.toThrow('Network error');
 
     expect(serviceMock.updateTicketStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches durable webhook registration events and propagates failures for retry', async () => {
+    serviceMock.registerPendingWebhook.mockRejectedValue(
+      new Error('Jira registration unavailable'),
+    );
+    const handleRegistration = (
+      listener as unknown as {
+        handleJiraWebhookRegistrationRequested: (event: {
+          organizationId: string;
+          connectionId: string;
+          registrationVersion: number;
+        }) => Promise<void>;
+      }
+    ).handleJiraWebhookRegistrationRequested;
+
+    await expect(
+      handleRegistration.call(listener, {
+        organizationId: ORG_ID,
+        connectionId: 'conn-1',
+        registrationVersion: 2,
+      }),
+    ).rejects.toThrow('Jira registration unavailable');
+
+    expect(serviceMock.registerPendingWebhook).toHaveBeenCalledWith({
+      organizationId: ORG_ID,
+      connectionId: 'conn-1',
+      registrationVersion: 2,
+    });
   });
 });

@@ -11,6 +11,7 @@ import {
   withPortMeta,
   ValidationError,
 } from '@sentris/component-sdk';
+import type { OpenSearchBulkIndexResult } from '../../utils/opensearch-indexer';
 
 // Schema for defining a data input port
 const dataInputDefinitionSchema = z.object({
@@ -46,7 +47,58 @@ const outputSchema = outputs({
     label: 'Index Name',
     description: 'Name of the OpenSearch index where data was stored.',
   }),
+  succeededCount: port(z.number(), {
+    label: 'Succeeded Count',
+    description: 'Number of documents OpenSearch accepted.',
+  }),
+  failedCount: port(z.number(), {
+    label: 'Failed Count',
+    description: 'Number of documents OpenSearch rejected.',
+  }),
+  degraded: port(z.boolean(), {
+    label: 'Degraded',
+    description: 'Whether only part of the requested batch was indexed.',
+  }),
 });
+
+export function finalizeAnalyticsIndexResult(
+  result: OpenSearchBulkIndexResult,
+  failOnError: boolean,
+) {
+  if (failOnError && result.failedCount > 0) {
+    throw new Error(
+      `Analytics indexing failed: ${result.failedCount} of ${result.documentCount} documents failed`,
+    );
+  }
+
+  return {
+    indexed: !result.degraded,
+    documentCount: result.succeededCount,
+    indexName: result.indexName,
+    succeededCount: result.succeededCount,
+    failedCount: result.failedCount,
+    degraded: result.degraded,
+  };
+}
+
+function countReceivedDocuments(inputValues: Record<string, unknown>): number {
+  let count = 0;
+  for (const value of Object.values(inputValues)) {
+    if (Array.isArray(value)) count += value.length;
+  }
+  return count;
+}
+
+function degradedAnalyticsResult(failedCount: number) {
+  return {
+    indexed: false,
+    documentCount: 0,
+    indexName: '',
+    succeededCount: 0,
+    failedCount,
+    degraded: true,
+  };
+}
 
 const parameterSchema = parameters({
   dataInputs: param(
@@ -68,14 +120,14 @@ const parameterSchema = parameters({
       .string()
       .optional()
       .describe(
-        'Optional suffix to append to the index name. Defaults to date (YYYY.MM.DD) if not provided.',
+        'Optional custom analytics suffix. Leave empty to write canonical findings observations.',
       ),
     {
       label: 'Index Suffix',
       editor: 'text',
-      placeholder: 'YYYY.MM.DD (default)',
+      placeholder: 'e.g., subdomain-enum',
       description:
-        'Custom suffix for the index name (e.g., "subdomain-enum"). Defaults to date-based sharding (YYYY.MM.DD) if not provided.',
+        'Custom non-findings analytics suffix (e.g., "subdomain-enum"). Leave empty for the stable canonical findings index; canonical and legacy date suffixes are reserved.',
     },
   ),
   assetKeyField: param(
@@ -207,6 +259,7 @@ const definition = defineComponent({
   async execute({ inputs, params }, context) {
     const { getOpenSearchIndexer } = await import('../../utils/opensearch-indexer');
     const indexer = getOpenSearchIndexer();
+    const receivedDocumentCount = countReceivedDocuments(inputs as Record<string, unknown>);
 
     const dataInputsMap = new Map<string, DataInputDefinition>(
       (params.dataInputs ?? []).map((d) => [d.id, d]),
@@ -217,11 +270,7 @@ const definition = defineComponent({
       context.logger.debug(
         '[Analytics Sink] OpenSearch not configured, skipping indexing (fire-and-forget)',
       );
-      return {
-        indexed: false,
-        documentCount: 0,
-        indexName: '',
-      };
+      return degradedAnalyticsResult(receivedDocumentCount);
     }
 
     // Validate required workflow context
@@ -233,11 +282,7 @@ const definition = defineComponent({
       if (params.failOnError) {
         throw error;
       }
-      return {
-        indexed: false,
-        documentCount: 0,
-        indexName: '',
-      };
+      return degradedAnalyticsResult(receivedDocumentCount);
     }
 
     // STRICT MODE: Require all configured inputs to be present
@@ -301,6 +346,9 @@ const definition = defineComponent({
         indexed: false,
         documentCount: 0,
         indexName: '',
+        succeededCount: 0,
+        failedCount: 0,
+        degraded: false,
       };
     }
 
@@ -332,6 +380,7 @@ const definition = defineComponent({
         workflowId: context.workflowId,
         workflowName: context.workflowName,
         runId: context.runId,
+        scopeId: context.scopeId ?? null,
         nodeRef: context.componentRef,
         componentId: 'core.analytics.sink',
         assetKeyField,
@@ -347,11 +396,7 @@ const definition = defineComponent({
       context.logger.info(
         `[Analytics Sink] Successfully indexed ${result.documentCount} document(s) to ${result.indexName}`,
       );
-      return {
-        indexed: true,
-        documentCount: result.documentCount,
-        indexName: result.indexName,
-      };
+      return finalizeAnalyticsIndexResult(result, params.failOnError);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error during indexing';
       context.logger.error(`[Analytics Sink] Indexing failed: ${errorMessage}`);
@@ -363,8 +408,11 @@ const definition = defineComponent({
       // Fire-and-forget mode: log error but don't fail workflow
       return {
         indexed: false,
-        documentCount,
+        documentCount: 0,
         indexName: '',
+        succeededCount: 0,
+        failedCount: documentCount,
+        degraded: true,
       };
     }
   },

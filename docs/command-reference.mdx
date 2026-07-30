@@ -256,7 +256,9 @@ Pulls prebuilt images from GHCR and starts the production environment.
 just prod-images build-test
 ```
 
-Builds production images with PostHog analytics baked in. Requires `POSTHOG_API_KEY` and `POSTHOG_HOST` environment variables.
+Builds generic local production images. Optional server and browser PostHog
+settings are passed when the containers start; they are not baked into these
+images.
 
 ### Stop / Logs / Status / Clean
 
@@ -359,7 +361,7 @@ For `init`, `update`, and `show`, omitting `N` uses `SENTRIS_INSTANCE`, then `.s
 | `just prod logs` | View production logs |
 | `just prod clean` | Clean production data |
 | `just prod-images` | Start with prebuilt GHCR images |
-| `just prod-images build-test` | Build test images with analytics |
+| `just prod-images build-test` | Build generic local production test images |
 | `just generate-certs` | Generate TLS certificates |
 | `just security-init` | Initialize OpenSearch security |
 | `just hash-password` | Generate BCrypt password hash |

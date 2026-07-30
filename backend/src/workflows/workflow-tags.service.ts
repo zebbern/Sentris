@@ -52,21 +52,25 @@ export class WorkflowTagsService {
   ): Promise<{ tags: string[] }> {
     const organizationId = await this.requireWorkflowAdmin(workflowId, auth);
 
-    // Verify workflow exists
-    const workflow = await this.repository.findById(workflowId, { organizationId });
-    if (!workflow) {
-      throw new NotFoundException(`Workflow ${workflowId} not found`);
-    }
+    const newTags = await this.repository.transaction(async (executor) => {
+      const workflow = await this.repository.findById(workflowId, {
+        organizationId,
+        executor,
+      });
+      if (!workflow) {
+        throw new NotFoundException(`Workflow ${workflowId} not found`);
+      }
 
-    const oldTags = await this.tagsRepository.getTagsByWorkflowId(workflowId);
-    const newTags = await this.tagsRepository.setTags(workflowId, tags);
-
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.tags.updated',
-      resourceType: 'workflow',
-      resourceId: workflowId,
-      resourceName: workflow.name,
-      metadata: { oldTags, newTags },
+      const oldTags = await this.tagsRepository.getTagsByWorkflowId(workflowId, { executor });
+      const updatedTags = await this.tagsRepository.setTags(workflowId, tags, { executor });
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.tags.updated',
+        resourceType: 'workflow',
+        resourceId: workflowId,
+        resourceName: workflow.name,
+        metadata: { oldTags, newTags: updatedTags },
+      });
+      return updatedTags;
     });
 
     this.logger.log(`Updated tags for workflow ${workflowId}: [${newTags.join(', ')}]`);

@@ -28,9 +28,8 @@ export class AssetInventoryService {
 
   /**
    * Ingest recon assets discovered by a completed node execution into the
-   * per-target asset inventory. Mirrors `TicketingListenerService`: the
-   * whole body is guarded so a failure here never breaks the node-io write
-   * path that emitted the event.
+   * per-target asset inventory. The event is dispatched from the durable
+   * outbox, so failures must escape and be retried rather than be acknowledged.
    */
   @OnEvent('asset.nodeio.completed', { async: true })
   async onNodeIoCompleted(event: AssetNodeIoCompletedEvent): Promise<void> {
@@ -71,6 +70,7 @@ export class AssetInventoryService {
       this.logger.error(
         `Failed to ingest assets for run=${event.runId} node=${event.nodeRef}: ${err}`,
       );
+      throw err;
     }
   }
 
@@ -78,13 +78,16 @@ export class AssetInventoryService {
   private async resolveOutputs(
     row: Pick<NodeIORecord, 'outputs' | 'outputsSpilled' | 'outputsStorageRef'>,
   ): Promise<Record<string, unknown> | null> {
-    if (row.outputsSpilled && row.outputsStorageRef) {
+    if (row.outputsSpilled) {
+      if (!row.outputsStorageRef) {
+        throw new Error('Spilled node outputs are missing a storage reference');
+      }
       try {
         const buffer = await this.storage.downloadFile(row.outputsStorageRef);
         return JSON.parse(buffer.toString('utf8')) as Record<string, unknown>;
       } catch (err) {
         this.logger.warn(`Failed to fetch spilled outputs from ${row.outputsStorageRef}: ${err}`);
-        return row.outputs;
+        throw err;
       }
     }
     return row.outputs;

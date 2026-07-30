@@ -14,6 +14,7 @@ import { TicketingListenerService } from './ticketing-listener.service';
 import { JiraAdapter } from './jira/jira.adapter';
 import { JiraWebhookController } from './jira/jira-webhook.controller';
 import { JiraWebhookService } from './jira/jira-webhook.service';
+import { JiraWebhookRenewalService } from './jira-webhook-renewal.service';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { JiraWebhookService } from './jira/jira-webhook.service';
     TicketingListenerService,
     JiraAdapter,
     JiraWebhookService,
+    JiraWebhookRenewalService,
   ],
   exports: [TicketingService, TicketingRepository],
 })

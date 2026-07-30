@@ -5,6 +5,7 @@ export interface LokiConfig {
   tenantId: string | undefined;
   username: string | undefined;
   password: string | undefined;
+  pushTimeoutMs: number;
 }
 
 export const lokiConfig = registerAs<LokiConfig>('loki', () => ({
@@ -12,4 +13,5 @@ export const lokiConfig = registerAs<LokiConfig>('loki', () => ({
   tenantId: process.env.LOKI_TENANT_ID,
   username: process.env.LOKI_USERNAME,
   password: process.env.LOKI_PASSWORD,
+  pushTimeoutMs: Number(process.env.LOKI_PUSH_TIMEOUT_MS ?? '10000'),
 }));

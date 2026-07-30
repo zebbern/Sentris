@@ -7,6 +7,10 @@ import { WorkflowDefinition } from '../../dsl/types';
 import { WorkflowGraphSchema } from '../dto/workflow-graph.dto';
 import { workflowsTable } from '../../database/schema/workflows';
 import { DRIZZLE_TOKEN } from '../../database/database.module';
+import type {
+  WorkflowTransactionExecutor,
+  WorkflowTransactionOptions,
+} from './workflow-transaction-executor';
 
 export type WorkflowRecord = typeof workflowsTable.$inferSelect;
 
@@ -28,7 +32,7 @@ export interface WorkflowSummaryRecord {
 
 type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
 
-export interface WorkflowRepositoryOptions {
+export interface WorkflowRepositoryOptions extends WorkflowTransactionOptions {
   organizationId?: string | null;
 }
 
@@ -39,11 +43,18 @@ export class WorkflowRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
+  async transaction<T>(
+    callback: (executor: WorkflowTransactionExecutor) => Promise<T>,
+  ): Promise<T> {
+    return this.db.transaction((tx) => callback(tx));
+  }
+
   async create(
     input: WorkflowGraph,
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .insert(workflowsTable)
       .values({
         name: input.name,
@@ -62,7 +73,8 @@ export class WorkflowRepository {
     input: WorkflowGraph,
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .update(workflowsTable)
       .set({
         name: input.name,
@@ -85,7 +97,8 @@ export class WorkflowRepository {
     metadata: { name: string; description?: string | null },
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .update(workflowsTable)
       .set({
         name: metadata.name,
@@ -107,7 +120,8 @@ export class WorkflowRepository {
     definition: WorkflowDefinition,
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .update(workflowsTable)
       .set({
         compiledDefinition: definition,
@@ -127,7 +141,8 @@ export class WorkflowRepository {
     id: string,
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord | undefined> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .select()
       .from(workflowsTable)
       .where(this.buildIdFilter(id, options.organizationId))
@@ -155,7 +170,8 @@ export class WorkflowRepository {
   }
 
   async delete(id: string, options: WorkflowRepositoryOptions = {}): Promise<void> {
-    await this.db.delete(workflowsTable).where(this.buildIdFilter(id, options.organizationId));
+    const executor = options.executor ?? this.db;
+    await executor.delete(workflowsTable).where(this.buildIdFilter(id, options.organizationId));
   }
 
   async list(
@@ -211,7 +227,8 @@ export class WorkflowRepository {
     id: string,
     options: WorkflowRepositoryOptions = {},
   ): Promise<WorkflowRecord> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .update(workflowsTable)
       .set({
         lastRun: new Date(),

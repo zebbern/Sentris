@@ -22,7 +22,7 @@ export class ScheduleRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async create(values: Omit<WorkflowScheduleInsert, 'id'>): Promise<WorkflowScheduleRecord> {
+  async create(values: WorkflowScheduleInsert): Promise<WorkflowScheduleRecord> {
     const [record] = await this.db.insert(workflowSchedulesTable).values(values).returning();
     return record;
   }

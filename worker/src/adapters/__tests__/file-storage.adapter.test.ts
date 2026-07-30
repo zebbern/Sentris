@@ -1,21 +1,268 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'bun:test';
 import { Client } from 'minio';
 import { Pool } from 'pg';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { FileStorageAdapter } from '../file-storage.adapter';
 import * as schema from '../schema';
 import { formatDatabaseTarget, getScriptDatabaseTarget } from '@sentris/local-runtime';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { IFileStorageService } from '@sentris/component-sdk';
 
 const enableFileStorageIntegration = process.env.ENABLE_FILE_STORAGE_TESTS === 'true';
 const fileStorageDescribe = enableFileStorageIntegration ? describe : describe.skip;
+const dialect = new PgDialect();
+
+function queryFor(condition: unknown): { sql: string; params: unknown[] } {
+  return dialect.sqlToQuery(condition as Parameters<PgDialect['sqlToQuery']>[0]);
+}
+
+describe('FileStorageAdapter organization scope', () => {
+  const foreignFileId = '22222222-2222-4222-8222-222222222222';
+  const foreignFile = {
+    id: foreignFileId,
+    fileName: 'foreign.json',
+    mimeType: 'application/json',
+    size: 12,
+    storageKey: 'organizations/org-b/foreign-file',
+    organizationId: 'org-b',
+    uploadedAt: new Date(),
+  };
+
+  it('does not download an organization B file from an organization A run', async () => {
+    let lookup: { sql: string; params: unknown[] } | undefined;
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where(condition: unknown) {
+                lookup = queryFor(condition);
+                return {
+                  limit() {
+                    const hasOrgAFilter =
+                      lookup?.sql.includes('"files"."organization_id"') &&
+                      lookup.params.includes('org-a');
+                    return Promise.resolve(hasOrgAFilter ? [] : [foreignFile]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as NodePgDatabase<typeof schema>;
+    const minio = {
+      getObject: async () => Readable.from([Buffer.from('foreign')]),
+    } as unknown as Client;
+    const adapter = new FileStorageAdapter(minio, db, 'files');
+
+    await expect(adapter.forOrganization('org-a').downloadFile(foreignFileId)).rejects.toThrow(
+      `File not found: ${foreignFileId}`,
+    );
+    expect(lookup?.sql).toContain('"files"."organization_id"');
+    expect(lookup?.params).toContain('org-a');
+  });
+
+  it('matches only null-owned files for trusted-local runs', async () => {
+    let lookup: { sql: string; params: unknown[] } | undefined;
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where(condition: unknown) {
+                lookup = queryFor(condition);
+                return {
+                  limit() {
+                    const restrictsToNullOwnedResources = lookup?.sql.includes(
+                      '"files"."organization_id" is null',
+                    );
+                    return Promise.resolve(restrictsToNullOwnedResources ? [] : [foreignFile]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as NodePgDatabase<typeof schema>;
+    const adapter = new FileStorageAdapter({} as Client, db, 'files');
+
+    await expect(adapter.forOrganization(null).getFileMetadata(foreignFileId)).rejects.toThrow(
+      `File not found: ${foreignFileId}`,
+    );
+    expect(lookup?.sql).toContain('"files"."organization_id" is null');
+  });
+
+  it('rejects a foreign known UUID before it can overwrite the foreign object', async () => {
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where() {
+                return {
+                  limit() {
+                    return Promise.resolve([{ organizationId: 'org-b' }]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as NodePgDatabase<typeof schema>;
+    const minio = {
+      putObject: vi.fn().mockResolvedValue(undefined),
+      removeObject: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Client;
+    const adapter = new FileStorageAdapter(minio, db, 'files');
+
+    await expect(
+      adapter
+        .forOrganization('org-a')
+        .uploadFile(foreignFileId, 'attempt.json', Buffer.from('{}'), 'application/json'),
+    ).rejects.toThrow(`File identifier is already owned by another organization: ${foreignFileId}`);
+    expect(minio.putObject).not.toHaveBeenCalled();
+  });
+
+  it('uses disjoint object namespaces for trusted-local and similarly named organizations', async () => {
+    const fileId = '44444444-4444-4444-8444-444444444444';
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where() {
+                return {
+                  limit() {
+                    return Promise.resolve([]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      insert() {
+        return {
+          values() {
+            return {
+              onConflictDoUpdate() {
+                return {
+                  returning() {
+                    return Promise.resolve([{ id: fileId }]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as NodePgDatabase<typeof schema>;
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const minio = { putObject } as unknown as Client;
+    const raw = new FileStorageAdapter(minio, db, 'files');
+
+    await raw
+      .forOrganization(null)
+      .uploadFile(fileId, 'local.json', Buffer.from('{}'), 'application/json');
+    await raw
+      .forOrganization('trusted-local')
+      .uploadFile(fileId, 'tenant.json', Buffer.from('{}'), 'application/json');
+
+    const localStorageKey = putObject.mock.calls[0]?.[1];
+    const tenantStorageKey = putObject.mock.calls[1]?.[1];
+    expect(localStorageKey).toBe(`trusted-local/${fileId}`);
+    expect(tenantStorageKey).toBe(`organizations/by-id/trusted-local/${fileId}`);
+    expect(localStorageKey).not.toBe(tenantStorageKey);
+  });
+
+  it('rejects a foreign insert race through the conflict-update ownership predicate', async () => {
+    let conflictWhere: { sql: string; params: unknown[] } | undefined;
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where() {
+                return {
+                  limit() {
+                    // The precheck runs before the foreign insert commits.
+                    return Promise.resolve([]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+      insert() {
+        return {
+          values() {
+            return {
+              onConflictDoUpdate(config: { where: unknown }) {
+                conflictWhere = queryFor(config.where);
+                return {
+                  returning() {
+                    // PostgreSQL returns no row because the conflict-update WHERE
+                    // rejects the now-foreign record.
+                    return Promise.resolve([]);
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as unknown as NodePgDatabase<typeof schema>;
+    const minio = {
+      putObject: vi.fn().mockResolvedValue(undefined),
+      removeObject: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Client;
+    const adapter = new FileStorageAdapter(minio, db, 'files').forOrganization('org-a');
+
+    await expect(
+      adapter.uploadFile(foreignFileId, 'attempt.json', Buffer.from('{}'), 'application/json'),
+    ).rejects.toThrow(`File identifier is already owned by another organization: ${foreignFileId}`);
+    expect(conflictWhere?.sql).toContain('"files"."organization_id"');
+    expect(conflictWhere?.params).toContain('org-a');
+    expect(minio.removeObject).toHaveBeenCalledWith(
+      'files',
+      `organizations/by-id/org-a/${foreignFileId}`,
+    );
+  });
+
+  it('does not let an organization-scoped capability mint another tenant scope', () => {
+    const raw = new FileStorageAdapter({} as Client, {} as NodePgDatabase<typeof schema>, 'files');
+    const scoped = raw.forOrganization('org-a');
+    const trustedLocal = raw.forOrganization(null);
+
+    expect(Object.isFrozen(scoped)).toBe(true);
+    expect(scoped.forOrganization('org-a')).toBe(scoped);
+    expect(trustedLocal.forOrganization(null)).toBe(trustedLocal);
+    expect(() => scoped.forOrganization('org-b')).toThrow();
+    expect(() => scoped.forOrganization(null)).toThrow();
+    expect(() => trustedLocal.forOrganization('org-a')).toThrow();
+  });
+
+  it('rejects file operations on the raw unbound adapter', async () => {
+    const raw = new FileStorageAdapter({} as Client, {} as NodePgDatabase<typeof schema>, 'files');
+
+    await expect(raw.getFileMetadata(foreignFileId)).rejects.toThrow(
+      'must be bound to an organization',
+    );
+  });
+});
 
 fileStorageDescribe('FileStorageAdapter (Integration)', () => {
   let minioClient: Client;
   let pool: Pool;
   let db: NodePgDatabase<typeof schema>;
-  let adapter: FileStorageAdapter;
+  let adapter: IFileStorageService;
   const bucketName = 'test-sentris-files';
 
   beforeAll(async () => {
@@ -43,7 +290,7 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
     }
 
     // Create adapter
-    adapter = new FileStorageAdapter(minioClient, db, bucketName);
+    adapter = new FileStorageAdapter(minioClient, db, bucketName).forOrganization(null);
 
     console.log(
       `✅ Test setup complete: MinIO + PostgreSQL connected (${formatDatabaseTarget(databaseTarget)})`,
@@ -246,7 +493,7 @@ fileStorageDescribe('FileStorageAdapter (Integration)', () => {
       const downloaded = await adapter.downloadFile(fileId);
       expect(downloaded.buffer.toString('utf-8')).toBe(updatedContent.toString('utf-8'));
 
-      await minioClient.removeObject(bucketName, fileId);
+      await minioClient.removeObject(bucketName, record?.storageKey ?? fileId);
     });
   });
 

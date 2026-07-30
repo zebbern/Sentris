@@ -15,6 +15,7 @@ import {
   truncateDetails,
   ERROR_LOG_LIMIT,
 } from '../utils/string-helpers';
+import { recordNodeIoWithoutChangingExecution } from '../utils/node-io-delivery';
 
 interface ErrorHandlerContext {
   actionRef: string;
@@ -22,6 +23,7 @@ interface ErrorHandlerContext {
   activityId: string;
   attempt: number;
   runId: string;
+  organizationId: string | null;
   streamId: string;
   joinStrategy?: unknown;
   triggeredBy?: string;
@@ -95,14 +97,17 @@ export async function handleComponentError(
     level: 'error',
   });
 
-  await ctx.nodeIO?.recordCompletion({
-    runId: ctx.runId,
-    nodeRef: ctx.actionRef,
-    componentId: ctx.componentId,
-    outputs: {},
-    status: 'failed',
-    errorMessage: errorMsg,
-  });
+  await recordNodeIoWithoutChangingExecution(() =>
+    ctx.nodeIO?.recordCompletion({
+      runId: ctx.runId,
+      nodeRef: ctx.actionRef,
+      organizationId: ctx.organizationId,
+      componentId: ctx.componentId,
+      outputs: {},
+      status: 'failed',
+      errorMessage: errorMsg,
+    }),
+  );
 
   const finalErrorType = errorType || 'ComponentError';
   const details = {

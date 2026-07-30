@@ -8,6 +8,9 @@ import {
   type NotificationChannelInsert,
   notificationChannelsTable,
 } from '../../database/schema';
+import type { OutboxExecutor } from '../../outbox/enqueue-outbox-event';
+
+type ChannelMutationHook<T = void> = (executor: OutboxExecutor, result: T) => Promise<void>;
 
 @Injectable()
 export class NotificationChannelRepository {
@@ -16,9 +19,16 @@ export class NotificationChannelRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async create(values: Omit<NotificationChannelInsert, 'id'>): Promise<NotificationChannelRecord> {
-    const [record] = await this.db.insert(notificationChannelsTable).values(values).returning();
-    return record;
+  async create(
+    values: Omit<NotificationChannelInsert, 'id'>,
+    onMutated?: ChannelMutationHook<NotificationChannelRecord>,
+  ): Promise<NotificationChannelRecord> {
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert'>) => {
+      const [record] = await executor.insert(notificationChannelsTable).values(values).returning();
+      await onMutated?.(executor, record);
+      return record;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
   async findById(
@@ -45,22 +55,42 @@ export class NotificationChannelRepository {
     id: string,
     values: Partial<NotificationChannelInsert>,
     options: { organizationId?: string } = {},
+    onMutated?: ChannelMutationHook<NotificationChannelRecord>,
   ): Promise<NotificationChannelRecord | undefined> {
-    const [record] = await this.db
-      .update(notificationChannelsTable)
-      .set({
-        ...values,
-        updatedAt: new Date(),
-      })
-      .where(this.buildIdFilter(id, options.organizationId))
-      .returning();
-    return record;
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'update'>) => {
+      const [record] = await executor
+        .update(notificationChannelsTable)
+        .set({
+          ...values,
+          updatedAt: new Date(),
+        })
+        .where(this.buildIdFilter(id, options.organizationId))
+        .returning();
+      if (record) {
+        await onMutated?.(executor, record);
+      }
+      return record;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
-  async delete(id: string, options: { organizationId?: string } = {}): Promise<void> {
-    await this.db
-      .delete(notificationChannelsTable)
-      .where(this.buildIdFilter(id, options.organizationId));
+  async delete(
+    id: string,
+    options: { organizationId?: string } = {},
+    onMutated?: ChannelMutationHook,
+  ): Promise<boolean> {
+    const mutate = async (executor: Pick<NodePgDatabase, 'delete' | 'insert'>) => {
+      const [deleted] = await executor
+        .delete(notificationChannelsTable)
+        .where(this.buildIdFilter(id, options.organizationId))
+        .returning({ id: notificationChannelsTable.id });
+      if (!deleted) {
+        return false;
+      }
+      await onMutated?.(executor, undefined);
+      return true;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 
   /**

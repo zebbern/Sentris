@@ -89,7 +89,11 @@ export async function handleToolModeRegistration(
       });
 
       const mcpOutput = await runMcp(activityInput);
-      const output = mcpOutput.output as { endpoint?: string; containerId?: string };
+      const output = mcpOutput.output as {
+        endpoint?: string;
+        containerId?: string;
+        authToken?: string;
+      };
       const endpoint = output.endpoint;
       const containerId = output.containerId;
 
@@ -117,6 +121,7 @@ export async function handleToolModeRegistration(
         port: (mergedParams.port as number) || 8080,
         endpoint,
         containerId,
+        authToken: output.authToken,
       });
     } else {
       await prepareAndRegisterToolActivity({

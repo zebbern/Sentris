@@ -87,7 +87,7 @@ export function FindingTriageControls({
 
   const handleAssigneeChange = useCallback(
     (userId: string | null) => {
-      handleMutation('assignee', { assigneeUserId: userId ?? '' });
+      handleMutation('assignee', { assigneeUserId: userId });
     },
     [handleMutation],
   );

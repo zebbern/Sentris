@@ -46,17 +46,13 @@ export interface DockerRunnerConfig {
   pidsLimit?: number; // Docker --pids-limit flag. Default: 256
 }
 
-
 export interface RemoteRunnerConfig {
   kind: 'remote';
   endpoint: string;
   authSecretName?: string;
 }
 
-export type RunnerConfig =
-  | InlineRunnerConfig
-  | DockerRunnerConfig
-  | RemoteRunnerConfig;
+export type RunnerConfig = InlineRunnerConfig | DockerRunnerConfig | RemoteRunnerConfig;
 
 export interface TerminalChunkInput {
   runId: string;
@@ -159,8 +155,11 @@ export interface AgentTracePart {
 }
 
 export interface AgentTraceEvent {
+  eventId?: string;
   agentRunId: string;
   workflowRunId: string;
+  workflowId?: string | null;
+  organizationId?: string | null;
   nodeRef: string;
   sequence: number;
   timestamp: string;
@@ -310,7 +309,15 @@ export interface ComponentPortMetadata {
   label: string;
   connectionType: ConnectionType;
   bindingType?: PortBindingType;
-  editor?: 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'multi-select' | 'json' | 'secret';
+  editor?:
+    | 'text'
+    | 'textarea'
+    | 'number'
+    | 'boolean'
+    | 'select'
+    | 'multi-select'
+    | 'json'
+    | 'secret';
   required?: boolean;
   description?: string;
   valuePriority?: 'manual-first' | 'connection-first';
@@ -368,13 +375,7 @@ export interface ComponentAuthorMetadata {
   url?: string;
 }
 
-export type ComponentUiType =
-  | 'trigger'
-  | 'input'
-  | 'scan'
-  | 'process'
-  | 'output';
-
+export type ComponentUiType = 'trigger' | 'input' | 'scan' | 'process' | 'output';
 
 export interface ComponentUiMetadata {
   slug: string;
@@ -409,6 +410,9 @@ export interface ExecutionContext {
   workflowId?: string;
   workflowName?: string;
   organizationId?: string | null;
+  scopeId?: string | null;
+  /** Activity/request cancellation propagated to runners and cancellable clients. */
+  signal?: AbortSignal;
 
   // Service interfaces - implemented by adapters
   storage?: IFileStorageService;
@@ -426,10 +430,7 @@ export interface ExecutionContext {
   };
 }
 
-export type TraceEventInput = Omit<
-  TraceEvent,
-  'runId' | 'nodeRef' | 'timestamp' | 'context'
-> & {
+export type TraceEventInput = Omit<TraceEvent, 'runId' | 'nodeRef' | 'timestamp' | 'context'> & {
   runId?: string;
   nodeRef?: string;
   timestamp?: string;
@@ -506,7 +507,7 @@ export interface ComponentDefinition<
   PShape extends Record<string, any> = Record<string, any>,
   I = z.infer<z.ZodObject<IShape>>,
   O = z.infer<z.ZodObject<OShape>>,
-  P = z.infer<z.ZodObject<PShape>>
+  P = z.infer<z.ZodObject<PShape>>,
 > {
   id: string;
   label: string;
@@ -528,9 +529,7 @@ export interface ComponentDefinition<
   retryPolicy?: ComponentRetryPolicy;
 
   execute: (payload: ExecutionPayload<I, P>, context: ExecutionContext) => Promise<O>;
-  resolvePorts?: (
-    params: P,
-  ) => {
+  resolvePorts?: (params: P) => {
     inputs?: InputsSchema<any>;
     outputs?: OutputsSchema<any>;
   };

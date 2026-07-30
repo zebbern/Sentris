@@ -103,6 +103,19 @@ export function FindingDetailSheet({ findingId, isOpen, onClose }: FindingDetail
         {/* Content */}
         {finding && (
           <div className="mt-6 space-y-6">
+            {(finding.availability === 'degraded' ||
+              finding.schemaCompatibility === 'legacy' ||
+              finding.schemaCompatibility === 'invalid') && (
+              <div
+                role="status"
+                aria-label="Finding data quality"
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+              >
+                Data availability is {finding.availability}. Observation schema is{' '}
+                {finding.schemaCompatibility ?? 'unknown'}.
+              </div>
+            )}
+
             {/* Overview */}
             <section>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">

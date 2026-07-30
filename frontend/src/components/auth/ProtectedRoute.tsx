@@ -6,7 +6,6 @@ import { AdminLoginForm } from './AdminLoginForm';
 import { Button } from '../ui/button';
 import { Shield, Lock } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { useAuthStore } from '../../store/authStore';
 
 export interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -29,9 +28,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isLoading, user } = useAuth();
   const authProvider = useAuthProvider();
   const { openSignIn, isOpen, close } = useAuthModal();
-  const adminUsername = useAuthStore((state) => state.adminUsername);
-  const adminPassword = useAuthStore((state) => state.adminPassword);
-
   // Track whether we've attempted to open the sign-in dialog
   const [signInAttempted, setSignInAttempted] = useState(false);
 
@@ -65,7 +61,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Compute derived values after hooks
   const isLocalAuth = authProvider.name === 'local';
-  const hasLocalCredentials = !!(adminUsername && adminPassword);
 
   // Show loading state
   if (isLoading) {
@@ -85,7 +80,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // If using local auth and no credentials, show login form
-  if (isLocalAuth && !hasLocalCredentials && requireAuth) {
+  if (isLocalAuth && !isAuthenticated && requireAuth) {
     return <AdminLoginForm />;
   }
 

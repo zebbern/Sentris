@@ -30,6 +30,8 @@ import { WorkflowRoleGuard } from './workflow-role.guard';
 import { FlowContextCacheService } from './flow-context-cache.service';
 import { ArchivingLockService } from './archiving-lock.service';
 import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
+import { RunTerminalReconcilerService } from './run-terminal-reconciler.service';
+import { RunTerminalLifecycleListener } from './run-terminal-lifecycle.listener';
 
 @Module({
   imports: [
@@ -97,6 +99,8 @@ import { FLOW_CONTEXT_REDIS, ARCHIVING_REDIS } from './workflows.tokens';
     ArchivingLockService,
     WorkflowRoleGuard,
     WorkflowTagsRepository,
+    RunTerminalReconcilerService,
+    RunTerminalLifecycleListener,
   ],
   exports: [
     WorkflowsService,

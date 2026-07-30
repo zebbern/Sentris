@@ -4,6 +4,7 @@ import { HealthCheckService, type HealthCheckResult } from '@nestjs/terminus';
 import { PostgresHealthIndicator } from './indicators/postgres.health-indicator';
 import { RedisHealthIndicator } from './indicators/redis.health-indicator';
 import { TemporalHealthIndicator } from './indicators/temporal.health-indicator';
+import { KafkaIngestHealthIndicator } from './indicators/kafka-ingest.health-indicator';
 
 @Injectable()
 export class HealthProbeService {
@@ -12,6 +13,7 @@ export class HealthProbeService {
     private readonly postgres: PostgresHealthIndicator,
     private readonly redis: RedisHealthIndicator,
     private readonly temporal: TemporalHealthIndicator,
+    private readonly kafkaIngest: KafkaIngestHealthIndicator,
   ) {}
 
   liveness(): { status: string; service: string; timestamp: string } {
@@ -27,6 +29,7 @@ export class HealthProbeService {
       () => this.postgres.isHealthy(),
       () => this.redis.isHealthy(),
       () => this.temporal.isHealthy(),
+      () => this.kafkaIngest.isHealthy(),
     ]);
   }
 }

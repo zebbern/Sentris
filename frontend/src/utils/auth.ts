@@ -14,6 +14,17 @@ export function normalizeRole(role: string): string {
   return normalized;
 }
 
+export type SupportedRole = 'ADMIN' | 'MEMBER';
+
+export function toSupportedRole(role: string | null | undefined): SupportedRole | null {
+  if (!role) {
+    return null;
+  }
+
+  const normalized = normalizeRole(role);
+  return normalized === 'ADMIN' || normalized === 'MEMBER' ? normalized : null;
+}
+
 /**
  * Check if a user has admin role
  */

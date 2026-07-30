@@ -17,6 +17,7 @@ async function fetchAnthropicModels(apiKeySecretId: string): Promise<ListAnthrop
   const headers = await getApiAuthHeaders();
   const response = await fetch(`${API_BASE_URL}/api/v1/ai/anthropic/models`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       ...headers,
       'Content-Type': 'application/json',

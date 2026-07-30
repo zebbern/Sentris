@@ -15,6 +15,7 @@ export interface FindingTriage {
   severityOverride: string | null;
   notes: string | null;
   updatedAt: string;
+  projectionVersion?: number;
 }
 
 export interface FindingItem {
@@ -26,15 +27,18 @@ export interface FindingItem {
   workflow_name?: string;
   workflow_id?: string;
   run_id?: string;
+  scope_id?: string;
   component_id?: string;
   node_ref?: string;
   raw?: Record<string, unknown>;
   triage?: FindingTriage | null;
+  schemaCompatibility?: 'canonical' | 'legacy' | 'invalid';
 }
 
 /** Full detail response — same as FindingItem but `raw` is always present. */
 export interface FindingDetailResponse extends FindingItem {
   raw: Record<string, unknown>;
+  availability: 'available' | 'degraded';
 }
 
 export interface FindingsResponse {
@@ -42,11 +46,33 @@ export interface FindingsResponse {
   total: number;
   page: number;
   pageSize: number;
+  availability: 'available' | 'degraded';
+  paginationMode: 'offset' | 'cursor';
+  currentCursor: string | null;
+  nextCursor: string | null;
+  projectionHealth?: FindingProjectionHealth;
+  schemaCoverage: FindingSchemaCoverage;
+  degradedReasons?: string[];
+}
+
+export interface FindingProjectionHealth {
+  availability: 'available' | 'degraded';
+  completedAt: string | null;
+  reconciledThrough: string | null;
+  reason: string | null;
+}
+
+export interface FindingSchemaCoverage {
+  canonical: number;
+  legacy: number;
+  invalid: number;
 }
 
 export interface FindingsQueryParams {
   page?: number;
   pageSize?: number;
+  paginationMode?: 'offset' | 'cursor';
+  cursor?: string;
   severity?: string;
   search?: string;
   sortOrder?: 'asc' | 'desc';
@@ -56,6 +82,7 @@ export interface FindingsQueryParams {
   dateTo?: string;
   triageStatus?: string;
   assigneeUserId?: string;
+  scopeId?: string;
 }
 
 export interface FindingsExportParams {
@@ -67,11 +94,27 @@ export interface FindingsExportParams {
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
+  scopeId?: string;
+  triageStatus?: string;
+  assigneeUserId?: string;
 }
 
 export interface FindingsStatsResponse {
   severityCounts: { severity: string; count: number }[];
   total: number;
+  availability: 'available' | 'degraded';
+  projectionHealth?: FindingProjectionHealth;
+  schemaCoverage: FindingSchemaCoverage;
+}
+
+export interface FindingsExportResult {
+  blob: Blob;
+  availability: 'available' | 'degraded' | 'unknown';
+  degradedReasons: string[];
+  projectionHealthReason: string | null;
+  projectionReconciledThrough: string | null;
+  schemaCoverage: FindingSchemaCoverage | null;
+  headers: Headers;
 }
 
 export interface FindingsStatsParams {
@@ -81,6 +124,9 @@ export interface FindingsStatsParams {
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
+  scopeId?: string;
+  triageStatus?: string;
+  assigneeUserId?: string;
 }
 
 export const findingsApi = {
@@ -88,6 +134,8 @@ export const findingsApi = {
     const searchParams = new URLSearchParams();
     if (params.page) searchParams.set('page', String(params.page));
     if (params.pageSize) searchParams.set('pageSize', String(params.pageSize));
+    if (params.paginationMode) searchParams.set('paginationMode', params.paginationMode);
+    if (params.cursor) searchParams.set('cursor', params.cursor);
     if (params.severity) searchParams.set('severity', params.severity);
     if (params.search) searchParams.set('search', params.search);
     if (params.sortOrder) searchParams.set('sortOrder', params.sortOrder);
@@ -97,6 +145,7 @@ export const findingsApi = {
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
     if (params.triageStatus) searchParams.set('triageStatus', params.triageStatus);
     if (params.assigneeUserId) searchParams.set('assigneeUserId', params.assigneeUserId);
+    if (params.scopeId) searchParams.set('scopeId', params.scopeId);
 
     const qs = searchParams.toString();
     const path = qs ? `/findings?${qs}` : '/findings';
@@ -107,7 +156,7 @@ export const findingsApi = {
     return httpGet<FindingDetailResponse>(`/findings/${id}`);
   },
 
-  exportFindings: async (params: FindingsExportParams): Promise<Blob> => {
+  exportFindings: async (params: FindingsExportParams): Promise<FindingsExportResult> => {
     const searchParams = new URLSearchParams();
     searchParams.set('format', params.format);
     if (params.severity) searchParams.set('severity', params.severity);
@@ -117,16 +166,52 @@ export const findingsApi = {
     if (params.componentId) searchParams.set('componentId', params.componentId);
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.scopeId) searchParams.set('scopeId', params.scopeId);
+    if (params.triageStatus) searchParams.set('triageStatus', params.triageStatus);
+    if (params.assigneeUserId) searchParams.set('assigneeUserId', params.assigneeUserId);
 
-    const headers = await getAuthHeaders();
+    const requestHeaders = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/findings/export?${searchParams.toString()}`, {
-      headers,
+      headers: requestHeaders,
+      credentials: 'include',
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Export failed' }));
       throw new Error(error.message || 'Export failed');
     }
-    return response.blob();
+    const responseHeaders = response.headers ?? new Headers();
+    const parseCount = (name: string): number | null => {
+      const raw = responseHeaders.get(name);
+      if (raw === null || !/^\d+$/.test(raw)) return null;
+      const value = Number(raw);
+      return Number.isSafeInteger(value) ? value : null;
+    };
+    const canonical = parseCount('X-Sentris-Schema-Canonical');
+    const legacy = parseCount('X-Sentris-Schema-Legacy');
+    const invalid = parseCount('X-Sentris-Schema-Invalid');
+    const availabilityHeader = responseHeaders.get('X-Sentris-Availability');
+    const degradedReasons =
+      responseHeaders
+        .get('X-Sentris-Degraded-Reasons')
+        ?.split(',')
+        .map((reason) => reason.trim())
+        .filter(Boolean) ?? [];
+
+    return {
+      blob: await response.blob(),
+      availability:
+        availabilityHeader === 'available' || availabilityHeader === 'degraded'
+          ? availabilityHeader
+          : 'unknown',
+      degradedReasons,
+      projectionHealthReason: responseHeaders.get('X-Sentris-Projection-Health-Reason'),
+      projectionReconciledThrough: responseHeaders.get('X-Sentris-Projection-Reconciled-Through'),
+      schemaCoverage:
+        canonical !== null && legacy !== null && invalid !== null
+          ? { canonical, legacy, invalid }
+          : null,
+      headers: responseHeaders,
+    };
   },
 
   getStats: async (params: FindingsStatsParams = {}): Promise<FindingsStatsResponse> => {
@@ -137,6 +222,9 @@ export const findingsApi = {
     if (params.componentId) searchParams.set('componentId', params.componentId);
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.scopeId) searchParams.set('scopeId', params.scopeId);
+    if (params.triageStatus) searchParams.set('triageStatus', params.triageStatus);
+    if (params.assigneeUserId) searchParams.set('assigneeUserId', params.assigneeUserId);
 
     const qs = searchParams.toString();
     const path = qs ? `/findings/stats?${qs}` : '/findings/stats';

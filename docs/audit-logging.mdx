@@ -1,65 +1,105 @@
-# Audit Logging
+---
+title: 'Audit logging'
+description: 'Durability, provenance, access, and export behavior for security-relevant events'
+---
 
-Sentris Flow emits **audit events** for important platform actions so customers can answer: who did what, when, and in which organization.
+Sentris records organization-scoped audit events for security-relevant
+mutations, credential use, exports, external side effects, and selected reads.
+The audit path is designed to preserve truthful intent without claiming that a
+PostgreSQL transaction can atomically commit a remote API or Temporal action.
 
-## Event Naming
+## Durability model
 
-Use the pattern:
+There are three intentionally different write patterns:
 
-- `{resource}.{verb}`
+| Operation                     | Audit boundary                                                                                        | Failure behavior                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| PostgreSQL mutation           | The state change and `audit.log.persist.v1` outbox event use the same transaction                     | The mutation rolls back if the audit event cannot be accepted |
+| Remote or runtime side effect | An awaited `phase: requested` event is accepted before network, storage-byte, or Temporal work begins | The side effect is not attempted if audit acceptance fails    |
+| Approved high-volume read     | A direct best-effort insert                                                                           | The response is not delayed or failed by audit storage        |
 
-Examples:
+Only `analytics.query`, `findings.list`, `findings.detail`, and
+`findings.stats` may use the best-effort path. Exports are not in that class:
+findings and audit exports require durable audit acceptance before response
+bytes are released.
 
-- `workflow.create`
-- `workflow.update`
-- `workflow.run`
-- `secret.create`
-- `secret.rotate`
-- `secret.access`
-- `api_key.create`
-- `webhook.update`
-- `artifact.download`
-- `analytics.query`
+For a database mutation, the outbox listener projects the audit record after
+commit. Its stable audit ID makes listener retries idempotent. For a remote
+operation, a later `completed`, `reconciled`, or action-specific result event
+may be committed with local state where the operation supports it. A requested
+event proves that Sentris accepted the operator's intent; it does not prove the
+remote service applied the request. Ambiguous notification and ticket outcomes
+remain visible for explicit reconciliation rather than automatic duplication.
 
-## Required Fields
+Current strict coverage includes workflow and schedule changes, workflow
+starts and cancellation, secrets and API keys, files and artifacts,
+notification channels and resends, generic OAuth configuration/connections and
+token issuance, Jira connection/webhook/ticket operations, finding triage,
+MCP configuration, webhook configuration, dead-letter requeue, and exports.
 
-Every audit event should include:
+## Event shape and naming
 
-- `organizationId`: organization scope (falls back to `local-dev` for local/internal tooling)
-- `actorId`: user ID or API key ID (when available)
-- `actorType`: `user` | `api-key` | `internal` | `unknown`
-- `action`: event name (see above)
-- `resourceType`: `workflow` | `secret` | `api_key` | `webhook` | `artifact` | `analytics`
-- `resourceId`: resource identifier (when applicable)
-- `createdAt`: event timestamp
+Actions use a stable `{resource}.{verb}`-style name, with more segments where
+they clarify a boundary. Examples include `workflow.run`,
+`workflow_run.cancel`, `integration.token.issue`,
+`ticketing.issue.transition`, `notification_delivery.resend`,
+`artifact.download`, and `audit.export`.
 
-Optional fields:
+Each record contains:
 
-- `resourceName`
-- `metadata` (safe, minimal details)
-- `ip`, `userAgent`
+- organization, actor ID/type, action, resource type, and occurrence time;
+- optional resource ID/name and small, explicitly selected metadata;
+- request provenance when available: direct peer IP, user agent, and
+  correlation ID.
 
-## Safety Rules
+Never place plaintext secrets, access or refresh tokens, API-key material,
+webhook credentials, full workflow graphs, or unbounded request/response
+payloads in audit metadata. This is a call-site contract; the audit service
+does not attempt to discover and redact arbitrary secret-bearing objects.
 
-- Never log secret values, API key plaintext, or decrypted materials.
-- Avoid logging large payloads (workflow graphs, full webhook payloads, raw analytics queries).
-- Prefer small, explicit metadata fields like counts, IDs, versions, and booleans.
-- Audit logging must be **non-blocking**: failures to write audit logs must not break the API request.
+## Request provenance
 
-## Standard Pattern (Backend)
+Every HTTP request receives an `X-Request-Id`. A non-empty caller value up to
+191 characters is preserved; otherwise the backend creates a UUID. The same
+value is returned in the response and attached to audit records created within
+that asynchronous request context.
 
-Prefer emitting audit events in the **service layer** right after a successful action.
+The audit IP is Express `req.ip`, which is the directly connected peer in the
+default deployment. Sentris does not parse `X-Forwarded-For` inside the audit
+middleware. This avoids accepting a spoofed address as provenance, but behind
+the bundled reverse proxy the peer can be the proxy rather than the original
+client. User-agent and request-ID values are also caller-controlled context,
+not authenticated identity; authorization-derived actor and organization
+fields remain authoritative.
 
-```ts
-// Example: after a successful mutation
-this.auditLogService.record(auth, {
-  action: 'secret.rotate',
-  resourceType: 'secret',
-  resourceId: secret.id,
-  resourceName: secret.name,
-  metadata: {
-    resolvedVersion: secret.activeVersion,
-  },
-});
-```
+Internal or background work can supply explicit provenance. When none exists,
+the corresponding fields are null. Local single-administrator operations use
+the deployment's local organization identity.
 
+## Reading and exporting
+
+`GET /api/v1/audit-logs` returns the authenticated organization's events using
+a stable `(createdAt, id)` keyset cursor. Access is limited to organization
+administrators and API keys with `audit.read`.
+
+`GET /api/v1/audit-logs/export` accepts the same filters and streams a complete
+CSV. The backend:
+
+1. validates tenant-scoped read authorization;
+2. durably records `audit.export`;
+3. releases headers and streams deterministic pages of at most 1,000 rows with
+   response backpressure.
+
+The export is not silently capped at 10,000 rows and is not accumulated in
+memory. CSV cells are escaped, including spreadsheet-formula neutralization.
+The export includes the correlation ID so an operator can join an event to
+request and application logs.
+
+## Operational recovery
+
+Strict audit records travel through the shared PostgreSQL outbox. Inspect
+tenant-scoped dead letters through the administration API, correct the
+underlying database or listener failure, and requeue the exact event. Do not
+turn a strict call site into best effort to restore availability: that changes
+the operation's evidence contract. See [Self-hosting](/self-hosting) for
+dead-letter and backup procedures.

@@ -1,118 +1,164 @@
 /**
  * Lightweight HTTP health server for the Temporal worker process.
  *
- * Uses only `node:http` — no framework dependencies.
+ * Uses only `node:http` so liveness remains independent of application
+ * frameworks and infrastructure clients.
  *
  * Endpoints:
- *   GET /health       — liveness + readiness checks (200 if all pass, 503 otherwise)
- *   GET /health/ready — alias for /health (kept for compatibility with k8s-style probes)
+ *   GET /health       — process-only liveness
+ *   GET /health/ready — cached, dependency-aware readiness
  */
 
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import { access, constants } from 'node:fs/promises';
-import { platform } from 'node:os';
-import type { NativeConnection } from '@temporalio/worker';
-import type Redis from 'ioredis';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 const DEFAULT_HEALTH_PORT = 9100;
+const DEFAULT_CHECK_TIMEOUT_MS = 3_000;
+const DEFAULT_CACHE_TTL_MS = 5_000;
 const SERVICE_NAME = 'sentris-worker';
 
-type CheckStatus = 'ok' | 'unhealthy' | 'not_configured';
+export type CheckStatus = 'ok' | 'unhealthy' | 'not_configured';
 
-interface CheckResult {
+export interface CheckResult {
   status: CheckStatus;
   message?: string;
 }
 
-interface HealthResponse {
+export interface HealthResponse {
   status: 'ok' | 'unhealthy';
   service: string;
   timestamp: string;
   checks: Record<string, CheckResult>;
 }
 
+export type ReadinessCheck = (signal?: AbortSignal) => Promise<CheckResult>;
+export type ReadinessEvaluator = () => Promise<HealthResponse>;
+
 export interface HealthServerDeps {
-  /** Temporal NativeConnection — used to verify connectivity. */
-  temporalConnection: NativeConnection;
-  /** Optional terminal Redis instance. */
-  terminalRedis?: Redis;
+  readiness: ReadinessEvaluator;
+}
+
+export interface HealthServerOptions {
+  port?: number;
 }
 
 export interface HealthServerHandle {
-  /** Close the health HTTP server gracefully. */
   close: () => Promise<void>;
-  /** The port the server is listening on. */
   port: number;
 }
 
-// ── Individual health checks ────────────────────────────────────────────
+export interface ReadinessEvaluatorOptions {
+  timeoutMs?: number;
+  cacheTtlMs?: number;
+  now?: () => number;
+}
 
-async function checkTemporal(connection: NativeConnection): Promise<CheckResult> {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+interface PendingReadinessCheck {
+  controller: AbortController;
+  promise: Promise<CheckResult>;
+}
+
+async function runCheckWithTimeout(
+  name: string,
+  pending: PendingReadinessCheck,
+  timeoutMs: number,
+): Promise<CheckResult> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const timeoutResult = new Promise<CheckResult>((resolve) => {
+    timeout = setTimeout(() => {
+      pending.controller.abort(new Error(`${name} readiness check timed out after ${timeoutMs}ms`));
+      resolve({
+        status: 'unhealthy',
+        message: `${name} readiness check timed out after ${timeoutMs}ms`,
+      });
+    }, timeoutMs);
+  });
+
   try {
-    // `describeNamespace` is a lightweight gRPC call that proves the connection
-    // is alive without side-effects. Any successful response means connectivity
-    // is fine.
-    await connection.workflowService.getSystemInfo({});
-    return { status: 'ok' };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 'unhealthy', message };
+    return await Promise.race([pending.promise, timeoutResult]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 
-async function checkDocker(): Promise<CheckResult> {
-  const os = platform();
-  const socketPath = os === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock';
+export function createCachedReadinessEvaluator(
+  checks: Record<string, ReadinessCheck>,
+  options: ReadinessEvaluatorOptions = {},
+): ReadinessEvaluator {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_CHECK_TIMEOUT_MS;
+  const cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
+  const now = options.now ?? Date.now;
+  let cached: { expiresAt: number; response: HealthResponse } | undefined;
+  let inFlight: Promise<HealthResponse> | undefined;
+  const pendingChecks = new Map<string, PendingReadinessCheck>();
 
-  try {
-    await access(socketPath, constants.R_OK);
-    return { status: 'ok' };
-  } catch {
-    // On Windows dev environments the Docker socket may not exist — treat as
-    // non-critical so the health check doesn't block development.
-    if (os === 'win32') {
-      return { status: 'ok', message: 'Docker socket not found (Windows dev — skipped)' };
+  const getPendingCheck = (name: string, check: ReadinessCheck): PendingReadinessCheck => {
+    const existing = pendingChecks.get(name);
+    if (existing) return existing;
+
+    const controller = new AbortController();
+    let operation: Promise<CheckResult>;
+    try {
+      operation = Promise.resolve(check(controller.signal));
+    } catch (error: unknown) {
+      operation = Promise.reject(error);
     }
-    return { status: 'unhealthy', message: `Docker socket not accessible at ${socketPath}` };
-  }
-}
+    const pending: PendingReadinessCheck = {
+      controller,
+      promise: operation.catch(
+        (error: unknown): CheckResult => ({
+          status: 'unhealthy',
+          message: errorMessage(error),
+        }),
+      ),
+    };
+    pendingChecks.set(name, pending);
+    void operation
+      .finally(() => {
+        if (pendingChecks.get(name) === pending) pendingChecks.delete(name);
+      })
+      .catch(() => undefined);
+    return pending;
+  };
 
-async function checkRedis(redis: Redis | undefined): Promise<CheckResult> {
-  if (!redis) {
-    return { status: 'not_configured' };
-  }
-  try {
-    const pong = await redis.ping();
-    if (pong === 'PONG') {
-      return { status: 'ok' };
+  return async () => {
+    const currentTime = now();
+    if (cached && currentTime < cached.expiresAt) {
+      return cached.response;
     }
-    return { status: 'unhealthy', message: `Unexpected PING response: ${pong}` };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 'unhealthy', message };
-  }
-}
+    if (inFlight) {
+      return inFlight;
+    }
 
-// ── Health endpoint handler ─────────────────────────────────────────────
+    inFlight = (async () => {
+      const entries = await Promise.all(
+        Object.entries(checks).map(async ([name, check]) => {
+          const result = await runCheckWithTimeout(name, getPendingCheck(name, check), timeoutMs);
+          return [name, result] as const;
+        }),
+      );
+      const results = Object.fromEntries(entries);
+      const healthy = Object.values(results).every(
+        ({ status }) => status === 'ok' || status === 'not_configured',
+      );
+      const response: HealthResponse = {
+        status: healthy ? 'ok' : 'unhealthy',
+        service: SERVICE_NAME,
+        timestamp: new Date(now()).toISOString(),
+        checks: results,
+      };
+      cached = { expiresAt: now() + cacheTtlMs, response };
+      return response;
+    })();
 
-async function buildHealthResponse(deps: HealthServerDeps): Promise<HealthResponse> {
-  const [temporal, docker, redis] = await Promise.all([
-    checkTemporal(deps.temporalConnection),
-    checkDocker(),
-    checkRedis(deps.terminalRedis),
-  ]);
-
-  const checks: Record<string, CheckResult> = { temporal, docker, redis };
-
-  const isHealthy = Object.values(checks).every(
-    (c) => c.status === 'ok' || c.status === 'not_configured',
-  );
-
-  return {
-    status: isHealthy ? 'ok' : 'unhealthy',
-    service: SERVICE_NAME,
-    timestamp: new Date().toISOString(),
-    checks,
+    try {
+      return await inFlight;
+    } finally {
+      inFlight = undefined;
+    }
   };
 }
 
@@ -133,17 +179,25 @@ function handleRequest(deps: HealthServerDeps) {
       return;
     }
 
-    if (req.url === '/health' || req.url === '/health/ready') {
+    if (req.url === '/health') {
+      sendJson(res, 200, {
+        status: 'ok',
+        service: SERVICE_NAME,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    if (req.url === '/health/ready') {
       try {
-        const health = await buildHealthResponse(deps);
+        const health = await deps.readiness();
         sendJson(res, health.status === 'ok' ? 200 : 503, health);
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
         sendJson(res, 503, {
           status: 'unhealthy',
           service: SERVICE_NAME,
           timestamp: new Date().toISOString(),
-          error: message,
+          error: errorMessage(error),
         });
       }
       return;
@@ -153,37 +207,37 @@ function handleRequest(deps: HealthServerDeps) {
   };
 }
 
-// ── Public API ──────────────────────────────────────────────────────────
+function resolvePort(options: HealthServerOptions): number {
+  const rawPort = options.port ?? process.env.WORKER_HEALTH_PORT ?? DEFAULT_HEALTH_PORT;
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+    throw new Error(`Invalid worker health port: ${rawPort}`);
+  }
+  return port;
+}
 
-/**
- * Start the health HTTP server.
- *
- * Port resolution order:
- *   1. `WORKER_HEALTH_PORT` env var (explicit override)
- *   2. `9100` (default)
- */
-export function startHealthServer(deps: HealthServerDeps): Promise<HealthServerHandle> {
-  const port = Number(process.env.WORKER_HEALTH_PORT) || DEFAULT_HEALTH_PORT;
+export function startHealthServer(
+  deps: HealthServerDeps,
+  options: HealthServerOptions = {},
+): Promise<HealthServerHandle> {
+  const requestedPort = resolvePort(options);
 
   return new Promise<HealthServerHandle>((resolve, reject) => {
     const server: Server = createServer(handleRequest(deps));
 
-    server.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        console.warn(`⚠️ Health server port ${port} is already in use — health endpoint disabled`);
-        // Resolve with a no-op handle so the worker isn't blocked by port conflicts.
-        resolve({ close: async () => {}, port });
-      } else {
-        reject(err);
-      }
-    });
-
-    server.listen(port, () => {
+    server.once('error', reject);
+    server.listen(requestedPort, () => {
+      server.removeListener('error', reject);
+      server.on('error', (error) => {
+        console.error('Worker health server error', error);
+      });
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : requestedPort;
       console.log(`✅ Health server listening on port ${port}`);
       resolve({
         close: () =>
           new Promise<void>((res, rej) => {
-            server.close((err) => (err ? rej(err) : res()));
+            server.close((error) => (error ? rej(error) : res()));
           }),
         port,
       });

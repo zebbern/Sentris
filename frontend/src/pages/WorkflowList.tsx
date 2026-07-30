@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,8 @@ import { DndContext } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortableList } from '@/hooks/useSortableList';
 import { useToast } from '@/components/ui/use-toast';
+import { useScope } from '@/hooks/queries/useScopeQueries';
+import { buildScopedWorkflowPath } from '@/lib/targetNavigation';
 import { WorkflowRow } from './WorkflowRow';
 
 // Stable reference to avoid creating a new [] on every render when query data is undefined.
@@ -79,7 +81,15 @@ const WORKFLOW_EXPORT_COLUMNS: ExportColumn[] = [
 export function WorkflowList() {
   useDocumentTitle('Workflows');
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const requestedScopeId = useMemo(
+    () => new URLSearchParams(location.search).get('scopeId'),
+    [location.search],
+  );
+  const { data: requestedScope } = useScope(requestedScopeId ?? '', {
+    enabled: Boolean(requestedScopeId),
+  });
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const {
     data: rawWorkflows = EMPTY_WORKFLOWS,
@@ -211,6 +221,11 @@ export function WorkflowList() {
           <div className="rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
             You are viewing workflows with read-only access. Administrators can create and edit
             workflows.
+          </div>
+        )}
+        {requestedScopeId && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+            Choose a workflow to run against {requestedScope?.name ?? 'the selected target'}.
           </div>
         )}
 
@@ -460,7 +475,9 @@ export function WorkflowList() {
                           isCloning={cloneWorkflow.isPending}
                           isDragDisabled={isDragDisabled}
                           formatDate={formatDate}
-                          onRowClick={() => navigate(`/workflows/${workflow.id}`)}
+                          onRowClick={() =>
+                            navigate(buildScopedWorkflowPath(workflow.id, location.search))
+                          }
                           onDeleteClick={handleDeleteClick}
                           onCloneClick={handleCloneClick}
                           availableTags={allTags.map((t) => t.name)}

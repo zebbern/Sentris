@@ -1200,6 +1200,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ticketing/reconciliation/{findingTriageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconcile an ambiguous Jira ticket creation */
+        post: operations["TicketingController_reconcileTicketCreation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ticketing/jira/webhook/{secret}": {
         parameters: {
             query?: never;
@@ -2885,6 +2902,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/internal/health/worker-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["InternalHealthController_workerReady"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-skills": {
         parameters: {
             query?: never;
@@ -3010,6 +3043,57 @@ export interface paths {
         patch: operations["ScopesController_updateScope"];
         trace?: never;
     };
+    "/api/v1/scopes/{id}/findings-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get finding counts for a scope */
+        get: operations["ScopeFindingsController_getSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scopes/{scopeId}/assets/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare asset observations and scanner coverage between two runs */
+        get: operations["AssetsController_compareRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scopes/{scopeId}/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List discovered assets for a scope */
+        get: operations["AssetsController_listAssets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai/anthropic/models": {
         parameters: {
             query?: never;
@@ -3027,10 +3111,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/outbox/dead-letters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List dead-lettered outbox events for the current organization */
+        get: operations["OutboxController_listDeadLetters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/outbox/dead-letters/{eventId}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Requeue one dead-lettered outbox event */
+        post: operations["OutboxController_requeue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WorkflowRunResultResponseDto: {
+            runId: string;
+            result: {
+                outputs: {
+                    [key: string]: unknown;
+                };
+                /** @enum {boolean} */
+                success: true;
+            } | {
+                /** @enum {string} */
+                status: "FAILED";
+                result: null;
+            } | {
+                /** @enum {string} */
+                status: "CANCELLED";
+                result: null;
+            } | {
+                /** @enum {string} */
+                status: "TIMED_OUT";
+                result: null;
+            } | {
+                /** @enum {string} */
+                status: "TERMINATED";
+                result: null;
+            };
+        };
+        CancelWorkflowRunResponseDto: {
+            /** @enum {string} */
+            status: "cancelled";
+            runId: string;
+        };
         RunArtifactsResponseDto: {
             runId: string;
             artifacts: {
@@ -3555,9 +3704,37 @@ export interface components {
         EnsureTenantDto: {
             organizationId: string;
         };
+        FindingItemDto: {
+            id: string;
+            /** @enum {string} */
+            schemaCompatibility?: "canonical" | "legacy" | "invalid";
+            timestamp: string;
+            severity?: string;
+            name?: string;
+            asset_key?: string;
+            workflow_name?: string;
+            workflow_id?: string;
+            run_id?: string;
+            scope_id?: string;
+            component_id?: string;
+            node_ref?: string;
+            raw?: {
+                [key: string]: unknown;
+            };
+            triage?: {
+                status: string;
+                assigneeUserId: string | null;
+                severityOverride: string | null;
+                notes: string | null;
+                updatedAt: string;
+                projectionVersion?: number;
+            } | null;
+        };
         FindingsResponseDto: {
             items: {
                 id: string;
+                /** @enum {string} */
+                schemaCompatibility?: "canonical" | "legacy" | "invalid";
                 timestamp: string;
                 severity?: string;
                 name?: string;
@@ -3565,6 +3742,7 @@ export interface components {
                 workflow_name?: string;
                 workflow_id?: string;
                 run_id?: string;
+                scope_id?: string;
                 component_id?: string;
                 node_ref?: string;
                 raw?: {
@@ -3576,11 +3754,40 @@ export interface components {
                     severityOverride: string | null;
                     notes: string | null;
                     updatedAt: string;
+                    projectionVersion?: number;
                 } | null;
             }[];
             total: number;
             page: number;
             pageSize: number;
+            /** @enum {string} */
+            availability: "available" | "degraded" | "unavailable";
+            /**
+             * @default offset
+             * @enum {string}
+             */
+            paginationMode: "offset" | "cursor";
+            /** @default null */
+            currentCursor: string | null;
+            /** @default null */
+            nextCursor: string | null;
+            projectionHealth?: {
+                /** @enum {string} */
+                availability: "available" | "degraded";
+                /** Format: date-time */
+                completedAt: string | null;
+                /** Format: date-time */
+                reconciledThrough: string | null;
+                /** @enum {string|null} */
+                reason: "not_reconciled" | "reconciliation_in_progress" | "reconciliation_failed" | "authoritative_updates_pending" | "watermark_missing" | "observation_index_rebuilt" | "watermark_mismatch" | "projection_events_pending" | "health_check_failed" | null;
+            };
+            schemaCoverage: {
+                canonical: number;
+                legacy: number;
+                invalid: number;
+            };
+            /** @default [] */
+            degradedReasons: string[];
         };
         FindingsStatsResponseDto: {
             severityCounts: {
@@ -3588,9 +3795,28 @@ export interface components {
                 count: number;
             }[];
             total: number;
+            /** @enum {string} */
+            availability: "available" | "degraded" | "unavailable";
+            projectionHealth?: {
+                /** @enum {string} */
+                availability: "available" | "degraded";
+                /** Format: date-time */
+                completedAt: string | null;
+                /** Format: date-time */
+                reconciledThrough: string | null;
+                /** @enum {string|null} */
+                reason: "not_reconciled" | "reconciliation_in_progress" | "reconciliation_failed" | "authoritative_updates_pending" | "watermark_missing" | "observation_index_rebuilt" | "watermark_mismatch" | "projection_events_pending" | "health_check_failed" | null;
+            };
+            schemaCoverage: {
+                canonical: number;
+                legacy: number;
+                invalid: number;
+            };
         };
         FindingDetailResponseDto: {
             id: string;
+            /** @enum {string} */
+            schemaCompatibility?: "canonical" | "legacy" | "invalid";
             timestamp: string;
             severity?: string;
             name?: string;
@@ -3598,6 +3824,7 @@ export interface components {
             workflow_name?: string;
             workflow_id?: string;
             run_id?: string;
+            scope_id?: string;
             component_id?: string;
             node_ref?: string;
             raw: {
@@ -3609,14 +3836,49 @@ export interface components {
                 severityOverride: string | null;
                 notes: string | null;
                 updatedAt: string;
+                projectionVersion?: number;
             } | null;
+            /** @enum {string} */
+            availability: "available" | "degraded" | "unavailable";
+        };
+        TicketLinkResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            findingTriageId: string;
+            /** @enum {string} */
+            provider: "jira";
+            lastSyncedAt: string | null;
+            createdAt: string;
+            externalId: string;
+            /** Format: uri */
+            externalUrl: string;
+            /** @enum {string} */
+            syncStatus: "synced" | "error";
+            /** @constant */
+            reconciliationRequired: false;
+        } | {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            findingTriageId: string;
+            /** @enum {string} */
+            provider: "jira";
+            lastSyncedAt: string | null;
+            createdAt: string;
+            externalId: null;
+            externalUrl: null;
+            /** @enum {string} */
+            syncStatus: "pending" | "unknown";
+            /** @enum {boolean} */
+            reconciliationRequired: true;
         };
         TriageUpdateDto: {
             /** @enum {string} */
             status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
-            assigneeUserId?: string;
+            assigneeUserId?: string | null;
             /** @enum {string|null} */
-            severityOverride?: "critical" | "high" | "medium" | "low" | "info" | null;
+            severityOverride?: "critical" | "high" | "medium" | "low" | "info" | "none" | null;
             notes?: string | null;
             comment?: string;
         };
@@ -3624,27 +3886,130 @@ export interface components {
             findingIds: string[];
             /** @enum {string} */
             status?: "new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk";
-            assigneeUserId?: string;
+            assigneeUserId?: string | null;
             comment?: string;
         };
         UpsertSlaPoliciesDto: {
             policies: {
                 /** @enum {string} */
-                severity: "critical" | "high" | "medium" | "low" | "info";
+                severity: "critical" | "high" | "medium" | "low" | "info" | "none";
                 deadlineHours: number;
             }[];
+        };
+        TicketingConnectionResponseDto: {
+            /** Format: uuid */
+            id: string | null;
+            /** @enum {string} */
+            provider: "jira";
+            isConnected: boolean;
+            cloudId: string | null;
+            config: {
+                projectKey: string;
+                issueTypeId: string;
+                statusMapping: {
+                    [key: string]: string | {
+                        transitionName: string;
+                        resultingStatus: string;
+                    };
+                };
+                autoCreateOnStatuses: ("new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk")[];
+            } | null;
+            createdAt: string | null;
+            webhookRegistration: {
+                /** @enum {string} */
+                status: "unregistered" | "pending" | "registered" | "dead";
+                version: number;
+                lastError: string | null;
+            } | null;
         };
         ConnectJiraDto: {
             /** Format: uri */
             redirectUri: string;
         };
+        OAuthConnectResponseDto: {
+            /** Format: uri */
+            authorizationUrl: string;
+            /** Format: uuid */
+            state: string;
+        };
+        OperationSuccessResponseDto: {
+            /** @enum {boolean} */
+            success: true;
+        };
+        TicketingErrorResponseDto: {
+            statusCode: number;
+            message: string | string[];
+            error?: string;
+        };
         UpdateTicketingConfigDto: {
             projectKey: string;
             issueTypeId: string;
             statusMapping: {
-                [key: string]: string;
+                [key: string]: string | {
+                    transitionName: string;
+                    resultingStatus: string;
+                };
             };
             autoCreateOnStatuses: ("new" | "triaged" | "in_progress" | "fixed" | "verified" | "wont_fix" | "accepted_risk")[];
+        };
+        JiraProjectDto: {
+            id: string;
+            key: string;
+            name: string;
+            avatarUrl: string | null;
+        };
+        JiraIssueTypeDto: {
+            id: string;
+            name: string;
+            description: string | null;
+            iconUrl: string | null;
+        };
+        ReconcileTicketCreationDto: {
+            /** @enum {string} */
+            action: "attach";
+            issueKey: string;
+        } | {
+            /** @enum {string} */
+            action: "clear_and_retry";
+            /** @enum {boolean} */
+            confirmedNoIssueExists: true;
+        };
+        ReconcileTicketCreationResponseDto: {
+            /** @enum {string} */
+            action: "attach";
+            /** @enum {string} */
+            status: "attached";
+            /** Format: uuid */
+            findingTriageId: string;
+            ticket: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                findingTriageId: string;
+                /** @enum {string} */
+                provider: "jira";
+                lastSyncedAt: string | null;
+                createdAt: string;
+                externalId: string;
+                /** Format: uri */
+                externalUrl: string;
+                /** @enum {string} */
+                syncStatus: "synced" | "error";
+                /** @constant */
+                reconciliationRequired: false;
+            };
+        } | {
+            /** @enum {string} */
+            action: "clear_and_retry";
+            /** @enum {string} */
+            status: "retry_queued";
+            /** Format: uuid */
+            findingTriageId: string;
+            ticket: null;
+        };
+        JiraWebhookResponseDto: {
+            /** @enum {string} */
+            status: "ignored" | "unmapped_status" | "no_change" | "synced" | "error";
         };
         IntegrationProviderResponse: {
             id: string;
@@ -3692,7 +4057,6 @@ export interface components {
             metadata?: Record<string, never>;
         };
         StartOAuthDto: {
-            userId: string;
             /** Format: uri */
             redirectUri: string;
             scopes?: string[];
@@ -3708,18 +4072,11 @@ export interface components {
             expiresIn: number;
         };
         CompleteOAuthDto: {
-            userId: string;
+            state: string;
+            code: string;
             /** Format: uri */
             redirectUri: string;
             scopes?: string[];
-            state: string;
-            code: string;
-        };
-        RefreshConnectionDto: {
-            userId: string;
-        };
-        DisconnectConnectionDto: {
-            userId: string;
         };
         ConnectionTokenResponseDto: {
             provider: string;
@@ -3830,7 +4187,6 @@ export interface components {
             /** Format: date-time */
             expiresAt?: string;
             rateLimit?: number;
-            organizationId?: string;
         };
         CreateApiKeyResponseDto: {
             id: string;
@@ -4282,8 +4638,6 @@ export interface components {
             responseData?: {
                 [key: string]: unknown;
             };
-            /** @description User ID or identifier of who resolved the input */
-            respondedBy?: string;
         };
         ResolveByTokenDto: {
             /**
@@ -4667,7 +5021,7 @@ export interface components {
             runId: string | null;
             eventType: string;
             /** @enum {string} */
-            status: "pending" | "sent" | "failed";
+            status: "pending" | "sending" | "sent" | "failed" | "unknown";
             payload: {
                 [key: string]: unknown;
             };
@@ -4701,7 +5055,7 @@ export interface components {
             command?: string;
             /** @description Arguments for stdio command */
             args?: string[];
-            /** @description Docker image for stdio transport */
+            /** @description Deprecated for single discovery; trusted-local stdio uses a same-worker loopback host proxy */
             image?: string;
             /**
              * Format: uuid
@@ -4856,7 +5210,7 @@ export interface components {
                 actorDisplay: string | null;
                 action: string;
                 /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage";
+                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage" | "outbox_event" | "integration" | "file" | "ticketing_connection";
                 resourceId: string | null;
                 resourceName: string | null;
                 metadata: {
@@ -4864,6 +5218,7 @@ export interface components {
                 } | null;
                 ip: string | null;
                 userAgent: string | null;
+                correlationId: string | null;
                 /** Format: date-time */
                 createdAt: string;
             }[];
@@ -4995,6 +5350,76 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        ScopeFindingsSummaryResponse: {
+            /** @enum {string} */
+            availability: "available" | "degraded" | "unavailable";
+            total: number;
+            bySeverity: {
+                critical: number;
+                high: number;
+                medium: number;
+                low: number;
+                info: number;
+                none: number;
+            };
+        };
+        AssetRunComparisonResponse: {
+            /** Format: uuid */
+            scopeId: string;
+            /** Format: uuid */
+            workflowId: string;
+            baselineRunId: string;
+            currentRunId: string;
+            baselineCoverage: {
+                completedComponents: string[];
+                failedComponents: string[];
+            };
+            currentCoverage: {
+                completedComponents: string[];
+                failedComponents: string[];
+            };
+            summary: {
+                observed: number;
+                notObserved: number;
+                notScanned: number;
+            };
+            items: {
+                /** @enum {string} */
+                assetType: "subdomain" | "host" | "ip-address" | "open-port" | "http-probe" | "dns-record" | "crawled-url" | "url";
+                assetValue: string;
+                sourceComponentIds: string[];
+                baselineObserved: boolean;
+                currentObserved: boolean;
+                /** @enum {string} */
+                observationStatus: "observed" | "not-observed" | "not-scanned";
+                /** @enum {string} */
+                change: "new" | "unchanged" | "missing";
+            }[];
+        };
+        AssetResponse: {
+            /** Format: uuid */
+            id: string;
+            organizationId: string;
+            /** Format: uuid */
+            scopeId: string;
+            /** @enum {string} */
+            assetType: "subdomain" | "host" | "ip-address" | "open-port" | "http-probe" | "dns-record" | "crawled-url" | "url";
+            assetValue: string;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            firstSeenRunId: string | null;
+            lastSeenRunId: string | null;
+            sourceComponentId: string | null;
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         ListAnthropicModelsDto: {
             apiKeySecretId: string;
         };
@@ -5007,6 +5432,43 @@ export interface components {
             /** @enum {string} */
             source: "live" | "error";
             error?: string | null;
+        };
+        ListDeadLettersResponseDto: {
+            items: {
+                /** Format: uuid */
+                id: string;
+                eventType: string;
+                organizationId: string | null;
+                aggregateType: string;
+                aggregateId: string;
+                dedupeKey: string;
+                payload: {
+                    [key: string]: unknown;
+                };
+                /** @enum {string} */
+                status: "dead";
+                attempts: number;
+                maxAttempts: number;
+                /** Format: date-time */
+                availableAt: string;
+                /** Format: date-time */
+                lockedAt: string | null;
+                lockedBy: string | null;
+                lastError: string | null;
+                /** Format: date-time */
+                processedAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            nextCursor: string | null;
+        };
+        RequeueDeadLetterResponseDto: {
+            /** Format: uuid */
+            eventId: string;
+            /** @enum {string} */
+            status: "pending";
         };
     };
     responses: never;
@@ -5350,7 +5812,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["WorkflowRunResultResponseDto"];
+                };
             };
         };
     };
@@ -5397,12 +5861,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Cancels a running workflow execution */
+            /** @description Cancellation request accepted by Temporal */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CancelWorkflowRunResponseDto"];
+                };
             };
         };
     };
@@ -6597,17 +7063,21 @@ export interface operations {
     FindingsController_listFindings: {
         parameters: {
             query?: {
-                page?: number;
-                pageSize?: number;
-                severity?: "critical" | "high" | "medium" | "low" | "info";
+                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
                 search?: string;
-                sortOrder?: "asc" | "desc";
                 workflowId?: string;
+                runId?: string;
+                scopeId?: string;
                 componentId?: string;
                 dateFrom?: string;
                 dateTo?: string;
                 triageStatus?: string;
                 assigneeUserId?: string;
+                page?: number;
+                pageSize?: number;
+                sortOrder?: "asc" | "desc";
+                paginationMode?: "offset" | "cursor";
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -6629,12 +7099,16 @@ export interface operations {
     FindingsController_getStats: {
         parameters: {
             query?: {
-                severity?: "critical" | "high" | "medium" | "low" | "info";
+                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
                 search?: string;
                 workflowId?: string;
+                runId?: string;
+                scopeId?: string;
                 componentId?: string;
                 dateFrom?: string;
                 dateTo?: string;
+                triageStatus?: string;
+                assigneeUserId?: string;
             };
             header?: never;
             path?: never;
@@ -6656,15 +7130,19 @@ export interface operations {
     FindingsController_exportFindings: {
         parameters: {
             query?: {
-                severity?: "critical" | "high" | "medium" | "low" | "info";
+                severity?: "critical" | "high" | "medium" | "low" | "info" | "none";
                 search?: string;
-                sortOrder?: "asc" | "desc";
-                format?: "csv" | "json";
-                limit?: number;
                 workflowId?: string;
+                runId?: string;
+                scopeId?: string;
                 componentId?: string;
                 dateFrom?: string;
                 dateTo?: string;
+                triageStatus?: string;
+                assigneeUserId?: string;
+                sortOrder?: "asc" | "desc";
+                format?: "csv" | "json";
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -6672,11 +7150,31 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Finding export in the requested format */
             200: {
                 headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    /** @description Trust state for the exported finding data */
+                    "X-Sentris-Availability"?: "available" | "degraded";
+                    /** @description Comma-separated reasons the export is degraded, when present */
+                    "X-Sentris-Degraded-Reasons"?: string;
+                    /** @description Projection degradation reason, when present */
+                    "X-Sentris-Projection-Health-Reason"?: string;
+                    /** @description Latest reconciled projection timestamp, when present */
+                    "X-Sentris-Projection-Reconciled-Through"?: string;
+                    /** @description Canonical observations included in the export */
+                    "X-Sentris-Schema-Canonical"?: number;
+                    /** @description Legacy observations included in the export */
+                    "X-Sentris-Schema-Legacy"?: number;
+                    /** @description Invalid versioned observations included in the export */
+                    "X-Sentris-Schema-Invalid"?: number;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["FindingItemDto"][];
+                    "text/csv": string;
+                };
             };
         };
     };
@@ -6684,7 +7182,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description OpenSearch finding document identifier */
+                id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -6704,7 +7205,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description OpenSearch finding document identifier */
+                id: string;
+            };
             cookie?: never;
         };
         requestBody: {
@@ -6748,7 +7252,10 @@ export interface operations {
                 limit?: number;
             };
             header?: never;
-            path?: never;
+            path: {
+                /** @description OpenSearch finding document identifier */
+                id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -6765,7 +7272,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description OpenSearch finding document identifier */
+                id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -6774,7 +7284,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TicketLinkResponseDto"] | null;
+                };
             };
         };
     };
@@ -6958,7 +7470,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TicketingConnectionResponseDto"];
+                };
             };
         };
     };
@@ -6979,7 +7493,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OAuthConnectResponseDto"];
+                };
             };
         };
     };
@@ -6999,7 +7515,17 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OperationSuccessResponseDto"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
+                };
             };
         };
     };
@@ -7016,7 +7542,17 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["OperationSuccessResponseDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
+                };
             };
         };
     };
@@ -7037,7 +7573,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TicketingConnectionResponseDto"];
+                };
             };
         };
     };
@@ -7054,7 +7592,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["JiraProjectDto"][];
+                };
             };
         };
     };
@@ -7073,7 +7613,34 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["JiraIssueTypeDto"][];
+                };
+            };
+        };
+    };
+    TicketingController_reconcileTicketCreation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                findingTriageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileTicketCreationDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconcileTicketCreationResponseDto"];
+                };
             };
         };
     };
@@ -7096,14 +7663,27 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["JiraWebhookResponseDto"];
+                };
             };
             /** @description Invalid webhook signature */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
+                };
+            };
+            /** @description Webhook processing failed; Jira should retry the delivery */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketingErrorResponseDto"];
+                };
             };
         };
     };
@@ -7194,9 +7774,7 @@ export interface operations {
     };
     IntegrationsController_listConnections: {
         parameters: {
-            query: {
-                userId: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -7272,11 +7850,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RefreshConnectionDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
@@ -7297,11 +7871,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DisconnectConnectionDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Connection removed */
             200: {
@@ -7317,6 +7887,8 @@ export interface operations {
             query?: never;
             header: {
                 "x-internal-token": string;
+                "x-organization-id": string;
+                "x-run-id": string;
             };
             path: {
                 id: string;
@@ -10171,6 +10743,23 @@ export interface operations {
             };
         };
     };
+    InternalHealthController_workerReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AgentSkillsController_listSkills: {
         parameters: {
             query: {
@@ -10450,6 +11039,75 @@ export interface operations {
             };
         };
     };
+    ScopeFindingsController_getSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeFindingsSummaryResponse"];
+                };
+            };
+        };
+    };
+    AssetsController_compareRuns: {
+        parameters: {
+            query: {
+                baselineRunId: string;
+                currentRunId: string;
+            };
+            header?: never;
+            path: {
+                scopeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetRunComparisonResponse"];
+                };
+            };
+        };
+    };
+    AssetsController_listAssets: {
+        parameters: {
+            query: {
+                type: string;
+                limit: string;
+            };
+            header?: never;
+            path: {
+                scopeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetResponse"][];
+                };
+            };
+        };
+    };
     AiController_listAnthropicModels: {
         parameters: {
             query?: never;
@@ -10470,6 +11128,63 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ListAnthropicModelsResponse"];
                 };
+            };
+        };
+    };
+    OutboxController_listDeadLetters: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDeadLettersResponseDto"];
+                };
+            };
+        };
+    };
+    OutboxController_requeue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequeueDeadLetterResponseDto"];
+                };
+            };
+            /** @description Event ID must be a UUID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Dead-lettered outbox event not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

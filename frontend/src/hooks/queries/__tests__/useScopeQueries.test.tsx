@@ -11,6 +11,8 @@ const getMock = vi.fn();
 const createMock = vi.fn();
 const updateMock = vi.fn();
 const removeMock = vi.fn();
+const listRunsMock = vi.fn();
+const listFindingsMock = vi.fn();
 
 mock.module('@/services/api', () => ({
   api: {
@@ -21,6 +23,15 @@ mock.module('@/services/api', () => ({
       update: updateMock,
       remove: removeMock,
     },
+    executions: {
+      listRuns: listRunsMock,
+    },
+    assets: {
+      listByScope: vi.fn(),
+    },
+    findings: {
+      list: listFindingsMock,
+    },
   },
 }));
 
@@ -30,6 +41,8 @@ import {
   useCreateScope,
   useUpdateScope,
   useDeleteScope,
+  useScopeRuns,
+  useTargetFindings,
 } from '../useScopeQueries';
 
 afterEach(cleanup);
@@ -40,6 +53,8 @@ beforeEach(() => {
   createMock.mockReset();
   updateMock.mockReset();
   removeMock.mockReset();
+  listRunsMock.mockReset();
+  listFindingsMock.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -85,6 +100,114 @@ describe('useScope', () => {
 
     expect(getMock).toHaveBeenCalledWith('scope-1');
     expect(result.current.data).toEqual(SCOPE_LIST[0]);
+  });
+});
+
+describe('useScopeRuns', () => {
+  it('loads target run history in pages without a silent 50-run cap', async () => {
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({
+      id: `run-${index}`,
+      workflowId: 'workflow-1',
+      workflowName: 'Recon',
+      status: 'COMPLETED',
+      startTime: '2026-01-01T00:00:00.000Z',
+    }));
+    const secondPage = [
+      {
+        id: 'run-50',
+        workflowId: 'workflow-1',
+        workflowName: 'Recon',
+        status: 'COMPLETED',
+        startTime: '2026-01-02T00:00:00.000Z',
+      },
+    ];
+    listRunsMock.mockImplementation(({ offset }: { offset?: number }) =>
+      Promise.resolve({ runs: offset === 50 ? secondPage : firstPage }),
+    );
+
+    const { result } = renderHookWithProviders(() => useScopeRuns('scope-1'));
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(50);
+    expect(result.current.hasNextPage).toBe(true);
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    expect(listRunsMock).toHaveBeenLastCalledWith({
+      scopeId: 'scope-1',
+      limit: 50,
+      offset: 50,
+    });
+    await waitFor(() => expect(result.current.data).toHaveLength(51));
+    await waitFor(() => expect(result.current.hasNextPage).toBe(false));
+  });
+});
+
+describe('useTargetFindings', () => {
+  it('uses canonical scope filtering and cursor pagination beyond 10,000 findings', async () => {
+    listFindingsMock.mockImplementation(({ cursor }: { cursor?: string }) =>
+      Promise.resolve({
+        items: [
+          {
+            id: cursor ? 'finding-2' : 'finding-1',
+            timestamp: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        total: 10_001,
+        page: cursor ? 2 : 1,
+        pageSize: 50,
+        paginationMode: 'cursor',
+        currentCursor: cursor ? 'opaque-page-2' : 'opaque-page-1',
+        nextCursor: cursor ? null : 'opaque-page-2',
+        availability: cursor ? 'degraded' : 'available',
+        projectionHealth: cursor
+          ? {
+              availability: 'degraded',
+              completedAt: null,
+              reconciledThrough: '2026-07-26T12:00:00.000Z',
+              reason: 'projection_events_pending',
+            }
+          : undefined,
+        degradedReasons: cursor ? ['projection_events_pending'] : [],
+        schemaCoverage: { canonical: 1, legacy: 0, invalid: 0 },
+      }),
+    );
+
+    const { result } = renderHookWithProviders(() => useTargetFindings('scope-1'));
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(listFindingsMock).toHaveBeenCalledWith({
+      scopeId: 'scope-1',
+      page: 1,
+      pageSize: 50,
+      paginationMode: 'cursor',
+      cursor: undefined,
+    });
+    expect(result.current.hasNextPage).toBe(true);
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    expect(listFindingsMock).toHaveBeenLastCalledWith({
+      scopeId: 'scope-1',
+      page: 2,
+      pageSize: 50,
+      paginationMode: 'cursor',
+      cursor: 'opaque-page-2',
+    });
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+    await waitFor(() => expect(result.current.availability).toBe('degraded'));
+    expect(result.current.degradedReasons).toEqual(['projection_events_pending']);
+    expect(result.current.projectionHealth).toEqual({
+      availability: 'degraded',
+      completedAt: null,
+      reconciledThrough: '2026-07-26T12:00:00.000Z',
+      reason: 'projection_events_pending',
+    });
+    expect(result.current.schemaCoverage).toEqual({ canonical: 1, legacy: 0, invalid: 0 });
   });
 });
 

@@ -35,13 +35,16 @@ function buildSchema(ports: PortSpec[]) {
 }
 
 function createMockSecrets(store: Record<string, string>): ISecretsService {
-  return {
+  const secrets = {
     get: vi.fn(async (key: string) => {
       const value = store[key];
       return value != null ? { value, version: 1 } : null;
     }),
     list: vi.fn(async () => Object.keys(store)),
-  } as unknown as ISecretsService;
+    forOrganization: vi.fn(),
+  };
+  secrets.forOrganization.mockReturnValue(secrets);
+  return secrets as unknown as ISecretsService;
 }
 
 function createComponent(opts: {
@@ -77,7 +80,14 @@ describe('resolveSecretInputOverrides', () => {
   it('resolves a secret-type input override via secrets.get()', async () => {
     const previousDebugValue = process.env.SENTRIS_DEBUG_WORKFLOW;
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const secrets = createMockSecrets({ 'secret-id-1': 'my-api-key' });
+    const scopedSecrets = createMockSecrets({ 'secret-id-1': 'my-api-key' });
+    const secrets = {
+      forOrganization: vi.fn(() => scopedSecrets),
+      get: vi.fn(async () => {
+        throw new Error('unscoped secret access');
+      }),
+      list: vi.fn(async () => []),
+    } as unknown as ISecretsService;
     const component = createComponent({
       inputPorts: [{ id: 'apiKey', editor: 'secret' }],
     });
@@ -92,10 +102,13 @@ describe('resolveSecretInputOverrides', () => {
         secrets,
         component,
         resolvedParams: {},
+        organizationId: 'org-a',
       });
 
       expect(inputs.apiKey).toBe('my-api-key');
-      expect(secrets.get).toHaveBeenCalledWith('secret-id-1');
+      expect(secrets.forOrganization).toHaveBeenCalledWith('org-a');
+      expect(scopedSecrets.get).toHaveBeenCalledWith('secret-id-1');
+      expect(secrets.get).not.toHaveBeenCalled();
       expect(consoleSpy).not.toHaveBeenCalled();
     } finally {
       consoleSpy.mockRestore();
@@ -209,7 +222,9 @@ describe('resolveSecretInputOverrides', () => {
     const secrets = {
       get: vi.fn().mockRejectedValue(new Error('vault down')),
       list: vi.fn(),
-    } as unknown as ISecretsService;
+      forOrganization: vi.fn(),
+    };
+    secrets.forOrganization.mockReturnValue(secrets);
 
     const component = createComponent({
       inputPorts: [{ id: 'apiKey', editor: 'secret' }],
@@ -497,7 +512,9 @@ describe('resolveSecretParams', () => {
     const secrets = {
       get: vi.fn().mockRejectedValue(new Error('vault error')),
       list: vi.fn(),
-    } as unknown as ISecretsService;
+      forOrganization: vi.fn(),
+    };
+    secrets.forOrganization.mockReturnValue(secrets);
 
     const component = createComponent({
       paramPorts: [{ id: 'apiToken', editor: 'secret' }],

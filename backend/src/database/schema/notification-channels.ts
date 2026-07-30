@@ -6,9 +6,11 @@ import {
   smallint,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const notificationChannelsTable = pgTable(
   'notification_channels',
@@ -41,14 +43,19 @@ export const notificationDeliveriesTable = pgTable(
       .references(() => notificationChannelsTable.id, { onDelete: 'cascade' }),
     runId: text('run_id'),
     eventType: text('event_type').notNull(),
-    status: text('status').notNull().default('pending').$type<'pending' | 'sent' | 'failed'>(),
+    status: text('status')
+      .notNull()
+      .default('pending')
+      .$type<'pending' | 'sending' | 'sent' | 'failed' | 'unknown'>(),
     payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
     errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    sendingStartedAt: timestamp('sending_started_at', { withTimezone: true }),
     sentAt: timestamp('sent_at', { withTimezone: true }),
     durationMs: integer('duration_ms'),
     responseStatus: smallint('response_status'),
     responseBody: text('response_body'),
+    outboxEventId: uuid('outbox_event_id'),
   },
   (table) => ({
     channelCreatedAtIdx: index('notification_deliveries_channel_created_at_idx').on(
@@ -56,6 +63,13 @@ export const notificationDeliveriesTable = pgTable(
       table.createdAt,
     ),
     runIdIdx: index('notification_deliveries_run_id_idx').on(table.runId),
+    channelOutboxEventIdx: uniqueIndex('notification_deliveries_channel_outbox_event_idx').on(
+      table.channelId,
+      table.outboxEventId,
+    ),
+    resolvedRetentionIdx: index('notification_deliveries_resolved_retention_idx')
+      .on(table.createdAt, table.id)
+      .where(sql`${table.status} IN ('sent', 'failed')`),
   }),
 );
 

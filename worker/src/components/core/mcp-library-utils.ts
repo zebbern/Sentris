@@ -4,6 +4,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpStdioHostProxy } from './mcp-stdio-host-proxy';
 import { mcpDiagnosticLog } from './mcp-diagnostics';
+import { buildBackendApiUrl, resolveBackendApiBaseUrl } from '../../common/backend-url';
 
 // Schema matching backend API response (McpServerResponse from mcp-servers.dto.ts)
 const McpServerSchema = z.object({
@@ -49,11 +50,10 @@ export async function fetchEnabledServers(
   context: ExecutionContext,
   options: { useAllEnabled?: boolean } = {},
 ): Promise<McpServer[]> {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
   const orgId = context.metadata.organizationId;
 
-  const response = await fetch(`${backendUrl}/api/v1/mcp-servers`, {
+  const response = await fetch(buildBackendApiUrl('mcp-servers'), {
     headers: {
       'Content-Type': 'application/json',
       ...(internalToken ? { 'x-internal-token': internalToken } : {}),
@@ -77,12 +77,11 @@ export async function fetchResolvedConfig(
   serverId: string,
   context: ExecutionContext,
 ): Promise<{ headers?: Record<string, string>; args?: string[] }> {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
   const orgId = context.metadata.organizationId;
 
   // Fetch resolved configuration using internal token auth
-  const resolveResponse = await fetch(`${backendUrl}/api/v1/mcp-servers/${serverId}/resolve`, {
+  const resolveResponse = await fetch(buildBackendApiUrl(`mcp-servers/${serverId}/resolve`), {
     headers: {
       'Content-Type': 'application/json',
       ...(internalToken ? { 'x-internal-token': internalToken } : {}),
@@ -190,14 +189,14 @@ export async function registerServerTools(
 
   // For stdio servers, expose the process through a host-side HTTP bridge.
   if (server.transportType === 'stdio') {
-    const { endpoint, containerId } = await startMcpStdioHostProxy({
+    const { endpoint, proxyId } = await startMcpStdioHostProxy({
       command: server.command || '',
       args: (resolvedConfig.args ?? server.args) || [],
       env: envFromHeaders,
       context,
     });
 
-    // Discover tools from the running container
+    // Discover tools through the same-worker loopback proxy.
     const tools = await discoverToolsFromEndpoint(endpoint, httpHeaders);
 
     // Register the server with pre-discovered tools
@@ -208,7 +207,8 @@ export async function registerServerTools(
       serverId: server.id,
       transport: 'stdio',
       endpoint,
-      containerId,
+      // The registry's legacy cleanup-handle field stores Docker IDs or host-proxy IDs.
+      containerId: proxyId,
       headers: httpHeaders,
       tools,
     });
@@ -238,8 +238,7 @@ export async function registerServerTools(
  * the MCP provider node while the gateway exposes the provider's child servers.
  */
 export async function registerProviderReady(context: ExecutionContext): Promise<void> {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
-  const internalApiUrl = `${backendUrl}/api/v1/internal/mcp`;
+  const internalApiUrl = `${resolveBackendApiBaseUrl()}/internal/mcp`;
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
   const response = await fetch(`${internalApiUrl}/register-component`, {
@@ -283,8 +282,7 @@ async function registerMcpServer(input: {
   headers?: Record<string, string>;
   tools: McpTool[];
 }): Promise<void> {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:3211';
-  const internalApiUrl = `${backendUrl}/api/v1/internal/mcp`;
+  const internalApiUrl = `${resolveBackendApiBaseUrl()}/internal/mcp`;
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
   const registerResponse = await fetch(`${internalApiUrl}/register-mcp-server`, {

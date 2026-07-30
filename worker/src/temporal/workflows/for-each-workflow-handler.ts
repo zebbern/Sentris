@@ -127,6 +127,7 @@ export async function handleForEachLoopInWorkflow(
         workflowName: bodyDefinition.title,
         workflowVersionId: input.workflowVersionId ?? null,
         organizationId: input.organizationId ?? null,
+        scopeId: input.scopeId ?? null,
         action: {
           ref: bodyAction.ref,
           componentId: bodyAction.componentId,

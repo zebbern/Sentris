@@ -76,24 +76,30 @@ export class WorkflowVersionService {
     this.logger.log(`Compiling workflow ${workflow.id} version ${version.version}`);
     const graph = WorkflowGraphSchema.parse(version.graph);
     const definition = compileWorkflowGraph(graph);
-    await this.repository.saveCompiledDefinition(id, definition, { organizationId });
-    await this.versionRepository.setCompiledDefinition(version.id, definition, {
-      organizationId,
+    await this.repository.transaction(async (executor) => {
+      await this.repository.saveCompiledDefinition(id, definition, {
+        organizationId,
+        executor,
+      });
+      await this.versionRepository.setCompiledDefinition(version.id, definition, {
+        organizationId,
+        executor,
+      });
+      await this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+        action: 'workflow.commit',
+        resourceType: 'workflow',
+        resourceId: workflow.id,
+        resourceName: workflow.name,
+        metadata: {
+          version: version.version,
+          actionCount: definition.actions.length,
+          entrypoint: definition.entrypoint.ref,
+        },
+      });
     });
     this.logger.log(
       `Compiled workflow ${workflow.id} version ${version.version} with ${definition.actions.length} action(s); entrypoint=${definition.entrypoint.ref}`,
     );
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.commit',
-      resourceType: 'workflow',
-      resourceId: workflow.id,
-      resourceName: workflow.name,
-      metadata: {
-        version: version.version,
-        actionCount: definition.actions.length,
-        entrypoint: definition.entrypoint.ref,
-      },
-    });
     return definition;
   }
 

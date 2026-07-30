@@ -7,6 +7,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
 export const MCP_STDIO_HOST_PROXY_ID_PREFIX = 'host-mcp-proxy-';
+export const MCP_STDIO_HOST_PROXY_HOST = '127.0.0.1';
 
 interface StartMcpStdioHostProxyInput {
   command: string;
@@ -17,7 +18,7 @@ interface StartMcpStdioHostProxyInput {
 
 interface StartMcpStdioHostProxyOutput {
   endpoint: string;
-  containerId: string;
+  proxyId: string;
 }
 
 interface RunningHostProxy {
@@ -33,7 +34,7 @@ async function getAvailablePort(): Promise<number> {
     const server = createTcpServer();
     server.unref();
     server.on('error', reject);
-    server.listen(0, '0.0.0.0', () => {
+    server.listen(0, MCP_STDIO_HOST_PROXY_HOST, () => {
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : 0;
       server.close((closeErr) => {
@@ -47,9 +48,30 @@ async function getAvailablePort(): Promise<number> {
   });
 }
 
-function normalizeProcessEnv(): Record<string, string> {
+/**
+ * Trusted-local stdio children receive only runtime path/home/temp/system
+ * variables. Worker credentials and service secrets are deliberately excluded;
+ * callers may pass server-specific variables through `input.env`.
+ */
+function minimalChildEnvironment(): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
+  const safeKeys = [
+    'PATH',
+    'Path',
+    'HOME',
+    'USERPROFILE',
+    'TMP',
+    'TEMP',
+    'TMPDIR',
+    'SYSTEMROOT',
+    'SystemRoot',
+    'WINDIR',
+    'ComSpec',
+    'PATHEXT',
+    'XDG_RUNTIME_DIR',
+  ];
+  for (const key of safeKeys) {
+    const value = process.env[key];
     if (typeof value === 'string') {
       env[key] = value;
     }
@@ -256,7 +278,7 @@ async function handleJsonRpc(
 async function listen(server: Server, port: number): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, '0.0.0.0', () => {
+    server.listen(port, MCP_STDIO_HOST_PROXY_HOST, () => {
       server.off('error', reject);
       resolve();
     });
@@ -268,15 +290,15 @@ export async function startMcpStdioHostProxy(
 ): Promise<StartMcpStdioHostProxyOutput> {
   const command = input.command.trim();
   if (!command) {
-    throw new Error('command is required for stdio MCP host proxy');
+    throw new Error('command is required for the same-worker loopback stdio MCP host proxy');
   }
 
   const env = input.env ?? {};
   const args = withDockerEnvPassthrough(command, input.args ?? [], env);
-  const childEnv = { ...normalizeProcessEnv(), ...env };
+  const childEnv = { ...minimalChildEnvironment(), ...env };
   const id = `${MCP_STDIO_HOST_PROXY_ID_PREFIX}${randomUUID()}`;
   const port = await getAvailablePort();
-  const endpoint = `http://localhost:${port}/mcp`;
+  const endpoint = `http://${MCP_STDIO_HOST_PROXY_HOST}:${port}/mcp`;
   const client = new Client({ name: 'sentris-mcp-stdio-host-proxy', version: '1.0.0' });
   const transport = new StdioClientTransport({ command, args, env: childEnv });
 
@@ -293,7 +315,7 @@ export async function startMcpStdioHostProxy(
     if (req.method === 'GET' && url.pathname === '/health') {
       sendJson(res, 200, {
         status: 'ok',
-        mode: 'host-stdio',
+        mode: 'same-worker-loopback-stdio',
         servers: [{ name: 'default', ready: true }],
       });
       return;
@@ -334,21 +356,21 @@ export async function startMcpStdioHostProxy(
   }
 
   runningHostProxies.set(id, { client, server, endpoint });
-  input.context?.logger.info(`[MCP Host Proxy] Started ${id} at ${endpoint}`);
-  return { endpoint, containerId: id };
+  input.context?.logger.info(`[MCP Same-Worker Loopback Proxy] Started ${id} at ${endpoint}`);
+  return { endpoint, proxyId: id };
 }
 
-export function isMcpStdioHostProxyId(containerId: string): boolean {
-  return containerId.startsWith(MCP_STDIO_HOST_PROXY_ID_PREFIX);
+export function isMcpStdioHostProxyId(proxyId: string): boolean {
+  return proxyId.startsWith(MCP_STDIO_HOST_PROXY_ID_PREFIX);
 }
 
-export async function stopMcpStdioHostProxy(containerId: string): Promise<boolean> {
-  const running = runningHostProxies.get(containerId);
+export async function stopMcpStdioHostProxy(proxyId: string): Promise<boolean> {
+  const running = runningHostProxies.get(proxyId);
   if (!running) {
     return false;
   }
 
-  runningHostProxies.delete(containerId);
+  runningHostProxies.delete(proxyId);
   await Promise.allSettled([
     running.client.close(),
     new Promise<void>((resolve) => running.server.close(() => resolve())),

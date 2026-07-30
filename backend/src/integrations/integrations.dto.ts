@@ -2,32 +2,25 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
-export const StartOAuthSchema = z.object({
-  userId: z.string().min(1),
-  redirectUri: z.string().url(),
-  scopes: z.array(z.string()).optional(),
-});
+export const StartOAuthSchema = z
+  .object({
+    redirectUri: z.string().url(),
+    scopes: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export class StartOAuthDto extends createZodDto(StartOAuthSchema) {}
 
-export const CompleteOAuthSchema = StartOAuthSchema.extend({
-  state: z.string().min(1),
-  code: z.string().min(1),
-});
+export const CompleteOAuthSchema = z
+  .object({
+    state: z.string().min(1),
+    code: z.string().min(1),
+    redirectUri: z.string().url(),
+    scopes: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export class CompleteOAuthDto extends createZodDto(CompleteOAuthSchema) {}
-
-export const RefreshConnectionSchema = z.object({
-  userId: z.string().min(1),
-});
-
-export class RefreshConnectionDto extends createZodDto(RefreshConnectionSchema) {}
-
-export const DisconnectConnectionSchema = z.object({
-  userId: z.string().min(1),
-});
-
-export class DisconnectConnectionDto extends createZodDto(DisconnectConnectionSchema) {}
 
 export const UpsertProviderConfigSchema = z.object({
   clientId: z.string().min(1),

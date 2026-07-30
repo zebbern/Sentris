@@ -1,6 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { status as grpcStatus, type ServiceError } from '@grpc/grpc-js';
 import { WorkflowNotFoundError } from '@temporalio/client';
 import '@sentris/worker/components';
@@ -19,6 +18,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import {
   ExecutionStatus,
+  EXECUTION_STATUS,
   FailureSummary,
   WorkflowRunStatusPayload,
   WorkflowRunConfigPayload,
@@ -30,6 +30,7 @@ import {
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import type { AuthContext } from '../auth/types';
 import type { WorkflowRunRecord } from '../database/schema';
+import type { FinalizeRunRequestDto, ReportableTerminalStatus } from './dto/run-finalization.dto';
 
 export interface WorkflowRunRequest {
   inputs?: Record<string, unknown>;
@@ -100,7 +101,6 @@ export class WorkflowRunService {
     private readonly analyticsService: AnalyticsService,
     private readonly auditLogService: AuditLogService,
     private readonly workflowVersionService: WorkflowVersionService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async requireRunAccess(runId: string, auth?: AuthContext | null) {
@@ -122,6 +122,36 @@ export class WorkflowRunService {
 
   async ensureRunAccess(runId: string, auth?: AuthContext | null): Promise<void> {
     await this.requireRunAccess(runId, auth);
+  }
+
+  async finalizeRun(
+    runId: string,
+    input: FinalizeRunRequestDto,
+    auth?: AuthContext | null,
+  ): Promise<{
+    runId: string;
+    status: ReportableTerminalStatus;
+    completedAt: string;
+    duplicate: boolean;
+  }> {
+    const organizationId = requireOrganizationId(auth);
+    const completedAt = input.completedAt ? new Date(input.completedAt) : new Date();
+    const finalized = await this.runRepository.finalizeTerminalRun({
+      runId,
+      organizationId,
+      status: input.status,
+      completedAt,
+    });
+    if (!finalized) {
+      throw new NotFoundException(`Workflow run ${runId} not found`);
+    }
+
+    return {
+      runId,
+      status: finalized.record.status as ReportableTerminalStatus,
+      completedAt: (finalized.record.closeTime ?? completedAt).toISOString(),
+      duplicate: finalized.duplicate,
+    };
   }
 
   async getCompiledWorkflowContext(
@@ -165,19 +195,6 @@ export class WorkflowRunService {
       runId: options.runId,
       idempotencyKey: options.idempotencyKey,
     });
-    this.auditLogService.record(auth ?? null, {
-      action: 'workflow.run',
-      resourceType: 'workflow',
-      resourceId: prepared.workflowId,
-      resourceName: null,
-      metadata: {
-        runId: prepared.runId,
-        workflowVersion: prepared.workflowVersion,
-        triggerType: options.trigger?.type ?? null,
-        triggerSourceId: options.trigger?.sourceId ?? null,
-        triggerLabel: options.trigger?.label ?? null,
-      },
-    });
     return this.startPreparedRun(prepared);
   }
 
@@ -193,19 +210,13 @@ export class WorkflowRunService {
       this.logger.log(
         `Run ${prepared.runId} already started (temporalRunId=${existingRecord.temporalRunId})`,
       );
-      return {
-        runId: existingRecord.runId,
-        workflowId: existingRecord.workflowId,
-        workflowVersionId: existingRecord.workflowVersionId ?? prepared.workflowVersionId,
-        workflowVersion: existingRecord.workflowVersion ?? prepared.workflowVersion,
-        temporalRunId: existingRecord.temporalRunId,
-        status: 'RUNNING',
-        taskQueue: this.temporalService.getDefaultTaskQueue(),
-      };
+      return this.buildStartedRunHandle(
+        existingRecord,
+        prepared,
+        existingRecord.temporalRunId,
+        this.temporalService.getDefaultTaskQueue(),
+      );
     }
-    await this.repository.incrementRunCount(prepared.workflowId, {
-      organizationId: prepared.organizationId,
-    });
     let temporalRunId: string | null = null;
     try {
       const temporalRun = await this.temporalService.startWorkflow({
@@ -220,6 +231,7 @@ export class WorkflowRunService {
             workflowVersionId: prepared.workflowVersionId,
             workflowVersion: prepared.workflowVersion,
             organizationId: prepared.organizationId,
+            scopeId: prepared.scopeId ?? null,
           },
         ],
       });
@@ -227,21 +239,7 @@ export class WorkflowRunService {
       this.logger.log(
         `Started workflow run ${prepared.runId} (workflowVersion=${prepared.workflowVersion}, temporalRunId=${temporalRun.runId}, taskQueue=${temporalRun.taskQueue}, actions=${prepared.totalActions})`,
       );
-      await this.runRepository.upsert({
-        runId: prepared.runId,
-        workflowId: prepared.workflowId,
-        workflowVersionId: prepared.workflowVersionId,
-        workflowVersion: prepared.workflowVersion,
-        temporalRunId: temporalRun.runId,
-        totalActions: prepared.totalActions,
-        inputs: prepared.inputs,
-        organizationId: prepared.organizationId,
-        triggerType: prepared.triggerMetadata.type,
-        triggerSource: prepared.triggerMetadata.sourceId,
-        triggerLabel: prepared.triggerMetadata.label,
-        inputPreview: prepared.inputPreview,
-        scopeId: prepared.scopeId,
-      });
+      await this.persistStartedRun(prepared, temporalRun.runId);
       return {
         runId: prepared.runId,
         workflowId: prepared.workflowId,
@@ -265,16 +263,37 @@ export class WorkflowRunService {
           this.logger.warn(
             `Workflow run ${prepared.runId} already active (temporalRunId=${existing.temporalRunId})`,
           );
-          return {
-            runId: existing.runId,
-            workflowId: existing.workflowId,
-            workflowVersionId: existing.workflowVersionId ?? prepared.workflowVersionId,
-            workflowVersion: existing.workflowVersion ?? prepared.workflowVersion,
-            temporalRunId: existing.temporalRunId,
-            status: 'RUNNING',
-            taskQueue: this.temporalService.getDefaultTaskQueue(),
-          };
+          return this.buildStartedRunHandle(
+            existing,
+            prepared,
+            existing.temporalRunId,
+            this.temporalService.getDefaultTaskQueue(),
+          );
         }
+
+        const recovered = await this.temporalService.describeWorkflow({
+          workflowId: prepared.runId,
+        });
+        await this.persistStartedRun(prepared, recovered.runId);
+        const recoveredStatus = this.normalizeStatus(recovered.status);
+        await this.finalizeTemporalTerminalStatus({
+          runId: prepared.runId,
+          organizationId: prepared.organizationId,
+          status: recoveredStatus,
+          closeTime: recovered.closeTime,
+        });
+        this.logger.warn(
+          `Recovered workflow run ${prepared.runId} after its Temporal start was not persisted (temporalRunId=${recovered.runId})`,
+        );
+        return {
+          runId: prepared.runId,
+          workflowId: prepared.workflowId,
+          workflowVersionId: prepared.workflowVersionId,
+          workflowVersion: prepared.workflowVersion,
+          temporalRunId: recovered.runId,
+          status: recoveredStatus,
+          taskQueue: recovered.taskQueue,
+        };
       }
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -283,6 +302,39 @@ export class WorkflowRunService {
       if (error instanceof Error && error.stack) this.logger.error(`Stack trace: ${error.stack}`);
       throw error;
     }
+  }
+
+  async markRunStarted(
+    runId: string,
+    temporalRunId: string,
+    auth?: AuthContext | null,
+  ): Promise<{
+    runId: string;
+    workflowId: string;
+    temporalRunId: string;
+    duplicate: boolean;
+  }> {
+    const organizationId = requireOrganizationId(auth);
+    const prepared = await this.runRepository.findByRunId(runId, { organizationId });
+    if (!prepared) {
+      throw new NotFoundException(`Workflow run ${runId} not found`);
+    }
+
+    const result = await this.persistStartedRun(
+      {
+        runId: prepared.runId,
+        workflowId: prepared.workflowId,
+        organizationId,
+      },
+      temporalRunId,
+    );
+
+    return {
+      runId: result.record.runId,
+      workflowId: result.record.workflowId,
+      temporalRunId,
+      duplicate: !result.transitioned,
+    };
   }
 
   async prepareRunPayload(
@@ -304,6 +356,13 @@ export class WorkflowRunService {
     const organizationId = requireOrganizationId(auth);
     const workflow = await this.repository.findById(id, { organizationId });
     if (!workflow) throw new NotFoundException(`Workflow ${id} not found`);
+    const scopeId = request.scopeId ?? null;
+    if (
+      scopeId &&
+      !(await this.runRepository.scopeBelongsToOrganization(scopeId, organizationId))
+    ) {
+      throw new NotFoundException(`Scope ${scopeId} not found`);
+    }
     const version = await this.workflowVersionService.resolveWorkflowVersion(
       workflow.id,
       request,
@@ -320,39 +379,66 @@ export class WorkflowRunService {
     const normalizedKey = this.normalizeIdempotencyKey(options.idempotencyKey);
     const runId =
       options.runId ??
-      (normalizedKey ? this.runIdFromIdempotencyKey(normalizedKey) : `sentris-run-${randomUUID()}`);
+      (normalizedKey
+        ? this.runIdFromIdempotencyKey(organizationId, workflow.id, normalizedKey)
+        : `sentris-run-${randomUUID()}`);
     const triggerMetadata = options.trigger ?? this.buildEntryPointTriggerMetadata(auth);
     const inputs = request.inputs ?? {};
     const inputPreview = this.buildInputPreview(inputs, nodeOverrides);
-    const scopeId = request.scopeId ?? null;
-    await this.runRepository.upsert({
-      runId,
-      workflowId: workflow.id,
-      workflowVersionId: version.id,
-      workflowVersion: version.version,
-      totalActions: definitionWithOverrides.actions.length,
-      inputs,
-      organizationId,
-      triggerType: triggerMetadata.type,
-      triggerSource: triggerMetadata.sourceId,
-      triggerLabel: triggerMetadata.label,
-      inputPreview,
-      parentRunId: options.parentRunId,
-      parentNodeRef: options.parentNodeRef,
-      scopeId,
-    });
-    this.analyticsService.trackWorkflowStarted({
-      workflowId: workflow.id,
-      workflowVersionId: version.id,
-      workflowVersion: version.version,
-      runId,
-      organizationId,
-      nodeCount: compiledDefinition.actions.length,
-      inputCount: Object.keys(request.inputs ?? {}).length,
-      triggerType: triggerMetadata.type,
-      triggerSource: triggerMetadata.sourceId ?? undefined,
-      triggerLabel: triggerMetadata.label ?? undefined,
-    });
+    const preparation = await this.runRepository.prepare(
+      {
+        runId,
+        workflowId: workflow.id,
+        workflowVersionId: version.id,
+        workflowVersion: version.version,
+        totalActions: definitionWithOverrides.actions.length,
+        inputs,
+        organizationId,
+        triggerType: triggerMetadata.type,
+        triggerSource: triggerMetadata.sourceId,
+        triggerLabel: triggerMetadata.label,
+        inputPreview,
+        parentRunId: options.parentRunId,
+        parentNodeRef: options.parentNodeRef,
+        scopeId,
+      },
+      async (executor) => {
+        await this.auditLogService.recordDurableWithExecutor(
+          executor,
+          auth ?? null,
+          {
+            action: 'workflow.run',
+            resourceType: 'workflow',
+            resourceId: workflow.id,
+            resourceName: null,
+            metadata: {
+              runId,
+              workflowVersion: version.version,
+              triggerType: triggerMetadata.type,
+              triggerSourceId: triggerMetadata.sourceId,
+              triggerLabel: triggerMetadata.label,
+              phase: 'requested',
+            },
+          },
+          undefined,
+          organizationId,
+        );
+      },
+    );
+    if (preparation.created) {
+      this.analyticsService.trackWorkflowStarted({
+        workflowId: workflow.id,
+        workflowVersionId: version.id,
+        workflowVersion: version.version,
+        runId,
+        organizationId,
+        nodeCount: compiledDefinition.actions.length,
+        inputCount: Object.keys(request.inputs ?? {}).length,
+        triggerType: triggerMetadata.type,
+        triggerSource: triggerMetadata.sourceId ?? undefined,
+        triggerLabel: triggerMetadata.label ?? undefined,
+      });
+    }
     return {
       runId,
       workflowId: workflow.id,
@@ -400,29 +486,22 @@ export class WorkflowRunService {
     this.logger.log(
       `Fetching result for workflow run ${runId} (temporalRunId=${temporalRunId ?? 'latest'})`,
     );
-    const { run } = await this.requireRunAccess(runId, auth);
-    const cachedStatus = run.status as string | undefined;
-    const nonResultStatuses = new Set(['TERMINATED', 'CANCELLED', 'TIMED_OUT']);
-    if (cachedStatus && nonResultStatuses.has(cachedStatus))
-      return { status: cachedStatus, result: null };
+    const { organizationId, run } = await this.requireRunAccess(runId, auth);
+    const cachedStatus = this.toResultlessTerminalStatus(run.status);
+    if (cachedStatus) return { status: cachedStatus, result: null };
     try {
       return await this.temporalService.getWorkflowResult({
         workflowId: runId,
         runId: temporalRunId,
       });
     } catch (error: unknown) {
-      const errorName = error instanceof Error ? error.constructor.name : '';
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (
-        errorName === 'WorkflowFailedError' ||
-        errorMessage.includes('terminated') ||
-        errorMessage.includes('cancelled') ||
-        errorMessage.includes('timed out')
-      ) {
-        this.logger.warn(`Workflow run ${runId} ended without a result: ${errorMessage}`);
-        return { status: 'TERMINATED', result: null };
-      }
-      throw error;
+      if (!this.isTerminalWorkflowResultError(error)) throw error;
+      return this.reconcileResultlessTerminalStatus({
+        runId,
+        temporalRunId,
+        organizationId,
+        resultError: error,
+      });
     }
   }
 
@@ -441,7 +520,17 @@ export class WorkflowRunService {
     this.logger.warn(
       `Cancelling workflow run ${runId} (temporalRunId=${temporalRunId ?? 'latest'})`,
     );
-    await this.requireRunAccess(runId, auth);
+    const { run } = await this.requireRunAccess(runId, auth);
+    await this.auditLogService.recordDurable(auth ?? null, {
+      action: 'workflow_run.cancel',
+      resourceType: 'workflow',
+      resourceId: runId,
+      resourceName: run.workflowId,
+      metadata: {
+        temporalRunId: temporalRunId ?? null,
+        phase: 'requested',
+      },
+    });
     await this.temporalService.cancelWorkflow({ workflowId: runId, runId: temporalRunId });
   }
 
@@ -565,28 +654,12 @@ export class WorkflowRunService {
           runId: temporalRunId,
         });
         const normalizedStatus = this.normalizeStatus(temporalStatus.status);
-        if ((TERMINAL_STATUSES as readonly string[]).includes(normalizedStatus)) {
-          this.runRepository
-            .cacheTerminalStatus(
-              run.runId,
-              normalizedStatus,
-              temporalStatus.closeTime ? new Date(temporalStatus.closeTime) : undefined,
-            )
-            .catch((err) => this.logger.warn(`Failed to cache status for ${run.runId}: ${err}`));
-
-          // Fire-and-forget: emit run lifecycle event for notification dispatch
-          try {
-            this.eventEmitter.emit('run.status.terminal', {
-              runId: run.runId,
-              workflowId: run.workflowId,
-              organizationId,
-              status: normalizedStatus,
-              completedAt: temporalStatus.closeTime,
-            });
-          } catch (emitErr) {
-            this.logger.warn(`Failed to emit run.status.terminal for ${run.runId}: ${emitErr}`);
-          }
-        }
+        await this.finalizeTemporalTerminalStatus({
+          runId: run.runId,
+          organizationId,
+          status: normalizedStatus,
+          closeTime: temporalStatus.closeTime,
+        });
       } catch (error: unknown) {
         if (this.isNotFoundError(error)) {
           const inferredStatus = this.inferStatusFromTraceEvents({
@@ -656,6 +729,7 @@ export class WorkflowRunService {
     },
     traceCounts: { startedActions: number; completedActions: number; failedActions: number },
     nodeCount: number,
+    organizationId: string,
   ): Promise<{ status: ExecutionStatus; closeTime: string | null }> {
     if (run.status && (TERMINAL_STATUSES as readonly string[]).includes(run.status)) {
       return {
@@ -669,15 +743,12 @@ export class WorkflowRunService {
         runId: run.temporalRunId ?? undefined,
       });
       const currentStatus = this.normalizeStatus(desc.status);
-      if ((TERMINAL_STATUSES as readonly string[]).includes(currentStatus)) {
-        this.runRepository
-          .cacheTerminalStatus(
-            run.runId,
-            currentStatus,
-            desc.closeTime ? new Date(desc.closeTime) : undefined,
-          )
-          .catch((err) => this.logger.warn(`Failed to cache status for ${run.runId}: ${err}`));
-      }
+      await this.finalizeTemporalTerminalStatus({
+        runId: run.runId,
+        organizationId,
+        status: currentStatus,
+        closeTime: desc.closeTime,
+      });
       return { status: currentStatus, closeTime: desc.closeTime ?? null };
     } catch (error: unknown) {
       if (this.isNotFoundError(error)) {
@@ -808,6 +879,7 @@ export class WorkflowRunService {
           run,
           { startedActions, completedActions, failedActions },
           nodeCount,
+          organizationId,
         );
 
         return this.buildSummaryRecord(run, organizationId, {
@@ -852,6 +924,7 @@ export class WorkflowRunService {
       run,
       { startedActions, completedActions, failedActions },
       nodeCount,
+      organizationId,
     );
 
     return this.buildSummaryRecord(run, organizationId, {
@@ -881,7 +954,7 @@ export class WorkflowRunService {
         return 'COMPLETED';
       case 'FAILED':
         return 'FAILED';
-      case 'CANCELED':
+      case 'CANCELLED':
         return 'CANCELLED';
       case 'TERMINATED':
         return 'TERMINATED';
@@ -892,6 +965,130 @@ export class WorkflowRunService {
       default:
         this.logger.warn(`Unknown Temporal status '${status}', defaulting to RUNNING`);
         return 'RUNNING';
+    }
+  }
+
+  private async finalizeTemporalTerminalStatus(input: {
+    runId: string;
+    organizationId: string;
+    status: ExecutionStatus;
+    closeTime?: string;
+  }): Promise<ReportableTerminalStatus | null> {
+    const status = this.toReportableTerminalStatus(input.status);
+    if (!status) return null;
+
+    try {
+      const result = await this.runRepository.finalizeTerminalRun({
+        runId: input.runId,
+        organizationId: input.organizationId,
+        status,
+        completedAt: input.closeTime ? new Date(input.closeTime) : new Date(),
+      });
+      if (!result) {
+        this.logger.warn(`Terminal finalization found no tenant-owned run for ${input.runId}`);
+        return null;
+      }
+      return this.toReportableTerminalStatus(result.record.status as ExecutionStatus);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed to durably finalize status for ${input.runId}; reconciler will retry: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  private toReportableTerminalStatus(status: ExecutionStatus): ReportableTerminalStatus | null {
+    switch (status) {
+      case 'COMPLETED':
+      case 'FAILED':
+      case 'CANCELLED':
+      case 'TERMINATED':
+      case 'TIMED_OUT':
+        return status;
+      default:
+        return null;
+    }
+  }
+
+  private toResultlessTerminalStatus(status?: string | null): ReportableTerminalStatus | null {
+    switch (status) {
+      case 'FAILED':
+      case 'CANCELLED':
+      case 'TERMINATED':
+      case 'TIMED_OUT':
+        return status;
+      default:
+        return null;
+    }
+  }
+
+  private isTerminalWorkflowResultError(error: unknown): boolean {
+    const errorName = error instanceof Error ? error.constructor.name : '';
+    const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
+    return (
+      errorName === 'WorkflowFailedError' ||
+      errorMessage.includes('terminated') ||
+      errorMessage.includes('cancelled') ||
+      errorMessage.includes('canceled') ||
+      errorMessage.includes('timed out')
+    );
+  }
+
+  private async reconcileResultlessTerminalStatus(input: {
+    runId: string;
+    temporalRunId?: string;
+    organizationId: string;
+    resultError: unknown;
+  }): Promise<{ status: ReportableTerminalStatus; result: null }> {
+    const refreshedRun = await this.runRepository.findByRunId(input.runId, {
+      organizationId: input.organizationId,
+    });
+    if (!refreshedRun) {
+      throw new NotFoundException(`Workflow run ${input.runId} not found`);
+    }
+
+    const durableStatus = this.toResultlessTerminalStatus(refreshedRun.status);
+    if (durableStatus) {
+      return { status: durableStatus, result: null };
+    }
+
+    try {
+      const described = await this.temporalService.describeWorkflow({
+        workflowId: input.runId,
+        runId: input.temporalRunId,
+      });
+      const describedStatus = this.toResultlessTerminalStatus(
+        this.normalizeStatus(described.status),
+      );
+      if (!describedStatus) {
+        throw input.resultError;
+      }
+
+      const durableResult = await this.finalizeTemporalTerminalStatus({
+        runId: input.runId,
+        organizationId: input.organizationId,
+        status: describedStatus,
+        closeTime: described.closeTime,
+      });
+      const reconciledStatus =
+        durableResult === null ? describedStatus : this.toResultlessTerminalStatus(durableResult);
+      if (!reconciledStatus) {
+        throw input.resultError;
+      }
+      return { status: reconciledStatus, result: null };
+    } catch (reconciliationError: unknown) {
+      if (reconciliationError !== input.resultError) {
+        this.logger.warn(
+          `Failed to reconcile result status for ${input.runId}: ${
+            reconciliationError instanceof Error
+              ? reconciliationError.message
+              : String(reconciliationError)
+          }`,
+        );
+      }
+      throw input.resultError;
     }
   }
 
@@ -987,11 +1184,57 @@ export class WorkflowRunService {
   private normalizeIdempotencyKey(key?: string | null): string | undefined {
     if (!key) return undefined;
     const trimmed = key.trim();
-    return trimmed ? trimmed.slice(0, 128) : undefined;
+    if (!trimmed) return undefined;
+    if (trimmed.length > 128) {
+      throw new BadRequestException('Idempotency key must be at most 128 characters');
+    }
+    return trimmed;
   }
 
-  private runIdFromIdempotencyKey(key: string): string {
-    return `sentris-run-${createHash('sha256').update(key).digest('hex')}`;
+  private async persistStartedRun(
+    prepared: Pick<PreparedRunPayload, 'runId' | 'workflowId' | 'organizationId'>,
+    temporalRunId: string,
+  ) {
+    return this.runRepository.markStarted(
+      {
+        runId: prepared.runId,
+        workflowId: prepared.workflowId,
+        organizationId: prepared.organizationId,
+        temporalRunId,
+      },
+      async (executor) => {
+        await this.repository.incrementRunCount(prepared.workflowId, {
+          organizationId: prepared.organizationId,
+          executor,
+        });
+      },
+    );
+  }
+
+  private buildStartedRunHandle(
+    record: WorkflowRunRecord,
+    prepared: PreparedRunPayload,
+    temporalRunId: string,
+    taskQueue: string,
+  ): WorkflowRunHandle {
+    const status =
+      record.status && (EXECUTION_STATUS as readonly string[]).includes(record.status)
+        ? (record.status as ExecutionStatus)
+        : 'RUNNING';
+    return {
+      runId: record.runId,
+      workflowId: record.workflowId,
+      workflowVersionId: record.workflowVersionId ?? prepared.workflowVersionId,
+      workflowVersion: record.workflowVersion ?? prepared.workflowVersion,
+      temporalRunId,
+      status,
+      taskQueue,
+    };
+  }
+
+  private runIdFromIdempotencyKey(organizationId: string, workflowId: string, key: string): string {
+    const namespace = JSON.stringify([organizationId, workflowId, key]);
+    return `sentris-run-${createHash('sha256').update(namespace).digest('hex')}`;
   }
 
   private applyNodeOverrides(

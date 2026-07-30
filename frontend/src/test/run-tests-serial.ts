@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import {
   collectTestFiles,
+  planExplicitFrontendTestRuns,
   planFrontendTestRuns,
   toPosixRelative,
   usesMockModule,
@@ -26,7 +27,17 @@ function main(): number {
   const cliArgs = process.argv.slice(2);
 
   if (cliArgs.length > 0) {
-    return runBunTest(cliArgs);
+    const explicitPlan = planExplicitFrontendTestRuns(cliArgs, (file) =>
+      usesMockModule(path.resolve(file)),
+    );
+    if (!explicitPlan) return runBunTest(cliArgs);
+
+    for (const run of explicitPlan.runs) {
+      console.log(`\n[frontend:test] ${run.isolated ? 'isolated' : 'batch'}: ${run.label}`);
+      const exitCode = runBunTest([...explicitPlan.passthroughArgs, ...run.files]);
+      if (exitCode !== 0) return exitCode;
+    }
+    return 0;
   }
 
   const srcDir = path.join(process.cwd(), 'src');

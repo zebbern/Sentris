@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, lazy, Suspense } from 'react';
+import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ShieldAlert, ChevronLeft, ChevronRight, LayoutList, Columns3, Search } from 'lucide-react';
 
@@ -36,6 +36,10 @@ import { TriageStatusBadge } from '@/features/findings/TriageStatusBadge';
 import { FindingsKanbanView } from '@/features/findings/FindingsKanbanView';
 import { BulkActionsToolbar } from '@/features/findings/BulkActionsToolbar';
 import { FINDING_TRIAGE_STATUSES, TRIAGE_STATUS_META } from '@/features/findings/types';
+import {
+  describeFindingDataQuality,
+  shouldShowFindingDataQuality,
+} from '@/features/findings/findingDataQuality';
 
 const FindingDetailSheet = lazy(() =>
   import('@/features/findings/FindingDetailSheet').then((m) => ({
@@ -54,6 +58,7 @@ const SEVERITY_OPTIONS = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
   { value: 'info', label: 'Info' },
+  { value: 'none', label: 'None' },
 ];
 
 const PAGE_SIZE = 25;
@@ -69,6 +74,12 @@ const STATUS_FILTER_OPTIONS = [
 ];
 
 const FILTER_TRIGGER_CLASS = 'w-full';
+
+interface CursorNavigation {
+  queryKey: string;
+  page: number;
+  cursors: (string | undefined)[];
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -142,52 +153,99 @@ export function FindingsPage() {
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState('all');
   const [triageStatus, setTriageStatus] = useState('all');
-  const [page, setPage] = useState(1);
-  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [cursorNavigation, setCursorNavigation] = useState<CursorNavigation>({
+    queryKey: '',
+    page: 1,
+    cursors: [undefined],
+  });
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
   const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
   const [componentId, setComponentId] = useState<string | undefined>(undefined);
+  const scopeId = searchParams.get('scopeId') || undefined;
+  const selectedFindingId = searchParams.get('findingId');
+  const selectFinding = useCallback(
+    (findingId: string) => {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set('findingId', findingId);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+  const closeFinding = useCallback(() => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.delete('findingId');
+      return next;
+    });
+  }, [setSearchParams]);
 
   // Bulk selection (table view)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const debouncedSearch = useDebounce(search, 300);
 
-  // Reset page when filters change
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
-    setPage(1);
   }, []);
 
   const handleSeverityChange = useCallback((value: string) => {
     setSeverity(value);
-    setPage(1);
   }, []);
 
   const handleTriageStatusChange = useCallback((value: string) => {
     setTriageStatus(value);
-    setPage(1);
   }, []);
 
   const handleDateRangeChange = useCallback((range: { from?: Date; to?: Date } | undefined) => {
     setDateRange(range);
-    setPage(1);
   }, []);
 
   const handleWorkflowChange = useCallback((id: string | undefined) => {
     setWorkflowId(id);
-    setPage(1);
   }, []);
 
   const handleComponentChange = useCallback((id: string | undefined) => {
     setComponentId(id);
-    setPage(1);
   }, []);
+
+  const paginationQueryKey = useMemo(
+    () =>
+      JSON.stringify({
+        severity: severity !== 'all' ? severity : null,
+        search: debouncedSearch || null,
+        workflowId: workflowId ?? null,
+        componentId: componentId ?? null,
+        dateFrom: dateRange?.from?.toISOString() ?? null,
+        dateTo: dateRange?.to?.toISOString() ?? null,
+        triageStatus: triageStatus !== 'all' ? triageStatus : null,
+        scopeId: scopeId ?? null,
+        activeView,
+      }),
+    [
+      severity,
+      debouncedSearch,
+      workflowId,
+      componentId,
+      dateRange,
+      triageStatus,
+      scopeId,
+      activeView,
+    ],
+  );
+  const page = cursorNavigation.queryKey === paginationQueryKey ? cursorNavigation.page : 1;
+  const cursor =
+    cursorNavigation.queryKey === paginationQueryKey
+      ? cursorNavigation.cursors[page - 1]
+      : undefined;
 
   const queryParams = useMemo(
     () => ({
-      page: activeView === 'kanban' ? 1 : page,
+      page,
       pageSize: activeView === 'kanban' ? KANBAN_PAGE_SIZE : PAGE_SIZE,
+      paginationMode: 'cursor' as const,
+      cursor,
       severity: severity !== 'all' ? severity : undefined,
       search: debouncedSearch || undefined,
       workflowId,
@@ -195,15 +253,51 @@ export function FindingsPage() {
       dateFrom: dateRange?.from?.toISOString(),
       dateTo: dateRange?.to?.toISOString(),
       triageStatus: triageStatus !== 'all' ? triageStatus : undefined,
+      scopeId,
     }),
-    [page, severity, debouncedSearch, workflowId, componentId, dateRange, triageStatus, activeView],
+    [
+      page,
+      severity,
+      debouncedSearch,
+      workflowId,
+      componentId,
+      dateRange,
+      triageStatus,
+      activeView,
+      scopeId,
+      cursor,
+    ],
   );
 
-  const { data, isLoading, error, refetch } = useFindingsQuery(queryParams);
+  const { data, isLoading, isPlaceholderData, error, refetch } = useFindingsQuery(queryParams);
 
   const items: FindingItem[] = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const activePageSize = activeView === 'kanban' ? KANBAN_PAGE_SIZE : PAGE_SIZE;
+  const totalPages = Math.max(1, Math.ceil(total / activePageSize));
+
+  const handlePreviousPage = useCallback(() => {
+    setCursorNavigation((previous) => ({
+      queryKey: paginationQueryKey,
+      page: Math.max(1, page - 1),
+      cursors: previous.queryKey === paginationQueryKey ? previous.cursors : [undefined],
+    }));
+  }, [page, paginationQueryKey]);
+
+  const handleNextPage = useCallback(() => {
+    if (!data?.nextCursor) return;
+    setCursorNavigation((previous) => {
+      const cursors =
+        previous.queryKey === paginationQueryKey ? [...previous.cursors] : [undefined];
+      cursors[page - 1] = data.currentCursor ?? undefined;
+      cursors[page] = data.nextCursor ?? undefined;
+      return {
+        queryKey: paginationQueryKey,
+        page: page + 1,
+        cursors,
+      };
+    });
+  }, [data?.currentCursor, data?.nextCursor, page, paginationQueryKey]);
 
   const hasFilters =
     severity !== 'all' ||
@@ -211,7 +305,12 @@ export function FindingsPage() {
     debouncedSearch.length > 0 ||
     !!workflowId ||
     !!componentId ||
-    !!dateRange;
+    !!dateRange ||
+    !!scopeId;
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [paginationQueryKey]);
 
   // Bulk selection handlers (table view)
   const handleSelectToggle = useCallback((id: string) => {
@@ -229,9 +328,18 @@ export function FindingsPage() {
 
   const handleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
-      if (prev.size === items.length) return new Set();
-      const next = new Set<string>();
-      items.slice(0, MAX_SELECTION).forEach((item) => next.add(item.id));
+      const currentPageIds = items.map((item) => item.id);
+      const allCurrentPageSelected =
+        currentPageIds.length > 0 && currentPageIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allCurrentPageSelected) {
+        currentPageIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      for (const id of currentPageIds) {
+        if (next.size >= MAX_SELECTION) break;
+        next.add(id);
+      }
       return next;
     });
   }, [items]);
@@ -324,6 +432,8 @@ export function FindingsPage() {
             componentId={queryParams.componentId}
             dateFrom={queryParams.dateFrom}
             dateTo={queryParams.dateTo}
+            scopeId={queryParams.scopeId}
+            triageStatus={queryParams.triageStatus}
             className="w-full"
           />
         </div>
@@ -337,7 +447,19 @@ export function FindingsPage() {
         componentId={queryParams.componentId}
         dateFrom={queryParams.dateFrom}
         dateTo={queryParams.dateTo}
+        scopeId={queryParams.scopeId}
+        triageStatus={queryParams.triageStatus}
       />
+
+      {data && shouldShowFindingDataQuality(data) && (
+        <div
+          role="status"
+          aria-label="Findings data quality"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+        >
+          {describeFindingDataQuality(data)}
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -355,11 +477,7 @@ export function FindingsPage() {
 
       {/* Kanban View */}
       {activeView === 'kanban' && (
-        <FindingsKanbanView
-          items={items}
-          isLoading={isLoading}
-          onCardClick={setSelectedFindingId}
-        />
+        <FindingsKanbanView items={items} isLoading={isLoading} onCardClick={selectFinding} />
       )}
 
       {/* Table View */}
@@ -378,7 +496,7 @@ export function FindingsPage() {
                 <TableRow>
                   <TableHead className="w-[40px]">
                     <Checkbox
-                      checked={items.length > 0 && selectedIds.size === items.length}
+                      checked={items.length > 0 && items.every((item) => selectedIds.has(item.id))}
                       onCheckedChange={handleSelectAll}
                       aria-label="Select all findings on this page"
                     />
@@ -398,7 +516,7 @@ export function FindingsPage() {
                     key={finding.id}
                     className="cursor-pointer hover:bg-muted/50"
                     data-state={selectedIds.has(finding.id) ? 'selected' : undefined}
-                    onClick={() => setSelectedFindingId(finding.id)}
+                    onClick={() => selectFinding(finding.id)}
                   >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
@@ -428,37 +546,34 @@ export function FindingsPage() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
         </>
+      )}
+
+      {items.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(page - 1) * activePageSize + 1}–
+            {Math.min((page - 1) * activePageSize + items.length, total)} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={handlePreviousPage}>
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isPlaceholderData || !data?.nextCursor}
+              onClick={handleNextPage}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Bulk actions toolbar (table view) */}
@@ -471,7 +586,7 @@ export function FindingsPage() {
         <FindingDetailSheet
           findingId={selectedFindingId}
           isOpen={!!selectedFindingId}
-          onClose={() => setSelectedFindingId(null)}
+          onClose={closeFinding}
         />
       </Suspense>
     </div>

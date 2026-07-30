@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { screen, cleanup } from '@testing-library/react';
+import { screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { createDialogMock, createAlertDialogMock } from '@/test/mocks/dialog';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -52,6 +52,10 @@ const mockQueryState: {
   disconnectIntegration: mock().mockResolvedValue(undefined),
 };
 
+const mockStartOAuth = mock().mockResolvedValue({
+  authorizationUrl: 'https://github.com/login/oauth/authorize',
+});
+
 mock.module('@/hooks/queries/useIntegrationQueries', () => ({
   useIntegrationProviders: () => ({
     data: mockQueryState.providers,
@@ -88,7 +92,7 @@ mock.module('@/config/env', () => ({
 mock.module('@/services/api', () => ({
   api: {
     integrations: {
-      startOAuth: mock().mockResolvedValue({ authorizationUrl: 'https://example.com/oauth' }),
+      startOAuth: mockStartOAuth,
       listProviders: mock().mockResolvedValue([]),
       listConnections: mock().mockResolvedValue([]),
       getProviderConfig: mock().mockResolvedValue({}),
@@ -190,6 +194,7 @@ const renderPage = () => renderWithProviders(<IntegrationsManager />);
 describe('IntegrationsManager', () => {
   beforeEach(() => {
     cleanup();
+    mockStartOAuth.mockClear();
     setupStore();
   });
 
@@ -280,6 +285,34 @@ describe('IntegrationsManager', () => {
 
     const connectButtons = screen.getAllByRole('button', { name: /Connect/i });
     expect(connectButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('starts OAuth without sending a client-selected user identity', async () => {
+    setupStore({ providers: [githubProvider], connections: [] });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Connect$/i }));
+
+    await waitFor(() => expect(mockStartOAuth).toHaveBeenCalledTimes(1));
+    expect(mockStartOAuth).toHaveBeenCalledWith('github', {
+      redirectUri: expect.stringContaining('/integrations/callback/github'),
+      scopes: ['repo', 'read:user'],
+    });
+  });
+
+  it('refreshes using only the authenticated connection identifier', async () => {
+    const refreshConnection = mock().mockResolvedValue(undefined);
+    setupStore({
+      providers: [githubProvider],
+      connections: [githubConnection],
+      refreshConnection,
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Refresh$/i }));
+
+    await waitFor(() => expect(refreshConnection).toHaveBeenCalledTimes(1));
+    expect(refreshConnection).toHaveBeenCalledWith({ id: 'conn-001' });
   });
 
   it('renders Manage credentials button for each provider', () => {

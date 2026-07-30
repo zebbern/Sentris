@@ -1,16 +1,18 @@
 import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import { getPostgresErrorCode, PG_ERROR } from '../common/postgres-error';
 import {
   mcpGroups,
   mcpGroupServers,
+  mcpServers,
   type McpGroupRecord,
   type NewMcpGroupRecord,
   type McpGroupServerRecord,
 } from '../database/schema';
+import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 export interface McpGroupQueryOptions {
   enabled?: boolean;
@@ -24,6 +26,8 @@ export interface McpGroupUpdateData {
   defaultDockerImage?: string | null;
   enabled?: boolean;
 }
+
+type McpGroupMutationHook<T = void> = (executor: OutboxExecutor, result: T) => Promise<void>;
 
 /** Row shape from raw PostgreSQL queries joining mcp_servers with group metadata and tool counts */
 export interface McpGroupServerRow {
@@ -97,11 +101,15 @@ export class McpGroupsRepository {
 
   async create(
     data: Omit<NewMcpGroupRecord, 'id' | 'createdAt' | 'updatedAt'>,
+    onMutated?: McpGroupMutationHook<McpGroupRecord>,
   ): Promise<McpGroupRecord> {
     try {
-      const [group] = await this.db.insert(mcpGroups).values(data).returning();
-
-      return group;
+      const mutate = async (executor: Pick<NodePgDatabase, 'insert'>) => {
+        const [group] = await executor.insert(mcpGroups).values(data).returning();
+        await onMutated?.(executor, group);
+        return group;
+      };
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP group slug '${data.slug}' already exists`);
@@ -110,22 +118,29 @@ export class McpGroupsRepository {
     }
   }
 
-  async update(id: string, data: McpGroupUpdateData): Promise<McpGroupRecord> {
+  async update(
+    id: string,
+    data: McpGroupUpdateData,
+    onMutated?: McpGroupMutationHook<McpGroupRecord>,
+  ): Promise<McpGroupRecord> {
     try {
-      const [updated] = await this.db
-        .update(mcpGroups)
-        .set({
-          ...data,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(mcpGroups.id, id))
-        .returning();
+      const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'update'>) => {
+        const [updated] = await executor
+          .update(mcpGroups)
+          .set({
+            ...data,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(mcpGroups.id, id))
+          .returning();
 
-      if (!updated) {
-        throw new NotFoundException(`MCP group ${id} not found`);
-      }
-
-      return updated;
+        if (!updated) {
+          throw new NotFoundException(`MCP group ${id} not found`);
+        }
+        await onMutated?.(executor, updated);
+        return updated;
+      };
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       if (getPostgresErrorCode(error) === PG_ERROR.UNIQUE_VIOLATION) {
         throw new ConflictException(`MCP group with this configuration already exists`);
@@ -134,15 +149,32 @@ export class McpGroupsRepository {
     }
   }
 
-  async delete(id: string): Promise<void> {
-    const deleted = await this.db
-      .delete(mcpGroups)
-      .where(eq(mcpGroups.id, id))
-      .returning({ id: mcpGroups.id });
+  async delete(
+    id: string,
+    onMutated?: McpGroupMutationHook<{ serverIds: string[] }>,
+  ): Promise<void> {
+    await this.db.transaction(async (executor) => {
+      const relatedServers = await executor
+        .select({ serverId: mcpGroupServers.serverId })
+        .from(mcpGroupServers)
+        .where(eq(mcpGroupServers.groupId, id));
+      const serverIds = relatedServers.map((relation) => relation.serverId);
 
-    if (deleted.length === 0) {
-      throw new NotFoundException(`MCP group ${id} not found`);
-    }
+      if (serverIds.length > 0) {
+        // Server tools and all group relations cascade from the server rows.
+        await executor.delete(mcpServers).where(inArray(mcpServers.id, serverIds));
+      }
+
+      const deleted = await executor
+        .delete(mcpGroups)
+        .where(eq(mcpGroups.id, id))
+        .returning({ id: mcpGroups.id });
+
+      if (deleted.length === 0) {
+        throw new NotFoundException(`MCP group ${id} not found`);
+      }
+      await onMutated?.(executor, { serverIds });
+    });
   }
 
   // Group-Server relationship methods
@@ -240,19 +272,24 @@ export class McpGroupsRepository {
       recommended?: boolean;
       defaultSelected?: boolean;
     },
+    onMutated?: McpGroupMutationHook<McpGroupServerRecord>,
   ): Promise<McpGroupServerRecord> {
     try {
-      const [relation] = await this.db
-        .insert(mcpGroupServers)
-        .values({
-          groupId,
-          serverId,
-          recommended: metadata?.recommended ?? false,
-          defaultSelected: metadata?.defaultSelected ?? true,
-        })
-        .returning();
+      const mutate = async (executor: Pick<NodePgDatabase, 'insert'>) => {
+        const [relation] = await executor
+          .insert(mcpGroupServers)
+          .values({
+            groupId,
+            serverId,
+            recommended: metadata?.recommended ?? false,
+            defaultSelected: metadata?.defaultSelected ?? true,
+          })
+          .returning();
 
-      return relation;
+        await onMutated?.(executor, relation);
+        return relation;
+      };
+      return await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
     } catch (error: unknown) {
       const code = getPostgresErrorCode(error);
       if (code === PG_ERROR.UNIQUE_VIOLATION) {
@@ -265,15 +302,23 @@ export class McpGroupsRepository {
     }
   }
 
-  async removeServerFromGroup(groupId: string, serverId: string): Promise<void> {
-    const deleted = await this.db
-      .delete(mcpGroupServers)
-      .where(and(eq(mcpGroupServers.groupId, groupId), eq(mcpGroupServers.serverId, serverId)))
-      .returning({ groupId: mcpGroupServers.groupId, serverId: mcpGroupServers.serverId });
+  async removeServerFromGroup(
+    groupId: string,
+    serverId: string,
+    onMutated?: McpGroupMutationHook,
+  ): Promise<void> {
+    const mutate = async (executor: Pick<NodePgDatabase, 'delete' | 'insert'>) => {
+      const deleted = await executor
+        .delete(mcpGroupServers)
+        .where(and(eq(mcpGroupServers.groupId, groupId), eq(mcpGroupServers.serverId, serverId)))
+        .returning({ groupId: mcpGroupServers.groupId, serverId: mcpGroupServers.serverId });
 
-    if (deleted.length === 0) {
-      throw new NotFoundException(`Server ${serverId} is not in group ${groupId}`);
-    }
+      if (deleted.length === 0) {
+        throw new NotFoundException(`Server ${serverId} is not in group ${groupId}`);
+      }
+      await onMutated?.(executor);
+    };
+    await (onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db));
   }
 
   async updateServerMetadata(
@@ -283,17 +328,21 @@ export class McpGroupsRepository {
       recommended?: boolean;
       defaultSelected?: boolean;
     },
+    onMutated?: McpGroupMutationHook<McpGroupServerRecord>,
   ): Promise<McpGroupServerRecord> {
-    const [updated] = await this.db
-      .update(mcpGroupServers)
-      .set(metadata)
-      .where(and(eq(mcpGroupServers.groupId, groupId), eq(mcpGroupServers.serverId, serverId)))
-      .returning();
+    const mutate = async (executor: Pick<NodePgDatabase, 'insert' | 'update'>) => {
+      const [updated] = await executor
+        .update(mcpGroupServers)
+        .set(metadata)
+        .where(and(eq(mcpGroupServers.groupId, groupId), eq(mcpGroupServers.serverId, serverId)))
+        .returning();
 
-    if (!updated) {
-      throw new NotFoundException(`Server ${serverId} is not in group ${groupId}`);
-    }
-
-    return updated;
+      if (!updated) {
+        throw new NotFoundException(`Server ${serverId} is not in group ${groupId}`);
+      }
+      await onMutated?.(executor, updated);
+      return updated;
+    };
+    return onMutated ? this.db.transaction((tx) => mutate(tx)) : mutate(this.db);
   }
 }

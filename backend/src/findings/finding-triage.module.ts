@@ -11,6 +11,9 @@ import { TriageAnalyticsService } from './triage-analytics.service';
 import { TriageAnalyticsRepository } from './triage-analytics.repository';
 import { SlaPolicyService } from './sla-policy.service';
 import { SlaPolicyRepository } from './sla-policy.repository';
+import { FindingTriageProjectorService } from './finding-triage-projector.service';
+import { FindingTriageReconcilerService } from './finding-triage-reconciler.service';
+import { FindingProjectionReconciliationLockService } from './finding-projection-reconciliation-lock.service';
 
 @Module({
   imports: [forwardRef(() => AnalyticsModule), OrgMembersModule, TicketingModule],
@@ -22,6 +25,9 @@ import { SlaPolicyRepository } from './sla-policy.repository';
     TriageAnalyticsRepository,
     SlaPolicyService,
     SlaPolicyRepository,
+    FindingTriageProjectorService,
+    FindingProjectionReconciliationLockService,
+    FindingTriageReconcilerService,
   ],
   exports: [FindingTriageService, SlaPolicyService],
 })

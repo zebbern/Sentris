@@ -253,6 +253,14 @@ export function AnimatedRoutes() {
           }
         />
         <Route
+          path="/targets/:id/findings"
+          element={
+            <ErrorBoundary>
+              <TargetDetailPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
           path="/action-center"
           element={
             <ErrorBoundary>

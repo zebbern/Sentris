@@ -39,6 +39,7 @@ describe('templatesApi.revalidate', () => {
       'http://localhost:3211/api/v1/templates/tpl-1/revalidate',
       {
         method: 'POST',
+        credentials: 'include',
         headers: { Authorization: 'Bearer test-token' },
       },
     );
@@ -70,6 +71,7 @@ describe('templatesApi.getRepoInfo', () => {
     const result = await templatesApi.getRepoInfo();
 
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:3211/api/v1/templates/repo-info', {
+      credentials: 'include',
       headers: { Authorization: 'Bearer test-token' },
     });
     expect(result).toEqual(response);
@@ -120,6 +122,7 @@ describe('templatesApi.getRevalidationJob', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3211/api/v1/templates/revalidations/template-revalidation-00000000-0000-4000-8000-000000000000',
       {
+        credentials: 'include',
         headers: { Authorization: 'Bearer test-token' },
       },
     );
@@ -171,6 +174,7 @@ describe('templatesApi.listRevalidationJobs', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3211/api/v1/templates/revalidations?limit=5',
       {
+        credentials: 'include',
         headers: { Authorization: 'Bearer test-token' },
       },
     );
@@ -201,6 +205,7 @@ describe('templatesApi.getRevalidationJobLog', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3211/api/v1/templates/revalidations/template-revalidation-00000000-0000-4000-8000-000000000001/log?stream=stderr&maxBytes=4096',
       {
+        credentials: 'include',
         headers: { Authorization: 'Bearer test-token' },
       },
     );

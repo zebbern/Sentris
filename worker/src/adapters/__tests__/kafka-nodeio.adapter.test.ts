@@ -6,16 +6,18 @@ import {
   type NodeIOStartEvent,
   type NodeIOCompletionEvent,
 } from '@sentris/component-sdk';
+import type { DurableKafkaFallbackInput } from '../../common/durable-kafka-fallback';
 
 const mockSend = vi.fn().mockResolvedValue(undefined);
 const mockConnect = vi.fn().mockResolvedValue(undefined);
+const mockDisconnect = vi.fn().mockResolvedValue(undefined);
 
 mock.module('kafkajs', () => ({
   Kafka: vi.fn(() => ({
     producer: vi.fn(() => ({
       connect: mockConnect,
       send: mockSend,
-      disconnect: vi.fn(),
+      disconnect: mockDisconnect,
     })),
   })),
   logLevel: {
@@ -44,17 +46,21 @@ describe('KafkaNodeIOAdapter', () => {
   };
 
   function createStorageMock(): IFileStorageService {
-    return {
+    const storage = {
       uploadFile: vi.fn().mockResolvedValue(undefined),
       downloadFile: vi.fn(),
       deleteFile: vi.fn(),
       getFileUrl: vi.fn(),
-    } as unknown as IFileStorageService;
+      forOrganization: vi.fn(),
+    };
+    storage.forOrganization.mockReturnValue(storage);
+    return storage as unknown as IFileStorageService;
   }
 
   beforeEach(() => {
     mockSend.mockClear();
     mockConnect.mockClear();
+    mockDisconnect.mockClear();
   });
 
   describe('constructor', () => {
@@ -98,6 +104,7 @@ describe('KafkaNodeIOAdapter', () => {
       expect(payload.organizationId).toBe('org-1');
       expect(payload.componentId).toBe('core.http');
       expect(payload.inputs).toEqual({ url: 'https://example.com' });
+      expect(payload.eventId).toBeString();
       expect(payload.timestamp).toBeDefined();
     });
 
@@ -122,6 +129,7 @@ describe('KafkaNodeIOAdapter', () => {
       const data: NodeIOCompletionEvent = {
         runId: 'run-3',
         nodeRef: 'node.http',
+        organizationId: 'org-a',
         componentId: 'core.http',
         outputs: { statusCode: 200, body: 'OK' },
         status: 'completed',
@@ -134,9 +142,11 @@ describe('KafkaNodeIOAdapter', () => {
       expect(payload.type).toBe('NODE_IO_COMPLETION');
       expect(payload.runId).toBe('run-3');
       expect(payload.nodeRef).toBe('node.http');
+      expect(payload.organizationId).toBe('org-a');
       expect(payload.componentId).toBe('core.http');
       expect(payload.outputs).toEqual({ statusCode: 200, body: 'OK' });
       expect(payload.status).toBe('completed');
+      expect(payload.eventId).toBeString();
     });
 
     it('includes errorMessage for failed completions', async () => {
@@ -145,6 +155,7 @@ describe('KafkaNodeIOAdapter', () => {
       const data: NodeIOCompletionEvent = {
         runId: 'run-4',
         nodeRef: 'node.http',
+        organizationId: 'org-a',
         outputs: {},
         status: 'failed',
         errorMessage: 'Connection timeout',
@@ -155,12 +166,19 @@ describe('KafkaNodeIOAdapter', () => {
       const payload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
       expect(payload.status).toBe('failed');
       expect(payload.errorMessage).toBe('Connection timeout');
+      expect(payload.organizationId).toBe('org-a');
     });
   });
 
   describe('spill-to-storage for inputs', () => {
     it('spills inputs to storage when they exceed KAFKA_SPILL_THRESHOLD_BYTES', async () => {
-      const storage = createStorageMock();
+      const scopedStorage = createStorageMock();
+      const storage = {
+        forOrganization: vi.fn(() => scopedStorage),
+        uploadFile: vi.fn().mockRejectedValue(new Error('unscoped storage access')),
+        downloadFile: vi.fn(),
+        getFileMetadata: vi.fn(),
+      } as unknown as IFileStorageService;
       const adapter = new KafkaNodeIOAdapter(defaultConfig, storage, noopLogger);
 
       // Create input data that exceeds the spill threshold
@@ -170,12 +188,15 @@ describe('KafkaNodeIOAdapter', () => {
       await adapter.recordStart({
         runId: 'run-spill-1',
         nodeRef: 'node.a',
+        organizationId: 'org-a',
         componentId: 'core.a',
         inputs,
       });
 
-      expect(storage.uploadFile).toHaveBeenCalledTimes(1);
-      const uploadCall = (storage.uploadFile as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(storage.forOrganization).toHaveBeenCalledWith('org-a');
+      expect(scopedStorage.uploadFile).toHaveBeenCalledTimes(1);
+      expect(storage.uploadFile).not.toHaveBeenCalled();
+      const uploadCall = (scopedStorage.uploadFile as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(uploadCall[0]).toBe('test-uuid-1234'); // fileId from mocked randomUUID
       expect(uploadCall[1]).toBe('inputs.json');
       expect(uploadCall[3]).toBe('application/json');
@@ -202,6 +223,21 @@ describe('KafkaNodeIOAdapter', () => {
       const payload = JSON.parse(mockSend.mock.calls[0][0].messages[0].value);
       expect(payload.inputsSpilled).toBeUndefined();
       expect(payload.inputs).toEqual({ small: 'value' });
+    });
+  });
+
+  describe('shutdown', () => {
+    it('disconnects a producer that was connected by the fast path', async () => {
+      const adapter = new KafkaNodeIOAdapter(defaultConfig, undefined, noopLogger);
+
+      await adapter.recordStart({
+        runId: 'run-shutdown',
+        nodeRef: 'node.a',
+        componentId: 'core.a',
+      });
+      await adapter.close();
+
+      expect(mockDisconnect).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -324,19 +360,86 @@ describe('KafkaNodeIOAdapter', () => {
   });
 
   describe('error handling', () => {
-    it('logs critical errors but does not throw', async () => {
+    it('reconnects the direct Kafka path after an initial connection failure', async () => {
+      const fallback = {
+        enqueue: vi.fn(async (_input: DurableKafkaFallbackInput) => undefined),
+      };
+      mockConnect
+        .mockRejectedValueOnce(new Error('Kafka starting'))
+        .mockResolvedValueOnce(undefined);
+      const adapter = new KafkaNodeIOAdapter(
+        defaultConfig,
+        undefined,
+        { log: () => {}, error: vi.fn() },
+        fallback,
+      );
+
+      await adapter.recordStart({
+        runId: 'run-connect-retry',
+        nodeRef: 'node.a',
+        componentId: 'core.a',
+      });
+      await adapter.recordCompletion({
+        runId: 'run-connect-retry',
+        nodeRef: 'node.a',
+        componentId: 'core.a',
+        outputs: {},
+        status: 'completed',
+      });
+
+      expect(mockConnect).toHaveBeenCalledTimes(2);
+      expect(fallback.enqueue).toHaveBeenCalledTimes(1);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('queues the exact serialized event when Kafka retries are exhausted', async () => {
+      const errorLogger = { log: () => {}, error: vi.fn() };
+      const fallback = {
+        enqueue: vi.fn(async (_input: DurableKafkaFallbackInput) => undefined),
+      };
+      const adapter = new KafkaNodeIOAdapter(defaultConfig, undefined, errorLogger, fallback);
+      mockSend.mockRejectedValueOnce(new Error('Kafka broker down'));
+
+      await expect(
+        adapter.recordCompletion({
+          runId: 'run-fallback',
+          nodeRef: 'node.scanner',
+          organizationId: 'org-1',
+          componentId: 'security.nuclei',
+          outputs: { findings: 2 },
+          status: 'completed',
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(fallback.enqueue).toHaveBeenCalledWith({
+        topic: 'node-io-events',
+        key: 'run-fallback',
+        value: expect.any(String),
+        organizationId: 'org-1',
+      });
+      const payload = JSON.parse(fallback.enqueue.mock.calls[0]![0].value);
+      expect(payload).toMatchObject({
+        type: 'NODE_IO_COMPLETION',
+        runId: 'run-fallback',
+        nodeRef: 'node.scanner',
+        status: 'completed',
+      });
+    });
+
+    it('logs and propagates send errors to the durable activity caller', async () => {
       const errorLogger = { log: () => {}, error: vi.fn() };
       const adapter = new KafkaNodeIOAdapter(defaultConfig, undefined, errorLogger);
 
       mockSend.mockRejectedValueOnce(new Error('Kafka broker down'));
 
-      // Should NOT throw
-      await adapter.recordStart({
-        runId: 'run-err',
-        nodeRef: 'node.a',
-        componentId: 'core.a',
-        inputs: { test: true },
-      });
+      await expect(
+        adapter.recordStart({
+          runId: 'run-err',
+          nodeRef: 'node.a',
+          componentId: 'core.a',
+          inputs: { test: true },
+        }),
+      ).rejects.toThrow('Kafka broker down');
 
       expect(errorLogger.error).toHaveBeenCalled();
       const errorMsg = errorLogger.error.mock.calls[0][0];

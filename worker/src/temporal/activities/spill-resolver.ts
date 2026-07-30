@@ -33,10 +33,12 @@ export async function unspill(
   storage: IFileStorageService | undefined,
   cache: Map<string, unknown>,
   warnings: InputWarning[],
+  organizationId: string | null = null,
 ): Promise<void> {
+  const scopedStorage = storage?.forOrganization(organizationId);
   for (const [key, value] of Object.entries(obj)) {
     if (isSpilledDataMarker(value)) {
-      if (!storage) {
+      if (!scopedStorage) {
         console.warn(
           `[Activity] ${contextLabel} '${key}' is spilled but no storage service is available`,
         );
@@ -48,7 +50,7 @@ export async function unspill(
         if (cache.has(value.storageRef)) {
           fullData = cache.get(value.storageRef);
         } else {
-          const content = await storage.downloadFile(value.storageRef);
+          const content = await scopedStorage.downloadFile(value.storageRef);
           fullData = JSON.parse(content.buffer.toString('utf8'));
           cache.set(value.storageRef, fullData);
         }

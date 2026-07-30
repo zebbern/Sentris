@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, vi } from 'bun:test';
 import {
   componentRegistry,
   createExecutionContext,
@@ -58,7 +58,12 @@ const scopedPackageResponse = {
 };
 
 describe('npm registry intel component', () => {
+  beforeEach(() => {
+    setSystemTime(new Date('2026-07-01T00:00:00.000Z'));
+  });
+
   afterEach(() => {
+    setSystemTime();
     vi.restoreAllMocks();
   });
 

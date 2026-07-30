@@ -1,30 +1,13 @@
-import { describe, it, expect, afterAll, afterEach, mock } from 'bun:test';
+import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GlobalAuthContext } from '../../../auth/auth-context-def';
 import type { FrontendAuthProvider } from '../../../auth/types';
 import type { ReactNode } from 'react';
-import { realModuleExports } from '@/test/restore-mocks';
 
 // ---------------------------------------------------------------------------
 // Mocks — stub out heavy dependencies that ProtectedRoute imports
 // ---------------------------------------------------------------------------
-
-mock.module('../../../store/authStore', () => ({
-  useAuthStore: ((selector?: (s: any) => any) => {
-    const state = {
-      adminUsername: 'admin',
-      adminPassword: 'admin-pass',
-      organizationId: 'local-dev',
-      token: 'test-token',
-      userId: 'user-1',
-      roles: ['ADMIN'],
-      provider: 'local',
-    };
-    return selector ? selector(state) : state;
-  }) as any,
-  DEFAULT_ORG_ID: 'local-dev',
-}));
 
 mock.module('../AuthModal', () => ({
   AuthModal: () => <div data-testid="auth-modal">Auth Modal</div>,
@@ -37,10 +20,6 @@ mock.module('../AdminLoginForm', () => ({
 import { ProtectedRoute } from '../ProtectedRoute';
 
 afterEach(cleanup);
-
-afterAll(() => {
-  mock.module('../../../store/authStore', () => realModuleExports('@/store/authStore'));
-});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -114,7 +93,7 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByTestId('protected-content')).toBeNull();
   });
 
-  it('does NOT render children when not authenticated and requireAuth=true (default)', () => {
+  it('renders the local login form when a local session is not authenticated', () => {
     const provider = createMockProvider({
       context: {
         user: null,
@@ -126,7 +105,7 @@ describe('ProtectedRoute', () => {
     renderProtectedRoute(provider);
 
     expect(screen.queryByTestId('protected-content')).toBeNull();
-    expect(screen.getByText('Authentication Required')).toBeDefined();
+    expect(screen.getByTestId('admin-login-form')).toBeDefined();
   });
 
   it('renders children regardless of auth state when requireAuth=false', () => {

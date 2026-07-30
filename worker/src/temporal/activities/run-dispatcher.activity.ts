@@ -1,16 +1,14 @@
 import type { PreparedRunPayload } from '@sentris/shared';
 import { ConfigurationError, ServiceError } from '@sentris/component-sdk';
 
-import type { PrepareRunPayloadActivityInput } from '../types';
+import type {
+  MarkRunStartedActivityInput,
+  MarkRunStartedActivityOutput,
+  PrepareRunPayloadActivityInput,
+} from '../types';
+import { buildBackendApiUrl } from '../../common/backend-url';
 
 type FetchResponse = Awaited<ReturnType<typeof fetch>>;
-
-const DEFAULT_API_BASE_URL =
-  process.env.SENTRIS_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://localhost:3211';
-
-function normalizeBaseUrl(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
-}
 
 async function readErrorBody(response: FetchResponse): Promise<string> {
   try {
@@ -33,7 +31,6 @@ export async function prepareRunPayloadActivity(
     );
   }
 
-  const baseUrl = normalizeBaseUrl(DEFAULT_API_BASE_URL);
   const organizationId = input.organizationId ?? process.env.DEFAULT_ORGANIZATION_ID ?? null;
 
   const headers: Record<string, string> = {
@@ -45,7 +42,7 @@ export async function prepareRunPayloadActivity(
     headers['X-Organization-Id'] = organizationId;
   }
 
-  const response = await fetch(`${baseUrl}/internal/runs`, {
+  const response = await fetch(buildBackendApiUrl('internal/runs'), {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -56,6 +53,7 @@ export async function prepareRunPayloadActivity(
       nodeOverrides: input.nodeOverrides,
       trigger: input.trigger,
       runId: input.runId,
+      scopeId: input.scopeId,
       parentRunId: input.parentRunId,
       parentNodeRef: input.parentNodeRef,
     }),
@@ -70,4 +68,55 @@ export async function prepareRunPayloadActivity(
   }
 
   return (await response.json()) as PreparedRunPayload;
+}
+
+export async function markRunStartedActivity(
+  input: MarkRunStartedActivityInput,
+): Promise<MarkRunStartedActivityOutput> {
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
+  if (!internalToken) {
+    throw new ConfigurationError(
+      'INTERNAL_SERVICE_TOKEN env var must be set to call internal run endpoint',
+      {
+        configKey: 'INTERNAL_SERVICE_TOKEN',
+      },
+    );
+  }
+
+  const organizationId = input.organizationId?.trim();
+  if (!organizationId) {
+    throw new ConfigurationError(
+      'organizationId is required to persist a worker-started workflow run',
+      {
+        configKey: 'organizationId',
+      },
+    );
+  }
+
+  const response = await fetch(
+    buildBackendApiUrl(`internal/runs/${encodeURIComponent(input.runId)}/started`),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Token': internalToken,
+        'X-Organization-Id': organizationId,
+      },
+      body: JSON.stringify({ temporalRunId: input.temporalRunId }),
+    },
+  );
+
+  if (!response.ok) {
+    const raw = await readErrorBody(response);
+    throw new ServiceError(`Failed to persist started workflow run: ${raw}`, {
+      statusCode: response.status,
+      details: {
+        statusText: response.statusText,
+        runId: input.runId,
+        temporalRunId: input.temporalRunId,
+      },
+    });
+  }
+
+  return (await response.json()) as MarkRunStartedActivityOutput;
 }

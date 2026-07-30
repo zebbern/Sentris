@@ -28,6 +28,8 @@ export function useFindingsQuery(params: FindingsQueryParams = {}) {
   const keyFilters: Record<string, unknown> = {
     page: params.page ?? 1,
     pageSize: params.pageSize ?? 25,
+    paginationMode: params.paginationMode ?? 'offset',
+    cursor: params.cursor,
     severity: params.severity,
     search: params.search,
     sortOrder: params.sortOrder ?? 'desc',
@@ -36,6 +38,8 @@ export function useFindingsQuery(params: FindingsQueryParams = {}) {
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
     triageStatus: params.triageStatus,
+    assigneeUserId: params.assigneeUserId,
+    scopeId: params.scopeId,
   };
 
   return useQuery<FindingsResponse>({
@@ -99,10 +103,15 @@ export function useUpdateTriageMutation() {
                   ...item,
                   triage: {
                     status: data.status ?? item.triage?.status ?? 'new',
-                    assigneeUserId: data.assigneeUserId ?? item.triage?.assigneeUserId ?? null,
+                    assigneeUserId:
+                      data.assigneeUserId === undefined
+                        ? (item.triage?.assigneeUserId ?? null)
+                        : data.assigneeUserId,
                     severityOverride:
-                      data.severityOverride ?? item.triage?.severityOverride ?? null,
-                    notes: data.notes ?? item.triage?.notes ?? null,
+                      data.severityOverride === undefined
+                        ? (item.triage?.severityOverride ?? null)
+                        : data.severityOverride,
+                    notes: data.notes === undefined ? (item.triage?.notes ?? null) : data.notes,
                     updatedAt: new Date().toISOString(),
                   },
                 }

@@ -24,6 +24,7 @@ export const artifactsApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/artifacts/${id}/download`, {
       headers,
+      credentials: 'include',
     });
     if (!response.ok) {
       throw new Error('Failed to download artifact');
@@ -36,6 +37,7 @@ export const artifactsApi = {
     const response = await fetch(`${API_BASE_URL}/api/v1/artifacts/${id}`, {
       method: 'DELETE',
       headers,
+      credentials: 'include',
     });
     if (!response.ok) {
       throw new Error('Failed to delete artifact');

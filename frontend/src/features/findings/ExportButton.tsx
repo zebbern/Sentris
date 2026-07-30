@@ -23,6 +23,9 @@ interface ExportButtonProps {
   componentId?: string;
   dateFrom?: string;
   dateTo?: string;
+  scopeId?: string;
+  triageStatus?: string;
+  assigneeUserId?: string;
   className?: string;
 }
 
@@ -52,6 +55,9 @@ export function ExportButton({
   componentId,
   dateFrom,
   dateTo,
+  scopeId,
+  triageStatus,
+  assigneeUserId,
   className,
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
@@ -69,11 +75,32 @@ export function ExportButton({
           componentId,
           dateFrom,
           dateTo,
+          scopeId,
+          triageStatus,
+          assigneeUserId,
         };
-        const blob = await findingsApi.exportFindings(params);
+        const result = await findingsApi.exportFindings(params);
         const timestamp = new Date().toISOString().slice(0, 10);
         const filename = `findings-${timestamp}.${format}`;
-        triggerBlobDownload(blob, filename);
+        triggerBlobDownload(result.blob, filename);
+        if (result.availability === 'degraded') {
+          const schemaDescription = result.schemaCoverage
+            ? ` Schema coverage: ${result.schemaCoverage.canonical} canonical, ${result.schemaCoverage.legacy} legacy, ${result.schemaCoverage.invalid} invalid.`
+            : '';
+          const projectionDescription = result.projectionHealthReason
+            ? ` Projection: ${result.projectionHealthReason.replace(/_/g, ' ')}.`
+            : '';
+          toast({
+            title: 'Export completed with degraded data',
+            description: `The file was downloaded, but some results may be stale or malformed.${projectionDescription}${schemaDescription}`,
+          });
+        } else if (result.availability === 'unknown') {
+          toast({
+            title: 'Export data quality unknown',
+            description:
+              'The file was downloaded, but its freshness and schema coverage metadata were not available.',
+          });
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Export failed';
         toast({ title: 'Export failed', description: message });
@@ -81,7 +108,18 @@ export function ExportButton({
         setIsExporting(false);
       }
     },
-    [severity, search, workflowId, componentId, dateFrom, dateTo, toast],
+    [
+      severity,
+      search,
+      workflowId,
+      componentId,
+      dateFrom,
+      dateTo,
+      scopeId,
+      triageStatus,
+      assigneeUserId,
+      toast,
+    ],
   );
 
   return (

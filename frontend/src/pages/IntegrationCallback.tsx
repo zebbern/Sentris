@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -7,7 +7,6 @@ import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 
 import type { components } from '@sentris/backend-client';
 import { api } from '@/services/api';
-import { getCurrentUserId } from '@/lib/currentUser';
 import { env } from '@/config/env';
 
 type IntegrationConnection = components['schemas']['IntegrationConnectionResponse'];
@@ -19,8 +18,6 @@ export function IntegrationCallback() {
   const { provider } = useParams<{ provider: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const userId = useMemo(() => getCurrentUserId(), []);
-
   const [status, setStatus] = useState<CallbackStatus>('pending');
   const [message, setMessage] = useState('Exchanging authorization code…');
   const exchangeStartedRef = useRef(false);
@@ -64,7 +61,6 @@ export function IntegrationCallback() {
     async function exchangeCode() {
       try {
         const connection = await api.integrations.completeOAuth(providerId, {
-          userId,
           code: authCode,
           state: authState,
           redirectUri,
@@ -99,7 +95,7 @@ export function IntegrationCallback() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, provider, searchParams, userId]);
+  }, [navigate, provider, searchParams]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6">

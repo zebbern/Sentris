@@ -96,6 +96,7 @@ const WorkflowBuilderContent = memo(function WorkflowBuilderContent() {
       onOpenChange={state.setRunDialogOpen}
       runtimeInputs={state.runtimeInputs}
       initialValues={state.prefilledRuntimeValues}
+      initialScopeId={state.requestedScopeId}
       onRun={(inputs, scopeId) =>
         state.executeWorkflow({ inputs, versionId: state.pendingVersionId, scopeId })
       }

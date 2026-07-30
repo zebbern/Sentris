@@ -137,11 +137,11 @@ export class McpGroupsController {
   @ApiOperation({ summary: 'Add a server to a group (admin only)' })
   @ApiCreatedResponse({ type: [McpGroupServerResponse] })
   async addServerToGroup(
-    @CurrentAuth() _auth: AuthContext | null,
+    @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(AddServerToGroupSchema)) body: AddServerToGroupDto,
   ): Promise<McpGroupServerResponse[]> {
-    return this.mcpGroupsService.addServerToGroup(id, body);
+    return this.mcpGroupsService.addServerToGroup(auth, id, body);
   }
 
   @Patch(':id/servers/:serverId')
@@ -149,12 +149,12 @@ export class McpGroupsController {
   @ApiOperation({ summary: 'Update server metadata in a group (admin only)' })
   @ApiOkResponse({ type: [McpGroupServerResponse] })
   async updateServerInGroup(
-    @CurrentAuth() _auth: AuthContext | null,
+    @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('serverId', new ParseUUIDPipe()) serverId: string,
     @Body(new ZodValidationPipe(UpdateServerInGroupSchema)) body: UpdateServerInGroupDto,
   ): Promise<McpGroupServerResponse[]> {
-    return this.mcpGroupsService.updateServerInGroup(id, serverId, body);
+    return this.mcpGroupsService.updateServerInGroup(auth, id, serverId, body);
   }
 
   @Delete(':id/servers/:serverId')
@@ -163,11 +163,11 @@ export class McpGroupsController {
   @ApiOperation({ summary: 'Remove a server from a group (admin only)' })
   @ApiNoContentResponse()
   async removeServerFromGroup(
-    @CurrentAuth() _auth: AuthContext | null,
+    @CurrentAuth() auth: AuthContext | null,
     @Param('id', new ParseUUIDPipe()) id: string,
     @Param('serverId', new ParseUUIDPipe()) serverId: string,
   ): Promise<void> {
-    await this.mcpGroupsService.removeServerFromGroup(id, serverId);
+    await this.mcpGroupsService.removeServerFromGroup(auth, id, serverId);
   }
 
   // Template sync endpoint

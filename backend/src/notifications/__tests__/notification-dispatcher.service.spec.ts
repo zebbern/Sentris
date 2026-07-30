@@ -44,7 +44,9 @@ function makeDeliveryRecord(
     durationMs: overrides.durationMs ?? null,
     responseStatus: overrides.responseStatus ?? null,
     responseBody: overrides.responseBody ?? null,
+    outboxEventId: overrides.outboxEventId ?? null,
     createdAt: overrides.createdAt ?? now,
+    sendingStartedAt: overrides.sendingStartedAt ?? null,
     sentAt: overrides.sentAt ?? null,
   };
 }
@@ -72,6 +74,10 @@ function createMocks() {
       deliveryUpdates.push({ id, values });
       return Promise.resolve(makeDeliveryRecord({ id, ...values }));
     }),
+    findOrCreateForOutbox: mock((values: Partial<NotificationDeliveryRecord>) =>
+      Promise.resolve(makeDeliveryRecord({ ...values, id: 'del-outbox' })),
+    ),
+    claimForSend: mock(() => Promise.resolve(true)),
   } as unknown as NotificationDeliveryRepository;
 
   const slackAdapter = {
@@ -192,7 +198,7 @@ describe('NotificationDispatcherService', () => {
     expect(updateCall[1].errorMessage).toBe('Slack error');
   });
 
-  it('updates delivery to failed when adapter throws', async () => {
+  it('updates delivery to unknown when adapter throws', async () => {
     const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
     (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
     (mocks.slackAdapter.send as any).mockReturnValue(Promise.reject(new Error('Network timeout')));
@@ -201,7 +207,7 @@ describe('NotificationDispatcherService', () => {
 
     expect(mocks.deliveryRepo.update).toHaveBeenCalledTimes(1);
     const updateCall = (mocks.deliveryRepo.update as any).mock.calls[0];
-    expect(updateCall[1].status).toBe('failed');
+    expect(updateCall[1].status).toBe('unknown');
     expect(updateCall[1].errorMessage).toBe('Network timeout');
   });
 
@@ -279,5 +285,137 @@ describe('NotificationDispatcherService', () => {
     const updateCall = (mocks.deliveryRepo.update as any).mock.calls[0];
     expect(updateCall[1].status).toBe('failed');
     expect(updateCall[1].errorMessage).toContain('not implemented');
+  });
+
+  it('propagates an outbox delivery failure so the event is retried', async () => {
+    const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
+    (mocks.slackAdapter.send as any).mockReturnValue(
+      Promise.resolve({ success: false, error: 'temporary webhook failure' }),
+    );
+
+    await expect(
+      dispatcher.handleRunTerminal({
+        ...failedRunEvent,
+        outbox: {
+          eventId: 'outbox-1',
+          dedupeKey: 'run.status.terminal:run-100',
+          attempt: 1,
+        },
+      }),
+    ).rejects.toThrow('temporary webhook failure');
+
+    expect(mocks.deliveryRepo.findOrCreateForOutbox).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channelId: 'ch-10',
+        outboxEventId: 'outbox-1',
+      }),
+    );
+  });
+
+  it('does not resend a channel already completed by an earlier outbox attempt', async () => {
+    const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
+    (mocks.deliveryRepo.findOrCreateForOutbox as any).mockReturnValue(
+      Promise.resolve(
+        makeDeliveryRecord({
+          id: 'del-outbox',
+          status: 'sent',
+          outboxEventId: 'outbox-1',
+        }),
+      ),
+    );
+
+    await dispatcher.handleRunTerminal({
+      ...failedRunEvent,
+      outbox: {
+        eventId: 'outbox-1',
+        dedupeKey: 'run.status.terminal:run-100',
+        attempt: 2,
+      },
+    });
+
+    expect(mocks.slackAdapter.send).not.toHaveBeenCalled();
+  });
+
+  it('does not automatically resend an ambiguous in-flight outbox delivery', async () => {
+    const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
+    (mocks.deliveryRepo.findOrCreateForOutbox as any).mockReturnValue(
+      Promise.resolve(
+        makeDeliveryRecord({
+          id: 'del-outbox',
+          status: 'sending' as any,
+          outboxEventId: 'outbox-1',
+        }),
+      ),
+    );
+
+    await expect(
+      dispatcher.handleRunTerminal({
+        ...failedRunEvent,
+        outbox: {
+          eventId: 'outbox-1',
+          dedupeKey: 'run.status.terminal:run-100',
+          attempt: 2,
+        },
+      }),
+    ).rejects.toThrow('manual resend');
+    expect(mocks.slackAdapter.send).not.toHaveBeenCalled();
+  });
+
+  it('does not clobber an active manual resend reservation during concurrent outbox recovery', async () => {
+    const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
+    (mocks.deliveryRepo.findOrCreateForOutbox as any).mockReturnValue(
+      Promise.resolve(
+        makeDeliveryRecord({
+          id: 'del-outbox',
+          status: 'sending',
+          errorMessage: 'sentris-manual-resend|reservation-1|1785081600000|failed',
+          outboxEventId: 'outbox-1',
+        }),
+      ),
+    );
+
+    await expect(
+      dispatcher.handleRunTerminal({
+        ...failedRunEvent,
+        outbox: {
+          eventId: 'outbox-1',
+          dedupeKey: 'run.status.terminal:run-100',
+          attempt: 1,
+        },
+      }),
+    ).rejects.toThrow('manual resend');
+
+    expect(mocks.deliveryRepo.update).not.toHaveBeenCalled();
+    expect(mocks.slackAdapter.send).not.toHaveBeenCalled();
+  });
+
+  it('marks an adapter-unknown outcome and does not claim success', async () => {
+    const channel = makeChannelRecord({ id: 'ch-10', type: 'slack' });
+    (mocks.channelRepo.findActiveByEventType as any).mockReturnValue(Promise.resolve([channel]));
+    (mocks.slackAdapter.send as any).mockReturnValue(
+      Promise.resolve({
+        success: false,
+        outcome: 'unknown',
+        error: 'request timeout',
+      }),
+    );
+
+    await expect(
+      dispatcher.handleRunTerminal({
+        ...failedRunEvent,
+        outbox: {
+          eventId: 'outbox-1',
+          dedupeKey: 'run.status.terminal:run-100',
+          attempt: 1,
+        },
+      }),
+    ).rejects.toThrow('request timeout');
+    expect(
+      mocks.deliveryUpdates.some((update) => update.values.status === ('unknown' as any)),
+    ).toBe(true);
   });
 });

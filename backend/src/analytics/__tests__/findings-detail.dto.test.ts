@@ -34,6 +34,7 @@ describe('FindingDetailResponseSchema', () => {
     component_id: 'comp-1',
     node_ref: 'node-1',
     raw: { '@timestamp': '2025-06-15T12:00:00.000Z', severity: 'high', custom_field: 42 },
+    availability: 'available',
   };
 
   it('validates a complete finding with required raw field', () => {
@@ -58,10 +59,16 @@ describe('FindingDetailResponseSchema', () => {
       id: 'min-1',
       timestamp: '2025-01-01T00:00:00Z',
       raw: { key: 'value' },
+      availability: 'degraded',
     };
     const result = FindingDetailResponseSchema.parse(minimal);
     expect(result.id).toBe('min-1');
     expect(result.severity).toBeUndefined();
     expect(result.name).toBeUndefined();
+  });
+
+  it('requires an explicit availability state', () => {
+    const { availability: _availability, ...withoutAvailability } = validFinding;
+    expect(() => FindingDetailResponseSchema.parse(withoutAvailability)).toThrow();
   });
 });

@@ -17,6 +17,7 @@ export interface LogMetadata {
 }
 
 export interface KafkaLogEntry {
+  eventId?: string;
   runId: string;
   nodeRef: string;
   stream: LogStream;

@@ -32,12 +32,12 @@ export class DiscordNotificationAdapter extends NotificationAdapter {
     const webhookUrl = config?.webhookUrl;
 
     if (!webhookUrl) {
-      return { success: false, error: 'Missing webhookUrl in channel config' };
+      return { success: false, outcome: 'rejected', error: 'Missing webhookUrl in channel config' };
     }
 
     const ssrfError = await this.validateUrl(webhookUrl);
     if (ssrfError) {
-      return { success: false, error: ssrfError };
+      return { success: false, outcome: 'rejected', error: ssrfError };
     }
 
     const body = this.buildDiscordPayload(channel, payload);
@@ -65,6 +65,7 @@ export class DiscordNotificationAdapter extends NotificationAdapter {
       if (response.ok) {
         return {
           success: true,
+          outcome: 'accepted',
           responseStatus: response.status,
           responseBody: truncatedBody,
         };
@@ -72,6 +73,7 @@ export class DiscordNotificationAdapter extends NotificationAdapter {
 
       return {
         success: false,
+        outcome: 'rejected',
         error: `Discord responded with HTTP ${response.status}: ${responseText.slice(0, 200)}`,
         responseStatus: response.status,
         responseBody: truncatedBody,
@@ -79,7 +81,7 @@ export class DiscordNotificationAdapter extends NotificationAdapter {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Discord webhook delivery failed for channel ${channel.id}: ${message}`);
-      return { success: false, error: message };
+      return { success: false, outcome: 'unknown', error: message };
     }
   }
 

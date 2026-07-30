@@ -144,6 +144,21 @@ describe('exportTableData — CSV', () => {
     expect(lines[1]).toBe(',,0');
   });
 
+  it('neutralizes spreadsheet formulas while preserving ordinary numeric values', async () => {
+    const data = [
+      { name: '=HYPERLINK("https://example.test")', status: '+cmd', count: -42 },
+      { name: '-cmd|calc', status: '@SUM(A1:A2)', count: 1 },
+      { name: '-42.50', status: '\t=1+1', count: 2 },
+    ];
+
+    exportTableData({ data, columns: COLUMNS, filename: 'safe', format: 'csv' });
+
+    const text = await lastBlob!.text();
+    expect(text).toContain('"\'=HYPERLINK(""https://example.test"")",\'+cmd,-42');
+    expect(text).toContain("'-cmd|calc,'@SUM(A1:A2),1");
+    expect(text).toContain("-42.50,'\t=1+1,2");
+  });
+
   it('handles empty data array (header only)', async () => {
     exportTableData({ data: [], columns: COLUMNS, filename: 'empty', format: 'csv' });
 

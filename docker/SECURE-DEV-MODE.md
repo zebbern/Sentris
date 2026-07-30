@@ -77,8 +77,10 @@ For development convenience, default passwords are set:
 
 ### How It Works
 
-1. **Index Pattern**: Each organization's data is stored in indices prefixed with their org ID:
-   - `security-findings-{org_id}-*`
+1. **Index Pattern**: Each organization's data uses a case-sensitive,
+   collision-safe key derived from its exact ID:
+   - Namespace: `security-findings-o{sha256(exact_org_id)}-*`
+   - Canonical findings: `security-findings-o{sha256(exact_org_id)}-observations-v1`
 
 2. **Tenant Isolation**: OpenSearch Dashboards uses tenants to isolate saved objects (dashboards, visualizations)
 
@@ -86,7 +88,12 @@ For development convenience, default passwords are set:
 
 ### Dynamic Provisioning
 
-When a new customer is onboarded, the backend creates:
+For every new organization, including trusted-local mode, the backend installs
+the content-addressed findings ingest pipeline, exact organization observation
+template, and stable observation index. It reads those artifacts back and
+hash-verifies the pipeline, template, final-pipeline index setting, and mapping
+before first-use provisioning succeeds. When OpenSearch Security is enabled,
+it additionally creates:
 
 1. A tenant for their organization
 2. A role with permissions scoped to their indices

@@ -15,13 +15,14 @@ import { ZodValidationPipe } from 'nestjs-zod';
 import type { ExecutionTriggerMetadata } from '@sentris/shared';
 import type { Response } from 'express';
 
-import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
 import { timingSafeCompare } from '../common/crypto-utils';
 import { ArtifactsService } from '../storage/artifacts.service';
 import { RunArtifactIdParamDto, RunArtifactIdParamSchema } from '../storage/dto/artifacts.dto';
 import { NodeIOService } from '../node-io/node-io.service';
 import { PrepareRunRequestDto, PrepareRunRequestSchema } from './dto/workflow-graph.dto';
+import { FinalizeRunRequestDto, FinalizeRunRequestSchema } from './dto/run-finalization.dto';
+import { MarkRunStartedRequestDto, MarkRunStartedRequestSchema } from './dto/run-started.dto';
 import { WorkflowRunService } from './workflow-run.service';
 
 @ApiExcludeController()
@@ -40,10 +41,12 @@ export class InternalRunsController {
 
   @Post()
   async prepareRun(
-    @CurrentAuth() auth: AuthContext | null,
+    @Headers('x-internal-token') internalToken: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
     @Body(new ZodValidationPipe(PrepareRunRequestSchema))
     body: PrepareRunRequestDto,
   ) {
+    const auth = this.assertInternalAccess(internalToken, organizationId);
     const triggerOverride = body.trigger as ExecutionTriggerMetadata | undefined;
     const triggerMetadata =
       triggerOverride ??
@@ -78,11 +81,24 @@ export class InternalRunsController {
       workflowVersionId: prepared.workflowVersionId,
       workflowVersion: prepared.workflowVersion,
       organizationId: prepared.organizationId,
+      scopeId: prepared.scopeId ?? null,
       definition: prepared.definition,
       inputs: prepared.inputs,
       trigger: prepared.triggerMetadata,
       inputPreview: prepared.inputPreview,
     };
+  }
+
+  @Post(':runId/started')
+  async markRunStarted(
+    @Headers('x-internal-token') internalToken: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('runId') runId: string,
+    @Body(new ZodValidationPipe(MarkRunStartedRequestSchema))
+    body: MarkRunStartedRequestDto,
+  ) {
+    const auth = this.assertInternalAccess(internalToken, organizationId);
+    return this.workflowRunService.markRunStarted(runId, body.temporalRunId, auth);
   }
 
   @Get(':runId')
@@ -93,6 +109,17 @@ export class InternalRunsController {
   ) {
     const auth = this.assertInternalAccess(internalToken, organizationId);
     return this.workflowRunService.getRun(runId, auth);
+  }
+
+  @Post(':runId/finalize')
+  async finalizeRun(
+    @Headers('x-internal-token') internalToken: string | undefined,
+    @Headers('x-organization-id') organizationId: string | undefined,
+    @Param('runId') runId: string,
+    @Body(new ZodValidationPipe(FinalizeRunRequestSchema)) body: FinalizeRunRequestDto,
+  ) {
+    const auth = this.assertInternalAccess(internalToken, organizationId);
+    return this.workflowRunService.finalizeRun(runId, body, auth);
   }
 
   @Get(':runId/node-io')

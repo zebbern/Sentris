@@ -1,5 +1,6 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { escapeCsvCell } from '@sentris/shared';
 import type { Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 
@@ -26,16 +27,59 @@ const CSV_COLUMNS = [
   'resourceId',
   'resourceName',
   'ip',
+  'correlationId',
   'metadata',
 ] as const;
 
-function escapeCsvValue(value: string | null | undefined): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`;
+async function writeWithBackpressure(response: Response, chunk: string): Promise<boolean> {
+  if (response.destroyed || response.writableEnded) {
+    return false;
   }
-  return str;
+  if (response.write(chunk)) {
+    return true;
+  }
+
+  await new Promise<void>((resolve) => {
+    const finish = () => {
+      response.off('drain', finish);
+      response.off('close', finish);
+      resolve();
+    };
+    response.once('drain', finish);
+    response.once('close', finish);
+  });
+  return !response.destroyed && !response.writableEnded;
+}
+
+function auditLogCsvRow(item: {
+  id: string;
+  createdAt: Date;
+  actorType: string;
+  actorDisplay?: string | null;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  resourceName?: string | null;
+  ip?: string | null;
+  correlationId?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): string {
+  const metadataStr =
+    item.metadata && Object.keys(item.metadata).length > 0 ? JSON.stringify(item.metadata) : '';
+
+  return [
+    escapeCsvCell(item.id),
+    escapeCsvCell(item.createdAt.toISOString()),
+    escapeCsvCell(item.actorType),
+    escapeCsvCell(item.actorDisplay),
+    escapeCsvCell(item.action),
+    escapeCsvCell(item.resourceType),
+    escapeCsvCell(item.resourceId),
+    escapeCsvCell(item.resourceName),
+    escapeCsvCell(item.ip),
+    escapeCsvCell(item.correlationId),
+    escapeCsvCell(metadataStr),
+  ].join(',');
 }
 
 @ApiTags('audit-logs')
@@ -50,12 +94,11 @@ export class AuditLogsController {
   async export(
     @CurrentAuth() auth: AuthContext | null,
     @Query(new ZodValidationPipe(ExportAuditLogsQuerySchema)) query: ExportAuditLogsQueryDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<string> {
+    @Res() res: Response,
+  ): Promise<void> {
     const from = query.from ? new Date(query.from) : undefined;
     const to = query.to ? new Date(query.to) : undefined;
-
-    const items = await this.auditLogService.exportAll(auth, {
+    const pages = this.auditLogService.exportPages(auth, {
       resourceType: query.resourceType,
       resourceId: query.resourceId,
       action: query.action,
@@ -64,32 +107,38 @@ export class AuditLogsController {
       to,
     });
 
+    await this.auditLogService.recordDurable(auth, {
+      action: 'audit.export',
+      resourceType: 'analytics',
+      resourceId: null,
+      resourceName: null,
+      metadata: {
+        phase: 'requested',
+        resourceType: query.resourceType ?? null,
+        resourceId: query.resourceId ?? null,
+        action: query.action ?? null,
+        actorId: query.actorId ?? null,
+        from: query.from ?? null,
+        to: query.to ?? null,
+      },
+    });
+
     const dateStr = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="audit-logs-${dateStr}.csv"`);
 
-    const rows: string[] = [CSV_COLUMNS.join(',')];
-    for (const item of items) {
-      const metadataStr =
-        item.metadata && Object.keys(item.metadata).length > 0 ? JSON.stringify(item.metadata) : '';
-
-      rows.push(
-        [
-          escapeCsvValue(item.id),
-          escapeCsvValue(item.createdAt.toISOString()),
-          escapeCsvValue(item.actorType),
-          escapeCsvValue(item.actorDisplay),
-          escapeCsvValue(item.action),
-          escapeCsvValue(item.resourceType),
-          escapeCsvValue(item.resourceId),
-          escapeCsvValue(item.resourceName),
-          escapeCsvValue(item.ip),
-          escapeCsvValue(metadataStr),
-        ].join(','),
-      );
+    if (!(await writeWithBackpressure(res, `${CSV_COLUMNS.join(',')}\n`))) {
+      return;
     }
 
-    return rows.join('\n');
+    for await (const page of pages) {
+      const chunk = `${page.map(auditLogCsvRow).join('\n')}\n`;
+      if (!(await writeWithBackpressure(res, chunk))) {
+        return;
+      }
+    }
+
+    res.end();
   }
 
   @Get()
@@ -130,6 +179,7 @@ export class AuditLogsController {
         metadata: (item.metadata as any) ?? null,
         ip: item.ip ?? null,
         userAgent: item.userAgent ?? null,
+        correlationId: item.correlationId ?? null,
         createdAt: item.createdAt.toISOString(),
       })),
       nextCursor: result.nextCursor,

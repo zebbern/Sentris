@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { isAnalyticsEnabled } from '@/features/analytics/config';
 import { logger } from '@/lib/logger';
+import { env } from '@/config/env';
 
 const hasPostHog = isAnalyticsEnabled();
 
@@ -21,8 +22,8 @@ const posthogReadyPromise: Promise<{
 }> | null = hasPostHog
   ? Promise.all([import('posthog-js'), import('posthog-js/react')]).then(
       ([{ default: posthog }, { PostHogProvider }]) => {
-        const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY!;
-        const apiHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST!;
+        const apiKey = env.VITE_PUBLIC_POSTHOG_KEY;
+        const apiHost = env.VITE_PUBLIC_POSTHOG_HOST;
         posthog.init(apiKey, {
           api_host: apiHost,
           autocapture: true,

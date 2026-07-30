@@ -16,6 +16,10 @@ export const AUDIT_RESOURCE_TYPES = [
   'notification_channel',
   'notification_delivery',
   'finding_triage',
+  'outbox_event',
+  'integration',
+  'file',
+  'ticketing_connection',
 ] as const;
 
 export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];
@@ -35,6 +39,7 @@ export const auditLogsTable = pgTable(
     metadata: jsonb('metadata').$type<Record<string, unknown> | null>().default(null),
     ip: varchar('ip', { length: 64 }),
     userAgent: text('user_agent'),
+    correlationId: varchar('correlation_id', { length: 191 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({

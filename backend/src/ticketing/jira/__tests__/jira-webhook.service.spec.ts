@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import type { TicketingRepository } from '../../ticketing.repository';
+import type { TicketingService } from '../../ticketing.service';
 import type { FindingTriageService } from '../../../findings/finding-triage.service';
 import { JiraWebhookService } from '../jira-webhook.service';
 
@@ -77,8 +78,8 @@ describe('JiraWebhookService', () => {
 
   let repoMock: {
     findConnectionByWebhookSecret: ReturnType<typeof mock>;
-    findTicketLinkByExternalId: ReturnType<typeof mock>;
-    updateTicketLink: ReturnType<typeof mock>;
+    findTicketLinksByExternalId: ReturnType<typeof mock>;
+    updateTicketLinksByIds: ReturnType<typeof mock>;
   };
 
   let triageServiceMock: {
@@ -89,13 +90,14 @@ describe('JiraWebhookService', () => {
     select: ReturnType<typeof mock>;
   };
 
-  // Helper to build the chainable select mock
+  let ticketingServiceMock: {
+    getCurrentJiraIssue: ReturnType<typeof mock>;
+  };
+
   function makeSelectChain(rows: unknown[]) {
     return {
       from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(rows),
-        }),
+        where: () => Promise.resolve(rows),
       }),
     };
   }
@@ -103,8 +105,8 @@ describe('JiraWebhookService', () => {
   beforeEach(() => {
     repoMock = {
       findConnectionByWebhookSecret: mock(() => Promise.resolve(makeConnection())),
-      findTicketLinkByExternalId: mock(() => Promise.resolve(makeTicketLink())),
-      updateTicketLink: mock(() => Promise.resolve(makeTicketLink())),
+      findTicketLinksByExternalId: mock(() => Promise.resolve([makeTicketLink()])),
+      updateTicketLinksByIds: mock(() => Promise.resolve()),
     };
 
     triageServiceMock = {
@@ -113,24 +115,33 @@ describe('JiraWebhookService', () => {
       ),
     };
 
-    // Mock for direct DB queries (findCurrentTriageStatus, getFindingOpensearchId)
-    let selectCallCount = 0;
     dbMock = {
-      select: mock(() => {
-        selectCallCount++;
-        // First call: findCurrentTriageStatus → returns current status
-        if (selectCallCount === 1) {
-          return makeSelectChain([{ status: 'in_progress' }]);
-        }
-        // Second call: getFindingOpensearchId → returns opensearch ID
-        return makeSelectChain([{ findingOpensearchId: 'f-1' }]);
-      }),
+      select: mock(() =>
+        makeSelectChain([
+          {
+            id: 'triage-1',
+            status: 'in_progress',
+            findingOpensearchId: 'f-1',
+          },
+        ]),
+      ),
+    };
+
+    ticketingServiceMock = {
+      getCurrentJiraIssue: mock(() =>
+        Promise.resolve({
+          id: '10042',
+          key: 'SEC-42',
+          fields: { status: { id: '5', name: 'Done' } },
+        }),
+      ),
     };
 
     service = new JiraWebhookService(
       repoMock as unknown as TicketingRepository,
       triageServiceMock as unknown as FindingTriageService,
       dbMock as any,
+      ticketingServiceMock as unknown as TicketingService,
     );
   });
 
@@ -154,14 +165,39 @@ describe('JiraWebhookService', () => {
     expect(source).toBe('jira_webhook');
   });
 
+  it('reverse-maps the resulting Jira status independently of the outbound transition name', async () => {
+    repoMock.findConnectionByWebhookSecret.mockResolvedValue(
+      makeConnection({
+        config: {
+          projectKey: 'SEC',
+          issueTypeId: '10001',
+          statusMapping: {
+            fixed: {
+              transitionName: 'Resolve issue',
+              resultingStatus: 'Done',
+            },
+          },
+          autoCreateOnStatuses: ['triaged'],
+        },
+      }),
+    );
+    const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
+
+    const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
+
+    expect(result.status).toBe('synced');
+    expect(triageServiceMock.upsertTriage.mock.calls[0]?.[2]).toEqual({ status: 'fixed' });
+  });
+
   it('updates ticket_link sync status to synced after success', async () => {
     const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
 
     await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 
-    expect(repoMock.updateTicketLink).toHaveBeenCalledTimes(1);
-    const [linkId, data] = repoMock.updateTicketLink.mock.calls[0]!;
-    expect(linkId).toBe('link-1');
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledTimes(1);
+    const [linkIds, organizationId, data] = repoMock.updateTicketLinksByIds.mock.calls[0]!;
+    expect(linkIds).toEqual(['link-1']);
+    expect(organizationId).toBe(ORGANIZATION_ID);
     expect(data.syncStatus).toBe('synced');
     expect(data.lastSyncedAt).toBeInstanceOf(Date);
   });
@@ -230,7 +266,7 @@ describe('JiraWebhookService', () => {
   // -----------------------------------------------------------------------
 
   it('returns ignored when no ticket_link exists for the issue', async () => {
-    repoMock.findTicketLinkByExternalId.mockReturnValue(Promise.resolve(undefined));
+    repoMock.findTicketLinksByExternalId.mockReturnValue(Promise.resolve([]));
 
     const payload = makeIssueUpdatedPayload('SEC-999', 'Open', 'Done');
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
@@ -241,7 +277,7 @@ describe('JiraWebhookService', () => {
 
   it('returns ignored when ticket_link belongs to a different org (filtered at DB level)', async () => {
     // With org-scoped query, mismatched org returns undefined from DB
-    repoMock.findTicketLinkByExternalId.mockReturnValue(Promise.resolve(undefined));
+    repoMock.findTicketLinksByExternalId.mockReturnValue(Promise.resolve([]));
 
     const payload = makeIssueUpdatedPayload('SEC-42', 'Open', 'Done');
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
@@ -255,11 +291,18 @@ describe('JiraWebhookService', () => {
   // -----------------------------------------------------------------------
 
   it('returns unmapped_status and marks link as error for unknown Jira status', async () => {
+    ticketingServiceMock.getCurrentJiraIssue.mockResolvedValue({
+      id: '10042',
+      key: 'SEC-42',
+      fields: { status: { name: 'Custom Status' } },
+    });
     const payload = makeIssueUpdatedPayload('SEC-42', 'Open', 'Custom Status');
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 
     expect(result.status).toBe('unmapped_status');
-    expect(repoMock.updateTicketLink).toHaveBeenCalledWith('link-1', { syncStatus: 'error' });
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledWith(['link-1'], ORGANIZATION_ID, {
+      syncStatus: 'error',
+    });
     expect(triageServiceMock.upsertTriage).not.toHaveBeenCalled();
   });
 
@@ -269,20 +312,26 @@ describe('JiraWebhookService', () => {
 
   it('returns no_change when triage status already matches', async () => {
     // Current status is already 'fixed', and Jira status maps to 'fixed'
-    let selectCallCount = 0;
-    dbMock.select = mock(() => {
-      selectCallCount++;
-      if (selectCallCount === 1) {
-        return makeSelectChain([{ status: 'fixed' }]); // already 'fixed'
-      }
-      return makeSelectChain([{ findingOpensearchId: 'f-1' }]);
-    });
+    dbMock.select = mock(() =>
+      makeSelectChain([
+        {
+          id: 'triage-1',
+          status: 'fixed',
+          findingOpensearchId: 'f-1',
+        },
+      ]),
+    );
 
     const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done'); // Done → fixed
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 
     expect(result.status).toBe('no_change');
     expect(triageServiceMock.upsertTriage).not.toHaveBeenCalled();
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledTimes(1);
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledWith(['link-1'], ORGANIZATION_ID, {
+      syncStatus: 'synced',
+      lastSyncedAt: expect.any(Date),
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -301,30 +350,90 @@ describe('JiraWebhookService', () => {
   // Error handling
   // -----------------------------------------------------------------------
 
-  it('returns error and marks link when upsertTriage fails', async () => {
+  it('throws and marks the link when upsertTriage fails so Jira retries the delivery', async () => {
     triageServiceMock.upsertTriage.mockRejectedValue(new Error('DB error'));
 
     const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
-    const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 
-    expect(result.status).toBe('error');
-    expect(repoMock.updateTicketLink).toHaveBeenCalledWith('link-1', { syncStatus: 'error' });
+    await expect(service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload)).rejects.toThrow(
+      'DB error',
+    );
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledWith(['link-1'], ORGANIZATION_ID, {
+      syncStatus: 'error',
+    });
   });
 
-  it('returns error when findingOpensearchId cannot be resolved', async () => {
+  it('successfully processes a retried delivery after a transient triage failure', async () => {
+    triageServiceMock.upsertTriage
+      .mockRejectedValueOnce(new Error('transient DB error'))
+      .mockResolvedValueOnce({
+        id: 'triage-1',
+        status: 'fixed',
+        findingOpensearchId: 'f-1',
+      });
+    dbMock.select = mock(() =>
+      makeSelectChain([
+        {
+          id: 'triage-1',
+          status: 'in_progress',
+          findingOpensearchId: 'f-1',
+        },
+      ]),
+    );
+
+    const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
+    await expect(service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload)).rejects.toThrow(
+      'transient DB error',
+    );
+
+    const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
+
+    expect(result.status).toBe('synced');
+    expect(triageServiceMock.upsertTriage).toHaveBeenCalledTimes(2);
+  });
+
+  it('repairs ticket-link state when a retry observes that triage already succeeded', async () => {
     let selectCallCount = 0;
     dbMock.select = mock(() => {
       selectCallCount++;
-      if (selectCallCount === 1) {
-        return makeSelectChain([{ status: 'in_progress' }]);
-      }
-      return makeSelectChain([]); // findingOpensearchId not found
+      return makeSelectChain([
+        {
+          id: 'triage-1',
+          status: selectCallCount === 1 ? 'in_progress' : 'fixed',
+          findingOpensearchId: 'f-1',
+        },
+      ]);
     });
+    repoMock.updateTicketLinksByIds
+      .mockRejectedValueOnce(new Error('ticket link write failed'))
+      .mockResolvedValueOnce(undefined);
 
     const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
+    await expect(service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload)).rejects.toThrow(
+      'ticket link write failed',
+    );
+
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 
-    expect(result.status).toBe('error');
+    expect(result.status).toBe('no_change');
+    expect(triageServiceMock.upsertTriage).toHaveBeenCalledTimes(1);
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledTimes(2);
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenLastCalledWith(['link-1'], ORGANIZATION_ID, {
+      syncStatus: 'synced',
+      lastSyncedAt: expect.any(Date),
+    });
+  });
+
+  it('throws and marks the link when its triage target cannot be resolved', async () => {
+    dbMock.select = mock(() => makeSelectChain([]));
+
+    const payload = makeIssueUpdatedPayload('SEC-42', 'In Progress', 'Done');
+    await expect(service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload)).rejects.toThrow(
+      'Finding triage triage-1 is unavailable',
+    );
+    expect(repoMock.updateTicketLinksByIds).toHaveBeenCalledWith(['link-1'], ORGANIZATION_ID, {
+      syncStatus: 'error',
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -332,6 +441,11 @@ describe('JiraWebhookService', () => {
   // -----------------------------------------------------------------------
 
   it('maps Jira status case-insensitively', async () => {
+    ticketingServiceMock.getCurrentJiraIssue.mockResolvedValue({
+      id: '10042',
+      key: 'SEC-42',
+      fields: { status: { name: 'done' } },
+    });
     const payload = makeIssueUpdatedPayload('SEC-42', 'Open', 'done'); // lowercase
     const result = await service.handleWebhook(WEBHOOK_SECRET, '{}', undefined, payload);
 

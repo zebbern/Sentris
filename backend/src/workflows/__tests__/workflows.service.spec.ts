@@ -142,8 +142,12 @@ describe('WorkflowsService', () => {
     id: string;
     metadata: { name: string; description?: string | null };
   }[] = [];
+  const transactionExecutor = { id: 'workflow-test-transaction' };
 
   const repositoryMock = {
+    async transaction<T>(callback: (executor: unknown) => Promise<T>) {
+      return callback(transactionExecutor);
+    },
     async create() {
       createCalls += 1;
       return makeWorkflowRecord();
@@ -271,24 +275,34 @@ describe('WorkflowsService', () => {
   };
 
   const runRepositoryMock = {
-    async upsert(data: {
-      runId: string;
-      workflowId: string;
-      workflowVersionId: string;
-      workflowVersion: number;
-      totalActions: number;
-      inputs?: Record<string, unknown>;
-      organizationId?: string | null;
-      triggerType?: ExecutionTriggerType;
-      triggerSource?: string | null;
-      triggerLabel?: string | null;
-      inputPreview?: ExecutionInputPreview;
-    }) {
+    async prepare(
+      data: {
+        runId: string;
+        workflowId: string;
+        workflowVersionId: string;
+        workflowVersion: number;
+        totalActions: number;
+        inputs?: Record<string, unknown>;
+        organizationId?: string | null;
+        triggerType?: ExecutionTriggerType;
+        triggerSource?: string | null;
+        triggerLabel?: string | null;
+        inputPreview?: ExecutionInputPreview;
+        parentRunId?: string | null;
+        parentNodeRef?: string | null;
+        scopeId?: string | null;
+      },
+      onPrepared?: (executor: unknown, record: any) => Promise<void>,
+    ) {
+      if (storedRunMeta?.runId === data.runId) {
+        return { record: storedRunMeta, created: false };
+      }
       storedRunMeta = {
         runId: data.runId,
         workflowId: data.workflowId,
         workflowVersionId: data.workflowVersionId,
         workflowVersion: data.workflowVersion,
+        temporalRunId: null,
         totalActions: data.totalActions,
         inputs: data.inputs ?? {},
         createdAt: new Date(now),
@@ -298,8 +312,46 @@ describe('WorkflowsService', () => {
         triggerSource: data.triggerSource ?? null,
         triggerLabel: data.triggerLabel ?? null,
         inputPreview: data.inputPreview ?? { runtimeInputs: {}, nodeOverrides: {} },
+        parentRunId: data.parentRunId ?? null,
+        parentNodeRef: data.parentNodeRef ?? null,
+        scopeId: data.scopeId ?? null,
       };
-      return storedRunMeta;
+      await onPrepared?.({}, storedRunMeta);
+      return { record: storedRunMeta, created: true };
+    },
+    async markStarted(
+      data: {
+        runId: string;
+        workflowId: string;
+        organizationId: string | null;
+        temporalRunId: string;
+      },
+      onTransition?: (executor: unknown, record: any) => Promise<void>,
+    ) {
+      if (
+        !storedRunMeta ||
+        storedRunMeta.runId !== data.runId ||
+        storedRunMeta.workflowId !== data.workflowId ||
+        storedRunMeta.organizationId !== data.organizationId
+      ) {
+        throw new Error('Prepared workflow run not found');
+      }
+      if (storedRunMeta.temporalRunId) {
+        if (storedRunMeta.temporalRunId !== data.temporalRunId) {
+          throw new Error('Workflow run points at a different Temporal execution');
+        }
+        return { record: storedRunMeta, transitioned: false };
+      }
+      storedRunMeta = {
+        ...storedRunMeta,
+        temporalRunId: data.temporalRunId,
+        updatedAt: new Date(now),
+      };
+      await onTransition?.({}, storedRunMeta);
+      return { record: storedRunMeta, transitioned: true };
+    },
+    async scopeBelongsToOrganization() {
+      return true;
     },
     async findByRunId(runId: string, options: { organizationId?: string | null } = {}) {
       if (storedRunMeta && storedRunMeta.runId === runId) {
@@ -325,8 +377,8 @@ describe('WorkflowsService', () => {
     async hasPendingInputs() {
       return false;
     },
-    async cacheTerminalStatus() {
-      // no-op in tests
+    async finalizeTerminalRun() {
+      return storedRunMeta ? { record: storedRunMeta, duplicate: false } : undefined;
     },
   };
 
@@ -458,7 +510,11 @@ describe('WorkflowsService', () => {
     resetWorkflowVersions();
 
     const temporalService = buildTemporalStub();
-    const auditLogMock = { record: vi.fn() } as any;
+    const auditLogMock = {
+      record: vi.fn(),
+      recordDurable: vi.fn().mockResolvedValue(undefined),
+      recordDurableWithExecutor: vi.fn().mockResolvedValue(undefined),
+    } as any;
     workflowVersionService = new WorkflowVersionService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
@@ -474,7 +530,6 @@ describe('WorkflowsService', () => {
       analyticsServiceMock as any,
       auditLogMock,
       workflowVersionService,
-      { emit: vi.fn() } as any,
     );
     service = new WorkflowsService(
       repositoryMock,
@@ -700,7 +755,11 @@ describe('WorkflowsService', () => {
       },
     });
 
-    const failureAuditLog = { record: vi.fn() } as any;
+    const failureAuditLog = {
+      record: vi.fn(),
+      recordDurable: vi.fn().mockResolvedValue(undefined),
+      recordDurableWithExecutor: vi.fn().mockResolvedValue(undefined),
+    } as any;
     const failureVersionService = new WorkflowVersionService(
       repositoryMock,
       workflowRoleRepositoryMock as any,
@@ -716,7 +775,6 @@ describe('WorkflowsService', () => {
       analyticsServiceMock as any,
       failureAuditLog,
       failureVersionService,
-      { emit: vi.fn() } as any,
     );
     service = new WorkflowsService(
       repositoryMock,

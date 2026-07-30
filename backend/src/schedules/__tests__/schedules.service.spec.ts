@@ -203,8 +203,12 @@ describe('SchedulesService', () => {
 
   const createScheduleCalls: unknown[] = [];
   const updateScheduleCalls: unknown[] = [];
+  const deleteScheduleCalls: unknown[][] = [];
   const pauseScheduleCalls: unknown[][] = [];
   const resumeScheduleCalls: unknown[][] = [];
+  const auditRecordCalls: unknown[][] = [];
+  let durableAuditError: Error | undefined;
+  let deleteScheduleError: Error | undefined;
 
   const createSchedule = async (input: unknown) => {
     createScheduleCalls.push(input);
@@ -212,7 +216,10 @@ describe('SchedulesService', () => {
   const updateSchedule = async (input: unknown) => {
     updateScheduleCalls.push(input);
   };
-  const deleteSchedule = async () => {};
+  const deleteSchedule = async (...args: unknown[]) => {
+    deleteScheduleCalls.push(args);
+    if (deleteScheduleError) throw deleteScheduleError;
+  };
   const pauseSchedule = async (...args: unknown[]) => {
     pauseScheduleCalls.push(args);
   };
@@ -228,6 +235,13 @@ describe('SchedulesService', () => {
     resumeSchedule,
   } as unknown as TemporalService;
 
+  const auditLogService = {
+    recordDurable: async (...args: unknown[]) => {
+      auditRecordCalls.push(args);
+      if (durableAuditError) throw durableAuditError;
+    },
+  };
+
   beforeEach(() => {
     compiledDefinition = workflowDefinition;
     repository = new InMemoryScheduleRepository();
@@ -235,7 +249,7 @@ describe('SchedulesService', () => {
       repository as unknown as ScheduleRepository,
       workflowsService,
       temporalService,
-      { record: () => {} } as any,
+      auditLogService as any,
     );
     ensureWorkflowAdminAccessCalls.length = 0;
     getCompiledWorkflowContextCalls.length = 0;
@@ -243,8 +257,12 @@ describe('SchedulesService', () => {
     startPreparedRunCalls.length = 0;
     createScheduleCalls.length = 0;
     updateScheduleCalls.length = 0;
+    deleteScheduleCalls.length = 0;
     pauseScheduleCalls.length = 0;
     resumeScheduleCalls.length = 0;
+    auditRecordCalls.length = 0;
+    durableAuditError = undefined;
+    deleteScheduleError = undefined;
   });
 
   it('creates schedules with validated payloads and registers Temporal schedules', async () => {
@@ -300,6 +318,29 @@ describe('SchedulesService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(createScheduleCalls.length).toBe(0);
+  });
+
+  it('does not create local or Temporal state when the durable create audit is unavailable', async () => {
+    durableAuditError = new Error('audit outbox unavailable');
+
+    await expect(
+      service.create(authContext, {
+        workflowId: 'workflow-1',
+        workflowVersionId: 'version-1',
+        name: 'Unaudited schedule',
+        cronExpression: '0 10 * * *',
+        timezone: 'UTC',
+        overlapPolicy: 'skip',
+        catchupWindowSeconds: 0,
+        inputPayload: {
+          runtimeInputs: { domain: 'acme.com' },
+          nodeOverrides: {},
+        },
+      }),
+    ).rejects.toThrow('audit outbox unavailable');
+
+    expect(await repository.list()).toHaveLength(0);
+    expect(createScheduleCalls).toHaveLength(0);
   });
 
   it('allows schedules to omit required runtime inputs that define defaults', async () => {
@@ -418,5 +459,67 @@ describe('SchedulesService', () => {
       nodeOverrides: { scanner: { params: { depth: 1 }, inputOverrides: {} } },
     });
     expect(startPreparedRunCalls.length).toBe(1);
+  });
+
+  it('blocks every external schedule mutation when its durable request audit is unavailable', async () => {
+    const created = await service.create(authContext, {
+      workflowId: 'workflow-1',
+      workflowVersionId: 'version-1',
+      name: 'Guarded',
+      cronExpression: '*/5 * * * *',
+      timezone: 'UTC',
+      overlapPolicy: 'skip',
+      catchupWindowSeconds: 0,
+      inputPayload: {
+        runtimeInputs: { domain: 'acme.com' },
+        nodeOverrides: {},
+      },
+    });
+    durableAuditError = new Error('audit outbox unavailable');
+
+    await expect(
+      service.update(authContext, created.id, { cronExpression: '*/10 * * * *' }),
+    ).rejects.toThrow('audit outbox unavailable');
+    await expect(service.pause(authContext, created.id)).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+    await expect(service.resume(authContext, created.id)).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+    await expect(service.trigger(authContext, created.id)).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+    await expect(service.delete(authContext, created.id)).rejects.toThrow(
+      'audit outbox unavailable',
+    );
+
+    expect(updateScheduleCalls).toHaveLength(0);
+    expect(pauseScheduleCalls).toHaveLength(0);
+    expect(resumeScheduleCalls).toHaveLength(0);
+    expect(startPreparedRunCalls).toHaveLength(0);
+    expect(deleteScheduleCalls).toHaveLength(0);
+    expect(await repository.findById(created.id)).toBeDefined();
+  });
+
+  it('retains the local schedule when Temporal deletion fails so the operator can retry', async () => {
+    const created = await service.create(authContext, {
+      workflowId: 'workflow-1',
+      workflowVersionId: 'version-1',
+      name: 'Retryable deletion',
+      cronExpression: '*/5 * * * *',
+      timezone: 'UTC',
+      overlapPolicy: 'skip',
+      catchupWindowSeconds: 0,
+      inputPayload: {
+        runtimeInputs: { domain: 'acme.com' },
+        nodeOverrides: {},
+      },
+    });
+    deleteScheduleError = new Error('Temporal unavailable');
+
+    await expect(service.delete(authContext, created.id)).rejects.toThrow('Temporal unavailable');
+
+    expect(deleteScheduleCalls).toHaveLength(1);
+    expect(await repository.findById(created.id)).toBeDefined();
   });
 });

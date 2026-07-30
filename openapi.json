@@ -554,7 +554,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Resolved workflow result payload"
+            "description": "Resolved workflow result payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRunResultResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Get workflow run result",
@@ -639,7 +646,14 @@
         ],
         "responses": {
           "200": {
-            "description": "Cancels a running workflow execution"
+            "description": "Cancellation request accepted by Temporal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelWorkflowRunResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Cancel a workflow run",
@@ -2956,6 +2970,105 @@
         "operationId": "FindingsController_listFindings",
         "parameters": [
           {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low",
+                "info",
+                "none"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "workflowId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "componentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "triageStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigneeUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 191,
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -2978,30 +3091,6 @@
             }
           },
           {
-            "name": "severity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "critical",
-                "high",
-                "medium",
-                "low",
-                "info"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          },
-          {
             "name": "sortOrder",
             "required": false,
             "in": "query",
@@ -3015,7 +3104,96 @@
             }
           },
           {
+            "name": "paginationMode",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "offset",
+              "type": "string",
+              "enum": [
+                "offset",
+                "cursor"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 16384,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of security findings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List security findings with pagination and filters",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
+    "/api/v1/findings/stats": {
+      "get": {
+        "operationId": "FindingsController_getStats",
+        "parameters": [
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low",
+                "info",
+                "none"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
             "name": "workflowId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
             "required": false,
             "in": "query",
             "schema": {
@@ -3073,25 +3251,25 @@
         ],
         "responses": {
           "200": {
-            "description": "Paginated list of security findings",
+            "description": "Severity counts and total for security findings",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FindingsResponseDto"
+                  "$ref": "#/components/schemas/FindingsStatsResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "List security findings with pagination and filters",
+        "summary": "Get severity distribution stats for findings",
         "tags": [
           "findings"
         ]
       }
     },
-    "/api/v1/findings/stats": {
+    "/api/v1/findings/export": {
       "get": {
-        "operationId": "FindingsController_getStats",
+        "operationId": "FindingsController_exportFindings",
         "parameters": [
           {
             "name": "severity",
@@ -3104,7 +3282,8 @@
                 "high",
                 "medium",
                 "low",
-                "info"
+                "info",
+                "none"
               ]
             }
           },
@@ -3119,6 +3298,24 @@
           },
           {
             "name": "workflowId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "scopeId",
             "required": false,
             "in": "query",
             "schema": {
@@ -3154,51 +3351,22 @@
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
               "type": "string"
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Severity counts and total for security findings",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FindingsStatsResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get severity distribution stats for findings",
-        "tags": [
-          "findings"
-        ]
-      }
-    },
-    "/api/v1/findings/export": {
-      "get": {
-        "operationId": "FindingsController_exportFindings",
-        "parameters": [
-          {
-            "name": "severity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "critical",
-                "high",
-                "medium",
-                "low",
-                "info"
-              ]
-            }
           },
           {
-            "name": "search",
+            "name": "triageStatus",
             "required": false,
             "in": "query",
             "schema": {
               "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigneeUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 191,
               "type": "string"
             }
           },
@@ -3234,53 +3402,88 @@
             "in": "query",
             "schema": {
               "minimum": 1,
-              "maximum": 10000,
-              "default": 1000,
+              "maximum": 1000000,
               "type": "integer"
-            }
-          },
-          {
-            "name": "workflowId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          },
-          {
-            "name": "componentId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maxLength": 200,
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date-time",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
-              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Finding export in the requested format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FindingItemDto"
+                  }
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment filename",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Sentris-Availability": {
+                "description": "Trust state for the exported finding data",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "available",
+                    "degraded"
+                  ]
+                }
+              },
+              "X-Sentris-Degraded-Reasons": {
+                "description": "Comma-separated reasons the export is degraded, when present",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Sentris-Projection-Health-Reason": {
+                "description": "Projection degradation reason, when present",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Sentris-Projection-Reconciled-Through": {
+                "description": "Latest reconciled projection timestamp, when present",
+                "schema": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "X-Sentris-Schema-Canonical": {
+                "description": "Canonical observations included in the export",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "X-Sentris-Schema-Legacy": {
+                "description": "Legacy observations included in the export",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "X-Sentris-Schema-Invalid": {
+                "description": "Invalid versioned observations included in the export",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
           }
         },
         "summary": "Export security findings as CSV or JSON",
@@ -3292,7 +3495,19 @@
     "/api/v1/findings/{id}": {
       "get": {
         "operationId": "FindingsController_getFinding",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "OpenSearch finding document identifier",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Single security finding detail",
@@ -3314,7 +3529,19 @@
     "/api/v1/findings/{id}/triage": {
       "patch": {
         "operationId": "FindingTriageController_updateTriage",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "OpenSearch finding document identifier",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -3375,6 +3602,17 @@
               "default": 50,
               "type": "integer"
             }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "OpenSearch finding document identifier",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
           }
         ],
         "responses": {
@@ -3391,10 +3629,34 @@
     "/api/v1/findings/{id}/ticket": {
       "get": {
         "operationId": "FindingTriageController_getTicket",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "OpenSearch finding document identifier",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/TicketLinkResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
           }
         },
         "summary": "Get linked ticket for a finding",
@@ -3620,7 +3882,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingConnectionResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Get Jira connection status",
@@ -3645,7 +3914,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthConnectResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Initiate Jira OAuth 2.0 connection",
@@ -3680,7 +3956,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationSuccessResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Handle Jira OAuth callback",
@@ -3695,7 +3988,24 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationSuccessResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Disconnect Jira integration",
@@ -3720,7 +4030,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingConnectionResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Update ticketing configuration",
@@ -3735,7 +4052,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JiraProjectDto"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List Jira projects",
@@ -3759,10 +4086,61 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JiraIssueTypeDto"
+                  }
+                }
+              }
+            }
           }
         },
         "summary": "List Jira issue types for a project",
+        "tags": [
+          "ticketing"
+        ]
+      }
+    },
+    "/api/v1/ticketing/reconciliation/{findingTriageId}": {
+      "post": {
+        "operationId": "TicketingController_reconcileTicketCreation",
+        "parameters": [
+          {
+            "name": "findingTriageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileTicketCreationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileTicketCreationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reconcile an ambiguous Jira ticket creation",
         "tags": [
           "ticketing"
         ]
@@ -3793,10 +4171,34 @@
         ],
         "responses": {
           "200": {
-            "description": "Webhook processed"
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraWebhookResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Invalid webhook signature"
+            "description": "Invalid webhook signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingErrorResponseDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Webhook processing failed; Jira should retry the delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketingErrorResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Receive Jira webhook",
@@ -3925,16 +4327,7 @@
     "/api/v1/integrations/connections": {
       "get": {
         "operationId": "IntegrationsController_listConnections",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "description": "",
@@ -4051,16 +4444,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RefreshConnectionDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "",
@@ -4092,16 +4475,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DisconnectConnectionDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Connection removed"
@@ -4127,6 +4500,22 @@
           },
           {
             "name": "x-internal-token",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-organization-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-run-id",
             "required": true,
             "in": "header",
             "schema": {
@@ -8421,6 +8810,20 @@
         ]
       }
     },
+    "/api/v1/internal/health/worker-ready": {
+      "get": {
+        "operationId": "InternalHealthController_workerReady",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalHealth"
+        ]
+      }
+    },
     "/api/v1/agent-skills": {
       "get": {
         "operationId": "AgentSkillsController_listSkills",
@@ -8812,6 +9215,86 @@
         ]
       }
     },
+    "/api/v1/scopes/{id}/findings-summary": {
+      "get": {
+        "operationId": "ScopeFindingsController_getSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopeFindingsSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get finding counts for a scope",
+        "tags": [
+          "scopes"
+        ]
+      }
+    },
+    "/api/v1/scopes/{scopeId}/assets/compare": {
+      "get": {
+        "operationId": "AssetsController_compareRuns",
+        "parameters": [
+          {
+            "name": "scopeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "baselineRunId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "currentRunId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetRunComparisonResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Compare asset observations and scanner coverage between two runs",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
     "/api/v1/scopes/{scopeId}/assets": {
       "get": {
         "operationId": "AssetsController_listAssets",
@@ -8893,6 +9376,88 @@
           "ai"
         ]
       }
+    },
+    "/api/v1/admin/outbox/dead-letters": {
+      "get": {
+        "operationId": "OutboxController_listDeadLetters",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minLength": 1,
+              "maxLength": 2048,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListDeadLettersResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List dead-lettered outbox events for the current organization",
+        "tags": [
+          "Outbox"
+        ]
+      }
+    },
+    "/api/v1/admin/outbox/dead-letters/{eventId}/requeue": {
+      "post": {
+        "operationId": "OutboxController_requeue",
+        "parameters": [
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequeueDeadLetterResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Event ID must be a UUID"
+          },
+          "404": {
+            "description": "Dead-lettered outbox event not found"
+          }
+        },
+        "summary": "Requeue one dead-lettered outbox event",
+        "tags": [
+          "Outbox"
+        ]
+      }
     }
   },
   "info": {
@@ -8910,6 +9475,141 @@
   ],
   "components": {
     "schemas": {
+      "WorkflowRunResultResponseDto": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "outputs": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "success": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "required": [
+                  "outputs",
+                  "success"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "FAILED"
+                    ]
+                  },
+                  "result": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CANCELLED"
+                    ]
+                  },
+                  "result": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "TIMED_OUT"
+                    ]
+                  },
+                  "result": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "result"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "TERMINATED"
+                    ]
+                  },
+                  "result": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "status",
+                  "result"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "runId",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "CancelWorkflowRunResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          },
+          "runId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "runId"
+        ],
+        "additionalProperties": false
+      },
       "RunArtifactsResponseDto": {
         "type": "object",
         "properties": {
@@ -10673,159 +11373,26 @@
         "type": "object",
         "properties": {
           "organizationId": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           }
         },
         "required": [
           "organizationId"
         ]
       },
-      "FindingsResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "timestamp": {
-                  "type": "string"
-                },
-                "severity": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "asset_key": {
-                  "type": "string"
-                },
-                "workflow_name": {
-                  "type": "string"
-                },
-                "workflow_id": {
-                  "type": "string"
-                },
-                "run_id": {
-                  "type": "string"
-                },
-                "component_id": {
-                  "type": "string"
-                },
-                "node_ref": {
-                  "type": "string"
-                },
-                "raw": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {}
-                },
-                "triage": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    },
-                    "assigneeUserId": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "severityOverride": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "notes": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "assigneeUserId",
-                    "severityOverride",
-                    "notes",
-                    "updatedAt"
-                  ],
-                  "nullable": true
-                }
-              },
-              "required": [
-                "id",
-                "timestamp"
-              ]
-            }
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          },
-          "page": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "pageSize": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 100
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "pageSize"
-        ]
-      },
-      "FindingsStatsResponseDto": {
-        "type": "object",
-        "properties": {
-          "severityCounts": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "severity": {
-                  "type": "string"
-                },
-                "count": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": [
-                "severity",
-                "count"
-              ]
-            }
-          },
-          "total": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
-          }
-        },
-        "required": [
-          "severityCounts",
-          "total"
-        ]
-      },
-      "FindingDetailResponseDto": {
+      "FindingItemDto": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
+          },
+          "schemaCompatibility": {
+            "type": "string",
+            "enum": [
+              "canonical",
+              "legacy",
+              "invalid"
+            ]
           },
           "timestamp": {
             "type": "string"
@@ -10846,6 +11413,9 @@
             "type": "string"
           },
           "run_id": {
+            "type": "string"
+          },
+          "scope_id": {
             "type": "string"
           },
           "component_id": {
@@ -10881,6 +11451,11 @@
               },
               "updatedAt": {
                 "type": "string"
+              },
+              "projectionVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               }
             },
             "required": [
@@ -10895,8 +11470,585 @@
         },
         "required": [
           "id",
+          "timestamp"
+        ]
+      },
+      "FindingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "schemaCompatibility": {
+                  "type": "string",
+                  "enum": [
+                    "canonical",
+                    "legacy",
+                    "invalid"
+                  ]
+                },
+                "timestamp": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "asset_key": {
+                  "type": "string"
+                },
+                "workflow_name": {
+                  "type": "string"
+                },
+                "workflow_id": {
+                  "type": "string"
+                },
+                "run_id": {
+                  "type": "string"
+                },
+                "scope_id": {
+                  "type": "string"
+                },
+                "component_id": {
+                  "type": "string"
+                },
+                "node_ref": {
+                  "type": "string"
+                },
+                "raw": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "triage": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "assigneeUserId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "severityOverride": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "projectionVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "assigneeUserId",
+                    "severityOverride",
+                    "notes",
+                    "updatedAt"
+                  ],
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "timestamp"
+              ]
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "degraded",
+              "unavailable"
+            ]
+          },
+          "paginationMode": {
+            "default": "offset",
+            "type": "string",
+            "enum": [
+              "offset",
+              "cursor"
+            ]
+          },
+          "currentCursor": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nextCursor": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectionHealth": {
+            "type": "object",
+            "properties": {
+              "availability": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "degraded"
+                ]
+              },
+              "completedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "reconciledThrough": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "not_reconciled",
+                  "reconciliation_in_progress",
+                  "reconciliation_failed",
+                  "authoritative_updates_pending",
+                  "watermark_missing",
+                  "observation_index_rebuilt",
+                  "watermark_mismatch",
+                  "projection_events_pending",
+                  "health_check_failed"
+                ],
+                "nullable": true
+              }
+            },
+            "required": [
+              "availability",
+              "completedAt",
+              "reconciledThrough",
+              "reason"
+            ]
+          },
+          "schemaCoverage": {
+            "type": "object",
+            "properties": {
+              "canonical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "legacy": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "invalid": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "canonical",
+              "legacy",
+              "invalid"
+            ]
+          },
+          "degradedReasons": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize",
+          "availability",
+          "schemaCoverage"
+        ]
+      },
+      "FindingsStatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "severityCounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "severity",
+                "count"
+              ]
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "degraded",
+              "unavailable"
+            ]
+          },
+          "projectionHealth": {
+            "type": "object",
+            "properties": {
+              "availability": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "degraded"
+                ]
+              },
+              "completedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "reconciledThrough": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "not_reconciled",
+                  "reconciliation_in_progress",
+                  "reconciliation_failed",
+                  "authoritative_updates_pending",
+                  "watermark_missing",
+                  "observation_index_rebuilt",
+                  "watermark_mismatch",
+                  "projection_events_pending",
+                  "health_check_failed"
+                ],
+                "nullable": true
+              }
+            },
+            "required": [
+              "availability",
+              "completedAt",
+              "reconciledThrough",
+              "reason"
+            ]
+          },
+          "schemaCoverage": {
+            "type": "object",
+            "properties": {
+              "canonical": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "legacy": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "invalid": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "canonical",
+              "legacy",
+              "invalid"
+            ]
+          }
+        },
+        "required": [
+          "severityCounts",
+          "total",
+          "availability",
+          "schemaCoverage"
+        ]
+      },
+      "FindingDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "schemaCompatibility": {
+            "type": "string",
+            "enum": [
+              "canonical",
+              "legacy",
+              "invalid"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "asset_key": {
+            "type": "string"
+          },
+          "workflow_name": {
+            "type": "string"
+          },
+          "workflow_id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "scope_id": {
+            "type": "string"
+          },
+          "component_id": {
+            "type": "string"
+          },
+          "node_ref": {
+            "type": "string"
+          },
+          "raw": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "triage": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "assigneeUserId": {
+                "type": "string",
+                "nullable": true
+              },
+              "severityOverride": {
+                "type": "string",
+                "nullable": true
+              },
+              "notes": {
+                "type": "string",
+                "nullable": true
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "projectionVersion": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "status",
+              "assigneeUserId",
+              "severityOverride",
+              "notes",
+              "updatedAt"
+            ],
+            "nullable": true
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "degraded",
+              "unavailable"
+            ]
+          }
+        },
+        "required": [
+          "id",
           "timestamp",
-          "raw"
+          "raw",
+          "availability"
+        ]
+      },
+      "TicketLinkResponseDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "findingTriageId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "jira"
+                ]
+              },
+              "lastSyncedAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "externalId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "externalUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "syncStatus": {
+                "type": "string",
+                "enum": [
+                  "synced",
+                  "error"
+                ]
+              },
+              "reconciliationRequired": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "id",
+              "findingTriageId",
+              "provider",
+              "lastSyncedAt",
+              "createdAt",
+              "externalId",
+              "externalUrl",
+              "syncStatus",
+              "reconciliationRequired"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "findingTriageId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "jira"
+                ]
+              },
+              "lastSyncedAt": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "externalId": {
+                "type": "null"
+              },
+              "externalUrl": {
+                "type": "null"
+              },
+              "syncStatus": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "unknown"
+                ]
+              },
+              "reconciliationRequired": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "findingTriageId",
+              "provider",
+              "lastSyncedAt",
+              "createdAt",
+              "externalId",
+              "externalUrl",
+              "syncStatus",
+              "reconciliationRequired"
+            ]
+          }
         ]
       },
       "TriageUpdateDto": {
@@ -10916,7 +12068,9 @@
           },
           "assigneeUserId": {
             "type": "string",
-            "maxLength": 191
+            "minLength": 1,
+            "maxLength": 191,
+            "nullable": true
           },
           "severityOverride": {
             "type": "string",
@@ -10925,7 +12079,8 @@
               "high",
               "medium",
               "low",
-              "info"
+              "info",
+              "none"
             ],
             "nullable": true
           },
@@ -10949,8 +12104,10 @@
             "type": "array",
             "items": {
               "type": "string",
+              "minLength": 1,
               "maxLength": 512
-            }
+            },
+            "uniqueItems": true
           },
           "status": {
             "type": "string",
@@ -10966,7 +12123,9 @@
           },
           "assigneeUserId": {
             "type": "string",
-            "maxLength": 191
+            "minLength": 1,
+            "maxLength": 191,
+            "nullable": true
           },
           "comment": {
             "type": "string",
@@ -10993,7 +12152,8 @@
                     "high",
                     "medium",
                     "low",
-                    "info"
+                    "info",
+                    "none"
                   ]
                 },
                 "deadlineHours": {
@@ -11013,6 +12173,140 @@
           "policies"
         ]
       },
+      "TicketingConnectionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "jira"
+            ]
+          },
+          "isConnected": {
+            "type": "boolean"
+          },
+          "cloudId": {
+            "type": "string",
+            "nullable": true
+          },
+          "config": {
+            "type": "object",
+            "properties": {
+              "projectKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "issueTypeId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "statusMapping": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "transitionName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "resultingStatus": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "transitionName",
+                        "resultingStatus"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "autoCreateOnStatuses": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "new",
+                    "triaged",
+                    "in_progress",
+                    "fixed",
+                    "verified",
+                    "wont_fix",
+                    "accepted_risk"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "projectKey",
+              "issueTypeId",
+              "statusMapping",
+              "autoCreateOnStatuses"
+            ],
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "webhookRegistration": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "unregistered",
+                  "pending",
+                  "registered",
+                  "dead"
+                ]
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastError": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "status",
+              "version",
+              "lastError"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "isConnected",
+          "cloudId",
+          "config",
+          "createdAt",
+          "webhookRegistration"
+        ]
+      },
       "ConnectJiraDto": {
         "type": "object",
         "properties": {
@@ -11023,6 +12317,68 @@
         },
         "required": [
           "redirectUri"
+        ]
+      },
+      "OAuthConnectResponseDto": {
+        "type": "object",
+        "properties": {
+          "authorizationUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "state": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "authorizationUrl",
+          "state"
+        ]
+      },
+      "OperationSuccessResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "TicketingErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "statusCode",
+          "message"
         ]
       },
       "UpdateTicketingConfigDto": {
@@ -11043,7 +12399,29 @@
               "type": "string"
             },
             "additionalProperties": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "transitionName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "resultingStatus": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "transitionName",
+                    "resultingStatus"
+                  ]
+                }
+              ]
             }
           },
           "autoCreateOnStatuses": {
@@ -11068,6 +12446,242 @@
           "issueTypeId",
           "statusMapping",
           "autoCreateOnStatuses"
+        ]
+      },
+      "JiraProjectDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "avatarUrl"
+        ]
+      },
+      "JiraIssueTypeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "iconUrl"
+        ]
+      },
+      "ReconcileTicketCreationDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "attach"
+                ]
+              },
+              "issueKey": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z][A-Za-z0-9_]*-[1-9][0-9]*$"
+              }
+            },
+            "required": [
+              "action",
+              "issueKey"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "clear_and_retry"
+                ]
+              },
+              "confirmedNoIssueExists": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "confirmedNoIssueExists"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "ReconcileTicketCreationResponseDto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "attach"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "attached"
+                ]
+              },
+              "findingTriageId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "ticket": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "findingTriageId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "jira"
+                    ]
+                  },
+                  "lastSyncedAt": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "externalId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "externalUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "syncStatus": {
+                    "type": "string",
+                    "enum": [
+                      "synced",
+                      "error"
+                    ]
+                  },
+                  "reconciliationRequired": {
+                    "type": "boolean",
+                    "const": false
+                  }
+                },
+                "required": [
+                  "id",
+                  "findingTriageId",
+                  "provider",
+                  "lastSyncedAt",
+                  "createdAt",
+                  "externalId",
+                  "externalUrl",
+                  "syncStatus",
+                  "reconciliationRequired"
+                ]
+              }
+            },
+            "required": [
+              "action",
+              "status",
+              "findingTriageId",
+              "ticket"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "clear_and_retry"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "retry_queued"
+                ]
+              },
+              "findingTriageId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "ticket": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "action",
+              "status",
+              "findingTriageId",
+              "ticket"
+            ]
+          }
+        ]
+      },
+      "JiraWebhookResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ignored",
+              "unmapped_status",
+              "no_change",
+              "synced",
+              "error"
+            ]
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "IntegrationProviderResponse": {
@@ -11225,10 +12839,6 @@
       "StartOAuthDto": {
         "type": "object",
         "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          },
           "redirectUri": {
             "type": "string",
             "format": "uri"
@@ -11241,9 +12851,9 @@
           }
         },
         "required": [
-          "userId",
           "redirectUri"
-        ]
+        ],
+        "additionalProperties": false
       },
       "OAuthStartResponseDto": {
         "type": "object",
@@ -11273,7 +12883,11 @@
       "CompleteOAuthDto": {
         "type": "object",
         "properties": {
-          "userId": {
+          "state": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
             "type": "string",
             "minLength": 1
           },
@@ -11286,46 +12900,14 @@
             "items": {
               "type": "string"
             }
-          },
-          "state": {
-            "type": "string",
-            "minLength": 1
-          },
-          "code": {
-            "type": "string",
-            "minLength": 1
           }
         },
         "required": [
-          "userId",
-          "redirectUri",
           "state",
-          "code"
-        ]
-      },
-      "RefreshConnectionDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId"
-        ]
-      },
-      "DisconnectConnectionDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId"
-        ]
+          "code",
+          "redirectUri"
+        ],
+        "additionalProperties": false
       },
       "ConnectionTokenResponseDto": {
         "type": "object",
@@ -11695,15 +13277,13 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
-          },
-          "organizationId": {
-            "type": "string"
           }
         },
         "required": [
           "name",
           "permissions"
-        ]
+        ],
+        "additionalProperties": false
       },
       "CreateApiKeyResponseDto": {
         "type": "object",
@@ -13171,10 +14751,6 @@
               "type": "string"
             },
             "additionalProperties": {}
-          },
-          "respondedBy": {
-            "description": "User ID or identifier of who resolved the input",
-            "type": "string"
           }
         }
       },
@@ -14636,8 +16212,10 @@
             "type": "string",
             "enum": [
               "pending",
+              "sending",
               "sent",
-              "failed"
+              "failed",
+              "unknown"
             ]
           },
           "payload": {
@@ -14734,7 +16312,7 @@
             }
           },
           "image": {
-            "description": "Docker image for stdio transport",
+            "description": "Deprecated for single discovery; trusted-local stdio uses a same-worker loopback host proxy",
             "type": "string",
             "minLength": 1
           },
@@ -15149,7 +16727,11 @@
                     "human_input",
                     "notification_channel",
                     "notification_delivery",
-                    "finding_triage"
+                    "finding_triage",
+                    "outbox_event",
+                    "integration",
+                    "file",
+                    "ticketing_connection"
                   ]
                 },
                 "resourceId": {
@@ -15176,6 +16758,10 @@
                   "type": "string",
                   "nullable": true
                 },
+                "correlationId": {
+                  "type": "string",
+                  "nullable": true
+                },
                 "createdAt": {
                   "type": "string",
                   "format": "date-time",
@@ -15195,6 +16781,7 @@
                 "metadata",
                 "ip",
                 "userAgent",
+                "correlationId",
                 "createdAt"
               ]
             }
@@ -15730,6 +17317,217 @@
           }
         }
       },
+      "ScopeFindingsSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "degraded",
+              "unavailable"
+            ]
+          },
+          "total": {
+            "type": "number"
+          },
+          "bySeverity": {
+            "type": "object",
+            "properties": {
+              "critical": {
+                "type": "number"
+              },
+              "high": {
+                "type": "number"
+              },
+              "medium": {
+                "type": "number"
+              },
+              "low": {
+                "type": "number"
+              },
+              "info": {
+                "type": "number"
+              },
+              "none": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "availability",
+          "total",
+          "bySeverity"
+        ]
+      },
+      "AssetRunComparisonResponse": {
+        "type": "object",
+        "properties": {
+          "scopeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "workflowId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "baselineRunId": {
+            "type": "string"
+          },
+          "currentRunId": {
+            "type": "string"
+          },
+          "baselineCoverage": {
+            "type": "object",
+            "properties": {
+              "completedComponents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failedComponents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "completedComponents",
+              "failedComponents"
+            ]
+          },
+          "currentCoverage": {
+            "type": "object",
+            "properties": {
+              "completedComponents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "failedComponents": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "completedComponents",
+              "failedComponents"
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "observed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "notObserved": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "notScanned": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "observed",
+              "notObserved",
+              "notScanned"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetType": {
+                  "type": "string",
+                  "enum": [
+                    "subdomain",
+                    "host",
+                    "ip-address",
+                    "open-port",
+                    "http-probe",
+                    "dns-record",
+                    "crawled-url",
+                    "url"
+                  ]
+                },
+                "assetValue": {
+                  "type": "string"
+                },
+                "sourceComponentIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "baselineObserved": {
+                  "type": "boolean"
+                },
+                "currentObserved": {
+                  "type": "boolean"
+                },
+                "observationStatus": {
+                  "type": "string",
+                  "enum": [
+                    "observed",
+                    "not-observed",
+                    "not-scanned"
+                  ]
+                },
+                "change": {
+                  "type": "string",
+                  "enum": [
+                    "new",
+                    "unchanged",
+                    "missing"
+                  ]
+                }
+              },
+              "required": [
+                "assetType",
+                "assetValue",
+                "sourceComponentIds",
+                "baselineObserved",
+                "currentObserved",
+                "observationStatus",
+                "change"
+              ]
+            }
+          }
+        },
+        "required": [
+          "scopeId",
+          "workflowId",
+          "baselineRunId",
+          "currentRunId",
+          "baselineCoverage",
+          "currentCoverage",
+          "summary",
+          "items"
+        ]
+      },
       "AssetResponse": {
         "type": "object",
         "properties": {
@@ -15869,6 +17667,145 @@
         "required": [
           "models",
           "source"
+        ]
+      },
+      "ListDeadLettersResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "eventType": {
+                  "type": "string"
+                },
+                "organizationId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "aggregateType": {
+                  "type": "string"
+                },
+                "aggregateId": {
+                  "type": "string"
+                },
+                "dedupeKey": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "dead"
+                  ]
+                },
+                "attempts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "maxAttempts": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "availableAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "lockedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "nullable": true
+                },
+                "lockedBy": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "lastError": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "processedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "eventType",
+                "organizationId",
+                "aggregateType",
+                "aggregateId",
+                "dedupeKey",
+                "payload",
+                "status",
+                "attempts",
+                "maxAttempts",
+                "availableAt",
+                "lockedAt",
+                "lockedBy",
+                "lastError",
+                "processedAt",
+                "createdAt",
+                "updatedAt"
+              ]
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RequeueDeadLetterResponseDto": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending"
+            ]
+          }
+        },
+        "required": [
+          "eventId",
+          "status"
         ]
       }
     }

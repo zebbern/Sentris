@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
@@ -8,6 +10,7 @@ import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { AuthContext } from '../../auth/types';
 import type { FindingTriageRecord, FindingTriageEventRecord } from '../../database/schema';
 import type { FindingTriageRepository } from '../finding-triage.repository';
+import { FindingTriageWriteConflictError } from '../finding-triage.repository';
 import type { AuditLogService } from '../../audit/audit-log.service';
 import type { SecurityAnalyticsService } from '../../analytics/security-analytics.service';
 import type { OrgMembersService } from '../../org/org-members.service';
@@ -50,6 +53,7 @@ function makeTriageRecord(overrides: Partial<FindingTriageRecord> = {}): Finding
     severityOverride: overrides.severityOverride ?? null,
     notes: overrides.notes ?? null,
     slaDeadline: overrides.slaDeadline ?? null,
+    projectionVersion: overrides.projectionVersion ?? 1,
     createdAt: overrides.createdAt ?? now,
     updatedAt: overrides.updatedAt ?? now,
   };
@@ -79,57 +83,84 @@ function makeEventRecord(
 describe('FindingTriageService', () => {
   let service: FindingTriageService;
   let repoMock: {
+    transaction: ReturnType<typeof mock>;
     findByOrgAndFindingId: ReturnType<typeof mock>;
     findByIds: ReturnType<typeof mock>;
     upsert: ReturnType<typeof mock>;
+    commitChange: ReturnType<typeof mock>;
     addEvents: ReturnType<typeof mock>;
     listEvents: ReturnType<typeof mock>;
     findByStatus: ReturnType<typeof mock>;
     getAllTriagedIds: ReturnType<typeof mock>;
+    hasTriageRecords: ReturnType<typeof mock>;
+    getProjectionReconciliationState: ReturnType<typeof mock>;
+    hasAuthoritativeChangesAfter: ReturnType<typeof mock>;
   };
   let auditCalls: unknown[][];
   let analyticsQueryMock: ReturnType<typeof mock>;
   let analyticsAvailableMock: ReturnType<typeof mock>;
+  let analyticsWatermarkMock: ReturnType<typeof mock>;
   let orgMembersListMock: ReturnType<typeof mock>;
-  let eventEmitterMock: { emit: ReturnType<typeof mock> };
+  const transactionExecutor = { id: 'finding-triage-test-transaction' };
 
   beforeEach(() => {
     idCounter = 0;
     auditCalls = [];
 
+    const writeMock = mock((input: any) =>
+      Promise.resolve(
+        makeTriageRecord({
+          id: input.triageId ?? 'triage-upserted',
+          findingOpensearchId: input.findingOpensearchId ?? 'f-1',
+          status: input.data?.status ?? 'new',
+          assigneeUserId: input.data?.assigneeUserId ?? null,
+          severityOverride: input.data?.severityOverride ?? null,
+          notes: input.data?.notes ?? null,
+          projectionVersion: (input.expectedVersion ?? 0) + 1,
+        }),
+      ),
+    );
     repoMock = {
+      transaction: mock((callback: (executor: unknown) => Promise<unknown>) =>
+        callback(transactionExecutor),
+      ),
       findByOrgAndFindingId: mock(() => Promise.resolve(null)),
       findByIds: mock(() => Promise.resolve([])),
-      upsert: mock(() =>
-        Promise.resolve(makeTriageRecord({ id: 'triage-upserted', findingOpensearchId: 'f-1' })),
-      ),
+      upsert: writeMock,
+      commitChange: writeMock,
       addEvents: mock(() => Promise.resolve()),
       listEvents: mock(() => Promise.resolve([])),
       findByStatus: mock(() => Promise.resolve([])),
       getAllTriagedIds: mock(() => Promise.resolve([])),
+      hasTriageRecords: mock(() => Promise.resolve(false)),
+      getProjectionReconciliationState: mock(() => Promise.resolve(null)),
+      hasAuthoritativeChangesAfter: mock(() => Promise.resolve(false)),
     };
 
     analyticsQueryMock = mock(() => Promise.resolve({ total: 1, items: [] }));
     analyticsAvailableMock = mock(() => true);
+    analyticsWatermarkMock = mock(() => Promise.resolve(null));
     orgMembersListMock = mock(() => Promise.resolve([{ userId: 'user-1' }, { userId: 'user-2' }]));
 
     const auditLogService = {
       record: (...args: unknown[]) => {
         auditCalls.push(args);
       },
+      recordDurableWithExecutor: (...args: unknown[]) => {
+        auditCalls.push(args);
+        return Promise.resolve();
+      },
     };
 
     const securityAnalyticsService = {
       isAvailable: analyticsAvailableMock,
       query: analyticsQueryMock,
+      queryFindings: analyticsQueryMock,
+      getFindingTriageProjectionWatermark: analyticsWatermarkMock,
     };
 
     const orgMembersService = {
       listMembers: orgMembersListMock,
-    };
-
-    eventEmitterMock = {
-      emit: mock(() => true),
     };
 
     service = new FindingTriageService(
@@ -137,7 +168,6 @@ describe('FindingTriageService', () => {
       auditLogService as unknown as AuditLogService,
       securityAnalyticsService as unknown as SecurityAnalyticsService,
       orgMembersService as unknown as OrgMembersService,
-      eventEmitterMock as any,
     );
   });
 
@@ -213,14 +243,13 @@ describe('FindingTriageService', () => {
 
       await service.upsertTriage(AUTH, 'f-1', { status: 'triaged' });
 
-      expect(repoMock.addEvents).toHaveBeenCalledTimes(1);
-      const events = repoMock.addEvents.mock.calls[0]![0] as any[];
+      const events = (repoMock.commitChange.mock.calls[0]![0] as any).events as any[];
       const statusEvent = events.find((e: any) => e.eventType === 'status_change');
       expect(statusEvent).toBeDefined();
       expect(statusEvent.fieldChanged).toBe('status');
       expect(statusEvent.oldValue).toBe('new');
       expect(statusEvent.newValue).toBe('triaged');
-      expect(statusEvent.userId).toBe('user-1');
+      expect((repoMock.commitChange.mock.calls[0]![0] as any).userId).toBe('user-1');
     });
 
     it('creates an assignment_change event when assignee changes', async () => {
@@ -231,8 +260,7 @@ describe('FindingTriageService', () => {
 
       await service.upsertTriage(AUTH, 'f-1', { assigneeUserId: 'user-2' });
 
-      expect(repoMock.addEvents).toHaveBeenCalledTimes(1);
-      const events = repoMock.addEvents.mock.calls[0]![0] as any[];
+      const events = (repoMock.commitChange.mock.calls[0]![0] as any).events as any[];
       const assignEvent = events.find((e: any) => e.eventType === 'assignment_change');
       expect(assignEvent).toBeDefined();
       expect(assignEvent.fieldChanged).toBe('assignee_user_id');
@@ -240,7 +268,38 @@ describe('FindingTriageService', () => {
       expect(assignEvent.newValue).toBe('user-2');
     });
 
-    it('does not create events when no fields actually changed', async () => {
+    it('rejects assigning a user from outside the organization', async () => {
+      orgMembersListMock.mockReturnValue(Promise.resolve([{ userId: 'user-1' }]));
+
+      await expect(
+        service.upsertTriage(AUTH, 'f-1', { assigneeUserId: 'user-outside' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(orgMembersListMock).toHaveBeenCalledTimes(1);
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+    });
+
+    it('clears an assignee with null without performing a membership lookup', async () => {
+      const existing = makeTriageRecord({
+        findingOpensearchId: 'f-1',
+        assigneeUserId: 'user-2',
+      });
+      repoMock.findByOrgAndFindingId.mockReturnValue(Promise.resolve(existing));
+
+      const result = await service.upsertTriage(AUTH, 'f-1', { assigneeUserId: null });
+
+      expect(result.assigneeUserId).toBeNull();
+      expect(orgMembersListMock).not.toHaveBeenCalled();
+      const events = (repoMock.commitChange.mock.calls[0]![0] as any).events;
+      expect(events).toEqual([
+        expect.objectContaining({
+          eventType: 'assignment_change',
+          oldValue: 'user-2',
+          newValue: null,
+        }),
+      ]);
+    });
+
+    it('does not write or audit when no fields actually changed', async () => {
       const existing = makeTriageRecord({
         findingOpensearchId: 'f-1',
         status: 'triaged',
@@ -254,8 +313,20 @@ describe('FindingTriageService', () => {
         assigneeUserId: 'user-2',
       });
 
-      // Same values, so no events should be created
-      expect(repoMock.addEvents).not.toHaveBeenCalled();
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+      expect(repoMock.transaction).not.toHaveBeenCalled();
+      expect(auditCalls).toHaveLength(0);
+    });
+
+    it('rejects a no-op that would otherwise create a new triage record', async () => {
+      repoMock.findByOrgAndFindingId.mockReturnValue(Promise.resolve(null));
+
+      await expect(service.upsertTriage(AUTH, 'f-1', { status: 'new' })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+      expect(repoMock.transaction).not.toHaveBeenCalled();
+      expect(auditCalls).toHaveLength(0);
     });
 
     it('records audit log for the action', async () => {
@@ -267,7 +338,7 @@ describe('FindingTriageService', () => {
       await service.upsertTriage(AUTH, 'f-1', { status: 'triaged' });
 
       expect(auditCalls.length).toBe(1);
-      const [authArg, auditData] = auditCalls[0]!;
+      const [, authArg, auditData] = auditCalls[0]!;
       expect(authArg).toBe(AUTH);
       expect((auditData as any).action).toBe('findings.triage');
       expect((auditData as any).resourceType).toBe('finding_triage');
@@ -288,6 +359,24 @@ describe('FindingTriageService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('does not create orphan triage state when the finding dependency is unavailable', async () => {
+      analyticsAvailableMock.mockReturnValue(false);
+
+      await expect(service.upsertTriage(AUTH, 'f-1', { status: 'triaged' })).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+    });
+
+    it('surfaces finding lookup failures instead of treating them as existence', async () => {
+      analyticsQueryMock.mockRejectedValue(new Error('OpenSearch timeout'));
+
+      await expect(service.upsertTriage(AUTH, 'f-1', { status: 'triaged' })).rejects.toThrow(
+        ServiceUnavailableException,
+      );
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+    });
+
     it('allows non-status-only updates (e.g., notes) without transition validation', async () => {
       repoMock.findByOrgAndFindingId.mockReturnValue(Promise.resolve(null));
       repoMock.upsert.mockReturnValue(
@@ -297,6 +386,59 @@ describe('FindingTriageService', () => {
       const result = await service.upsertTriage(AUTH, 'f-1', { notes: 'Some note' });
       expect(result).toBeDefined();
       expect(repoMock.upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads state and retries once after an optimistic write conflict', async () => {
+      const initial = makeTriageRecord({
+        findingOpensearchId: 'f-1',
+        status: 'new',
+        projectionVersion: 1,
+      });
+      const concurrent = makeTriageRecord({
+        findingOpensearchId: 'f-1',
+        status: 'accepted_risk',
+        projectionVersion: 2,
+      });
+      repoMock.findByOrgAndFindingId
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValueOnce(concurrent);
+      repoMock.commitChange
+        .mockRejectedValueOnce(new FindingTriageWriteConflictError())
+        .mockResolvedValueOnce(
+          makeTriageRecord({
+            findingOpensearchId: 'f-1',
+            status: 'triaged',
+            projectionVersion: 3,
+          }),
+        );
+
+      const result = await service.upsertTriage(AUTH, 'f-1', { status: 'triaged' });
+
+      expect(result.projectionVersion).toBe(3);
+      expect(repoMock.commitChange).toHaveBeenCalledTimes(2);
+      expect((repoMock.commitChange.mock.calls[1]![0] as any).expectedVersion).toBe(2);
+    });
+
+    it('revalidates the transition after a concurrent state change', async () => {
+      const initial = makeTriageRecord({
+        findingOpensearchId: 'f-1',
+        status: 'triaged',
+        projectionVersion: 1,
+      });
+      const concurrent = makeTriageRecord({
+        findingOpensearchId: 'f-1',
+        status: 'accepted_risk',
+        projectionVersion: 2,
+      });
+      repoMock.findByOrgAndFindingId
+        .mockResolvedValueOnce(initial)
+        .mockResolvedValueOnce(concurrent);
+      repoMock.commitChange.mockRejectedValueOnce(new FindingTriageWriteConflictError());
+
+      await expect(service.upsertTriage(AUTH, 'f-1', { status: 'in_progress' })).rejects.toThrow(
+        UnprocessableEntityException,
+      );
+      expect(repoMock.commitChange).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -308,8 +450,13 @@ describe('FindingTriageService', () => {
     it('processes multiple findings and returns per-finding results', async () => {
       const ids = ['f-1', 'f-2', 'f-3'];
       repoMock.findByIds.mockReturnValue(Promise.resolve([]));
-      repoMock.upsert.mockImplementation((_org: string, findingId: string) =>
-        Promise.resolve(makeTriageRecord({ findingOpensearchId: findingId, status: 'triaged' })),
+      repoMock.upsert.mockImplementation((input: any) =>
+        Promise.resolve(
+          makeTriageRecord({
+            findingOpensearchId: input.findingOpensearchId,
+            status: 'triaged',
+          }),
+        ),
       );
 
       const result = await service.bulkTriage(AUTH, ids, { status: 'triaged' });
@@ -320,14 +467,72 @@ describe('FindingTriageService', () => {
       expect(result.results.every((r) => r.success)).toBe(true);
     });
 
+    it('validates a non-null assignee membership once for the whole bulk request', async () => {
+      repoMock.findByIds.mockReturnValue(Promise.resolve([]));
+
+      const result = await service.bulkTriage(AUTH, ['f-1', 'f-2', 'f-3'], {
+        assigneeUserId: 'user-2',
+      });
+
+      expect(result.successCount).toBe(3);
+      expect(orgMembersListMock).toHaveBeenCalledTimes(1);
+      expect(orgMembersListMock).toHaveBeenCalledWith('org-1');
+    });
+
+    it('rejects a foreign bulk assignee before loading or changing findings', async () => {
+      orgMembersListMock.mockReturnValue(Promise.resolve([{ userId: 'user-1' }]));
+
+      await expect(
+        service.bulkTriage(AUTH, ['f-1', 'f-2'], { assigneeUserId: 'user-outside' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(orgMembersListMock).toHaveBeenCalledTimes(1);
+      expect(repoMock.findByIds).not.toHaveBeenCalled();
+      expect(repoMock.commitChange).not.toHaveBeenCalled();
+    });
+
+    it('clears bulk assignees with null without performing a membership lookup', async () => {
+      repoMock.findByIds.mockReturnValue(
+        Promise.resolve([
+          makeTriageRecord({ findingOpensearchId: 'f-1', assigneeUserId: 'user-2' }),
+          makeTriageRecord({ findingOpensearchId: 'f-2', assigneeUserId: 'user-2' }),
+        ]),
+      );
+
+      const result = await service.bulkTriage(AUTH, ['f-1', 'f-2'], {
+        assigneeUserId: null,
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          successCount: 2,
+          failureCount: 0,
+        }),
+      );
+      expect(orgMembersListMock).not.toHaveBeenCalled();
+      for (const call of repoMock.commitChange.mock.calls) {
+        expect((call[0] as any).events).toEqual([
+          expect.objectContaining({
+            eventType: 'assignment_change',
+            oldValue: 'user-2',
+            newValue: null,
+          }),
+        ]);
+      }
+    });
+
     it('skips findings with invalid transitions and succeeds for valid ones', async () => {
       const existingVerified = makeTriageRecord({
         findingOpensearchId: 'f-2',
         status: 'verified',
       });
       repoMock.findByIds.mockReturnValue(Promise.resolve([existingVerified]));
-      repoMock.upsert.mockImplementation((_org: string, findingId: string) =>
-        Promise.resolve(makeTriageRecord({ findingOpensearchId: findingId, status: 'triaged' })),
+      repoMock.upsert.mockImplementation((input: any) =>
+        Promise.resolve(
+          makeTriageRecord({
+            findingOpensearchId: input.findingOpensearchId,
+            status: 'triaged',
+          }),
+        ),
       );
 
       const result = await service.bulkTriage(AUTH, ['f-1', 'f-2', 'f-3'], {
@@ -343,11 +548,11 @@ describe('FindingTriageService', () => {
 
     it('creates events for all successful updates', async () => {
       repoMock.findByIds.mockReturnValue(Promise.resolve([]));
-      repoMock.upsert.mockImplementation((_org: string, findingId: string) =>
+      repoMock.upsert.mockImplementation((input: any) =>
         Promise.resolve(
           makeTriageRecord({
-            id: `triage-${findingId}`,
-            findingOpensearchId: findingId,
+            id: `triage-${input.findingOpensearchId}`,
+            findingOpensearchId: input.findingOpensearchId,
             status: 'triaged',
           }),
         ),
@@ -355,21 +560,22 @@ describe('FindingTriageService', () => {
 
       await service.bulkTriage(AUTH, ['f-1', 'f-2'], { status: 'triaged' });
 
-      expect(repoMock.addEvents).toHaveBeenCalledTimes(1);
-      const events = repoMock.addEvents.mock.calls[0]![0] as any[];
+      const events = repoMock.commitChange.mock.calls.flatMap(
+        (call) => (call[0] as any).events as any[],
+      );
       expect(events).toHaveLength(2); // one status_change event per finding
     });
 
     it('records audit log with bulk_triage action', async () => {
       repoMock.findByIds.mockReturnValue(Promise.resolve([]));
-      repoMock.upsert.mockImplementation((_org: string, findingId: string) =>
-        Promise.resolve(makeTriageRecord({ findingOpensearchId: findingId })),
+      repoMock.upsert.mockImplementation((input: any) =>
+        Promise.resolve(makeTriageRecord({ findingOpensearchId: input.findingOpensearchId })),
       );
 
       await service.bulkTriage(AUTH, ['f-1'], { status: 'triaged' });
 
       expect(auditCalls.length).toBe(1);
-      const [, auditData] = auditCalls[0]!;
+      const [, , auditData] = auditCalls[0]!;
       expect((auditData as any).action).toBe('findings.bulk_triage');
     });
 
@@ -489,6 +695,143 @@ describe('FindingTriageService', () => {
       expect(enriched[0]!.name).toBe('Finding 1');
       expect((enriched[0] as any).severity).toBe('high');
       expect(enriched[0]!.id).toBe('f-1');
+    });
+  });
+
+  describe('getProjectionHealth', () => {
+    it('is available without a watermark when the tenant has no authoritative triage', async () => {
+      await expect(service.getProjectionHealth('org-1')).resolves.toEqual({
+        availability: 'available',
+        completedAt: null,
+        reconciledThrough: null,
+        reason: null,
+      });
+      expect(analyticsWatermarkMock).not.toHaveBeenCalled();
+    });
+
+    it('is available only when PostgreSQL and the current observation index agree', async () => {
+      const completedAt = new Date('2026-07-26T12:01:00.000Z');
+      const reconciledThrough = new Date('2026-07-26T12:00:00.000Z');
+      repoMock.hasTriageRecords.mockReturnValue(Promise.resolve(true));
+      repoMock.getProjectionReconciliationState.mockReturnValue(
+        Promise.resolve({
+          organizationId: 'org-1',
+          cursor: null,
+          cycleStartedAt: null,
+          cycleCutoff: null,
+          checked: 10_001,
+          repaired: 4,
+          failed: 0,
+          lastCompletedAt: completedAt,
+          reconciledThrough,
+          updatedAt: completedAt,
+        }),
+      );
+      analyticsWatermarkMock.mockReturnValue(
+        Promise.resolve({
+          observationIndexUuid: 'index-uuid',
+          matchesCurrentObservationIndex: true,
+          reconciledThrough: reconciledThrough.toISOString(),
+          completedAt: completedAt.toISOString(),
+          checked: 10_001,
+          repaired: 4,
+          failed: 0,
+        }),
+      );
+
+      await expect(service.getProjectionHealth('org-1')).resolves.toEqual({
+        availability: 'available',
+        completedAt: completedAt.toISOString(),
+        reconciledThrough: reconciledThrough.toISOString(),
+        reason: null,
+      });
+      expect(repoMock.hasAuthoritativeChangesAfter).toHaveBeenCalledWith(
+        'org-1',
+        reconciledThrough,
+      );
+    });
+
+    it.each([
+      {
+        name: 'an unfinished cursor',
+        state: { cursor: 'finding-0500', failed: 0 },
+        watermark: null,
+        expectedReason: 'reconciliation_in_progress',
+      },
+      {
+        name: 'failed repairs',
+        state: { cursor: null, failed: 1 },
+        watermark: null,
+        expectedReason: 'reconciliation_failed',
+      },
+      {
+        name: 'a rebuilt observation index',
+        state: { cursor: null, failed: 0 },
+        watermark: {
+          observationIndexUuid: 'old-index',
+          matchesCurrentObservationIndex: false,
+          reconciledThrough: '2026-07-26T12:00:00.000Z',
+          completedAt: '2026-07-26T12:01:00.000Z',
+          checked: 1,
+          repaired: 0,
+          failed: 0,
+        },
+        expectedReason: 'observation_index_rebuilt',
+      },
+    ])('degrades for $name', async ({ state, watermark, expectedReason }) => {
+      const completedAt = new Date('2026-07-26T12:01:00.000Z');
+      const reconciledThrough = new Date('2026-07-26T12:00:00.000Z');
+      repoMock.hasTriageRecords.mockReturnValue(Promise.resolve(true));
+      repoMock.getProjectionReconciliationState.mockReturnValue(
+        Promise.resolve({
+          organizationId: 'org-1',
+          cycleStartedAt: state.cursor ? new Date('2026-07-26T11:59:00.000Z') : null,
+          cycleCutoff: state.cursor ? reconciledThrough : null,
+          checked: 1,
+          repaired: 0,
+          lastCompletedAt: completedAt,
+          reconciledThrough,
+          updatedAt: completedAt,
+          ...state,
+        }),
+      );
+      analyticsWatermarkMock.mockReturnValue(Promise.resolve(watermark));
+
+      await expect(service.getProjectionHealth('org-1')).resolves.toEqual(
+        expect.objectContaining({
+          availability: 'degraded',
+          reason: expectedReason,
+        }),
+      );
+    });
+
+    it('degrades when authoritative triage changed after the completed watermark', async () => {
+      const completedAt = new Date('2026-07-26T12:01:00.000Z');
+      const reconciledThrough = new Date('2026-07-26T12:00:00.000Z');
+      repoMock.hasTriageRecords.mockReturnValue(Promise.resolve(true));
+      repoMock.getProjectionReconciliationState.mockReturnValue(
+        Promise.resolve({
+          organizationId: 'org-1',
+          cursor: null,
+          cycleStartedAt: null,
+          cycleCutoff: null,
+          checked: 1,
+          repaired: 0,
+          failed: 0,
+          lastCompletedAt: completedAt,
+          reconciledThrough,
+          updatedAt: completedAt,
+        }),
+      );
+      repoMock.hasAuthoritativeChangesAfter.mockReturnValue(Promise.resolve(true));
+
+      await expect(service.getProjectionHealth('org-1')).resolves.toEqual(
+        expect.objectContaining({
+          availability: 'degraded',
+          reason: 'authoritative_updates_pending',
+        }),
+      );
+      expect(analyticsWatermarkMock).not.toHaveBeenCalled();
     });
   });
 });

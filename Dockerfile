@@ -28,6 +28,7 @@ COPY --chown=sentris:sentris packages/ packages/
 COPY --chown=sentris:sentris backend/ backend/
 COPY --chown=sentris:sentris frontend/ frontend/
 COPY --chown=sentris:sentris worker/ worker/
+COPY --chown=sentris:sentris scripts/lib/local-script-runtime.ts scripts/lib/local-script-runtime.ts
 
 # Install ALL dependencies (no filtering)
 RUN bun install --frozen-lockfile
@@ -40,12 +41,6 @@ FROM base AS backend
 # Switch to user
 USER sentris
 
-# PostHog analytics (optional)
-ARG POSTHOG_API_KEY=""
-ARG POSTHOG_HOST=""
-ENV POSTHOG_API_KEY=${POSTHOG_API_KEY}
-ENV POSTHOG_HOST=${POSTHOG_HOST}
-
 # Set working directory for backend
 WORKDIR /app/backend
 
@@ -57,7 +52,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:3211/api/v1/health || exit 1
 
 # Run migrations first, then start backend
-CMD ["sh", "-c", "bun run migration:push && bun src/main.ts"]
+CMD ["sh", "-c", "bun run migration:run && bun src/main.ts"]
 
 # ============================================================================
 # WORKER SERVICE
@@ -67,18 +62,15 @@ FROM base AS worker
 # Switch to user
 USER sentris
 
-# PostHog analytics (optional)
-ARG POSTHOG_API_KEY=""
-ARG POSTHOG_HOST=""
-ENV POSTHOG_API_KEY=${POSTHOG_API_KEY}
-ENV POSTHOG_HOST=${POSTHOG_HOST}
-
 # Set working directory for worker
 WORKDIR /app/worker
 
-# Health check (process-based — worker has no HTTP port)
+# Worker liveness/readiness endpoint
+EXPOSE 9100 9101
+
+# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD pgrep -f "dev.worker" || exit 1
+  CMD curl -sf http://localhost:9100/health/ready || exit 1
 
 # Run worker with Node + tsx (not bun, due to SWC binding issues)
 CMD ["node", "--import", "tsx/esm", "src/temporal/workers/dev.worker.ts"]
@@ -88,26 +80,10 @@ CMD ["node", "--import", "tsx/esm", "src/temporal/workers/dev.worker.ts"]
 # ============================================================================
 FROM base AS frontend
 
-# Frontend build-time configuration
-ARG VITE_AUTH_PROVIDER=local
-ARG VITE_CLERK_PUBLISHABLE_KEY=""
-ARG VITE_API_URL=http://localhost:3211
-ARG VITE_BACKEND_URL=http://localhost:3211
-ARG VITE_DEFAULT_ORG_ID=local-dev
+# Build provenance is image-specific. Operator configuration is injected at startup.
 ARG VITE_GIT_SHA=unknown
-ARG VITE_PUBLIC_POSTHOG_KEY=""
-ARG VITE_PUBLIC_POSTHOG_HOST=""
-ARG VITE_OPENSEARCH_DASHBOARDS_URL=""
 
-ENV VITE_AUTH_PROVIDER=${VITE_AUTH_PROVIDER}
-ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
-ENV VITE_API_URL=${VITE_API_URL}
-ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
-ENV VITE_DEFAULT_ORG_ID=${VITE_DEFAULT_ORG_ID}
 ENV VITE_GIT_SHA=${VITE_GIT_SHA}
-ENV VITE_PUBLIC_POSTHOG_KEY=${VITE_PUBLIC_POSTHOG_KEY}
-ENV VITE_PUBLIC_POSTHOG_HOST=${VITE_PUBLIC_POSTHOG_HOST}
-ENV VITE_OPENSEARCH_DASHBOARDS_URL=${VITE_OPENSEARCH_DASHBOARDS_URL}
 
 # Set working directory for frontend
 USER sentris
@@ -116,7 +92,7 @@ WORKDIR /app/frontend
 # Build TypeScript declarations for workspace packages first (project references require this)
 RUN cd /app && bunx tsc --build packages/shared packages/backend-client
 
-# Build production assets ahead of time so Vite embeds the env vars
+# Build one profile-independent production bundle.
 RUN bun run build
 
 # Expose port
@@ -126,8 +102,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:8080 || exit 1
 
-# Serve the built bundle with Vite preview
-CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "8080"]
+# Generate the whitelisted public config from container env, then serve the same bundle.
+CMD ["sh", "-c", "bun src/scripts/generate-runtime-config.ts && exec bun run preview --host 0.0.0.0 --port 8080"]
 
 # ============================================================================
 # FRONTEND DEBUG SERVICE (non-minified for debugging)

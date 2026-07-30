@@ -12,6 +12,7 @@ const SEVERITY_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string 
   medium: { variant: 'warning', label: 'Medium' },
   low: { variant: 'default', label: 'Low' },
   info: { variant: 'secondary', label: 'Info' },
+  none: { variant: 'outline', label: 'None' },
 };
 
 // ---------------------------------------------------------------------------

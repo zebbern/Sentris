@@ -81,7 +81,7 @@ export const templatesApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(
       `${API_V1_URL}/templates${searchParams.toString() ? `?${searchParams.toString()}` : ''}`,
-      { headers },
+      { headers, credentials: 'include' },
     );
 
     if (!response.ok) throw new Error('Failed to fetch templates');
@@ -90,28 +90,40 @@ export const templatesApi = {
 
   get: async (id: string) => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/${id}`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/${id}`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch template');
     return response.json();
   },
 
   getCategories: async () => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/categories`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/categories`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch categories');
     return response.json();
   },
 
   getTags: async () => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/tags`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/tags`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch tags');
     return response.json();
   },
 
   getRepoInfo: async (): Promise<TemplateRepoInfo> => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/repo-info`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/repo-info`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch template repository info');
     return response.json();
   },
@@ -120,6 +132,7 @@ export const templatesApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/templates/publish`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         ...headers,
         'Content-Type': 'application/json',
@@ -144,6 +157,7 @@ export const templatesApi = {
     const headers = await getAuthHeaders();
     const response = await fetch(`${API_V1_URL}/templates/${templateId}/use`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         ...headers,
         'Content-Type': 'application/json',
@@ -164,6 +178,7 @@ export const templatesApi = {
     const response = await fetch(`${API_V1_URL}/templates/sync`, {
       method: 'POST',
       headers,
+      credentials: 'include',
     });
 
     if (!response.ok) throw new Error('Failed to sync templates');
@@ -175,6 +190,7 @@ export const templatesApi = {
     const response = await fetch(`${API_V1_URL}/templates/${templateId}/revalidate`, {
       method: 'POST',
       headers,
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -189,7 +205,10 @@ export const templatesApi = {
 
   getRevalidationJob: async (auditId: string): Promise<TemplateRevalidationJobStatus> => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/revalidations/${auditId}`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/revalidations/${auditId}`, {
+      headers,
+      credentials: 'include',
+    });
 
     if (!response.ok) {
       const errorData = await response
@@ -206,7 +225,7 @@ export const templatesApi = {
     const searchParams = new URLSearchParams({ limit: String(limit) });
     const response = await fetch(
       `${API_V1_URL}/templates/revalidations?${searchParams.toString()}`,
-      { headers },
+      { headers, credentials: 'include' },
     );
 
     if (!response.ok) {
@@ -232,7 +251,7 @@ export const templatesApi = {
 
     const response = await fetch(
       `${API_V1_URL}/templates/revalidations/${auditId}/log?${searchParams.toString()}`,
-      { headers },
+      { headers, credentials: 'include' },
     );
 
     if (!response.ok) {
@@ -247,14 +266,20 @@ export const templatesApi = {
 
   getMySubmissions: async () => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/my`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/my`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch submissions');
     return response.json();
   },
 
   getSubmissions: async () => {
     const headers = await getAuthHeaders();
-    const response = await fetch(`${API_V1_URL}/templates/submissions`, { headers });
+    const response = await fetch(`${API_V1_URL}/templates/submissions`, {
+      headers,
+      credentials: 'include',
+    });
     if (!response.ok) throw new Error('Failed to fetch submissions');
     return response.json();
   },

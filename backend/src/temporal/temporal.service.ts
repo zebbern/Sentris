@@ -9,6 +9,7 @@ import {
   Connection,
   ScheduleClient,
   ScheduleDescription,
+  ScheduleNotFoundError,
   ScheduleOverlapPolicy as TemporalScheduleOverlapPolicy,
   WorkflowClient,
   type Workflow,
@@ -200,10 +201,8 @@ export class TemporalService implements OnModuleDestroy {
 
   async cancelWorkflow(ref: WorkflowRunReference): Promise<void> {
     const handle = await this.getWorkflowHandle(ref);
-    this.logger.warn(`Terminating workflow ${handle.workflowId} (runId=${ref.runId ?? 'latest'})`);
-    // Use terminate() for immediate stop - shows as TERMINATED status
-    // cancel() requires workflow cooperation and may show as FAILED if not handled
-    await handle.terminate('User requested stop');
+    this.logger.warn(`Cancelling workflow ${handle.workflowId} (runId=${ref.runId ?? 'latest'})`);
+    await handle.cancel();
   }
 
   /**
@@ -421,7 +420,14 @@ export class TemporalService implements OnModuleDestroy {
   async deleteSchedule(scheduleId: string): Promise<void> {
     const client = await this.getScheduleClient();
     const handle = client.getHandle(scheduleId);
-    await handle.delete();
+    try {
+      await handle.delete();
+    } catch (error) {
+      if (error instanceof ScheduleNotFoundError) {
+        return;
+      }
+      throw error;
+    }
   }
 
   async pauseSchedule(scheduleId: string, note = 'Paused via API'): Promise<void> {

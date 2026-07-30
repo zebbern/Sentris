@@ -24,6 +24,8 @@ import { useRuntimeInputResolver } from './useRuntimeInputResolver';
 import { useWorkflowRunner } from './useWorkflowRunner';
 import { useWorkflowKeyboardShortcuts } from './useWorkflowKeyboardShortcuts';
 import { computeGraphSignature } from '../workflowBuilderUtils';
+import { consumeScopedLaunchSearch } from '@/lib/targetNavigation';
+import { useScopedWorkflowLaunch } from './useScopedWorkflowLaunch';
 
 const BUILDER_ROUTE_PREFIX = '/workflows';
 
@@ -35,6 +37,14 @@ export function useWorkflowBuilderState() {
   const { id, runId: routeRunId } = useParams<{ id: string; runId?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const requestedScopeId = useMemo(
+    () => new URLSearchParams(location.search).get('scopeId'),
+    [location.search],
+  );
+  const launchRequested = useMemo(
+    () => new URLSearchParams(location.search).get('launch') === '1',
+    [location.search],
+  );
   const isNewWorkflow = id === 'new';
   const isRunsRoute = location.pathname.includes('/runs') && !routeRunId;
   const isInWorkflowBuilder = location.pathname.match(/^\/workflows\/[^/]/) !== null;
@@ -307,6 +317,26 @@ export function useWorkflowBuilderState() {
     mostRecentRunId,
     setIsLoading,
     workflowRoutePrefix: BUILDER_ROUTE_PREFIX,
+    requestedScopeId,
+  });
+
+  const consumeScopedLaunch = useCallback(() => {
+    const search = consumeScopedLaunchSearch(location.search);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: search ? `?${search}` : '',
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
+
+  useScopedWorkflowLaunch({
+    requested: launchRequested,
+    ready: !isLoading && !isNewWorkflow && Boolean(metadata.id),
+    requestKey: metadata.id && requestedScopeId ? `${metadata.id}:${requestedScopeId}` : null,
+    onConsume: consumeScopedLaunch,
+    onLaunch: handleRun,
   });
 
   // --- Keyboard shortcuts ---
@@ -400,6 +430,7 @@ export function useWorkflowBuilderState() {
     runtimeInputs,
     prefilledRuntimeValues,
     pendingVersionId,
+    requestedScopeId,
 
     // Handlers
     handleSave,

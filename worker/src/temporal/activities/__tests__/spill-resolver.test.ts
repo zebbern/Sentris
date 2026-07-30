@@ -12,8 +12,8 @@ function createSpilledMarker(storageRef: string, handle?: string) {
   };
 }
 
-function createMockStorage(downloads: Record<string, unknown>): IFileStorageService {
-  return {
+function createMockStorage(downloads: Record<string, unknown>) {
+  const scoped = {
     downloadFile: vi.fn(async (ref: string) => {
       const data = downloads[ref];
       if (data === undefined) {
@@ -26,7 +26,20 @@ function createMockStorage(downloads: Record<string, unknown>): IFileStorageServ
     }),
     getFileMetadata: vi.fn(),
     uploadFile: vi.fn(),
-  } as unknown as IFileStorageService;
+    forOrganization: vi.fn(),
+  };
+  scoped.forOrganization.mockReturnValue(scoped);
+  const storage = {
+    downloadFile: vi.fn(async () => {
+      throw new Error('unscoped storage access');
+    }),
+    getFileMetadata: vi.fn(),
+    uploadFile: vi.fn(),
+    forOrganization: vi.fn(),
+    scoped,
+  };
+  storage.forOrganization.mockReturnValue(scoped);
+  return storage as unknown as IFileStorageService & { scoped: typeof scoped };
 }
 
 describe('unspill', () => {
@@ -57,9 +70,10 @@ describe('unspill', () => {
       data: createSpilledMarker('ref-1', '__self__'),
     };
 
-    await unspill(obj, 'Input', storage, cache, warnings);
+    await unspill(obj, 'Input', storage, cache, warnings, 'org-a');
 
     expect(obj.data).toEqual(fullData);
+    expect(storage.forOrganization).toHaveBeenCalledWith('org-a');
     expect(warnings).toHaveLength(0);
   });
 
@@ -120,7 +134,8 @@ describe('unspill', () => {
 
     expect(obj.first).toEqual(fullData);
     expect(obj.second).toEqual(fullData);
-    expect(storage.downloadFile).toHaveBeenCalledTimes(1);
+    expect(storage.scoped.downloadFile).toHaveBeenCalledTimes(1);
+    expect(storage.downloadFile).not.toHaveBeenCalled();
   });
 
   it('logs warning and skips when storage service is undefined', async () => {
@@ -176,7 +191,7 @@ describe('unspill', () => {
     };
 
     await unspill(obj2, 'Param', storage, cache, warnings);
-    expect(storage.downloadFile).toHaveBeenCalledTimes(1);
+    expect(storage.scoped.downloadFile).toHaveBeenCalledTimes(1);
     expect(obj2.b).toEqual(fullData);
   });
 });

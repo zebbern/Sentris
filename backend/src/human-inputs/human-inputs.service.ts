@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import * as schema from '../database/schema';
 import { humanInputRequests as humanInputRequestsTable } from '../database/schema';
@@ -10,9 +17,10 @@ import {
   HumanInputResponseDto,
   PublicResolveResultDto,
 } from './dto/human-inputs.dto';
-import { TemporalService } from '../temporal/temporal.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { AuthContext } from '../auth/types';
+import { enqueueOutboxEvent, type OutboxExecutor } from '../outbox/enqueue-outbox-event';
+import { HUMAN_INPUT_RESOLUTION_SIGNAL_EVENT } from './human-input.events';
 
 @Injectable()
 export class HumanInputsService {
@@ -20,7 +28,6 @@ export class HumanInputsService {
 
   constructor(
     @Inject(DRIZZLE_TOKEN) private readonly db: NodePgDatabase<typeof schema>,
-    private readonly temporalService: TemporalService,
     private readonly auditLogService: AuditLogService,
   ) {}
 
@@ -28,12 +35,10 @@ export class HumanInputsService {
     query?: ListHumanInputsQueryDto,
     organizationId?: string,
   ): Promise<HumanInputResponseDto[]> {
+    const scopedOrganizationId = this.requireOrganizationId(organizationId);
     const conditions = [];
 
-    // SECURITY: Always filter by organization
-    if (organizationId) {
-      conditions.push(eq(humanInputRequestsTable.organizationId, organizationId));
-    }
+    conditions.push(eq(humanInputRequestsTable.organizationId, scopedOrganizationId));
 
     if (query?.status) {
       conditions.push(eq(humanInputRequestsTable.status, query.status));
@@ -54,12 +59,11 @@ export class HumanInputsService {
   }
 
   async getById(id: string, organizationId?: string): Promise<HumanInputResponseDto> {
-    const conditions = [eq(humanInputRequestsTable.id, id)];
-
-    // SECURITY: Always filter by organization
-    if (organizationId) {
-      conditions.push(eq(humanInputRequestsTable.organizationId, organizationId));
-    }
+    const scopedOrganizationId = this.requireOrganizationId(organizationId);
+    const conditions = [
+      eq(humanInputRequestsTable.id, id),
+      eq(humanInputRequestsTable.organizationId, scopedOrganizationId),
+    ];
 
     const request = await this.db.query.humanInputRequests.findFirst({
       where: and(...conditions),
@@ -78,7 +82,9 @@ export class HumanInputsService {
     organizationId?: string,
     auth?: AuthContext | null,
   ): Promise<HumanInputResponseDto> {
-    const request = await this.getById(id, organizationId);
+    const scopedOrganizationId = this.requireAuthenticatedOrganization(organizationId, auth);
+    const respondedBy = (auth!.userId ?? auth!.provider) || 'authenticated';
+    const request = await this.getById(id, scopedOrganizationId);
 
     if (request.status !== 'pending') {
       throw new Error(`Human input request is ${request.status}, cannot resolve`);
@@ -86,45 +92,51 @@ export class HumanInputsService {
 
     // Determine if approved based on responseData
     const isApproved = dto.responseData?.status !== 'rejected';
+    const respondedAt = new Date();
 
-    // Update database
-    const [updated] = await this.db
-      .update(humanInputRequestsTable)
-      .set({
-        status: 'resolved',
-        responseData: dto.responseData,
-        respondedBy: dto.respondedBy,
-        respondedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(humanInputRequestsTable.id, id))
-      .returning();
+    const updated = await this.db.transaction(async (tx) => {
+      const conditions = [
+        eq(humanInputRequestsTable.id, id),
+        eq(humanInputRequestsTable.status, 'pending'),
+      ];
+      conditions.push(eq(humanInputRequestsTable.organizationId, scopedOrganizationId));
 
-    // Signal Temporal workflow with correct signal name and payload
-    await this.temporalService.signalWorkflow({
-      workflowId: updated.runId, // runId contains the Temporal workflow ID
-      signalName: 'resolveHumanInput',
-      args: {
-        requestId: updated.id,
-        nodeRef: updated.nodeRef,
+      const [resolved] = await tx
+        .update(humanInputRequestsTable)
+        .set({
+          status: 'resolved',
+          responseData: dto.responseData,
+          respondedBy,
+          respondedAt,
+          updatedAt: new Date(),
+        })
+        .where(and(...conditions))
+        .returning();
+
+      if (!resolved) {
+        throw new ConflictException('Human input request is no longer pending');
+      }
+
+      await this.auditLogService.recordDurableWithExecutor(tx, auth ?? null, {
+        action: 'human_input.resolve',
+        resourceType: 'human_input',
+        resourceId: resolved.id,
+        resourceName: resolved.title,
+        metadata: {
+          approved: isApproved,
+          respondedBy,
+          inputType: resolved.inputType,
+        },
+      });
+
+      await this.enqueueResolutionSignal(tx, resolved, {
         approved: isApproved,
-        respondedBy: dto.respondedBy ?? 'unknown',
-        responseNote: dto.responseData?.comment as string | undefined,
-        respondedAt: new Date().toISOString(),
+        respondedBy,
+        respondedAt,
         responseData: dto.responseData,
-      },
-    });
+      });
 
-    this.auditLogService.record(auth ?? null, {
-      action: 'human_input.resolve',
-      resourceType: 'human_input',
-      resourceId: updated.id,
-      resourceName: updated.title,
-      metadata: {
-        approved: isApproved,
-        respondedBy: dto.respondedBy ?? 'unknown',
-        inputType: updated.inputType,
-      },
+      return resolved;
     });
 
     return updated as unknown as HumanInputResponseDto;
@@ -171,51 +183,76 @@ export class HumanInputsService {
     const isApproved = action !== 'reject';
     let responseData = data || {};
     responseData = { ...responseData, status: isApproved ? 'approved' : 'rejected' };
+    const respondedAt = new Date();
 
-    // Update DB
-    const [updated] = await this.db
-      .update(humanInputRequestsTable)
-      .set({
-        status: 'resolved',
-        responseData: responseData,
-        respondedAt: new Date(),
-        respondedBy: 'public-link',
-        updatedAt: new Date(),
-      })
-      .where(eq(humanInputRequestsTable.id, request.id))
-      .returning();
+    const updated = await this.db.transaction(async (tx) => {
+      const [resolved] = await tx
+        .update(humanInputRequestsTable)
+        .set({
+          status: 'resolved',
+          responseData: responseData,
+          respondedAt,
+          respondedBy: 'public-link',
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(humanInputRequestsTable.id, request.id),
+            eq(humanInputRequestsTable.resolveToken, token),
+            eq(humanInputRequestsTable.status, 'pending'),
+          ),
+        )
+        .returning();
 
-    // Signal Workflow with correct signal name and payload
-    await this.temporalService.signalWorkflow({
-      workflowId: updated.runId,
-      signalName: 'resolveHumanInput',
-      args: {
-        requestId: updated.id,
-        nodeRef: updated.nodeRef,
+      if (!resolved) {
+        return null;
+      }
+
+      await this.auditLogService.recordDurableWithExecutor(
+        tx,
+        null,
+        {
+          action: 'human_input.resolve',
+          resourceType: 'human_input',
+          resourceId: resolved.id,
+          resourceName: resolved.title,
+          metadata: {
+            approved: isApproved,
+            respondedBy: 'public-link',
+            inputType: resolved.inputType,
+          },
+        },
+        undefined,
+        request.organizationId,
+      );
+
+      await this.enqueueResolutionSignal(tx, resolved, {
         approved: isApproved,
         respondedBy: 'public-link',
-        responseNote: responseData.comment as string | undefined,
-        respondedAt: new Date().toISOString(),
-        responseData: responseData,
-      },
+        respondedAt,
+        responseData,
+      });
+
+      return resolved;
     });
 
-    this.auditLogService.record(
-      null,
-      {
-        action: 'human_input.resolve',
-        resourceType: 'human_input',
-        resourceId: updated.id,
-        resourceName: updated.title,
-        metadata: {
-          approved: isApproved,
-          respondedBy: 'public-link',
-          inputType: updated.inputType,
+    if (!updated) {
+      const current =
+        (await this.db.query.humanInputRequests.findFirst({
+          where: eq(humanInputRequestsTable.resolveToken, token),
+        })) ?? request;
+      return {
+        success: false,
+        message: `Request is already ${current.status}`,
+        input: {
+          id: current.id,
+          title: current.title,
+          inputType: current.inputType,
+          status: current.status,
+          respondedAt: current.respondedAt?.toISOString() ?? null,
         },
-      },
-      undefined,
-      request.organizationId,
-    );
+      };
+    }
 
     return {
       success: true,
@@ -228,5 +265,60 @@ export class HumanInputsService {
         respondedAt: updated.respondedAt?.toISOString() ?? null,
       },
     };
+  }
+
+  private requireOrganizationId(organizationId?: string): string {
+    if (!organizationId) {
+      throw new ForbiddenException('Organization context is required');
+    }
+    return organizationId;
+  }
+
+  private requireAuthenticatedOrganization(
+    organizationId: string | undefined,
+    auth: AuthContext | null | undefined,
+  ): string {
+    const scopedOrganizationId = this.requireOrganizationId(organizationId);
+    if (
+      !auth?.isAuthenticated ||
+      !auth.organizationId ||
+      auth.organizationId !== scopedOrganizationId
+    ) {
+      throw new ForbiddenException('Authenticated organization context is required');
+    }
+    return scopedOrganizationId;
+  }
+
+  private async enqueueResolutionSignal(
+    executor: OutboxExecutor,
+    request: typeof humanInputRequestsTable.$inferSelect,
+    resolution: {
+      approved: boolean;
+      respondedBy: string;
+      respondedAt: Date;
+      responseData?: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    await enqueueOutboxEvent(executor, {
+      eventType: HUMAN_INPUT_RESOLUTION_SIGNAL_EVENT,
+      organizationId: request.organizationId,
+      aggregateType: 'human_input',
+      aggregateId: request.id,
+      dedupeKey: `human-input-resolution-signal:${request.id}`,
+      maxAttempts: 12,
+      payload: {
+        requestId: request.id,
+        workflowId: request.runId,
+        nodeRef: request.nodeRef,
+        approved: resolution.approved,
+        respondedBy: resolution.respondedBy,
+        responseNote:
+          typeof resolution.responseData?.comment === 'string'
+            ? resolution.responseData.comment
+            : undefined,
+        respondedAt: resolution.respondedAt.toISOString(),
+        responseData: resolution.responseData,
+      },
+    });
   }
 }

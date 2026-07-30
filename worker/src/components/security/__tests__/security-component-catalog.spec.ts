@@ -55,4 +55,17 @@ describe('security component catalog', () => {
       expect(parameterIds).toContain('containerCpuLimit');
     }
   });
+
+  it('declares an explicit network policy for every docker security component', () => {
+    for (const componentId of SECURITY_DOCKER_COMPONENT_IDS) {
+      const component = componentRegistry.get(componentId);
+      expect(component, `${componentId} should be registered`).toBeDefined();
+
+      const runner = component!.runner as DockerRunnerConfig;
+      expect(
+        ['bridge', 'none'],
+        `${componentId} must explicitly preserve or deny network access`,
+      ).toContain(runner.network ?? 'implicit-default');
+    }
+  });
 });

@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ForbiddenException,
   OnModuleInit,
   Inject,
   Optional,
@@ -147,10 +148,41 @@ export class McpGroupsService implements OnModuleInit {
     input?: ImportTemplateRequestDto,
     auth?: AuthContext | null,
   ): Promise<ImportGroupTemplateResponse> {
+    const cachedByServerName = new Map<
+      string,
+      {
+        tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+        toolCount: number;
+      } | null
+    >();
+
+    // Validate every bearer cache token before template synchronization creates
+    // groups or servers. Promise.all performs only Redis reads before this barrier.
+    if (input?.serverCacheTokens) {
+      const cachedEntries = await Promise.all(
+        Object.entries(input.serverCacheTokens).map(async ([serverName, cacheToken]) => {
+          const cached = await this.getCachedDiscovery(cacheToken, organizationId);
+          return [serverName, cached] as const;
+        }),
+      );
+      for (const [serverName, cached] of cachedEntries) {
+        cachedByServerName.set(serverName, cached);
+      }
+    }
+
+    const templateName = this.seedingService.getTemplateBySlug(slug)?.name ?? slug;
     const result: TemplateSyncResult = await this.seedingService.syncTemplate(
       slug,
       false,
       organizationId,
+      (executor, syncResult) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth ?? null, {
+          action: 'mcp_group.import_template',
+          resourceType: 'mcp_group',
+          resourceId: syncResult.groupId ?? null,
+          resourceName: templateName,
+          metadata: { slug, action: syncResult.action },
+        }),
     );
     const group = await this.getGroupBySlug(slug);
 
@@ -169,7 +201,7 @@ export class McpGroupsService implements OnModuleInit {
         if (cacheToken) {
           try {
             // Load tools from discovery cache (same logic as createServer in McpServersService)
-            const cached = await this.getCachedDiscovery(cacheToken);
+            const cached = cachedByServerName.get(server.name) ?? null;
             if (cached && cached.tools.length > 0) {
               this.logger.log(
                 `Loading ${cached.tools.length} tools for server '${server.name}' from cache`,
@@ -194,13 +226,15 @@ export class McpGroupsService implements OnModuleInit {
       }
     }
 
-    this.auditLogService.record(auth ?? null, {
-      action: 'mcp_group.import_template',
-      resourceType: 'mcp_group',
-      resourceId: group.id,
-      resourceName: group.name,
-      metadata: { slug, action: result.action },
-    });
+    if (result.action === 'skipped') {
+      await this.auditLogService.recordDurable(auth ?? null, {
+        action: 'mcp_group.import_template',
+        resourceType: 'mcp_group',
+        resourceId: group.id,
+        resourceName: group.name,
+        metadata: { slug, action: result.action },
+      });
+    }
 
     return {
       action: result.action,
@@ -216,23 +250,25 @@ export class McpGroupsService implements OnModuleInit {
       );
     }
 
-    const group = await this.repository.create({
-      slug: input.slug.trim(),
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      credentialContractName: input.credentialContractName.trim(),
-      credentialMapping: input.credentialMapping ?? null,
-      defaultDockerImage: input.defaultDockerImage?.trim() || null,
-      enabled: input.enabled ?? true,
-    });
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_group.create',
-      resourceType: 'mcp_group',
-      resourceId: group.id,
-      resourceName: group.name,
-      metadata: { slug: group.slug },
-    });
+    const group = await this.repository.create(
+      {
+        slug: input.slug.trim(),
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        credentialContractName: input.credentialContractName.trim(),
+        credentialMapping: input.credentialMapping ?? null,
+        defaultDockerImage: input.defaultDockerImage?.trim() || null,
+        enabled: input.enabled ?? true,
+      },
+      (executor, created) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_group.create',
+          resourceType: 'mcp_group',
+          resourceId: created.id,
+          resourceName: created.name,
+          metadata: { slug: created.slug },
+        }),
+    );
 
     return this.mapGroupToResponse(group);
   }
@@ -277,41 +313,33 @@ export class McpGroupsService implements OnModuleInit {
       return this.mapGroupToResponse(current);
     }
 
-    const group = await this.repository.update(id, updates);
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_group.update',
-      resourceType: 'mcp_group',
-      resourceId: group.id,
-      resourceName: group.name,
-      metadata: { slug: group.slug },
-    });
+    const group = await this.repository.update(id, updates, (executor, updated) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'mcp_group.update',
+        resourceType: 'mcp_group',
+        resourceId: updated.id,
+        resourceName: updated.name,
+        metadata: { slug: updated.slug },
+      }),
+    );
 
     return this.mapGroupToResponse(group);
   }
 
   async deleteGroup(auth: AuthContext | null, id: string): Promise<void> {
-    // Verify group exists and collect servers to clean up
+    // Verify the group before entering the destructive transaction so audit
+    // metadata can retain the human-readable identity.
     const group = await this.repository.findById(id);
-    const servers = await this.repository.findServersByGroup(id);
 
-    for (const server of servers) {
-      // Remove group relation first
-      await this.repository.removeServerFromGroup(id, server.id);
-      // Clear tools and delete the server itself
-      await this.mcpServersRepository.clearTools(server.id);
-      await this.mcpServersRepository.delete(server.id);
-    }
-
-    await this.repository.delete(id);
-
-    this.auditLogService.record(auth, {
-      action: 'mcp_group.delete',
-      resourceType: 'mcp_group',
-      resourceId: group.id,
-      resourceName: group.name,
-      metadata: { slug: group.slug, serverCount: servers.length },
-    });
+    await this.repository.delete(id, (executor, result) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'mcp_group.delete',
+        resourceType: 'mcp_group',
+        resourceId: group.id,
+        resourceName: group.name,
+        metadata: { slug: group.slug, serverCount: result.serverIds.length },
+      }),
+    );
   }
 
   // Group-Server relationship methods
@@ -325,36 +353,66 @@ export class McpGroupsService implements OnModuleInit {
   }
 
   async addServerToGroup(
+    auth: AuthContext | null,
     groupId: string,
     input: AddServerToGroupDto,
   ): Promise<McpGroupServerResponse[]> {
     // Verify group exists
-    await this.repository.findById(groupId);
+    const group = await this.repository.findById(groupId);
 
-    await this.repository.addServerToGroup(groupId, input.serverId, {
-      recommended: input.recommended,
-      defaultSelected: input.defaultSelected,
-    });
+    await this.repository.addServerToGroup(
+      groupId,
+      input.serverId,
+      {
+        recommended: input.recommended,
+        defaultSelected: input.defaultSelected,
+      },
+      (executor, relation) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_group.server_add',
+          resourceType: 'mcp_group',
+          resourceId: group.id,
+          resourceName: group.name,
+          metadata: {
+            serverId: relation.serverId,
+            recommended: relation.recommended,
+            defaultSelected: relation.defaultSelected,
+          },
+        }),
+    );
 
     // Return updated list of servers
     const servers = await this.repository.findServersByGroup(groupId);
     return servers.map((s) => this.mapGroupServerToResponse(s));
   }
 
-  async removeServerFromGroup(groupId: string, serverId: string): Promise<void> {
+  async removeServerFromGroup(
+    auth: AuthContext | null,
+    groupId: string,
+    serverId: string,
+  ): Promise<void> {
     // Verify group exists
-    await this.repository.findById(groupId);
+    const group = await this.repository.findById(groupId);
 
-    await this.repository.removeServerFromGroup(groupId, serverId);
+    await this.repository.removeServerFromGroup(groupId, serverId, (executor) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'mcp_group.server_remove',
+        resourceType: 'mcp_group',
+        resourceId: group.id,
+        resourceName: group.name,
+        metadata: { serverId },
+      }),
+    );
   }
 
   async updateServerInGroup(
+    auth: AuthContext | null,
     groupId: string,
     serverId: string,
     input: UpdateServerInGroupDto,
   ): Promise<McpGroupServerResponse[]> {
     // Verify group exists
-    await this.repository.findById(groupId);
+    const group = await this.repository.findById(groupId);
 
     const updates: { recommended?: boolean; defaultSelected?: boolean } = {};
     if (input.recommended !== undefined) {
@@ -365,7 +423,20 @@ export class McpGroupsService implements OnModuleInit {
     }
 
     if (Object.keys(updates).length > 0) {
-      await this.repository.updateServerMetadata(groupId, serverId, updates);
+      await this.repository.updateServerMetadata(groupId, serverId, updates, (executor, relation) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'mcp_group.server_update',
+          resourceType: 'mcp_group',
+          resourceId: group.id,
+          resourceName: group.name,
+          metadata: {
+            serverId: relation.serverId,
+            updatedFields: Object.keys(updates),
+            recommended: relation.recommended,
+            defaultSelected: relation.defaultSelected,
+          },
+        }),
+      );
     }
 
     // Return updated list of servers
@@ -394,7 +465,10 @@ export class McpGroupsService implements OnModuleInit {
    * Get cached discovery results from Redis
    * Shared with McpServersService to load tools from cache
    */
-  private async getCachedDiscovery(cacheToken: string): Promise<{
+  private async getCachedDiscovery(
+    cacheToken: string,
+    organizationId: string,
+  ): Promise<{
     tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
     toolCount: number;
   } | null> {
@@ -406,13 +480,26 @@ export class McpGroupsService implements OnModuleInit {
     if (!value) {
       return null;
     }
-    const cached = JSON.parse(value);
+    let cached: {
+      status?: string;
+      organizationId?: string;
+      tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
+      toolCount?: number;
+    };
+    try {
+      cached = JSON.parse(value) as typeof cached;
+    } catch {
+      throw new ForbiddenException('Discovery cache access denied');
+    }
+    if (cached.organizationId !== organizationId) {
+      throw new ForbiddenException('Discovery cache access denied');
+    }
     if (cached.status !== 'completed') {
       return null;
     }
     return {
-      tools: cached.tools,
-      toolCount: cached.toolCount,
+      tools: cached.tools ?? [],
+      toolCount: cached.toolCount ?? cached.tools?.length ?? 0,
     };
   }
 

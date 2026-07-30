@@ -94,7 +94,7 @@ export const NotificationDeliverySchema = z.object({
   channelId: z.string().uuid(),
   runId: z.string().nullable(),
   eventType: z.string(),
-  status: z.enum(['pending', 'sent', 'failed']),
+  status: z.enum(['pending', 'sending', 'sent', 'failed', 'unknown']),
   payload: z.record(z.string(), z.unknown()),
   errorMessage: z.string().nullable(),
   durationMs: z.number().nullable(),

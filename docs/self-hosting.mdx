@@ -1,0 +1,833 @@
+---
+title: 'Self-hosting'
+description: 'Operate Sentris Flow locally or as a hardened multi-user deployment'
+---
+
+Sentris Flow keeps its scanner, Docker, raw HTTP, MCP, and integration
+capabilities in both supported trust profiles. The profiles change who is
+trusted and which authority may cross a process boundary; they do not turn the
+platform into a reduced-function “safe mode.”
+
+## Choose the trust profile
+
+|                                | `trusted-local`                                           | `hardened`                                        |
+| ------------------------------ | --------------------------------------------------------- | ------------------------------------------------- |
+| Use when                       | One trusted administrator controls the host and workflows | Users or organizations do not trust one another   |
+| Authentication                 | Local admin or Clerk                                      | Clerk with an active organization                 |
+| Host stdio MCP                 | Off by default; explicit opt-in available                 | Rejected at startup                               |
+| Docker scanners                | Dedicated DIND daemon                                     | The same dedicated DIND topology                  |
+| Public scanner and HTTP egress | Available according to the component declaration          | Available according to the component declaration  |
+| Tenant ownership checks        | Enforced                                                  | Enforced; null-owned resources are not a fallback |
+
+`SENTRIS_TRUST_PROFILE` should always be explicit in a self-hosted environment.
+Production code defaults to `hardened` when the setting is absent, while the
+bundled all-in-one Compose file explicitly defaults to `trusted-local` so a
+single-admin installation remains practical.
+
+`trusted-local` is not an isolation boundary between mutually untrusted users.
+If another person can create workflows, configure MCP servers, or administer
+the host, use `hardened`.
+
+## Required configuration
+
+Keep deployment secrets outside the repository and pass an explicit env file to
+Compose. The exact 32-character master keys below can be generated as 16 random
+bytes encoded as hex; the session and service tokens can be longer.
+
+```dotenv
+SENTRIS_TAG=1.0.0
+SENTRIS_TRUST_PROFILE=trusted-local
+AUTH_PROVIDER=local
+
+ADMIN_USERNAME=sentris-admin
+ADMIN_PASSWORD=<unique-high-entropy-password>
+SESSION_SECRET=<random-session-secret>
+INTERNAL_SERVICE_TOKEN=<random-worker-service-token>
+SECRET_STORE_MASTER_KEY=<exactly-32-characters>
+INTEGRATION_STORE_MASTER_KEY=<exactly-32-characters>
+MCP_DOCKER_PROXY_TOKEN=<random-proxy-token>
+
+SENTRIS_PUBLIC_API_BASE_URL=https://sentris.example.net
+MCP_DISCOVERY_TRUSTED_LOCAL_STDIO=false
+```
+
+The production frontend image is built once. At container startup it writes a
+whitelisted public `runtime-config.js`; changing a `VITE_*` setting requires a
+container restart, not an image rebuild. These values are browser-visible and
+must never contain secrets.
+
+For the default same-origin proxy, leave `VITE_API_URL` empty. If the browser
+and API use separate origins, configure both sides:
+
+```dotenv
+VITE_API_URL=https://api.sentris.example.net
+CORS_ALLOWED_ORIGINS=https://sentris.example.net
+```
+
+`CORS_ALLOWED_ORIGINS` is a comma-separated exact origin list. Local session
+cookies support same-site HTTPS frontend/API origins; they are not an
+arbitrary cross-site authentication mechanism. Use Clerk bearer authentication
+for a genuinely cross-site hardened deployment. The bundled static Nginx
+policy permits HTTP(S)/WS(S) connections and HTTPS provider scripts, frames,
+and images because operator-selected runtime origins are not known when the
+generic image is built; `frame-ancestors 'none'` remains enforced.
+
+Server and browser PostHog analytics are opt-in at runtime. Server analytics is
+disabled unless both `POSTHOG_API_KEY` and `POSTHOG_HOST` are set. Browser
+analytics is disabled unless both public frontend values are set:
+
+```dotenv
+POSTHOG_API_KEY=
+POSTHOG_HOST=
+DISABLE_ANALYTICS=false
+
+VITE_PUBLIC_POSTHOG_KEY=
+VITE_PUBLIC_POSTHOG_HOST=
+VITE_DISABLE_ANALYTICS=false
+```
+
+Set `DISABLE_ANALYTICS=true` and `VITE_DISABLE_ANALYTICS=true` for explicit
+kill switches. Release images never embed an operator's PostHog configuration.
+
+`INTEGRATION_STORE_MASTER_KEY` is optional and otherwise falls back to
+`SECRET_STORE_MASTER_KEY`; a separate value limits the effect of one key being
+exposed. Do not replace either key on an existing deployment without a data
+re-encryption procedure: existing encrypted secrets or OAuth connections would
+become unreadable.
+
+For `hardened`, change the auth settings and provide the matching frontend
+configuration:
+
+```dotenv
+SENTRIS_TRUST_PROFILE=hardened
+AUTH_PROVIDER=clerk
+CLERK_SECRET_KEY=<clerk-secret-key>
+CLERK_PUBLISHABLE_KEY=<clerk-publishable-key>
+VITE_AUTH_PROVIDER=clerk
+VITE_CLERK_PUBLISHABLE_KEY=<clerk-publishable-key>
+MCP_DISCOVERY_TRUSTED_LOCAL_STDIO=false
+```
+
+The backend rejects `hardened` with local authentication. The worker rejects
+host stdio MCP under `hardened`. Unknown organization roles fail closed.
+
+## OAuth integration ownership
+
+Generic OAuth provider overrides, authorization states, and stored connections
+are scoped to the authenticated organization. A connection is additionally
+owned by the authenticated user. Provider-configuration cache keys include the
+organization, so one tenant's client ID or encrypted client secret cannot
+override another tenant's provider.
+
+`trusted-local` installations without an active organization use one explicit
+null-owned local namespace. This preserves the simple single-administrator
+experience; it is not a fallback used by `hardened`. The ownership migration
+leaves pre-existing null-owned provider configurations and connections in that
+namespace instead of guessing a tenant. After switching an existing deployment
+to `hardened`, reconfigure provider credentials and reconnect each integration
+inside the intended organization. Hardened requests do not discover or redeem
+the legacy null-owned rows.
+
+OAuth state redemption is bound to the state value, provider, user, and
+organization. Worker credential issuance also requires the internal service
+token plus authoritative `X-Organization-Id` and `X-Run-Id` headers. Before
+decrypting or refreshing a token, the backend verifies both the connection and
+workflow run belong to that organization. Missing and foreign ownership return
+the same not-found response. These checks preserve runtime integration
+capability while preventing a connection identifier from becoming a
+cross-tenant credential handle.
+
+## Optional Jira Cloud integration
+
+Create an OAuth 2.0 (3LO) app in the Atlassian developer console and register
+the externally reachable Sentris frontend callback URL. Then add all three
+settings to the Compose env file:
+
+```dotenv
+JIRA_CLIENT_ID=<atlassian-oauth-client-id>
+JIRA_CLIENT_SECRET=<atlassian-oauth-client-secret>
+JIRA_CALLBACK_URL=https://sentris.example.net/settings/ticketing/callback
+```
+
+Set all three values or omit all three. `JIRA_CALLBACK_URL` is authoritative:
+it must exactly match both the callback registered with Atlassian and the
+browser origin used to open Settings > Ticketing. This keeps authorization and
+token exchange redirect URIs consistent behind reverse proxies.
+
+The OAuth callback stores encrypted credentials and queues webhook registration
+atomically; it does not wait for Jira's webhook API. The connection response
+reports `webhookRegistration.status` as `unregistered`, `pending`,
+`registered`, or `dead`. During upgrade, an existing Jira connection that
+already has both a cloud ID and callback-path secret is atomically moved to
+`pending` with a deduplicated registration outbox event. An incomplete legacy
+connection remains `unregistered`; reconnect that account once after correcting
+its OAuth configuration.
+
+Registration is retried by the backend outbox. If it reaches `dead`, an
+organization administrator can inspect it with
+`GET /api/v1/admin/outbox/dead-letters` and requeue its event ID with
+`POST /api/v1/admin/outbox/dead-letters/{eventId}/requeue`. Reconnecting also
+creates a newer registration version; stale versions safely no-op. Cleanup of a
+duplicate or superseded Jira webhook is bounded and attempted after the active
+registration is durable. The backend first lists and reuses an exact
+callback/event/filter match, so a crash after Jira creates a webhook does not
+force a duplicate on retry. Listing is capped at ten 100-item pages and fails
+into retry, without creating, if Jira cannot return a complete page sequence.
+An ambiguous database response is resolved by rereading the exact
+tenant/version/ID winner, and the possible winner is never deleted on an
+unresolved response. Cleanup failures are logged; the residual callback is safe
+because inbound updates converge idempotently, and Jira expires dynamic
+webhooks. Cleanup availability therefore does not block ticket creation or
+status synchronization.
+
+Jira expires dynamic webhooks after 30 days. Sentris scans at backend startup
+and every six hours, queues at most 100 due renewals per tick once a webhook is
+20 days old, and continues full batches on later ticks. This leaves a ten-day
+retry window without an unbounded database scan. Multi-instance scanners use
+row locks with `SKIP LOCKED`; the version transition and deduplicated outbox
+event commit atomically. While the connection reports a pending renewal, its
+existing callback remains active. Renewal failures use the same visible
+dead-letter and administrator requeue workflow described above.
+
+The reverse proxy must expose
+`/api/v1/ticketing/jira/webhook/<connection-secret>` to Jira. The path secret
+authenticates the connection; Sentris additionally validates the delivery HMAC
+when Jira supplies one. On each status-change delivery, Sentris reads the
+issue's current status from Jira before applying it, so a delayed or retried
+webhook cannot roll findings back to the stale payload status.
+
+Before startup, render and inspect the effective configuration:
+
+```bash
+docker compose \
+  --env-file self-hosted.env \
+  -f docker/docker-compose.full.yml \
+  config
+```
+
+Do not publish PostgreSQL, MinIO, Redis, Redpanda, OpenSearch, Temporal, or the
+DIND Docker API to an untrusted network. Terminate TLS in a reverse proxy or
+load balancer in front of nginx. Set the public URL to the externally reachable
+HTTPS origin.
+
+## Start and verify
+
+```bash
+docker compose \
+  --env-file self-hosted.env \
+  -f docker/docker-compose.full.yml \
+  up -d --pull always --wait
+```
+
+Application liveness only proves that the process is running. Readiness proves
+that required dependencies are reachable:
+
+```bash
+curl -fsS https://sentris.example.net/health
+
+docker compose \
+  --env-file self-hosted.env \
+  -f docker/docker-compose.full.yml \
+  exec -T backend curl -fsS http://localhost:3211/health/ready
+
+docker compose \
+  --env-file self-hosted.env \
+  -f docker/docker-compose.full.yml \
+  exec -T worker curl -fsS http://localhost:9100/health/ready
+```
+
+Worker readiness covers Temporal, PostgreSQL, MinIO, Kafka, Docker through the
+mTLS DIND endpoint, Redis when configured, backend callback authentication, and
+maintenance and required-telemetry state. It returns 503 when a required
+dependency, maintenance pass, or telemetry durability path is unhealthy.
+`/health` remains process-only liveness so a temporary dependency outage does
+not cause a restart loop.
+
+The repository also includes a destructive clean-start release smoke:
+
+```bash
+SENTRIS_INSTANCE=7 \
+SENTRIS_ALLOW_PRODUCTION_COMPOSE_SMOKE=true \
+bun run smoke:production-compose
+```
+
+It uses a disposable Compose project, builds the production images, starts from
+empty volumes, checks readiness and Temporal, stops and recovers every
+dependency required by worker readiness, and—in `trusted-local`—stops
+OpenSearch, requires a findings request to fail closed, restores readiness, and
+runs `smoke:findings-opensearch`. It then hard-kills the worker while a
+purpose-built Docker workflow owns a managed child container and exchange
+workspace. The child may remain running or exit inside DIND; the proof tracks
+its exact ID and metadata while the outer worker service is stopped. After the
+replacement worker becomes ready, the smoke verifies startup reconciliation
+preserved those exact resources because the Temporal run is still active. It
+then waits for Temporal to create a distinct replacement attempt and retains
+that attempt's exact exchange ID from its validated container label, so a
+directory cannot disappear from the proof merely because its metadata was
+removed first. The smoke cancels the run and requires reconciliation to remove
+every exact-run container, volume, exchange directory, and metadata record. It
+also creates and migrates an instance-named lifecycle-only PostgreSQL database,
+proves no application consumer is connected to it, runs the durable side-effect
+smoke, and drops that database. It then runs the Docker/telemetry
+target-to-triage journey and removes the disposable volumes.
+
+The parent smoke configures `WORKER_ORPHAN_MIN_AGE_MS=0` and
+`WORKER_ORPHAN_INTERVAL_MS=1000` only for this proof. The nested
+`smoke:worker-crash-recovery` command refuses to run unless the running worker
+has those bounded test values, `SENTRIS_INSTANCE` and `COMPOSE_PROJECT_NAME`
+are explicit, an internal E2E token and API base URL target the disposable
+stack, and CI or the destructive opt-in is set.
+
+On the `trusted-local` leg, the parent smoke also runs
+`smoke:browser-target-journey`. That Playwright proof signs in through the real
+local-admin UI and exercises the target, scoped run, paginated history, asset
+filter/source-run, finding detail/triage, and rescan paths. It creates cheap
+deterministic history through a guarded backend-container maintenance helper so
+the pagination proof does not execute 51 scanners, then removes only its
+recorded fixture identities even when the browser journey fails. Playwright's
+Chromium binary is installed by release CI only for this leg; manual operators
+must install it explicitly and opt in to the destructive journey as documented
+in the release process.
+
+Release CI runs the parent smoke once per supported trust profile. Its hardened
+run uses the internal test identity and syntactically valid disposable Clerk
+keys, so it validates hardened startup and platform boundaries but does not
+replace a deployment's end-user sign-in through real Clerk. Keep that as an
+external/manual release gate against the intended Clerk instance and
+organization. Fixed production container names mean any other full or
+development stack using those names must be stopped first. Never point either
+command at the Compose project or volumes holding real data.
+
+For an already running multi-instance development stack, run the same strict
+critical journey without allowing unavailable services to skip:
+
+```bash
+SENTRIS_INSTANCE=7 bun run test:e2e:release
+```
+
+## Findings/OpenSearch acceptance smoke
+
+The `trusted-local` release Compose gate runs a real
+`smoke:findings-opensearch` child after dependency recovery and before the
+PostgreSQL lifecycle and API/browser journeys. The parent runner owns the
+OpenSearch outage: it stops the service, requires the backend findings endpoint
+to return HTTP 503 instead of an empty success, restarts OpenSearch, and waits
+for backend readiness before the child can mutate fixtures.
+
+The child verifies the installed final pipeline, observation template,
+per-organization first-use resources, exact contract classification, and
+drift detection. It compares more than 10,000 live observations with
+authoritative PostgreSQL triage across filters, totals, charts, scope summaries,
+exports, reconciliation, and watermarks. It also holds a point-in-time cursor
+for 125 seconds before backward/forward navigation and walks more than one page
+of composite organization discovery across a simulated repository restart.
+For deterministic ownership, the trusted-local parent pauses only the automatic
+reconciliation scheduler while the harness continues to invoke reconciliation
+directly. Tenant provisioning follows request aborts and post-body disconnects,
+uses bounded OpenSearch attempts, and has an 80-second server-side overall
+bound. The release child uses an 88-second endpoint deadline and waits through
+an 85-second server-completion horizon after an ambiguous failure, still within
+its 90-second work-drain reserve.
+
+The harness is destructive by design and refuses to infer its instance,
+Compose project, database, API, token, or OpenSearch target. The parent release
+smoke supplies those values for its empty `sentris` database and disposable
+Compose volumes. Directly invoking `bun run smoke:findings-opensearch` is an
+advanced child-only check: it does not perform the required outage/recovery
+proof, and it still requires
+`SENTRIS_ALLOW_FINDINGS_OPENSEARCH_SMOKE=true` and
+`SENTRIS_FINDINGS_OPENSEARCH_DISPOSABLE_PROJECT=true`. Cleanup uses only exact
+generated IDs and resource names, verifies zero PostgreSQL residual rows and
+absent OpenSearch fixture resources, and never wildcard-deletes indexes. The
+global supported pipeline and template remain installed as deployment
+bootstrap resources: cleanup restores and reads back their exact captured
+bodies. Every fixture reconciliation control index is deleted by exact name,
+and PostgreSQL must produce two consecutive exact zero passes separated by a
+delay before cleanup succeeds.
+
+The child budgets 960 seconds for work, 90 seconds for cooperative drain, 180
+seconds for cleanup, 60 seconds for cleanup drain, and 30 seconds for close
+inside its 1,350-second standalone bound. Container and parent bounds remain at
+1,470 and 1,500 seconds. Cleanup starts only after cancelled work settles; a
+non-cooperative phase fails visibly rather than racing cleanup against ongoing
+mutations. Drift restoration is limited to 55 seconds, preserving room inside
+the fixed 90-second drain for a bounded PostgreSQL connect/query tail and the
+mandatory 5-second advisory unlock settlement.
+
+## Capability and egress controls
+
+Component definitions declare their runner and network requirement:
+
+- scanners and raw HTTP/MCP components that need the public network use bridge
+  egress;
+- components that do not need a network use `network: none`;
+- Docker execution uses the dedicated DIND daemon, not the host Docker socket;
+- the worker receives only DIND client certificates and a run-scoped shared I/O
+  directory;
+- host stdio MCP needs both `trusted-local` and
+  `MCP_DISCOVERY_TRUSTED_LOCAL_STDIO=true`;
+- hosted MCP discovery uses authenticated remote or container execution, not an
+  arbitrary worker-host command.
+
+The `docker-control` network is intentionally egress-capable. Making it
+internal would break DNS, HTTP probes, repository scanners, image pulls, and
+other legitimate security automation. Apply deployment-level DNS, firewall, or
+proxy policy when your environment needs tighter egress, but allow the
+destinations required by the workflows you intend to run. Test scanner
+capability after changing that policy.
+
+The platform does not decide whether you are authorized to scan a target.
+Operators remain responsible for target authorization and for the credentials
+they connect.
+
+### Capability regression matrix
+
+These are supported product paths, not optional examples. The release gate and
+the cited focused suites must keep them available:
+
+| Capability              | `trusted-local` path                                                                           | `hardened` path                                                      | Regression evidence                                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Raw HTTP workflows      | Inline `http.request` component with the workflow HTTP client                                  | Same component and request contract                                  | `worker/src/components/core/__tests__/http-request.test.ts`                                                                                          |
+| Public-network scanners | Docker scanners such as HTTPX, Nuclei, Subfinder, and Prowler declare bridge egress            | Same scanners through the isolated DIND topology                     | `worker/src/components/security/__tests__/security-component-catalog.spec.ts` and scanner suites                                                     |
+| Offline Docker tools    | Checkov, YARA, and terminal fixtures explicitly declare `network: none`                        | Same no-egress runner policy                                         | Security component catalog plus production Docker round-trip                                                                                         |
+| Custom MCP over HTTP    | Authenticated HTTP server registration and discovery                                           | Same, with tenant ownership and redirect/SSRF checks                 | `worker/src/components/core/__tests__/mcp-library.integration.test.ts` and `worker/src/temporal/activities/__tests__/mcp-discovery.activity.test.ts` |
+| Container MCP           | Group/custom servers run behind the authenticated worker-owned Docker proxy                    | Same DIND-backed proxy; no worker-host command execution             | `worker/src/components/core/__tests__/mcp-docker-proxy.test.ts`                                                                                      |
+| Host stdio MCP          | Available only with `MCP_DISCOVERY_TRUSTED_LOCAL_STDIO=true`; child environment is allowlisted | Configuration is rejected                                            | `worker/src/components/core/__tests__/mcp-stdio-host-proxy.test.ts` and worker environment validation                                                |
+| OAuth integrations      | Authenticated local administrator owns each connection                                         | Authenticated Clerk user and active organization own each connection | `backend/src/integrations/__tests__/integrations.http.spec.ts` and service/repository ownership suites                                               |
+| Local administration    | Explicit production `trusted-local` profile with non-default local credentials                 | Not available; external organization auth is required                | backend/worker environment validation and shared trust-profile tests                                                                                 |
+
+Every Docker security component must declare `bridge` or `none` explicitly.
+There is no implicit network default in the supported scanner catalog. This
+keeps egress decisions reviewable and prevents a hardening change from silently
+disabling a scanner.
+
+## Checked upgrades
+
+Database startup uses the checked migration ledger in `backend/migrations`.
+Production startup does not run an uncontrolled schema push.
+
+Before selecting a new image:
+
+```bash
+bun --cwd=backend run migration:check
+bun --cwd=backend run migration:typecheck
+```
+
+Then:
+
+1. Back up PostgreSQL, MinIO, OpenSearch, and any logs or event history your
+   retention policy requires.
+2. Pin `SENTRIS_TAG` to the exact release; do not use `latest` for a controlled
+   upgrade.
+3. Pull the images and review the rendered Compose configuration.
+4. Start the backend. It acquires the migration advisory lock and applies the
+   immutable migration prefix once.
+
+When upgrading from daily findings indexes, migrate each organization only
+after the PostgreSQL migration succeeds. The first command is a dry run:
+
+```bash
+OPENSEARCH_URL=http://localhost:9200 \
+bun run migrate:findings-index -- --organization <organization-id>
+
+OPENSEARCH_URL=http://localhost:9200 \
+bun run migrate:findings-index -- --organization <organization-id> --apply
+```
+
+The OpenSearch migration preserves its daily source indexes. Keep them and the
+coordinated backup until list totals, schema coverage, triage filters, and a
+representative export have been verified.
+
+5. Verify backend and worker readiness, then run a representative workflow.
+6. Retain the backup until the target-to-triage journey and your integrations
+   have passed.
+
+The repository release gate tests an empty database, adoption of the previous
+supported baseline, current-schema parity, and concurrent startup. A changed
+checksum, unknown ledger row, gap, duplicate ordering, or schema drift stops
+startup.
+
+### Rollback
+
+Migrations are forward-only. Rolling the application image back is safe only
+when that release explicitly supports the current schema. Otherwise stop
+writes and restore the coordinated pre-upgrade backup. Do not delete migration
+ledger rows or manually reverse DDL: that creates a schema the startup guard
+cannot trust.
+
+## PostgreSQL lifecycle durability smoke
+
+The release Compose gate runs a backend-only lifecycle smoke after dependency
+recovery and before the API/browser journeys. It verifies the checked migration
+ledger, then uses the production PostgreSQL repositories and services to prove:
+
+- mutation and audit-outbox atomicity, idempotent audit projection replay, and a
+  tenant-scoped CSV export of more than 10,000 rows with bounded keyset pages,
+  formula neutralization, and response backpressure;
+- notification claim → emit → complete, retry rescheduling, bounded
+  dead-lettering, explicit audited resend/requeue, post-restart completion, and
+  retention boundaries; and
+- Jira reservation/replay, restart-safe status projection, ambiguous-create
+  reconciliation, explicit dead-event revival, and tenant isolation.
+
+The script refuses to infer an instance, requires the script-specific database
+override, and accepts only the exact database name
+`sentris_lifecycle_smoke_i<SENTRIS_INSTANCE>`. It verifies the checked schema
+before mutation, prints a redacted target, applies bounded PostgreSQL
+statement/lock/query/idle-transaction waits, deletes only exact generated
+identities, and requires every post-cleanup residual count to be zero.
+
+The production Compose runner creates and migrates this database with a
+one-off backend child while the real backend remains connected to `sentris`; it
+also checks that no consumer session is attached before the harness starts.
+This isolation is what makes the production global retention query safe to
+exercise. Slack and Jira remain deterministic in-process transports, so no
+real backend consumer can race the fake adapters or make an external call for a
+smoke event.
+
+For a manual run, first create and migrate a dedicated database that no
+application process uses:
+
+```bash
+createdb \
+  --host 127.0.0.1 \
+  --port 5433 \
+  --username sentris \
+  sentris_lifecycle_smoke_i7
+
+DRIZZLE_DATABASE_URL=postgresql://sentris:sentris@127.0.0.1:5433/sentris_lifecycle_smoke_i7 \
+bun --cwd=backend run migration:run
+
+SENTRIS_INSTANCE=7 \
+SENTRIS_ALLOW_LIFECYCLE_DURABILITY_SMOKE=true \
+LIFECYCLE_DURABILITY_SMOKE_DATABASE_URL=postgresql://sentris:sentris@127.0.0.1:5433/sentris_lifecycle_smoke_i7 \
+bun run smoke:lifecycle-durability
+
+dropdb \
+  --host 127.0.0.1 \
+  --port 5433 \
+  --username sentris \
+  --force \
+  sentris_lifecycle_smoke_i7
+```
+
+Do not point the harness at `sentris`, `sentris_instance_7`, a retained
+database, or a lifecycle database for another instance. A process or host kill
+can leave the dedicated database behind, but cannot pass the harness guard
+against an application database; drop the exact instance-named smoke database
+before retrying.
+
+Slack and Jira are deterministic in-process transports in this smoke. They
+prove Sentris transaction, replay, ambiguous-outcome, and reconciliation
+semantics without external accounts or network calls. They do not prove a real
+provider's credentials, DNS/TLS path, rate limits, webhook policy, or service
+availability; keep provider-specific staging checks when those integrations are
+part of a deployment.
+
+## Recover durable side effects
+
+Administrators can inspect tenant-scoped failures with
+`GET /api/v1/admin/outbox/dead-letters?limit=50`. Each item includes its event
+type, aggregate, attempt count, last error, and retained payload. Fix the
+reported dependency, configuration, or credential problem before replaying the
+event.
+
+For an idempotent internal event or a definitely rejected external request,
+`POST /api/v1/admin/outbox/dead-letters/{eventId}/requeue` returns the event to
+`pending`. Requeue one event, verify that it completes, and only then recover a
+larger batch. Repeated dead-lettering means the underlying fault is still
+present; do not reset rows or attempts directly in PostgreSQL.
+
+### Telemetry replay and retention
+
+Workflow traces, agent traces, node I/O, and logs normally publish directly to
+the instance-scoped Kafka topics with no PostgreSQL write on the producer path.
+Node-I/O payloads are marked as spilled only when an object-storage reference
+exists. If storage is unavailable but the event can still be transported, the
+payload remains inline; an explicit spill marker without a reference is
+rejected and retried instead of being projected as an empty observation.
+After Kafka retries are exhausted, the worker stores the exact serialized
+message as a `telemetry.kafka.publish.v1` outbox event. Once Kafka recovers, the
+backend topic allowlist prevents arbitrary publication. Consumer logical-event
+receipts suppress ambiguous direct-plus-fallback duplicates only within
+`TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS`. Inspect older dead letters before
+requeueing them: after their receipt expires, recovery is intentionally
+at-least-once and may reproject an old logical event.
+
+The worker retains asynchronous trace, log, and terminal publication promises
+until each activity or legacy execution exits. A graceful shutdown waits for
+all still-retained publications before closing Kafka producers. `SIGKILL`, host
+power loss, and equivalent hard termination cannot run this drain; investigate
+the affected run if termination occurred after a scanner side effect.
+
+Backend ingest consumers reconnect without a process restart. Startup and
+runtime failures mark readiness failed before cleanup and create a new
+generation after bounded exponential backoff with jitter. Missing heartbeats
+also trigger recovery when KafkaJS cannot emit its normal crash event. Cleanup
+is bounded: after that deadline a replacement in the same group may overlap an
+unreachable generation's final in-flight handler. Ingest receipts and stable
+Loki identities suppress this availability-first overlap within the receipt
+window under at-least-once delivery. Loki pushes default to a 10-second
+deadline; override it with
+`LOKI_PUSH_TIMEOUT_MS`. `/health/ready` remains 503 until all four enabled
+streams are connected, subscribed, and running. When ingest services are
+explicitly disabled, Kafka brokers are optional, those consumers are not
+readiness requirements, and pending telemetry replay rows remain retryable.
+`ENABLE_INGEST_SERVICES=false` disables Kafka consumers only; PostgreSQL remains
+required for the API. `SKIP_INGEST_SERVICES=true` is reserved for test and
+OpenAPI-generation processes that intentionally use mocked persistence.
+
+The bundled Redpanda configuration retains Kafka messages for seven days.
+Receipt retention must be longer than the maximum Kafka replay window:
+
+```dotenv
+TELEMETRY_KAFKA_REPLAY_RETENTION_DAYS=7
+TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS=30
+```
+
+The receipt window must be at least eight days and strictly greater than the
+declared replay window. Match the replay value to any custom broker retention
+policy. Cleanup deletes only completed ingest receipts and completed fallback
+publications, in bounded batches. Pending, processing, and dead rows are never
+removed by this cleanup. A fallback row can contain raw trace or log content, so
+include PostgreSQL in the same evidence-retention and access policy as Loki and
+Kafka.
+
+Malformed Kafka payloads are retained as `telemetry.kafka.poison.v1` dead
+records with a hash, byte length, and validation error. They are evidence of a
+producer/contract problem, not dispatchable outbox work; correct the producer
+before replaying the source data. Null values on the required telemetry topics
+are retained the same way, with their exact topic, partition, and offset and a
+zero-byte payload.
+
+If Kafka and the PostgreSQL fallback fail together, worker readiness records a
+sticky required-telemetry error. Treat the resulting 503 as a stop-new-work
+signal and restore both dependencies. Sentris intentionally does not rerun an
+already completed, potentially side-effecting scanner solely to recreate the
+lost observation. This preserves the workflow result but means that particular
+telemetry event may be absent; record and investigate the gap before returning
+the worker to service.
+
+### Telemetry durability release proof
+
+The destructive `trusted-local` production Compose gate tests the complete
+recovery path in six ordered phases: `direct`, `fallback`, `await-dead`,
+`recover`, `poison`, and `cleanup`. It first proves healthy duplicate
+publication projects exactly once, then stops the backend and Redpanda so exact
+trace and log messages enter PostgreSQL fallback. It restarts the backend while
+Kafka is still unavailable to observe a bounded dead letter, restores Redpanda,
+force-recreates the backend, and requires a changed backend container
+generation before proving replay, explicit dead-letter recovery, receipts,
+Loki visibility, and duplicate suppression.
+
+The poison phase retains malformed event and log payloads as exact hashed dead
+evidence without projecting them. Those poison records diagnose a producer
+contract failure and are not generic outbox work to requeue. Cleanup stops the
+backend, deletes only the suite's PostgreSQL identities, requires two
+zero-residual passes, and then relies on the parent smoke's immediate
+`down -v --remove-orphans` to remove its disposable Kafka and Loki volumes.
+Consequently the trusted-local release smoke rejects
+`SENTRIS_PRODUCTION_SMOKE_KEEP=true`.
+
+This is a live projection proof for **events and logs** only. Readiness is
+checked across events, logs, agent traces, and node I/O, but **agent-trace and
+node-I/O** receive static shared-mechanism coverage in this gate rather than
+live projection coverage. Do not interpret it as a live four-stream proof.
+The nested telemetry wrapper has a 1,920-second hard bound; the full
+trusted-local parent has a 10,420-second worst-case bound inside the
+180-minute CI job. Its default 300-second image-build and service-readiness
+budgets are independent, so a cold build cannot consume the health-wait window.
+
+### Ambiguous external deliveries
+
+Do not generically requeue an ambiguous external side effect. A notification or
+ticket service may have accepted a request even when its response never reached
+Sentris:
+
+- For a notification delivery with `unknown` status, first check the receiving
+  service. Use the explicit resend action in the channel delivery history only
+  when a duplicate is acceptable; the resend is separately audited. When the
+  new delivery is confirmed `sent`, Sentris atomically marks the original
+  delivery resolved and requeues its tenant-owned dead outbox anchor. The next
+  outbox pass reruns every lifecycle listener but skips this webhook through
+  the original `sent` receipt. A failed or still-ambiguous manual delivery does
+  not requeue the anchor.
+- For an unresolved Jira creation, verify Jira by the finding and reserved
+  intent. Then call
+  `POST /api/v1/ticketing/reconciliation/{findingTriageId}` with either
+  `{"action":"attach","issueKey":"SEC-42"}` for the issue that exists, or
+  `{"action":"clear_and_retry","confirmedNoIssueExists":true}` after confirming
+  no issue was created. The latter queues the durable predecessor; it does not
+  perform an untracked synchronous create.
+
+Both endpoints require an authenticated organization administrator. Tenant
+scoping is applied in the database update, so an event or reconciliation ID
+from another organization is reported as not found.
+
+### Notification delivery history and retention
+
+Channel tests create ordinary delivery-history rows and use the same
+`pending` → `sending` → terminal claim path as lifecycle notifications. A
+process loss during `sending` is not automatically replayed because the remote
+webhook may have accepted it. For ten minutes the attempt is treated as active;
+after that, a separate explicit operator resend can atomically mark the stale
+attempt `unknown` and create a new delivery identity. Manual-resend recovery
+uses the child delivery's send-start timestamp (or that child's creation time
+for legacy rows), so an old parent reservation cannot make a freshly claimed
+child appear stale.
+
+Resolved history is retained for 90 days by default:
+
+```dotenv
+NOTIFICATION_DELIVERY_RETENTION_DAYS=90
+```
+
+The accepted range is 1–3650 days. Cleanup runs at backend startup and hourly,
+deleting at most ten 1,000-row batches per pass. It deletes only old `sent` or
+`failed` rows that have no outbox anchor or whose anchor is `completed`.
+`pending`, `sending`, `unknown`, and deliveries tied to pending, processing, or
+dead outbox work remain available for recovery. Deleting a notification channel
+intentionally cascades to its delivery history immediately; export or retain
+that evidence before deleting the channel when policy requires it.
+
+## Backup and restore
+
+At minimum, protect these state owners:
+
+| State                                                 | Owner                          | Restore importance                                                            |
+| ----------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Workflows, runs, triage, audit, outbox, configuration | PostgreSQL `sentris` database  | Required                                                                      |
+| Temporal workflow history                             | PostgreSQL `temporal` database | Required for in-flight durable workflows                                      |
+| Files and artifacts                                   | MinIO                          | Required when workflows reference stored objects                              |
+| Finding/search documents and triage projection        | OpenSearch                     | Required unless you have separately retained and can replay every observation |
+| Logs                                                  | Loki                           | According to your evidence-retention policy                                   |
+| Kafka retained events                                 | Redpanda                       | According to replay and retention requirements                                |
+| Terminal stream cache                                 | Redis                          | Normally disposable after archival                                            |
+| Scanner image/cache and run exchange                  | DIND volumes                   | Disposable; reconcile rather than restore                                     |
+
+Use database-native backups (`pg_dump`/`pg_restore`) and OpenSearch snapshot
+repositories when available. Use `mc mirror` or storage-native snapshots for
+MinIO. If you snapshot Docker volumes instead, quiesce application writes and
+take a coordinated snapshot so PostgreSQL rows, Temporal history, object data,
+and search state refer to the same point in time.
+
+Store the env file and encryption keys in a separate secrets backup. A data
+backup without the matching master keys cannot decrypt stored secrets or OAuth
+tokens.
+
+Test restoration into an isolated Compose project:
+
+1. Restore both PostgreSQL databases and object/search state.
+2. Start the exact image version recorded with the backup.
+3. Check the migration ledger before allowing an upgrade.
+4. Verify readiness.
+5. Open a historical run and download one artifact.
+6. Query findings and triage state.
+7. Start and cancel a disposable Docker workflow, then verify resource cleanup.
+
+## Performance gate
+
+The release gate benchmarks two clean, different full 40-character commit SHAs
+sequentially on one host. It uses the candidate revision's collector for both
+stacks, the same explicit instance, `trusted-local` profile, sample count, and
+deterministic fixture shape, and a fresh disposable Compose project/volume set
+for each leg. Both source roots and the artifact directory must be distinct;
+the artifact directory must also be outside both Docker build contexts.
+
+```bash
+SENTRIS_ALLOW_RELEASE_PERFORMANCE_PAIR=true \
+SENTRIS_INSTANCE=7 \
+SENTRIS_TRUST_PROFILE=trusted-local \
+RELEASE_BENCHMARK_ADMIN_USERNAME=<admin-user> \
+RELEASE_BENCHMARK_ADMIN_PASSWORD=<admin-password> \
+RELEASE_BENCHMARK_INTERNAL_TOKEN=<internal-token> \
+bun run performance:pair -- \
+  --baseline-root ../sentris-baseline \
+  --baseline-revision <baseline-40-character-sha> \
+  --candidate-root ../sentris-candidate \
+  --candidate-revision <candidate-40-character-sha> \
+  --output-dir ../sentris-performance-evidence
+```
+
+This command is destructive. It verifies both Git `HEAD` values, rejects
+tracked or untracked source changes, pre-cleans and post-cleans the exact
+pair-owned Compose projects with `down -v --remove-orphans`, and refuses to
+continue when process-tree settlement cannot be proved. It retains
+`baseline.json` and `candidate.json` before comparison, including when the
+budget fails.
+
+Release artifacts use schema version 2. They contain raw samples plus
+median/p95 metrics, an ISO recording time, exact revision, instance, trust
+profile, and a privacy-preserving SHA-256 host fingerprint. The comparator
+rejects a different host fingerprint, instance, trust profile, sample count,
+unit, direction, duplicate/same revision, or a candidate not recorded after
+its baseline.
+
+The enforced release comparison has a fixed 10% budget across API request
+median/p95, workflow duration median/p95 and throughput, warmed Docker component
+startup median/p95, and the targets → target detail → scope-filtered findings
+browser journey median/p95. It cannot be widened with a release-workflow input.
+An evidenced exception therefore requires an explicit code/release decision,
+not an ad hoc command-line flag.
+
+For diagnostics outside the release gate, collect one already-running stack
+and compare two artifacts directly:
+
+```bash
+SENTRIS_INSTANCE=7 \
+SENTRIS_TRUST_PROFILE=trusted-local \
+RELEASE_BENCHMARK_REVISION=<revision> \
+RELEASE_BENCHMARK_ADMIN_USERNAME=<admin-user> \
+RELEASE_BENCHMARK_ADMIN_PASSWORD=<admin-password> \
+RELEASE_BENCHMARK_INTERNAL_TOKEN=<internal-token> \
+RELEASE_BENCHMARK_OUTPUT=../sentris-performance-evidence/candidate.json \
+bun run performance:collect
+
+bun run performance:compare -- \
+  --baseline ../sentris-performance-evidence/baseline.json \
+  --candidate ../sentris-performance-evidence/candidate.json \
+  --budget 10
+```
+
+Tagged releases automatically resolve the previous reachable release tag to
+an exact ancestor commit. Manual releases require the baseline ref explicitly.
+CI uploads both JSON artifacts for 30 days even when collection or comparison
+fails. A dirty local goal worktree is not valid revision evidence; benchmark a
+clean exact candidate checkout after its changes have been committed.
+
+## Accepted residual risks
+
+- Trusted-local administrators intentionally retain broad workflow and optional
+  host-stdio authority.
+- DIND is privileged. Its API is isolated from the host and other application
+  services, but a compromised worker can control the dedicated daemon.
+- The worker is part of the trusted computing base and holds the deployment-wide
+  internal service token, database access, and the secret-store master key.
+  Components and child processes do not receive those credentials; a compromise
+  of the worker process itself requires deployment credential rotation and host
+  incident response.
+- Public-network scanners are intentionally able to make outbound requests.
+- OpenSearch and several bundled infrastructure services rely on single-host
+  network isolation in the all-in-one profile. Use private networks,
+  infrastructure credentials, and managed TLS/authentication when separating
+  them across hosts.
+- Triage and other read projections are eventually consistent. The UI reports a
+  degraded or unavailable state rather than presenting dependency failure as
+  zero findings.
+- An external notification or ticket endpoint can accept a request while the
+  connection result is unknown. Ambiguous deliveries are retained for operator
+  review instead of being automatically duplicated.
+- Cleanup is bounded and fail-closed when Temporal state is unknown. Old
+  resources may be retained during an outage and are removed by a later healthy
+  reconciliation pass.
+
+These are deliberate capability and availability tradeoffs, not claims of
+maximal isolation. Revisit them when deployment assumptions change.
+
+## Architecture references
+
+- [System architecture](/architecture)
+- [Trust profiles ADR](https://github.com/zebbern/Sentris/blob/main/docs/architecture/adr-self-hosted-trust-profiles.md)
+- [Worker capability ADR](https://github.com/zebbern/Sentris/blob/main/docs/architecture/adr-worker-capability-and-credential-boundaries.md)
+- [Findings ownership ADR](https://github.com/zebbern/Sentris/blob/main/docs/architecture/adr-findings-ownership-and-projection.md)
+- [Docker/DIND topology ADR](https://github.com/zebbern/Sentris/blob/main/docs/architecture/adr-supported-docker-dind-topology.md)

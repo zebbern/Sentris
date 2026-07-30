@@ -114,6 +114,17 @@ async function bootstrap() {
       'X-Real-IP',
       'X-Forwarded-For',
       'X-Forwarded-Proto',
+      'X-Request-Id',
+    ],
+    exposedHeaders: [
+      'Content-Disposition',
+      'X-Sentris-Availability',
+      'X-Sentris-Projection-Health-Reason',
+      'X-Sentris-Projection-Reconciled-Through',
+      'X-Sentris-Schema-Canonical',
+      'X-Sentris-Schema-Legacy',
+      'X-Sentris-Schema-Invalid',
+      'X-Request-Id',
     ],
   });
   registerRootHealthRoutes(app);
@@ -139,6 +150,7 @@ async function bootstrap() {
   }
 
   await app.listen(port, host);
+  Logger.log(`Trust profile: ${appCfg.trustProfile}`, 'Bootstrap');
   Logger.log(`🚀 Sentris backend listening on http://${host}:${port}`, 'Bootstrap');
 }
 

@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, vi } from 'bun:test';
 import type { INestApplication } from '@nestjs/common';
 import type { HealthCheckResult } from '@nestjs/terminus';
 
-import { HealthController } from '../health.controller';
+import { HealthController, InternalHealthController } from '../health.controller';
 import { HealthProbeService } from '../health-probe.service';
 import { registerRootHealthRoutes } from '../health-routes';
 
@@ -111,5 +111,14 @@ describe('health routes', () => {
 
     expect(controller.liveness()).toEqual(liveness);
     await expect(controller.readiness()).resolves.toEqual(readiness);
+  });
+
+  it('exposes an authenticated internal worker probe without running dependency checks', () => {
+    const { probes, liveness } = createProbeService();
+    const readinessSpy = vi.spyOn(probes, 'readiness');
+    const controller = new InternalHealthController(probes as unknown as HealthProbeService);
+
+    expect(controller.workerReady()).toEqual(liveness);
+    expect(readinessSpy).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,7 @@ import { realModuleExports } from '@/test/restore-mocks';
 // that doesn't call normalizeRole.
 mock.module('@/utils/auth', () => realModuleExports('@/utils/auth'));
 
-import { normalizeRole, hasAdminRole } from '../auth';
+import { normalizeRole, hasAdminRole, toSupportedRole } from '../auth';
 
 describe('normalizeRole', () => {
   it('uppercases standard roles', () => {
@@ -65,5 +65,14 @@ describe('hasAdminRole', () => {
   it('is case-insensitive', () => {
     expect(hasAdminRole(['admin'])).toBe(true);
     expect(hasAdminRole(['Admin'])).toBe(true);
+  });
+});
+
+describe('toSupportedRole', () => {
+  it('accepts only known roles after Clerk prefix normalization', () => {
+    expect(toSupportedRole('org:admin')).toBe('ADMIN');
+    expect(toSupportedRole('org_member')).toBe('MEMBER');
+    expect(toSupportedRole('owner')).toBeNull();
+    expect(toSupportedRole(undefined)).toBeNull();
   });
 });

@@ -21,6 +21,7 @@ import { ListFilesQueryDto, ListFilesQuerySchema } from './dto/files.dto';
 import { FileIdParamDto, FileIdParamSchema } from './dto/file-param.dto';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import type { AuthContext } from '../auth/types';
+import { AuditLogService } from '../audit/audit-log.service';
 
 /** Minimal multer file shape from NestJS file upload interceptors */
 interface MulterFile {
@@ -34,7 +35,10 @@ interface MulterFile {
 @ApiTags('files')
 @Controller('files')
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   @Post('upload')
   @ApiOperation({ summary: 'Upload a file' })
@@ -71,6 +75,16 @@ export class FilesController {
       throw new BadRequestException('No file provided');
     }
 
+    await this.auditLogService.recordDurable(auth, {
+      action: 'file.upload',
+      resourceType: 'file',
+      resourceName: file.originalname,
+      metadata: {
+        mimeType: file.mimetype,
+        size: file.size,
+        phase: 'requested',
+      },
+    });
     return this.filesService.uploadFile(auth, file.originalname, file.buffer, file.mimetype);
   }
 
@@ -129,6 +143,14 @@ export class FilesController {
     @Param(new ZodValidationPipe(FileIdParamSchema)) params: FileIdParamDto,
     @Res({ passthrough: true }) res: Response,
   ) {
+    const fileMetadata = await this.filesService.getFileById(auth, params.id);
+    await this.auditLogService.recordDurable(auth, {
+      action: 'file.download',
+      resourceType: 'file',
+      resourceId: fileMetadata.id,
+      resourceName: fileMetadata.fileName,
+      metadata: { phase: 'requested' },
+    });
     const { buffer, file } = await this.filesService.downloadFile(auth, params.id);
 
     res.set({
@@ -149,6 +171,14 @@ export class FilesController {
     @CurrentAuth() auth: AuthContext | null,
     @Param(new ZodValidationPipe(FileIdParamSchema)) params: FileIdParamDto,
   ) {
+    const file = await this.filesService.getFileById(auth, params.id);
+    await this.auditLogService.recordDurable(auth, {
+      action: 'file.delete',
+      resourceType: 'file',
+      resourceId: file.id,
+      resourceName: file.fileName,
+      metadata: { phase: 'requested' },
+    });
     await this.filesService.deleteFile(auth, params.id);
     return { status: 'deleted', id: params.id };
   }

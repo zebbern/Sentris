@@ -474,6 +474,7 @@ const definition = defineComponent({
         agentRunId,
       });
     } finally {
+      await agentStream.settleWithoutChangingExecution();
       await volume.cleanup();
     }
   },

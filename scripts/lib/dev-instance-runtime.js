@@ -384,7 +384,11 @@ function applyInstanceEnvValues(content, app, instance) {
       `http://localhost:${getInstanceBackendPort(instance)}/api/v1`,
     );
   } else if (app === 'frontend') {
-    next = setEnvFileValue(next, 'VITE_API_URL', `http://localhost:${getInstanceBackendPort(instance)}`);
+    next = setEnvFileValue(
+      next,
+      'VITE_API_URL',
+      `http://localhost:${getInstanceBackendPort(instance)}`,
+    );
   } else {
     throw new Error(`Unknown app: ${app}`);
   }
@@ -406,7 +410,9 @@ function ensureInstanceEnvFiles(options = {}) {
     const sourcePath = created ? getInstanceEnvSource(root, app) : undefined;
 
     if (created && !sourcePath) {
-      throw new Error(`Missing source env file for ${app}: expected ${app}/.env or ${app}/.env.example`);
+      throw new Error(
+        `Missing source env file for ${app}: expected ${app}/.env or ${app}/.env.example`,
+      );
     }
 
     const baseContent = created
@@ -495,9 +501,8 @@ function readE2eEnvFile(options = {}) {
 
 function createE2eTestCommand(options = {}) {
   const instance = validateInstance(options.instance ?? 0, 'instance');
-  const targets = Array.isArray(options.targets) && options.targets.length > 0
-    ? options.targets
-    : ['e2e-tests'];
+  const targets =
+    Array.isArray(options.targets) && options.targets.length > 0 ? options.targets : ['e2e-tests'];
   const extraArgs = Array.isArray(options.extraArgs) ? options.extraArgs : [];
   const env = {
     SENTRIS_INSTANCE: String(instance),
@@ -521,6 +526,7 @@ function createRootTestPlan(options = {}) {
   return {
     cleanupPaths: ['worker/dist'],
     commands: [
+      { command: 'bun', args: ['test', 'scripts/__tests__'] },
       { command: 'bun', args: ['test', 'packages'] },
       { command: 'bun', args: ['test', 'backend'] },
       { command: 'bun', args: ['test', 'worker'] },

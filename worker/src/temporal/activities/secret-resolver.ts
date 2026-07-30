@@ -28,10 +28,12 @@ export async function resolveSecretInputOverrides(
     secrets: ISecretsService | undefined;
     component: ComponentDefinition;
     resolvedParams: Record<string, unknown>;
+    organizationId?: string | null;
   },
 ): Promise<void> {
   const { secrets, component, resolvedParams } = options;
-  if (!secrets) {
+  const scopedSecrets = secrets?.forOrganization(options.organizationId ?? null);
+  if (!scopedSecrets) {
     return;
   }
 
@@ -69,7 +71,7 @@ export async function resolveSecretInputOverrides(
     // This is a secret reference, resolve it
     try {
       workflowDiagnosticLog(`[Activity] Resolving secret reference for input '${key}'...`);
-      const resolved = await secrets.get(value);
+      const resolved = await scopedSecrets.get(value);
       if (resolved?.value) {
         inputs[key] = resolved.value;
         workflowDiagnosticLog(
@@ -100,10 +102,12 @@ export async function resolveLlmProviderModelOverrides(
   options: {
     secrets: ISecretsService | undefined;
     componentId: string;
+    organizationId?: string | null;
   },
 ): Promise<void> {
   const { secrets, componentId } = options;
-  if (!secrets || !AGENT_MODEL_COMPONENT_IDS.has(componentId)) {
+  const scopedSecrets = secrets?.forOrganization(options.organizationId ?? null);
+  if (!scopedSecrets || !AGENT_MODEL_COMPONENT_IDS.has(componentId)) {
     return;
   }
 
@@ -129,7 +133,7 @@ export async function resolveLlmProviderModelOverrides(
       workflowDiagnosticLog(
         '[Activity] Resolving LLM provider oauthTokenSecretId for model input...',
       );
-      const resolved = await secrets.get(oauthSecretId.trim());
+      const resolved = await scopedSecrets.get(oauthSecretId.trim());
       if (resolved?.value) {
         inputs.model = {
           ...model,
@@ -159,7 +163,7 @@ export async function resolveLlmProviderModelOverrides(
 
   try {
     workflowDiagnosticLog('[Activity] Resolving LLM provider apiKeySecretId for model input...');
-    const resolved = await secrets.get(secretId.trim());
+    const resolved = await scopedSecrets.get(secretId.trim());
     if (resolved?.value) {
       inputs.model = {
         ...model,
@@ -189,10 +193,12 @@ export async function resolveSecretParams(
   options: {
     secrets: ISecretsService | undefined;
     component: ComponentDefinition;
+    organizationId?: string | null;
   },
 ): Promise<void> {
   const { secrets, component } = options;
-  if (!secrets || !component.parameters) {
+  const scopedSecrets = secrets?.forOrganization(options.organizationId ?? null);
+  if (!scopedSecrets || !component.parameters) {
     return;
   }
 
@@ -215,7 +221,7 @@ export async function resolveSecretParams(
 
     try {
       workflowDiagnosticLog(`[Activity] Resolving secret reference for param '${key}'...`);
-      const resolved = await secrets.get(value);
+      const resolved = await scopedSecrets.get(value);
       if (resolved?.value) {
         params[key] = resolved.value;
         workflowDiagnosticLog(

@@ -1,2 +1,5 @@
 # Force LF line endings for shell scripts (prevents CRLF issues in Linux containers)
 *.sh text eol=lf
+backend/migrations/*.sql text eol=lf
+backend/migrations/manifest.json text eol=lf
+backend/migrations/meta/*.json text eol=lf

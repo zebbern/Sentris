@@ -10,6 +10,11 @@ export interface FrontendTestRun {
   isolated: boolean;
 }
 
+export interface ExplicitFrontendTestPlan {
+  passthroughArgs: string[];
+  runs: FrontendTestRun[];
+}
+
 export function collectTestFiles(dir: string): string[] {
   const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -112,4 +117,17 @@ export function planFrontendTestRuns(
 
   flushBatch();
   return runs;
+}
+
+export function planExplicitFrontendTestRuns(
+  args: string[],
+  isIsolatedFile: (file: string) => boolean,
+): ExplicitFrontendTestPlan | null {
+  const files = args.filter((arg) => TEST_FILE_PATTERN.test(path.basename(arg)));
+  if (files.length === 0) return null;
+
+  return {
+    passthroughArgs: args.filter((arg) => !TEST_FILE_PATTERN.test(path.basename(arg))),
+    runs: planFrontendTestRuns(files, isIsolatedFile),
+  };
 }

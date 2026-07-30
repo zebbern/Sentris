@@ -24,6 +24,9 @@ describe('file-loader component', () => {
 
     // Mock storage service
     const mockStorage: IFileStorageService = {
+      forOrganization() {
+        return this;
+      },
       downloadFile: async (fileId: string) => {
         expect(fileId).toBe(testFileId);
         return {
@@ -97,6 +100,9 @@ describe('file-loader component', () => {
     const binaryData = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG header
 
     const mockStorage: IFileStorageService = {
+      forOrganization() {
+        return this;
+      },
       downloadFile: async (fileId: string) => ({
         buffer: binaryData,
         metadata: {

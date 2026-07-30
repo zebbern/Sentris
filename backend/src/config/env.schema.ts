@@ -4,6 +4,7 @@ import {
   temporalConfigSchema,
   secretStoreKeySchema,
   integrationStoreKeySchema,
+  resolveSentrisTrustProfile,
   stringToBoolean,
 } from '@sentris/shared';
 
@@ -17,6 +18,37 @@ const authProviderSchema = z
   .default('local')
   .transform((v) => v.trim().toLowerCase())
   .pipe(z.enum(['local', 'clerk']).catch('local'));
+
+const blankStringToUndefined = (value: unknown): unknown =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
+
+const optionalTrimmedString = z.preprocess(
+  blankStringToUndefined,
+  z.string().trim().min(1).optional(),
+);
+
+const optionalSecretString = z.preprocess(blankStringToUndefined, z.string().min(1).optional());
+
+const optionalHttpUrl = z.preprocess(
+  blankStringToUndefined,
+  z
+    .string()
+    .trim()
+    .url()
+    .refine(
+      (value) => {
+        try {
+          return ['http:', 'https:'].includes(new URL(value).protocol);
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: 'URL must use http or https',
+      },
+    )
+    .optional(),
+);
 
 export const backendEnvSchema = z
   .object({
@@ -33,6 +65,15 @@ export const backendEnvSchema = z
     HOST: z.string().optional().default('0.0.0.0'),
     SKIP_INGEST_SERVICES: stringToBoolean(false),
     ENABLE_INGEST_SERVICES: stringToBoolean(true),
+    TELEMETRY_KAFKA_REPLAY_RETENTION_DAYS: z.coerce.number().int().min(1).optional().default(7),
+    TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS: z.coerce.number().int().min(8).optional().default(30),
+    NOTIFICATION_DELIVERY_RETENTION_DAYS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(3650)
+      .optional()
+      .default(90),
 
     // --- Auth ---
     AUTH_PROVIDER: authProviderSchema,
@@ -40,8 +81,8 @@ export const backendEnvSchema = z
     CLERK_PUBLISHABLE_KEY: z.string().optional(),
     AUTH_LOCAL_ALLOW_UNAUTHENTICATED: stringToBoolean(true),
     AUTH_LOCAL_API_KEY: z.string().optional().default(''),
-    ADMIN_USERNAME: z.string().optional().default('admin'),
-    ADMIN_PASSWORD: z.string().optional().default('admin'),
+    ADMIN_USERNAME: optionalTrimmedString,
+    ADMIN_PASSWORD: optionalSecretString,
 
     // --- Optional services ---
     REDIS_URL: z.string().optional(),
@@ -53,12 +94,20 @@ export const backendEnvSchema = z
     OPENSEARCH_USERNAME: z.string().optional(),
     OPENSEARCH_PASSWORD: z.string().optional(),
     OPENSEARCH_DASHBOARDS_URL: z.string().optional().default(''),
+    OPENSEARCH_TENANT_FETCH_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(100)
+      .max(10_000)
+      .optional()
+      .default(5_000),
 
     // --- Loki ---
     LOKI_URL: z.string().optional(),
     LOKI_TENANT_ID: z.string().optional().default(''),
     LOKI_USERNAME: z.string().optional().default(''),
     LOKI_PASSWORD: z.string().optional().default(''),
+    LOKI_PUSH_TIMEOUT_MS: z.coerce.number().int().positive().optional().default(10_000),
 
     // --- MinIO ---
     MINIO_ROOT_USER: z.string().optional(),
@@ -71,6 +120,11 @@ export const backendEnvSchema = z
     // --- Zoom OAuth ---
     ZOOM_OAUTH_CLIENT_ID: z.string().optional(),
     ZOOM_OAUTH_CLIENT_SECRET: z.string().optional(),
+
+    // --- Jira OAuth ---
+    JIRA_CLIENT_ID: optionalTrimmedString,
+    JIRA_CLIENT_SECRET: optionalSecretString,
+    JIRA_CALLBACK_URL: optionalHttpUrl,
 
     // --- Platform ---
     PLATFORM_API_URL: z.string().optional().default(''),
@@ -97,19 +151,65 @@ export const backendEnvSchema = z
 
     // --- Runtime ---
     NODE_ENV: z.string().optional().default('development'),
+    SENTRIS_TRUST_PROFILE: z.string().optional(),
+    FINDINGS_RECONCILIATION_SCHEDULE_ENABLED: stringToBoolean(true),
   })
   .merge(temporalConfigSchema)
   .superRefine((data, ctx) => {
-    // Match the runtime guard in node-io.module.ts / trace.module.ts:
-    //   ingestEnabled = ENABLE_INGEST_SERVICES !== false && SKIP_INGEST_SERVICES !== true
-    const ingestRequired = data.ENABLE_INGEST_SERVICES && !data.SKIP_INGEST_SERVICES;
-    if (ingestRequired) {
+    if (data.TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS <= data.TELEMETRY_KAFKA_REPLAY_RETENTION_DAYS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS'],
+        message:
+          'TELEMETRY_KAFKA_RECEIPT_RETENTION_DAYS must exceed TELEMETRY_KAFKA_REPLAY_RETENTION_DAYS',
+      });
+    }
+
+    let trustProfile: ReturnType<typeof resolveSentrisTrustProfile> | undefined;
+    try {
+      trustProfile = resolveSentrisTrustProfile(data);
+    } catch (error: unknown) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SENTRIS_TRUST_PROFILE'],
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    if (trustProfile === 'hardened' && data.AUTH_PROVIDER !== 'clerk') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTH_PROVIDER'],
+        message: 'AUTH_PROVIDER=clerk is required when SENTRIS_TRUST_PROFILE=hardened',
+      });
+    }
+
+    if (data.NODE_ENV === 'production' && data.AUTH_PROVIDER === 'local') {
+      if (!data.ADMIN_USERNAME) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ADMIN_USERNAME'],
+          message: 'ADMIN_USERNAME is required for local authentication in production',
+        });
+      }
+      if (!data.ADMIN_PASSWORD) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ADMIN_PASSWORD'],
+          message: 'ADMIN_PASSWORD is required for local authentication in production',
+        });
+      }
+    }
+
+    // SKIP_INGEST_SERVICES is the explicit test/OpenAPI mode that replaces
+    // persistence with a recursive mock. Disabling Kafka ingest alone keeps
+    // the rest of the API backed by PostgreSQL.
+    if (!data.SKIP_INGEST_SERVICES) {
       if (!data.DATABASE_URL) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['DATABASE_URL'],
-          message:
-            'DATABASE_URL is required (set SKIP_INGEST_SERVICES=true or ENABLE_INGEST_SERVICES=false to skip)',
+          message: 'DATABASE_URL is required (set SKIP_INGEST_SERVICES=true to skip)',
         });
       } else {
         const parsed = databaseUrlSchema.safeParse(data.DATABASE_URL);
@@ -119,7 +219,10 @@ export const backendEnvSchema = z
           }
         }
       }
+    }
 
+    const ingestRequired = data.ENABLE_INGEST_SERVICES && !data.SKIP_INGEST_SERVICES;
+    if (ingestRequired) {
       if (!data.LOG_KAFKA_BROKERS) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -147,6 +250,30 @@ export const backendEnvSchema = z
         });
       }
     }
-  });
+
+    const jiraOAuthConfigured = Boolean(
+      data.JIRA_CLIENT_ID || data.JIRA_CLIENT_SECRET || data.JIRA_CALLBACK_URL,
+    );
+    if (jiraOAuthConfigured) {
+      const requiredJiraSettings = [
+        ['JIRA_CLIENT_ID', data.JIRA_CLIENT_ID],
+        ['JIRA_CLIENT_SECRET', data.JIRA_CLIENT_SECRET],
+        ['JIRA_CALLBACK_URL', data.JIRA_CALLBACK_URL],
+      ] as const;
+      for (const [setting, value] of requiredJiraSettings) {
+        if (!value) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [setting],
+            message: `${setting} is required when Jira OAuth is configured`,
+          });
+        }
+      }
+    }
+  })
+  .transform((data) => ({
+    ...data,
+    SENTRIS_TRUST_PROFILE: resolveSentrisTrustProfile(data),
+  }));
 
 export type BackendEnvConfig = z.infer<typeof backendEnvSchema>;

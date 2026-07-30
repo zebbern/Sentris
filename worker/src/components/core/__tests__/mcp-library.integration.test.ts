@@ -8,7 +8,7 @@ const mockStartMcpDockerServer = vi.fn(async () => ({
 }));
 const mockStartMcpStdioHostProxy = vi.fn(async () => ({
   endpoint: 'http://localhost:3000/mcp',
-  containerId: 'host-mcp-proxy-123',
+  proxyId: 'host-mcp-proxy-123',
 }));
 const mockStopMcpStdioHostProxy = vi.fn(async () => true);
 
@@ -17,6 +17,7 @@ vi.mock('../mcp-runtime', () => ({
 }));
 
 vi.mock('../mcp-stdio-host-proxy', () => ({
+  MCP_STDIO_HOST_PROXY_HOST: '127.0.0.1',
   MCP_STDIO_HOST_PROXY_ID_PREFIX: 'host-mcp-proxy-',
   isMcpStdioHostProxyId: (id: string) => id.startsWith('host-mcp-proxy-'),
   startMcpStdioHostProxy: mockStartMcpStdioHostProxy,
@@ -365,7 +366,7 @@ describe('MCP Library Integration Tests', () => {
         .mockRejectedValueOnce(new Error('host proxy failed to start'))
         .mockResolvedValueOnce({
           endpoint: 'http://localhost:3000/mcp',
-          containerId: 'host-mcp-proxy-456',
+          proxyId: 'host-mcp-proxy-456',
         });
 
       const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');

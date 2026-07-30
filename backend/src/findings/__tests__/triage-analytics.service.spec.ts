@@ -196,7 +196,7 @@ describe('TriageAnalyticsService', () => {
 
       const result = await service.getMttr(AUTH, '30d');
 
-      expect(result.severities).toHaveLength(5); // All 5 severities represented
+      expect(result.severities).toHaveLength(6); // All canonical severities represented
       const critical = result.severities.find((s) => s.severity === 'critical');
       expect(critical).toBeDefined();
       expect(critical!.mttrSeconds).toBe(3601); // Rounded
@@ -212,7 +212,7 @@ describe('TriageAnalyticsService', () => {
 
       const result = await service.getMttr(AUTH, '30d');
 
-      expect(result.severities).toHaveLength(5);
+      expect(result.severities).toHaveLength(6);
       for (const sev of result.severities) {
         expect(sev.mttrSeconds).toBeNull();
         expect(sev.resolvedCount).toBe(0);
@@ -232,6 +232,7 @@ describe('TriageAnalyticsService', () => {
       expect(severityNames).toContain('medium');
       expect(severityNames).toContain('low');
       expect(severityNames).toContain('info');
+      expect(severityNames).toContain('none');
     });
 
     it('throws ForbiddenException without organization context', async () => {
@@ -254,7 +255,7 @@ describe('TriageAnalyticsService', () => {
 
       const result = await service.getSlaCompliance(AUTH, '30d');
 
-      expect(result.severities).toHaveLength(5);
+      expect(result.severities).toHaveLength(6);
 
       const critical = result.severities.find((s) => s.severity === 'critical');
       expect(critical!.totalWithSla).toBe(10);

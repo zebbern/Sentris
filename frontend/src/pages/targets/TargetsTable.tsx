@@ -56,7 +56,7 @@ export function TargetsTable({
                 <TableHead className="text-xs uppercase">Name</TableHead>
                 <TableHead className="text-xs uppercase">Scope</TableHead>
                 <TableHead className="text-xs uppercase whitespace-nowrap">Updated</TableHead>
-                <TableHead className="text-right w-[100px] text-xs uppercase">Actions</TableHead>
+                <TableHead className="text-right w-[132px] text-xs uppercase">Actions</TableHead>
               </TableRow>
             </TableHeader>
           )}

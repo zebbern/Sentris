@@ -77,7 +77,13 @@ describe('Logic/Script Component', () => {
 
   it('gates sandbox success diagnostics behind component debug logging', async () => {
     const previousDebugFlag = process.env.SENTRIS_DEBUG_COMPONENTS;
+    const previousInternalToken = process.env.INTERNAL_SERVICE_TOKEN;
+    const previousDatabaseUrl = process.env.DATABASE_URL;
+    const previousMasterKey = process.env.SECRET_STORE_MASTER_KEY;
     delete process.env.SENTRIS_DEBUG_COMPONENTS;
+    process.env.INTERNAL_SERVICE_TOKEN = 'worker-internal-token';
+    process.env.DATABASE_URL = 'postgresql://worker-only';
+    process.env.SECRET_STORE_MASTER_KEY = 'worker-master-key';
 
     const runSpy = vi.spyOn(sdk, 'runComponentWithRunner').mockResolvedValue({ sum: 3 });
 
@@ -115,6 +121,21 @@ describe('Logic/Script Component', () => {
         delete process.env.SENTRIS_DEBUG_COMPONENTS;
       } else {
         process.env.SENTRIS_DEBUG_COMPONENTS = previousDebugFlag;
+      }
+      if (previousInternalToken === undefined) {
+        delete process.env.INTERNAL_SERVICE_TOKEN;
+      } else {
+        process.env.INTERNAL_SERVICE_TOKEN = previousInternalToken;
+      }
+      if (previousDatabaseUrl === undefined) {
+        delete process.env.DATABASE_URL;
+      } else {
+        process.env.DATABASE_URL = previousDatabaseUrl;
+      }
+      if (previousMasterKey === undefined) {
+        delete process.env.SECRET_STORE_MASTER_KEY;
+      } else {
+        process.env.SECRET_STORE_MASTER_KEY = previousMasterKey;
       }
     }
   });

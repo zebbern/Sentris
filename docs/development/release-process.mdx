@@ -1,6 +1,6 @@
 ---
-title: "Release Process"
-description: "Docker image releases and npm package versioning"
+title: 'Release Process'
+description: 'Docker image releases and npm package versioning'
 ---
 
 This document describes the release process for Sentris Flow, including Docker image releases and npm package versioning.
@@ -13,12 +13,232 @@ This document describes the release process for Sentris Flow, including Docker i
 
 When you push a git tag matching the pattern `v*.*.*` (e.g., `v1.0.0`, `v1.2.3`), the GitHub Actions workflow automatically:
 
-1. **Builds** all three Docker images (backend, worker, frontend)
-2. **Tags** images with:
+1. **Runs the full readiness gate** on the tagged commit: lint, typecheck,
+   unit and release-harness tests, tenant-boundary tests, application builds,
+   generated API drift, checked migrations, and production Compose smoke under
+   both `trusted-local` and `hardened`, plus the enforced performance pair.
+2. **Builds** all three Docker images (backend, worker, frontend)
+3. **Tags** images with:
    - Version tag: `ghcr.io/zebbern/sentris-{service}:{version}`
    - Latest tag: `ghcr.io/zebbern/sentris-{service}:latest`
-3. **Pushes** images to GitHub Container Registry (GHCR)
-4. **Creates** a GitHub release with changelog
+4. **Pushes** images to GitHub Container Registry (GHCR)
+5. **Creates** a GitHub release with changelog
+
+The release workflow does not publish images, create a GitHub release, or
+update the version service unless the full readiness gate succeeds. Manual
+workflow dispatch uses the same gate.
+
+### Performance release gate
+
+Before readiness starts, a tagged release resolves the previous reachable
+release tag to an exact ancestor commit. A manual release requires a baseline
+tag or commit explicitly. The reusable CI workflow then checks out the
+candidate and a detached baseline worktree and requires both to be clean,
+different full 40-character commit SHAs.
+
+`performance:pair` builds the two production Compose stacks sequentially on the
+same runner, with one explicit instance, `trusted-local`, one sample count, the
+candidate collector, fresh pair-owned volumes, and artifacts outside both
+source trees. It records a hashed host fingerprint and rejects incomparable
+hosts, timestamps, revisions, profiles, units, directions, or sample counts.
+CI uploads every artifact that was produced for 30 days; when the comparison
+itself fails, both completed artifacts remain available.
+
+The release comparison uses a fixed 10% regression budget across all nine API,
+workflow, throughput, Docker-component, and real-browser metrics. There is no
+manual workflow input that widens the budget. The job has a 210-minute hard
+bound; image or GitHub Release publication cannot start until it passes.
+
+### Real-browser release proof
+
+The `trusted-local` production-smoke leg includes a real-browser target journey
+after the API/Temporal critical journey. Playwright drives a real local-admin
+login and proves target list → target detail, a scoped zero-input workflow run,
+more than 50 history rows with Load More, run detail, asset type filtering and
+source-run navigation, a scope-filtered finding deep link and triage change,
+and rescan navigation with the target scope preserved.
+
+The harness uses the internal API and a guarded database maintenance helper
+only to create deterministic disposable identities and remove those exact
+identities in `finally`. Browser-visible behavior is asserted through the UI;
+fixture calls are not substitutes for those assertions. The maintenance helper
+runs inside the backend container, requires an explicit script-specific
+production-Compose database target, reports that target before mutation, and
+uses parameterized writes.
+
+Playwright is a development dependency. Release CI installs its Chromium binary
+only for the `trusted-local` matrix leg. For a manual run against an isolated,
+already-running production Compose stack:
+
+```bash
+bunx playwright install chromium
+SENTRIS_INSTANCE=7 \
+SENTRIS_TRUST_PROFILE=trusted-local \
+SENTRIS_ALLOW_PRODUCTION_BROWSER_JOURNEY=true \
+SENTRIS_BROWSER_BASE_URL=http://127.0.0.1 \
+ADMIN_USERNAME=<disposable-local-admin> \
+ADMIN_PASSWORD=<disposable-local-password> \
+INTERNAL_SERVICE_TOKEN=<matching-compose-token> \
+COMPOSE_PROJECT_NAME=<isolated-compose-project> \
+bun run smoke:browser-target-journey
+```
+
+Never point this destructive fixture harness at retained data. Its target,
+workflow, runs, assets, findings, and triage records are deliberately
+disposable.
+
+The `hardened` production-smoke leg still proves hardened startup and internal
+platform boundaries with disposable Clerk-shaped keys; those keys cannot prove
+an end-user sign-in. Before publishing for a Clerk deployment, keep a separate
+external/manual gate that signs in through real Clerk, selects the intended
+organization, and repeats a representative target-to-triage journey.
+
+### Findings/OpenSearch release proof
+
+The `trusted-local` production-smoke leg owns the destructive
+`smoke:findings-opensearch` child. Before starting that child, the parent stops
+OpenSearch and requires a real findings request through the backend to return
+HTTP 503 rather than a successful empty result. It then restarts OpenSearch,
+waits for container and backend readiness to recover, and invokes the child
+inside the backend container with explicit instance, Compose project, API,
+OpenSearch, internal-token, and PostgreSQL targets.
+
+The child applies and reads back the supported ingest pipeline and observation
+template, provisions security-disabled tenants through the production API, and
+indexes a compatibility corpus covering canonical, legacy, invalid, forged-ID,
+timestamp, evidence, and source shapes. It mutates and restores each pipeline,
+template, mapping, and final-pipeline setting invariant independently. A
+separate corpus of more than 10,000 observations and authoritative triage rows
+must agree across list totals, combined filters, statistics, scope summaries,
+charts, complete export, reconciliation state, and OpenSearch watermarks. The
+same run proves multi-page tenant discovery, restart-safe discovery cursors,
+case/whitespace-distinct tenant keys, and a 125-second hold before revisiting
+earlier pages on the same point-in-time snapshot.
+
+The trusted-local parent sets
+`FINDINGS_RECONCILIATION_SCHEDULE_ENABLED=false` so the release fixture has no
+race with the production scheduler; the harness still invokes the same
+reconciliation methods directly. Hardened smoke leaves the validated switch
+enabled. Tenant first-use requests have bounded OpenSearch attempts and an
+80-second server-side provisioning bound that also follows request aborts and
+post-body socket disconnects. The child gives that endpoint 88 seconds and,
+after an ambiguous client failure, does not settle its phase until the
+85-second server-completion horizon has passed; this remains inside the
+90-second work-drain reserve.
+
+This is intentionally a `trusted-local` proof because the bundled production
+Compose profile runs OpenSearch without the Security plugin. It does not reduce
+the capability of the `hardened` profile or substitute for a deployment-specific
+OpenSearch Security integration check. The child refuses an inferred instance
+or target and requires either CI or
+`SENTRIS_ALLOW_FINDINGS_OPENSEARCH_SMOKE=true` plus
+`SENTRIS_FINDINGS_OPENSEARCH_DISPOSABLE_PROJECT=true`. Its exact generated
+documents, indexes, per-tenant templates, audit/outbox rows, triage rows, runs,
+scope, and workflow are removed and verified in `finally`; the supported global
+pipeline and template are deployment bootstrap resources, so cleanup restores
+their exact captured bodies and reads them back before success. Every
+organization's reconciliation control index is ledgered and removed by exact
+name. PostgreSQL cleanup requires two consecutive exact zero passes separated
+by a delay so a late fire-and-forget audit/outbox write cannot escape the
+proof.
+The parent command is the release proof because it also owns outage injection
+and recovery; `smoke:findings-opensearch` alone runs only the live acceptance
+child.
+
+The child reserves 960 seconds for acceptance work, 90 seconds for cooperative
+work drain, 180 seconds for exact cleanup, 60 seconds for cleanup drain, and 30
+seconds for client close inside a 1,350-second standalone bound. The container
+wrapper escalates at 1,470 seconds and the parent process step has a
+1,500-second hard bound. A phase must settle after cancellation before cleanup
+starts; if it does not, the harness reports cleanup as unsafe instead of racing
+still-running mutations. Drift restoration has its own 55-second recovery
+scope; a 10-second PostgreSQL connect, 15-second in-flight query, and 5-second
+settled advisory unlock still fit inside the fixed 90-second work-drain bound.
+
+### PostgreSQL lifecycle release proof
+
+Both production-smoke trust-profile legs run
+`smoke:lifecycle-durability` inside the backend container after dependency
+failure/recovery. The parent runner derives the exact disposable database name
+`sentris_lifecycle_smoke_i<SENTRIS_INSTANCE>`, creates it in the isolated
+PostgreSQL container, applies checked migrations with a one-off backend child,
+and requires zero other sessions before starting the harness. The long-running
+backend remains connected to the normal `sentris` application database and
+never consumes lifecycle-smoke outbox rows. The harness independently rejects
+any target whose database name or script-specific override does not match the
+selected instance.
+
+It exercises the production audit, notification, outbox, retention, ticketing,
+and Jira reconciliation services over real PostgreSQL. Slack and Jira calls use
+deterministic in-process transports, so the gate proves local transaction,
+replay, restart, ambiguity, and tenant semantics without external accounts. It
+does not replace a provider staging check for real credentials, network/TLS,
+rate limits, or provider availability.
+
+Cleanup first deletes the harness's exact generated identities and verifies
+zero residual rows, then the parent drops the dedicated database. The drop is
+also attempted from the parent runner's `finally` path, including when the
+stack is retained for debugging. Never override the lifecycle database URL in
+the production Compose smoke.
+
+### Telemetry durability release proof
+
+The `trusted-local` production-smoke leg runs a six-phase telemetry durability
+proof after managed workflow resources have been reconciled:
+
+1. `direct` publishes duplicate trace and log fixtures through healthy Kafka
+   and requires exactly one event and log projection with no PostgreSQL
+   fallback row.
+2. `fallback` stops the backend and Redpanda, then publishes exact fixtures
+   through worker-side PostgreSQL fallback.
+3. `await-dead` restarts the backend while Kafka remains unavailable and proves
+   one bounded fixture becomes an inspectable dead letter while the replay
+   fixtures remain unprojected.
+4. `recover` restores Redpanda, force-recreates the backend, requires a changed
+   backend container generation and full readiness, then proves fallback
+   replay, explicit dead-letter recovery, receipts, APIs, Loki, and duplicate
+   suppression.
+5. `poison` sends malformed event and log payloads and requires exact hashed
+   dead evidence without projection. Poison records are evidence-only contract
+   failures, not generic outbox work to requeue.
+6. `cleanup` first stops the backend, deletes the exact PostgreSQL fixtures, and
+   requires two zero-residual passes. The parent immediately follows with
+   `down -v --remove-orphans`, which removes the disposable Kafka and Loki
+   volumes.
+
+The live projection scope is deliberately limited to **events and logs**.
+Backend readiness still gates all four enabled consumers. Static tests cover
+agent-trace and node-I/O through the shared mechanism; this release proof must
+not be reported as a live four-stream projection test.
+
+The wrapper owns one generated suite ID and start timestamp across all phases,
+pins every target to the exact production Compose project, rejects retained
+stacks, and has a 1,920-second hard process bound. Cleanup-unsafe process-tree
+settlement propagates a reserved failure code so the parent suppresses unsafe
+follow-on work.
+
+Every child command has a hard process deadline: the parent requests TERM five
+seconds before the advertised bound, requests forceful process-tree termination
+one second before it, then unreferences any non-closing child handle and rejects
+at the bound even if the child never reports closure. Container-side migration,
+lifecycle, findings, telemetry, and PostgreSQL utility
+deadlines also escalate from TERM to KILL. Lifecycle PostgreSQL sessions set
+connection, statement, query, idle-transaction, and lock timeouts. With the
+default 300-second initial Compose wait, image building and service readiness
+run as separate commands with independent hard bounds. The image build receives
+the configured 300-second profile bound; the startup command independently
+retains Compose's full 300-second health wait plus 60 seconds of wrapper
+headroom. Operators can raise both configured bounds with
+`SENTRIS_PRODUCTION_SMOKE_WAIT_SECONDS` on slower builders. The smoke scales the
+successful one-shot `opensearch-init` service to zero during that long-running
+readiness wait, then runs the initializer in the foreground and propagates its
+exit status. The sum of sequential command bounds, the nginx probe, a
+worst-case repeated lifecycle-database cleanup, and a worst-case repeated
+OpenSearch restart/readiness recovery is 10,420 seconds for `trusted-local` and
+5,800 seconds for `hardened`. The CI job timeout is 180
+minutes, leaving setup, Chromium-install, and final cleanup headroom without
+shortening the findings, lifecycle, telemetry, or dependency
+failure/readiness proofs.
 
 ### Creating a Release
 
@@ -41,6 +261,8 @@ You can also trigger a release manually via GitHub Actions UI:
 1. Go to Actions → Release workflow
 2. Click "Run workflow"
 3. Enter the version tag (e.g., `v1.0.0`)
+4. Enter the previous release tag or exact ancestor commit used as the
+   performance baseline
 
 ---
 
@@ -48,10 +270,10 @@ You can also trigger a release manually via GitHub Actions UI:
 
 Images are tagged as:
 
-| Service | Image |
-|---------|-------|
-| Backend | `ghcr.io/zebbern/sentris-backend:{version}` |
-| Worker | `ghcr.io/zebbern/sentris-worker:{version}` |
+| Service  | Image                                        |
+| -------- | -------------------------------------------- |
+| Backend  | `ghcr.io/zebbern/sentris-backend:{version}`  |
+| Worker   | `ghcr.io/zebbern/sentris-worker:{version}`   |
 | Frontend | `ghcr.io/zebbern/sentris-frontend:{version}` |
 
 All images also have a `:latest` tag.
@@ -74,17 +296,18 @@ docker pull ghcr.io/zebbern/sentris-backend:latest
 
 This is a **monorepo** with workspace packages:
 
-| Package | Version | Published |
-|---------|---------|-----------|
-| `@sentris/shared` | v0.1.0 | No |
-| `@sentris/component-sdk` | v0.1.0 | No (private) |
-| `@sentris/backend-client` | v0.1.0 | No |
-| `@sentris/flow-backend` | v0.1.0 | No |
-| `@sentris/worker` | v0.1.0 | No (private) |
-| `@sentris/flow-frontend` | v1.0.0 | No |
+| Package                   | Version | Published    |
+| ------------------------- | ------- | ------------ |
+| `@sentris/shared`         | v0.1.0  | No           |
+| `@sentris/component-sdk`  | v0.1.0  | No (private) |
+| `@sentris/backend-client` | v0.1.0  | No           |
+| `@sentris/flow-backend`   | v0.1.0  | No           |
+| `@sentris/worker`         | v0.1.0  | No (private) |
+| `@sentris/flow-frontend`  | v1.0.0  | No           |
 
 <Note>
-  These packages are **workspace dependencies** and are **not published to npm**. They're consumed internally within the monorepo.
+  These packages are **workspace dependencies** and are **not published to npm**. They're consumed
+  internally within the monorepo.
 </Note>
 
 ### Versioning Options
@@ -130,13 +353,17 @@ Before creating a release:
 - [ ] Run tests: `bun run test`
 - [ ] Run typecheck: `bun run typecheck`
 - [ ] Run lint: `bun run lint`
+- [ ] Confirm the candidate commit can run the full readiness gate, including
+      its destructive isolated production Compose smoke in both trust profiles
+      and dependency failure/recovery checks
+- [ ] Confirm the previous release tag or exact ancestor performance baseline
 - [ ] Update package versions (if syncing): `bun run release:sync-versions v1.0.0`
 - [ ] Commit version changes (if any)
 
 Create the release:
 
 - [ ] Create and push tag: `git tag -a v1.0.0 -m "Release v1.0.0" && git push origin v1.0.0`
-- [ ] Verify GitHub Actions workflow completes
+- [ ] Verify the Full Readiness Gate job completes before publication starts
 - [ ] Verify images are available in GHCR
 - [ ] Verify GitHub release is created
 
@@ -144,7 +371,19 @@ Create the release:
 
 ## Required GitHub Secrets
 
-The release workflow uses `GITHUB_TOKEN` which is automatically provided by GitHub Actions. No additional secrets are required for GHCR.
+GitHub Actions automatically provides `GITHUB_TOKEN`; no additional secret is
+required to publish images to GHCR or create the GitHub release.
+
+The version-check publication step also requires:
+
+- `VERSION_CHECK_URL` — base URL of the version-check service.
+- `VERSION_CHECK_ADMIN_SECRET` — bearer token authorized to update the
+  published Sentris version.
+
+PostHog is optional runtime configuration, not a release secret or image build
+argument. Self-host operators provide `POSTHOG_API_KEY` and `POSTHOG_HOST` for
+server analytics and the matching public `VITE_PUBLIC_*` values for browser
+analytics when their containers start.
 
 ---
 
@@ -175,11 +414,11 @@ The release workflow uses `GITHUB_TOKEN` which is automatically provided by GitH
 
 Follow [Semantic Versioning](https://semver.org/):
 
-| Change Type | Version Bump | Example |
-|-------------|--------------|---------|
-| Breaking changes | Major | `1.0.0` → `2.0.0` |
-| New features | Minor | `1.0.0` → `1.1.0` |
-| Bug fixes | Patch | `1.0.0` → `1.0.1` |
+| Change Type      | Version Bump | Example           |
+| ---------------- | ------------ | ----------------- |
+| Breaking changes | Major        | `1.0.0` → `2.0.0` |
+| New features     | Minor        | `1.0.0` → `1.1.0` |
+| Bug fixes        | Patch        | `1.0.0` → `1.0.1` |
 
 ### Commit Message Convention
 

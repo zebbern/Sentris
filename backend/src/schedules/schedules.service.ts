@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import {
@@ -56,7 +57,21 @@ export class SchedulesService {
 
     this.validateSchedulePayload(context.definition, normalizedPayload);
 
+    const scheduleId = randomUUID();
+    await this.auditLogService.recordDurable(auth, {
+      action: 'schedule.create',
+      resourceType: 'schedule',
+      resourceId: scheduleId,
+      resourceName: dto.name,
+      metadata: {
+        workflowId: context.workflow.id,
+        cronExpression: dto.cronExpression,
+        phase: 'requested',
+      },
+    });
+
     const record = await this.repository.create({
+      id: scheduleId,
       workflowId: context.workflow.id,
       workflowVersionId: context.version.id,
       workflowVersion: context.version.version,
@@ -117,17 +132,6 @@ export class SchedulesService {
       { organizationId: context.organizationId },
     );
 
-    this.auditLogService.record(auth, {
-      action: 'schedule.create',
-      resourceType: 'schedule',
-      resourceId: (updated ?? record).id,
-      resourceName: (updated ?? record).name,
-      metadata: {
-        workflowId: (updated ?? record).workflowId,
-        cronExpression: (updated ?? record).cronExpression,
-      },
-    });
-
     return this.mapRecord(updated ?? record);
   }
 
@@ -156,6 +160,18 @@ export class SchedulesService {
       scheduleId: existing.id,
       scheduleName: dto.name ?? existing.name,
       payload: nextPayload,
+    });
+
+    await this.auditLogService.recordDurable(auth, {
+      action: 'schedule.update',
+      resourceType: 'schedule',
+      resourceId: existing.id,
+      resourceName: dto.name ?? existing.name,
+      metadata: {
+        workflowId: context.workflow.id,
+        cronExpression: dto.cronExpression ?? existing.cronExpression,
+        phase: 'requested',
+      },
     });
 
     const temporalScheduleId = existing.temporalScheduleId ?? existing.id;
@@ -202,44 +218,36 @@ export class SchedulesService {
       throw new NotFoundException(`Schedule ${id} not found`);
     }
 
-    this.auditLogService.record(auth, {
-      action: 'schedule.update',
-      resourceType: 'schedule',
-      resourceId: updated.id,
-      resourceName: updated.name,
-      metadata: { workflowId: updated.workflowId, cronExpression: updated.cronExpression },
-    });
-
     return this.mapRecord(updated);
   }
 
   async delete(auth: AuthContext | null, id: string): Promise<void> {
     const existing = await this.findOwnedScheduleOrThrow(id, auth);
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
-    const temporalScheduleId = existing.temporalScheduleId ?? existing.id;
-    if (temporalScheduleId) {
-      await this.temporalService.deleteSchedule(temporalScheduleId).catch((error) => {
-        this.logger.warn(
-          `Failed to delete Temporal schedule ${temporalScheduleId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      });
-    }
-    await this.repository.delete(existing.id, { organizationId: existing.organizationId });
-
-    this.auditLogService.record(auth, {
+    await this.auditLogService.recordDurable(auth, {
       action: 'schedule.delete',
       resourceType: 'schedule',
       resourceId: existing.id,
       resourceName: existing.name,
-      metadata: { workflowId: existing.workflowId },
+      metadata: { workflowId: existing.workflowId, phase: 'requested' },
     });
+    const temporalScheduleId = existing.temporalScheduleId ?? existing.id;
+    if (temporalScheduleId) {
+      await this.temporalService.deleteSchedule(temporalScheduleId);
+    }
+    await this.repository.delete(existing.id, { organizationId: existing.organizationId });
   }
 
   async pause(auth: AuthContext | null, id: string): Promise<WorkflowSchedule> {
     const existing = await this.findOwnedScheduleOrThrow(id, auth);
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
+    await this.auditLogService.recordDurable(auth, {
+      action: 'schedule.pause',
+      resourceType: 'schedule',
+      resourceId: existing.id,
+      resourceName: existing.name,
+      metadata: { phase: 'requested' },
+    });
     const temporalScheduleId = existing.temporalScheduleId ?? existing.id;
     if (temporalScheduleId) {
       await this.temporalService.pauseSchedule(temporalScheduleId);
@@ -249,19 +257,19 @@ export class SchedulesService {
       { status: 'paused' },
       { organizationId: existing.organizationId },
     );
-    this.auditLogService.record(auth, {
-      action: 'schedule.pause',
-      resourceType: 'schedule',
-      resourceId: existing.id,
-      resourceName: existing.name,
-    });
-
     return this.mapRecord(updated ?? existing);
   }
 
   async resume(auth: AuthContext | null, id: string): Promise<WorkflowSchedule> {
     const existing = await this.findOwnedScheduleOrThrow(id, auth);
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
+    await this.auditLogService.recordDurable(auth, {
+      action: 'schedule.resume',
+      resourceType: 'schedule',
+      resourceId: existing.id,
+      resourceName: existing.name,
+      metadata: { phase: 'requested' },
+    });
     const temporalScheduleId = existing.temporalScheduleId ?? existing.id;
     if (temporalScheduleId) {
       await this.temporalService.resumeSchedule(temporalScheduleId);
@@ -271,13 +279,6 @@ export class SchedulesService {
       { status: 'active' },
       { organizationId: existing.organizationId },
     );
-
-    this.auditLogService.record(auth, {
-      action: 'schedule.resume',
-      resourceType: 'schedule',
-      resourceId: existing.id,
-      resourceName: existing.name,
-    });
 
     return this.mapRecord(updated ?? existing);
   }
@@ -308,15 +309,18 @@ export class SchedulesService {
       },
     );
 
-    await this.workflowsService.startPreparedRun(prepared);
-
-    this.auditLogService.record(auth, {
+    await this.auditLogService.recordDurable(auth, {
       action: 'schedule.trigger',
       resourceType: 'schedule',
       resourceId: existing.id,
       resourceName: existing.name,
-      metadata: { workflowId: existing.workflowId },
+      metadata: {
+        workflowId: existing.workflowId,
+        runId: prepared.runId,
+        phase: 'requested',
+      },
     });
+    await this.workflowsService.startPreparedRun(prepared);
   }
 
   private async findOwnedScheduleOrThrow(id: string, auth: AuthContext | null) {

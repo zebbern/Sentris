@@ -8,6 +8,7 @@
 
 import { Pool } from 'pg';
 import Redis from 'ioredis';
+import { Kafka, logLevel as KafkaLogLevel } from 'kafkajs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'minio';
 import { ConfigurationError } from '@sentris/component-sdk';
@@ -23,6 +24,10 @@ import {
   KafkaAgentTracePublisher,
   KafkaNodeIOAdapter,
 } from '../../adapters';
+import { createKafkaReadiness } from '../../health/kafka-readiness';
+import type { KafkaReadiness } from '../../health/readiness-checks';
+import { PostgresDurableKafkaFallback } from '../../common/durable-kafka-fallback';
+import { resolveWorkerRuntimeTimeouts } from './runtime-timeouts';
 
 // ── Database ────────────────────────────────────────────────────────────
 
@@ -38,7 +43,21 @@ export function createDatabasePool(): DatabaseServices {
       configKey: 'DATABASE_URL',
     });
   }
-  const pool = new Pool({ connectionString });
+  const timeouts = resolveWorkerRuntimeTimeouts();
+  const pool = new Pool({
+    connectionString,
+    connectionTimeoutMillis: timeouts.databaseConnectionTimeoutMs,
+    query_timeout: timeouts.databaseQueryTimeoutMs,
+    statement_timeout: timeouts.databaseQueryTimeoutMs,
+  });
+  pool.on('error', (error) => {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined;
+    console.error(
+      `PostgreSQL idle client error; the pool will replace the failed connection${
+        code ? ` (code=${code})` : ''
+      }`,
+    );
+  });
   const db = drizzle(pool, { schema });
   console.log(`✅ Connected to database`);
   return { pool, db };
@@ -94,9 +113,14 @@ export interface KafkaAdapters {
   logs: KafkaLogAdapter;
   terminalStream?: RedisTerminalStreamAdapter;
   terminalRedis?: Redis;
+  readiness: Required<KafkaReadiness>;
 }
 
-export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters {
+export function createKafkaAdapters(
+  storage: FileStorageAdapter,
+  databasePool: Pool,
+  onFallbackFailure?: (message: string) => void,
+): KafkaAdapters {
   const kafkaBrokerEnv = process.env.LOG_KAFKA_BROKERS;
   const kafkaBrokers = kafkaBrokerEnv
     ? kafkaBrokerEnv
@@ -115,35 +139,64 @@ export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters 
   const instanceMsg = topicResolver.isInstanceIsolated()
     ? ` (instance ${topicResolver.getInstanceId()})`
     : '';
+  const readiness = createKafkaReadiness(
+    new Kafka({
+      clientId: `${
+        process.env.LOG_KAFKA_CLIENT_ID ?? topicResolver.resolveClientId('sentris-worker')
+      }-readiness`,
+      brokers: kafkaBrokers,
+      logLevel: KafkaLogLevel.NOTHING,
+    }).admin(),
+  );
+  const durableFallback = new PostgresDurableKafkaFallback(databasePool, onFallbackFailure);
 
-  const trace = new KafkaTraceAdapter({
-    brokers: kafkaBrokers,
-    topic: topicResolver.getEventsTopic(),
-    clientId: process.env.EVENT_KAFKA_CLIENT_ID ?? 'sentris-worker-events',
-  });
+  const trace = new KafkaTraceAdapter(
+    {
+      brokers: kafkaBrokers,
+      topic: topicResolver.getEventsTopic(),
+      clientId:
+        process.env.EVENT_KAFKA_CLIENT_ID ?? topicResolver.resolveClientId('sentris-worker-events'),
+    },
+    console,
+    durableFallback,
+  );
 
-  const agentTrace = new KafkaAgentTracePublisher({
-    brokers: kafkaBrokers,
-    topic: topicResolver.getAgentTraceTopic(),
-    clientId: process.env.AGENT_TRACE_KAFKA_CLIENT_ID ?? 'sentris-worker-agent-trace',
-  });
+  const agentTrace = new KafkaAgentTracePublisher(
+    {
+      brokers: kafkaBrokers,
+      topic: topicResolver.getAgentTraceTopic(),
+      clientId:
+        process.env.AGENT_TRACE_KAFKA_CLIENT_ID ??
+        topicResolver.resolveClientId('sentris-worker-agent-trace'),
+    },
+    console,
+    durableFallback,
+  );
 
   const nodeIO = new KafkaNodeIOAdapter(
     {
       brokers: kafkaBrokers,
       topic: topicResolver.getNodeIOTopic(),
-      clientId: process.env.NODE_IO_KAFKA_CLIENT_ID ?? 'sentris-worker-node-io',
+      clientId:
+        process.env.NODE_IO_KAFKA_CLIENT_ID ??
+        topicResolver.resolveClientId('sentris-worker-node-io'),
     },
     storage,
+    console,
+    durableFallback,
   );
 
   let logs: KafkaLogAdapter;
   try {
-    logs = new KafkaLogAdapter({
-      brokers: kafkaBrokers,
-      topic: topicResolver.getLogsTopic(),
-      clientId: process.env.LOG_KAFKA_CLIENT_ID ?? 'sentris-worker',
-    });
+    logs = new KafkaLogAdapter(
+      {
+        brokers: kafkaBrokers,
+        topic: topicResolver.getLogsTopic(),
+        clientId:
+          process.env.LOG_KAFKA_CLIENT_ID ?? topicResolver.resolveClientId('sentris-worker'),
+      },
+      durableFallback,
+    );
     console.log(`✅ Kafka logging enabled (${kafkaBrokers.join(', ')})${instanceMsg}`);
   } catch (error: unknown) {
     console.error('❌ Failed to initialize Kafka logging', error);
@@ -156,7 +209,10 @@ export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters 
   const terminalRedisUrl = process.env.TERMINAL_REDIS_URL;
   if (terminalRedisUrl) {
     try {
-      terminalRedis = new Redis(terminalRedisUrl);
+      const timeouts = resolveWorkerRuntimeTimeouts();
+      terminalRedis = new Redis(terminalRedisUrl, {
+        commandTimeout: timeouts.terminalRedisCommandTimeoutMs,
+      });
       const maxEntries = Number(process.env.TERMINAL_REDIS_MAXLEN ?? '5000');
       terminalStream = new RedisTerminalStreamAdapter(terminalRedis, { maxEntries });
       console.log(`✅ Terminal Redis streaming enabled (${terminalRedisUrl})`);
@@ -167,5 +223,5 @@ export function createKafkaAdapters(storage: FileStorageAdapter): KafkaAdapters 
     console.warn('⚠️ TERMINAL_REDIS_URL not set; terminal streaming disabled');
   }
 
-  return { trace, agentTrace, nodeIO, logs, terminalStream, terminalRedis };
+  return { trace, agentTrace, nodeIO, logs, terminalStream, terminalRedis, readiness };
 }

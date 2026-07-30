@@ -22,7 +22,6 @@ export const ResolveHumanInputSchema = z.object({
     .record(z.string(), z.unknown())
     .optional()
     .describe('The response data from the human'),
-  respondedBy: z.string().optional().describe('User ID or identifier of who resolved the input'),
 });
 
 export class ResolveHumanInputDto extends createZodDto(ResolveHumanInputSchema) {}

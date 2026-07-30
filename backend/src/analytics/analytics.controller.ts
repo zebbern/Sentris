@@ -5,9 +5,11 @@ import {
   ForbiddenException,
   Get,
   Headers,
+  HttpCode,
   Logger,
   Post,
   Put,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -19,7 +21,10 @@ import { timingSafeCompare } from '../common/crypto-utils';
 
 import { SecurityAnalyticsService } from './security-analytics.service';
 import { OrganizationSettingsService } from './organization-settings.service';
-import { OpenSearchTenantService } from './opensearch-tenant.service';
+import {
+  OPENSEARCH_TENANT_PROVISIONING_TIMEOUT_MS,
+  OpenSearchTenantService,
+} from './opensearch-tenant.service';
 import {
   AnalyticsQueryRequestDto,
   AnalyticsQueryRequestSchema,
@@ -36,6 +41,42 @@ import { AuditLogService } from '../audit/audit-log.service';
 import { CurrentAuth } from '../auth/auth-context.decorator';
 import { Public } from '../auth/public.decorator';
 import type { AuthContext } from '../auth/types';
+import type { Request } from 'express';
+
+export function createTenantProvisioningAbortScope(
+  request?: Request,
+  timeoutMs = OPENSEARCH_TENANT_PROVISIONING_TIMEOUT_MS,
+): {
+  signal: AbortSignal;
+  dispose(): void;
+} {
+  const requestController = new AbortController();
+  const handleRequestAbort = () => {
+    requestController.abort(new Error('Tenant provisioning request aborted'));
+  };
+  const timeout = setTimeout(
+    () =>
+      requestController.abort(
+        new DOMException(`Tenant provisioning exceeded ${timeoutMs}ms`, 'TimeoutError'),
+      ),
+    timeoutMs,
+  );
+  if (request?.aborted || request?.socket?.destroyed) {
+    handleRequestAbort();
+  } else {
+    request?.once('aborted', handleRequestAbort);
+    request?.socket?.once('close', handleRequestAbort);
+  }
+
+  return {
+    signal: requestController.signal,
+    dispose: () => {
+      clearTimeout(timeout);
+      request?.off('aborted', handleRequestAbort);
+      request?.socket?.off('close', handleRequestAbort);
+    },
+  };
+}
 
 @ApiTags('analytics')
 @Controller('analytics')
@@ -88,7 +129,7 @@ export class AnalyticsController {
     const size = queryDto.size ?? 10;
     const from = queryDto.from ?? 0;
 
-    this.auditLogService.record(auth, {
+    this.auditLogService.recordBestEffort(auth, {
       action: 'analytics.query',
       resourceType: 'analytics',
       resourceId: null,
@@ -230,8 +271,9 @@ export class AnalyticsController {
   }
 
   /**
-   * Ensure tenant resources exist for an organization.
-   * Called by worker before indexing to ensure tenant isolation is set up.
+   * Ensure observation storage exists for an organization.
+   * Called by the worker before indexing. In secured mode this also provisions
+   * the tenant isolation resources.
    *
    * Requires X-Internal-Token header for authentication (internal service-to-service).
    * This endpoint is idempotent - safe to call multiple times.
@@ -239,6 +281,7 @@ export class AnalyticsController {
   @Public()
   @SkipThrottle()
   @Post('ensure-tenant')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Ensure tenant resources exist for an organization' })
   @ApiOkResponse({
     description: 'Ensure tenant resources exist for organization',
@@ -254,6 +297,7 @@ export class AnalyticsController {
   async ensureTenant(
     @Headers('x-internal-token') internalToken: string | undefined,
     @Body(new ZodValidationPipe(EnsureTenantSchema)) body: EnsureTenantDto,
+    @Req() request?: Request,
   ): Promise<{ success: boolean; securityEnabled: boolean; message: string }> {
     // Validate internal service token
     if (!this.internalServiceToken) {
@@ -266,24 +310,28 @@ export class AnalyticsController {
 
     const orgId = body.organizationId;
 
-    // Check if security mode is enabled
-    if (!this.openSearchTenantService.isSecurityEnabled()) {
-      return {
-        success: true,
-        securityEnabled: false,
-        message: 'Security mode disabled, tenant provisioning skipped',
-      };
-    }
+    const securityEnabled = this.openSearchTenantService.isSecurityEnabled();
 
-    // Provision tenant resources
-    const success = await this.openSearchTenantService.ensureTenantExists(orgId);
+    // Observation storage is required in both trusted-local and secured modes.
+    // The tenant service conditionally skips only Security/Dashboards resources.
+    const abortScope = createTenantProvisioningAbortScope(request);
+    let success: boolean;
+    try {
+      success = await this.openSearchTenantService.ensureTenantExists(orgId, abortScope.signal);
+    } finally {
+      abortScope.dispose();
+    }
 
     return {
       success,
-      securityEnabled: true,
+      securityEnabled,
       message: success
-        ? `Tenant provisioned for ${orgId}`
-        : `Failed to provision tenant for ${orgId}`,
+        ? securityEnabled
+          ? `Tenant provisioned for ${orgId}`
+          : `Observation storage provisioned for ${orgId}; security mode disabled`
+        : securityEnabled
+          ? `Failed to provision tenant for ${orgId}`
+          : `Failed to provision observation storage for ${orgId}`,
     };
   }
 }

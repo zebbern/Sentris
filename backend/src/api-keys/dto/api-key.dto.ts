@@ -51,14 +51,15 @@ export const ApiKeyPermissionsSchema = z.object({
     .optional(),
 });
 
-export const CreateApiKeySchema = z.object({
-  name: z.string().min(1).max(191),
-  description: z.string().optional(),
-  permissions: ApiKeyPermissionsSchema,
-  expiresAt: z.string().datetime().optional(),
-  rateLimit: z.number().int().positive().optional(),
-  organizationId: z.string().optional(), // In case admin creates for another org in future
-});
+export const CreateApiKeySchema = z
+  .object({
+    name: z.string().min(1).max(191),
+    description: z.string().optional(),
+    permissions: ApiKeyPermissionsSchema,
+    expiresAt: z.string().datetime().optional(),
+    rateLimit: z.number().int().positive().optional(),
+  })
+  .strict();
 
 export class CreateApiKeyDto extends createZodDto(CreateApiKeySchema) {}
 

@@ -85,31 +85,34 @@ export class WebhooksService {
     // Validate expected inputs against workflow's entry point
     await this.validateExpectedInputs(dto.workflowId, dto.expectedInputs, auth);
 
-    const record = await this.repository.create({
-      workflowId: dto.workflowId,
-      workflowVersionId: dto.workflowVersionId ?? null,
-      workflowVersion: null,
-      name: dto.name,
-      description: dto.description ?? null,
-      webhookPath,
-      parsingScript: dto.parsingScript,
-      expectedInputs: dto.expectedInputs as WebhookInputDefinition[],
-      status: 'active',
-      organizationId,
-      createdBy: auth?.userId ?? 'system',
-    });
+    const record = await this.repository.create(
+      {
+        workflowId: dto.workflowId,
+        workflowVersionId: dto.workflowVersionId ?? null,
+        workflowVersion: null,
+        name: dto.name,
+        description: dto.description ?? null,
+        webhookPath,
+        parsingScript: dto.parsingScript,
+        expectedInputs: dto.expectedInputs as WebhookInputDefinition[],
+        status: 'active',
+        organizationId,
+        createdBy: auth?.userId ?? 'system',
+      },
+      (executor, created) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'webhook.create',
+          resourceType: 'webhook',
+          resourceId: created.id,
+          resourceName: created.name,
+          metadata: {
+            workflowId: created.workflowId,
+            status: created.status,
+          },
+        }),
+    );
 
     this.logger.log(`Created webhook ${record.id} for workflow ${dto.workflowId}`);
-    this.auditLogService.record(auth, {
-      action: 'webhook.create',
-      resourceType: 'webhook',
-      resourceId: record.id,
-      resourceName: record.name,
-      metadata: {
-        workflowId: record.workflowId,
-        status: record.status,
-      },
-    });
     return this.mapConfigurationRecord(record);
   }
 
@@ -159,6 +162,17 @@ export class WebhooksService {
         status: dto.status,
       },
       { organizationId },
+      (executor, record) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'webhook.update',
+          resourceType: 'webhook',
+          resourceId: id,
+          resourceName: record.name,
+          metadata: {
+            updatedFields: Object.keys(dto),
+            status: record.status,
+          },
+        }),
     );
 
     if (!updated) {
@@ -166,16 +180,6 @@ export class WebhooksService {
     }
 
     this.logger.log(`Updated webhook ${id}`);
-    this.auditLogService.record(auth, {
-      action: 'webhook.update',
-      resourceType: 'webhook',
-      resourceId: id,
-      resourceName: updated.name,
-      metadata: {
-        updatedFields: Object.keys(dto),
-        status: updated.status,
-      },
-    });
     return this.mapConfigurationRecord(updated);
   }
 
@@ -188,17 +192,18 @@ export class WebhooksService {
 
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
 
-    await this.repository.delete(id, { organizationId });
+    await this.repository.delete(id, { organizationId }, (executor) =>
+      this.auditLogService.recordDurableWithExecutor(executor, auth, {
+        action: 'webhook.delete',
+        resourceType: 'webhook',
+        resourceId: id,
+        resourceName: existing.name,
+        metadata: {
+          workflowId: existing.workflowId,
+        },
+      }),
+    );
     this.logger.log(`Deleted webhook ${id}`);
-    this.auditLogService.record(auth, {
-      action: 'webhook.delete',
-      resourceType: 'webhook',
-      resourceId: id,
-      resourceName: existing.name,
-      metadata: {
-        workflowId: existing.workflowId,
-      },
-    });
   }
 
   async regeneratePath(auth: AuthContext | null, id: string): Promise<WebhookUrlResponse> {
@@ -211,23 +216,28 @@ export class WebhooksService {
     await this.workflowsService.ensureWorkflowAdminAccess(existing.workflowId, auth);
 
     const newPath = this.generateWebhookPath();
-    const updated = await this.repository.update(id, { webhookPath: newPath }, { organizationId });
+    const updated = await this.repository.update(
+      id,
+      { webhookPath: newPath },
+      { organizationId },
+      (executor, record) =>
+        this.auditLogService.recordDurableWithExecutor(executor, auth, {
+          action: 'webhook.regenerate_path',
+          resourceType: 'webhook',
+          resourceId: id,
+          resourceName: record.name,
+          metadata: {
+            oldPathHint: existing.webhookPath?.slice(-4) ?? null,
+            newPathHint: record.webhookPath?.slice(-4) ?? null,
+          },
+        }),
+    );
 
     if (!updated) {
       throw new NotFoundException(`Webhook ${id} not found`);
     }
 
     this.logger.log(`Regenerated path for webhook ${id}: ${newPath}`);
-    this.auditLogService.record(auth, {
-      action: 'webhook.regenerate_path',
-      resourceType: 'webhook',
-      resourceId: id,
-      resourceName: updated.name,
-      metadata: {
-        oldPathHint: existing.webhookPath?.slice(-4) ?? null,
-        newPathHint: updated.webhookPath?.slice(-4) ?? null,
-      },
-    });
     return {
       id: updated.id,
       name: updated.name,
@@ -238,7 +248,7 @@ export class WebhooksService {
 
   async getUrl(auth: AuthContext | null, id: string): Promise<WebhookUrlResponse> {
     const webhook = await this.get(auth, id);
-    this.auditLogService.record(auth, {
+    await this.auditLogService.recordDurable(auth, {
       action: 'webhook.url_access',
       resourceType: 'webhook',
       resourceId: webhook.id,

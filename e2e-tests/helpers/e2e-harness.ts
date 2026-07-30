@@ -14,6 +14,8 @@
 import { describe, test } from 'bun:test';
 
 import { getApiBaseUrl } from './api-base';
+import { buildE2eHeaders } from './e2e-config';
+import { resolveE2eGateDecision } from './e2e-gate';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -21,10 +23,7 @@ import { getApiBaseUrl } from './api-base';
 
 export const API_BASE = getApiBaseUrl();
 
-export const HEADERS: Record<string, string> = {
-  'Content-Type': 'application/json',
-  'x-internal-token': 'local-internal-token',
-};
+export const HEADERS: Record<string, string> = buildE2eHeaders(process.env);
 
 // ---------------------------------------------------------------------------
 // E2E gate flags
@@ -32,6 +31,7 @@ export const HEADERS: Record<string, string> = {
 
 export const runE2E = process.env.RUN_E2E === 'true';
 export const runCloudE2E = process.env.RUN_CLOUD_E2E === 'true';
+export const strictE2EServices = process.env.E2E_STRICT_SERVICES === 'true';
 
 // ---------------------------------------------------------------------------
 // Service availability
@@ -90,8 +90,28 @@ export function isE2EReady(): boolean {
  * For cloud tests pass `{ cloud: true }` to also require RUN_CLOUD_E2E.
  */
 export function e2eDescribe(name: string, fn: () => void, opts?: { cloud?: boolean }): void {
-  const enabled = opts?.cloud ? runE2E && runCloudE2E && _servicesOk : runE2E && _servicesOk;
-  (enabled ? describe : describe.skip)(name, fn);
+  const decision = resolveE2eGateDecision({
+    runE2E,
+    runCloudE2E,
+    servicesOk: _servicesOk,
+    strictServices: strictE2EServices,
+    cloud: opts?.cloud,
+  });
+  if (decision === 'run') {
+    describe(name, fn);
+    return;
+  }
+  if (decision === 'fail') {
+    describe(name, () => {
+      test('requires the configured E2E service preflight', () => {
+        throw new Error(
+          `Strict E2E service preflight failed for ${API_BASE}/health; refusing to skip release tests`,
+        );
+      });
+    });
+    return;
+  }
+  describe.skip(name, fn);
 }
 
 /**
@@ -103,12 +123,24 @@ export function e2eTest(
   optionsOrFn: { timeout?: number } | (() => void | Promise<void>),
   fn?: () => void | Promise<void>,
 ): void {
-  if (isE2EReady()) {
+  const decision = resolveE2eGateDecision({
+    runE2E,
+    runCloudE2E,
+    servicesOk: _servicesOk,
+    strictServices: strictE2EServices,
+  });
+  if (decision === 'run') {
     if (typeof optionsOrFn === 'function') {
       test(name, optionsOrFn);
     } else if (fn) {
       (test as any)(name, optionsOrFn, fn);
     }
+  } else if (decision === 'fail') {
+    test(name, () => {
+      throw new Error(
+        `Strict E2E service preflight failed for ${API_BASE}/health; refusing to skip release tests`,
+      );
+    });
   } else {
     const actualFn = typeof optionsOrFn === 'function' ? optionsOrFn : fn!;
     test.skip(name, actualFn);
