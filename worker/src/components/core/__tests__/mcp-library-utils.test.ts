@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'bun:test';
 import { createExecutionContext } from '@sentris/component-sdk';
-import type { McpServer } from '../mcp-library-utils';
+import type { McpServer, PersistedMcpTool } from '../mcp-library-utils';
 
 const originalFetch = globalThis.fetch;
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
@@ -33,7 +33,37 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
   StreamableHTTPClientTransport: mockTransport,
 }));
 
-import { registerServerTools } from '../mcp-library-utils';
+import {
+  buildMcpToolExclusionKey,
+  filterMcpToolsForServer,
+  registerServerTools,
+} from '../mcp-library-utils';
+
+const liveTools = [
+  {
+    name: 'ping',
+    description: 'Ping a target',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'status',
+    description: 'Read status',
+    inputSchema: { type: 'object', properties: {} },
+  },
+];
+
+function persistedTool(serverId: string, toolName: string, enabled: boolean): PersistedMcpTool {
+  return {
+    id: `${serverId}-${toolName}`,
+    toolName,
+    description: null,
+    inputSchema: null,
+    serverId,
+    serverName: serverId,
+    enabled,
+    discoveredAt: '2026-07-31T00:00:00.000Z',
+  };
+}
 
 describe('mcp-library-utils', () => {
   beforeEach(() => {
@@ -51,6 +81,43 @@ describe('mcp-library-utils', () => {
       process.env.SENTRIS_DEBUG_WORKFLOW = originalDebugWorkflow;
     }
     vi.restoreAllMocks();
+  });
+
+  test('removes live tools disabled in persisted server records', () => {
+    const result = filterMcpToolsForServer('server-a', liveTools, [
+      persistedTool('server-a', 'ping', false),
+      persistedTool('server-a', 'status', true),
+    ]);
+
+    expect(result.map((tool) => tool.name)).toEqual(['status']);
+  });
+
+  test('uses server-qualified workflow exclusions without removing another server same-name tool', () => {
+    const exclusions = [buildMcpToolExclusionKey('server-a', 'ping')];
+
+    const serverATools = filterMcpToolsForServer('server-a', liveTools, [], exclusions);
+    const serverBTools = filterMcpToolsForServer('server-b', liveTools, [], exclusions);
+
+    expect(serverATools.map((tool) => tool.name)).toEqual(['status']);
+    expect(serverBTools.map((tool) => tool.name)).toEqual(['ping', 'status']);
+  });
+
+  test('preserves live discovery when a server has no persisted tool records', () => {
+    const result = filterMcpToolsForServer('server-a', liveTools, [
+      persistedTool('another-server', 'ping', false),
+    ]);
+
+    expect(result.map((tool) => tool.name)).toEqual(['ping', 'status']);
+  });
+
+  test('throws a clear error when no tools remain after filtering', () => {
+    expect(() =>
+      filterMcpToolsForServer(
+        'server-a',
+        [liveTools[0]],
+        [persistedTool('server-a', 'ping', false)],
+      ),
+    ).toThrow('No MCP tools remain enabled for server server-a');
   });
 
   test('does not mirror successful HTTP server registration diagnostics to console.log by default', async () => {

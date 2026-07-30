@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'bun:test';
-import { render, screen } from '@testing-library/react';
-import { ParameterField } from '../ParameterField';
+import { describe, expect, it, mock } from 'bun:test';
+import { fireEvent, render, screen } from '@testing-library/react';
+
+mock.module('../McpLibraryToolSelector', () => ({
+  McpLibraryToolSelector: ({
+    onToolExclusionsChange,
+  }: {
+    onToolExclusionsChange: (exclusions: string[]) => void;
+  }) => (
+    <button type="button" onClick={() => onToolExclusionsChange(['server-a:ping'])}>
+      Exclude ping
+    </button>
+  ),
+}));
+
+const { ParameterField } = await import('../ParameterField');
 
 describe('ParameterField security component parameters', () => {
   it('renders dnsx record type multi-select parameters', () => {
@@ -78,5 +91,31 @@ describe('ParameterField security component parameters', () => {
     );
 
     expect(screen.getByDisplayValue('5')).toBeDefined();
+  });
+
+  it('updates mcp.custom toolExclusions through onUpdateParameter', () => {
+    const onChange = mock(() => undefined);
+    const onUpdateParameter = mock(() => undefined);
+
+    render(
+      <ParameterField
+        parameter={{
+          id: 'toolExclusions',
+          label: 'Enabled Tools',
+          type: 'multi-select',
+          default: [],
+        }}
+        value={[]}
+        onChange={onChange}
+        componentId="mcp.custom"
+        parameters={{ enabledServers: ['server-a'] }}
+        onUpdateParameter={onUpdateParameter}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exclude ping' }));
+
+    expect(onUpdateParameter).toHaveBeenCalledWith('toolExclusions', ['server-a:ping']);
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

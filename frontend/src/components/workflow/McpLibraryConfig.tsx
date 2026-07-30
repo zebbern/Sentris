@@ -200,7 +200,7 @@ export function McpLibraryConfig({ value, onChange, disabled = false }: McpLibra
             </p>
             {totalTools > 0 && (
               <p className="text-xs text-muted-foreground">
-                {totalTools} tool{totalTools !== 1 ? 's' : ''} available to AI agents
+                {totalTools} globally enabled tool{totalTools !== 1 ? 's' : ''}
               </p>
             )}
           </div>

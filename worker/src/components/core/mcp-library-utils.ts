@@ -42,6 +42,48 @@ const McpToolSchema = z.object({
 
 export type McpTool = z.infer<typeof McpToolSchema>;
 
+const PersistedMcpToolSchema = z.object({
+  id: z.string(),
+  toolName: z.string(),
+  description: z.string().nullable(),
+  inputSchema: z.record(z.string(), z.unknown()).nullable(),
+  serverId: z.string(),
+  serverName: z.string(),
+  enabled: z.boolean(),
+  discoveredAt: z.string().datetime(),
+});
+
+export type PersistedMcpTool = z.infer<typeof PersistedMcpToolSchema>;
+
+export function buildMcpToolExclusionKey(serverId: string, toolName: string): string {
+  return `${serverId}:${toolName}`;
+}
+
+export function filterMcpToolsForServer(
+  serverId: string,
+  liveTools: McpTool[],
+  persistedTools: PersistedMcpTool[],
+  toolExclusions: string[] = [],
+): McpTool[] {
+  const serverRecords = persistedTools.filter((tool) => tool.serverId === serverId);
+  const enabledToolNames =
+    serverRecords.length > 0
+      ? new Set(serverRecords.filter((tool) => tool.enabled).map((tool) => tool.toolName))
+      : null;
+  const exclusions = new Set(toolExclusions);
+  const finalTools = liveTools.filter(
+    (tool) =>
+      (enabledToolNames === null || enabledToolNames.has(tool.name)) &&
+      !exclusions.has(buildMcpToolExclusionKey(serverId, tool.name)),
+  );
+
+  if (finalTools.length === 0) {
+    throw new Error(`No MCP tools remain enabled for server ${serverId}`);
+  }
+
+  return finalTools;
+}
+
 /**
  * Fetch server details from backend API
  */
@@ -71,6 +113,27 @@ export async function fetchEnabledServers(
     .filter(
       (s) => s.enabled && (options.useAllEnabled === true || enabledServerIds.includes(s.id)),
     );
+}
+
+export async function fetchPersistedMcpTools(
+  context: ExecutionContext,
+): Promise<PersistedMcpTool[]> {
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
+  const orgId = context.metadata.organizationId;
+
+  const response = await fetch(buildBackendApiUrl('mcp-servers/tools'), {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(internalToken ? { 'x-internal-token': internalToken } : {}),
+      ...(orgId ? { 'x-organization-id': orgId } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch persisted MCP tools: ${response.statusText}`);
+  }
+
+  return z.array(PersistedMcpToolSchema).parse(await response.json());
 }
 
 export async function fetchResolvedConfig(
@@ -164,6 +227,10 @@ async function discoverToolsFromEndpoint(
 export async function registerServerTools(
   server: McpServer,
   context: ExecutionContext,
+  options: {
+    persistedTools?: PersistedMcpTool[];
+    toolExclusions?: string[];
+  } = {},
 ): Promise<void> {
   // Fetch resolved configuration (with secrets resolved)
   const resolvedConfig = await fetchResolvedConfig(server.id, context);
@@ -197,7 +264,12 @@ export async function registerServerTools(
     });
 
     // Discover tools through the same-worker loopback proxy.
-    const tools = await discoverToolsFromEndpoint(endpoint, httpHeaders);
+    const tools = filterMcpToolsForServer(
+      server.id,
+      await discoverToolsFromEndpoint(endpoint, httpHeaders),
+      options.persistedTools ?? [],
+      options.toolExclusions,
+    );
 
     // Register the server with pre-discovered tools
     await registerMcpServer({
@@ -216,7 +288,12 @@ export async function registerServerTools(
   // For HTTP servers, register directly with resolved headers
   else if (server.transportType === 'http' && server.endpoint) {
     // Discover tools from the HTTP endpoint
-    const tools = await discoverToolsFromEndpoint(server.endpoint, httpHeaders);
+    const tools = filterMcpToolsForServer(
+      server.id,
+      await discoverToolsFromEndpoint(server.endpoint, httpHeaders),
+      options.persistedTools ?? [],
+      options.toolExclusions,
+    );
 
     await registerMcpServer({
       runId: context.runId,

@@ -7,6 +7,7 @@ import type { Parameter } from '@/schemas/component';
 import type { InputMapping } from '@/schemas/node';
 import { LeanSelect, type SelectOption } from '@/components/inputs/LeanSelect';
 import { McpLibraryConfig } from './McpLibraryConfig';
+import { McpLibraryToolSelector } from './McpLibraryToolSelector';
 import { AgentSkillsConfig } from './AgentSkillsConfig';
 import { McpGroupConfig } from './McpGroupConfig';
 import { ArtifactSelector } from './parameter-field/ArtifactSelector';
@@ -95,6 +96,29 @@ export function ParameterField({
     const selectedServers = Array.isArray(currentValue) ? currentValue : [];
     return (
       <McpLibraryConfig value={selectedServers} onChange={onChange} disabled={isReceivingInput} />
+    );
+  }
+
+  if (componentId === 'mcp.custom' && parameter.id === 'toolExclusions') {
+    const selectedServerIds = Array.isArray(parameters?.enabledServers)
+      ? parameters.enabledServers.filter((id): id is string => typeof id === 'string')
+      : [];
+    const toolExclusions = Array.isArray(currentValue)
+      ? currentValue.filter((key): key is string => typeof key === 'string')
+      : [];
+    return (
+      <McpLibraryToolSelector
+        selectedServerIds={selectedServerIds}
+        toolExclusions={toolExclusions}
+        onToolExclusionsChange={(exclusions) => {
+          if (onUpdateParameter) {
+            onUpdateParameter(parameter.id, exclusions);
+          } else {
+            onChange(exclusions);
+          }
+        }}
+        disabled={isReceivingInput}
+      />
     );
   }
 

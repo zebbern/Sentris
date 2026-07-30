@@ -1,53 +1,60 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Server, Wrench, RefreshCw, AlertCircle } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { useMcpServers, useMcpAllTools } from '@/hooks/queries/useMcpServerQueries';
+import { useMemo, useState } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight, RefreshCw, Server, Wrench } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useMcpAllTools, useMcpServers } from '@/hooks/queries/useMcpServerQueries';
 import { queryKeys } from '@/lib/queryKeys';
+import { cn } from '@/lib/utils';
 
-interface McpLibraryToolSelectorProps {
-  /** Whether Custom MCPs is enabled (controls visibility) */
-  enabled?: boolean;
-  /** List of excluded server IDs */
-  serverExclusions?: string[];
-  /** List of excluded tool names */
-  toolExclusions?: string[];
-  /** Callback when server exclusions change */
-  onServerExclusionChange?: (exclusions: string[] | undefined) => void;
-  /** Callback when tool exclusions change */
-  onToolExclusionChange?: (exclusions: string[] | undefined) => void;
+export interface McpLibraryToolSelectorProps {
+  selectedServerIds: string[];
+  toolExclusions: string[];
+  onToolExclusionsChange: (exclusions: string[]) => void;
+  disabled?: boolean;
 }
 
 type ExpandedState = Record<string, boolean>;
 
-/**
- * Custom MCPs Tool Selector
- *
- * Shows MCP servers from the library with health status indicators.
- * Allows users to exclude specific servers or tools from being available to the AI agent.
- */
+const toolExclusionKey = (serverId: string, toolName: string) => `${serverId}:${toolName}`;
+
 export function McpLibraryToolSelector({
-  enabled = true,
-  serverExclusions = [],
-  toolExclusions = [],
-  onServerExclusionChange,
-  onToolExclusionChange,
+  selectedServerIds,
+  toolExclusions,
+  onToolExclusionsChange,
+  disabled = false,
 }: McpLibraryToolSelectorProps) {
   const { data: servers = [], isLoading, error: serversError } = useMcpServers();
-  const { data: tools = [] } = useMcpAllTools();
+  const { data: tools = [], error: toolsError } = useMcpAllTools();
   const queryClient = useQueryClient();
-  const error = serversError?.message ?? null;
-
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Only show enabled servers
-  const enabledServers = servers.filter((s) => s.enabled);
+  const selectedServers = useMemo(() => {
+    const selectedIds = new Set(selectedServerIds);
+    return servers.filter((server) => server.enabled && selectedIds.has(server.id));
+  }, [selectedServerIds, servers]);
+
+  const selectedServerIdSet = useMemo(
+    () => new Set(selectedServers.map((server) => server.id)),
+    [selectedServers],
+  );
+  const selectedTools = useMemo(
+    () => tools.filter((tool) => selectedServerIdSet.has(tool.serverId)),
+    [selectedServerIdSet, tools],
+  );
+  const exclusionSet = useMemo(() => new Set(toolExclusions), [toolExclusions]);
+  const finalEnabledCount = useMemo(
+    () =>
+      selectedTools.filter(
+        (tool) => tool.enabled && !exclusionSet.has(toolExclusionKey(tool.serverId, tool.toolName)),
+      ).length,
+    [exclusionSet, selectedTools],
+  );
 
   const handleRefresh = async () => {
+    if (disabled || isRefreshing) return;
     setIsRefreshing(true);
     try {
       await Promise.all([
@@ -59,119 +66,77 @@ export function McpLibraryToolSelector({
     }
   };
 
-  const toggleServer = (serverId: string) => {
-    setExpanded((prev) => ({
-      ...prev,
-      [serverId]: !prev[serverId],
-    }));
+  const handleToolToggle = (serverId: string, toolName: string) => {
+    if (disabled) return;
+    const key = toolExclusionKey(serverId, toolName);
+    onToolExclusionsChange(
+      exclusionSet.has(key)
+        ? toolExclusions.filter((exclusion) => exclusion !== key)
+        : [...toolExclusions, key],
+    );
   };
 
-  const isServerExcluded = (serverId: string) => serverExclusions.includes(serverId);
-  const isToolExcluded = (toolName: string) => toolExclusions.includes(toolName);
-
-  const handleServerExclusionToggle = (serverId: string) => {
-    const newExclusions = isServerExcluded(serverId)
-      ? serverExclusions.filter((id) => id !== serverId)
-      : [...serverExclusions, serverId];
-
-    onServerExclusionChange?.(newExclusions.length > 0 ? newExclusions : undefined);
-  };
-
-  const handleToolExclusionToggle = (toolName: string) => {
-    const newExclusions = isToolExcluded(toolName)
-      ? toolExclusions.filter((name) => name !== toolName)
-      : [...toolExclusions, toolName];
-
-    onToolExclusionChange?.(newExclusions.length > 0 ? newExclusions : undefined);
-  };
-
-  const getHealthIndicator = (serverId: string) => {
-    const server = servers.find((s) => s.id === serverId);
-    const status = server?.lastHealthStatus ?? 'unknown';
-    switch (status) {
-      case 'healthy':
-        return <span className="w-2 h-2 rounded-full bg-green-500" title="Healthy" />;
-      case 'unhealthy':
-        return <span className="w-2 h-2 rounded-full bg-red-500" title="Unhealthy" />;
-      default:
-        return <span className="w-2 h-2 rounded-full bg-muted-foreground" title="Unknown" />;
-    }
-  };
-
-  const getServerTools = (serverId: string) => tools.filter((t) => t.serverId === serverId);
-
-  if (!enabled) {
-    return null;
-  }
-
+  const error = serversError ?? toolsError;
   if (isLoading && servers.length === 0) {
-    return <div className="text-xs text-muted-foreground py-2">Loading MCP servers...</div>;
+    return <div className="py-2 text-xs text-muted-foreground">Loading MCP tools...</div>;
   }
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-xs text-destructive py-2">
+      <div className="flex items-center gap-2 py-2 text-xs text-destructive">
         <AlertCircle className="h-3.5 w-3.5" />
-        <span>{error}</span>
+        <span>{error.message}</span>
       </div>
     );
   }
 
-  if (enabledServers.length === 0) {
+  if (selectedServers.length === 0) {
     return (
-      <div className="text-xs text-muted-foreground py-2">
-        No MCP servers configured. Add servers in the{' '}
-        <a href="/mcp-library" className="text-primary hover:underline">
-          Custom MCPs
-        </a>
-        .
+      <div className="py-2 text-xs text-muted-foreground">
+        Select an enabled MCP server above to configure its tools.
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {/* Header with refresh button */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {enabledServers.length} server{enabledServers.length !== 1 ? 's' : ''} available
+          {finalEnabledCount} tool{finalEnabledCount === 1 ? '' : 's'} enabled
         </span>
         <Button
           variant="ghost"
           size="sm"
           className="h-6 w-6 p-0"
           onClick={handleRefresh}
-          disabled={isRefreshing}
-          title="Refresh servers"
+          disabled={disabled || isRefreshing}
+          title="Refresh MCP tools"
+          aria-label="Refresh MCP tools"
         >
           <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
         </Button>
       </div>
 
-      {/* Server list */}
-      <div className="space-y-1 max-h-64 overflow-y-auto">
-        {enabledServers.map((server) => {
-          const serverTools = getServerTools(server.id);
+      <div className="max-h-64 space-y-1 overflow-y-auto">
+        {selectedServers.map((server) => {
+          const serverTools = selectedTools.filter((tool) => tool.serverId === server.id);
           const isExpanded = expanded[server.id] ?? false;
-          const excluded = isServerExcluded(server.id);
-          const status = server.lastHealthStatus ?? 'unknown';
-          const isUnhealthy = status === 'unhealthy';
+          const enabledToolCount = serverTools.filter((tool) => tool.enabled).length;
 
           return (
-            <div
-              key={server.id}
-              className={cn(
-                'rounded-md border',
-                excluded && 'opacity-50',
-                isUnhealthy && 'border-red-200 dark:border-red-900',
-              )}
-            >
-              {/* Server header */}
+            <div key={server.id} className="rounded-md border">
               <div className="flex items-center gap-2 px-2 py-1.5">
                 <button
                   type="button"
-                  onClick={() => toggleServer(server.id)}
+                  onClick={() =>
+                    setExpanded((current) => ({
+                      ...current,
+                      [server.id]: !isExpanded,
+                    }))
+                  }
                   className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                  aria-label={`${isExpanded ? 'Hide' : 'Show'} tools for ${server.name}`}
+                  aria-expanded={isExpanded}
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -179,99 +144,74 @@ export function McpLibraryToolSelector({
                     <ChevronRight className="h-3.5 w-3.5" />
                   )}
                 </button>
-
-                <Checkbox
-                  id={`server-${server.id}`}
-                  checked={!excluded}
-                  onCheckedChange={() => handleServerExclusionToggle(server.id)}
-                  className="h-3.5 w-3.5"
-                />
-
-                {getHealthIndicator(server.id)}
-
                 <Server className="h-3.5 w-3.5 text-muted-foreground" />
-
-                <label
-                  htmlFor={`server-${server.id}`}
-                  className={cn(
-                    'flex-1 text-xs font-medium cursor-pointer truncate',
-                    excluded && 'line-through text-muted-foreground',
-                  )}
-                  title={server.name}
-                >
+                <span className="min-w-0 flex-1 truncate text-xs font-medium" title={server.name}>
                   {server.name}
-                </label>
-
-                <Badge variant="outline" className="text-[9px] px-1 py-0">
+                </span>
+                <Badge variant="outline" className="px-1 py-0 text-[9px]">
                   {server.transportType}
                 </Badge>
-
-                {serverTools.length > 0 && (
-                  <Badge variant="secondary" className="text-[9px] px-1 py-0">
-                    {serverTools.length} tool{serverTools.length !== 1 ? 's' : ''}
-                  </Badge>
-                )}
+                <Badge variant="secondary" className="px-1 py-0 text-[9px]">
+                  {enabledToolCount}/{serverTools.length}
+                </Badge>
               </div>
 
-              {/* Expanded tools list */}
-              {isExpanded && serverTools.length > 0 && (
-                <div className="border-t px-2 py-1.5 space-y-1 bg-muted/30">
-                  {serverTools.map((tool) => {
-                    const toolExcluded = isToolExcluded(tool.toolName);
-                    return (
-                      <div key={tool.id} className="flex items-center gap-2 pl-6">
-                        <Checkbox
-                          id={`tool-${tool.id}`}
-                          checked={!toolExcluded && !excluded}
-                          onCheckedChange={() => handleToolExclusionToggle(tool.toolName)}
-                          disabled={excluded}
-                          className="h-3 w-3"
-                        />
-                        <Wrench className="h-3 w-3 text-muted-foreground" />
-                        <label
-                          htmlFor={`tool-${tool.id}`}
-                          className={cn(
-                            'flex-1 text-[11px] cursor-pointer truncate',
-                            (toolExcluded || excluded) && 'line-through text-muted-foreground',
-                          )}
-                          title={tool.description ?? tool.toolName}
-                        >
-                          {tool.toolName}
-                        </label>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              {isExpanded && (
+                <div className="space-y-1 border-t bg-muted/30 px-2 py-1.5">
+                  {serverTools.length === 0 ? (
+                    <span className="pl-6 text-[10px] text-muted-foreground">
+                      No persisted tools. Live discovery remains available at run time.
+                    </span>
+                  ) : (
+                    serverTools.map((tool) => {
+                      const key = toolExclusionKey(server.id, tool.toolName);
+                      const workflowExcluded = exclusionSet.has(key);
+                      const unavailable = !tool.enabled;
+                      const checkboxDisabled = disabled || unavailable;
 
-              {/* Show message if no tools discovered */}
-              {isExpanded && serverTools.length === 0 && (
-                <div className="border-t px-2 py-1.5 bg-muted/30">
-                  <span className="text-[10px] text-muted-foreground pl-6">
-                    No tools discovered. Check server health.
-                  </span>
+                      return (
+                        <div key={tool.id} className="flex items-center gap-2 pl-6">
+                          <Checkbox
+                            id={`tool-${tool.id}`}
+                            aria-label={`${tool.toolName} on ${server.name}`}
+                            checked={tool.enabled && !workflowExcluded}
+                            onCheckedChange={() =>
+                              !checkboxDisabled && handleToolToggle(server.id, tool.toolName)
+                            }
+                            disabled={checkboxDisabled}
+                            className="h-3 w-3"
+                          />
+                          <Wrench className="h-3 w-3 text-muted-foreground" />
+                          <label
+                            htmlFor={`tool-${tool.id}`}
+                            className={cn(
+                              'min-w-0 flex-1 truncate text-[11px]',
+                              !checkboxDisabled && 'cursor-pointer',
+                              (workflowExcluded || unavailable) &&
+                                'text-muted-foreground line-through',
+                            )}
+                            title={tool.description ?? tool.toolName}
+                          >
+                            {tool.toolName}
+                          </label>
+                          {unavailable && (
+                            <Badge
+                              variant="outline"
+                              className="px-1 py-0 text-[9px] text-muted-foreground"
+                            >
+                              Globally disabled
+                            </Badge>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
-
-      {/* Summary of exclusions */}
-      {(serverExclusions.length > 0 || toolExclusions.length > 0) && (
-        <div className="text-[10px] text-muted-foreground pt-1 border-t">
-          {serverExclusions.length > 0 && (
-            <div>
-              {serverExclusions.length} server{serverExclusions.length !== 1 ? 's' : ''} excluded
-            </div>
-          )}
-          {toolExclusions.length > 0 && (
-            <div>
-              {toolExclusions.length} tool{toolExclusions.length !== 1 ? 's' : ''} excluded
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

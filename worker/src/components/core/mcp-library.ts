@@ -10,6 +10,7 @@ import {
 } from '@sentris/component-sdk';
 import {
   fetchEnabledServers,
+  fetchPersistedMcpTools,
   registerProviderReady,
   registerServerTools,
 } from './mcp-library-utils';
@@ -32,6 +33,17 @@ const parameterSchema = parameters({
       editor: 'boolean',
       description:
         'Expose all enabled custom MCP servers from the MCP library. Useful for reusable templates where server IDs differ between environments.',
+    },
+  ),
+  toolExclusions: param(
+    z
+      .array(z.string())
+      .default([])
+      .describe('Server-qualified MCP tool keys excluded from this workflow'),
+    {
+      label: 'Enabled Tools',
+      editor: 'multi-select',
+      description: 'Select the exact MCP tools exposed by this workflow',
     },
   ),
   continueOnServerError: param(
@@ -91,15 +103,17 @@ const definition = defineComponent({
   async execute({ params }, context) {
     const enabledServers = params.enabledServers as string[];
     const useAllEnabled = params.useAllEnabled === true;
+    const toolExclusions = params.toolExclusions as string[];
     const continueOnServerError = params.continueOnServerError === true;
 
     // 1. Fetch server details from backend
     const servers = await fetchEnabledServers(enabledServers, context, { useAllEnabled });
+    const persistedTools = servers.length > 0 ? await fetchPersistedMcpTools(context) : [];
 
     // 2. Register each server's tools with Tool Registry
     for (const server of servers) {
       try {
-        await registerServerTools(server, context);
+        await registerServerTools(server, context, { persistedTools, toolExclusions });
       } catch (error) {
         if (!continueOnServerError) {
           throw error;

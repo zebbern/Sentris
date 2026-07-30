@@ -72,7 +72,7 @@ describe('MCP Library Integration Tests', () => {
     global.fetch = originalFetch;
   });
 
-  function setupFetchMocks(servers: any[] = []) {
+  function setupFetchMocks(servers: any[] = [], persistedTools: any[] = []) {
     // Add required timestamps to servers
     const serversWithTimestamps = servers.map((s) => ({
       ...s,
@@ -85,6 +85,14 @@ describe('MCP Library Integration Tests', () => {
       // Internal token generation endpoint
       if (url.includes('/generate-token')) {
         return new Response(JSON.stringify({ token: 'test-internal-token' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Fetch persisted tool enablement records
+      if (url.endsWith('/api/v1/mcp-servers/tools')) {
+        return new Response(JSON.stringify(persistedTools), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -442,6 +450,180 @@ describe('MCP Library Integration Tests', () => {
   });
 
   describe('Test Case 3: Tool Registration Verification', () => {
+    test('registers only live tools that remain globally enabled and workflow-selected', async () => {
+      mockListTools.mockResolvedValueOnce({
+        tools: [
+          {
+            name: 'ping',
+            description: 'Ping a target',
+            inputSchema: { type: 'object', properties: {} },
+          },
+          {
+            name: 'status',
+            description: 'Read status',
+            inputSchema: { type: 'object', properties: {} },
+          },
+          {
+            name: 'inspect',
+            description: 'Inspect a target',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      });
+      setupFetchMocks(
+        [
+          {
+            id: 'http-server',
+            name: 'HTTP MCP Server',
+            transportType: 'http',
+            command: null,
+            args: null,
+            enabled: true,
+            endpoint: 'https://example.com/mcp',
+            hasHeaders: false,
+            headerKeys: null,
+          },
+        ],
+        [
+          {
+            id: 'tool-ping',
+            toolName: 'ping',
+            description: null,
+            inputSchema: null,
+            serverId: 'http-server',
+            serverName: 'HTTP MCP Server',
+            enabled: false,
+            discoveredAt: '2026-07-31T00:00:00.000Z',
+          },
+          {
+            id: 'tool-status',
+            toolName: 'status',
+            description: null,
+            inputSchema: null,
+            serverId: 'http-server',
+            serverName: 'HTTP MCP Server',
+            enabled: true,
+            discoveredAt: '2026-07-31T00:00:00.000Z',
+          },
+          {
+            id: 'tool-inspect',
+            toolName: 'inspect',
+            description: null,
+            inputSchema: null,
+            serverId: 'http-server',
+            serverName: 'HTTP MCP Server',
+            enabled: true,
+            discoveredAt: '2026-07-31T00:00:00.000Z',
+          },
+        ],
+      );
+
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      const context = createExecutionContext({
+        runId: 'test-run-exact-tools',
+        componentRef: 'mcp.custom',
+        metadata: { organizationId: 'org-exact-tools' },
+      });
+
+      await component!.execute(
+        {
+          inputs: {},
+          params: {
+            enabledServers: ['http-server'],
+            toolExclusions: ['http-server:inspect'],
+          },
+        },
+        context,
+      );
+
+      const toolsRequest = (global.fetch as any).mock.calls.find(([url]: [string]) =>
+        url.endsWith('/api/v1/mcp-servers/tools'),
+      );
+      expect(toolsRequest[1].headers).toMatchObject({
+        'x-internal-token': 'test-internal-token',
+        'x-organization-id': 'org-exact-tools',
+      });
+
+      const registerCall = (global.fetch as any).mock.calls.find(
+        ([url, init]: [string, RequestInit]) =>
+          url.includes('/register-mcp-server') && init?.method === 'POST',
+      );
+      expect(JSON.parse(String(registerCall[1].body)).tools.map((tool: any) => tool.name)).toEqual([
+        'status',
+      ]);
+    });
+
+    test('continues after exact filtering leaves one optional server with zero tools', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setupFetchMocks(
+        [
+          {
+            id: 'empty-server',
+            name: 'Empty MCP Server',
+            transportType: 'http',
+            command: null,
+            args: null,
+            enabled: true,
+            endpoint: 'https://empty.example.com/mcp',
+            hasHeaders: false,
+            headerKeys: null,
+          },
+          {
+            id: 'working-server',
+            name: 'Working MCP Server',
+            transportType: 'http',
+            command: null,
+            args: null,
+            enabled: true,
+            endpoint: 'https://working.example.com/mcp',
+            hasHeaders: false,
+            headerKeys: null,
+          },
+        ],
+        [
+          {
+            id: 'empty-ping',
+            toolName: 'ping',
+            description: null,
+            inputSchema: null,
+            serverId: 'empty-server',
+            serverName: 'Empty MCP Server',
+            enabled: false,
+            discoveredAt: '2026-07-31T00:00:00.000Z',
+          },
+        ],
+      );
+
+      const component = componentRegistry.get<McpLibraryInput, McpLibraryOutput>('mcp.custom');
+      const context = createExecutionContext({
+        runId: 'test-run-zero-tools-continue',
+        componentRef: 'custom-mcps',
+      });
+
+      const result = await component!.execute(
+        {
+          inputs: {},
+          params: {
+            enabledServers: ['empty-server', 'working-server'],
+            continueOnServerError: true,
+          },
+        },
+        context,
+      );
+
+      const registerCalls = (global.fetch as any).mock.calls.filter(
+        ([url, init]: [string, RequestInit]) =>
+          url.includes('/register-mcp-server') && init?.method === 'POST',
+      );
+      expect(result).toEqual({});
+      expect(registerCalls).toHaveLength(1);
+      expect(JSON.parse(String(registerCalls[0][1].body)).serverId).toBe('working-server');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('No MCP tools remain enabled for server empty-server'),
+      );
+      warnSpy.mockRestore();
+    });
+
     test('should verify tool registration payload structure', async () => {
       setupFetchMocks([
         {
