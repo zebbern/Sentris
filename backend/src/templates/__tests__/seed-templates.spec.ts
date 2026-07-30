@@ -4744,21 +4744,22 @@ describe('new seed templates', () => {
     );
 
     const result = runTemplateScript<{
-      report: { summary: { findings: number }; warnings: unknown[]; nextSteps: unknown[] };
+      report: { summary: { findings: number }; warnings: unknown[]; nextSteps: string[] };
     }>(assembleNode.data.config.params.code, {
       domain: 'example.com',
       validDomain: true,
       authorizationNotes: 'test fixture',
-      rootData: { Answer: [{ type: 16, data: '"v=spf1 -all"' }] },
+      rootData: { Status: 0, Answer: [{ type: 16, data: '"v=spf1 -all"' }] },
       rootStatus: 200,
-      dmarcData: { Answer: [{ type: 16, data: '"v=DMARC1; p=none; pct=50"' }] },
+      dmarcData: { Status: 0, Answer: [{ type: 16, data: '"v=DMARC1; p=none; pct=50"' }] },
       dmarcStatus: 200,
-      mxData: { Answer: [] },
+      mxData: { Status: 0, Answer: [] },
       mxStatus: 200,
     });
 
     expect(result.report.summary.findings).toBe(3);
     expect(result.report.nextSteps.length).toBeGreaterThan(0);
+    expect(result.report.nextSteps.join(' ')).not.toContain('SPF record');
     expect(result.report.warnings).toEqual(expect.any(Array));
   });
 
@@ -4794,6 +4795,7 @@ describe('new seed templates', () => {
         code_challenge_methods_supported: ['S256'],
         id_token_signing_alg_values_supported: ['RS256'],
         response_types_supported: ['code'],
+        subject_types_supported: ['public'],
       },
     });
 
@@ -4879,6 +4881,166 @@ describe('new seed templates', () => {
     });
     expect(unavailable.report.findings).toEqual([]);
     expect(unavailable.report.warnings.join(' ')).toContain('no usable DNS evidence');
+  });
+
+  it('domain-email-authentication-posture rejects DNS application errors without absence findings', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+    const result = runTemplateScript<{
+      report: {
+        findings: unknown[];
+        warnings: string[];
+        nextSteps: string[];
+        sourceStatuses: Record<string, { dnsStatus: number; usable: boolean }>;
+      };
+    }>(assembleNode.data.config.params.code, {
+      domain: 'example.com',
+      validDomain: true,
+      rootData: { Status: 2, Comment: 'SERVFAIL' },
+      rootStatus: 200,
+      dmarcData: { Status: 5, Comment: 'REFUSED' },
+      dmarcStatus: 200,
+      mxData: { Status: null, Answer: [] },
+      mxStatus: 200,
+    });
+
+    expect(result.report.findings).toEqual([]);
+    expect(result.report.sourceStatuses).toEqual({
+      rootTxt: expect.objectContaining({ dnsStatus: 2, usable: false }),
+      dmarcTxt: expect.objectContaining({ dnsStatus: 5, usable: false }),
+      mx: expect.objectContaining({ dnsStatus: null, usable: false }),
+    });
+    expect(result.report.warnings.join(' ')).toContain('DNS status');
+    expect(result.report.nextSteps[0]).toContain('Retry');
+    expect(result.report.nextSteps.join(' ')).not.toContain('Publish');
+  });
+
+  it('domain-email-authentication-posture treats NXDOMAIN as usable negative evidence', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+    const result = runTemplateScript<{
+      report: {
+        findings: { title: string }[];
+        sourceStatuses: Record<string, { dnsStatus: number; usable: boolean }>;
+      };
+    }>(assembleNode.data.config.params.code, {
+      domain: 'example.com',
+      validDomain: true,
+      rootData: { Status: 3 },
+      rootStatus: 200,
+      dmarcData: { Status: 3 },
+      dmarcStatus: 200,
+      mxData: { Status: 3 },
+      mxStatus: 200,
+    });
+
+    expect(result.report.sourceStatuses).toEqual({
+      rootTxt: expect.objectContaining({ dnsStatus: 3, usable: true }),
+      dmarcTxt: expect.objectContaining({ dnsStatus: 3, usable: true }),
+      mx: expect.objectContaining({ dnsStatus: 3, usable: true }),
+    });
+    expect(result.report.findings.map((finding) => finding.title)).toEqual([
+      'No SPF record observed',
+      'No DMARC record observed',
+      'No MX records observed',
+    ]);
+  });
+
+  it('domain-email-authentication-posture gives neutral next steps for clean evidence', () => {
+    const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_email_posture',
+    );
+    const result = runTemplateScript<{
+      report: { findings: unknown[]; warnings: string[]; nextSteps: string[] };
+    }>(assembleNode.data.config.params.code, {
+      domain: 'example.com',
+      validDomain: true,
+      rootData: { Status: 0, Answer: [{ type: 16, data: '"v=spf1 -all"' }] },
+      rootStatus: 200,
+      dmarcData: { Status: 0, Answer: [{ type: 16, data: '"v=DMARC1; p=reject; pct=100"' }] },
+      dmarcStatus: 200,
+      mxData: { Status: 0, Answer: [{ type: 15, data: '10 mail.example.com.' }] },
+      mxStatus: 200,
+    });
+
+    expect(result.report.findings).toEqual([]);
+    expect(result.report.warnings).toEqual([]);
+    expect(result.report.nextSteps[0]).toContain('No SPF, DMARC, or MX posture gaps');
+    expect(result.report.nextSteps.join(' ')).not.toContain('Publish');
+  });
+
+  it('oidc-discovery-configuration-review rejects 2xx error payloads as unusable evidence', () => {
+    const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_oidc_review',
+    );
+    const result = runTemplateScript<{
+      report: {
+        findings: unknown[];
+        warnings: string[];
+        sourceStatus: { usable: boolean };
+      };
+    }>(assembleNode.data.config.params.code, {
+      expectedIssuer: 'https://issuer.example',
+      validIssuer: true,
+      status: 200,
+      data: { error: 'temporarily_unavailable' },
+    });
+
+    expect(result.report.sourceStatus.usable).toBe(false);
+    expect(result.report.findings).toEqual([]);
+    expect(result.report.warnings.join(' ')).toContain('plausible discovery metadata');
+  });
+
+  it('oidc-discovery-configuration-review flags response types containing implicit-flow tokens', () => {
+    const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_oidc_review',
+    );
+    const riskyResponseTypes = [
+      'id_token',
+      'token',
+      'code id_token',
+      'code token',
+      'id_token token',
+    ];
+
+    for (const responseType of riskyResponseTypes) {
+      const result = runTemplateScript<{
+        report: { findings: { title: string; evidence: { responseTypesSupported: string[] } }[] };
+      }>(assembleNode.data.config.params.code, {
+        expectedIssuer: 'https://issuer.example',
+        validIssuer: true,
+        status: 200,
+        data: {
+          issuer: 'https://issuer.example',
+          authorization_endpoint: 'https://issuer.example/authorize',
+          token_endpoint: 'https://issuer.example/token',
+          jwks_uri: 'https://issuer.example/jwks',
+          code_challenge_methods_supported: ['S256'],
+          id_token_signing_alg_values_supported: ['RS256'],
+          response_types_supported: [responseType],
+          subject_types_supported: ['public'],
+        },
+      });
+
+      expect(result.report.findings).toEqual([
+        expect.objectContaining({
+          title: 'Potentially higher-risk response type is advertised',
+          evidence: { responseTypesSupported: [responseType] },
+        }),
+      ]);
+    }
   });
 
   it('oidc-discovery-configuration-review does not infer metadata findings from unavailable or invalid inputs', () => {
