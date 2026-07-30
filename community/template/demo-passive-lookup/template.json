@@ -1,0 +1,135 @@
+{
+  "_metadata": {
+    "name": "HTTP URL Status Check",
+    "description": "Community example template: GET a public URL and summarize HTTP status metadata. Safe demo for Template Library → Community; no secrets or tools required.",
+    "category": "recon",
+    "tags": ["community", "example", "http", "status-check", "demo"],
+    "author": "zebbern",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "HTTP URL Status Check",
+    "description": "Community example: check a public URL with a simple GET and summarize status.",
+    "version": "1.0.0",
+    "author": "zebbern",
+    "category": "recon",
+    "tags": ["community", "example", "http", "status-check", "demo"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 3,
+    "edgeCount": 5
+  },
+  "graph": {
+    "name": "HTTP URL Status Check",
+    "description": "Minimal community example: public HTTP GET status summary.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": { "x": 100, "y": 240 },
+        "data": {
+          "label": "URL Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "targetUrl",
+                  "label": "Target URL",
+                  "type": "text",
+                  "required": true,
+                  "defaultValue": "https://httpbin.org/get",
+                  "description": "Public HTTPS URL to check (example: https://httpbin.org/get or http://scanme.nmap.org/)."
+                },
+                {
+                  "id": "notes",
+                  "label": "Notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Optional context for this community example run."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "http_get",
+        "type": "core.http.request",
+        "position": { "x": 420, "y": 240 },
+        "data": {
+          "label": "HTTP GET",
+          "config": {
+            "params": {
+              "method": "GET",
+              "contentType": "application/json",
+              "authType": "none",
+              "timeout": 15000,
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "summarize_status",
+        "type": "core.logic.script",
+        "position": { "x": 740, "y": 240 },
+        "data": {
+          "label": "Summarize Status",
+          "config": {
+            "params": {
+              "variables": [
+                { "name": "targetUrl", "type": "string" },
+                { "name": "notes", "type": "string" },
+                { "name": "status", "type": "number" },
+                { "name": "statusText", "type": "string" }
+              ],
+              "returns": [{ "name": "summary", "type": "json" }],
+              "code": "export function script(input) {\n  const status = Number(input.status || 0);\n  const ok = status >= 200 && status < 400;\n  return {\n    summary: {\n      template: 'community-example-http-url-status-check',\n      targetUrl: typeof input.targetUrl === 'string' ? input.targetUrl : null,\n      status,\n      statusText: input.statusText || null,\n      ok,\n      notes: input.notes || null,\n      note: 'Community example template — not an official Sentris workflow.'\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger-http-url",
+        "source": "trigger_1",
+        "target": "http_get",
+        "sourceHandle": "targetUrl",
+        "targetHandle": "url"
+      },
+      {
+        "id": "trigger-summarize-url",
+        "source": "trigger_1",
+        "target": "summarize_status",
+        "sourceHandle": "targetUrl",
+        "targetHandle": "targetUrl"
+      },
+      {
+        "id": "trigger-summarize-notes",
+        "source": "trigger_1",
+        "target": "summarize_status",
+        "sourceHandle": "notes",
+        "targetHandle": "notes"
+      },
+      {
+        "id": "http-summarize-status",
+        "source": "http_get",
+        "target": "summarize_status",
+        "sourceHandle": "status",
+        "targetHandle": "status"
+      },
+      {
+        "id": "http-summarize-status-text",
+        "source": "http_get",
+        "target": "summarize_status",
+        "sourceHandle": "statusText",
+        "targetHandle": "statusText"
+      }
+    ]
+  },
+  "requiredSecrets": []
+}
