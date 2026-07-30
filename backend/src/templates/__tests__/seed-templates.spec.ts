@@ -4804,7 +4804,7 @@ describe('new seed templates', () => {
     expect(result.report.warnings).toEqual(expect.any(Array));
   });
 
-  it('domain-email-authentication-posture does not infer missing records from unavailable DNS', () => {
+  it('domain-email-authentication-posture ignores invalid-domain sentinel NXDOMAIN evidence', () => {
     const filePath = join(seedTemplatesDir, 'domain-email-authentication-posture.json');
     const template = JSON.parse(readFileSync(filePath, 'utf8'));
     const buildNode = template.graph.nodes.find(
@@ -4824,27 +4824,39 @@ describe('new seed templates', () => {
       report: {
         findings: { title: string }[];
         warnings: string[];
-        sourceStatuses: { rootTxt: { usable: boolean } };
+        nextSteps: string[];
+        sourceStatuses: Record<string, { usable: boolean }>;
       };
     }>(assembleNode.data.config.params.code, {
       domain: invalidInput.domain,
       validDomain: invalidInput.validDomain,
-      rootStatus: 503,
-      rootStatusText: 'Service Unavailable',
-      dmarcStatus: 503,
-      dmarcStatusText: 'Service Unavailable',
-      mxStatus: 503,
-      mxStatusText: 'Service Unavailable',
+      rootData: { Status: 3 },
+      rootStatus: 200,
+      rootStatusText: 'OK',
+      dmarcData: { Status: 3 },
+      dmarcStatus: 200,
+      dmarcStatusText: 'OK',
+      mxData: { Status: 3 },
+      mxStatus: 200,
+      mxStatusText: 'OK',
     });
 
     expect(invalidInput.validDomain).toBe(false);
     expect([invalidInput.rootTxtUrl, invalidInput.dmarcTxtUrl, invalidInput.mxUrl]).toEqual(
       expect.arrayContaining([expect.stringContaining('invalid.invalid')]),
     );
-    expect(unavailable.report.sourceStatuses.rootTxt.usable).toBe(false);
+    expect(unavailable.report.sourceStatuses).toEqual({
+      rootTxt: expect.objectContaining({ usable: true }),
+      dmarcTxt: expect.objectContaining({ usable: true }),
+      mx: expect.objectContaining({ usable: true }),
+    });
     expect(unavailable.report.findings).toEqual([]);
-    expect(unavailable.report.warnings.join(' ')).toContain('invalid');
-    expect(unavailable.report.warnings.join(' ')).toContain('no usable DNS evidence');
+    expect(unavailable.report.warnings).toEqual([
+      'The supplied domain was empty or invalid; DNS requests were routed to invalid.invalid.',
+    ]);
+    expect(unavailable.report.nextSteps).toEqual([
+      'Provide a valid domain and rerun the public DNS posture review.',
+    ]);
   });
 
   it('domain-email-authentication-posture does not infer missing records for a valid domain when DNS is unavailable', () => {
@@ -4905,6 +4917,7 @@ describe('new seed templates', () => {
       dmarcStatus: 200,
       mxData: { Status: null, Answer: [] },
       mxStatus: 200,
+      mxStatusText: 'OK',
     });
 
     expect(result.report.findings).toEqual([]);
@@ -4914,6 +4927,11 @@ describe('new seed templates', () => {
       mx: expect.objectContaining({ dnsStatus: null, usable: false }),
     });
     expect(result.report.warnings.join(' ')).toContain('DNS status');
+    const malformedStatusWarning = result.report.warnings.find((warning) =>
+      warning.startsWith('mx lookup'),
+    );
+    expect(malformedStatusWarning).toContain('missing or invalid DNS application status');
+    expect(malformedStatusWarning).not.toContain(': OK');
     expect(result.report.nextSteps[0]).toContain('Retry');
     expect(result.report.nextSteps.join(' ')).not.toContain('Publish');
   });
@@ -4999,6 +5017,28 @@ describe('new seed templates', () => {
     expect(result.report.sourceStatus.usable).toBe(false);
     expect(result.report.findings).toEqual([]);
     expect(result.report.warnings.join(' ')).toContain('plausible discovery metadata');
+  });
+
+  it('oidc-discovery-configuration-review rejects arbitrary 2xx JSON missing discovery fields', () => {
+    const filePath = join(seedTemplatesDir, 'oidc-discovery-configuration-review.json');
+    const template = JSON.parse(readFileSync(filePath, 'utf8'));
+    const assembleNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'assemble_oidc_review',
+    );
+    const result = runTemplateScript<{
+      report: { findings: unknown[]; warnings: string[]; sourceStatus: { usable: boolean } };
+    }>(assembleNode.data.config.params.code, {
+      expectedIssuer: 'https://issuer.example',
+      validIssuer: true,
+      status: 200,
+      statusText: 'OK',
+      data: { message: 'healthy' },
+    });
+
+    expect(result.report.sourceStatus.usable).toBe(false);
+    expect(result.report.findings).toEqual([]);
+    expect(result.report.warnings.join(' ')).toContain('missing required discovery fields');
+    expect(result.report.warnings.join(' ')).not.toContain(': OK');
   });
 
   it('oidc-discovery-configuration-review flags response types containing implicit-flow tokens', () => {
