@@ -74,10 +74,19 @@ describe('RunReportSummary', () => {
 
   it('offers the full report without an error banner when preview content cannot be summarized', () => {
     previewState.data = { status: 'ready', content: '{not json' };
+
+    render(<RunReportSummary runId="run-1" artifacts={[reportArtifact]} onViewReport={() => {}} />);
+
+    expect(screen.getByRole('button', { name: 'View full report' })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('offers a neutral full-report fallback when the preview request fails', () => {
     previewState.error = new Error('Preview request failed');
 
     render(<RunReportSummary runId="run-1" artifacts={[reportArtifact]} onViewReport={() => {}} />);
 
+    expect(screen.getByText('View the full report for run details.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'View full report' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByText('Preview request failed')).toBeNull();

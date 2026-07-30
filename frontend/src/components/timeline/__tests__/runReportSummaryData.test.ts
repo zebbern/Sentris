@@ -51,7 +51,7 @@ describe('extractRunReportSummary', () => {
       extractRunReportSummary(
         JSON.stringify({
           summary: { packagesChecked: 3, vulnerablePackages: 0, highestSeverity: null },
-          warnings: ['NVD lookup was unavailable'],
+          warnings: ['NVD lookup was unavailable', 'Ignored second warning'],
           nextSteps: ['Retry later', 'Review lockfile', 'Ignored third action'],
         }),
       ),
@@ -71,7 +71,7 @@ describe('extractRunReportSummary', () => {
         JSON.stringify({
           report: {
             summary: { findingsClosed: 0, remediationRequired: false },
-            recommendations: ['Review the affected dependency'],
+            recommendations: ['Review the affected dependency', 'Ignored second recommendation'],
             nextSteps: ['Open the report'],
           },
         }),
