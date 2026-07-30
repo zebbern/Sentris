@@ -1,12 +1,14 @@
-import { describe, it, beforeEach, afterEach, expect, mock } from 'bun:test';
-import { screen, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
+import { screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { createSelectMock } from '@/test/mocks/radix-select';
 import { createAuthStoreMock } from '@/test/mocks/auth-store';
+import { realModuleExports, restoreMockedModules } from '@/test/restore-mocks';
 import { renderWithProviders } from '@/test/render-with-providers';
 import type { FindingsResponse, FindingItem } from '@/services/api/findings';
 import type { FindingsQueryParams } from '@/services/api';
 
 // --- Mock select components (passthrough for test rendering) ---
+realModuleExports('@/components/ui/select');
 mock.module('@/components/ui/select', createSelectMock);
 
 // --- Mutable mock state for findings queries ---
@@ -21,6 +23,7 @@ const mockQueryState: {
 };
 const mockFindingsQueryParams: FindingsQueryParams[] = [];
 
+realModuleExports('@/hooks/queries/useFindingsQueries');
 mock.module('@/hooks/queries/useFindingsQueries', () => ({
   useFindingsQuery: (params: FindingsQueryParams) => {
     mockFindingsQueryParams.push(params);
@@ -36,8 +39,10 @@ mock.module('@/hooks/queries/useFindingsQueries', () => ({
 }));
 
 // --- Auth store ---
+realModuleExports('@/store/authStore');
 mock.module('@/store/authStore', () => createAuthStoreMock());
 
+realModuleExports('@/features/findings/FindingDetailSheet');
 mock.module('@/features/findings/FindingDetailSheet', () => ({
   FindingDetailSheet: ({ findingId, isOpen }: { findingId: string | null; isOpen: boolean }) =>
     isOpen ? <div role="dialog">detail:{findingId}</div> : null,
@@ -123,12 +128,33 @@ describe('FindingsPage', () => {
     cleanup();
   });
 
-  it('omits the redundant page heading supplied by the app top bar', () => {
+  afterAll(() =>
+    restoreMockedModules([
+      '@/components/ui/select',
+      '@/hooks/queries/useFindingsQueries',
+      '@/store/authStore',
+      '@/features/findings/FindingDetailSheet',
+    ]),
+  );
+
+  it('omits the redundant page heading and top-bar controls supplied by AppLayout', () => {
     setupStore();
     renderPage();
 
     expect(screen.queryByRole('heading', { level: 2, name: /^Findings$/ })).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Search findings by name/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Search findings/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Table/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Kanban/i })).not.toBeInTheDocument();
+  });
+
+  it('passes ?search= URL param to the findings query after debounce', async () => {
+    setupStore({ data: POPULATED_RESPONSE });
+    renderPage('/findings?search=sql');
+
+    await waitFor(() => {
+      const latestParams = mockFindingsQueryParams[mockFindingsQueryParams.length - 1];
+      expect(latestParams?.search).toBe('sql');
+    });
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {

@@ -1,7 +1,12 @@
-import { describe, it, expect, afterEach } from 'bun:test';
+import { describe, it, expect, afterEach, mock } from 'bun:test';
 import { render, screen, cleanup } from '@testing-library/react';
+import { createDialogMock } from '@/test/mocks/dialog';
 import type { Template } from '@/types/templates';
+
+mock.module('@/components/ui/dialog', createDialogMock);
+
 import { TemplateCard } from '../TemplateCard';
+import { TemplateDetailModal } from '../TemplateDetailModal';
 
 afterEach(cleanup);
 
@@ -28,25 +33,20 @@ function makeTemplate(
   };
 }
 
-describe('TemplateCard no-setup badge', () => {
-  it('shows the badge for a net-only template', () => {
+describe('TemplateCard readiness metadata', () => {
+  it('keeps readiness status out of the grid card', () => {
     const t = makeTemplate([
       'core.workflow.entrypoint',
       'sentris.nvd.cve.query',
       'core.artifact.writer',
     ]);
     render(<TemplateCard template={t} onUse={() => {}} onPreview={() => {}} canUse />);
-    expect(screen.getByText('No setup required')).toBeDefined();
-  });
-
-  it('does not show the badge for a Docker-scanner template', () => {
-    const t = makeTemplate(['core.workflow.entrypoint', 'sentris.nuclei.scan']);
-    render(<TemplateCard template={t} onUse={() => {}} onPreview={() => {}} canUse />);
     expect(screen.queryByText('No setup required')).toBeNull();
-    expect(screen.getByText('Local tools required')).toBeDefined();
+    expect(screen.queryByText('Active')).toBeNull();
+    expect(screen.queryByText(/ago|today/i)).toBeNull();
   });
 
-  it('surfaces live verification, run inputs, report output, and an action-oriented CTA', () => {
+  it('surfaces readiness in the detail modal instead', () => {
     const t = makeTemplate([
       'core.workflow.entrypoint',
       'sentris.osv.query',
@@ -76,12 +76,27 @@ describe('TemplateCard no-setup badge', () => {
       isCurrent: true,
     };
 
+    render(
+      <TemplateDetailModal template={t} open onOpenChange={() => {}} onUse={() => {}} canUse />,
+    );
+
+    expect(screen.getByText('Active')).toBeDefined();
+    expect(screen.getByText('Live verified')).toBeDefined();
+    expect(screen.getByText('No setup required')).toBeDefined();
+    expect(screen.getByText(/Updated /i)).toBeDefined();
+    expect(screen.getByText('1 run input')).toBeDefined();
+    expect(screen.getByText('Creates a report')).toBeDefined();
+  });
+
+  it('still shows recommended starter and CTA on the card', () => {
+    const t = makeTemplate([
+      'core.workflow.entrypoint',
+      'sentris.osv.query',
+      'core.artifact.writer',
+    ]);
     render(<TemplateCard template={t} onUse={() => {}} onPreview={() => {}} canUse recommended />);
 
     expect(screen.getByText('Recommended starter')).toBeDefined();
-    expect(screen.getByText('Live verified')).toBeDefined();
-    expect(screen.getByText('1 run input')).toBeDefined();
-    expect(screen.getByText('Creates a report')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Configure & Run' })).toBeDefined();
   });
 });

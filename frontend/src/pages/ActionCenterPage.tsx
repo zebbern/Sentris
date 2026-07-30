@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,13 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DndContext } from '@dnd-kit/core';
@@ -24,17 +18,9 @@ import { useSortableList } from '@/hooks/useSortableList';
 import { Zap } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorBanner } from '@/components/ui/error-banner';
-import { PageToolbar } from '@/components/shared/PageToolbar';
 import { ActionCenterRow } from '@/pages/action-center/ActionCenterRow';
 import { useHumanInputs, useInvalidateHumanInputs } from '@/hooks/queries/useHumanInputQueries';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'expired', label: 'Expired' },
-];
 
 import {
   HumanInputResolutionView,
@@ -43,15 +29,19 @@ import {
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useAuthStore } from '@/store/authStore';
 
+const ACTION_CENTER_STATUSES = new Set(['all', 'pending', 'resolved', 'expired']);
+
 export function ActionCenterPage() {
   useDocumentTitle('Action Center');
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'expired'>(
-    'pending',
-  );
+  const [searchParams, setSearchParams] = useSearchParams();
   const [actionState] = useState<Record<string, 'approve' | 'reject' | 'view'>>({});
 
   const organizationId = useAuthStore((state) => state.organizationId);
+  const search = searchParams.get('search') ?? '';
+  const rawStatus = searchParams.get('status') ?? 'pending';
+  const statusFilter = ACTION_CENTER_STATUSES.has(rawStatus)
+    ? (rawStatus as 'all' | 'pending' | 'resolved' | 'expired')
+    : 'pending';
 
   const status = statusFilter === 'all' ? undefined : statusFilter;
   const {
@@ -147,38 +137,6 @@ export function ActionCenterPage() {
             </div>
           )}
 
-          {/* Filters */}
-          <PageToolbar
-            searchValue={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Filter by title, node, or run ID"
-            searchLabel="Search requests"
-            filters={
-              <>
-                <Select
-                  value={statusFilter}
-                  onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {lastUpdatedText ? (
-                  <span className="ml-auto self-center text-xs text-muted-foreground whitespace-nowrap">
-                    Updated {lastUpdatedText}
-                  </span>
-                ) : null}
-              </>
-            }
-          />
-
           {error && <ErrorBanner message={error} onRetry={handleRefresh} />}
 
           {/* Table */}
@@ -258,14 +216,23 @@ export function ActionCenterPage() {
                                 <Button
                                   variant="outline"
                                   onClick={() => {
-                                    setSearch('');
-                                    setStatusFilter('all');
+                                    const next = new URLSearchParams(searchParams);
+                                    next.delete('search');
+                                    next.set('status', 'all');
+                                    setSearchParams(next, { replace: true });
                                   }}
                                 >
                                   Clear filters
                                 </Button>
                               ) : statusFilter !== 'all' ? (
-                                <Button variant="outline" onClick={() => setStatusFilter('all')}>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    const next = new URLSearchParams(searchParams);
+                                    next.set('status', 'all');
+                                    setSearchParams(next, { replace: true });
+                                  }}
+                                >
                                   View all statuses
                                 </Button>
                               ) : undefined
@@ -279,6 +246,11 @@ export function ActionCenterPage() {
               </DndContext>
             </div>
           </div>
+          {lastUpdatedText ? (
+            <p className="text-right text-xs text-muted-foreground whitespace-nowrap">
+              Updated {lastUpdatedText}
+            </p>
+          ) : null}
         </div>
       </div>
 

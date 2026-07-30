@@ -75,23 +75,6 @@ export function CreateSecretForm({
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="secret-description" className="text-sm font-medium">
-              Description
-              <span className="text-muted-foreground"> (optional)</span>
-            </label>
-            <Input
-              id="secret-description"
-              placeholder="Describe how this secret is used"
-              value={formState.description}
-              onChange={onChange('description')}
-              disabled={disableCreate}
-              maxLength={500}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] md:gap-4">
-          <div className="space-y-2">
             <label htmlFor="secret-tags" className="text-sm font-medium">
               Tags
               <span className="text-muted-foreground"> (comma separated)</span>
@@ -104,26 +87,41 @@ export function CreateSecretForm({
               disabled={disableCreate}
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <FieldHintLabel
-              htmlFor="secret-value"
-              hint="The plaintext is never shown again after creation."
-            >
-              Secret value
-            </FieldHintLabel>
-            <Textarea
-              id="secret-value"
-              placeholder="Paste the secret value"
-              value={formState.value}
-              onChange={onChange('value')}
-              disabled={disableCreate}
-              rows={4}
-              required
-              aria-required="true"
-              aria-describedby={formError ? 'create-secret-error' : undefined}
-            />
-          </div>
+        <div className="space-y-2">
+          <label htmlFor="secret-description" className="text-sm font-medium">
+            Description
+            <span className="text-muted-foreground"> (optional)</span>
+          </label>
+          <Input
+            id="secret-description"
+            placeholder="Describe how this secret is used"
+            value={formState.description}
+            onChange={onChange('description')}
+            disabled={disableCreate}
+            maxLength={500}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <FieldHintLabel
+            htmlFor="secret-value"
+            hint="The plaintext is never shown again after creation."
+          >
+            Secret value
+          </FieldHintLabel>
+          <Textarea
+            id="secret-value"
+            placeholder="Paste the secret value"
+            value={formState.value}
+            onChange={onChange('value')}
+            disabled={disableCreate}
+            rows={4}
+            required
+            aria-required="true"
+            aria-describedby={formError ? 'create-secret-error' : undefined}
+          />
         </div>
 
         {formError && (

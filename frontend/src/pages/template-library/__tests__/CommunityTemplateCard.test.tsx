@@ -1,6 +1,21 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { communityCatalogFixture } from '../__fixtures__/community-catalog';
+
+const mockUseCommunityTemplateJson = mock(() => ({
+  data: undefined as Record<string, unknown> | undefined,
+  isLoading: false,
+  error: null,
+}));
+
+mock.module('@/hooks/queries/useCommunityCatalog', () => ({
+  useCommunityTemplateJson: mockUseCommunityTemplateJson,
+}));
+
+mock.module('@/features/templates/WorkflowPreview', () => ({
+  WorkflowPreview: () => <div data-testid="workflow-preview">preview</div>,
+}));
+
 import { CommunityTemplateCard } from '../CommunityTemplateCard';
 
 const entry = communityCatalogFixture.templates[0]!;
@@ -8,6 +23,12 @@ const entry = communityCatalogFixture.templates[0]!;
 describe('CommunityTemplateCard', () => {
   afterEach(() => {
     cleanup();
+    mockUseCommunityTemplateJson.mockReset();
+    mockUseCommunityTemplateJson.mockImplementation(() => ({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    }));
   });
 
   it('renders shoutout metadata and action buttons', () => {
@@ -29,6 +50,48 @@ describe('CommunityTemplateCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Import$/i }));
     expect(onImport).toHaveBeenCalledWith(entry);
+  });
+
+  it('renders workflow preview when template JSON includes a graph', () => {
+    mockUseCommunityTemplateJson.mockImplementation(() => ({
+      data: {
+        graph: {
+          nodes: [{ id: 'n1', type: 'core.workflow.entrypoint' }],
+        },
+      },
+      isLoading: false,
+      error: null,
+    }));
+
+    render(
+      <CommunityTemplateCard entry={entry} onPreview={() => {}} onImport={() => {}} canImport />,
+    );
+
+    expect(screen.getByTestId('workflow-preview')).toBeInTheDocument();
+    expect(mockUseCommunityTemplateJson).toHaveBeenCalled();
+  });
+
+  it('opens detail preview when the preview section is clicked', () => {
+    const onPreview = mock(() => {});
+
+    mockUseCommunityTemplateJson.mockImplementation(() => ({
+      data: {
+        graph: {
+          nodes: [{ id: 'n1', type: 'core.workflow.entrypoint' }],
+        },
+      },
+      isLoading: false,
+      error: null,
+    }));
+
+    const { container } = render(
+      <CommunityTemplateCard entry={entry} onPreview={onPreview} onImport={() => {}} canImport />,
+    );
+
+    const previewSection = container.querySelector('.h-44');
+    expect(previewSection).not.toBeNull();
+    fireEvent.click(previewSection!);
+    expect(onPreview).toHaveBeenCalledWith(entry);
   });
 
   it('disables Import for non-admins', () => {

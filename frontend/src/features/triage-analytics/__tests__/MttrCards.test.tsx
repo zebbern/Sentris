@@ -29,6 +29,7 @@ mock.module('@/hooks/queries/useTriageAnalyticsQueries', () => ({
 
 // Import after mocks
 import { MttrCards } from '@/features/triage-analytics/MttrCards';
+import { getSeverityCardTintStyle, SEVERITY_ORDER } from '@/features/triage-analytics/constants';
 
 // --- Helpers ---
 const setupState = (overrides: Partial<typeof mockQueryState> = {}) => {
@@ -158,5 +159,30 @@ describe('MttrCards', () => {
     renderCards();
 
     expect(screen.getByLabelText('Mean time to remediate per severity')).toBeInTheDocument();
+  });
+
+  it('applies severity-tinted backgrounds instead of color dots', () => {
+    setupState({
+      data: {
+        severities: SEVERITY_ORDER.map((severity) => ({
+          severity,
+          mttrSeconds: 3600,
+          resolvedCount: 1,
+        })),
+      },
+    });
+    const { container } = renderCards();
+
+    expect(container.querySelector('.inline-block.w-2.h-2.rounded-full')).toBeNull();
+
+    const cards = container.querySelectorAll('[class*="rounded-lg"][class*="border"]');
+    expect(cards.length).toBe(SEVERITY_ORDER.length);
+
+    SEVERITY_ORDER.forEach((severity, index) => {
+      const card = cards[index] as HTMLElement;
+      const tint = getSeverityCardTintStyle(severity);
+      expect(card.style.backgroundColor).toBe(tint.backgroundColor);
+      expect(card.style.borderColor).toBe(tint.borderColor);
+    });
   });
 });

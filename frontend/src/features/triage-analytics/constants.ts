@@ -7,6 +7,27 @@ export const SEVERITY_COLORS: Record<string, string> = {
   info: '#6b7280',
 };
 
+/** Convert #RRGGBB to rgba for low-opacity severity tints */
+export function hexToRgba(hex: string, alpha: number): string {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Subtle card background + border tint derived from SEVERITY_COLORS */
+export function getSeverityCardTintStyle(severity: string): {
+  backgroundColor: string;
+  borderColor: string;
+} {
+  const color = SEVERITY_COLORS[severity] ?? SEVERITY_COLORS.info;
+  return {
+    backgroundColor: hexToRgba(color, 0.1),
+    borderColor: hexToRgba(color, 0.2),
+  };
+}
+
 export const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'] as const;
 
 /** Triage status colors — matches app theme */

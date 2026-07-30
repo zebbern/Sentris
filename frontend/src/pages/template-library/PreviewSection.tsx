@@ -147,14 +147,16 @@ export function PreviewSection({
         }}
       />
 
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle, hsl(var(--foreground)) 0.5px, transparent 0.5px)',
-          backgroundSize: '12px 12px',
-        }}
-      />
+      {interactive && (
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, hsl(var(--foreground)) 0.5px, transparent 0.5px)',
+            backgroundSize: '12px 12px',
+          }}
+        />
+      )}
 
       {showCategoryBadge && (
         <Badge

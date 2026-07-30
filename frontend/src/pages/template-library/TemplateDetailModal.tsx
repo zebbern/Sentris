@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { Template } from '@/hooks/queries/useTemplateQueries';
 import { cn } from '@/lib/utils';
+import { formatTimeAgo } from '@/utils/timeFormat';
 import { getCategoryStyle, toTitleCase } from './types';
 import { PreviewSection } from './PreviewSection';
 import {
@@ -88,9 +89,9 @@ export function TemplateDetailModal({
             <DialogTitle className="text-2xl font-semibold">
               {toTitleCase(template.name)}
             </DialogTitle>
-            {template.description && (
-              <DialogDescription className="mt-2 text-sm">{template.description}</DialogDescription>
-            )}
+            <DialogDescription className={template.description ? 'mt-2 text-sm' : 'sr-only'}>
+              {template.description || 'Template details and readiness metadata.'}
+            </DialogDescription>
           </DialogHeader>
 
           {filteredTags.length > 0 && (
@@ -110,6 +111,16 @@ export function TemplateDetailModal({
             className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
             aria-label="Template readiness"
           >
+            {template.updatedAt && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1">
+                Updated {formatTimeAgo(template.updatedAt)}
+              </span>
+            )}
+            {liveVerified && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
+                Active
+              </span>
+            )}
             {liveVerified && (
               <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-sky-700 dark:text-sky-300">
                 <CheckCircle2 className="h-3.5 w-3.5" />

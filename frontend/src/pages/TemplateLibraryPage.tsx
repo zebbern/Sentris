@@ -4,7 +4,6 @@ import { Layers } from 'lucide-react';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useTemplates,
   useTemplateCategories,
@@ -31,13 +30,8 @@ import {
   isNoSetupTemplate,
   isRecommendedTemplate,
   officialTemplateRepoUrl,
+  parseLibraryTab,
 } from './template-library';
-
-type LibraryTab = 'official' | 'community';
-
-function parseLibraryTab(value: string | null): LibraryTab {
-  return value === 'community' ? 'community' : 'official';
-}
 
 function clearSearchParam(
   searchParams: URLSearchParams,
@@ -60,17 +54,11 @@ export function TemplateLibraryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<LibraryTab>(() =>
-    parseLibraryTab(searchParams.get('tab')),
-  );
+  const activeTab = parseLibraryTab(searchParams.get('tab'));
   const deepLinkTemplateId = searchParams.get('id');
   const [showNoSetupOnly, setShowNoSetupOnly] = useState(
     () => searchParams.get('setup') === 'none',
   );
-
-  useEffect(() => {
-    setActiveTab(parseLibraryTab(searchParams.get('tab')));
-  }, [searchParams]);
 
   const filters = useMemo(() => {
     const f: { category?: string; search?: string } = {};
@@ -128,14 +116,6 @@ export function TemplateLibraryPage() {
       clearSearchParam(searchParams, setSearchParams, 'id');
     }
   }, [deepLinkTemplateId, isLoading, templates, searchParams, setSearchParams]);
-
-  const setLibraryTab = (tab: LibraryTab) => {
-    setActiveTab(tab);
-    const params = new URLSearchParams(searchParams);
-    if (tab === 'official') params.delete('tab');
-    else params.set('tab', tab);
-    setSearchParams(params, { replace: true });
-  };
 
   const handleSync = async () => {
     try {
@@ -212,21 +192,8 @@ export function TemplateLibraryPage() {
   return (
     <div className="flex-1 bg-background" aria-busy={isLoading && activeTab === 'official'}>
       <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setLibraryTab(parseLibraryTab(value))}
-          className="mb-6"
-        >
-          <TabsList aria-label="Template library source">
-            <TabsTrigger value="official" onClick={() => setLibraryTab('official')}>
-              Official
-            </TabsTrigger>
-            <TabsTrigger value="community" onClick={() => setLibraryTab('community')}>
-              Community
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="official" className="mt-6">
+        {activeTab === 'official' ? (
+          <>
             <TemplateFilters
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
@@ -324,15 +291,13 @@ export function TemplateLibraryPage() {
                 </SortableContext>
               </DndContext>
             )}
-          </TabsContent>
-
-          <TabsContent value="community" className="mt-6">
-            <CommunityTemplatesPanel
-              canImport={canManageWorkflows}
-              onImported={handleCommunityImported}
-            />
-          </TabsContent>
-        </Tabs>
+          </>
+        ) : (
+          <CommunityTemplatesPanel
+            canImport={canManageWorkflows}
+            onImported={handleCommunityImported}
+          />
+        )}
       </div>
 
       <TemplateDetailModal

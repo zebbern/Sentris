@@ -287,7 +287,7 @@ export function WebhooksPage() {
           {/* Filters Row */}
           <PageToolbar
             filters={
-              <div className="flex-1 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-2">
                   <label
                     htmlFor="webhook-filter-search"

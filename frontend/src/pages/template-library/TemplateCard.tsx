@@ -1,27 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatTimeAgo } from '@/utils/timeFormat';
-import {
-  ArrowRight,
-  CheckCircle2,
-  FileOutput,
-  KeyRound,
-  SlidersHorizontal,
-  Sparkles,
-  Star,
-  Wrench,
-  Zap,
-} from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import type { Template } from '@/hooks/queries/useTemplateQueries';
 import { cn } from '@/lib/utils';
 import { toTitleCase } from './types';
 import { PreviewSection } from './PreviewSection';
-import {
-  getTemplateRuntimeInputCount,
-  getTemplateSetupLevel,
-  isLiveVerifiedTemplate,
-  templateProducesArtifact,
-} from './setupLevel';
 
 export interface TemplateCardProps {
   template: Template;
@@ -31,10 +14,6 @@ export interface TemplateCardProps {
   recommended?: boolean;
 }
 
-function StatusDot({ className }: { className?: string }) {
-  return <span className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', className)} />;
-}
-
 export function TemplateCard({
   template,
   onUse,
@@ -42,36 +21,6 @@ export function TemplateCard({
   canUse,
   recommended = false,
 }: TemplateCardProps) {
-  const setupLevel = getTemplateSetupLevel(template);
-  const runtimeInputCount = getTemplateRuntimeInputCount(template);
-  const producesArtifact = templateProducesArtifact(template);
-  const liveVerified = isLiveVerifiedTemplate(template);
-  const categoryLower = (template.category || '').toLowerCase();
-  const tags = (template.tags || [])
-    .filter((tag) => tag.toLowerCase() !== categoryLower)
-    .slice(0, 3);
-
-  const setupLabel =
-    setupLevel === 'no-setup'
-      ? 'No setup required'
-      : setupLevel === 'needs-secrets'
-        ? `${template.requiredSecrets.length} stored secret${template.requiredSecrets.length === 1 ? '' : 's'}`
-        : 'Local tools required';
-
-  const setupTone =
-    setupLevel === 'no-setup'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : setupLevel === 'needs-secrets'
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-muted-foreground';
-
-  const setupDotClass =
-    setupLevel === 'no-setup'
-      ? 'bg-emerald-500'
-      : setupLevel === 'needs-secrets'
-        ? 'bg-amber-500'
-        : 'bg-muted-foreground/50';
-
   return (
     <article
       className={cn(
@@ -91,36 +40,12 @@ export function TemplateCard({
       />
 
       <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            {template.updatedAt && (
-              <span className="truncate">{formatTimeAgo(template.updatedAt)}</span>
-            )}
-            {liveVerified ? (
-              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                <StatusDot className="bg-emerald-500" />
-                Active
-              </span>
-            ) : (
-              <span className={cn('inline-flex items-center gap-1.5', setupTone)}>
-                <StatusDot className={setupDotClass} />
-                {setupLabel}
-              </span>
-            )}
-            {liveVerified && (
-              <span className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300">
-                <CheckCircle2 className="h-3 w-3" />
-                Live verified
-              </span>
-            )}
-          </div>
-          {recommended && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              <Sparkles className="h-3 w-3" />
-              Recommended starter
-            </span>
-          )}
-        </div>
+        {recommended && (
+          <span className="inline-flex w-fit items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            <Sparkles className="h-3 w-3" />
+            Recommended starter
+          </span>
+        )}
 
         <div>
           <h3 className="text-lg font-semibold leading-tight tracking-tight">
@@ -137,69 +62,12 @@ export function TemplateCard({
 
           {template.description && (
             <p
-              className="mt-1.5 line-clamp-2 text-sm text-muted-foreground group-hover:line-clamp-3"
+              className="mt-1.5 line-clamp-2 text-sm text-muted-foreground"
               title={template.description}
             >
               {template.description}
             </p>
           )}
-        </div>
-
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Extra info expands on hover */}
-        <div
-          className={cn(
-            'grid transition-[grid-template-rows,opacity] duration-200 ease-out',
-            'grid-rows-[0fr] opacity-0 group-hover:grid-rows-[1fr] group-hover:opacity-100',
-            'focus-within:grid-rows-[1fr] focus-within:opacity-100',
-          )}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              {runtimeInputCount > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <SlidersHorizontal className="h-3 w-3" />
-                  {runtimeInputCount} run input{runtimeInputCount === 1 ? '' : 's'}
-                </span>
-              )}
-              {producesArtifact && (
-                <span className="inline-flex items-center gap-1">
-                  <FileOutput className="h-3 w-3" />
-                  Creates a report
-                </span>
-              )}
-              {template.popularity > 0 && (
-                <span className="inline-flex items-center gap-1">
-                  <Star className="h-3 w-3 text-amber-500" />
-                  {template.popularity}
-                </span>
-              )}
-              {liveVerified && (
-                <span className={cn('inline-flex items-center gap-1', setupTone)}>
-                  {setupLevel === 'no-setup' ? (
-                    <Zap className="h-3 w-3" />
-                  ) : setupLevel === 'needs-secrets' ? (
-                    <KeyRound className="h-3 w-3" />
-                  ) : (
-                    <Wrench className="h-3 w-3" />
-                  )}
-                  {setupLabel}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 pt-3">

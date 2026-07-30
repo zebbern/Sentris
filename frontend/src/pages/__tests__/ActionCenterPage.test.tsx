@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, afterAll, expect, mock } from 'bun:test';
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { HumanInputRequest } from '@/components/workflow/HumanInputResolutionView';
 import { createDialogMock } from '@/test/mocks/dialog';
@@ -119,9 +119,9 @@ const setupStore = (overrides: MockQueryOverrides = {}) => {
   return mockQueryState;
 };
 
-const renderPage = () =>
+const renderPage = (initialEntry = '/action-center') =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <ActionCenterPage />
     </MemoryRouter>,
   );
@@ -158,7 +158,9 @@ describe('ActionCenterPage', () => {
     expect(
       screen.queryByRole('heading', { level: 2, name: /^Action Center$/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Filter by title, node, or run ID/i)).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText(/Filter by title, node, or run ID/i),
+    ).not.toBeInTheDocument();
   });
 
   it('renders loading skeletons when isLoading is true and no data', () => {
@@ -220,26 +222,17 @@ describe('ActionCenterPage', () => {
     expect(screen.getByRole('button', { name: /View Details/i })).toBeInTheDocument();
   });
 
-  it('search input filters approvals by title', () => {
+  it('filters approvals by title via ?search= URL param', () => {
     setupStore();
-    renderPage();
-
-    expect(screen.getByText('Deploy to Production')).toBeInTheDocument();
-    expect(screen.getByText('Security Review')).toBeInTheDocument();
-
-    const searchInput = screen.getByPlaceholderText(/Filter by title, node, or run ID/i);
-    fireEvent.change(searchInput, { target: { value: 'Deploy' } });
+    renderPage('/action-center?search=Deploy');
 
     expect(screen.getByText('Deploy to Production')).toBeInTheDocument();
     expect(screen.queryByText('Security Review')).not.toBeInTheDocument();
   });
 
-  it('search input filters approvals by node ref', () => {
+  it('filters approvals by node ref via ?search= URL param', () => {
     setupStore();
-    renderPage();
-
-    const searchInput = screen.getByPlaceholderText(/Filter by title, node, or run ID/i);
-    fireEvent.change(searchInput, { target: { value: 'review-node' } });
+    renderPage('/action-center?search=review-node');
 
     expect(screen.queryByText('Deploy to Production')).not.toBeInTheDocument();
     expect(screen.getByText('Security Review')).toBeInTheDocument();

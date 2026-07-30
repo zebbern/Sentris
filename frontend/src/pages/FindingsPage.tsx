@@ -1,9 +1,8 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldAlert, ChevronLeft, ChevronRight, LayoutList, Columns3, Search } from 'lucide-react';
+import { ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useFindingsQuery, type FindingItem } from '@/hooks/queries/useFindingsQueries';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -40,6 +38,7 @@ import {
   describeFindingDataQuality,
   shouldShowFindingDataQuality,
 } from '@/features/findings/findingDataQuality';
+import { parseFindingsView } from '@/pages/findings/findingsView';
 
 const FindingDetailSheet = lazy(() =>
   import('@/features/findings/FindingDetailSheet').then((m) => ({
@@ -129,28 +128,10 @@ function truncate(value: string | undefined, max = 40): string {
 export function FindingsPage() {
   useDocumentTitle('Findings');
 
-  // URL-driven view toggle
+  // URL-driven view toggle and search (controls live in App top bar)
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeView = (searchParams.get('view') === 'kanban' ? 'kanban' : 'table') as
-    | 'table'
-    | 'kanban';
-
-  const handleViewChange = useCallback(
-    (view: string) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        if (view === 'table') {
-          next.delete('view');
-        } else {
-          next.set('view', view);
-        }
-        return next;
-      });
-    },
-    [setSearchParams],
-  );
-
-  const [search, setSearch] = useState('');
+  const activeView = parseFindingsView(searchParams.get('view'));
+  const search = searchParams.get('search') ?? '';
   const severityParam = searchParams.get('severity');
   const [severity, setSeverity] = useState(
     severityParam && severityParam !== 'all' ? severityParam : 'all',
@@ -188,10 +169,6 @@ export function FindingsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const debouncedSearch = useDebounce(search, 300);
-
-  const handleSearchChange = useCallback((value: string) => {
-    setSearch(value);
-  }, []);
 
   const handleSeverityChange = useCallback(
     (value: string) => {
@@ -368,35 +345,8 @@ export function FindingsPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="space-y-3">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative min-w-0 flex-1" data-testid="page-toolbar-search">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search findings by name, asset, workflow…"
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9"
-              autoComplete="off"
-              aria-label="Search findings by name, asset, workflow…"
-            />
-          </div>
-          <Tabs value={activeView} onValueChange={handleViewChange}>
-            <TabsList className="h-9 shrink-0">
-              <TabsTrigger value="table" className="gap-1.5 px-3">
-                <LayoutList className="h-4 w-4" />
-                Table
-              </TabsTrigger>
-              <TabsTrigger value="kanban" className="gap-1.5 px-3">
-                <Columns3 className="h-4 w-4" />
-                Kanban
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
+    <div className="flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6">
+      <div className="w-full">
         <div
           data-testid="page-toolbar-filters"
           className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
@@ -470,7 +420,7 @@ export function FindingsPage() {
         <div
           role="status"
           aria-label="Findings data quality"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+          className="w-full rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
         >
           {describeFindingDataQuality(data)}
         </div>

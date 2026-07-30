@@ -87,6 +87,19 @@ export function CommunityDetailModal({
             </p>
           </DialogHeader>
 
+          {(entry.tags?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {entry.tags!.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               className="h-11 flex-1 gap-2 rounded-xl"

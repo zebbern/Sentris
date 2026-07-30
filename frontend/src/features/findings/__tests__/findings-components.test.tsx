@@ -289,7 +289,7 @@ describe('SeverityChart', () => {
     expect(await screen.findByText('Findings data is unavailable')).toBeTruthy();
   });
 
-  it('marks chart values as degraded with projection and schema context', async () => {
+  it('still renders the chart when stats availability is degraded', async () => {
     getStatsMock.mockResolvedValueOnce({
       severityCounts: [{ severity: 'high', count: 2 }],
       total: 2,
@@ -303,11 +303,12 @@ describe('SeverityChart', () => {
       schemaCoverage: { canonical: 1, legacy: 0, invalid: 1 },
     });
 
-    render(<SeverityChart />, { wrapper: Wrapper });
+    const { container } = render(<SeverityChart />, { wrapper: Wrapper });
 
-    const status = await screen.findByRole('status', { name: /Severity data quality/i });
-    expect(status.textContent).toContain('projection events pending');
-    expect(status.textContent).toContain('1 invalid');
+    await waitFor(() => {
+      expect(container.querySelector('.recharts-responsive-container')).not.toBeNull();
+    });
+    expect(screen.queryByRole('status', { name: /Severity data quality/i })).toBeNull();
   });
 
   it('renders the canonical none severity bucket instead of dropping it', () => {

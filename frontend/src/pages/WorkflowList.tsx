@@ -66,6 +66,9 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const WORKFLOW_TABLE_CLASS =
+  'table-fixed w-full [&_th]:h-9 [&_th]:px-3 [&_th]:py-2 [&_td]:py-2 [&_td]:px-3';
+
 const WORKFLOW_EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'name', header: 'Name' },
   { key: 'description', header: 'Description' },
@@ -216,15 +219,15 @@ export function WorkflowList() {
 
   return (
     <div className="flex-1 bg-background">
-      <div className="container mx-auto max-w-5xl space-y-3 px-3 py-3 md:space-y-4 md:px-4 md:py-5">
+      <div className="w-full min-w-0 space-y-1 px-3 pt-1.5 pb-2.5 md:space-y-1.5 md:px-4 md:pt-2 md:pb-3">
         {isReadOnly && (
-          <div className="rounded-md border border-border/60 bg-muted/30 px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm text-muted-foreground">
+          <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm text-muted-foreground">
             You are viewing workflows with read-only access. Administrators can create and edit
             workflows.
           </div>
         )}
         {requestedScopeId && (
-          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm">
             Choose a workflow to run against {requestedScope?.name ?? 'the selected target'}.
           </div>
         )}
@@ -238,7 +241,7 @@ export function WorkflowList() {
           filters={
             <div className="flex w-full min-w-0 flex-1 flex-wrap items-center gap-2">
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-                <SelectTrigger className="h-10 w-[150px]">
+                <SelectTrigger className="h-9 w-[150px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -262,7 +265,7 @@ export function WorkflowList() {
                       href={DOCS_URLS.userGuide}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
                       aria-label="View documentation"
                     >
                       <CircleHelp className="h-4 w-4" />
@@ -276,7 +279,7 @@ export function WorkflowList() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="h-10 gap-1.5"
+                      className="h-9 gap-1.5"
                       disabled={filteredWorkflows.length === 0}
                       aria-label="Export workflows"
                     >
@@ -320,12 +323,11 @@ export function WorkflowList() {
           <ErrorBanner
             message={error?.message ?? 'Failed to load workflows'}
             onRetry={() => refetch()}
-            className="mb-6"
           />
         ) : isLoading ? (
           <div className="border rounded-lg bg-card overflow-hidden">
             <div className="overflow-x-auto">
-              <Table className="table-fixed w-full" aria-label="Workflows">
+              <Table className={WORKFLOW_TABLE_CLASS} aria-label="Workflows">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10 hidden sm:table-cell" />
@@ -435,7 +437,7 @@ export function WorkflowList() {
                 collisionDetection={collisionDetection}
                 onDragEnd={handleDragEnd}
               >
-                <Table className="table-fixed w-full" aria-label="Workflows">
+                <Table className={WORKFLOW_TABLE_CLASS} aria-label="Workflows">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10 hidden sm:table-cell" />

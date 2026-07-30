@@ -283,11 +283,13 @@ The `/analytics` page provides triage performance metrics derived from `finding_
 
 ## Learned User Preferences
 
-- Prefers compact app chrome: shorter top bar, narrower sidebar, centered sidebar icons/brand, and icon-only canvas controls with hover labels instead of always-visible text.
+- Prefers compact app chrome: shorter top bar, narrower sidebar, centered sidebar icons/brand, and icon-only controls with hover/aria labels (canvas overlays and App top-bar actions like Refresh / New) instead of always-visible button text.
 - Component config panel should default to hiding non-editable info sections (e.g. Documentation); keep anything that changes run behavior; persist like other UI prefs; toggle copy is "Hide info sections?" / "Show info sections?".
 - After frontend UI work, verify in the browser rather than relying on code review alone.
 - Browser document title should be "Sentris Flow" only (no tagline).
-- List-page Refresh actions belong in the App top bar (same pattern as Action Center / Artifacts), not in page toolbars.
+- List-page primary controls belong in the App top bar when practical (Refresh, search, status/view toggles such as Table/Kanban or Official/Community), not only in page toolbars.
+- Prefers denser list pages: less empty space above tables, filter rows on one line when they fit, and compact single-row KPI strips (e.g. MTTR cards).
+- Template Library cards should stay clean: hide setup spots and extra tag chips on the grid (show those in the preview modal); Community cards should show an in-card workflow preview like Official; avoid hover translate/shift on cards.
 - Prefers simple component parameters over extra modes/options; for agent/CVE research workflows, maximize chance of real findings over cost or tight timeout conservatism.
 - Prefers single zip/archive download for repo fetch when equivalent to multi-request clone paths.
 - Execution timeline: play at end should restart from the beginning; prefer unit-based duration display (ms/s/m/h) over padded `0:0x` clock-style text.
@@ -297,5 +299,5 @@ The `/analytics` page provides triage performance metrics derived from `finding_
 - App shell visual baseline: main background around `#151618`, top/sidebar chrome around translucent `#191a1f`.
 - Canvas heatmap control belongs with Smart Routing overlays on the canvas (not only in the workflow top bar).
 - Agent Skills are folder bundles (not only a single `SKILL.md`) and should be discoverable from `.agents/skills`, `.claude/skills`, `.github/skills`, `.codex/skills`, `.kimi/skills`, and `.opencode/skills`.
-- Template Library direction: Official (Sentris-team) and Community tabs; community catalog intended via PR-reviewed GitHub path under `zebbern/Sentris` (`community/template(s)`), with author shoutout styling while keeping official templates for users who distrust community content.
+- Template Library: Official (default, Sentris-team) and Community tabs; community catalog is PR-reviewed on `zebbern/Sentris` at `community/template/` (singular), loaded from GitHub `main` raw `index.json` (override via `VITE_COMMUNITY_TEMPLATES_INDEX_URL`); prefer the real hosted catalog over local fake mirrors; Community flow is Preview + explicit Import (do not auto-run untrusted graphs), with author shoutout styling.
 - Primary product use case emphasized in recent work: bug-bounty / security-research workflows aimed at reportable findings (e.g. CVE-oriented templates).

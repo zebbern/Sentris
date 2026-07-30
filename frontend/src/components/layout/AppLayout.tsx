@@ -6,6 +6,13 @@ import { AppTopBar } from '@/components/layout/AppTopBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Workflow,
   KeyRound,
   Plus,
@@ -26,6 +33,8 @@ import {
   TrendingUp,
   RefreshCw,
   Search,
+  LayoutList,
+  Columns3,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -50,14 +59,124 @@ import { SidebarContext, type SidebarContextValue } from './sidebar-context';
 import { SidebarNav, type NavItem } from './SidebarNav';
 import { useSidebarState } from '@/hooks/useSidebarState';
 import { useIsMobile, useIsTablet } from '@/hooks/useIsMobile';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { parseLibraryTab } from '@/pages/template-library';
+import { parseFindingsView } from '@/pages/findings/findingsView';
 
 const TOP_BAR_CONTROL = 'h-8';
 const TOP_BAR_BUTTON = 'h-8 gap-1.5';
 
+const ACTION_CENTER_STATUS_OPTIONS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'expired', label: 'Expired' },
+] as const;
+
+const ACTION_CENTER_STATUSES = new Set<string>(
+  ACTION_CENTER_STATUS_OPTIONS.map((option) => option.value),
+);
+
+function FindingsTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchValue = searchParams.get('search') ?? '';
+  const activeView = parseFindingsView(searchParams.get('view'));
+
+  const handleSearchChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleViewChange = (value: string) => {
+    const view = parseFindingsView(value);
+    const next = new URLSearchParams(searchParams);
+    if (view === 'table') next.delete('view');
+    else next.set('view', view);
+    setSearchParams(next, { replace: true });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Search findings…"
+          aria-label="Search findings by name, asset, workflow"
+          autoComplete="off"
+          className={cn(TOP_BAR_CONTROL, 'w-36 pl-8 md:w-48')}
+        />
+      </div>
+      <Tabs value={activeView} onValueChange={handleViewChange}>
+        <TabsList aria-label="Findings view" className="h-8">
+          <TabsTrigger value="table" className="h-7 gap-1 px-2 text-xs">
+            <LayoutList className="h-3.5 w-3.5" />
+            Table
+          </TabsTrigger>
+          <TabsTrigger value="kanban" className="h-7 gap-1 px-2 text-xs">
+            <Columns3 className="h-3.5 w-3.5" />
+            Kanban
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+  );
+}
+
+function TemplatesTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = parseLibraryTab(searchParams.get('tab'));
+
+  const handleTabChange = (value: string) => {
+    const tab = parseLibraryTab(value);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'official') next.delete('tab');
+    else next.set('tab', tab);
+    setSearchParams(next, { replace: true });
+  };
+
+  return (
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
+      <TabsList aria-label="Template library source" className="h-8">
+        <TabsTrigger value="official" className="h-7 text-xs">
+          Official
+        </TabsTrigger>
+        <TabsTrigger value="community" className="h-7 text-xs">
+          Community
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+}
+
 function ActionCenterTopBarActions() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const invalidateHumanInputs = useInvalidateHumanInputs();
   const { toast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const searchValue = searchParams.get('search') ?? '';
+  const rawStatus = searchParams.get('status') ?? 'pending';
+  const statusFilter = ACTION_CENTER_STATUSES.has(rawStatus)
+    ? (rawStatus as (typeof ACTION_CENTER_STATUS_OPTIONS)[number]['value'])
+    : 'pending';
+
+  const handleSearchChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  };
+
+  const handleStatusChange = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === 'pending') next.delete('status');
+    else next.set('status', value);
+    setSearchParams(next, { replace: true });
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -73,16 +192,42 @@ function ActionCenterTopBarActions() {
   };
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className={TOP_BAR_BUTTON}
-      onClick={handleRefresh}
-      disabled={isRefreshing}
-    >
-      <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-      <span className="hidden md:inline">Refresh</span>
-    </Button>
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Filter by title, node, or run ID"
+          aria-label="Search requests"
+          autoComplete="off"
+          className={cn(TOP_BAR_CONTROL, 'w-40 pl-8 md:w-56')}
+        />
+      </div>
+      <Select value={statusFilter} onValueChange={handleStatusChange}>
+        <SelectTrigger className={cn(TOP_BAR_CONTROL, 'w-[140px]')} aria-label="Filter by status">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          {ACTION_CENTER_STATUS_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        variant="outline"
+        size="sm"
+        className={TOP_BAR_BUTTON}
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+        aria-label="Refresh requests"
+      >
+        <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
+      </Button>
+    </div>
   );
 }
 
@@ -149,7 +294,6 @@ function ArtifactsTopBarActions() {
         aria-label="Refresh artifacts"
       >
         <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-        <span className="hidden md:inline">Refresh</span>
       </Button>
     </div>
   );
@@ -202,7 +346,6 @@ function SchedulesTopBarActions() {
         aria-label="Refresh schedules"
       >
         <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-        <span className="hidden md:inline">Refresh</span>
       </Button>
       <Button
         type="button"
@@ -213,11 +356,10 @@ function SchedulesTopBarActions() {
           next.set('create', '1');
           navigate(`/schedules?${next.toString()}`);
         }}
+        aria-label="New schedule"
       >
         <Plus className="h-3.5 w-3.5" />
-        <span>
-          New <span className="hidden md:inline">schedule</span>
-        </span>
+        <span>New</span>
       </Button>
     </div>
   );
@@ -247,7 +389,6 @@ function SecretsTopBarActions() {
       aria-label="Refresh secrets"
     >
       <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-      <span className="hidden md:inline">Refresh</span>
     </Button>
   );
 }
@@ -311,7 +452,6 @@ function WebhooksTopBarActions() {
         aria-label="Refresh webhooks"
       >
         <RefreshCw className={cn('h-3.5 w-3.5', isRefreshing && 'animate-spin')} />
-        <span className="hidden md:inline">Refresh</span>
       </Button>
       <Button onClick={() => navigate('/webhooks/new')} size="sm" className={TOP_BAR_BUTTON}>
         <Plus className="h-3.5 w-3.5" />
@@ -489,8 +629,14 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (location.pathname === '/schedules') {
       return <SchedulesTopBarActions />;
     }
+    if (location.pathname === '/templates') {
+      return <TemplatesTopBarActions />;
+    }
     if (location.pathname === '/action-center') {
       return <ActionCenterTopBarActions />;
+    }
+    if (location.pathname === '/findings') {
+      return <FindingsTopBarActions />;
     }
     if (location.pathname === '/analytics') {
       return <AnalyticsTopBarActions />;

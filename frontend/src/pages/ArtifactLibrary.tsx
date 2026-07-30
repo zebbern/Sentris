@@ -53,6 +53,9 @@ const formatTimestamp = (value: string) => {
   }
 };
 
+const ARTIFACT_TABLE_CLASS =
+  'table-fixed w-full min-w-[600px] [&_th]:h-9 [&_th]:px-3 [&_th]:py-2 [&_td]:py-2 [&_td]:px-3';
+
 export function ArtifactLibrary() {
   useDocumentTitle('Artifacts');
   const [searchParams] = useSearchParams();
@@ -102,10 +105,10 @@ export function ArtifactLibrary() {
 
   return (
     <div className="flex-1 bg-background" aria-busy={libraryLoading}>
-      <div className="container mx-auto py-4 md:py-8 px-3 md:px-4">
-        <div className="overflow-x-auto -mx-3 md:mx-0 px-3 md:px-0">
-          {libraryLoading && !libraryError ? (
-            <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
+      <div className="w-full min-w-0 px-3 pt-1.5 pb-2.5 md:px-4 md:pt-2 md:pb-3">
+        {libraryLoading && !libraryError ? (
+          <div className="overflow-x-auto rounded-md border">
+            <Table className={ARTIFACT_TABLE_CLASS} aria-label="Artifacts">
               <TableHeader>
                 <TableRow className="text-xs uppercase text-muted-foreground">
                   <TableHead className="w-10" />
@@ -141,32 +144,34 @@ export function ArtifactLibrary() {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <Skeleton className="h-8 w-8" />
-                        <Skeleton className="h-8 w-8" />
+                        <Skeleton className="h-7 w-7" />
+                        <Skeleton className="h-7 w-7" />
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          ) : (
-            <>
-              {libraryError && (
-                <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-4" />
-              )}
-              {library.length === 0 && !libraryError ? (
-                <EmptyState
-                  icon={FileBox}
-                  title="No artifacts found"
-                  description="Run workflows with artifact saving enabled to populate this library."
-                />
-              ) : library.length > 0 ? (
+          </div>
+        ) : (
+          <>
+            {libraryError && (
+              <ErrorBanner message={libraryError} onRetry={handleRefresh} className="mb-3" />
+            )}
+            {library.length === 0 && !libraryError ? (
+              <EmptyState
+                icon={FileBox}
+                title="No artifacts found"
+                description="Run workflows with artifact saving enabled to populate this library."
+              />
+            ) : library.length > 0 ? (
+              <div className="overflow-x-auto rounded-md border">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={collisionDetection}
                   onDragEnd={handleDragEnd}
                 >
-                  <Table className="table-fixed w-full min-w-[600px]" aria-label="Artifacts">
+                  <Table className={ARTIFACT_TABLE_CLASS} aria-label="Artifacts">
                     <TableHeader>
                       <TableRow className="text-xs uppercase text-muted-foreground">
                         <TableHead className="w-10" />
@@ -236,10 +241,10 @@ export function ArtifactLibrary() {
                     </TableBody>
                   </Table>
                 </DndContext>
-              ) : null}
-            </>
-          )}
-        </div>
+              </div>
+            ) : null}
+          </>
+        )}
         <ConfirmDialog {...dialogProps} />
       </div>
     </div>
@@ -280,7 +285,7 @@ function ArtifactLibraryRow({
               {artifact.id}
             </div>
             {remoteUploads.length > 0 && (
-              <div className="mt-2 space-y-1 hidden md:block">
+              <div className="mt-1.5 space-y-1 hidden md:block">
                 {remoteUploads.map((remote) => (
                   <div
                     key={`${artifact.id}-${remote.uri}`}
@@ -343,25 +348,25 @@ function ArtifactLibraryRow({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-7 w-7"
                 onClick={onDownload}
                 disabled={isDownloading}
                 aria-label={`Download ${artifact.name}`}
               >
-                <Download className="h-4 w-4" />
+                <Download className="h-3.5 w-3.5" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => {
                   onDelete();
                 }}
                 disabled={isDeleting}
                 aria-label={`Delete ${artifact.name}`}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           </TableCell>

@@ -412,22 +412,19 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getByText('Failed to load templates')).toBeInTheDocument();
   });
 
-  it('renders popularity count for templates with popularity > 0', () => {
+  it('keeps popularity count off the grid card', () => {
     setupStore();
     renderPage();
 
-    // templateA has popularity 42
-    expect(screen.getByText('42')).toBeInTheDocument();
-    // templateB has popularity 15
-    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.queryByText('42')).not.toBeInTheDocument();
+    expect(screen.queryByText('15')).not.toBeInTheDocument();
   });
 
-  it('renders required secrets count', () => {
+  it('keeps required secrets count off the grid card', () => {
     setupStore();
     renderPage();
 
-    // templateA has 1 required secret
-    expect(screen.getByText('1 stored secret')).toBeInTheDocument();
+    expect(screen.queryByText('1 stored secret')).not.toBeInTheDocument();
   });
 
   it('renders author initials avatar', () => {
@@ -439,16 +436,7 @@ describe('TemplateLibraryPage', () => {
     expect(screen.getByText('C')).toBeInTheDocument();
   });
 
-  it('renders updated-at relative timestamps', () => {
-    setupStore();
-    renderPage();
-
-    // Card meta uses formatTimeAgo (e.g. "today", "1d ago") without an "Updated" prefix.
-    const relativeTimes = screen.getAllByText(/ago|today/i);
-    expect(relativeTimes.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('surfaces current live verification without admin revalidation controls', () => {
+  it('keeps updated-at and live verification off the grid cards', () => {
     setupStore({
       templates: [
         {
@@ -468,11 +456,41 @@ describe('TemplateLibraryPage', () => {
 
     renderPage();
 
-    expect(screen.getByText('Live verified')).toBeInTheDocument();
+    expect(screen.queryByText(/ago|today/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Live verified')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
     expect(screen.queryByText('Validation stale')).not.toBeInTheDocument();
     expect(screen.queryByText('Revalidate')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Filter by validation')).not.toBeInTheDocument();
     expect(screen.queryByText('Recent revalidations')).not.toBeInTheDocument();
+  });
+
+  it('surfaces live verification in the detail modal', async () => {
+    setupStore({
+      templates: [
+        {
+          ...templateA,
+          validation: {
+            status: 'live-verified',
+            recommendation: 'keep',
+            terminalStatus: 'COMPLETED',
+            artifactsCount: 1,
+            verifiedAt: '2026-06-21T07:15:23.121Z',
+            rationale: 'Live execution completed and produced at least one artifact.',
+            isCurrent: true,
+          },
+        } as Template,
+      ],
+    });
+
+    renderPage();
+    fireEvent.click(
+      screen.getByRole('button', { name: /View Network Recon Scan template details/i }),
+    );
+
+    expect(await screen.findByText('Live verified')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText(/Updated /i)).toBeInTheDocument();
   });
 
   it('prioritizes verified no-setup templates as recommended starters', () => {
@@ -674,8 +692,8 @@ describe('TemplateLibraryPage', () => {
 
   it('defaults to the Official tab and shows Official filters', () => {
     renderPage();
-    expect(screen.getByRole('tab', { name: 'Official' }).getAttribute('data-state')).toBe('active');
     expect(screen.getByPlaceholderText('Filter by template name')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search community templates')).not.toBeInTheDocument();
   });
 
   it('opens the Community tab from ?tab=community and preserves setup', () => {
@@ -695,17 +713,14 @@ describe('TemplateLibraryPage', () => {
 
     renderPage('/templates?tab=community&setup=none');
 
-    expect(screen.getByRole('tab', { name: 'Community' }).getAttribute('data-state')).toBe(
-      'active',
-    );
     expect(screen.getByPlaceholderText('Search community templates')).toBeInTheDocument();
     expect(screen.getByText('HTTP URL Status Check')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('Filter by template name')).not.toBeInTheDocument();
   });
 
-  it('switches to Community via the tab control', () => {
-    renderPage();
-    fireEvent.click(screen.getByRole('tab', { name: 'Community' }));
+  it('shows Community content when ?tab=community is in the URL', () => {
+    renderPage('/templates?tab=community');
     expect(screen.getByPlaceholderText('Search community templates')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Filter by template name')).not.toBeInTheDocument();
   });
 });

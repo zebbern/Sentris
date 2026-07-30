@@ -18,6 +18,8 @@ export type { CommunityTemplatesPanelProps } from './CommunityTemplatesPanel';
 export type { SetupLevel } from './setupLevel';
 export { CATEGORY_STYLES, getCategoryStyle, hasGraphNodes, toTitleCase } from './types';
 export { officialTemplateRepoUrl } from './officialRepo';
+export type { LibraryTab } from './libraryTab';
+export { parseLibraryTab } from './libraryTab';
 export {
   NET_ONLY_COMPONENT_TYPES,
   compareTemplatesForActivation,

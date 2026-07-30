@@ -45,7 +45,11 @@ export const COMMUNITY_TEMPLATES_CONTRIBUTE_URL =
   'https://github.com/zebbern/Sentris/tree/main/community/template';
 
 export function getCommunityTemplatesIndexUrl(): string {
-  return env.VITE_COMMUNITY_TEMPLATES_INDEX_URL.trim() || DEFAULT_COMMUNITY_TEMPLATES_INDEX_URL;
+  const configured = env.VITE_COMMUNITY_TEMPLATES_INDEX_URL;
+  return (
+    (typeof configured === 'string' ? configured.trim() : '') ||
+    DEFAULT_COMMUNITY_TEMPLATES_INDEX_URL
+  );
 }
 
 /** Derive a fetchable URL for a catalog templatePath from the index URL. */
