@@ -546,6 +546,7 @@
 **Files:**
 
 - Modify: `backend/src/mcp/mcp-gateway.service.ts`
+- Modify: `backend/src/mcp/mcp-gateway.controller.ts`
 - Modify: `backend/src/mcp/__tests__/mcp-gateway.spec.ts`
 - Delete: `backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts`
 
@@ -583,6 +584,8 @@
 
   Remove `servers`, cross-request `registeredToolNames`, `externalToolSchemas`, cache-key builders/parsers, `patchListToolsWithExternalSchemas`, `refreshServersForRun`, `cleanupSession`, and external-client owner maps. Use a request-local `Set<string>` and fail on canonical-name collision instead of silently skipping one tool.
 
+  To keep the repository compilable between Tasks 5 and 6 without a fake `getServerForRun` wrapper, make the narrow controller call-site migration in the same commit: parse its already-validated `auth.extra` with `parseRunMcpRequestContext`, compute any still-needed legacy transport key locally, and call `createServerForRun(context)`. Remove `x-allowed-tools` parsing at this point. Do not otherwise rewrite the controller's transport/session lifecycle; Task 6 replaces that lifecycle with `McpFacade` and deletes the temporary controller-local key logic.
+
 - [ ] **Step 3: Register schemas through public v2 APIs**
 
   Import `McpServer` and `fromJsonSchema` from `@modelcontextprotocol/server`. The default Node validator supports JSON Schema 2020-12; use `fromJsonSchema(document)` and register external input/output schemas without a private list-handler patch. Only add a custom validator from `@modelcontextprotocol/server/validators/ajv` if focused dialect/bounds tests prove the runtime default is insufficient; do not add `@modelcontextprotocol/core` merely for `fromJsonSchema`.
@@ -606,7 +609,7 @@
 - [ ] **Step 6: Commit the request-local server factory**
 
   ```powershell
-  git add backend/src/mcp/mcp-gateway.service.ts backend/src/mcp/__tests__/mcp-gateway.spec.ts backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts
+  git add backend/src/mcp/mcp-gateway.service.ts backend/src/mcp/mcp-gateway.controller.ts backend/src/mcp/__tests__/mcp-gateway.spec.ts backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts
   git commit -s -m "refactor: make MCP run servers request local"
   ```
 
