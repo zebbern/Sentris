@@ -8,6 +8,8 @@ import type {
 import {
   assertCapabilityGrantApplies,
   buildInvocationManifest,
+  ClaimComponentDispatchOutcomeSchema,
+  MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
   PrepareToolInvocationOutcomeSchema,
   resolveInvocationManifestEntry,
   ToolInvocationRequestSchema,
@@ -172,6 +174,57 @@ describe('ToolInvocationResultSchema', () => {
         output: { text: 'x'.repeat(1_048_576) },
       }),
     ).toThrow('Invocation output exceeds 1048576 UTF-8 bytes');
+  });
+
+  it('bounds persisted and public error messages', () => {
+    expect(() =>
+      ToolInvocationResultSchema.parse({
+        ...failedResult,
+        error: {
+          ...failedResult.error,
+          message: 'x'.repeat(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS + 1),
+        },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('ClaimComponentDispatchOutcomeSchema', () => {
+  it('parses structural dispatch context and terminal replay outcomes', () => {
+    expect(
+      ClaimComponentDispatchOutcomeSchema.parse({
+        kind: 'dispatch',
+        context: {
+          ref: preparedRef,
+          run: {
+            runId: 'run-123',
+            workflowId: '44444444-4444-4444-8444-444444444444',
+            workflowVersionId: null,
+            organizationId: 'org-123',
+            scopeId: null,
+          },
+          component: {
+            nodeId: 'scanner-node',
+            componentId: 'security.scanner',
+            arguments: { target: 'example.com' },
+            parameters: { mode: 'safe' },
+            credentials: { token: 'resolved-only-here' },
+          },
+        },
+      }),
+    ).toMatchObject({ kind: 'dispatch' });
+
+    expect(
+      ClaimComponentDispatchOutcomeSchema.parse({
+        kind: 'terminal',
+        result: {
+          invocationId: INVOCATION_ID,
+          status: 'cancelled',
+          error: { class: 'cancelled', message: 'Run ended', retryable: false },
+          completedAt: '2026-07-31T10:01:00.000Z',
+        },
+      }),
+    ).toMatchObject({ kind: 'terminal' });
   });
 });
 

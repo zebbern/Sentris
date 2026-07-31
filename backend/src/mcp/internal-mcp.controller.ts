@@ -1,26 +1,43 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
+import { ZodValidationPipe } from 'nestjs-zod';
 import { ToolRegistryService } from './tool-registry.service';
 import { McpLegacyOutboundCompatibilityService } from './mcp-legacy-outbound-compatibility.service';
 import { McpGroupsService } from '../mcp-groups/mcp-groups.service';
 import { McpAuthService } from './mcp-auth.service';
 import {
   CleanupRunInput,
+  AmbiguousMcpInvocationBody,
+  AmbiguousMcpInvocationBodySchema,
+  ClaimMcpInvocationBody,
+  ClaimMcpInvocationBodySchema,
   GenerateTokenInput,
+  PrepareMcpInvocationBody,
+  PrepareMcpInvocationBodySchema,
+  ReconcileMcpInvocationBody,
+  ReconcileMcpInvocationBodySchema,
+  ReconcileRunMcpInvocationsBody,
+  ReconcileRunMcpInvocationsBodySchema,
   RegisterComponentToolInput,
   RegisterGroupServerInput,
   RegisterMcpServerInput,
+  SettleMcpInvocationBody,
+  SettleMcpInvocationBodySchema,
   ToolsReadyInput,
 } from './dto/mcp.dto';
+import { InternalOnlyGuard } from '../auth/internal-only.guard';
+import { McpInvocationService } from '../mcp-runtime/mcp-invocation.service';
 
 @ApiExcludeController()
 @Controller('internal/mcp')
+@UseGuards(InternalOnlyGuard)
 export class InternalMcpController {
   constructor(
     private readonly toolRegistry: ToolRegistryService,
     private readonly mcpGroupsService: McpGroupsService,
     private readonly legacyOutbound: McpLegacyOutboundCompatibilityService,
     private readonly mcpAuthService: McpAuthService,
+    private readonly invocationService: McpInvocationService,
   ) {}
 
   @Post('generate-token')
@@ -78,5 +95,62 @@ export class InternalMcpController {
   async registerGroupServer(@Body() body: RegisterGroupServerInput) {
     const serverConfig = await this.mcpGroupsService.getServerConfig(body.groupSlug, body.serverId);
     return serverConfig;
+  }
+
+  @Post('invocations/prepare')
+  prepareInvocation(
+    @Body(new ZodValidationPipe(PrepareMcpInvocationBodySchema))
+    body: PrepareMcpInvocationBody,
+  ) {
+    return this.invocationService.prepare(body.request);
+  }
+
+  @Post('invocations/claim')
+  claimInvocation(
+    @Body(new ZodValidationPipe(ClaimMcpInvocationBodySchema))
+    body: ClaimMcpInvocationBody,
+  ) {
+    return this.invocationService.claimComponentDispatch(body.ref);
+  }
+
+  @Post('invocations/complete')
+  completeInvocation(
+    @Body(new ZodValidationPipe(SettleMcpInvocationBodySchema))
+    body: SettleMcpInvocationBody,
+  ) {
+    return this.invocationService.complete(body.ref, body.result);
+  }
+
+  @Post('invocations/fail')
+  failInvocation(
+    @Body(new ZodValidationPipe(SettleMcpInvocationBodySchema))
+    body: SettleMcpInvocationBody,
+  ) {
+    return this.invocationService.fail(body.ref, body.result);
+  }
+
+  @Post('invocations/ambiguous')
+  ambiguousInvocation(
+    @Body(new ZodValidationPipe(AmbiguousMcpInvocationBodySchema))
+    body: AmbiguousMcpInvocationBody,
+  ) {
+    return this.invocationService.ambiguous(body.ref, body.message, body.completedAt);
+  }
+
+  @Post('invocations/reconcile')
+  reconcileInvocation(
+    @Body(new ZodValidationPipe(ReconcileMcpInvocationBodySchema))
+    body: ReconcileMcpInvocationBody,
+  ) {
+    return this.invocationService.reconcileDispatchFailure(body);
+  }
+
+  @Post('invocations/reconcile-run')
+  async reconcileRunInvocations(
+    @Body(new ZodValidationPipe(ReconcileRunMcpInvocationsBodySchema))
+    body: ReconcileRunMcpInvocationsBody,
+  ) {
+    await this.invocationService.reconcileRunInvocations(body);
+    return { success: true };
   }
 }

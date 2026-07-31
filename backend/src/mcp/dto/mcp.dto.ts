@@ -1,5 +1,15 @@
 import { ToolInputSchema } from '@sentris/component-sdk';
-import type { JsonSchemaDocument, McpIcon, McpToolRegistrationDescriptor } from '@sentris/shared';
+import {
+  MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
+  PreparedInvocationRefSchema,
+  ToolInvocationRequestSchema,
+  ToolInvocationResultSchema,
+  type JsonSchemaDocument,
+  type McpIcon,
+  type McpToolRegistrationDescriptor,
+} from '@sentris/shared';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 
 /**
  * Tool discovered from an MCP server.
@@ -101,3 +111,48 @@ export class RegisterGroupServerInput {
   groupSlug!: string;
   serverId!: string;
 }
+
+export const PrepareMcpInvocationBodySchema = z
+  .object({ request: ToolInvocationRequestSchema })
+  .strict();
+export class PrepareMcpInvocationBody extends createZodDto(PrepareMcpInvocationBodySchema) {}
+
+export const ClaimMcpInvocationBodySchema = z.object({ ref: PreparedInvocationRefSchema }).strict();
+export class ClaimMcpInvocationBody extends createZodDto(ClaimMcpInvocationBodySchema) {}
+
+export const SettleMcpInvocationBodySchema = z
+  .object({ ref: PreparedInvocationRefSchema, result: ToolInvocationResultSchema })
+  .strict();
+export class SettleMcpInvocationBody extends createZodDto(SettleMcpInvocationBodySchema) {}
+
+const boundedInvocationMessage = z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS);
+
+export const AmbiguousMcpInvocationBodySchema = z
+  .object({
+    ref: PreparedInvocationRefSchema,
+    message: boundedInvocationMessage,
+    completedAt: z.string().datetime(),
+  })
+  .strict();
+export class AmbiguousMcpInvocationBody extends createZodDto(AmbiguousMcpInvocationBodySchema) {}
+
+export const ReconcileMcpInvocationBodySchema = z
+  .object({
+    ref: PreparedInvocationRefSchema,
+    cause: z.enum(['failure', 'deadline', 'cancelled']),
+    message: boundedInvocationMessage,
+    completedAt: z.string().datetime(),
+  })
+  .strict();
+export class ReconcileMcpInvocationBody extends createZodDto(ReconcileMcpInvocationBodySchema) {}
+
+export const ReconcileRunMcpInvocationsBodySchema = z
+  .object({
+    runId: z.string().min(1),
+    message: boundedInvocationMessage,
+    completedAt: z.string().datetime(),
+  })
+  .strict();
+export class ReconcileRunMcpInvocationsBody extends createZodDto(
+  ReconcileRunMcpInvocationsBodySchema,
+) {}

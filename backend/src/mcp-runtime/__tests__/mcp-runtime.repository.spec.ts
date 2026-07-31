@@ -478,6 +478,17 @@ describe('McpRuntimeRepository', () => {
   });
 
   describe('attempt state machine', () => {
+    it('reads the exact current invocation request and prepared reference for dispatch', async () => {
+      const { db } = createMockDb({ select: [[invocationRows('prepared')]] });
+
+      await expect(new McpRuntimeRepository(db).getInvocationForDispatch(ref)).resolves.toEqual({
+        request,
+        ref,
+        status: 'prepared',
+        result: null,
+      });
+    });
+
     it('claims the exact current prepared attempt atomically on both rows', async () => {
       const dispatched = invocationRows('dispatched');
       const { db, calls } = createMockDb({
@@ -714,6 +725,153 @@ describe('McpRuntimeRepository', () => {
           result: completedResult,
         }),
       ).rejects.toThrow('could not be settled');
+    });
+
+    it.each([
+      ['failure', 'failed', 'pre-dispatch'],
+      ['deadline', 'failed', 'deadline-before-dispatch'],
+      ['cancelled', 'cancelled', 'cancelled'],
+    ] as const)(
+      'reconciles prepared %s before dispatch as %s/%s on both rows',
+      async (cause, status, failureClass) => {
+        const terminalResult: ToolInvocationResult = {
+          invocationId: INVOCATION_ID,
+          status,
+          error: {
+            class: failureClass,
+            message: 'activity ended',
+            retryable: cause === 'failure',
+          },
+          completedAt: '2026-07-31T10:04:00.000Z',
+        };
+        const terminal = invocationRows(status, { result: terminalResult });
+        const { db, calls } = createMockDb({
+          select: [[invocationRows('prepared')]],
+          update: [[terminal.invocation], [terminal.attempt]],
+        });
+
+        await expect(
+          new McpRuntimeRepository(db).reconcileDispatchFailure({
+            ref,
+            cause,
+            message: 'activity ended',
+            completedAt: terminalResult.completedAt,
+          }),
+        ).resolves.toEqual(terminalResult);
+
+        const sets = calls.filter((call) => call.method === 'set').map((call) => call.args[0]);
+        expect(sets[0]).toEqual(expect.objectContaining({ status, result: terminalResult }));
+        expect(sets[1]).toEqual(expect.objectContaining({ status }));
+      },
+    );
+
+    it('reconciles dispatched activity failure as ambiguous', async () => {
+      const ambiguousResult: ToolInvocationResult = {
+        invocationId: INVOCATION_ID,
+        status: 'ambiguous',
+        error: {
+          class: 'ambiguous-after-dispatch',
+          message: 'activity transport failed',
+          retryable: false,
+        },
+        completedAt: '2026-07-31T10:04:00.000Z',
+      };
+      const terminal = invocationRows('ambiguous', { result: ambiguousResult });
+      const { db } = createMockDb({
+        select: [[invocationRows('dispatched')]],
+        update: [[terminal.invocation], [terminal.attempt]],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'activity transport failed',
+          completedAt: ambiguousResult.completedAt,
+        }),
+      ).resolves.toEqual(ambiguousResult);
+    });
+
+    it('replays terminal reconciliation and conflicts on missing or stale references', async () => {
+      const terminalDb = createMockDb({
+        select: [[invocationRows('completed', { result: completedResult })]],
+      });
+      await expect(
+        new McpRuntimeRepository(terminalDb.db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'ignored',
+          completedAt: completedResult.completedAt,
+        }),
+      ).resolves.toEqual(completedResult);
+
+      const missingDb = createMockDb({ select: [[]] });
+      await expect(
+        new McpRuntimeRepository(missingDb.db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'missing',
+          completedAt: completedResult.completedAt,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      const staleDb = createMockDb({
+        select: [[invocationRows('prepared', { currentAttemptNumber: 2 })]],
+      });
+      await expect(
+        new McpRuntimeRepository(staleDb.db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'stale',
+          completedAt: completedResult.completedAt,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('closes every prepared and dispatched invocation when a run finalizes', async () => {
+      const secondRef = {
+        ...ref,
+        invocationId: '99999999-9999-4999-8999-999999999999',
+        attemptId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      };
+      const dispatched = invocationRows('dispatched');
+      dispatched.invocation.invocationId = secondRef.invocationId;
+      dispatched.invocation.request = {
+        ...request,
+        invocationId: secondRef.invocationId,
+      };
+      dispatched.attempt.id = secondRef.attemptId;
+      dispatched.attempt.invocationId = secondRef.invocationId;
+      const { db, calls } = createMockDb({
+        select: [[invocationRows('prepared'), dispatched]],
+        update: [
+          [
+            invocationRows('cancelled', {
+              result: {
+                invocationId: INVOCATION_ID,
+                status: 'cancelled',
+                error: { class: 'cancelled', message: 'run finalized', retryable: false },
+                completedAt: '2026-07-31T10:05:00.000Z',
+              },
+            }).invocation,
+          ],
+          [invocationRows('cancelled').attempt],
+          [dispatched.invocation],
+          [dispatched.attempt],
+        ],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).reconcileRunInvocations({
+          runId: 'run-1',
+          message: 'run finalized',
+          completedAt: '2026-07-31T10:05:00.000Z',
+        }),
+      ).resolves.toBeUndefined();
+
+      const sets = calls.filter((call) => call.method === 'set').map((call) => call.args[0]);
+      expect(sets[0]).toEqual(expect.objectContaining({ status: 'cancelled' }));
+      expect(sets[2]).toEqual(expect.objectContaining({ status: 'ambiguous' }));
     });
   });
 

@@ -25,6 +25,8 @@ import type { RedisConfig } from '../config';
 import { McpRuntimeModule } from '../mcp-runtime/mcp-runtime.module';
 import { McpRunCatalogService } from '../mcp-runtime/mcp-run-catalog.service';
 import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service';
+import { McpInvocationService } from '../mcp-runtime/mcp-invocation.service';
+import { InternalOnlyGuard } from '../auth/internal-only.guard';
 
 @Global()
 @Module({
@@ -97,6 +99,8 @@ import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service
     McpLegacyOutboundCompatibilityService,
     McpRunCatalogService,
     McpRunAuthorityService,
+    McpInvocationService,
+    InternalOnlyGuard,
     McpAuthService,
     McpGatewayService,
     McpDiscoveryOrchestratorService,

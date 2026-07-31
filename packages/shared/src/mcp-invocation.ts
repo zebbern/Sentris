@@ -14,6 +14,7 @@ export const TOOL_INVOCATION_PROTOCOL_VERSION = 1 as const;
 export const MAX_INLINE_INVOCATION_INPUT_BYTES = 256 * 1024;
 export const MAX_INLINE_INVOCATION_OUTPUT_BYTES = 1024 * 1024;
 export const MAX_INVOCATION_MANIFEST_ENTRIES = 1024;
+export const MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS = 8192;
 
 export const InvocationAttemptStatusSchema = z.enum([
   'planned',
@@ -36,8 +37,8 @@ export const ToolInvocationFailureClassSchema = z.enum([
   'runtime-owner-loss',
 ]);
 
-type JsonObject = { [key: string]: JsonValue };
-type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+export type JsonObject = { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 
 type JsonTraversalFrame =
   | { kind: 'enter'; value: unknown }
@@ -230,7 +231,7 @@ export type PreparedInvocationRef = z.infer<typeof PreparedInvocationRefSchema>;
 export const ToolInvocationErrorSchema = z
   .object({
     class: ToolInvocationFailureClassSchema,
-    message: z.string().min(1),
+    message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
     retryable: z.boolean(),
   })
   .strict();
@@ -328,6 +329,19 @@ export const ComponentInvocationDispatchContextSchema = z
   .strict();
 export type ComponentInvocationDispatchContext = z.infer<
   typeof ComponentInvocationDispatchContextSchema
+>;
+
+export const ClaimComponentDispatchOutcomeSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('dispatch'),
+      context: ComponentInvocationDispatchContextSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal('terminal'), result: ToolInvocationResultSchema }).strict(),
+]);
+export type ClaimComponentDispatchOutcome = z.infer<
+  typeof ClaimComponentDispatchOutcomeSchema
 >;
 
 export function assertCapabilityGrantApplies(

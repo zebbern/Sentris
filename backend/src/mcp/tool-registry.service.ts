@@ -9,11 +9,19 @@
  * TTL: 1 hour (configurable)
  */
 
-import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  Inject,
+  OnModuleDestroy,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type Redis from 'ioredis';
 import { type ToolInputSchema } from '@sentris/component-sdk';
-import type { McpToolRegistrationDescriptor } from '@sentris/shared';
+import { JsonObjectSchema, type McpToolRegistrationDescriptor } from '@sentris/shared';
 import { SecretsEncryptionService } from '../secrets/secrets.encryption';
+import { computeMcpBindingFingerprint } from '../mcp-runtime/mcp-binding-fingerprint';
 import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
 
 export const TOOL_REGISTRY_REDIS = Symbol('TOOL_REGISTRY_REDIS');
@@ -87,6 +95,11 @@ export interface RegisteredTool {
 
   /** Timestamp when tool was registered */
   registeredAt: string;
+}
+
+export interface ResolvedComponentForDispatch {
+  tool: RegisteredTool;
+  credentials: Record<string, unknown> | null;
 }
 
 const REGISTRY_TTL_SECONDS = 3 * 60 * 60;
@@ -292,6 +305,59 @@ export class ToolRegistryService implements OnModuleDestroy {
   async getToolByName(runId: string, toolName: string): Promise<RegisteredTool | null> {
     const tools = await this.getToolsForRun(runId);
     return tools.find((t) => t.toolName === toolName) ?? null;
+  }
+
+  async resolveComponentForDispatch(input: {
+    runId: string;
+    nodeId: string;
+    componentId: string;
+    toolName: string;
+    bindingFingerprint: string;
+    descriptor: McpToolRegistrationDescriptor;
+  }): Promise<ResolvedComponentForDispatch> {
+    if (!this.redis) {
+      throw new ServiceUnavailableException('MCP tool registry is unavailable');
+    }
+
+    const toolJson = await this.redis.hget(this.getRegistryKey(input.runId), input.nodeId);
+    if (!toolJson) {
+      throw new ServiceUnavailableException('MCP component binding is unavailable');
+    }
+
+    let parsedTool: unknown;
+    try {
+      parsedTool = JSON.parse(toolJson);
+    } catch {
+      throw new ServiceUnavailableException('MCP component binding is invalid');
+    }
+    if (!parsedTool || typeof parsedTool !== 'object' || Array.isArray(parsedTool)) {
+      throw new ServiceUnavailableException('MCP component binding is invalid');
+    }
+    const tool = parsedTool as RegisteredTool;
+    if (
+      tool.nodeId !== input.nodeId ||
+      tool.componentId !== input.componentId ||
+      tool.toolName !== input.toolName ||
+      tool.type !== 'component' ||
+      tool.status !== 'ready' ||
+      tool.exposedToAgent === false ||
+      computeMcpBindingFingerprint(tool, [input.descriptor]) !== input.bindingFingerprint
+    ) {
+      throw new ConflictException('Live MCP component binding no longer matches its snapshot');
+    }
+
+    if (!tool.encryptedCredentials) {
+      return { tool, credentials: null };
+    }
+
+    try {
+      const encryptionMaterial = JSON.parse(tool.encryptedCredentials);
+      const decrypted = await this.encryption.decrypt(encryptionMaterial);
+      return { tool, credentials: JsonObjectSchema.parse(JSON.parse(decrypted)) };
+    } catch {
+      this.logger.error(`Unable to resolve credentials for MCP component node ${input.nodeId}`);
+      throw new ServiceUnavailableException('MCP component credentials are unavailable');
+    }
   }
 
   /**

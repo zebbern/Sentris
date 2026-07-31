@@ -14,6 +14,8 @@ import { McpLegacyOutboundCompatibilityService } from '../mcp-legacy-outbound-co
 import { McpAuthService } from '../mcp-auth.service';
 import { McpGroupsService } from '../../mcp-groups/mcp-groups.service';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from '../tool-registry.service';
+import { InternalOnlyGuard } from '../../auth/internal-only.guard';
+import { McpInvocationService } from '../../mcp-runtime/mcp-invocation.service';
 
 // Simple Mock Redis
 class MockRedis {
@@ -56,6 +58,68 @@ describe('MCP Internal API (Integration)', () => {
   const generateSessionToken = vi.fn(async () => 'mock-token');
   const cleanedOutboundRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
+  const preparedRef = {
+    invocationId: '11111111-1111-4111-8111-111111111111',
+    attemptId: '22222222-2222-4222-8222-222222222222',
+    attemptNumber: 1,
+    capabilitySnapshotId: '33333333-3333-4333-8333-333333333333',
+    capabilityGrantId: '44444444-4444-4444-8444-444444444444',
+    toolName: 'scan_target',
+    sourceId: 'scanner-node',
+    destination: 'component-activity' as const,
+    retryPolicy: 'pre-dispatch-only' as const,
+    preparedAt: '2026-07-31T10:00:01.000Z',
+  };
+  const completedResult = {
+    invocationId: preparedRef.invocationId,
+    status: 'completed' as const,
+    output: { findings: 1 },
+    completedAt: '2026-07-31T10:01:00.000Z',
+  };
+  const invocationService = {
+    prepare: vi.fn(async () => ({
+      kind: 'prepared' as const,
+      ref: preparedRef,
+      manifest: {
+        capabilitySnapshotId: preparedRef.capabilitySnapshotId,
+        capabilityGrantId: preparedRef.capabilityGrantId,
+        version: '1' as const,
+        entries: [
+          {
+            toolName: preparedRef.toolName,
+            sourceId: preparedRef.sourceId,
+            destination: preparedRef.destination,
+            retryPolicy: preparedRef.retryPolicy,
+          },
+        ],
+      },
+    })),
+    claimComponentDispatch: vi.fn(async () => ({
+      kind: 'dispatch' as const,
+      context: {
+        ref: preparedRef,
+        run: {
+          runId: 'run-1',
+          workflowId: '55555555-5555-4555-8555-555555555555',
+          workflowVersionId: null,
+          organizationId: 'org-1',
+          scopeId: null,
+        },
+        component: {
+          nodeId: 'scanner-node',
+          componentId: 'security.scanner',
+          arguments: { target: 'example.com' },
+          parameters: {},
+          credentials: { apiKey: 'resolved-secret' },
+        },
+      },
+    })),
+    complete: vi.fn(async () => completedResult),
+    fail: vi.fn(async (_ref, result) => result),
+    ambiguous: vi.fn(async () => completedResult),
+    reconcileDispatchFailure: vi.fn(async () => completedResult),
+    reconcileRunInvocations: vi.fn(async () => undefined),
+  };
 
   beforeAll(async () => {
     process.env.INTERNAL_SERVICE_TOKEN = INTERNAL_TOKEN;
@@ -100,6 +164,8 @@ describe('MCP Internal API (Integration)', () => {
           useValue: { getServerConfig: async () => ({}) },
         },
         { provide: TOOL_REGISTRY_REDIS, useValue: mockRedis },
+        { provide: McpInvocationService, useValue: invocationService },
+        InternalOnlyGuard,
         {
           provide: AuthService,
           useValue: {
@@ -129,6 +195,8 @@ describe('MCP Internal API (Integration)', () => {
     controller = moduleFixture.get(InternalMcpController);
     (controller as unknown as { toolRegistry: ToolRegistryService }).toolRegistry =
       toolRegistryService;
+    (controller as unknown as { invocationService: typeof invocationService }).invocationService =
+      invocationService;
     (
       controller as unknown as {
         mcpAuthService: { generateSessionToken: typeof generateSessionToken };
@@ -356,5 +424,58 @@ describe('MCP Internal API (Integration)', () => {
 
     // Should be caught by global AuthGuard
     expect(response.status).toBe(403);
+  });
+
+  it('prepares and claims an invocation only with the internal service credential', async () => {
+    const requestBody = {
+      invocationId: preparedRef.invocationId,
+      scope: {
+        kind: 'run',
+        organizationId: 'org-1',
+        runId: 'run-1',
+        capabilityGrantId: preparedRef.capabilityGrantId,
+      },
+      capabilitySnapshotId: preparedRef.capabilitySnapshotId,
+      toolName: preparedRef.toolName,
+      input: { target: 'example.com' },
+      requestedAt: '2099-07-31T10:00:00.000Z',
+      deadlineAt: '2099-07-31T10:05:00.000Z',
+    };
+    await request(app.getHttpServer())
+      .post('/internal/mcp/invocations/prepare')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ request: requestBody })
+      .expect(201);
+
+    const claim = await request(app.getHttpServer())
+      .post('/internal/mcp/invocations/claim')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ ref: preparedRef })
+      .expect(201);
+    expect(claim.body.context.component.credentials).toEqual({ apiKey: 'resolved-secret' });
+
+    await request(app.getHttpServer())
+      .post('/internal/mcp/invocations/prepare')
+      .send({ request: requestBody })
+      .expect(403);
+  });
+
+  it('strictly rejects unknown invocation DTO fields', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/mcp/invocations/claim')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ ref: preparedRef, unexpected: true })
+      .expect(400);
+    expect(invocationService.claimComponentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('returns only terminal results from settlement routes', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/internal/mcp/invocations/complete')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ ref: preparedRef, result: completedResult })
+      .expect(201);
+    expect(response.body).toEqual(completedResult);
+    expect(response.body.context).toBeUndefined();
   });
 });
