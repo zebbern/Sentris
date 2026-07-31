@@ -3,9 +3,59 @@ import {
   MCP_CAPABILITY_CONTRACT_VERSION,
   type CapabilityGrant,
   type ExecutionScope,
+  ExecutionScopeSchema,
   type McpCapabilityCatalogSnapshot,
   type ToolDescriptor,
 } from './mcp-capabilities.js';
+
+export const TOOL_INVOCATION_UPDATE_NAME = 'executeToolInvocation' as const;
+export const TOOL_INVOCATION_PROTOCOL_QUERY_NAME = 'getToolInvocationProtocolVersion' as const;
+export const TOOL_INVOCATION_PROTOCOL_VERSION = 1 as const;
+export const MAX_INLINE_INVOCATION_INPUT_BYTES = 256 * 1024;
+export const MAX_INLINE_INVOCATION_OUTPUT_BYTES = 1024 * 1024;
+
+export const InvocationAttemptStatusSchema = z.enum([
+  'planned',
+  'prepared',
+  'dispatched',
+  'completed',
+  'failed',
+  'ambiguous',
+  'cancelled',
+]);
+
+export const ToolInvocationFailureClassSchema = z.enum([
+  'validation',
+  'authorization',
+  'deadline-before-dispatch',
+  'pre-dispatch',
+  'remote-tool',
+  'cancelled',
+  'ambiguous-after-dispatch',
+  'runtime-owner-loss',
+]);
+
+type JsonObject = { [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number().finite(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    JsonObjectSchema,
+  ]),
+);
+
+export const JsonObjectSchema: z.ZodType<JsonObject> = z.lazy(() =>
+  z.record(z.string(), JsonValueSchema),
+);
+
+function isWithinInlineJsonByteLimit(value: JsonValue, maximumBytes: number): boolean {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength <= maximumBytes;
+}
 
 export const InvocationManifestEntrySchema = z
   .object({
@@ -28,6 +78,150 @@ export const InvocationManifestSchema = z
   .strict()
   .readonly();
 export type InvocationManifest = z.infer<typeof InvocationManifestSchema>;
+
+export const ToolInvocationRequestSchema = z
+  .object({
+    invocationId: z.string().uuid(),
+    scope: ExecutionScopeSchema,
+    capabilitySnapshotId: z.string().uuid(),
+    toolName: z.string().min(1).max(128),
+    input: JsonObjectSchema.refine(
+      (input) => isWithinInlineJsonByteLimit(input, MAX_INLINE_INVOCATION_INPUT_BYTES),
+      { message: 'Invocation input exceeds 262144 UTF-8 bytes' },
+    ),
+    requestedAt: z.string().datetime(),
+    deadlineAt: z.string().datetime(),
+  })
+  .strict()
+  .superRefine(({ requestedAt, deadlineAt }, context) => {
+    if (new Date(deadlineAt) < new Date(requestedAt)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['deadlineAt'],
+        message: 'Invocation deadline must not be before requestedAt',
+      });
+    }
+  });
+export type ToolInvocationRequest = z.infer<typeof ToolInvocationRequestSchema>;
+
+export const PreparedInvocationRefSchema = z
+  .object({
+    invocationId: z.string().uuid(),
+    attemptId: z.string().uuid(),
+    attemptNumber: z.number().int().positive(),
+    capabilitySnapshotId: z.string().uuid(),
+    capabilityGrantId: z.string().uuid(),
+    toolName: z.string().min(1).max(128),
+    sourceId: z.string().min(1),
+    destination: z.enum(['component-activity', 'mcp-activity']),
+    retryPolicy: z.enum(['pre-dispatch-only', 'reviewed-idempotent']),
+    preparedAt: z.string().datetime(),
+  })
+  .strict();
+export type PreparedInvocationRef = z.infer<typeof PreparedInvocationRefSchema>;
+
+export const ToolInvocationErrorSchema = z
+  .object({
+    class: ToolInvocationFailureClassSchema,
+    message: z.string().min(1),
+    retryable: z.boolean(),
+  })
+  .strict();
+
+export const ToolInvocationResultSchema = z
+  .object({
+    invocationId: z.string().uuid(),
+    status: z.enum(['completed', 'failed', 'ambiguous', 'cancelled']),
+    output: JsonValueSchema.optional(),
+    error: ToolInvocationErrorSchema.optional(),
+    completedAt: z.string().datetime(),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (
+      result.output !== undefined &&
+      !isWithinInlineJsonByteLimit(result.output, MAX_INLINE_INVOCATION_OUTPUT_BYTES)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['output'],
+        message: 'Invocation output exceeds 1048576 UTF-8 bytes',
+      });
+    }
+
+    if (result.status === 'completed') {
+      if (result.output === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['output'],
+          message: 'Completed invocations require output',
+        });
+      }
+      if (result.error !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['error'],
+          message: 'Completed invocations must not include an error',
+        });
+      }
+      return;
+    }
+
+    if (result.error === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['error'],
+        message: 'Terminal invocation failures require an error',
+      });
+    }
+    if (result.output !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['output'],
+        message: 'Terminal invocation failures must not include output',
+      });
+    }
+  });
+export type ToolInvocationResult = z.infer<typeof ToolInvocationResultSchema>;
+
+export const PrepareToolInvocationOutcomeSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('prepared'),
+      ref: PreparedInvocationRefSchema,
+      manifest: InvocationManifestSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal('terminal'), result: ToolInvocationResultSchema }).strict(),
+]);
+export type PrepareToolInvocationOutcome = z.infer<typeof PrepareToolInvocationOutcomeSchema>;
+
+export const ComponentInvocationDispatchContextSchema = z
+  .object({
+    ref: PreparedInvocationRefSchema,
+    run: z
+      .object({
+        runId: z.string().min(1),
+        workflowId: z.string().uuid(),
+        workflowVersionId: z.string().uuid().nullable(),
+        organizationId: z.string().min(1).nullable(),
+        scopeId: z.string().uuid().nullable(),
+      })
+      .strict(),
+    component: z
+      .object({
+        nodeId: z.string().min(1),
+        componentId: z.string().min(1),
+        arguments: JsonObjectSchema,
+        parameters: JsonObjectSchema,
+        credentials: JsonObjectSchema.optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type ComponentInvocationDispatchContext = z.infer<
+  typeof ComponentInvocationDispatchContextSchema
+>;
 
 export function assertCapabilityGrantApplies(
   scope: ExecutionScope,

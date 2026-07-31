@@ -8,7 +8,10 @@ import type {
 import {
   assertCapabilityGrantApplies,
   buildInvocationManifest,
+  PrepareToolInvocationOutcomeSchema,
   resolveInvocationManifestEntry,
+  ToolInvocationRequestSchema,
+  ToolInvocationResultSchema,
   type InvocationManifest,
   type InvocationManifestEntry,
 } from '../mcp-invocation.js';
@@ -18,6 +21,8 @@ type Mutable<T> = { -readonly [Key in keyof T]: T[Key] };
 const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_GRANT_ID = '22222222-2222-4222-8222-222222222222';
 const SNAPSHOT_ID = '33333333-3333-4333-8333-333333333333';
+const INVOCATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const ATTEMPT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 const scope: ExecutionScope = {
   kind: 'run',
@@ -26,6 +31,145 @@ const scope: ExecutionScope = {
   capabilityGrantId: GRANT_ID,
   invokingNodeId: 'agent-node',
 };
+
+const request = {
+  invocationId: INVOCATION_ID,
+  scope,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  toolName: 'osv_query',
+  input: { package: { ecosystem: 'npm', name: 'lodash' }, version: '4.17.20' },
+  requestedAt: '2026-07-31T10:00:00.000Z',
+  deadlineAt: '2026-07-31T10:05:00.000Z',
+};
+
+const preparedRef = {
+  invocationId: INVOCATION_ID,
+  attemptId: ATTEMPT_ID,
+  attemptNumber: 1,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  capabilityGrantId: GRANT_ID,
+  toolName: 'osv_query',
+  sourceId: 'component:osv',
+  destination: 'component-activity' as const,
+  retryPolicy: 'pre-dispatch-only' as const,
+  preparedAt: '2026-07-31T10:00:01.000Z',
+};
+
+describe('ToolInvocationRequestSchema', () => {
+  it('parses a bounded request with nested finite JSON input', () => {
+    expect(ToolInvocationRequestSchema.parse(request)).toEqual(request);
+  });
+
+  it('rejects input at or above the inline byte limit', () => {
+    expect(() =>
+      ToolInvocationRequestSchema.parse({
+        ...request,
+        input: { text: 'x'.repeat(262_144) },
+      }),
+    ).toThrow('Invocation input exceeds 262144 UTF-8 bytes');
+  });
+
+  it.each([
+    { input: { count: Number.POSITIVE_INFINITY } },
+    { input: { count: Number.NaN } },
+    { input: { missing: undefined } },
+  ])('rejects non-finite and undefined JSON input %#', ({ input }) => {
+    expect(() => ToolInvocationRequestSchema.parse({ ...request, input })).toThrow();
+  });
+
+  it('rejects a deadline before the request time', () => {
+    expect(() =>
+      ToolInvocationRequestSchema.parse({
+        ...request,
+        deadlineAt: '2026-07-31T09:59:59.999Z',
+      }),
+    ).toThrow('Invocation deadline must not be before requestedAt');
+  });
+});
+
+describe('ToolInvocationResultSchema', () => {
+  const completedResult = {
+    invocationId: INVOCATION_ID,
+    status: 'completed' as const,
+    output: { vulnerabilities: [] },
+    completedAt: '2026-07-31T10:01:00.000Z',
+  };
+
+  const failedResult = {
+    invocationId: INVOCATION_ID,
+    status: 'failed' as const,
+    error: {
+      class: 'remote-tool' as const,
+      message: 'Upstream tool rejected the package.',
+      retryable: false,
+    },
+    completedAt: '2026-07-31T10:01:00.000Z',
+  };
+
+  it('enforces terminal output and error combinations', () => {
+    expect(ToolInvocationResultSchema.parse(completedResult)).toEqual(completedResult);
+    expect(ToolInvocationResultSchema.parse(failedResult)).toEqual(failedResult);
+    expect(() =>
+      ToolInvocationResultSchema.parse({ ...completedResult, output: undefined }),
+    ).toThrow();
+    expect(() =>
+      ToolInvocationResultSchema.parse({ ...completedResult, error: failedResult.error }),
+    ).toThrow();
+    expect(() =>
+      ToolInvocationResultSchema.parse({ ...failedResult, output: null }),
+    ).toThrow();
+    expect(() => ToolInvocationResultSchema.parse({ ...failedResult, error: undefined })).toThrow();
+  });
+
+  it('rejects output at or above the inline byte limit', () => {
+    expect(() =>
+      ToolInvocationResultSchema.parse({
+        ...completedResult,
+        output: { text: 'x'.repeat(1_048_576) },
+      }),
+    ).toThrow('Invocation output exceeds 1048576 UTF-8 bytes');
+  });
+});
+
+describe('PrepareToolInvocationOutcomeSchema', () => {
+  it('parses prepared and terminal preflight outcomes', () => {
+    expect(
+      PrepareToolInvocationOutcomeSchema.parse({
+        kind: 'prepared',
+        ref: preparedRef,
+        manifest: {
+          capabilitySnapshotId: SNAPSHOT_ID,
+          capabilityGrantId: GRANT_ID,
+          version: '1',
+          entries: [
+            {
+              toolName: 'osv_query',
+              sourceId: 'component:osv',
+              destination: 'component-activity',
+              retryPolicy: 'pre-dispatch-only',
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({ kind: 'prepared', ref: preparedRef });
+
+    expect(
+      PrepareToolInvocationOutcomeSchema.parse({
+        kind: 'terminal',
+        result: {
+          invocationId: INVOCATION_ID,
+          status: 'cancelled',
+          error: {
+            class: 'cancelled',
+            message: 'Invocation cancelled before dispatch.',
+            retryable: false,
+          },
+          completedAt: '2026-07-31T10:01:00.000Z',
+        },
+      }),
+    ).toMatchObject({ kind: 'terminal' });
+  });
+});
 
 const grant: CapabilityGrant = {
   id: GRANT_ID,
