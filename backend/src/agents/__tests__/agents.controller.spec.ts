@@ -184,6 +184,12 @@ describe('AgentsController', () => {
       return result.parts.length > 0 ? result.parts[0].chunk : null;
     }
 
+    async function getChunks(events: AgentTracePartEntry[]) {
+      (agentTraceService.list as ReturnType<typeof jest.fn>).mockResolvedValue(events);
+      const result = await controller.parts(AGENT_RUN_ID, {}, AUTH);
+      return result.parts.map((part) => part.chunk);
+    }
+
     it('converts message-start type', async () => {
       const chunk = await getChunk({
         type: 'message-start',
@@ -220,6 +226,20 @@ describe('AgentsController', () => {
     it('converts data-text-start to text-start', async () => {
       const chunk = await getChunk({ type: 'data-text-start', id: 'dts-1' });
       expect(chunk).toEqual({ type: 'text-start', id: 'dts-1' });
+    });
+
+    it('preserves one text id across start, delta, and end chunks', async () => {
+      const events = [
+        makeEvent({ sequence: 1, part: { type: 'data-text-start', data: { id: 'text-1' } } }),
+        makeEvent({ sequence: 2, part: { type: 'text-delta', id: 'text-1', textDelta: 'hello' } }),
+        makeEvent({ sequence: 3, part: { type: 'data-text-end', data: { id: 'text-1' } } }),
+      ];
+
+      expect(await getChunks(events)).toEqual([
+        { type: 'text-start', id: 'text-1' },
+        { type: 'text-delta', id: 'text-1', delta: 'hello' },
+        { type: 'text-end', id: 'text-1' },
+      ]);
     });
 
     it('converts text-end type', async () => {

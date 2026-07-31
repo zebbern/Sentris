@@ -166,9 +166,11 @@ function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk 
   }
 
   if (type === 'data-text-start') {
+    const data = isRecord(payload.data) ? payload.data : {};
+    const textId = ensureString(payload.id) ?? ensureString(data.id) ?? baseMessageId;
     return {
       type: 'text-start',
-      id: ensureString(payload.id) ?? baseMessageId,
+      id: textId,
     };
   }
 
@@ -180,9 +182,11 @@ function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk 
   }
 
   if (type === 'data-text-end') {
+    const data = isRecord(payload.data) ? payload.data : {};
+    const textId = ensureString(payload.id) ?? ensureString(data.id) ?? baseMessageId;
     return {
       type: 'text-end',
-      id: ensureString(payload.id) ?? baseMessageId,
+      id: textId,
     };
   }
 
@@ -257,4 +261,8 @@ function convertAgentTraceToUiChunk(event: AgentTracePartEntry): UIMessageChunk 
 
 function ensureString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

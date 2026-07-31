@@ -7,7 +7,7 @@ export type AgentStreamPart =
       role: 'assistant' | 'user';
       metadata?: Record<string, unknown>;
     }
-  | { type: 'text-delta'; textDelta: string }
+  | { type: 'text-delta'; id: string; textDelta: string }
   | {
       type: 'tool-input-available';
       toolCallId: string;
@@ -18,16 +18,33 @@ export type AgentStreamPart =
   | { type: 'finish'; finishReason: string; responseText: string }
   | { type: `data-${string}`; data: unknown };
 
+export interface AgentStreamRecorderOptions {
+  textFlushIntervalMs?: number;
+  textFlushMaxChars?: number;
+}
+
+const DEFAULT_TEXT_FLUSH_INTERVAL_MS = 150;
+const DEFAULT_TEXT_FLUSH_MAX_CHARS = 2048;
+
 export class AgentStreamRecorder {
   private sequence = 0;
   private activeTextId: string | null = null;
+  private pendingText = '';
+  private textFlushTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly textFlushIntervalMs: number;
+  private readonly textFlushMaxChars: number;
+  private terminalEmitted = false;
   private pendingPublication = Promise.resolve();
   private publicationError: unknown;
 
   constructor(
     private readonly context: ExecutionContext,
     private readonly agentRunId: string,
-  ) {}
+    options: AgentStreamRecorderOptions = {},
+  ) {
+    this.textFlushIntervalMs = options.textFlushIntervalMs ?? DEFAULT_TEXT_FLUSH_INTERVAL_MS;
+    this.textFlushMaxChars = options.textFlushMaxChars ?? DEFAULT_TEXT_FLUSH_MAX_CHARS;
+  }
 
   emitMessageStart(role: 'assistant' | 'user' = 'assistant'): void {
     this.emitPart({
@@ -38,6 +55,7 @@ export class AgentStreamRecorder {
   }
 
   emitToolInput(toolCallId: string, toolName: string, input: Record<string, unknown>): void {
+    this.flushPendingText();
     this.emitPart({
       type: 'tool-input-available',
       toolCallId,
@@ -47,6 +65,7 @@ export class AgentStreamRecorder {
   }
 
   emitToolOutput(toolCallId: string, toolName: string, output: unknown): void {
+    this.flushPendingText();
     this.emitPart({
       type: 'tool-output-available',
       toolCallId,
@@ -56,6 +75,7 @@ export class AgentStreamRecorder {
   }
 
   emitToolError(toolCallId: string, toolName: string, error: string): void {
+    this.flushPendingText();
     this.emitPart({
       type: 'data-tool-error',
       data: { toolCallId, toolName, error },
@@ -76,17 +96,23 @@ export class AgentStreamRecorder {
   }
 
   emitTextDelta(textDelta: string): void {
-    if (!textDelta.trim()) {
+    if (textDelta.length === 0) {
       return;
     }
     this.ensureTextStream();
-    this.emitPart({
-      type: 'text-delta',
-      textDelta,
-    });
+    this.pendingText += textDelta;
+    if (this.pendingText.length >= this.textFlushMaxChars) {
+      this.flushPendingText();
+      return;
+    }
+    this.scheduleTextFlush();
   }
 
   emitFinish(finishReason: string, responseText: string): void {
+    if (this.terminalEmitted) {
+      return;
+    }
+    this.flushPendingText();
     if (this.activeTextId) {
       this.emitPart({
         type: 'data-text-end',
@@ -94,10 +120,37 @@ export class AgentStreamRecorder {
       });
       this.activeTextId = null;
     }
+    this.terminalEmitted = true;
     this.emitPart({
       type: 'finish',
       finishReason,
       responseText,
+    });
+  }
+
+  private scheduleTextFlush(): void {
+    if (this.textFlushTimer) {
+      return;
+    }
+    this.textFlushTimer = setTimeout(() => {
+      this.flushPendingText();
+    }, this.textFlushIntervalMs);
+  }
+
+  private flushPendingText(): void {
+    if (this.textFlushTimer) {
+      clearTimeout(this.textFlushTimer);
+      this.textFlushTimer = undefined;
+    }
+    if (!this.pendingText || !this.activeTextId) {
+      return;
+    }
+    const textDelta = this.pendingText;
+    this.pendingText = '';
+    this.emitPart({
+      type: 'text-delta',
+      id: this.activeTextId,
+      textDelta,
     });
   }
 
@@ -134,6 +187,7 @@ export class AgentStreamRecorder {
   }
 
   async flush(): Promise<void> {
+    this.flushPendingText();
     await this.pendingPublication;
     if (this.publicationError !== undefined) {
       throw this.publicationError;
