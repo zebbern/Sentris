@@ -328,6 +328,7 @@ export class McpRuntimeRepository {
               eq(mcpInvocationAttemptsTable.id, ref.attemptId),
               eq(mcpInvocationAttemptsTable.invocationId, ref.invocationId),
               eq(mcpInvocationAttemptsTable.attemptNumber, ref.attemptNumber),
+              eq(mcpInvocationAttemptsTable.preparedAt, new Date(ref.preparedAt)),
               eq(mcpInvocationAttemptsTable.sourceId, ref.sourceId),
               eq(mcpInvocationAttemptsTable.destination, ref.destination),
               eq(mcpInvocationAttemptsTable.retryPolicy, ref.retryPolicy),
@@ -561,7 +562,9 @@ export class McpRuntimeRepository {
     }
     if (
       TERMINAL_STATUSES.has(rows.invocation.status) !== (result !== null) ||
-      (result && result.status !== rows.invocation.status)
+      (result &&
+        (result.status !== rows.invocation.status ||
+          result.invocationId !== rows.invocation.invocationId))
     ) {
       throw new ConflictException('Persisted MCP invocation terminal result is inconsistent');
     }
@@ -710,6 +713,7 @@ export class McpRuntimeRepository {
           eq(mcpInvocationAttemptsTable.id, ref.attemptId),
           eq(mcpInvocationAttemptsTable.invocationId, ref.invocationId),
           eq(mcpInvocationAttemptsTable.attemptNumber, ref.attemptNumber),
+          eq(mcpInvocationAttemptsTable.preparedAt, new Date(ref.preparedAt)),
           eq(mcpInvocationAttemptsTable.sourceId, ref.sourceId),
           eq(mcpInvocationAttemptsTable.destination, ref.destination),
           eq(mcpInvocationAttemptsTable.retryPolicy, ref.retryPolicy),

@@ -115,10 +115,12 @@ interface MockCall {
 }
 
 interface MockRows {
-  insert?: unknown[][];
-  select?: unknown[][];
-  update?: unknown[][];
+  insert?: MockResult[];
+  select?: MockResult[];
+  update?: MockResult[];
 }
+
+type MockResult = unknown[] | ((calls: MockCall[]) => unknown[]);
 
 function createMockDb(rows: MockRows = {}): { db: never; calls: MockCall[] } {
   const calls: MockCall[] = [];
@@ -128,15 +130,19 @@ function createMockDb(rows: MockRows = {}): { db: never; calls: MockCall[] } {
     update: [...(rows.update ?? [])],
   };
 
-  function chainable(resolvedValue: unknown[]) {
+  function chainable(result: MockResult) {
     const builder: Record<string, unknown> = {};
+    const builderCalls: MockCall[] = [];
     const self = new Proxy(builder, {
       get(_target, prop: string) {
         if (prop === 'then') {
-          return (resolve: (value: unknown[]) => void) => resolve(resolvedValue);
+          return (resolve: (value: unknown[]) => void) =>
+            resolve(typeof result === 'function' ? result(builderCalls) : result);
         }
         return (...args: unknown[]) => {
-          calls.push({ method: prop, args });
+          const call = { method: prop, args };
+          calls.push(call);
+          builderCalls.push(call);
           return self;
         };
       },
@@ -246,6 +252,31 @@ function sqlContainsColumn(node: unknown, name: string): boolean {
   const candidate = node as { name?: string; queryChunks?: unknown[] };
   if (candidate.name === name) return true;
   return candidate.queryChunks?.some((chunk) => sqlContainsColumn(chunk, name)) ?? false;
+}
+
+function sqlContainsDateParamValue(node: unknown, value: string): boolean {
+  if (!node || typeof node !== 'object') return false;
+  const candidate = node as {
+    constructor?: { name?: string };
+    value?: unknown;
+    queryChunks?: unknown[];
+  };
+  if (
+    candidate.constructor?.name === 'Param' &&
+    candidate.value instanceof Date &&
+    candidate.value.toISOString() === value
+  ) {
+    return true;
+  }
+  return candidate.queryChunks?.some((chunk) => sqlContainsDateParamValue(chunk, value)) ?? false;
+}
+
+function matchAttemptByPreparedAt(row: unknown): (calls: MockCall[]) => unknown[] {
+  return (calls) => {
+    const where = calls.find((call) => call.method === 'where')?.args[0];
+    if (!sqlContainsColumn(where, 'prepared_at')) return [row];
+    return sqlContainsDateParamValue(where, ref.preparedAt) ? [row] : [];
+  };
 }
 
 function sqlContainsText(node: unknown, text: string): boolean {
@@ -466,6 +497,9 @@ describe('McpRuntimeRepository', () => {
       const where = calls.find((call) => call.method === 'where')?.args[0];
       expect(sqlContainsParamValue(where, 'prepared')).toBe(true);
       expect(sqlContainsParamValue(where, 1)).toBe(true);
+      const attemptWhere = calls.filter((call) => call.method === 'where')[1]?.args[0];
+      expect(sqlContainsColumn(attemptWhere, 'prepared_at')).toBe(true);
+      expect(sqlContainsDateParamValue(attemptWhere, ref.preparedAt)).toBe(true);
     });
 
     it.each([
@@ -494,6 +528,9 @@ describe('McpRuntimeRepository', () => {
       expect((sets[0] as { terminalAt: Date }).terminalAt).toBe(
         (sets[1] as { completedAt: Date }).completedAt,
       );
+      const attemptWhere = calls.filter((call) => call.method === 'where')[1]?.args[0];
+      expect(sqlContainsColumn(attemptWhere, 'prepared_at')).toBe(true);
+      expect(sqlContainsDateParamValue(attemptWhere, ref.preparedAt)).toBe(true);
     });
 
     it('marks dispatched attempts ambiguous and never returns them to prepared', async () => {
@@ -596,6 +633,35 @@ describe('McpRuntimeRepository', () => {
       ).rejects.toThrow();
     });
 
+    it.each(['claim', 'prepare'] as const)(
+      'rejects %s replay when persisted terminal result belongs to another invocation',
+      async (operation) => {
+        const wrongInvocationResult: ToolInvocationResult = {
+          ...completedResult,
+          invocationId: '66666666-6666-4666-8666-666666666666',
+        };
+        const terminal = invocationRows('completed', { result: wrongInvocationResult });
+        const { db } = createMockDb({
+          insert: operation === 'prepare' ? [[]] : [],
+          update: operation === 'claim' ? [[]] : [],
+          select: [[terminal]],
+        });
+        const repository = new McpRuntimeRepository(db);
+
+        const replay =
+          operation === 'claim'
+            ? repository.claimAttempt(ref)
+            : repository.prepareInvocation({
+                request,
+                requestHash: REQUEST_HASH,
+                entry,
+                manifest,
+              });
+
+        await expect(replay).rejects.toThrow('terminal result is inconsistent');
+      },
+    );
+
     it('rejects stale non-current attempts on claim and settlement', async () => {
       const stale = invocationRows('dispatched', { currentAttemptNumber: 2 });
       const claimDb = createMockDb({ update: [[]], select: [[stale]] });
@@ -619,6 +685,34 @@ describe('McpRuntimeRepository', () => {
           preparedAt: '2026-07-31T10:01:01.000Z',
         }),
       ).rejects.toThrow('does not match persistence');
+    });
+
+    it('cannot claim an active attempt with a wrong prepared-reference timestamp', async () => {
+      const dispatched = invocationRows('dispatched');
+      const { db } = createMockDb({
+        update: [[dispatched.invocation], matchAttemptByPreparedAt(dispatched.attempt)],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).claimAttempt({
+          ...ref,
+          preparedAt: '2026-07-31T10:01:01.000Z',
+        }),
+      ).rejects.toThrow('could not be claimed');
+    });
+
+    it('cannot settle an active attempt with a wrong prepared-reference timestamp', async () => {
+      const terminal = invocationRows('completed', { result: completedResult });
+      const { db } = createMockDb({
+        update: [[terminal.invocation], matchAttemptByPreparedAt(terminal.attempt)],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).settleAttempt({
+          ref: { ...ref, preparedAt: '2026-07-31T10:01:01.000Z' },
+          result: completedResult,
+        }),
+      ).rejects.toThrow('could not be settled');
     });
   });
 
