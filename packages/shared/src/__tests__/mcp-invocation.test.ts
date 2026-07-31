@@ -9,7 +9,11 @@ import {
   assertCapabilityGrantApplies,
   buildInvocationManifest,
   resolveInvocationManifestEntry,
+  type InvocationManifest,
+  type InvocationManifestEntry,
 } from '../mcp-invocation.js';
+
+type Mutable<T> = { -readonly [Key in keyof T]: T[Key] };
 
 const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_GRANT_ID = '22222222-2222-4222-8222-222222222222';
@@ -302,6 +306,43 @@ describe('buildInvocationManifest', () => {
       }),
     ).toThrow();
   });
+
+  it('makes the planned authority immutable', () => {
+    const manifest = buildInvocationManifest(
+      snapshot([componentTool('scanner.scan_target')]),
+      grant,
+    );
+    const originalEntry = { ...manifest.entries[0] };
+
+    if (false) {
+      // @ts-expect-error Invocation manifests expose readonly properties.
+      manifest.capabilityGrantId = OTHER_GRANT_ID;
+      // @ts-expect-error Invocation manifest entries are a readonly array.
+      manifest.entries.push(manifest.entries[0]);
+      // @ts-expect-error Invocation manifest entry properties are readonly.
+      manifest.entries[0].destination = 'mcp-activity';
+    }
+
+    expect(Object.isFrozen(manifest)).toBe(true);
+    expect(Object.isFrozen(manifest.entries)).toBe(true);
+    expect(Object.isFrozen(manifest.entries[0])).toBe(true);
+    expect(() => {
+      (manifest as Mutable<InvocationManifest>).entries = [];
+    }).toThrow(TypeError);
+    expect(() => {
+      (manifest.entries as InvocationManifestEntry[]).push({
+        ...originalEntry,
+        toolName: 'scanner.injected',
+      });
+    }).toThrow(TypeError);
+    expect(() => {
+      (manifest.entries[0] as Mutable<InvocationManifestEntry>).destination = 'mcp-activity';
+    }).toThrow(TypeError);
+    expect(() => {
+      (manifest.entries[0] as Mutable<InvocationManifestEntry>).retryPolicy = 'pre-dispatch-only';
+    }).toThrow(TypeError);
+    expect(manifest.entries).toEqual([originalEntry]);
+  });
 });
 
 describe('resolveInvocationManifestEntry', () => {
@@ -328,5 +369,30 @@ describe('resolveInvocationManifestEntry', () => {
     ['tool', { scope, capabilitySnapshotId: SNAPSHOT_ID, toolName: 'scanner.missing' }],
   ] as const)('rejects an unbound %s lookup', (_name, input) => {
     expect(() => resolveInvocationManifestEntry(manifest, input)).toThrow();
+  });
+
+  it('returns immutable planned authority', () => {
+    const resolved = resolveInvocationManifestEntry(manifest, {
+      scope,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      toolName: 'scanner.scan_target',
+    });
+
+    if (false) {
+      // @ts-expect-error Resolved manifest entry properties are readonly.
+      resolved.destination = 'mcp-activity';
+    }
+
+    expect(Object.isFrozen(resolved)).toBe(true);
+    expect(() => {
+      (resolved as Mutable<InvocationManifestEntry>).destination = 'mcp-activity';
+    }).toThrow(TypeError);
+    expect(
+      resolveInvocationManifestEntry(manifest, {
+        scope,
+        capabilitySnapshotId: SNAPSHOT_ID,
+        toolName: 'scanner.scan_target',
+      }).destination,
+    ).toBe('component-activity');
   });
 });

@@ -14,7 +14,8 @@ export const InvocationManifestEntrySchema = z
     destination: z.enum(['component-activity', 'mcp-activity']),
     retryPolicy: z.enum(['pre-dispatch-only', 'reviewed-idempotent']),
   })
-  .strict();
+  .strict()
+  .readonly();
 export type InvocationManifestEntry = z.infer<typeof InvocationManifestEntrySchema>;
 
 export const InvocationManifestSchema = z
@@ -22,9 +23,10 @@ export const InvocationManifestSchema = z
     capabilitySnapshotId: z.string().uuid(),
     capabilityGrantId: z.string().uuid(),
     version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
-    entries: z.array(InvocationManifestEntrySchema),
+    entries: z.array(InvocationManifestEntrySchema).readonly(),
   })
-  .strict();
+  .strict()
+  .readonly();
 export type InvocationManifest = z.infer<typeof InvocationManifestSchema>;
 
 export function assertCapabilityGrantApplies(
@@ -120,12 +122,12 @@ export function buildInvocationManifest(
       return 0;
     });
 
-  return {
+  return InvocationManifestSchema.parse({
     capabilitySnapshotId: snapshot.id,
     capabilityGrantId: grant.id,
     version: MCP_CAPABILITY_CONTRACT_VERSION,
     entries,
-  };
+  });
 }
 
 export function resolveInvocationManifestEntry(
