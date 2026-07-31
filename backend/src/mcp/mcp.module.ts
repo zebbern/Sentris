@@ -17,6 +17,7 @@ import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
 import { DatabaseModule } from '../database/database.module';
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
 import { SessionRegistryService } from './session-registry.service';
+import { McpFacadeService } from './mcp-facade.service';
 import { MCP_DISCOVERY_REDIS, SESSION_REGISTRY_REDIS } from './mcp.tokens';
 import type { RedisConfig } from '../config';
 
@@ -92,7 +93,14 @@ import type { RedisConfig } from '../config';
     McpDiscoveryOrchestratorService,
     McpServersRepository,
     SessionRegistryService,
+    McpFacadeService,
   ],
-  exports: [ToolRegistryService, McpGatewayService, McpAuthService, SessionRegistryService],
+  exports: [
+    ToolRegistryService,
+    McpGatewayService,
+    McpAuthService,
+    SessionRegistryService,
+    McpFacadeService,
+  ],
 })
 export class McpModule {}
