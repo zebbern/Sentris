@@ -528,11 +528,11 @@ export class McpGatewayService {
     return `${runId}\u0000${endpoint}`;
   }
 
-  private async evictLegacyOutboundClient(clientKey: string): Promise<void> {
-    const client = this.legacyOutboundClients.get(clientKey);
-    if (client) {
-      await this.closeLegacyOutboundClient(clientKey, client);
-    }
+  private async evictLegacyOutboundClient(
+    clientKey: string,
+    client: LegacyMcpClient,
+  ): Promise<void> {
+    await this.closeLegacyOutboundClient(clientKey, client);
   }
 
   /**
@@ -545,11 +545,12 @@ export class McpGatewayService {
   ): Promise<DiscoveredTool[]> {
     const endpoint = source.endpoint;
     if (!endpoint) return [];
+    let client: LegacyMcpClient | undefined;
     try {
       this.logger.debug(`[discoverToolsFromEndpoint] START: endpoint=${endpoint}`);
 
       const headers = await this.getExternalRequestHeaders(runId, source);
-      const client = await this.getOrCreateLegacyOutboundClient(runId, endpoint, headers);
+      client = await this.getOrCreateLegacyOutboundClient(runId, endpoint, headers);
       const res = await client.listTools();
 
       const tools = res.tools ?? [];
@@ -565,7 +566,12 @@ export class McpGatewayService {
     } catch (error) {
       this.logger.error(`[discoverToolsFromEndpoint] FAILED for ${endpoint}: ${error}`);
       // If the client failed, remove it from cache so next attempt creates a fresh one
-      await this.evictLegacyOutboundClient(this.getLegacyOutboundClientKey(runId, endpoint));
+      if (client) {
+        await this.evictLegacyOutboundClient(
+          this.getLegacyOutboundClientKey(runId, endpoint),
+          client,
+        );
+      }
       return [];
     }
   }
@@ -590,8 +596,9 @@ export class McpGatewayService {
     const headers = await this.getExternalRequestHeaders(runId, source);
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      let client: LegacyMcpClient | undefined;
       try {
-        const client = await this.getOrCreateLegacyOutboundClient(runId, source.endpoint, headers);
+        client = await this.getOrCreateLegacyOutboundClient(runId, source.endpoint, headers);
 
         const result = await Promise.race([
           client.callTool({
@@ -611,9 +618,12 @@ export class McpGatewayService {
         lastError = error;
         this.logger.warn(`External tool call attempt ${attempt} failed: ${error}`);
         // Evict the broken client so next attempt creates a fresh one
-        await this.evictLegacyOutboundClient(
-          this.getLegacyOutboundClientKey(runId, source.endpoint),
-        );
+        if (client) {
+          await this.evictLegacyOutboundClient(
+            this.getLegacyOutboundClientKey(runId, source.endpoint),
+            client,
+          );
+        }
         if (attempt < MAX_RETRIES) {
           await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
         }

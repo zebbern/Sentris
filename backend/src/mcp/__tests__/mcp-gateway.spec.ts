@@ -421,6 +421,160 @@ describe('McpGatewayService', () => {
     expect(unexpectedClient.close).not.toHaveBeenCalled();
   });
 
+  it('does not evict a replacement when an operation on the old v1 client fails late', async () => {
+    configureExternalRegistry(toolRegistry, 'http://127.0.0.1:9/mcp');
+    let rejectFirstFailure!: () => void;
+    let rejectLateFailure!: () => void;
+    let markBothOldCallsStarted!: () => void;
+    let markReplacementUsed!: () => void;
+    const firstFailure = new Promise<never>((_, reject) => {
+      rejectFirstFailure = () => reject(new Error('first old-client failure'));
+    });
+    const lateFailure = new Promise<never>((_, reject) => {
+      rejectLateFailure = () => reject(new Error('late old-client failure'));
+    });
+    const bothOldCallsStarted = new Promise<void>((resolve) => {
+      markBothOldCallsStarted = resolve;
+    });
+    const replacementUsed = new Promise<void>((resolve) => {
+      markReplacementUsed = resolve;
+    });
+    const oldClient = {
+      callTool: jest.fn().mockImplementation(() => {
+        if (oldClient.callTool.mock.calls.length === 1) return firstFailure;
+        markBothOldCallsStarted();
+        return lateFailure;
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const replacementClient = {
+      callTool: jest.fn().mockImplementation(() => {
+        markReplacementUsed();
+        return Promise.resolve({ content: [{ type: 'text', text: 'replacement' }] });
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const unexpectedClient = {
+      callTool: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'unexpected' }] }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const connectClient = jest.spyOn(
+      service as unknown as {
+        connectLegacyOutboundClient: () => Promise<typeof oldClient>;
+      },
+      'connectLegacyOutboundClient',
+    );
+    connectClient
+      .mockResolvedValueOnce(oldClient)
+      .mockResolvedValueOnce(replacementClient)
+      .mockResolvedValue(unexpectedClient);
+    const client = await connectToGateway(service, RUN_CONTEXT, clients, servers);
+
+    const firstOperation = client.callTool({
+      name: 'External_Server__lookup',
+      arguments: { query: 'fails-first' },
+    });
+    const lateOperation = client.callTool({
+      name: 'External_Server__lookup',
+      arguments: { query: 'fails-late' },
+    });
+    await bothOldCallsStarted;
+    rejectFirstFailure();
+    await replacementUsed;
+    rejectLateFailure();
+    await Promise.all([firstOperation, lateOperation]);
+    const replacementCloseCountBeforeCleanup = replacementClient.close.mock.calls.length;
+    await service.cleanupRun('run-1');
+
+    expect(connectClient).toHaveBeenCalledTimes(2);
+    expect(oldClient.callTool).toHaveBeenCalledTimes(2);
+    expect(oldClient.close).toHaveBeenCalledTimes(1);
+    expect(replacementClient.callTool).toHaveBeenCalledTimes(2);
+    expect(replacementCloseCountBeforeCleanup).toBe(0);
+    expect(replacementClient.close).toHaveBeenCalledTimes(1);
+    expect(unexpectedClient.callTool).not.toHaveBeenCalled();
+    expect(unexpectedClient.close).not.toHaveBeenCalled();
+  });
+
+  it('does not evict a replacement when discovery on the old v1 client fails late', async () => {
+    const endpoint = 'http://127.0.0.1:9/mcp';
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('parent/external', 'External Server', endpoint),
+    ]);
+    (toolRegistry.getServerTools as ReturnType<typeof jest.fn>).mockResolvedValue(null);
+    let rejectFirstFailure!: () => void;
+    let rejectLateFailure!: () => void;
+    let markBothOldListsStarted!: () => void;
+    let markReplacementUsed!: () => void;
+    const firstFailure = new Promise<never>((_, reject) => {
+      rejectFirstFailure = () => reject(new Error('first old-client discovery failure'));
+    });
+    const lateFailure = new Promise<never>((_, reject) => {
+      rejectLateFailure = () => reject(new Error('late old-client discovery failure'));
+    });
+    const bothOldListsStarted = new Promise<void>((resolve) => {
+      markBothOldListsStarted = resolve;
+    });
+    const replacementUsed = new Promise<void>((resolve) => {
+      markReplacementUsed = resolve;
+    });
+    const discoveredTools = {
+      tools: [{ name: 'lookup', inputSchema: { type: 'object' } }],
+    };
+    const oldClient = {
+      listTools: jest.fn().mockImplementation(() => {
+        if (oldClient.listTools.mock.calls.length === 1) return firstFailure;
+        markBothOldListsStarted();
+        return lateFailure;
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const replacementClient = {
+      listTools: jest.fn().mockImplementation(() => {
+        markReplacementUsed();
+        return Promise.resolve(discoveredTools);
+      }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const unexpectedClient = {
+      listTools: jest.fn().mockResolvedValue(discoveredTools),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const connectClient = jest.spyOn(
+      service as unknown as {
+        connectLegacyOutboundClient: () => Promise<typeof oldClient>;
+      },
+      'connectLegacyOutboundClient',
+    );
+    connectClient
+      .mockResolvedValueOnce(oldClient)
+      .mockResolvedValueOnce(replacementClient)
+      .mockResolvedValue(unexpectedClient);
+
+    const firstDiscovery = service.createServerForRun(RUN_CONTEXT);
+    const lateDiscovery = service.createServerForRun(RUN_CONTEXT);
+    await bothOldListsStarted;
+    rejectFirstFailure();
+    servers.push(await firstDiscovery);
+    const replacementServer = await service.createServerForRun(RUN_CONTEXT);
+    servers.push(replacementServer);
+    await replacementUsed;
+    rejectLateFailure();
+    servers.push(await lateDiscovery);
+    servers.push(await service.createServerForRun(RUN_CONTEXT));
+    const replacementCloseCountBeforeCleanup = replacementClient.close.mock.calls.length;
+    await service.cleanupRun('run-1');
+
+    expect(connectClient).toHaveBeenCalledTimes(2);
+    expect(oldClient.listTools).toHaveBeenCalledTimes(2);
+    expect(oldClient.close).toHaveBeenCalledTimes(1);
+    expect(replacementClient.listTools).toHaveBeenCalledTimes(2);
+    expect(replacementCloseCountBeforeCleanup).toBe(0);
+    expect(replacementClient.close).toHaveBeenCalledTimes(1);
+    expect(unexpectedClient.listTools).not.toHaveBeenCalled();
+    expect(unexpectedClient.close).not.toHaveBeenCalled();
+  });
+
   it('keeps run access validation while the legacy controller is mounted', async () => {
     workflowRunRepository.findByRunId.mockResolvedValue(null);
 
