@@ -38,23 +38,126 @@ export const ToolInvocationFailureClassSchema = z.enum([
 type JsonObject = { [key: string]: JsonValue };
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 
-export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number().finite(),
-    z.boolean(),
-    z.null(),
-    z.array(JsonValueSchema),
-    JsonObjectSchema,
-  ]),
-);
+type JsonTraversalFrame =
+  | { kind: 'enter'; value: unknown }
+  | { kind: 'exit'; value: object };
 
-export const JsonObjectSchema: z.ZodType<JsonObject> = z.lazy(() =>
-  z.record(z.string(), JsonValueSchema),
+function isPlainJsonObject(value: unknown): value is JsonObject {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function isFiniteJsonValue(root: unknown): root is JsonValue {
+  const ancestors = new WeakSet<object>();
+  const stack: JsonTraversalFrame[] = [{ kind: 'enter', value: root }];
+
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (!frame) break;
+
+    if (frame.kind === 'exit') {
+      ancestors.delete(frame.value);
+      continue;
+    }
+
+    const value = frame.value;
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      continue;
+    }
+
+    if (typeof value !== 'object') {
+      return false;
+    }
+
+    if (ancestors.has(value)) {
+      return false;
+    }
+
+    let children: unknown[];
+    try {
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const keys = Reflect.ownKeys(descriptors);
+
+      if (Array.isArray(value)) {
+        if (Object.getPrototypeOf(value) !== Array.prototype || keys.length - 1 !== value.length) {
+          return false;
+        }
+
+        children = [];
+        for (const key of keys) {
+          if (key === 'length') continue;
+          if (typeof key !== 'string') return false;
+
+          const index = Number(key);
+          const descriptor = descriptors[key];
+          if (
+            !Number.isInteger(index) ||
+            index < 0 ||
+            index >= value.length ||
+            String(index) !== key ||
+            !descriptor?.enumerable ||
+            !('value' in descriptor)
+          ) {
+            return false;
+          }
+          children.push(descriptor.value);
+        }
+      } else {
+        if (!isPlainJsonObject(value)) return false;
+
+        children = [];
+        for (const key of keys) {
+          if (typeof key !== 'string') return false;
+
+          const descriptor = descriptors[key];
+          if (!descriptor?.enumerable || !('value' in descriptor)) {
+            return false;
+          }
+          children.push(descriptor.value);
+        }
+      }
+    } catch {
+      return false;
+    }
+
+    ancestors.add(value);
+    stack.push({ kind: 'exit', value });
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      stack.push({ kind: 'enter', value: children[index] });
+    }
+  }
+
+  return true;
+}
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.custom<JsonValue>(isFiniteJsonValue, {
+  message: 'Expected finite JSON value',
+});
+
+export const JsonObjectSchema: z.ZodType<JsonObject> = z.custom<JsonObject>(
+  (value) => isPlainJsonObject(value) && isFiniteJsonValue(value),
+  { message: 'Expected finite JSON object' },
 );
 
 function isWithinInlineJsonByteLimit(value: JsonValue, maximumBytes: number): boolean {
-  return new TextEncoder().encode(JSON.stringify(value)).byteLength <= maximumBytes;
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength <= maximumBytes;
+  } catch {
+    return false;
+  }
 }
 
 export const InvocationManifestEntrySchema = z

@@ -55,6 +55,12 @@ const preparedRef = {
   preparedAt: '2026-07-31T10:00:01.000Z',
 };
 
+class ObjectValue {
+  value = 1;
+}
+
+class ArrayValues extends Array<number> {}
+
 describe('ToolInvocationRequestSchema', () => {
   it('parses a bounded request with nested finite JSON input', () => {
     expect(ToolInvocationRequestSchema.parse(request)).toEqual(request);
@@ -75,6 +81,44 @@ describe('ToolInvocationRequestSchema', () => {
     { input: { missing: undefined } },
   ])('rejects non-finite and undefined JSON input %#', ({ input }) => {
     expect(() => ToolInvocationRequestSchema.parse({ ...request, input })).toThrow();
+  });
+
+  it('rejects functions in JSON input', () => {
+    expect(
+      ToolInvocationRequestSchema.safeParse({
+        ...request,
+        input: { callback: () => undefined },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects object class instances in JSON input', () => {
+    expect(
+      ToolInvocationRequestSchema.safeParse({
+        ...request,
+        input: { value: new ObjectValue() },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects Array subclass instances in JSON input', () => {
+    expect(
+      ToolInvocationRequestSchema.safeParse({
+        ...request,
+        input: { values: new ArrayValues(1, 2) },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects cyclic JSON input without throwing', () => {
+    const cyclicInput: Record<string, unknown> = {};
+    cyclicInput.self = cyclicInput;
+    let result: { success: boolean } | undefined;
+
+    expect(() => {
+      result = ToolInvocationRequestSchema.safeParse({ ...request, input: cyclicInput });
+    }).not.toThrow();
+    expect(result?.success).toBe(false);
   });
 
   it('rejects a deadline before the request time', () => {
