@@ -16,6 +16,8 @@ build/
 # Local agent/task scratch state
 .tasks/
 .claude/
+.cursor/hooks/state/
+.playwright-mcp/
 
 # Environment variables
 .env
