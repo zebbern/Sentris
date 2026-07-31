@@ -1,181 +1,36 @@
-import { Controller, All, UseGuards, Req, Res, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { All, Controller, Req, Res, UseGuards } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { randomUUID } from 'crypto';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
-import { isInitializeRequest } from '@modelcontextprotocol/server';
 
 import { Public } from '../auth/public.decorator';
 import { McpAuthGuard, type McpGatewayRequest } from './mcp-auth.guard';
+import { McpFacadeService, type McpFacadeEndpoint } from './mcp-facade.service';
 import { McpGatewayService } from './mcp-gateway.service';
-import { parseRunMcpRequestContext } from './run-mcp-request-context';
-import { SessionRegistryService } from './session-registry.service';
-import { setAffinityCookie } from './set-affinity-cookie';
+import { RunMcpScopeResolver } from './run-mcp-scope-resolver.service';
 
 @ApiTags('mcp')
 @Controller('mcp')
 @Public()
 @UseGuards(McpAuthGuard)
 export class McpGatewayController {
-  private readonly logger = new Logger(McpGatewayController.name);
-
-  // Mapping of runId to its current Streamable HTTP transport
-  // NOTE: In-memory transport storage for active sessions. Single-instance design.
-  // SCALING LIMITATION: For horizontal scaling, implement sticky sessions via load balancer
-  private readonly transports = new Map<string, NodeStreamableHTTPServerTransport>();
-
-  // Pending initialization promises prevent duplicate setup for concurrent initialize
-  // requests. A pre-initialize GET is never allowed to create a stateful transport.
-  private readonly pendingInits = new Map<string, Promise<NodeStreamableHTTPServerTransport>>();
+  private readonly endpoint: McpFacadeEndpoint;
 
   constructor(
-    private readonly mcpGateway: McpGatewayService,
-    private readonly sessionRegistry: SessionRegistryService,
-  ) {}
+    facade: McpFacadeService,
+    scopeResolver: RunMcpScopeResolver,
+    gateway: McpGatewayService,
+  ) {
+    this.endpoint = facade.createEndpoint({
+      createServer: async ({ authInfo }) => {
+        const context = await scopeResolver.resolve(authInfo!);
+        return gateway.createServerForRun(context);
+      },
+    });
+  }
 
   @All('gateway')
   @ApiOperation({ summary: 'Unified MCP Gateway endpoint (Streamable HTTP)' })
-  async handleGateway(@Req() req: McpGatewayRequest, @Res() res: Response) {
-    const auth = req.auth;
-    if (!auth || !auth.extra) {
-      return res.status(401).send('Authentication missing');
-    }
-
-    const context = parseRunMcpRequestContext(auth.extra);
-    const { runId, organizationId, allowedNodeIds } = context;
-
-    // Cache key includes allowedNodeIds to support multiple agents with different tool scopes
-    const cacheKey = buildLegacyTransportKey(runId, allowedNodeIds);
-
-    let transport = this.transports.get(cacheKey);
-    const isExistingTransport = !!transport;
-    const body = req.body as unknown;
-    const isPost = req.method === 'POST';
-    const isGet = req.method === 'GET';
-    const isDelete = req.method === 'DELETE';
-    const requestSessionId = req.headers['mcp-session-id'];
-    const isInitRequest =
-      isPost &&
-      (isInitializeRequest(body) ||
-        (Array.isArray(body) && body.some((item) => isInitializeRequest(item))));
-
-    if (isGet && requestSessionId && !transport) {
-      return res.status(404).send('MCP session not found');
-    }
-
-    if (isGet && !requestSessionId) {
-      // Streamable HTTP's standalone SSE stream is optional. @ai-sdk/mcp may probe it
-      // while the initialize POST is in flight. A probe without the session header is
-      // still pre-initialize even if the server has just assigned its own session ID.
-      res.setHeader('Allow', 'POST');
-      return res.status(405).send('Method Not Allowed: Initialize the MCP session first');
-    }
-
-    // Initialization if transport doesn't exist
-    if (!transport) {
-      if (!isInitRequest) {
-        return res.status(400).send('Bad Request: No valid session ID provided');
-      }
-
-      // If another request already started initialization for this cache key, await it
-      // instead of creating a duplicate transport.
-      const pending = this.pendingInits.get(cacheKey);
-      if (pending) {
-        try {
-          transport = await pending;
-        } catch (error) {
-          this.logger.error(`Pending MCP init failed for run ${runId}: ${error}`);
-          return res
-            .status(error instanceof Error && error.name === 'NotFoundException' ? 404 : 403)
-            .send(error instanceof Error ? error.message : 'Access denied');
-        }
-      } else {
-        this.logger.log(
-          `Initializing new MCP transport for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
-        );
-
-        // Create the transport and connect the server inside a shared promise so
-        // duplicate initialize requests cannot race gateway setup.
-        const initPromise = (async () => {
-          const t = new NodeStreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            enableJsonResponse: true,
-          });
-          const server = await this.mcpGateway.createServerForRun(context);
-          await server.connect(t);
-          return t;
-        })();
-        this.pendingInits.set(cacheKey, initPromise);
-
-        try {
-          transport = await initPromise;
-          this.transports.set(cacheKey, transport);
-          setAffinityCookie(req, res, cacheKey, '/api/v1/mcp');
-
-          // Register session in Redis for admin observability
-          try {
-            await this.sessionRegistry.register(cacheKey, {
-              userId: (auth.extra.userId as string) ?? null,
-              organizationId,
-              sessionType: 'mcp-gateway',
-              runId,
-            });
-          } catch (regError) {
-            this.logger.warn(`Session registry register failed: ${regError}`);
-          }
-        } catch (error) {
-          this.logger.error(`Failed to initialize MCP server for run ${runId}: ${error}`);
-          return res
-            .status(error instanceof Error && error.name === 'NotFoundException' ? 404 : 403)
-            .send(error instanceof Error ? error.message : 'Access denied');
-        } finally {
-          this.pendingInits.delete(cacheKey);
-        }
-      }
-    }
-
-    if (isDelete && !transport.sessionId) {
-      return res.status(400).send('Bad Request: Server not initialized');
-    }
-
-    // Refresh affinity cookie on subsequent requests (skip for newly-initialized sessions
-    // which already had the cookie set in the init block above)
-    if (isExistingTransport) {
-      setAffinityCookie(req, res, cacheKey, '/api/v1/mcp');
-    }
-
-    if (isGet) {
-      // Closing the optional SSE stream does not terminate the MCP session. The client
-      // may reconnect it while continuing to issue POST requests on this transport.
-      res.on('close', () => {
-        this.logger.log(
-          `MCP SSE connection closed for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
-        );
-      });
-
-      // Handle the initial GET request to start the SSE stream
-      // We don't await this because for SSE, it blocks until the connection is closed.
-      void transport.handleRequest(req, res);
-    } else if (isDelete) {
-      // Handle DELETE (Session termination) — clean up transport and registry
-      await transport.handleRequest(req, res, req.body);
-      this.transports.delete(cacheKey);
-      try {
-        await this.sessionRegistry.deregister(cacheKey);
-      } catch (e) {
-        this.logger.warn(`Session registry deregister failed: ${e}`);
-      }
-    } else {
-      // Handle POST (Messages)
-      await transport.handleRequest(req, res, req.body);
-    }
+  async handleGateway(@Req() req: McpGatewayRequest, @Res() res: Response): Promise<void> {
+    await this.endpoint.handle(req, res, req.body);
   }
-}
-
-function buildLegacyTransportKey(runId: string, allowedNodeIds: readonly string[]): string {
-  if (allowedNodeIds.length === 0) {
-    return runId;
-  }
-  const escapeNodeId = (id: string): string => id.replace(/\\/g, '\\\\').replace(/,/g, '\\,');
-  return `${runId}:${allowedNodeIds.map(escapeNodeId).join(',')}`;
 }

@@ -115,6 +115,9 @@ async function bootstrap() {
       'X-Forwarded-For',
       'X-Forwarded-Proto',
       'X-Request-Id',
+      'MCP-Protocol-Version',
+      'Mcp-Method',
+      'Mcp-Name',
     ],
     exposedHeaders: [
       'Content-Disposition',
@@ -125,6 +128,9 @@ async function bootstrap() {
       'X-Sentris-Schema-Legacy',
       'X-Sentris-Schema-Invalid',
       'X-Request-Id',
+      'MCP-Protocol-Version',
+      'Mcp-Method',
+      'Mcp-Name',
     ],
   });
   registerRootHealthRoutes(app);

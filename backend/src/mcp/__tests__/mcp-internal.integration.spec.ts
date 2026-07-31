@@ -27,6 +27,9 @@ class MockRedis {
   async hget(key: string, field: string) {
     return this.data.get(key)?.get(field) || null;
   }
+  async hgetall(key: string) {
+    return Object.fromEntries(this.data.get(key) ?? []);
+  }
   async expire() {
     return 1;
   }
@@ -38,7 +41,9 @@ class MockRedis {
     return 'OK';
   }
   async del(key: string) {
-    return this.kv.delete(key) ? 1 : 0;
+    const removedHash = this.data.delete(key);
+    const removedValue = this.kv.delete(key);
+    return removedHash || removedValue ? 1 : 0;
   }
   async quit() {}
 }
@@ -47,6 +52,7 @@ describe('MCP Internal API (Integration)', () => {
   let app: INestApplication;
   let redis: MockRedis;
   const generateSessionToken = vi.fn(async () => 'mock-token');
+  const cleanedGatewayRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
 
   beforeAll(async () => {
@@ -78,7 +84,14 @@ describe('MCP Internal API (Integration)', () => {
       controllers: [InternalMcpController],
       providers: [
         { provide: ToolRegistryService, useValue: toolRegistryService },
-        { provide: McpGatewayService, useValue: {} },
+        {
+          provide: McpGatewayService,
+          useValue: {
+            cleanupRun: async (runId: string) => {
+              cleanedGatewayRuns.push(runId);
+            },
+          },
+        },
         { provide: McpAuthService, useValue: { generateSessionToken } },
         {
           provide: McpGroupsService,
@@ -119,6 +132,15 @@ describe('MCP Internal API (Integration)', () => {
         mcpAuthService: { generateSessionToken: typeof generateSessionToken };
       }
     ).mcpAuthService = { generateSessionToken };
+    (
+      controller as unknown as {
+        mcpGatewayService: { cleanupRun: (runId: string) => Promise<void> };
+      }
+    ).mcpGatewayService = {
+      cleanupRun: async (runId: string) => {
+        cleanedGatewayRuns.push(runId);
+      },
+    };
 
     redis = moduleFixture.get(TOOL_REGISTRY_REDIS);
   });
@@ -226,6 +248,32 @@ describe('MCP Internal API (Integration)', () => {
       type: 'object',
       properties: { query: { type: 'string' } },
     });
+  });
+
+  it('cleans registry state and the outbound gateway pool for a run', async () => {
+    await request(app.getHttpServer())
+      .post('/internal/mcp/register-mcp-server')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({
+        runId: 'run-cleanup',
+        nodeId: 'mcp-cleanup',
+        serverName: 'Cleanup MCP Server',
+        transport: 'stdio',
+        endpoint: 'http://localhost:9999/mcp',
+        containerId: 'container-cleanup',
+        tools: [{ name: 'search' }],
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .post('/internal/mcp/cleanup')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ runId: 'run-cleanup' });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ containerIds: ['container-cleanup'] });
+    expect(await redis.hget('mcp:run:run-cleanup:tools', 'mcp-cleanup')).toBeNull();
+    expect(cleanedGatewayRuns).toEqual(['run-cleanup']);
   });
 
   it('rejects identity-less internal requests', async () => {

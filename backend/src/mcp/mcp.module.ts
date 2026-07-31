@@ -18,6 +18,7 @@ import { DatabaseModule } from '../database/database.module';
 import { McpDiscoveryOrchestratorService } from './mcp-discovery-orchestrator.service';
 import { SessionRegistryService } from './session-registry.service';
 import { McpFacadeService } from './mcp-facade.service';
+import { RunMcpScopeResolver } from './run-mcp-scope-resolver.service';
 import { MCP_DISCOVERY_REDIS, SESSION_REGISTRY_REDIS } from './mcp.tokens';
 import type { RedisConfig } from '../config';
 
@@ -94,6 +95,7 @@ import type { RedisConfig } from '../config';
     McpServersRepository,
     SessionRegistryService,
     McpFacadeService,
+    RunMcpScopeResolver,
   ],
   exports: [
     ToolRegistryService,

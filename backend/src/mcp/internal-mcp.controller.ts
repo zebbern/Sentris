@@ -54,6 +54,7 @@ export class InternalMcpController {
   @Post('cleanup')
   async cleanupRun(@Body() body: CleanupRunInput) {
     const containerIds = await this.toolRegistry.cleanupRun(body.runId);
+    await this.mcpGatewayService.cleanupRun(body.runId);
     return { containerIds };
   }
 

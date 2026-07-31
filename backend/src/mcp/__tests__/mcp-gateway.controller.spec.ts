@@ -1,142 +1,243 @@
 import { afterEach, describe, expect, it, jest } from 'bun:test';
-import express, { type Request, type Response } from 'express';
+import express, { type Request, type Response as ExpressResponse } from 'express';
 import type { Server as HttpServer } from 'node:http';
-import { createMCPClient } from '@ai-sdk/mcp';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { McpServer, type AuthInfo } from '@modelcontextprotocol/server';
 
+import type { WorkflowRunRepository } from '../../workflows/repository/workflow-run.repository';
+import { McpFacadeService } from '../mcp-facade.service';
 import { McpGatewayController } from '../mcp-gateway.controller';
 import type { McpGatewayRequest } from '../mcp-auth.guard';
 import type { McpGatewayService } from '../mcp-gateway.service';
-import type { SessionRegistryService } from '../session-registry.service';
+import { RunMcpScopeResolver } from '../run-mcp-scope-resolver.service';
 
-describe('McpGatewayController protocol lifecycle', () => {
-  let httpServer: HttpServer | undefined;
-  const createdServers: McpServer[] = [];
+const GRANT_ID = '97d45255-a20d-4f3b-82c7-0e464f57632b';
+const AUTH_INFO: AuthInfo = {
+  token: 'test-session-token',
+  clientId: 'test-agent',
+  scopes: ['tools:list', 'tools:call'],
+  extra: {
+    runId: 'run-1',
+    organizationId: 'org-1',
+    capabilityGrantId: GRANT_ID,
+    allowedNodeIds: ['tool-node'],
+  },
+};
+
+describe('McpGatewayController stateless protocol lifecycle', () => {
+  const httpServers: HttpServer[] = [];
+  const facades: McpFacadeService[] = [];
+  const modernClients: Client[] = [];
+  const legacyClients: MCPClient[] = [];
 
   afterEach(async () => {
-    await Promise.all(createdServers.splice(0).map((server) => server.close().catch(() => {})));
+    await Promise.allSettled(legacyClients.splice(0).map((client) => client.close()));
+    await Promise.allSettled(modernClients.splice(0).map((client) => client.close()));
+    await Promise.all(
+      httpServers.splice(0).map(async (server) => {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }),
+    );
+    await Promise.allSettled(facades.splice(0).map((facade) => facade.onModuleDestroy()));
+  });
 
-    if (httpServer) {
-      httpServer.closeAllConnections();
-      await new Promise<void>((resolve) => httpServer?.close(() => resolve()));
-      httpServer = undefined;
+  it('serves official auto-negotiated and AI SDK legacy-stateless clients at one URL', async () => {
+    const gateway = createGateway({ reply: 'same-registry' });
+    const endpoint = await startGateway(AUTH_INFO, matchingScopeResolver(), gateway);
+
+    const modernHeaders: Headers[] = [];
+    const modern = new Client(
+      { name: 'official-v2-test', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } },
+    );
+    modernClients.push(modern);
+    await modern.connect(
+      new StreamableHTTPClientTransport(new URL(endpoint.url), {
+        fetch: recordingFetch(modernHeaders),
+        requestInit: { headers: { Authorization: `Bearer ${AUTH_INFO.token}` } },
+      }),
+    );
+
+    expect(modern.getProtocolEra()).toBe('modern');
+    expect((await modern.listTools()).tools.map((tool) => tool.name)).toEqual(['echo']);
+    expect(await modern.callTool({ name: 'echo', arguments: {} })).toMatchObject({
+      content: [{ type: 'text', text: 'same-registry' }],
+    });
+    expectNoSessionState(modernHeaders);
+
+    const legacyHeaders: Headers[] = [];
+    const legacy = await createMCPClient({
+      transport: {
+        type: 'http',
+        url: endpoint.url,
+        headers: { Authorization: `Bearer ${AUTH_INFO.token}` },
+        fetch: recordingFetch(legacyHeaders),
+      },
+    });
+    legacyClients.push(legacy);
+    const tools = await legacy.tools();
+
+    expect(Object.keys(tools)).toEqual(['echo']);
+    expect(await tools.echo.execute?.({}, {} as never)).toMatchObject({
+      content: [{ type: 'text', text: 'same-registry' }],
+    });
+    expectNoSessionState(legacyHeaders);
+  });
+
+  it('rejects legacy session methods without breaking later POST requests', async () => {
+    const endpoint = await startGateway(
+      AUTH_INFO,
+      matchingScopeResolver(),
+      createGateway({ reply: 'still-stateless' }),
+    );
+
+    for (const method of ['GET', 'DELETE']) {
+      const response = await fetch(endpoint.url, {
+        method,
+        headers: { Authorization: `Bearer ${AUTH_INFO.token}` },
+      });
+      expect(response.status).toBe(405);
+    }
+
+    const modern = new Client(
+      { name: 'post-after-method-test', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } },
+    );
+    modernClients.push(modern);
+    await modern.connect(
+      new StreamableHTTPClientTransport(new URL(endpoint.url), {
+        requestInit: { headers: { Authorization: `Bearer ${AUTH_INFO.token}` } },
+      }),
+    );
+
+    expect((await modern.listTools()).tools.map((tool) => tool.name)).toEqual(['echo']);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['organization-mismatched', { organizationId: 'org-2' }],
+  ])('rejects %s run scope before creating a server', async (_label, run) => {
+    const createServerForRun = jest.fn(async () => createToolServer('must-not-run'));
+    const gateway = { createServerForRun } as unknown as McpGatewayService;
+    const resolver = new RunMcpScopeResolver({
+      findByRunId: jest.fn(async () => run),
+    } as unknown as WorkflowRunRepository);
+    const endpoint = await startGateway(AUTH_INFO, resolver, gateway);
+    const client = new Client(
+      { name: 'scope-rejection-test', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } },
+    );
+    modernClients.push(client);
+
+    await expect(
+      client.connect(
+        new StreamableHTTPClientTransport(new URL(endpoint.url), {
+          requestInit: { headers: { Authorization: `Bearer ${AUTH_INFO.token}` } },
+        }),
+      ),
+    ).rejects.toBeDefined();
+    expect(createServerForRun).not.toHaveBeenCalled();
+  });
+
+  it('continues serving modern requests after a fresh facade and controller simulate restart', async () => {
+    const registry = { reply: 'survives-restart' };
+    const gateway = createGateway(registry);
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const endpoint = await startGateway(AUTH_INFO, matchingScopeResolver(), gateway);
+      const client = new Client(
+        { name: `restart-test-${attempt}`, version: '1.0.0' },
+        { versionNegotiation: { mode: 'auto' } },
+      );
+      modernClients.push(client);
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(endpoint.url), {
+          requestInit: { headers: { Authorization: `Bearer ${AUTH_INFO.token}` } },
+        }),
+      );
+
+      expect(await client.callTool({ name: 'echo', arguments: {} })).toMatchObject({
+        content: [{ type: 'text', text: 'survives-restart' }],
+      });
+      await client.close();
+      modernClients.splice(modernClients.indexOf(client), 1);
+      endpoint.server.closeAllConnections();
+      await new Promise<void>((resolve) => endpoint.server.close(() => resolve()));
+      httpServers.splice(httpServers.indexOf(endpoint.server), 1);
+      await endpoint.facade.onModuleDestroy();
+      facades.splice(facades.indexOf(endpoint.facade), 1);
     }
   });
 
-  it('rejects the AI SDK pre-initialize GET without breaking tool discovery', async () => {
-    const mcpGateway = {
-      getServerForRun: async () => {
-        const server = new McpServer({ name: 'sentris-test-gateway', version: '1.0.0' });
-        server.registerTool('echo', { description: 'Echo a value' }, async () => ({
-          content: [{ type: 'text', text: 'ok' }],
-        }));
-        createdServers.push(server);
-        return server;
-      },
-      cleanupSession: jest.fn().mockResolvedValue(undefined),
-    } as unknown as McpGatewayService;
-    let markRegistrationStarted!: () => void;
-    let releaseRegistration!: () => void;
-    const registrationStarted = new Promise<void>((resolve) => {
-      markRegistrationStarted = resolve;
-    });
-    const registrationGate = new Promise<void>((resolve) => {
-      releaseRegistration = resolve;
-    });
-    const sessionRegistry = {
-      register: jest.fn(async () => {
-        // The controller stores the transport immediately before registering it. Hold
-        // this boundary open to exercise a GET that lands before initialize is handled.
-        markRegistrationStarted();
-        await registrationGate;
-      }),
-      deregister: jest.fn().mockResolvedValue(undefined),
-    } as unknown as SessionRegistryService;
-    const controller = new McpGatewayController(mcpGateway, sessionRegistry);
+  function matchingScopeResolver(): RunMcpScopeResolver {
+    return new RunMcpScopeResolver({
+      findByRunId: jest.fn(async () => ({ organizationId: 'org-1' })),
+    } as unknown as WorkflowRunRepository);
+  }
 
+  function createGateway(registry: { reply: string }): McpGatewayService {
+    return {
+      createServerForRun: async () => createToolServer(registry.reply),
+    } as unknown as McpGatewayService;
+  }
+
+  async function startGateway(
+    authInfo: AuthInfo,
+    scopeResolver: RunMcpScopeResolver,
+    gateway: McpGatewayService,
+  ): Promise<{ url: string; server: HttpServer; facade: McpFacadeService }> {
+    const facade = new McpFacadeService();
+    facades.push(facade);
+    const controller = new McpGatewayController(facade, scopeResolver, gateway);
     const app = express();
     app.use(express.json());
-    app.all('/gateway', async (req: Request, res: Response) => {
+    app.all('/gateway', async (req: Request, res: ExpressResponse) => {
       const gatewayRequest = req as McpGatewayRequest;
-      gatewayRequest.auth = {
-        token: 'test-session-token',
-        clientId: 'test-agent',
-        scopes: ['tools:list', 'tools:call'],
-        extra: {
-          runId: 'run-1',
-          organizationId: 'org-1',
-          allowedNodeIds: ['tool-node'],
-        },
-      };
+      gatewayRequest.auth = authInfo;
       await controller.handleGateway(gatewayRequest, res);
     });
 
-    httpServer = app.listen(0, '127.0.0.1');
-    await new Promise<void>((resolve) => httpServer?.once('listening', resolve));
-    const address = httpServer.address();
+    const server = app.listen(0, '127.0.0.1');
+    httpServers.push(server);
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    const address = server.address();
     if (!address || typeof address === 'string') {
       throw new Error('Expected an ephemeral TCP port');
     }
-    const gatewayUrl = `http://127.0.0.1:${address.port}/gateway`;
-
-    const unknownSessionStream = await fetch(gatewayUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/event-stream',
-        Authorization: 'Bearer test-session-token',
-        'Mcp-Session-Id': 'missing-session',
-      },
-    });
-    expect(unknownSessionStream.status).toBe(404);
-
-    const preInitializeStream = await fetch(gatewayUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/event-stream',
-        Authorization: 'Bearer test-session-token',
-      },
-    });
-    expect(preInitializeStream.status).toBe(405);
-
-    const clientPromise = createMCPClient({
-      transport: {
-        type: 'http',
-        url: gatewayUrl,
-        headers: { Authorization: 'Bearer test-session-token' },
-      },
-    });
-
-    await registrationStarted;
-    const overlappingPreInitializeStream = await fetch(gatewayUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'text/event-stream',
-        Authorization: 'Bearer test-session-token',
-      },
-    });
-    const overlappingStatus = overlappingPreInitializeStream.status;
-    releaseRegistration();
-
-    const client = await clientPromise;
-
-    try {
-      expect(overlappingStatus).toBe(405);
-
-      // A preflight GET may be serviced after the SDK has assigned a server-side
-      // session ID but before the client has received it, so it still has no header.
-      const stalePreflightStream = await fetch(gatewayUrl, {
-        method: 'GET',
-        headers: {
-          Accept: 'text/event-stream',
-          Authorization: 'Bearer test-session-token',
-        },
-      });
-      expect(stalePreflightStream.status).toBe(405);
-
-      const tools = await client.tools();
-      expect(Object.keys(tools)).toEqual(['echo']);
-    } finally {
-      await client.close();
-    }
-  });
+    return {
+      url: `http://127.0.0.1:${address.port}/gateway`,
+      server,
+      facade,
+    };
+  }
 });
+
+function createToolServer(reply: string): McpServer {
+  const server = new McpServer({ name: 'sentris-test-gateway', version: '1.0.0' });
+  server.registerTool('echo', { description: 'Return the registry value' }, async () => ({
+    content: [{ type: 'text', text: reply }],
+  }));
+  return server;
+}
+
+function recordingFetch(headers: Headers[]): typeof fetch {
+  const recordedFetch = async (
+    input: Parameters<typeof fetch>[0],
+    init?: Parameters<typeof fetch>[1],
+  ): Promise<Response> => {
+    const response = await fetch(input, init);
+    headers.push(new Headers(response.headers));
+    return response;
+  };
+  return Object.assign(recordedFetch, { preconnect: fetch.preconnect });
+}
+
+function expectNoSessionState(headers: Headers[]): void {
+  expect(headers.length).toBeGreaterThan(0);
+  for (const responseHeaders of headers) {
+    expect(responseHeaders.get('mcp-session-id')).toBeNull();
+    expect(responseHeaders.get('set-cookie')).toBeNull();
+  }
+}
