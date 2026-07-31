@@ -23,9 +23,8 @@ export class McpGatewayController {
   // SCALING LIMITATION: For horizontal scaling, implement sticky sessions via load balancer
   private readonly transports = new Map<string, StreamableHTTPServerTransport>();
 
-  // Pending initialization promises to prevent race conditions when GET SSE and POST
-  // initialize requests arrive concurrently (@ai-sdk/mcp HttpMCPTransport fires both
-  // simultaneously via `void this.openInboundSse()` followed by POST initialize)
+  // Pending initialization promises prevent duplicate setup for concurrent initialize
+  // requests. A pre-initialize GET is never allowed to create a stateful transport.
   private readonly pendingInits = new Map<string, Promise<StreamableHTTPServerTransport>>();
 
   constructor(
@@ -58,19 +57,32 @@ export class McpGatewayController {
     const isPost = req.method === 'POST';
     const isGet = req.method === 'GET';
     const isDelete = req.method === 'DELETE';
+    const requestSessionId = req.headers['mcp-session-id'];
     const isInitRequest =
       isPost &&
       (isInitializeRequest(body) ||
         (Array.isArray(body) && body.some((item) => isInitializeRequest(item))));
 
+    if (isGet && requestSessionId && !transport) {
+      return res.status(404).send('MCP session not found');
+    }
+
+    if (isGet && !requestSessionId) {
+      // Streamable HTTP's standalone SSE stream is optional. @ai-sdk/mcp may probe it
+      // while the initialize POST is in flight. A probe without the session header is
+      // still pre-initialize even if the server has just assigned its own session ID.
+      res.setHeader('Allow', 'POST');
+      return res.status(405).send('Method Not Allowed: Initialize the MCP session first');
+    }
+
     // Initialization if transport doesn't exist
     if (!transport) {
-      if (!isInitRequest && !isGet && !isPost) {
+      if (!isInitRequest) {
         return res.status(400).send('Bad Request: No valid session ID provided');
       }
 
       // If another request already started initialization for this cache key, await it
-      // instead of creating a duplicate transport (prevents race between GET SSE and POST)
+      // instead of creating a duplicate transport.
       const pending = this.pendingInits.get(cacheKey);
       if (pending) {
         try {
@@ -98,8 +110,8 @@ export class McpGatewayController {
                 .slice(0, ALLOWED_TOOLS_MAX)
             : undefined;
 
-        // Create transport and connect server inside a shared promise so concurrent
-        // requests (GET SSE + POST initialize) both await the same initialization
+        // Create the transport and connect the server inside a shared promise so
+        // duplicate initialize requests cannot race gateway setup.
         const initPromise = (async () => {
           const t = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
@@ -154,22 +166,12 @@ export class McpGatewayController {
     }
 
     if (isGet) {
-      // Cleanup on client disconnect (specifically for the SSE stream)
-      res.on('close', async () => {
+      // Closing the optional SSE stream does not terminate the MCP session. The client
+      // may reconnect it while continuing to issue POST requests on this transport.
+      res.on('close', () => {
         this.logger.log(
           `MCP SSE connection closed for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
         );
-        // We don't necessarily want to delete the transport here if POSTs are still allowed,
-        // but for Sentris run-bounded sessions, closing SSE usually means the agent is done.
-        this.transports.delete(cacheKey);
-        await this.mcpGateway.cleanupSession(cacheKey);
-
-        // Deregister session from Redis
-        try {
-          await this.sessionRegistry.deregister(cacheKey);
-        } catch (regError) {
-          this.logger.warn(`Session registry deregister failed: ${regError}`);
-        }
       });
 
       // Handle the initial GET request to start the SSE stream
