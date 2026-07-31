@@ -547,7 +547,9 @@
 
 - Modify: `backend/src/mcp/mcp-gateway.service.ts`
 - Modify: `backend/src/mcp/mcp-gateway.controller.ts`
+- Modify: `backend/src/mcp/internal-mcp.controller.ts`
 - Modify: `backend/src/mcp/__tests__/mcp-gateway.spec.ts`
+- Modify: `backend/src/mcp/__tests__/mcp-internal.integration.spec.ts`
 - Delete: `backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts`
 
 **Interfaces:**
@@ -586,6 +588,8 @@
 
   To keep the repository compilable between Tasks 5 and 6 without a fake `getServerForRun` wrapper, make the narrow controller call-site migration in the same commit: parse its already-validated `auth.extra` with `parseRunMcpRequestContext`, compute any still-needed legacy transport key locally, and call `createServerForRun(context)`. Remove `x-allowed-tools` parsing at this point. Do not otherwise rewrite the controller's transport/session lifecycle; Task 6 replaces that lifecycle with `McpFacade` and deletes the temporary controller-local key logic.
 
+  The removed service APIs also have two narrow callers outside the service. Remove both `refreshServersForRun()` calls from `InternalMcpController` because request-local factories see new registry state without refresh, and remove the legacy controller's `cleanupSession()` call because outbound clients are run-owned and `cleanupRun()` remains their lifecycle boundary. Update the existing internal-controller integration expectations. Task 6 still adds `cleanupRun()` to the internal cleanup endpoint when it removes inbound session lifecycle entirely.
+
 - [ ] **Step 3: Register schemas through public v2 APIs**
 
   Import `McpServer` and `fromJsonSchema` from `@modelcontextprotocol/server`. The default Node validator supports JSON Schema 2020-12; use `fromJsonSchema(document)` and register external input/output schemas without a private list-handler patch. Only add a custom validator from `@modelcontextprotocol/server/validators/ajv` if focused dialect/bounds tests prove the runtime default is insufficient; do not add `@modelcontextprotocol/core` merely for `fromJsonSchema`.
@@ -609,7 +613,7 @@
 - [ ] **Step 6: Commit the request-local server factory**
 
   ```powershell
-  git add backend/src/mcp/mcp-gateway.service.ts backend/src/mcp/mcp-gateway.controller.ts backend/src/mcp/__tests__/mcp-gateway.spec.ts backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts
+  git add backend/src/mcp/mcp-gateway.service.ts backend/src/mcp/mcp-gateway.controller.ts backend/src/mcp/internal-mcp.controller.ts backend/src/mcp/__tests__/mcp-gateway.spec.ts backend/src/mcp/__tests__/mcp-internal.integration.spec.ts backend/src/mcp/__tests__/mcp-external-tools.integration.spec.ts
   git commit -s -m "refactor: make MCP run servers request local"
   ```
 
