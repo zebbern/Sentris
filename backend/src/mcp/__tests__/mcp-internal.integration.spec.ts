@@ -64,9 +64,6 @@ describe('MCP Internal API (Integration)', () => {
       },
     } as any);
     const toolRegistryService = new ToolRegistryService(mockRedis as unknown as any, encryption);
-    const mockGatewayService = {
-      refreshServersForRun: async () => {},
-    };
 
     // Register InternalMcpController directly with mock providers
     // instead of importing McpModule (which cascades into dozens of modules).
@@ -81,7 +78,7 @@ describe('MCP Internal API (Integration)', () => {
       controllers: [InternalMcpController],
       providers: [
         { provide: ToolRegistryService, useValue: toolRegistryService },
-        { provide: McpGatewayService, useValue: mockGatewayService },
+        { provide: McpGatewayService, useValue: {} },
         { provide: McpAuthService, useValue: { generateSessionToken } },
         {
           provide: McpGroupsService,
@@ -117,8 +114,11 @@ describe('MCP Internal API (Integration)', () => {
     const controller = moduleFixture.get(InternalMcpController);
     (controller as unknown as { toolRegistry: ToolRegistryService }).toolRegistry =
       toolRegistryService;
-    (controller as unknown as { mcpGatewayService: typeof mockGatewayService }).mcpGatewayService =
-      mockGatewayService;
+    (
+      controller as unknown as {
+        mcpAuthService: { generateSessionToken: typeof generateSessionToken };
+      }
+    ).mcpAuthService = { generateSessionToken };
 
     redis = moduleFixture.get(TOOL_REGISTRY_REDIS);
   });

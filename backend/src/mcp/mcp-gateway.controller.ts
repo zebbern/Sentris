@@ -2,12 +2,13 @@ import { Controller, All, UseGuards, Req, Res, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { randomUUID } from 'crypto';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { isInitializeRequest } from '@modelcontextprotocol/server';
 
 import { Public } from '../auth/public.decorator';
 import { McpAuthGuard, type McpGatewayRequest } from './mcp-auth.guard';
-import { buildMcpGatewayCacheKey, McpGatewayService } from './mcp-gateway.service';
+import { McpGatewayService } from './mcp-gateway.service';
+import { parseRunMcpRequestContext } from './run-mcp-request-context';
 import { SessionRegistryService } from './session-registry.service';
 import { setAffinityCookie } from './set-affinity-cookie';
 
@@ -21,11 +22,11 @@ export class McpGatewayController {
   // Mapping of runId to its current Streamable HTTP transport
   // NOTE: In-memory transport storage for active sessions. Single-instance design.
   // SCALING LIMITATION: For horizontal scaling, implement sticky sessions via load balancer
-  private readonly transports = new Map<string, StreamableHTTPServerTransport>();
+  private readonly transports = new Map<string, NodeStreamableHTTPServerTransport>();
 
   // Pending initialization promises prevent duplicate setup for concurrent initialize
   // requests. A pre-initialize GET is never allowed to create a stateful transport.
-  private readonly pendingInits = new Map<string, Promise<StreamableHTTPServerTransport>>();
+  private readonly pendingInits = new Map<string, Promise<NodeStreamableHTTPServerTransport>>();
 
   constructor(
     private readonly mcpGateway: McpGatewayService,
@@ -40,16 +41,11 @@ export class McpGatewayController {
       return res.status(401).send('Authentication missing');
     }
 
-    const runId = auth.extra.runId as string;
-    const organizationId = auth.extra.organizationId as string | null;
-    const allowedNodeIds = auth.extra.allowedNodeIds as string[] | undefined;
-
-    if (!runId) {
-      return res.status(400).send('runId missing in session token');
-    }
+    const context = parseRunMcpRequestContext(auth.extra);
+    const { runId, organizationId, allowedNodeIds } = context;
 
     // Cache key includes allowedNodeIds to support multiple agents with different tool scopes
-    const cacheKey = buildMcpGatewayCacheKey(runId, allowedNodeIds);
+    const cacheKey = buildLegacyTransportKey(runId, allowedNodeIds);
 
     let transport = this.transports.get(cacheKey);
     const isExistingTransport = !!transport;
@@ -98,31 +94,14 @@ export class McpGatewayController {
           `Initializing new MCP transport for run: ${runId} with allowedNodeIds: ${allowedNodeIds?.join(',') ?? 'none'}`,
         );
 
-        const allowedToolsHeader = req.headers['x-allowed-tools'];
-        const ALLOWED_TOOLS_MAX = 100;
-        const ALLOWED_TOOL_NAME_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
-        const allowedTools =
-          typeof allowedToolsHeader === 'string'
-            ? allowedToolsHeader
-                .split(',')
-                .map((t) => t.trim())
-                .filter((t) => ALLOWED_TOOL_NAME_REGEX.test(t))
-                .slice(0, ALLOWED_TOOLS_MAX)
-            : undefined;
-
         // Create the transport and connect the server inside a shared promise so
         // duplicate initialize requests cannot race gateway setup.
         const initPromise = (async () => {
-          const t = new StreamableHTTPServerTransport({
+          const t = new NodeStreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             enableJsonResponse: true,
           });
-          const server = await this.mcpGateway.getServerForRun(
-            runId,
-            organizationId,
-            allowedTools,
-            allowedNodeIds,
-          );
+          const server = await this.mcpGateway.createServerForRun(context);
           await server.connect(t);
           return t;
         })();
@@ -181,7 +160,6 @@ export class McpGatewayController {
       // Handle DELETE (Session termination) — clean up transport and registry
       await transport.handleRequest(req, res, req.body);
       this.transports.delete(cacheKey);
-      await this.mcpGateway.cleanupSession(cacheKey);
       try {
         await this.sessionRegistry.deregister(cacheKey);
       } catch (e) {
@@ -192,4 +170,12 @@ export class McpGatewayController {
       await transport.handleRequest(req, res, req.body);
     }
   }
+}
+
+function buildLegacyTransportKey(runId: string, allowedNodeIds: readonly string[]): string {
+  if (allowedNodeIds.length === 0) {
+    return runId;
+  }
+  const escapeNodeId = (id: string): string => id.replace(/\\/g, '\\\\').replace(/,/g, '\\,');
+  return `${runId}:${allowedNodeIds.map(escapeNodeId).join(',')}`;
 }

@@ -38,7 +38,6 @@ export class InternalMcpController {
   @Post('register-component')
   async registerComponent(@Body() body: RegisterComponentToolInput) {
     await this.toolRegistry.registerComponentTool(body);
-    await this.mcpGatewayService.refreshServersForRun(body.runId);
     return { success: true };
   }
 
@@ -49,7 +48,6 @@ export class InternalMcpController {
   @Post('register-mcp-server')
   async registerMcpServer(@Body() body: RegisterMcpServerInput) {
     await this.toolRegistry.registerMcpServer(body);
-    await this.mcpGatewayService.refreshServersForRun(body.runId);
     return { success: true, toolCount: body.tools?.length ?? 0 };
   }
 
