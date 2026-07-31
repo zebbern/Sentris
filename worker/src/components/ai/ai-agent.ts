@@ -385,6 +385,16 @@ function safeStringify(value: unknown, maxLength: number): string {
   }
 }
 
+function redactCredentialText(value: string): string {
+  return value
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|secret|token)["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|(?:Bearer|Basic)\s+[^\s,;}]+|[^\s,;}]+)/gi,
+      '$1[REDACTED]',
+    )
+    .replace(/\b(Bearer|Basic)\s+[^\s"',;}]+/gi, '$1 [REDACTED]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[REDACTED]');
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -456,11 +466,14 @@ function formatErrorForLog(error: unknown, maxLength: number): Record<string, un
   if (error instanceof Error) {
     return {
       name: error.name,
-      message: truncateText(error.message, maxLength),
-      stack: error.stack ? truncateText(error.stack, maxLength) : undefined,
+      message: truncateText(redactCredentialText(error.message), maxLength),
+      stack: error.stack ? truncateText(redactCredentialText(error.stack), maxLength) : undefined,
       cause:
         'cause' in error
-          ? safeStringify((error as { cause?: unknown }).cause, maxLength)
+          ? truncateText(
+              redactCredentialText(safeStringify((error as { cause?: unknown }).cause, maxLength)),
+              maxLength,
+            )
           : undefined,
     };
   }
@@ -470,12 +483,12 @@ function formatErrorForLog(error: unknown, maxLength: number): Record<string, un
       typeof error.message === 'string' ? error.message : safeStringify(error, maxLength);
     return {
       name: typeof error.name === 'string' ? error.name : undefined,
-      message: truncateText(message, maxLength),
-      keys: Object.keys(error).slice(0, 12),
+      message: truncateText(redactCredentialText(message), maxLength),
+      keys: Object.keys(error).slice(0, 12).map(redactCredentialText),
     };
   }
 
-  return { message: truncateText(String(error), maxLength) };
+  return { message: truncateText(redactCredentialText(String(error)), maxLength) };
 }
 
 function getToolInput(entity: { input?: unknown } | null | undefined): unknown {
@@ -633,36 +646,10 @@ Loop the Conversation State output back into the next agent invocation to keep m
     const createGoogleGenerativeAIImpl =
       aiSdkOverrides?.createGoogleGenerativeAI ?? createGoogleGenerativeAI;
     const createAnthropicImpl = aiSdkOverrides?.createAnthropic ?? createAnthropic;
-
-    const gatewayAccess = await prepareAgentGatewayAccess<ToolSet>({
-      runId: context.runId,
-      organizationId: organizationId ?? null,
-      connectedToolNodeIds,
-      ttlSeconds: profile.mcpTokenTtlSeconds,
-      toolAvailability,
-      discoverTools: async (sessionToken) => {
-        if (connectedToolNodeIds && connectedToolNodeIds.length > 0) {
-          context.logger.info(
-            `Discovering tools from gateway for nodes: ${connectedToolNodeIds.join(', ')}`,
-          );
-        }
-        return registerGatewayTools({
-          gatewayUrl: DEFAULT_GATEWAY_URL,
-          sessionToken,
-          createClient: createMCPClientImpl,
-          logInfo: (message) => context.logger.info(message),
-        });
-      },
-      onDegraded: (message) => {
-        context.logger.warn(`Connected MCP tools are unavailable: ${message}`);
-        context.emitProgress({
-          level: 'warn',
-          message: `Connected MCP tools are unavailable: ${message}`,
-        });
-      },
-    });
-    const discoveredTools = gatewayAccess.discovery?.tools ?? {};
-    const closeDiscovery = gatewayAccess.discovery?.close;
+    let closeDiscovery: (() => Promise<void>) | undefined;
+    let lifecycleFailed = false;
+    let lifecycleError: unknown;
+    let output: Output | undefined;
 
     try {
       agentStream.emitMessageStart();
@@ -674,6 +661,36 @@ Loop the Conversation State output back into the next agent invocation to keep m
           agentStatus: 'started',
         },
       });
+
+      const gatewayAccess = await prepareAgentGatewayAccess<ToolSet>({
+        runId: context.runId,
+        organizationId: organizationId ?? null,
+        connectedToolNodeIds,
+        ttlSeconds: profile.mcpTokenTtlSeconds,
+        toolAvailability,
+        discoverTools: async (sessionToken) => {
+          if (connectedToolNodeIds && connectedToolNodeIds.length > 0) {
+            context.logger.info(
+              `Discovering tools from gateway for nodes: ${connectedToolNodeIds.join(', ')}`,
+            );
+          }
+          return registerGatewayTools({
+            gatewayUrl: DEFAULT_GATEWAY_URL,
+            sessionToken,
+            createClient: createMCPClientImpl,
+            logInfo: (message) => context.logger.info(message),
+          });
+        },
+        onDegraded: (message) => {
+          context.logger.warn(`Connected MCP tools are unavailable: ${message}`);
+          context.emitProgress({
+            level: 'warn',
+            message: `Connected MCP tools are unavailable: ${message}`,
+          });
+        },
+      });
+      const discoveredTools = gatewayAccess.discovery?.tools ?? {};
+      closeDiscovery = gatewayAccess.discovery?.close;
 
       const trimmedInput = userInput.trim();
 
@@ -853,16 +870,18 @@ Loop the Conversation State output back into the next agent invocation to keep m
         },
       });
 
-      return {
+      output = {
         responseText,
         conversationState: nextState,
         agentRunId,
         toolStatus: gatewayAccess.toolStatus,
       };
     } catch (error: unknown) {
+      lifecycleFailed = true;
+      lifecycleError = error;
       const errorSummary = formatErrorForLog(error, LOG_TRUNCATE_LIMIT);
       context.logger.error(
-        `[AIAgent] agent.stream() FAILED (truncated): ${safeStringify(
+        `[AIAgent] lifecycle FAILED (truncated): ${safeStringify(
           errorSummary,
           LOG_TRUNCATE_LIMIT,
         )}`,
@@ -870,13 +889,31 @@ Loop the Conversation State output back into the next agent invocation to keep m
       const errorMessage =
         error instanceof Error ? error.message : safeStringify(error, LOG_TRUNCATE_LIMIT);
       agentStream.emitFinish('error', truncateText(errorMessage, LOG_TRUNCATE_LIMIT));
-      throw error;
-    } finally {
-      await agentStream.settleWithoutChangingExecution();
-      if (closeDiscovery) {
+    }
+
+    await agentStream.settleWithoutChangingExecution();
+    if (closeDiscovery) {
+      try {
         await closeDiscovery();
+      } catch (cleanupError: unknown) {
+        const cleanupSummary = formatErrorForLog(cleanupError, LOG_TRUNCATE_LIMIT);
+        context.logger.error(
+          `[AIAgent] MCP cleanup FAILED (truncated): ${safeStringify(
+            cleanupSummary,
+            LOG_TRUNCATE_LIMIT,
+          )}`,
+        );
+        if (!lifecycleFailed) {
+          lifecycleFailed = true;
+          lifecycleError = cleanupError;
+        }
       }
     }
+
+    if (lifecycleFailed) {
+      throw lifecycleError;
+    }
+    return output!;
   },
 });
 

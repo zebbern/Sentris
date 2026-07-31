@@ -387,6 +387,7 @@ describe('core.ai.agent (refactor)', () => {
   test('fails by default when gateway discovery returns zero connected tools', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
+    const published: AgentTraceEvent[] = [];
 
     const originalFetch = globalThis.fetch;
     const fetchMock: typeof fetch = async () =>
@@ -397,6 +398,7 @@ describe('core.ai.agent (refactor)', () => {
     fetchMock.preconnect = () => {};
     globalThis.fetch = fetchMock;
     createMCPClientMock.mockResolvedValue({ tools: async () => ({}), close: async () => {} });
+    const baseContext = createTestContext();
 
     try {
       await expect(
@@ -413,12 +415,24 @@ describe('core.ai.agent (refactor)', () => {
           },
           createTestContext({
             metadata: {
-              ...createTestContext().metadata,
+              ...baseContext.metadata,
               connectedToolNodeIds: ['tool-node-1'],
+            },
+            agentTracePublisher: {
+              publish: async (event) => {
+                await Bun.sleep(1);
+                published.push(event);
+              },
             },
           }),
         ),
       ).rejects.toThrow('Connected MCP tools are required but unavailable');
+      expect(published.filter((event) => event.part.type === 'message-start')).toHaveLength(1);
+      expect(published.filter((event) => event.part.type === 'finish')).toHaveLength(1);
+      expect(published.find((event) => event.part.type === 'finish')?.part).toMatchObject({
+        type: 'finish',
+        finishReason: 'error',
+      });
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -734,5 +748,95 @@ describe('core.ai.agent (refactor)', () => {
       finishReason: 'error',
       responseText: 'provider stream failed',
     });
+  });
+
+  test('preserves the provider failure when MCP cleanup also fails', async () => {
+    const providerError = new Error('provider stream failed first');
+    const cleanupError = new Error('MCP cleanup failed second');
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [{ type: 'error', error: providerError }],
+        text: '',
+      }),
+    );
+
+    const originalFetch = globalThis.fetch;
+    const fetchMock: typeof fetch = async () =>
+      new Response(JSON.stringify({ token: 'gateway-token' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    fetchMock.preconnect = () => {};
+    globalThis.fetch = fetchMock;
+    const close = vi.fn(async () => {
+      throw cleanupError;
+    });
+    createMCPClientMock.mockResolvedValue({
+      tools: async () => ({
+        ping: {
+          inputSchema: { type: 'object', properties: {} },
+          execute: async () => ({ type: 'json', value: { ok: true } }),
+        },
+      }),
+      close,
+    });
+
+    const baseContext = createTestContext();
+    try {
+      await expect(
+        runAgent(
+          createTestContext({
+            metadata: {
+              ...baseContext.metadata,
+              connectedToolNodeIds: ['tool-node-1'],
+            },
+          }),
+        ),
+      ).rejects.toBe(providerError);
+      expect(close).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('redacts credentials from provider error diagnostics', async () => {
+    const apiKey = 'sk-review-message-secret-12345';
+    const bearerToken = 'review-bearer-secret-67890';
+    const stackToken = 'review-stack-token-secret-abc';
+    const causeAuthorization = 'review-cause-authorization-secret-xyz';
+    const causeAccessToken = 'review-cause-access-token-secret-uvw';
+    const providerError = new Error(
+      `provider rejected apiKey=${apiKey} Authorization: Bearer ${bearerToken}`,
+    );
+    providerError.stack = `${providerError.stack}\nrequest token=${stackToken}`;
+    providerError.cause = {
+      authorization: `Bearer ${causeAuthorization}`,
+      access_token: causeAccessToken,
+    };
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [{ type: 'error', error: providerError }],
+        text: '',
+      }),
+    );
+    const loggerError = vi.fn();
+    const baseContext = createTestContext();
+
+    await expect(
+      runAgent(
+        createTestContext({
+          logger: {
+            ...baseContext.logger,
+            error: loggerError,
+          },
+        }),
+      ),
+    ).rejects.toBe(providerError);
+
+    const diagnostics = loggerError.mock.calls.flat().join('\n');
+    expect(diagnostics).toContain('[REDACTED]');
+    for (const secret of [apiKey, bearerToken, stackToken, causeAuthorization, causeAccessToken]) {
+      expect(diagnostics).not.toContain(secret);
+    }
   });
 });
