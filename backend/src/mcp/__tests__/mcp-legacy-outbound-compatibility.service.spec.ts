@@ -111,6 +111,62 @@ describe('McpLegacyOutboundCompatibilityService', () => {
     expect(runTwoClient.close).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a replacement pooled when an older cleanup close finishes late', async () => {
+    const service = createService();
+    let releaseOldClose!: () => void;
+    let markOldCloseStarted!: () => void;
+    const oldCloseStarted = new Promise<void>((resolve) => {
+      markOldCloseStarted = resolve;
+    });
+    const heldOldClose = new Promise<void>((resolve) => {
+      releaseOldClose = resolve;
+    });
+    const oldClient = fakeClient();
+    oldClient.close.mockImplementation(() => {
+      markOldCloseStarted();
+      return heldOldClose;
+    });
+    const replacement = fakeClient({ tools: [{ name: 'replacement' }] });
+    const unexpected = fakeClient({ tools: [{ name: 'unexpected' }] });
+    const connect = jest
+      .spyOn(
+        service as unknown as { connectLegacyOutboundClient: () => Promise<unknown> },
+        'connectLegacyOutboundClient',
+      )
+      .mockResolvedValueOnce(oldClient)
+      .mockResolvedValueOnce(replacement)
+      .mockResolvedValue(unexpected);
+
+    await service.discoverTools('run-1', source());
+    const staleCleanup = service.cleanupRun('run-1');
+    await oldCloseStarted;
+    await expect(service.discoverTools('run-1', source())).resolves.toEqual([
+      {
+        name: 'replacement',
+        inputSchema: undefined,
+        outputSchema: undefined,
+        title: undefined,
+        description: undefined,
+        icons: undefined,
+        annotations: undefined,
+        _meta: undefined,
+      },
+    ]);
+
+    releaseOldClose();
+    await staleCleanup;
+    await service.discoverTools('run-1', source());
+    await service.cleanupRun('run-1');
+
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(oldClient.listTools).toHaveBeenCalledTimes(1);
+    expect(oldClient.close).toHaveBeenCalledTimes(1);
+    expect(replacement.listTools).toHaveBeenCalledTimes(2);
+    expect(replacement.close).toHaveBeenCalledTimes(1);
+    expect(unexpected.listTools).not.toHaveBeenCalled();
+    expect(unexpected.close).not.toHaveBeenCalled();
+  });
+
   it('does not evict a replacement when an old client operation fails late', async () => {
     const service = createService();
     let failFirst!: () => void;
@@ -165,6 +221,69 @@ describe('McpLegacyOutboundCompatibilityService', () => {
     expect(replacement.callTool).toHaveBeenCalledTimes(3);
     expect(replacement.close).not.toHaveBeenCalled();
     expect(unexpected.callTool).not.toHaveBeenCalled();
+  });
+
+  it('does not evict a replacement when discovery on an old client fails late', async () => {
+    const service = createService();
+    let failFirst!: () => void;
+    let failLate!: () => void;
+    let markBothStarted!: () => void;
+    let markReplacementUsed!: () => void;
+    const firstFailure = new Promise<never>((_, reject) => {
+      failFirst = () => reject(new Error('first discovery failure'));
+    });
+    const lateFailure = new Promise<never>((_, reject) => {
+      failLate = () => reject(new Error('late discovery failure'));
+    });
+    const bothStarted = new Promise<void>((resolve) => {
+      markBothStarted = resolve;
+    });
+    const replacementUsed = new Promise<void>((resolve) => {
+      markReplacementUsed = resolve;
+    });
+    const oldClient = fakeClient();
+    oldClient.listTools
+      .mockImplementationOnce(() => firstFailure)
+      .mockImplementationOnce(() => {
+        markBothStarted();
+        return lateFailure;
+      });
+    const replacement = fakeClient({ tools: [{ name: 'replacement' }] });
+    replacement.listTools.mockImplementation(() => {
+      markReplacementUsed();
+      return Promise.resolve({ tools: [{ name: 'replacement' }] });
+    });
+    const unexpected = fakeClient({ tools: [{ name: 'unexpected' }] });
+    const connect = jest
+      .spyOn(
+        service as unknown as { connectLegacyOutboundClient: () => Promise<unknown> },
+        'connectLegacyOutboundClient',
+      )
+      .mockResolvedValueOnce(oldClient)
+      .mockResolvedValueOnce(replacement)
+      .mockResolvedValue(unexpected);
+
+    const firstDiscovery = service.discoverTools('run-1', source());
+    const lateDiscovery = service.discoverTools('run-1', source());
+    await bothStarted;
+    failFirst();
+    await firstDiscovery;
+    const replacementDiscovery = service.discoverTools('run-1', source());
+    await replacementUsed;
+    failLate();
+    await Promise.all([lateDiscovery, replacementDiscovery]);
+    await service.discoverTools('run-1', source());
+    const replacementCloseCountBeforeCleanup = replacement.close.mock.calls.length;
+    await service.cleanupRun('run-1');
+
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(oldClient.listTools).toHaveBeenCalledTimes(2);
+    expect(oldClient.close).toHaveBeenCalledTimes(1);
+    expect(replacement.listTools).toHaveBeenCalledTimes(2);
+    expect(replacementCloseCountBeforeCleanup).toBe(0);
+    expect(replacement.close).toHaveBeenCalledTimes(1);
+    expect(unexpected.listTools).not.toHaveBeenCalled();
+    expect(unexpected.close).not.toHaveBeenCalled();
   });
 });
 
