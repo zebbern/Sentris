@@ -276,6 +276,7 @@ const definition = defineComponent({
     const gatewayAccess = await prepareAgentGatewayAccess({
       runId: context.runId,
       organizationId: orgId,
+      invokingNodeId: context.componentRef,
       connectedToolNodeIds,
       ttlSeconds: profile.mcpTokenTtlSeconds,
       toolAvailability,

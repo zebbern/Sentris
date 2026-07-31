@@ -128,6 +128,7 @@ export const ComponentToolSourceSchema = z
     sourceId: z.string().min(1),
     nodeId: z.string().min(1),
     componentId: z.string().min(1),
+    bindingFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 export type ComponentToolSource = z.infer<typeof ComponentToolSourceSchema>;
@@ -136,9 +137,10 @@ export const McpToolSourceSchema = z
   .object({
     kind: z.literal('mcp'),
     sourceId: z.string().min(1),
-    serverId: z.string().min(1),
+    serverId: z.string().min(1).optional(),
     nodeId: z.string().min(1).optional(),
     upstreamName: z.string().min(1),
+    bindingFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
   })
   .strict();
 export type McpToolSource = z.infer<typeof McpToolSourceSchema>;

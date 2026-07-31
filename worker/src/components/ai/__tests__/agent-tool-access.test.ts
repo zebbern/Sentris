@@ -5,6 +5,7 @@ import { prepareAgentGatewayAccess } from '../agent-tool-access';
 const baseInput = {
   runId: 'run-tools',
   organizationId: 'org-tools',
+  invokingNodeId: 'agent-node',
   connectedToolNodeIds: ['tool-a'],
   ttlSeconds: 900,
 } as const;
@@ -28,9 +29,10 @@ describe('prepareAgentGatewayAccess', () => {
   });
 
   it('returns configured status after a gateway token is issued', async () => {
+    const requestToken = vi.fn(async () => 'gateway-token');
     const result = await prepareAgentGatewayAccess({
       ...baseInput,
-      requestToken: async () => 'gateway-token',
+      requestToken,
     });
 
     expect(result.gatewayToken).toBe('gateway-token');
@@ -39,6 +41,13 @@ describe('prepareAgentGatewayAccess', () => {
       status: 'configured',
       connectedNodeCount: 1,
     });
+    expect(requestToken).toHaveBeenCalledWith(
+      'run-tools',
+      'org-tools',
+      ['tool-a'],
+      900,
+      'agent-node',
+    );
   });
 
   it('fails required mode when the connected gateway cannot be configured', async () => {

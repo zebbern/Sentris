@@ -100,6 +100,13 @@ describe('core.ai.claude-code', () => {
       status: 'configured',
       connectedNodeCount: 1,
     });
+    expect(utils.getGatewaySessionToken).toHaveBeenCalledWith(
+      'test-run',
+      'org-1',
+      ['tool-1'],
+      expect.any(Number),
+      'test-ref',
+    );
 
     const volumeInstance = (
       IsolatedContainerVolume as unknown as {

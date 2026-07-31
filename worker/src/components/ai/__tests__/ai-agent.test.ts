@@ -335,9 +335,11 @@ describe('core.ai.agent (refactor)', () => {
     );
 
     let fetchCalls = 0;
+    let tokenRequestBody: Record<string, unknown> | undefined;
     const originalFetch = globalThis.fetch;
-    const fetchMock: typeof fetch = async () => {
+    const fetchMock: typeof fetch = async (_input, init) => {
       fetchCalls += 1;
+      tokenRequestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response(JSON.stringify({ token: 'gateway-token' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -398,6 +400,7 @@ describe('core.ai.agent (refactor)', () => {
         availableToolCount: 1,
       });
       expect(fetchCalls).toBeGreaterThan(0);
+      expect(tokenRequestBody?.invokingNodeId).toBe('core.ai.agent');
       expect(createMCPClientMock).toHaveBeenCalledWith(
         expect.objectContaining({
           transport: {

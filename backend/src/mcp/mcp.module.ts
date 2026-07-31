@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from './tool-registry.service';
 import { McpGatewayService } from './mcp-gateway.service';
+import { McpLegacyOutboundCompatibilityService } from './mcp-legacy-outbound-compatibility.service';
 import { McpAuthService } from './mcp-auth.service';
 import { McpGatewayController } from './mcp-gateway.controller';
 import { McpSessionsController } from './mcp-sessions.controller';
@@ -21,6 +22,9 @@ import { McpFacadeService } from './mcp-facade.service';
 import { RunMcpScopeResolver } from './run-mcp-scope-resolver.service';
 import { MCP_DISCOVERY_REDIS, SESSION_REGISTRY_REDIS } from './mcp.tokens';
 import type { RedisConfig } from '../config';
+import { McpRuntimeModule } from '../mcp-runtime/mcp-runtime.module';
+import { McpRunCatalogService } from '../mcp-runtime/mcp-run-catalog.service';
+import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service';
 
 @Global()
 @Module({
@@ -31,6 +35,7 @@ import type { RedisConfig } from '../config';
     TemporalModule,
     DatabaseModule,
     McpGroupsModule,
+    McpRuntimeModule,
   ],
   controllers: [
     McpGatewayController,
@@ -89,6 +94,9 @@ import type { RedisConfig } from '../config';
       inject: [ConfigService],
     },
     ToolRegistryService,
+    McpLegacyOutboundCompatibilityService,
+    McpRunCatalogService,
+    McpRunAuthorityService,
     McpAuthService,
     McpGatewayService,
     McpDiscoveryOrchestratorService,

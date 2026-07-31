@@ -5,6 +5,10 @@ import {
   McpCapabilityCatalogSnapshotSchema,
   ToolDescriptorSchema,
 } from '../mcp-capabilities.js';
+import {
+  InvocationManifestSchema,
+  MAX_INVOCATION_MANIFEST_ENTRIES,
+} from '../mcp-invocation.js';
 
 const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
@@ -160,6 +164,7 @@ describe('capability descriptors', () => {
         serverId: 'github-server',
         nodeId: 'github-node',
         upstreamName: 'search_code',
+        bindingFingerprint: 'b'.repeat(64),
       },
       title: 'GitHub code search',
       icons: [
@@ -178,6 +183,46 @@ describe('capability descriptors', () => {
     };
 
     expect(ToolDescriptorSchema.parse(descriptor)).toEqual(descriptor);
+  });
+
+  it('accepts an ephemeral MCP source without inventing a saved server ID', () => {
+    const source = {
+      kind: 'mcp' as const,
+      sourceId: 'local-node',
+      nodeId: 'local-node',
+      upstreamName: 'scan',
+      bindingFingerprint: 'c'.repeat(64),
+    };
+
+    expect(
+      ToolDescriptorSchema.parse({
+        canonicalName: 'local__scan',
+        displayName: 'scan',
+        inputSchema: { type: 'object' },
+        source,
+        effects: 'unknown',
+        effectsSource: 'unknown',
+        retryPolicy: 'pre-dispatch-only',
+      }).source,
+    ).toEqual(source);
+  });
+
+  it('rejects invocation manifests above the bounded entry count', () => {
+    const entries = Array.from({ length: MAX_INVOCATION_MANIFEST_ENTRIES + 1 }, (_, index) => ({
+      toolName: `tool-${index}`,
+      sourceId: `source-${index}`,
+      destination: 'component-activity' as const,
+      retryPolicy: 'pre-dispatch-only' as const,
+    }));
+
+    expect(
+      InvocationManifestSchema.safeParse({
+        capabilitySnapshotId: SNAPSHOT_ID,
+        capabilityGrantId: GRANT_ID,
+        version: '1',
+        entries,
+      }).success,
+    ).toBe(false);
   });
 
   it('accepts an empty catalog without claiming resource or prompt runtime support', () => {

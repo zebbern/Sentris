@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'bun:test';
-import { InternalMcpController } from '../internal-mcp.controller';
+import { status as grpcStatus } from '@grpc/grpc-js';
+import { QueryNotRegisteredError } from '@temporalio/client';
 import { McpAuthService } from '../mcp-auth.service';
 
 class MockRedis {
@@ -27,6 +28,8 @@ class MockRedis {
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V5_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DURABLE_GRANT_ID = '11111111-1111-5111-8111-111111111111';
+const DURABLE_SNAPSHOT_ID = '22222222-2222-5222-8222-222222222222';
 
 describe('McpAuthService', () => {
   it.each([
@@ -39,7 +42,7 @@ describe('McpAuthService', () => {
     { requested: 20000, expected: 10800 },
   ])('bounds token lifetime for requested TTL $requested', async ({ requested, expected }) => {
     const redis = new MockRedis();
-    const service = new McpAuthService(redis as never);
+    const service = createService(redis);
 
     const before = Math.floor(Date.now() / 1000);
     await service.generateSessionToken('run-ttl', 'org-ttl', 'agent-ttl', ['tool-a'], requested);
@@ -52,25 +55,37 @@ describe('McpAuthService', () => {
     expect(metadata.expiresAt).toBeLessThanOrEqual(after + expected);
   });
 
-  it('stores one grant UUID and a normalized immutable node scope for every new token', async () => {
+  it('stores the materialized grant and snapshot with normalized immutable token scope', async () => {
     const redis = new MockRedis();
-    const service = new McpAuthService(redis as never);
+    const materialize = vi.fn(async () => durableAuthority());
+    const service = createService(redis, undefined, materialize);
 
-    const token = await service.generateSessionToken('run-grant', 'org-grant', 'agent-grant', [
-      ' node-b ',
-      '',
-      'node-a',
-      'node-b',
-      '   ',
-    ]);
+    const token = await service.generateSessionToken(
+      'run-grant',
+      'org-grant',
+      'agent-grant',
+      [' node-b ', '', 'node-a', 'node-b', '   '],
+      undefined,
+      'agent-node',
+    );
 
     expect(redis.sets).toHaveLength(1);
     const metadata = JSON.parse(redis.sets[0].value) as {
       capabilityGrantId: string;
+      capabilitySnapshotId: string;
+      invokingNodeId: string;
       allowedNodeIds: string[];
     };
-    expect(metadata.capabilityGrantId).toMatch(UUID_V4_PATTERN);
+    expect(metadata.capabilityGrantId).toBe(DURABLE_GRANT_ID);
+    expect(metadata.capabilitySnapshotId).toBe(DURABLE_SNAPSHOT_ID);
+    expect(metadata.invokingNodeId).toBe('agent-node');
     expect(metadata.allowedNodeIds).toEqual(['node-a', 'node-b']);
+    expect(materialize).toHaveBeenCalledWith({
+      runId: 'run-grant',
+      organizationId: 'org-grant',
+      invokingNodeId: 'agent-node',
+      allowedNodeIds: ['node-a', 'node-b'],
+    });
 
     const firstValidation = await service.validateToken(token);
     const secondValidation = await service.validateToken(token);
@@ -78,6 +93,8 @@ describe('McpAuthService', () => {
       runId: 'run-grant',
       organizationId: 'org-grant',
       capabilityGrantId: metadata.capabilityGrantId,
+      capabilitySnapshotId: metadata.capabilitySnapshotId,
+      invokingNodeId: 'agent-node',
       allowedNodeIds: ['node-a', 'node-b'],
     });
     expect(secondValidation?.extra?.capabilityGrantId).toBe(metadata.capabilityGrantId);
@@ -93,7 +110,7 @@ describe('McpAuthService', () => {
       allowedNodeIds: ['node-b', ' node-a ', 'node-b'],
       expiresAt: 4_102_444_800,
     });
-    const service = new McpAuthService(redis as never);
+    const service = createService(redis);
 
     const firstValidation = await service.validateToken(token);
     const secondValidation = await service.validateToken(token);
@@ -131,39 +148,87 @@ describe('McpAuthService', () => {
     for (const variant of variants) {
       const redis = new MockRedis();
       redis.seed(`mcp:session:${variant.token}`, variant.metadata);
-      const authInfo = await new McpAuthService(redis as never).validateToken(variant.token);
+      const authInfo = await createService(redis).validateToken(variant.token);
       grantIds.push(authInfo?.extra?.capabilityGrantId as string);
     }
 
     expect(new Set(grantIds).size).toBe(variants.length);
   });
-});
 
-describe('InternalMcpController', () => {
-  it('passes requested token TTL to the auth service', async () => {
-    const generateSessionToken = vi.fn(async () => 'gateway-token');
-    const controller = new InternalMcpController(
-      {} as never,
-      {} as never,
-      {} as never,
-      { generateSessionToken } as never,
-    );
+  it('queries protocol version 1 before materializing durable token authority', async () => {
+    const redis = new MockRedis();
+    const queryWorkflow = vi.fn(async () => 1);
+    const materialize = vi.fn(async () => durableAuthority());
+    const service = createService(redis, queryWorkflow, materialize);
 
-    await expect(
-      controller.generateToken({
-        runId: 'run-controller-ttl',
-        organizationId: 'org-controller-ttl',
-        agentId: 'agent-controller-ttl',
-        allowedNodeIds: ['tool-a'],
-        ttlSeconds: 900,
-      }),
-    ).resolves.toEqual({ token: 'gateway-token' });
-    expect(generateSessionToken).toHaveBeenCalledWith(
-      'run-controller-ttl',
-      'org-controller-ttl',
-      'agent-controller-ttl',
-      ['tool-a'],
+    await service.generateSessionToken(
+      'run-protocol',
+      null,
+      'agent-protocol',
+      ['node-a'],
       900,
+      'invoking-agent',
     );
+
+    expect(queryWorkflow).toHaveBeenCalledWith({
+      workflowId: 'run-protocol',
+      queryType: 'getToolInvocationProtocolVersion',
+    });
+    expect(materialize).toHaveBeenCalledTimes(1);
+  });
+
+  it('issues only a bounded legacy token when the workflow query is not registered', async () => {
+    const redis = new MockRedis();
+    const materialize = vi.fn(async () => durableAuthority());
+    const service = createService(
+      redis,
+      vi.fn(async () => {
+        throw new QueryNotRegisteredError('query is not registered', grpcStatus.INVALID_ARGUMENT);
+      }),
+      materialize,
+    );
+
+    await service.generateSessionToken('legacy-run', null, 'legacy-agent', ['node-a'], 20_000);
+
+    expect(materialize).not.toHaveBeenCalled();
+    expect(redis.sets[0].ttl).toBe(10_800);
+    const metadata = JSON.parse(redis.sets[0].value) as Record<string, unknown>;
+    expect(metadata.capabilityGrantId).toMatch(UUID_V4_PATTERN);
+    expect(metadata).not.toHaveProperty('capabilitySnapshotId');
+  });
+
+  it.each([
+    ['unsupported protocol', async () => 2, 'Unsupported tool invocation protocol version: 2'],
+    [
+      'Temporal transport error',
+      async () => {
+        throw new Error('Temporal unavailable');
+      },
+      'Temporal unavailable',
+    ],
+  ])('propagates %s without storing a token', async (_name, queryWorkflow, message) => {
+    const redis = new MockRedis();
+    const service = createService(redis, queryWorkflow);
+
+    await expect(service.generateSessionToken('run-error', null)).rejects.toThrow(message);
+    expect(redis.sets).toHaveLength(0);
   });
 });
+
+function createService(
+  redis: MockRedis,
+  queryWorkflow: (input: { workflowId: string; queryType: string }) => Promise<number> = async () =>
+    1,
+  materialize: (input: unknown) => Promise<ReturnType<typeof durableAuthority>> = async () =>
+    durableAuthority(),
+): McpAuthService {
+  return new McpAuthService(redis as never, { queryWorkflow } as never, { materialize } as never);
+}
+
+function durableAuthority() {
+  return {
+    grant: { id: DURABLE_GRANT_ID },
+    snapshot: { id: DURABLE_SNAPSHOT_ID },
+    manifest: {},
+  };
+}

@@ -20,6 +20,7 @@ interface GatewayToolDiscoveryResult<T> {
 interface PrepareAgentGatewayAccessInput<T> {
   runId: string;
   organizationId: string | null;
+  invokingNodeId?: string;
   connectedToolNodeIds?: readonly string[];
   ttlSeconds: number;
   toolAvailability?: AgentToolAvailability;
@@ -58,6 +59,7 @@ export async function prepareAgentGatewayAccess<T = never>(
       input.organizationId,
       [...connectedToolNodeIds],
       input.ttlSeconds,
+      input.invokingNodeId,
     );
     const discovery = input.discoverTools ? await input.discoverTools(gatewayToken) : undefined;
 

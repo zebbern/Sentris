@@ -665,6 +665,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
       const gatewayAccess = await prepareAgentGatewayAccess<ToolSet>({
         runId: context.runId,
         organizationId: organizationId ?? null,
+        invokingNodeId: context.componentRef,
         connectedToolNodeIds,
         ttlSeconds: profile.mcpTokenTtlSeconds,
         toolAvailability,

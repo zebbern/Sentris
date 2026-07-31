@@ -10,7 +10,7 @@ import { ApiKeysService } from '../../api-keys/api-keys.service';
 import { SecretsEncryptionService } from '../../secrets/secrets.encryption';
 import { integrationsEnvConfig } from '../../config/integrations.config';
 import { InternalMcpController } from '../internal-mcp.controller';
-import { McpGatewayService } from '../mcp-gateway.service';
+import { McpLegacyOutboundCompatibilityService } from '../mcp-legacy-outbound-compatibility.service';
 import { McpAuthService } from '../mcp-auth.service';
 import { McpGroupsService } from '../../mcp-groups/mcp-groups.service';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from '../tool-registry.service';
@@ -54,7 +54,7 @@ describe('MCP Internal API (Integration)', () => {
   let controller: InternalMcpController;
   let toolRegistryService: ToolRegistryService;
   const generateSessionToken = vi.fn(async () => 'mock-token');
-  const cleanedGatewayRuns: string[] = [];
+  const cleanedOutboundRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
 
   beforeAll(async () => {
@@ -87,10 +87,10 @@ describe('MCP Internal API (Integration)', () => {
       providers: [
         { provide: ToolRegistryService, useValue: toolRegistryService },
         {
-          provide: McpGatewayService,
+          provide: McpLegacyOutboundCompatibilityService,
           useValue: {
             cleanupRun: async (runId: string) => {
-              cleanedGatewayRuns.push(runId);
+              cleanedOutboundRuns.push(runId);
             },
           },
         },
@@ -136,11 +136,11 @@ describe('MCP Internal API (Integration)', () => {
     ).mcpAuthService = { generateSessionToken };
     (
       controller as unknown as {
-        mcpGatewayService: { cleanupRun: (runId: string) => Promise<void> };
+        legacyOutbound: { cleanupRun: (runId: string) => Promise<void> };
       }
-    ).mcpGatewayService = {
+    ).legacyOutbound = {
       cleanupRun: async (runId: string) => {
-        cleanedGatewayRuns.push(runId);
+        cleanedOutboundRuns.push(runId);
       },
     };
 
@@ -190,6 +190,7 @@ describe('MCP Internal API (Integration)', () => {
         agentId: 'agent-token-ttl',
         allowedNodeIds: ['tool-a'],
         ttlSeconds: 900,
+        invokingNodeId: 'agent-node',
       });
 
     expect(response.status).toBe(201);
@@ -200,6 +201,7 @@ describe('MCP Internal API (Integration)', () => {
       'agent-token-ttl',
       ['tool-a'],
       900,
+      'agent-node',
     );
   });
 
@@ -303,7 +305,7 @@ describe('MCP Internal API (Integration)', () => {
     expect(response.status).toBe(201);
     expect(response.body).toEqual({ containerIds: ['container-cleanup'] });
     expect(await redis.hget('mcp:run:run-cleanup:tools', 'mcp-cleanup')).toBeNull();
-    expect(cleanedGatewayRuns).toEqual(['run-cleanup']);
+    expect(cleanedOutboundRuns).toEqual(['run-cleanup']);
   });
 
   it('awaits gateway cleanup before returning a registry cleanup error', async () => {
@@ -315,7 +317,7 @@ describe('MCP Internal API (Integration)', () => {
         throw registryError;
       },
     };
-    const delayedGateway = {
+    const delayedOutbound = {
       cleanupRun: async () => {
         cleanupEvents.push('gateway-started');
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -324,8 +326,8 @@ describe('MCP Internal API (Integration)', () => {
     };
     (controller as unknown as { toolRegistry: typeof failingRegistry }).toolRegistry =
       failingRegistry;
-    (controller as unknown as { mcpGatewayService: typeof delayedGateway }).mcpGatewayService =
-      delayedGateway;
+    (controller as unknown as { legacyOutbound: typeof delayedOutbound }).legacyOutbound =
+      delayedOutbound;
 
     try {
       await expect(controller.cleanupRun({ runId: 'run-cleanup-failure' })).rejects.toBe(
@@ -337,11 +339,11 @@ describe('MCP Internal API (Integration)', () => {
         toolRegistryService;
       (
         controller as unknown as {
-          mcpGatewayService: { cleanupRun: (runId: string) => Promise<void> };
+          legacyOutbound: { cleanupRun: (runId: string) => Promise<void> };
         }
-      ).mcpGatewayService = {
+      ).legacyOutbound = {
         cleanupRun: async (runId: string) => {
-          cleanedGatewayRuns.push(runId);
+          cleanedOutboundRuns.push(runId);
         },
       };
     }

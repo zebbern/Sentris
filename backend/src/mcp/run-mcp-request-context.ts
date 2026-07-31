@@ -7,6 +7,8 @@ export interface RunMcpRequestContext {
   runId: string;
   organizationId: string | null;
   capabilityGrantId: string;
+  capabilitySnapshotId?: string;
+  invokingNodeId?: string;
   allowedNodeIds: readonly string[];
 }
 
@@ -29,14 +31,25 @@ export function parseRunMcpRequestContext(extra: unknown): RunMcpRequestContext 
     throw invalidRunContext();
   }
 
-  const { runId, organizationId, capabilityGrantId, allowedNodeIds } = extra;
+  const {
+    runId,
+    organizationId,
+    capabilityGrantId,
+    capabilitySnapshotId,
+    invokingNodeId,
+    allowedNodeIds,
+  } = extra;
   if (
     typeof runId !== 'string' ||
     runId.trim().length === 0 ||
     (organizationId !== null &&
       (typeof organizationId !== 'string' || organizationId.trim().length === 0)) ||
     typeof capabilityGrantId !== 'string' ||
-    !UUID_PATTERN.test(capabilityGrantId)
+    !UUID_PATTERN.test(capabilityGrantId) ||
+    (capabilitySnapshotId !== undefined &&
+      (typeof capabilitySnapshotId !== 'string' || !UUID_PATTERN.test(capabilitySnapshotId))) ||
+    (invokingNodeId !== undefined &&
+      (typeof invokingNodeId !== 'string' || invokingNodeId.trim().length === 0))
   ) {
     throw invalidRunContext();
   }
@@ -47,6 +60,8 @@ export function parseRunMcpRequestContext(extra: unknown): RunMcpRequestContext 
     runId,
     organizationId,
     capabilityGrantId,
+    ...(capabilitySnapshotId !== undefined && { capabilitySnapshotId }),
+    ...(invokingNodeId !== undefined && { invokingNodeId }),
     allowedNodeIds: normalizedNodeIds,
   });
 }
@@ -57,6 +72,7 @@ export function toRunExecutionScope(context: RunMcpRequestContext): ExecutionSco
     runId: context.runId,
     organizationId: context.organizationId,
     capabilityGrantId: context.capabilityGrantId,
+    ...(context.invokingNodeId !== undefined && { invokingNodeId: context.invokingNodeId }),
   });
 }
 

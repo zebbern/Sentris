@@ -1,10 +1,16 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
-import { uuid4 } from '@temporalio/workflow';
+import { QueryNotRegisteredError } from '@temporalio/client';
+import {
+  TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
+  TOOL_INVOCATION_PROTOCOL_VERSION,
+} from '@sentris/shared';
 import { TOOL_REGISTRY_REDIS } from './tool-registry.service';
 import type { AuthInfo } from '@modelcontextprotocol/server';
 import { normalizeRunMcpAllowedNodeIds } from './run-mcp-request-context';
+import { TemporalService } from '../temporal/temporal.service';
+import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service';
 
 export interface McpSessionMetadata {
   runId: string;
@@ -12,6 +18,8 @@ export interface McpSessionMetadata {
   agentId?: string;
   allowedNodeIds?: string[];
   capabilityGrantId?: string;
+  capabilitySnapshotId?: string;
+  invokingNodeId?: string;
   expiresAt: number;
 }
 
@@ -23,7 +31,11 @@ export class McpAuthService {
   private readonly MIN_TOKEN_TTL_SECONDS = 60;
   private readonly MAX_TOKEN_TTL_SECONDS = 3 * 60 * 60;
 
-  constructor(@Inject(TOOL_REGISTRY_REDIS) private readonly redis: Redis) {}
+  constructor(
+    @Inject(TOOL_REGISTRY_REDIS) private readonly redis: Redis,
+    private readonly temporalService: TemporalService,
+    private readonly runAuthority: McpRunAuthorityService,
+  ) {}
 
   /**
    * Generate a secure, short-lived session token for an MCP agent
@@ -34,6 +46,7 @@ export class McpAuthService {
     agentId = 'agent',
     allowedNodeIds?: string[],
     ttlSeconds = this.DEFAULT_TOKEN_TTL_SECONDS,
+    invokingNodeId?: string,
   ): Promise<string> {
     const normalizedTtlSeconds =
       typeof ttlSeconds === 'number' && Number.isFinite(ttlSeconds)
@@ -43,16 +56,38 @@ export class McpAuthService {
       this.MAX_TOKEN_TTL_SECONDS,
       Math.max(this.MIN_TOKEN_TTL_SECONDS, normalizedTtlSeconds),
     );
-    const token = `mcp_sk_${uuid4().replace(/-/g, '')}`;
+    const normalizedAllowedNodeIds = normalizeRunMcpAllowedNodeIds(allowedNodeIds);
+    let authority: Awaited<ReturnType<McpRunAuthorityService['materialize']>> | undefined;
+    try {
+      const version = await this.temporalService.queryWorkflow<number>({
+        workflowId: runId,
+        queryType: TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
+      });
+      if (version !== TOOL_INVOCATION_PROTOCOL_VERSION) {
+        throw new Error(`Unsupported tool invocation protocol version: ${version}`);
+      }
+      authority = await this.runAuthority.materialize({
+        runId,
+        organizationId,
+        ...(invokingNodeId !== undefined && { invokingNodeId }),
+        allowedNodeIds: normalizedAllowedNodeIds,
+      });
+    } catch (error) {
+      if (!(error instanceof QueryNotRegisteredError)) throw error;
+    }
+
+    const token = `mcp_sk_${randomUUID().replace(/-/g, '')}`;
     const expiresAt = Math.floor(Date.now() / 1000) + boundedTtlSeconds;
-    const capabilityGrantId = uuid4();
+    const capabilityGrantId = authority?.grant.id ?? randomUUID();
 
     const metadata: McpSessionMetadata = {
       runId,
       organizationId,
       agentId,
-      allowedNodeIds: normalizeRunMcpAllowedNodeIds(allowedNodeIds),
+      allowedNodeIds: normalizedAllowedNodeIds,
       capabilityGrantId,
+      ...(authority !== undefined && { capabilitySnapshotId: authority.snapshot.id }),
+      ...(invokingNodeId !== undefined && { invokingNodeId }),
       expiresAt,
     };
 
@@ -92,6 +127,12 @@ export class McpAuthService {
           runId: metadata.runId,
           organizationId: metadata.organizationId,
           capabilityGrantId,
+          ...(metadata.capabilitySnapshotId !== undefined && {
+            capabilitySnapshotId: metadata.capabilitySnapshotId,
+          }),
+          ...(metadata.invokingNodeId !== undefined && {
+            invokingNodeId: metadata.invokingNodeId,
+          }),
           allowedNodeIds,
         },
       };

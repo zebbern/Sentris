@@ -48,6 +48,7 @@ const snapshot: McpCapabilityCatalogSnapshot = {
         sourceId: 'component:node-1',
         nodeId: 'node-1',
         componentId: 'scanner',
+        bindingFingerprint: 'b'.repeat(64),
       },
       effects: 'read-only',
       effectsSource: 'sentris-contract',

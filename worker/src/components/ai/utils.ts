@@ -14,6 +14,7 @@ export async function getGatewaySessionToken(
   organizationId: string | null,
   connectedToolNodeIds?: string[],
   ttlSeconds?: number,
+  invokingNodeId?: string,
 ): Promise<string> {
   const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
@@ -25,7 +26,13 @@ export async function getGatewaySessionToken(
   }
 
   const url = `${DEFAULT_API_BASE_URL}/internal/mcp/generate-token`;
-  const body = { runId, organizationId, allowedNodeIds: connectedToolNodeIds, ttlSeconds };
+  const body = {
+    runId,
+    organizationId,
+    allowedNodeIds: connectedToolNodeIds,
+    ttlSeconds,
+    invokingNodeId,
+  };
 
   const response = await fetch(url, {
     method: 'POST',

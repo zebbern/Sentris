@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { parseRunMcpRequestContext, toRunExecutionScope } from '../run-mcp-request-context';
 
 const GRANT_ID = '97d45255-a20d-4f3b-82c7-0e464f57632b';
+const SNAPSHOT_ID = '87a3d333-244f-4ea2-8a82-f6b87117f6ee';
 
 describe('RunMcpRequestContext', () => {
   it('returns only a frozen token-bound scope with normalized node IDs', () => {
@@ -10,6 +11,8 @@ describe('RunMcpRequestContext', () => {
       runId: 'run-1',
       organizationId: 'org-1',
       capabilityGrantId: GRANT_ID,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      invokingNodeId: 'agent-node',
       allowedNodeIds: [' node-b ', '', 'node-a', 'node-b', '   '],
       'x-allowed-tools': 'caller-controlled-tool',
     });
@@ -19,6 +22,8 @@ describe('RunMcpRequestContext', () => {
       runId: 'run-1',
       organizationId: 'org-1',
       capabilityGrantId: GRANT_ID,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      invokingNodeId: 'agent-node',
       allowedNodeIds: ['node-a', 'node-b'],
     });
     expect(Object.isFrozen(context)).toBe(true);
@@ -31,6 +36,8 @@ describe('RunMcpRequestContext', () => {
       runId: 'local-run',
       organizationId: null,
       capabilityGrantId: GRANT_ID,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      invokingNodeId: 'agent-node',
     });
 
     expect(toRunExecutionScope(context)).toEqual({
@@ -38,6 +45,7 @@ describe('RunMcpRequestContext', () => {
       runId: 'local-run',
       organizationId: null,
       capabilityGrantId: GRANT_ID,
+      invokingNodeId: 'agent-node',
     });
   });
 
@@ -48,6 +56,24 @@ describe('RunMcpRequestContext', () => {
     ['invalid organization', { runId: 'run-1', organizationId: 123, capabilityGrantId: GRANT_ID }],
     ['empty organization', { runId: 'run-1', organizationId: '', capabilityGrantId: GRANT_ID }],
     ['invalid grant ID', { runId: 'run-1', organizationId: null, capabilityGrantId: 'not-a-uuid' }],
+    [
+      'invalid snapshot ID',
+      {
+        runId: 'run-1',
+        organizationId: null,
+        capabilityGrantId: GRANT_ID,
+        capabilitySnapshotId: 'not-a-uuid',
+      },
+    ],
+    [
+      'empty invoking node ID',
+      {
+        runId: 'run-1',
+        organizationId: null,
+        capabilityGrantId: GRANT_ID,
+        invokingNodeId: ' ',
+      },
+    ],
     [
       'non-string node ID',
       {

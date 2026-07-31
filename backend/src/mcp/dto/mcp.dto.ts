@@ -72,6 +72,7 @@ export class GenerateTokenInput {
   runId!: string;
   organizationId?: string | null;
   agentId?: string;
+  invokingNodeId?: string;
   allowedNodeIds?: string[];
   ttlSeconds?: number;
 }

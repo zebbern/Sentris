@@ -13,6 +13,7 @@ export const TOOL_INVOCATION_PROTOCOL_QUERY_NAME = 'getToolInvocationProtocolVer
 export const TOOL_INVOCATION_PROTOCOL_VERSION = 1 as const;
 export const MAX_INLINE_INVOCATION_INPUT_BYTES = 256 * 1024;
 export const MAX_INLINE_INVOCATION_OUTPUT_BYTES = 1024 * 1024;
+export const MAX_INVOCATION_MANIFEST_ENTRIES = 1024;
 
 export const InvocationAttemptStatusSchema = z.enum([
   'planned',
@@ -176,7 +177,10 @@ export const InvocationManifestSchema = z
     capabilitySnapshotId: z.string().uuid(),
     capabilityGrantId: z.string().uuid(),
     version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
-    entries: z.array(InvocationManifestEntrySchema).readonly(),
+    entries: z
+      .array(InvocationManifestEntrySchema)
+      .max(MAX_INVOCATION_MANIFEST_ENTRIES)
+      .readonly(),
   })
   .strict()
   .readonly();
