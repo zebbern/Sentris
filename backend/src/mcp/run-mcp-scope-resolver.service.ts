@@ -1,12 +1,15 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthInfo } from '@modelcontextprotocol/server';
 
-import type { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
+import { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
 import { parseRunMcpRequestContext, type RunMcpRequestContext } from './run-mcp-request-context';
 
 @Injectable()
 export class RunMcpScopeResolver {
-  constructor(private readonly workflowRunRepository: WorkflowRunRepository) {}
+  constructor(
+    @Inject(WorkflowRunRepository)
+    private readonly workflowRunRepository: WorkflowRunRepository,
+  ) {}
 
   async resolve(authInfo: AuthInfo): Promise<RunMcpRequestContext> {
     const context = parseRunMcpRequestContext(authInfo.extra);

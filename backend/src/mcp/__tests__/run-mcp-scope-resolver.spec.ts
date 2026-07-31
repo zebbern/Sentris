@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'bun:test';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { SELF_DECLARED_DEPS_METADATA } from '@nestjs/common/constants';
 import type { AuthInfo } from '@modelcontextprotocol/server';
 
-import type { WorkflowRunRepository } from '../../workflows/repository/workflow-run.repository';
+import { WorkflowRunRepository } from '../../workflows/repository/workflow-run.repository';
 import { RunMcpScopeResolver } from '../run-mcp-scope-resolver.service';
 
 const GRANT_ID = '97d45255-a20d-4f3b-82c7-0e464f57632b';
@@ -23,6 +24,12 @@ function makeResolver(run: { organizationId: string | null } | undefined) {
 }
 
 describe('RunMcpScopeResolver', () => {
+  it('publishes the concrete repository token for Nest dependency injection', () => {
+    expect(Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, RunMcpScopeResolver)).toEqual([
+      { index: 0, param: WorkflowRunRepository },
+    ]);
+  });
+
   it.each([
     ['local', null],
     ['organization-owned', 'org-1'],
