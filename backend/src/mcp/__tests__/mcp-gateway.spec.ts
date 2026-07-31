@@ -352,6 +352,75 @@ describe('McpGatewayService', () => {
     expect(runTwoUpstream.initializeCount).toBe(1);
   });
 
+  it('keeps a replacement v1 client pooled when a concurrent stale close finishes', async () => {
+    configureExternalRegistry(toolRegistry, 'http://127.0.0.1:9/mcp');
+    let releaseOldClose!: () => void;
+    let markOldCloseStarted!: () => void;
+    const oldCloseStarted = new Promise<void>((resolve) => {
+      markOldCloseStarted = resolve;
+    });
+    const heldOldClose = new Promise<void>((resolve) => {
+      releaseOldClose = resolve;
+    });
+    const oldClient = {
+      callTool: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'old' }] }),
+      close: jest.fn().mockImplementation(() => {
+        if (oldClient.close.mock.calls.length === 1) {
+          markOldCloseStarted();
+          return heldOldClose;
+        }
+        return Promise.resolve();
+      }),
+    };
+    const replacementClient = {
+      callTool: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'replacement' }] }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const unexpectedClient = {
+      callTool: jest.fn().mockResolvedValue({ content: [{ type: 'text', text: 'unexpected' }] }),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const connectClient = jest.spyOn(
+      service as unknown as {
+        connectLegacyOutboundClient: () => Promise<typeof oldClient>;
+      },
+      'connectLegacyOutboundClient',
+    );
+    connectClient
+      .mockResolvedValueOnce(oldClient)
+      .mockResolvedValueOnce(replacementClient)
+      .mockResolvedValue(unexpectedClient);
+    const client = await connectToGateway(service, RUN_CONTEXT, clients, servers);
+
+    await client.callTool({
+      name: 'External_Server__lookup',
+      arguments: { query: 'before-cleanup' },
+    });
+    const staleCleanup = service.cleanupRun('run-1');
+    await oldCloseStarted;
+    await service.cleanupRun('run-1');
+    await client.callTool({
+      name: 'External_Server__lookup',
+      arguments: { query: 'replacement-before-stale-close' },
+    });
+
+    releaseOldClose();
+    await staleCleanup;
+    await client.callTool({
+      name: 'External_Server__lookup',
+      arguments: { query: 'replacement-after-stale-close' },
+    });
+    await service.cleanupRun('run-1');
+
+    expect(connectClient).toHaveBeenCalledTimes(2);
+    expect(oldClient.callTool).toHaveBeenCalledTimes(1);
+    expect(oldClient.close).toHaveBeenCalledTimes(1);
+    expect(replacementClient.callTool).toHaveBeenCalledTimes(2);
+    expect(replacementClient.close).toHaveBeenCalledTimes(1);
+    expect(unexpectedClient.callTool).not.toHaveBeenCalled();
+    expect(unexpectedClient.close).not.toHaveBeenCalled();
+  });
+
   it('keeps run access validation while the legacy controller is mounted', async () => {
     workflowRunRepository.findByRunId.mockResolvedValue(null);
 

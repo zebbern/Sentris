@@ -763,9 +763,10 @@ export class McpGatewayService {
     clientKey: string,
     client: LegacyMcpClient,
   ): Promise<void> {
+    if (this.legacyOutboundClients.get(clientKey) !== client) return;
+    this.legacyOutboundClients.delete(clientKey);
     await client.close().catch((err) => {
       this.logger.warn(`Failed to close legacy outbound client for ${clientKey}: ${err}`);
     });
-    this.legacyOutboundClients.delete(clientKey);
   }
 }
