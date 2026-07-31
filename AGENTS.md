@@ -168,6 +168,58 @@ be used in startup, reset, or other operational paths.
 4. **E2E Tests**: Mandatory for significant features. Place in `e2e-tests/` folder.
 5. **GitHub CLI**: Use `gh` for all GitHub operations (issues, PRs, actions, releases). Never use browser automation for GitHub tasks.
 
+### Engineering and Product Decision Preferences
+
+- Fix the underlying ownership, lifecycle, or abstraction problem. Do not stack local
+  patches, compatibility shims, duplicated state, or parallel implementations when a
+  shared root-cause fix is practical.
+- Prefer one canonical implementation for behavior that must stay consistent across
+  the backend, worker, frontend, scripts, or deployment modes. Temporary duplication
+  is acceptable only as an explicit migration boundary with an owning module or role,
+  verification criteria, and a deletion condition.
+- Optimize for long-term product capability, reliability, maintainability, and
+  performance. Do not preserve a known weak architecture merely because replacing it
+  requires a larger but well-justified change.
+- Sentris must remain useful as a locally hosted open-source alternative to expensive
+  platforms. Avoid architecture that unnecessarily requires managed services, heavy
+  infrastructure, or enterprise-only dependencies for the normal local path.
+- Security is a product constraint, not the sole objective. Evaluate controls against
+  the realistic attack surface, protected value, capability cost, latency, complexity,
+  and deployment trust profile. Do not remove valuable scanner, agent, MCP, Docker,
+  filesystem, or network capability solely to maximize theoretical security. Prefer
+  explicit trusted-local and hardened choices when their risk models differ.
+- Use mature, actively maintained tools and official integrations when they solve the
+  requirement well. Do not rebuild capabilities such as scanners, package intelligence,
+  model-provider abstractions, or durable orchestration without a demonstrated gap.
+  Keep third-party integrations behind a Sentris-owned boundary when that prevents
+  vendor lock-in or contains unstable APIs.
+- Add abstractions, services, dependencies, configuration, and tests in proportion to
+  demonstrated product or operational value. Avoid speculative scale architecture and
+  repeated broad testing that does not increase confidence in changed behavior.
+
+### Knowledge Freshness and Research
+
+For non-trivial implementation decisions—especially integrations, SDKs, protocols,
+platforms, AI agents, orchestration, security tooling, and architectural patterns—do
+not rely only on model memory or the versions already used by this repository.
+
+1. Check current official documentation, release notes, changelogs, compatibility
+   guidance, and maintained examples before choosing the design.
+2. Verify whether a newer official SDK, integration, protocol revision, or simpler
+   supported pattern materially changes the implementation approach.
+3. Prefer primary sources and maintained upstream tools over remembered patterns,
+   third-party summaries, or locally reinvented equivalents.
+4. Compare the current repository versions and behavior with the latest supported
+   versions. Record important compatibility constraints and migration consequences in
+   the design or ADR.
+5. If official sources do not resolve a material ambiguity, present the viable choices
+   or ask the user rather than silently defaulting to an older remembered approach.
+   Minor gaps may use a stated, evidence-based assumption.
+
+Research should inform an implementation decision, not become open-ended work. Once
+the relevant current approach and compatibility boundary are established, proceed with
+focused implementation and proportional verification.
+
 ### Frontend: Read Before Writing Code
 
 Before writing ANY frontend code that fetches data or adds a page, you MUST read these files first:
@@ -233,7 +285,20 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 - **Backend**: `GET /health` (liveness) and `GET /health/ready` (readiness) via Terminus. Indicators: Postgres, Redis, Temporal, and all enabled Kafka ingest consumers.
 - **Worker**: `GET :9100+N*100/health` per worker instance.
 
-### Sticky Sessions & MCP Session Registry
+### MCP Protocol Migration
+
+MCP `2026-07-28` removes transport-level sessions from modern HTTP. The accepted target
+is a stateless dual-era facade, canonical MCP capability/invocation layer, worker-owned
+runtime leases for live stdio/Docker resources, and Temporal-owned durable agent/task
+lifecycle. See
+`docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
+design spec. Do not expand the legacy session architecture while this migration is in
+progress.
+
+### Legacy Sticky Sessions & MCP Session Registry
+
+The following describes the current compatibility implementation, not the target
+architecture:
 
 - **Nginx** uses consistent hash on the `mcp_affinity` cookie for MCP routes, ensuring stateful MCP connections stick to the same backend instance.
 - **Redis session registry**: keys at `mcp:sessions:{sessionId}` track active MCP sessions.

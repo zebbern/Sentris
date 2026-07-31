@@ -492,13 +492,20 @@ not process-only liveness.
 
 ---
 
-## Sticky Sessions & MCP Session Registry
+## MCP Protocol and Runtime
 
-MCP (Model Context Protocol) connections are stateful. To ensure a client session always reaches the same backend instance:
+MCP `2026-07-28` removes transport-level sessions from modern HTTP. Sentris's accepted
+target is a request-local, dual-era MCP facade backed by one capability/invocation
+boundary. Persistent stdio and Docker resources use worker-owned application leases,
+while Temporal owns durable run and agent lifecycle. See
+[ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).
 
-1. **Nginx** applies a consistent hash on the `mcp_affinity` cookie for all `/api/v1/mcp/*` routes.
-2. **Redis session registry** tracks active sessions under the key pattern `mcp:sessions:{sessionId}`.
-3. **Admin endpoint** `GET /api/v1/mcp/sessions` lists all active MCP sessions for debugging and monitoring.
+The implementation is currently migrating from the older stateful transport model.
+During that compatibility window, Nginx still applies the `mcp_affinity` cookie, Redis
+tracks `mcp:sessions:{sessionId}`, and `GET /api/v1/mcp/sessions` exposes diagnostic
+session metadata. These are legacy implementation details and must not be extended for
+modern MCP traffic. They are removed once supported clients pass the modern or
+legacy-stateless compatibility path defined by the ADR.
 
 ---
 
