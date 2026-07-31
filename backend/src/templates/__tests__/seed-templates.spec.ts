@@ -231,6 +231,153 @@ describe('new seed templates', () => {
     );
   });
 
+  it('gemini autonomous npm investigator keeps source evidence usable when OSV fails', () => {
+    const template = readSeed('gemini-autonomous-npm-investigator.json');
+    const graph = WorkflowGraphSchema.parse(template.graph);
+    const compiled = compileWorkflowGraph(graph);
+    const buildOsvSuccessNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_osv_success',
+    );
+    const buildOsvFailureNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_osv_failure',
+    );
+    const finalizeOsvNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'finalize_osv_evidence',
+    );
+    const evidenceNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_evidence_packet',
+    );
+
+    expect(buildOsvSuccessNode).toBeDefined();
+    expect(buildOsvFailureNode).toBeDefined();
+    expect(finalizeOsvNode).toBeDefined();
+    if (!buildOsvSuccessNode || !buildOsvFailureNode || !finalizeOsvNode) return;
+
+    expect(finalizeOsvNode.data.config.joinStrategy).toBe('any');
+    expect(template.graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'osv_query',
+          target: 'build_osv_success',
+          sourceHandle: 'findings',
+          targetHandle: 'findings',
+        }),
+        expect.objectContaining({
+          source: 'osv_query',
+          target: 'build_osv_success',
+          sourceHandle: 'summary',
+          targetHandle: 'summary',
+        }),
+        expect.objectContaining({
+          source: 'osv_query',
+          target: 'build_osv_failure',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          source: 'build_osv_success',
+          target: 'finalize_osv_evidence',
+          sourceHandle: 'osvEvidence',
+          targetHandle: 'successEvidence',
+        }),
+        expect.objectContaining({
+          source: 'build_osv_failure',
+          target: 'finalize_osv_evidence',
+          sourceHandle: 'osvEvidence',
+          targetHandle: 'failureEvidence',
+        }),
+        expect.objectContaining({
+          source: 'finalize_osv_evidence',
+          sourceHandle: 'osvFindings',
+          target: 'build_evidence_packet',
+          targetHandle: 'osvFindings',
+        }),
+        expect.objectContaining({
+          source: 'finalize_osv_evidence',
+          sourceHandle: 'osvSummary',
+          target: 'build_evidence_packet',
+          targetHandle: 'osvSummary',
+        }),
+      ]),
+    );
+    expect(compiled.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceRef: 'osv_query',
+          targetRef: 'build_osv_failure',
+          kind: 'error',
+        }),
+        expect.objectContaining({
+          sourceRef: 'finalize_osv_evidence',
+          targetRef: 'build_evidence_packet',
+        }),
+      ]),
+    );
+
+    const failed = runTemplateScript<{
+      osvEvidence: {
+        findings: unknown[];
+        summary: {
+          status: string;
+          findingCount: number;
+          warningCount: number;
+          warning: string;
+        };
+      };
+    }>(buildOsvFailureNode.data.config.params.code, {
+      failure: { reason: { message: 'OSV service unavailable' } },
+    });
+    expect(failed).toEqual({
+      osvEvidence: {
+        findings: [],
+        summary: {
+          status: 'failed',
+          findingCount: 0,
+          warningCount: 1,
+          warning: 'OSV query failed: OSV service unavailable',
+        },
+      },
+    });
+
+    const normalized = runTemplateScript<{
+      osvFindings: unknown[];
+      osvSummary: { status: string; findingCount: number; warningCount: number; warning: string };
+    }>(finalizeOsvNode.data.config.params.code, {
+      failureEvidence: failed.osvEvidence,
+    });
+    expect(normalized).toEqual({
+      osvFindings: [],
+      osvSummary: {
+        status: 'failed',
+        findingCount: 0,
+        warningCount: 1,
+        warning: 'OSV query failed: OSV service unavailable',
+      },
+    });
+
+    const result = runTemplateScript<{ agentInput: string }>(evidenceNode.data.config.params.code, {
+      packageSpec: 'lodash@4.17.20',
+      packageName: 'lodash',
+      requestedVersion: '4.17.20',
+      registryRecords: [],
+      registryWarnings: [],
+      osvFindings: normalized.osvFindings,
+      osvSummary: normalized.osvSummary,
+      sourceEvidence: {
+        sourceBundle: '# FILE: package/index.js\nmodule.exports = {};',
+        sourceStatus: { sourceType: 'npm-tarball', usable: true },
+        packageProvenance: { sourceType: 'published-package' },
+        semgrepFindings: [{ check_id: 'javascript.lang.security.audit.prototype-pollution' }],
+        semgrepCount: 1,
+        scannerFailure: null,
+        scannerCaveat: null,
+      },
+    });
+
+    expect(result.agentInput).toContain('OSV query failed: OSV service unavailable');
+    expect(result.agentInput).toContain('javascript.lang.security.audit.prototype-pollution');
+    expect(result.agentInput).toContain('# FILE: package/index.js');
+  });
+
   it('gemini autonomous npm investigator promotes only evidence-backed sidecar findings', () => {
     const template = readSeed('gemini-autonomous-npm-investigator.json');
     const parserNode = template.graph.nodes.find(

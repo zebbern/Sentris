@@ -15,8 +15,8 @@
     "category": "cve-research",
     "tags": ["cve-research", "npm", "gemini", "semgrep", "osv", "mcp"],
     "entryPoint": "trigger_1",
-    "nodeCount": 15,
-    "edgeCount": 38
+    "nodeCount": 18,
+    "edgeCount": 43
   },
   "graph": {
     "name": "Gemini Autonomous npm Investigator",
@@ -157,6 +157,109 @@
               "hydrateAdvisories": true,
               "maxAdvisoriesPerPackage": 30,
               "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_osv_success",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1040,
+          "y": 40
+        },
+        "data": {
+          "label": "Build OSV Success Evidence",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "findings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "summary",
+                  "type": "json"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "osvEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  return {\n    osvEvidence: {\n      findings: Array.isArray(input.findings) ? input.findings : [],\n      summary: input.summary && typeof input.summary === 'object' ? input.summary : {}\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_osv_failure",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1040,
+          "y": 200
+        },
+        "data": {
+          "label": "Build OSV Failure Evidence",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "failure",
+                  "type": "json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "osvEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const failure = input.failure;\n  const reason = failure && typeof failure === 'object' && failure.reason != null ? failure.reason : failure;\n  const rawMessage = reason && typeof reason === 'object' ? reason.message : reason;\n  const message = String(rawMessage || 'Unknown OSV query failure.').trim().slice(0, 1000);\n  return {\n    osvEvidence: {\n      findings: [],\n      summary: {\n        status: 'failed',\n        findingCount: 0,\n        warningCount: 1,\n        warning: 'OSV query failed: ' + message\n      }\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "finalize_osv_evidence",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1360,
+          "y": 120
+        },
+        "data": {
+          "label": "Finalize OSV Evidence",
+          "config": {
+            "joinStrategy": "any",
+            "params": {
+              "variables": [
+                {
+                  "name": "successEvidence",
+                  "type": "json",
+                  "required": false
+                },
+                {
+                  "name": "failureEvidence",
+                  "type": "json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "osvFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "osvSummary",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const successEvidence = input.successEvidence && typeof input.successEvidence === 'object' ? input.successEvidence : null;\n  const failureEvidence = input.failureEvidence && typeof input.failureEvidence === 'object' ? input.failureEvidence : null;\n  const evidence = successEvidence || failureEvidence;\n  if (evidence) {\n    return {\n      osvFindings: Array.isArray(evidence.findings) ? evidence.findings : [],\n      osvSummary: evidence.summary && typeof evidence.summary === 'object' ? evidence.summary : {}\n    };\n  }\n  return {\n    osvFindings: [],\n    osvSummary: {\n      status: 'unavailable',\n      findingCount: 0,\n      warningCount: 1,\n      warning: 'No OSV evidence branch completed.'\n    }\n  };\n}"
             },
             "inputOverrides": {}
           }
@@ -752,15 +855,49 @@
       {
         "id": "osv_query-findings-build_evidence_packet-osvFindings",
         "source": "osv_query",
-        "target": "build_evidence_packet",
+        "target": "build_osv_success",
         "sourceHandle": "findings",
-        "targetHandle": "osvFindings"
+        "targetHandle": "findings"
       },
       {
         "id": "osv_query-summary-build_evidence_packet-osvSummary",
         "source": "osv_query",
-        "target": "build_evidence_packet",
+        "target": "build_osv_success",
         "sourceHandle": "summary",
+        "targetHandle": "summary"
+      },
+      {
+        "id": "osv_query-error-build_osv_failure-trigger",
+        "source": "osv_query",
+        "target": "build_osv_failure",
+        "kind": "error"
+      },
+      {
+        "id": "build_osv_success-osvEvidence-finalize_osv_evidence-successEvidence",
+        "source": "build_osv_success",
+        "target": "finalize_osv_evidence",
+        "sourceHandle": "osvEvidence",
+        "targetHandle": "successEvidence"
+      },
+      {
+        "id": "build_osv_failure-osvEvidence-finalize_osv_evidence-failureEvidence",
+        "source": "build_osv_failure",
+        "target": "finalize_osv_evidence",
+        "sourceHandle": "osvEvidence",
+        "targetHandle": "failureEvidence"
+      },
+      {
+        "id": "finalize_osv_evidence-osvFindings-build_evidence_packet-osvFindings",
+        "source": "finalize_osv_evidence",
+        "target": "build_evidence_packet",
+        "sourceHandle": "osvFindings",
+        "targetHandle": "osvFindings"
+      },
+      {
+        "id": "finalize_osv_evidence-osvSummary-build_evidence_packet-osvSummary",
+        "source": "finalize_osv_evidence",
+        "target": "build_evidence_packet",
+        "sourceHandle": "osvSummary",
         "targetHandle": "osvSummary"
       },
       {

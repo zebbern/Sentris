@@ -761,6 +761,40 @@ describe('core.ai.agent (refactor)', () => {
     expect((errorData.error as string).length).toBeLessThan(2_050);
   });
 
+  test('redacts credentials from durable tool error events', async () => {
+    const published: AgentTraceEvent[] = [];
+    const apiKey = 'sk-tool-trace-secret-12345';
+    const bearerToken = 'tool-bearer-trace-secret-67890';
+    const basicCredential = 'dG9vbC11c2VyOnRvb2wtcGFzcw==';
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [
+          {
+            type: 'tool-error',
+            toolCallId: 'call-secret',
+            toolName: 'audit',
+            input: { package: 'sentris' },
+            error: {
+              message: `tool request rejected apiKey=${apiKey} Authorization: Bearer ${bearerToken} upstream Basic ${basicCredential}`,
+            },
+            dynamic: true,
+          },
+        ] as TextStreamPart<ToolSet>[],
+      }),
+    );
+
+    await runAgent(contextWithTracePublisher(published));
+
+    const toolError = published.find((event) => event.part.type === 'data-tool-error');
+    const errorData = isRecord(toolError?.part.data) ? toolError.part.data : {};
+    expect(errorData.error).toContain('tool request rejected');
+    expect(errorData.error).toContain('[REDACTED]');
+    const durableTrace = JSON.stringify(published);
+    for (const secret of [apiKey, bearerToken, basicCredential]) {
+      expect(durableTrace).not.toContain(secret);
+    }
+  });
+
   test('publishes one error finish and rejects when the provider stream fails', async () => {
     const published: AgentTraceEvent[] = [];
     const providerError = new Error('provider stream failed');
@@ -780,6 +814,32 @@ describe('core.ai.agent (refactor)', () => {
       finishReason: 'error',
       responseText: 'provider stream failed',
     });
+  });
+
+  test('redacts credentials from the terminal provider error trace', async () => {
+    const published: AgentTraceEvent[] = [];
+    const apiKey = 'sk-provider-trace-secret-12345';
+    const bearerToken = 'provider-bearer-trace-secret-67890';
+    const basicCredential = 'cHJvdmlkZXItdXNlcjpwcm92aWRlci1wYXNz';
+    const providerError = new Error(
+      `provider request failed apiKey=${apiKey} Authorization: Bearer ${bearerToken} upstream Basic ${basicCredential}`,
+    );
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [{ type: 'error', error: providerError }],
+        text: '',
+      }),
+    );
+
+    await expect(runAgent(contextWithTracePublisher(published))).rejects.toBe(providerError);
+
+    const finish = published.find((event) => event.part.type === 'finish');
+    expect(finish?.part.responseText).toContain('provider request failed');
+    expect(finish?.part.responseText).toContain('[REDACTED]');
+    const durableTrace = JSON.stringify(published);
+    for (const secret of [apiKey, bearerToken, basicCredential]) {
+      expect(durableTrace).not.toContain(secret);
+    }
   });
 
   test('preserves the provider failure when MCP cleanup also fails', async () => {

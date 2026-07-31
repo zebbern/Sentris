@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { runWorkflowWithScheduler, type WorkflowSchedulerRunContext } from '../workflow-scheduler';
 import type { WorkflowDefinition } from '../types';
@@ -737,5 +739,121 @@ describe('runWorkflowWithScheduler', () => {
 
     expect(order).toEqual(['start', 'context', 'agent', 'final']);
     expect(skipped).toEqual(['errorHandler']);
+  });
+
+  it('runs the Gemini compiled-shape evidence path when the OSV query fails', async () => {
+    const templatePath = join(
+      import.meta.dir,
+      '../../../../backend/scripts/seed-templates/gemini-autonomous-npm-investigator.json',
+    );
+    const template = JSON.parse(readFileSync(templatePath, 'utf8')) as {
+      graph: {
+        name: string;
+        nodes: {
+          id: string;
+          type: string;
+          data?: { config?: { joinStrategy?: 'all' | 'any' | 'first' } };
+        }[];
+        edges: {
+          id: string;
+          source: string;
+          target: string;
+          sourceHandle?: string;
+          targetHandle?: string;
+          kind?: 'success' | 'error';
+        }[];
+      };
+    };
+    const schedulerEdges = template.graph.edges.map((edge) => ({
+      id: edge.id,
+      sourceRef: edge.source,
+      targetRef: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      kind: edge.kind ?? ('success' as const),
+    }));
+    const definition: WorkflowDefinition = {
+      version: 2,
+      title: template.graph.name,
+      entrypoint: { ref: 'trigger_1' },
+      nodes: Object.fromEntries(
+        template.graph.nodes.map((node) => [
+          node.id,
+          {
+            ref: node.id,
+            joinStrategy: node.data?.config?.joinStrategy,
+          },
+        ]),
+      ),
+      edges: schedulerEdges,
+      dependencyCounts: Object.fromEntries(
+        template.graph.nodes.map((node) => [
+          node.id,
+          new Set(
+            schedulerEdges
+              .filter((edge) => edge.targetRef === node.id)
+              .map((edge) => edge.sourceRef),
+          ).size,
+        ]),
+      ),
+      actions: template.graph.nodes.map((node) => ({
+        ref: node.id,
+        componentId: node.type,
+        params: {},
+        inputOverrides: {},
+        dependsOn: [
+          ...new Set(
+            schedulerEdges
+              .filter((edge) => edge.targetRef === node.id)
+              .map((edge) => edge.sourceRef),
+          ),
+        ],
+        inputMappings: {},
+      })),
+      config: { environment: 'test', timeoutSeconds: 30 },
+    };
+    const order: string[] = [];
+    const skipped: string[] = [];
+    const contexts = new Map<string, WorkflowSchedulerRunContext>();
+    let sourceEvidenceUsable = false;
+
+    await expect(
+      runWorkflowWithScheduler(definition, {
+        run: async (ref, context) => {
+          order.push(ref);
+          contexts.set(ref, context);
+          if (ref === 'osv_query') {
+            throw new Error('OSV service unavailable');
+          }
+          if (ref === 'finalize_source_evidence') {
+            sourceEvidenceUsable = true;
+          }
+          if (ref === 'build_evidence_packet') {
+            expect(sourceEvidenceUsable).toBe(true);
+          }
+          return null;
+        },
+        onNodeSkipped: async (ref) => {
+          skipped.push(ref);
+        },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(order).toEqual(
+      expect.arrayContaining([
+        'fetch_npm_source',
+        'semgrep_scan',
+        'finalize_source_evidence',
+        'build_osv_failure',
+        'finalize_osv_evidence',
+        'build_evidence_packet',
+      ]),
+    );
+    expect(order).not.toContain('build_osv_success');
+    expect(skipped).toContain('build_osv_success');
+    expect(skipped).not.toContain('build_evidence_packet');
+    expect(contexts.get('build_osv_failure')?.failure?.reason.message).toBe(
+      'OSV service unavailable',
+    );
   });
 });

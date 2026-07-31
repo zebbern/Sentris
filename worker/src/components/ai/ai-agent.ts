@@ -823,7 +823,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
             agentStream.emitToolError(
               part.toolCallId,
               part.toolName,
-              safeStringify(part.error, LOG_TRUNCATE_LIMIT),
+              redactCredentialText(safeStringify(part.error, LOG_TRUNCATE_LIMIT)),
             );
             break;
           case 'error':
@@ -888,7 +888,10 @@ Loop the Conversation State output back into the next agent invocation to keep m
       );
       const errorMessage =
         error instanceof Error ? error.message : safeStringify(error, LOG_TRUNCATE_LIMIT);
-      agentStream.emitFinish('error', truncateText(errorMessage, LOG_TRUNCATE_LIMIT));
+      agentStream.emitFinish(
+        'error',
+        truncateText(redactCredentialText(errorMessage), LOG_TRUNCATE_LIMIT),
+      );
     }
 
     await agentStream.settleWithoutChangingExecution();
