@@ -91,9 +91,14 @@ export class AgentsController {
     let seenFinish = false;
     let aborted = false;
 
-    req.on('close', () => {
+    const handleDisconnect = () => {
       aborted = true;
-    });
+    };
+    if (req.aborted) {
+      handleDisconnect();
+    }
+    req.once('aborted', handleDisconnect);
+    res.once('close', handleDisconnect);
 
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {

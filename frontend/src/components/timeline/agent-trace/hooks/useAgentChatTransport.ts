@@ -9,6 +9,7 @@ export function useAgentChatTransport(agentRunId: string | null) {
       return null;
     }
     return new DefaultChatTransport({
+      credentials: 'include',
       prepareSendMessagesRequest: async ({ body, headers }) => {
         const authHeaders = await getApiAuthHeaders();
         return {

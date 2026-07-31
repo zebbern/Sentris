@@ -84,8 +84,9 @@ Required secret:
 
 - `GEMINI_API_KEY`, selected from Sentris Secrets when the template is used.
 
-The template uses `gemini-2.5-flash` by default so the acceptance run is inexpensive
-and fast. The workflow stores a secret reference, never the key value. A user can
+The template uses `gemini-3.5-flash` by default so new Gemini accounts can use a
+current stable model while retaining strong long-horizon agent performance.
+The workflow stores a secret reference, never the key value. A user can
 change the model configuration on the agent node after importing the template.
 
 The workflow should remain useful when no MCP servers are enabled. When tools are
@@ -139,7 +140,7 @@ The template binds Gemini directly on `core.ai.agent`:
 {
   "chatModel": {
     "provider": "gemini",
-    "modelId": "gemini-2.5-flash"
+    "modelId": "gemini-3.5-flash"
   },
   "modelApiKey": "{{SECRET:GEMINI_API_KEY}}"
 }

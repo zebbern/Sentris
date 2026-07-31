@@ -29,6 +29,21 @@ mock.module('@/components/timeline/agent-trace/hooks/useAgentChatTransport', () 
 
 const mockSendMessage = mock(async () => {});
 const mockSetMessages = mock(() => {});
+const mockInvalidateQueries = mock(async () => {});
+
+mock.module('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+  }),
+}));
+
+mock.module('@/lib/queryKeys', () => ({
+  queryKeys: {
+    agents: {
+      transcript: (agentRunId: string) => ['agentTranscript', 'test-org', agentRunId],
+    },
+  },
+}));
 
 // IMPORTANT: Stable reference to prevent infinite re-render loops.
 // The component has useEffect([messages,...]) that calls setVisibleMessages;
@@ -103,6 +118,7 @@ function resetMocks() {
   mockSteps = [];
   mockSendMessage.mockClear();
   mockSetMessages.mockClear();
+  mockInvalidateQueries.mockClear();
   mockTimelineState = {
     playbackMode: 'replay',
     timelineStartTime: null,
@@ -197,5 +213,16 @@ describe('AgentRunCard', () => {
     render(<AgentRunCard {...makeProps({ live: true })} />);
 
     expect(screen.getByText(/Status:/)).toBeTruthy();
+  });
+
+  it('refreshes the persisted transcript when a live run becomes terminal', () => {
+    const props = makeProps({ live: true });
+    const { rerender } = render(<AgentRunCard {...props} />);
+
+    rerender(<AgentRunCard {...props} live={false} />);
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['agentTranscript', 'test-org', props.agentRunId],
+    });
   });
 });

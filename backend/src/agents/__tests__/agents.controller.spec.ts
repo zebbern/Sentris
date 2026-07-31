@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 import { NotFoundException } from '@nestjs/common';
+import { EventEmitter } from 'node:events';
 
 import { AgentsController } from '../agents.controller';
 import type { AgentTraceService, AgentTracePartEntry } from '../../agent-trace/agent-trace.service';
@@ -63,6 +64,38 @@ function createController(
   const workflowsService = overrides.workflowsService ?? makeWorkflowsService();
   const controller = new AgentsController(workflowsService, agentTraceService);
   return { controller, agentTraceService, workflowsService };
+}
+
+function createStreamingHttpDoubles() {
+  const request = new EventEmitter() as any;
+  const response = new EventEmitter() as any;
+  const chunks: Uint8Array[] = [];
+  let resolveEnded!: () => void;
+  const ended = new Promise<void>((resolve) => {
+    resolveEnded = resolve;
+  });
+
+  response.writeHead = jest.fn();
+  response.write = jest.fn((chunk: Uint8Array) => {
+    chunks.push(chunk);
+    return true;
+  });
+  response.end = jest.fn(resolveEnded);
+
+  return {
+    request,
+    response,
+    ended,
+    body: () => Buffer.concat(chunks).toString('utf8'),
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 // ===========================================================================
@@ -434,6 +467,51 @@ describe('AgentsController', () => {
         controller.chat(AGENT_RUN_ID, { cursor: 0 }, AUTH, mockRes, mockReq),
       ).rejects.toThrow('Access denied');
       expect(workflowsService.ensureRunAccess).toHaveBeenCalledWith(WORKFLOW_RUN_ID, AUTH);
+    });
+
+    it('continues streaming after the completed POST request closes', async () => {
+      const firstPoll = deferred<AgentTracePartEntry[]>();
+      (agentTraceService.list as ReturnType<typeof jest.fn>)
+        .mockImplementationOnce(() => firstPoll.promise)
+        .mockResolvedValueOnce([
+          makeEvent({
+            sequence: 2,
+            part: { type: 'finish', finishReason: 'stop', responseText: 'done' },
+          }),
+        ]);
+      const http = createStreamingHttpDoubles();
+
+      await controller.chat(AGENT_RUN_ID, { cursor: 0 }, AUTH, http.response, http.request);
+      http.request.emit('close');
+      firstPoll.resolve([
+        makeEvent({ sequence: 1, part: { type: 'text-delta', textDelta: 'still streaming' } }),
+      ]);
+      await http.ended;
+
+      expect(agentTraceService.list).toHaveBeenCalledTimes(2);
+      expect(http.body()).toContain('"type":"finish"');
+    });
+
+    it('stops streaming when the response closes', async () => {
+      const firstPoll = deferred<AgentTracePartEntry[]>();
+      (agentTraceService.list as ReturnType<typeof jest.fn>)
+        .mockImplementationOnce(() => firstPoll.promise)
+        .mockResolvedValueOnce([
+          makeEvent({
+            sequence: 2,
+            part: { type: 'finish', finishReason: 'stop', responseText: 'done' },
+          }),
+        ]);
+      const http = createStreamingHttpDoubles();
+
+      await controller.chat(AGENT_RUN_ID, { cursor: 0 }, AUTH, http.response, http.request);
+      http.response.emit('close');
+      firstPoll.resolve([
+        makeEvent({ sequence: 1, part: { type: 'text-delta', textDelta: 'last buffered part' } }),
+      ]);
+      await http.ended;
+
+      expect(agentTraceService.list).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -21,7 +21,7 @@ async function main() {
   });
 
   const providerParams = provider.inputs.parse({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     apiKey: process.env.GEMINI_API_KEY ?? 'replace-with-real-key',
   });
   const providerOutput = await provider.execute(

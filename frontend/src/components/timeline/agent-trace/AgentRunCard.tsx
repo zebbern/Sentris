@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
+import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
 import type { AgentRunCardProps } from './types';
 import { extractAssistantText, chunksToMessages } from './utils';
@@ -30,6 +32,7 @@ export function AgentRunCard({
     steps,
   } = useAgentTranscript(agentRunId);
   const transport = useAgentChatTransport(agentRunId);
+  const queryClient = useQueryClient();
   const { messages, sendMessage, status, setMessages } = useChat({
     id: agentRunId,
     transport: transport ?? undefined,
@@ -39,6 +42,7 @@ export function AgentRunCard({
   const hydratedRef = useRef(false);
   const startedRef = useRef(false);
   const lastReplaySequenceRef = useRef<number | null>(null);
+  const previousLiveStateRef = useRef({ agentRunId, live });
   const playbackMode = useExecutionTimelineStore((state) => state.playbackMode);
   const timelineStartTime = useExecutionTimelineStore((state) => state.timelineStartTime);
   const timelineCurrentTime = useExecutionTimelineStore((state) => state.currentTime);
@@ -98,6 +102,16 @@ export function AgentRunCard({
       body: cursor > 0 ? { cursor } : undefined,
     });
   }, [live, cursor, sendMessage, transport]);
+
+  useEffect(() => {
+    const previous = previousLiveStateRef.current;
+    previousLiveStateRef.current = { agentRunId, live };
+    if (previous.agentRunId === agentRunId && previous.live && !live) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.agents.transcript(agentRunId),
+      });
+    }
+  }, [agentRunId, live, queryClient]);
 
   useEffect(() => {
     const isReplayForRun = playbackMode === 'replay' && runId && selectedTimelineRunId === runId;

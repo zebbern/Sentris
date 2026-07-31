@@ -43,7 +43,7 @@ const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrout
 const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL ?? '';
 
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
 const DEFAULT_OPENROUTER_MODEL = 'openai/gpt-4o-mini';
 const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_TEMPERATURE = 0.7;
@@ -110,7 +110,7 @@ const inputSchema = inputs({
     {
       label: 'Chat Model',
       description:
-        'Provider configuration. Example: {"provider":"gemini","modelId":"gemini-2.5-flash","apiKey":"gm-..."}',
+        'Provider configuration. Example: {"provider":"gemini","modelId":"gemini-3.5-flash","apiKey":"gm-..."}',
       connectionType: { kind: 'contract', name: llmProviderContractName, credential: true },
     },
   ),

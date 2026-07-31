@@ -12,7 +12,7 @@ import {
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.5-flash';
 const DEFAULT_BASE_URL = process.env.GEMINI_BASE_URL ?? '';
 
 const inputSchema = inputs({
@@ -40,15 +40,18 @@ const outputSchema = outputs({
 
 const parameterSchema = parameters({
   model: param(
-    z.string().default(DEFAULT_MODEL).describe('Gemini model identifier (e.g., gemini-2.5-flash).'),
+    z.string().default(DEFAULT_MODEL).describe('Gemini model identifier (e.g., gemini-3.5-flash).'),
     {
       label: 'Model',
       editor: 'select',
       options: [
-        { label: 'Gemini 3 Pro (Preview)', value: 'gemini-3-pro-preview' },
+        { label: 'Gemini 3.6 Flash', value: 'gemini-3.6-flash' },
+        { label: 'Gemini 3.5 Flash', value: 'gemini-3.5-flash' },
+        { label: 'Gemini 3.5 Flash-Lite', value: 'gemini-3.5-flash-lite' },
+        { label: 'Gemini 3.1 Pro (Preview)', value: 'gemini-3.1-pro-preview' },
         { label: 'Gemini 3 Flash (Preview)', value: 'gemini-3-flash-preview' },
         { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
-        { label: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+        { label: 'Gemini 2.5 Flash (Legacy)', value: 'gemini-2.5-flash' },
       ],
       description: 'Gemini model to emit.',
     },

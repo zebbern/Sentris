@@ -294,6 +294,38 @@ describe('core.ai.agent (refactor)', () => {
     expect(stepCountIsMock).toHaveBeenCalledWith(64);
   });
 
+  test('falls back to the current stable Gemini Flash model', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      {
+        inputs: {
+          userInput: 'Investigate the target',
+          conversationState: undefined,
+          chatModel: { provider: 'gemini', modelId: '' },
+          modelApiKey: 'test-gemini-key',
+        },
+        params: {
+          systemPrompt: '',
+          temperature: 0.2,
+          maxTokens: 128,
+          memorySize: 4,
+          executionProfile: 'fast',
+        },
+      },
+      createTestContext(),
+    );
+
+    const settings = expectRecord(toolLoopAgentSettings, 'agent settings');
+    expect(settings.model).toEqual({
+      provider: 'gemini',
+      modelId: 'gemini-3.5-flash',
+    });
+  });
+
   test('discovers gateway tools and passes them to the agent', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();

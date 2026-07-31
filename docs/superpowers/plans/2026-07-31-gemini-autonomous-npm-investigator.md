@@ -18,7 +18,7 @@
 - Use native `core.ai.agent`; OpenCode and Claude Code streaming are outside this slice.
 - Do not expose model reasoning deltas. Stream final-response text and tool lifecycle events only.
 - Coalesce text for perceptible live output without creating one Kafka/Postgres record per token.
-- Use `gemini-2.5-flash`, `executionProfile: "deep"`, `toolAvailability: "best-effort"`, and named secret placeholder `{{SECRET:GEMINI_API_KEY}}`.
+- Use `gemini-3.5-flash`, `executionProfile: "deep"`, `toolAvailability: "best-effort"`, and named secret placeholder `{{SECRET:GEMINI_API_KEY}}`.
 - Fetch the published npm tarball once and reuse its source bundle/volume.
 - Scanner and MCP output are leads; only evidence-backed agent sidecar entries become canonical findings.
 - Run focused tests/typechecks and one live browser acceptance; do not run unrelated broad security suites.
@@ -483,7 +483,7 @@ it('gemini autonomous npm investigator wires source evidence, optional MCP, and 
   const agent = template.graph.nodes.find((node) => node.id === 'gemini_investigator');
   expect(agent.type).toBe('core.ai.agent');
   expect(agent.data.config.inputOverrides).toMatchObject({
-    chatModel: { provider: 'gemini', modelId: 'gemini-2.5-flash' },
+    chatModel: { provider: 'gemini', modelId: 'gemini-3.5-flash' },
     modelApiKey: '{{SECRET:GEMINI_API_KEY}}',
   });
   expect(agent.data.config.params).toMatchObject({
@@ -677,7 +677,7 @@ Use:
   "inputOverrides": {
     "chatModel": {
       "provider": "gemini",
-      "modelId": "gemini-2.5-flash"
+      "modelId": "gemini-3.5-flash"
     },
     "modelApiKey": "{{SECRET:GEMINI_API_KEY}}"
   }
