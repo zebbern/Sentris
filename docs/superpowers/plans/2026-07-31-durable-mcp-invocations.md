@@ -19,6 +19,8 @@
 - Persist no plaintext credentials, resolved headers, endpoint authorization values, or live transport/process data. Workflow history receives the bounded request, compact manifest, prepared reference, and bounded result only. A dispatch activity may receive credentials from the internal backend endpoint in memory; that response must never be returned from the activity.
 - Inline invocation input is limited to 256 KiB of UTF-8 JSON and inline result output to 1 MiB. Both must be finite JSON values; `undefined`, `NaN`, `Infinity`, functions, class instances, and cycles are rejected. Artifact-backed payloads remain a later agent-history task.
 - Invocation state is exactly `planned | prepared | dispatched | completed | failed | ambiguous | cancelled`. A logical invocation has a stable UUID and one or more numbered attempts; this slice creates attempt `1` only but must not prevent later reviewed-idempotent attempts.
+- One immutable grant owns exactly one immutable snapshot/manifest. Any catalog/configuration change mints a new grant plus snapshot; snapshots never refresh under an existing grant ID.
+- Durable invocation execution in this slice is explicitly run-scoped. Studio/discovery keep the shared authority vocabulary but do not create `mcp_invocations` rows until their later durable-operation plan.
 - Dispatch activities use `maximumAttempts: 1`. Preflight and ambiguity-recording activities may use three attempts because neither calls the tool. Once an attempt is `dispatched`, an uncertain outcome becomes `ambiguous`; it is never automatically executed again.
 - A backend timeout or lost response from `executeUpdate` must be returned as an error. Never fall back to the legacy signal after an Update was submitted because the Update may still execute.
 - Component tools move to Workflow Updates in this slice. Snapshot-authorized external MCP tools continue through the named v1 outbound compatibility path without a second live authorization decision; canonical outbound v2 clients, worker runtime leases, stdio/Docker ownership, and external invocation dispatch are the next plan.
@@ -236,10 +238,11 @@
   - an authority collision with non-identical JSON throws instead of mutating it;
   - preparing the same invocation ID and request hash returns the same attempt;
   - reusing an invocation ID with a different hash throws;
-  - `prepared -> dispatched -> completed|failed` succeeds once;
+  - invocation and current-attempt status change atomically through `prepared -> dispatched -> completed|failed`;
   - `dispatched -> ambiguous` succeeds and cannot return to `prepared`;
   - a terminal duplicate returns the stored validated result;
-  - a later attempt number is representable even though this slice creates only attempt `1`.
+  - a stale/non-current attempt cannot claim or settle an invocation;
+  - a later attempt number is representable at the schema level even though this slice's repository API creates only attempt `1`.
 
 - [ ] **Step 2: Run the repository test and observe RED**
 
@@ -281,6 +284,7 @@
     request_hash varchar(64) not null
     request jsonb not null
     status varchar(32) not null
+    current_attempt_number integer not null default 1
     result jsonb null
     created_at/updated_at/terminal_at timestamptz
 
@@ -296,7 +300,7 @@
     unique(invocation_id, attempt_number)
   ```
 
-  Add indexes for `(run_id, created_at)`, `(organization_id, created_at)`, `(status, updated_at)`, and attempt status. Use `onDelete: 'restrict'`; never cascade immutable authority or audit rows from mutable MCP configuration.
+  Add indexes for `(run_id, created_at)`, `(organization_id, created_at)`, `(status, updated_at)`, and attempt status. Add database checks for lowercase 64-hex hashes, allowed statuses/destinations/retry policies, and positive attempt numbers. Use `onDelete: 'restrict'`; never cascade immutable authority or audit rows from mutable MCP configuration. The one-to-one grant/snapshot unique key is intentional: changed catalog/configuration creates a new grant rather than mutating or versioning a snapshot under existing authority.
 
 - [ ] **Step 4: Implement parsed, compare-and-set repository methods**
 
@@ -308,6 +312,11 @@
     snapshot: McpCapabilityCatalogSnapshot;
     manifest: InvocationManifest;
   }
+
+  export type ClaimAttemptOutcome =
+    | { kind: 'claimed' }
+    | { kind: 'terminal'; result: ToolInvocationResult }
+    | { kind: 'ambiguous'; result: ToolInvocationResult };
 
   export class McpRuntimeRepository {
     createOrReadRunAuthority(input: {
@@ -331,7 +340,7 @@
       manifest: InvocationManifest;
     }): Promise<PrepareToolInvocationOutcome>;
 
-    claimAttempt(ref: PreparedInvocationRef): Promise<'claimed' | 'already-dispatched'>;
+    claimAttempt(ref: PreparedInvocationRef): Promise<ClaimAttemptOutcome>;
     settleAttempt(input: {
       ref: PreparedInvocationRef;
       result: ToolInvocationResult;
@@ -344,7 +353,7 @@
   }
   ```
 
-  Use database transactions and conditional `WHERE status = ...` updates for transitions. Parse every JSONB read with the shared Zod schema. Compare immutable collisions with one canonical, key-sorted JSON serializer. Treat nullable organization IDs with explicit `IS NULL`/equality logic rather than truthiness.
+  Use database transactions and conditional `WHERE status = ...` updates for transitions. `mcp_invocations.status` is the authoritative query projection of its `current_attempt_number`; every claim/settlement updates the logical invocation and exact current attempt atomically to the same state with one transaction timestamp. `prepared` claims both rows as `dispatched`; a second claim of that exact dispatched attempt atomically records and returns `ambiguous`; a matching terminal replay returns the stored result; missing/wrong/stale references throw. Settlement requires the ref's attempt ID/number to equal the logical invocation's current attempt and CASes from `dispatched` only. Parse every JSONB read with the shared Zod schema and verify a terminal replay equals the stored result rather than accepting a conflicting duplicate. Compare immutable authority collisions through one canonical semantic projection: omit `createdAt`, substitute grant/snapshot IDs in nested scope/manifest references with fixed sentinels, sort object keys, and preserve array order. This lets concurrent identical materializations return the winner while a real SHA-256 key collision or semantic mismatch throws. Treat nullable organization IDs with explicit `IS NULL`/equality logic rather than truthiness.
 
 - [ ] **Step 5: Generate and seal the checked migration**
 
@@ -353,7 +362,7 @@
   bun --cwd=backend run migration:check
   ```
 
-  Inspect `0010_mcp_runtime_persistence.sql`; confirm it creates only the four tables, required indexes/constraints, and no destructive statements. Add a migration artifact test that asserts the tables, unique attempt key, restrictive foreign keys, and checked-manifest entry.
+  Do not hand-author SQL, snapshots, journal entries, or checksum entries. Inspect the generator-produced `0010_mcp_runtime_persistence.sql`; confirm it creates only the four tables, required checks/indexes/constraints, and no destructive statements. Add a migration artifact test that asserts the tables, one-to-one grant/snapshot key, unique attempt key, restrictive foreign keys, status/hash checks, and checked-manifest entry. Recheck the generated sequence number immediately before staging in case another migration landed concurrently.
 
 - [ ] **Step 6: Run focused verification GREEN**
 
@@ -379,10 +388,16 @@
 
 - Create: `backend/src/mcp-runtime/mcp-run-catalog.service.ts`
 - Create: `backend/src/mcp-runtime/mcp-run-authority.service.ts`
+- Create: `backend/src/mcp-runtime/mcp-tool-name.ts`
 - Create: `backend/src/mcp/mcp-legacy-outbound-compatibility.service.ts`
+- Create: `backend/src/mcp/__tests__/mcp-legacy-outbound-compatibility.service.spec.ts`
 - Create: `backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts`
 - Create: `backend/src/mcp-runtime/__tests__/mcp-run-authority.service.spec.ts`
+- Modify: `packages/shared/src/mcp-capabilities.ts`
+- Modify: `packages/shared/src/__tests__/mcp-capabilities.test.ts`
 - Modify: `backend/src/mcp/mcp-auth.service.ts`
+- Modify: `backend/src/mcp/mcp-gateway.service.ts`
+- Modify: `backend/src/mcp/__tests__/mcp-gateway.spec.ts`
 - Modify: `backend/src/mcp/run-mcp-request-context.ts`
 - Modify: `backend/src/mcp/dto/mcp.dto.ts`
 - Modify: `backend/src/mcp/internal-mcp.controller.ts`
@@ -410,7 +425,7 @@
   - external names remain `${sanitize(source.toolName)}__${sanitize(upstream.name)}` and preserve full MCP metadata/schema;
   - hierarchical allowed node IDs are applied before snapshot creation;
   - config fingerprints are deterministic across object key order and change for endpoint, component parameters, tool schema, or encrypted-credential-version hash changes without persisting any secret/ciphertext;
-  - repeated identical token requests reuse one authority; changed catalog/config creates a new one;
+  - repeated and concurrent identical token requests reuse one semantic authority despite different candidate timestamps; changed catalog/config creates a new one;
   - protocol query `1` creates a durable token with `capabilitySnapshotId`;
   - `QueryNotRegisteredError` alone creates a legacy token without a snapshot; every other Temporal error is propagated;
   - request context parsing retains optional `invokingNodeId` and snapshot ID.
@@ -421,9 +436,31 @@
   bun test backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts backend/src/mcp-runtime/__tests__/mcp-run-authority.service.spec.ts backend/src/mcp/__tests__/mcp-auth.service.spec.ts
   ```
 
-- [ ] **Step 3: Extract canonical catalog construction**
+- [ ] **Step 3: Extract the one named v1 compatibility adapter**
 
-  `McpRunCatalogService.build(input)` returns descriptors plus runtime bindings, but persists descriptors only:
+  Move the gateway's v1 imports/client maps, connection coalescing, per-run keying, request-header resolution, live endpoint discovery, call/retry behavior, generation-safe eviction/close, conversion, and cleanup into `McpLegacyOutboundCompatibilityService`:
+
+  ```ts
+  discoverTools(
+    runId: string,
+    source: RegisteredTool,
+  ): Promise<McpToolRegistrationDescriptor[]>;
+
+  callTool(
+    runId: string,
+    source: RegisteredTool,
+    upstreamName: string,
+    args: Record<string, unknown>,
+  ): Promise<CallToolResult>;
+
+  cleanupRun(runId: string): Promise<void>;
+  ```
+
+  Keep all v1 SDK types private. The adapter depends only on `ToolRegistryService`. Move pooling regression tests (concurrent connect, stale/late failure eviction, per-run cleanup, headers/call forwarding) into its dedicated spec. `McpGatewayService` delegates discovery/calls, and `InternalMcpController.cleanupRun` calls the adapter directly; do not retain a gateway cleanup wrapper with no other owner.
+
+- [ ] **Step 4: Extract canonical catalog construction**
+
+  `McpRunCatalogService.build(input)` examines ephemeral registry bindings but returns/persists descriptors plus their configuration fingerprint only:
 
   ```ts
   export interface BuiltRunCatalog {
@@ -437,13 +474,15 @@
   }): Promise<BuiltRunCatalog>;
   ```
 
-  Use Redis pre-discovered server tools first and database cached tools for registered remote servers. Move the gateway's existing v1 client pool, endpoint discovery, request-header resolution, call, eviction, and close behavior into `McpLegacyOutboundCompatibilityService`; use that same explicitly transitional service for the existing live endpoint-discovery fallback when an allowed ready local source has no cached descriptor. Snapshot the discovery result once and never refresh that snapshot. Do not duplicate a second v1 client implementation in the catalog service.
+  Use Redis pre-discovered server tools first and database cached tools for registered remote servers. Use the same explicitly transitional adapter for the existing live endpoint-discovery fallback when an allowed ready local source has no cached descriptor. Snapshot the discovery result once and never refresh that snapshot. Do not return/persist endpoint, credential, client, or runtime-binding objects.
+
+  Move tool-name normalization/collision rules into pure `mcp-tool-name.ts` and use it from catalog plus the remaining legacy gateway path. Set run snapshot `sourceId = nodeId` and always preserve `nodeId`. Make shared MCP `serverId` optional because local/ephemeral MCP sources legitimately have no saved server row; never invent a fake server ID from the node ID.
 
   Fingerprint a canonical object containing normalized source/node IDs, component IDs, parameters, endpoints/server IDs/container references, complete public descriptors, and `sha256(encryptedCredentials)` when present. Never include the encrypted value itself in the canonical object, logs, snapshot, or tests.
 
-- [ ] **Step 4: Create/reuse immutable run authority**
+- [ ] **Step 5: Create/reuse immutable run authority**
 
-  `McpRunAuthorityService.materialize` creates UUIDs, builds a strict run `ExecutionScope`, grants `all` access only to sources already filtered by allowed nodes, creates the snapshot and manifest, computes `authorityKey = sha256([contractVersion, scope without grant ID, sorted allowed nodes, configFingerprint])`, and calls `createOrReadRunAuthority`:
+  `McpRunAuthorityService.materialize` first computes the semantic authority tuple and `authorityKey = sha256([contractVersion, scope subject/invoker without IDs/timestamps, sorted allowed nodes, configFingerprint])`. Derive stable UUID-shaped grant and snapshot IDs from distinct SHA-256 domain prefixes plus that key, build a strict run `ExecutionScope`, grant `all` access only to sources already filtered by allowed nodes, create the snapshot/manifest, and call `createOrReadRunAuthority`. The repository's semantic comparison ignores only candidate timestamps and normalized nested ID references, so concurrent identical callers return the winner while different authority content still conflicts:
 
   ```ts
   materialize(input: {
@@ -454,7 +493,7 @@
   }): Promise<StoredMcpAuthority>;
   ```
 
-- [ ] **Step 5: Bind token generation to Workflow capability**
+- [ ] **Step 6: Bind token generation to Workflow capability**
 
   Add `capabilitySnapshotId?: string` and `invokingNodeId?: string` to token metadata and request context. Before token creation:
 
@@ -476,19 +515,23 @@
 
   Replace the backend runtime import of `uuid4` from `@temporalio/workflow` with `randomUUID` from `node:crypto`. Add `invokingNodeId` to `getGatewaySessionToken`/`prepareAgentGatewayAccess`, pass `context.componentRef` from all three real agent implementations, and keep callers that omit it compatible.
 
-- [ ] **Step 6: Run focused tests and affected typechecks GREEN**
+  Hashing the current registry ciphertext is deliberately a conservative credential-version surrogate: unchanged registration material reuses authority; re-registering even identical plaintext mints new authority because the runtime cannot prove version identity without decrypting. The runtime-manager plan replaces this with a saved credential reference/version.
+
+- [ ] **Step 7: Register the acyclic provider graph and run focused verification GREEN**
+
+  `McpRuntimeModule` continues to export only `McpRuntimeRepository`. Register the compatibility adapter, catalog, authority, auth, gateway, and later invocation services as `McpModule` providers. The dependency direction is adapter → registry, catalog → registry/repository-of-saved-tools/adapter, authority → catalog/runtime repository, auth → Temporal/authority; no `forwardRef` and no import back from runtime to MCP.
 
   ```powershell
-  bun test backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts backend/src/mcp-runtime/__tests__/mcp-run-authority.service.spec.ts backend/src/mcp/__tests__/mcp-auth.service.spec.ts backend/src/mcp/__tests__/run-mcp-request-context.spec.ts backend/src/mcp/__tests__/mcp-internal.integration.spec.ts worker/src/components/ai/__tests__/agent-tool-access.test.ts worker/src/components/ai/__tests__/ai-agent.test.ts
+  bun test packages/shared/src/__tests__/mcp-capabilities.test.ts backend/src/mcp/__tests__/mcp-legacy-outbound-compatibility.service.spec.ts backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts backend/src/mcp-runtime/__tests__/mcp-run-authority.service.spec.ts backend/src/mcp/__tests__/mcp-auth.service.spec.ts backend/src/mcp/__tests__/run-mcp-request-context.spec.ts backend/src/mcp/__tests__/mcp-internal.integration.spec.ts backend/src/mcp/__tests__/mcp-gateway.spec.ts worker/src/components/ai/__tests__/agent-tool-access.test.ts worker/src/components/ai/__tests__/ai-agent.test.ts
   bun --cwd=backend run typecheck
   bun --cwd=worker run typecheck
   git diff --check
   ```
 
-- [ ] **Step 7: Commit immutable token authority**
+- [ ] **Step 8: Commit immutable token authority**
 
   ```powershell
-  git add backend/src/mcp-runtime backend/src/mcp/mcp-legacy-outbound-compatibility.service.ts backend/src/mcp/mcp-auth.service.ts backend/src/mcp/run-mcp-request-context.ts backend/src/mcp/dto/mcp.dto.ts backend/src/mcp/internal-mcp.controller.ts backend/src/mcp/mcp.module.ts backend/src/mcp/__tests__ worker/src/components/ai
+  git add packages/shared/src/mcp-capabilities.ts packages/shared/src/__tests__/mcp-capabilities.test.ts backend/src/mcp-runtime backend/src/mcp/mcp-legacy-outbound-compatibility.service.ts backend/src/mcp/mcp-auth.service.ts backend/src/mcp/mcp-gateway.service.ts backend/src/mcp/run-mcp-request-context.ts backend/src/mcp/dto/mcp.dto.ts backend/src/mcp/internal-mcp.controller.ts backend/src/mcp/mcp.module.ts backend/src/mcp/__tests__ worker/src/components/ai
   git diff --cached --check
   git commit -s -m "feat: bind MCP tokens to immutable run catalogs"
   ```
@@ -501,6 +544,7 @@
 
 - Create: `backend/src/mcp-runtime/mcp-invocation.service.ts`
 - Create: `backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts`
+- Modify: `backend/src/mcp/mcp.module.ts`
 - Modify: `backend/src/mcp/dto/mcp.dto.ts`
 - Modify: `backend/src/mcp/internal-mcp.controller.ts`
 - Modify: `backend/src/mcp/__tests__/mcp-internal.integration.spec.ts`
