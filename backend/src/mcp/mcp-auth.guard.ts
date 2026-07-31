@@ -6,8 +6,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import type { AuthInfo } from '@modelcontextprotocol/server';
 import { McpAuthService } from './mcp-auth.service';
-import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
 /**
  * Request interface for MCP Gateway which uses spec-compliant AuthInfo

@@ -1,14 +1,17 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import Redis from 'ioredis';
 import { uuid4 } from '@temporalio/workflow';
 import { TOOL_REGISTRY_REDIS } from './tool-registry.service';
-import { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { AuthInfo } from '@modelcontextprotocol/server';
+import { normalizeRunMcpAllowedNodeIds } from './run-mcp-request-context';
 
 export interface McpSessionMetadata {
   runId: string;
   organizationId: string | null;
   agentId?: string;
   allowedNodeIds?: string[];
+  capabilityGrantId?: string;
   expiresAt: number;
 }
 
@@ -42,12 +45,14 @@ export class McpAuthService {
     );
     const token = `mcp_sk_${uuid4().replace(/-/g, '')}`;
     const expiresAt = Math.floor(Date.now() / 1000) + boundedTtlSeconds;
+    const capabilityGrantId = uuid4();
 
     const metadata: McpSessionMetadata = {
       runId,
       organizationId,
       agentId,
-      allowedNodeIds,
+      allowedNodeIds: normalizeRunMcpAllowedNodeIds(allowedNodeIds),
+      capabilityGrantId,
       expiresAt,
     };
 
@@ -72,6 +77,10 @@ export class McpAuthService {
 
     try {
       const metadata: McpSessionMetadata = JSON.parse(data);
+      const allowedNodeIds = normalizeRunMcpAllowedNodeIds(metadata.allowedNodeIds);
+      const capabilityGrantId =
+        metadata.capabilityGrantId ??
+        this.deriveLegacyCapabilityGrantId(token, metadata, allowedNodeIds);
 
       // Map to MCP Spec AuthInfo
       return {
@@ -82,7 +91,8 @@ export class McpAuthService {
         extra: {
           runId: metadata.runId,
           organizationId: metadata.organizationId,
-          allowedNodeIds: metadata.allowedNodeIds,
+          capabilityGrantId,
+          allowedNodeIds,
         },
       };
     } catch (err) {
@@ -96,5 +106,28 @@ export class McpAuthService {
    */
   async revokeToken(token: string): Promise<void> {
     await this.redis.del(`${this.TOKEN_PREFIX}${token}`);
+  }
+
+  private deriveLegacyCapabilityGrantId(
+    token: string,
+    metadata: McpSessionMetadata,
+    allowedNodeIds: string[],
+  ): string {
+    const canonicalTuple = [
+      1,
+      token,
+      metadata.runId,
+      metadata.organizationId,
+      metadata.agentId ?? null,
+      allowedNodeIds,
+    ];
+    const bytes = createHash('sha256')
+      .update(JSON.stringify(canonicalTuple))
+      .digest()
+      .subarray(0, 16);
+    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50;
+    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 }
