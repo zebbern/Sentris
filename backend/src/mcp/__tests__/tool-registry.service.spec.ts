@@ -1,8 +1,46 @@
 import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { z } from 'zod';
+import {
+  componentRegistry,
+  inputs,
+  outputs,
+  parameters,
+  param,
+  port,
+  type ComponentDefinition,
+} from '@sentris/component-sdk';
 import { ToolRegistryService } from '../tool-registry.service';
 import type { SecretsEncryptionService } from '../../secrets/secrets.encryption';
 import { computeMcpBindingFingerprint } from '../../mcp-runtime/mcp-binding-fingerprint';
+
+function dispatchComponent(profileExposed: boolean): ComponentDefinition {
+  return {
+    id: 'test.registry-dispatch-component',
+    label: 'Registry dispatch component',
+    category: 'security',
+    runner: { kind: 'inline' },
+    inputs: inputs({
+      target: port(z.string(), { label: 'Target' }),
+    }),
+    outputs: outputs({}),
+    parameters: parameters({
+      profile: param(z.string().default('default'), {
+        label: 'Profile',
+        editor: 'text',
+        exposeToTool: profileExposed,
+      }),
+    }),
+    toolProvider: {
+      kind: 'component',
+      name: 'scan_target',
+      description: 'Scan target',
+    },
+    execute: async () => ({}),
+  };
+}
+
+const SNAPSHOT_COMPONENT = dispatchComponent(true);
 
 // Mock Redis
 class MockRedis {
@@ -75,12 +113,17 @@ describe('ToolRegistryService', () => {
   let service: ToolRegistryService;
   let redis: MockRedis;
   let encryption: MockEncryptionService;
+  let componentGetSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     redis = new MockRedis();
     encryption = new MockEncryptionService();
     service = new ToolRegistryService(redis as any, encryption as any as SecretsEncryptionService);
+    componentGetSpy = vi.spyOn(componentRegistry, 'get') as unknown as ReturnType<typeof vi.fn>;
+    componentGetSpy.mockReturnValue(SNAPSHOT_COMPONENT);
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   describe('registerComponentTool', () => {
     it('registers a component tool with encrypted credentials', async () => {
@@ -129,7 +172,7 @@ describe('ToolRegistryService', () => {
       runId: 'run-dispatch',
       nodeId: 'node-dispatch',
       toolName: 'scan_target',
-      componentId: 'security.scanner',
+      componentId: SNAPSHOT_COMPONENT.id,
       description: 'Scan target',
       inputSchema: {
         type: 'object',
@@ -158,7 +201,11 @@ describe('ToolRegistryService', () => {
           nodeId: registration.nodeId,
           componentId: registration.componentId,
           toolName: registration.toolName,
-          bindingFingerprint: computeMcpBindingFingerprint(stored, [descriptor]),
+          bindingFingerprint: computeMcpBindingFingerprint(
+            stored,
+            [descriptor],
+            SNAPSHOT_COMPONENT,
+          ),
           descriptor,
         }),
       ).resolves.toEqual({ tool: stored, credentials: registration.credentials });
@@ -171,20 +218,153 @@ describe('ToolRegistryService', () => {
       expect(encryption.decryptCalls).toBe(1);
     });
 
-    it('rejects changed identity/readiness/fingerprint before decrypting', async () => {
+    it('rejects a non-ready component before decrypting', async () => {
       await service.registerComponentTool(registration);
       const stored = await service.getTool(registration.runId, registration.nodeId);
       if (!stored) throw new Error('fixture registration failed');
+      stored.status = 'pending';
+      await redis.hset('mcp:run:run-dispatch:tools', registration.nodeId, JSON.stringify(stored));
+      encryption.decryptCalls = 0;
+      const descriptor = {
+        name: registration.toolName,
+        description: registration.description,
+        inputSchema: registration.inputSchema,
+      };
+
+      await expect(
+        service.resolveComponentForDispatch({
+          runId: registration.runId,
+          nodeId: registration.nodeId,
+          componentId: registration.componentId,
+          toolName: registration.toolName,
+          bindingFingerprint: computeMcpBindingFingerprint(
+            stored,
+            [descriptor],
+            SNAPSHOT_COMPONENT,
+          ),
+          descriptor,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(encryption.decryptCalls).toBe(0);
+    });
+
+    it('rejects an explicitly unexposed component before decrypting', async () => {
+      await service.registerComponentTool(registration);
+      const stored = await service.getTool(registration.runId, registration.nodeId);
+      if (!stored) throw new Error('fixture registration failed');
+      stored.exposedToAgent = false;
+      await redis.hset('mcp:run:run-dispatch:tools', registration.nodeId, JSON.stringify(stored));
+      encryption.decryptCalls = 0;
+      const descriptor = {
+        name: registration.toolName,
+        description: registration.description,
+        inputSchema: registration.inputSchema,
+      };
+
+      await expect(
+        service.resolveComponentForDispatch({
+          runId: registration.runId,
+          nodeId: registration.nodeId,
+          componentId: registration.componentId,
+          toolName: registration.toolName,
+          bindingFingerprint: computeMcpBindingFingerprint(
+            stored,
+            [descriptor],
+            SNAPSHOT_COMPONENT,
+          ),
+          descriptor,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(encryption.decryptCalls).toBe(0);
+    });
+
+    it.each([
+      ['missing', undefined],
+      ['malformed', 'yes'],
+    ])(
+      'rejects %s exposure state before fingerprinting or decrypting',
+      async (_label, exposure) => {
+        await service.registerComponentTool(registration);
+        const stored = await service.getTool(registration.runId, registration.nodeId);
+        if (!stored) throw new Error('fixture registration failed');
+        if (exposure === undefined) {
+          delete stored.exposedToAgent;
+        } else {
+          stored.exposedToAgent = exposure as never;
+        }
+        await redis.hset('mcp:run:run-dispatch:tools', registration.nodeId, JSON.stringify(stored));
+        encryption.decryptCalls = 0;
+        const descriptor = {
+          name: registration.toolName,
+          description: registration.description,
+          inputSchema: registration.inputSchema,
+        };
+
+        await expect(
+          service.resolveComponentForDispatch({
+            runId: registration.runId,
+            nodeId: registration.nodeId,
+            componentId: registration.componentId,
+            toolName: registration.toolName,
+            bindingFingerprint: computeMcpBindingFingerprint(
+              stored,
+              [descriptor],
+              SNAPSHOT_COMPONENT,
+            ),
+            descriptor,
+          }),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        expect(componentGetSpy).not.toHaveBeenCalled();
+        expect(encryption.decryptCalls).toBe(0);
+      },
+    );
+
+    it('rejects a fingerprint mismatch before decrypting', async () => {
+      await service.registerComponentTool(registration);
       encryption.decryptCalls = 0;
 
       await expect(
         service.resolveComponentForDispatch({
           runId: registration.runId,
           nodeId: registration.nodeId,
-          componentId: 'security.other',
+          componentId: registration.componentId,
           toolName: registration.toolName,
-          bindingFingerprint: computeMcpBindingFingerprint(stored, []),
-          descriptor: { name: registration.toolName },
+          bindingFingerprint: 'f'.repeat(64),
+          descriptor: {
+            name: registration.toolName,
+            description: registration.description,
+            inputSchema: registration.inputSchema,
+          },
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(encryption.decryptCalls).toBe(0);
+    });
+
+    it('rejects current component definition drift before decrypting', async () => {
+      await service.registerComponentTool(registration);
+      const stored = await service.getTool(registration.runId, registration.nodeId);
+      if (!stored) throw new Error('fixture registration failed');
+      encryption.decryptCalls = 0;
+      const descriptor = {
+        name: registration.toolName,
+        description: registration.description,
+        inputSchema: registration.inputSchema,
+      };
+      const snapshotFingerprint = computeMcpBindingFingerprint(
+        stored,
+        [descriptor],
+        SNAPSHOT_COMPONENT,
+      );
+      componentGetSpy.mockReturnValue(dispatchComponent(false));
+
+      await expect(
+        service.resolveComponentForDispatch({
+          runId: registration.runId,
+          nodeId: registration.nodeId,
+          componentId: registration.componentId,
+          toolName: registration.toolName,
+          bindingFingerprint: snapshotFingerprint,
+          descriptor,
         }),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(encryption.decryptCalls).toBe(0);
@@ -201,7 +381,7 @@ describe('ToolRegistryService', () => {
         description: registration.description,
         inputSchema: registration.inputSchema,
       };
-      const fingerprint = computeMcpBindingFingerprint(stored, [descriptor]);
+      const fingerprint = computeMcpBindingFingerprint(stored, [descriptor], SNAPSHOT_COMPONENT);
 
       await expect(
         service.resolveComponentForDispatch({
@@ -223,7 +403,11 @@ describe('ToolRegistryService', () => {
           nodeId: registration.nodeId,
           componentId: registration.componentId,
           toolName: registration.toolName,
-          bindingFingerprint: computeMcpBindingFingerprint(stored, [descriptor]),
+          bindingFingerprint: computeMcpBindingFingerprint(
+            stored,
+            [descriptor],
+            SNAPSHOT_COMPONENT,
+          ),
           descriptor,
         }),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);

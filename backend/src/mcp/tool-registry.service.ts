@@ -18,8 +18,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type Redis from 'ioredis';
-import { type ToolInputSchema } from '@sentris/component-sdk';
+import { componentRegistry, type ToolInputSchema } from '@sentris/component-sdk';
 import { JsonObjectSchema, type McpToolRegistrationDescriptor } from '@sentris/shared';
+import { z } from 'zod';
 import { SecretsEncryptionService } from '../secrets/secrets.encryption';
 import { computeMcpBindingFingerprint } from '../mcp-runtime/mcp-binding-fingerprint';
 import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
@@ -101,6 +102,27 @@ export interface ResolvedComponentForDispatch {
   tool: RegisteredTool;
   credentials: Record<string, unknown> | null;
 }
+
+const RegisteredComponentDispatchRecordSchema = z
+  .object({
+    nodeId: z.string().min(1),
+    toolName: z.string().min(1),
+    exposedToAgent: z.boolean(),
+    type: z.enum(['component', 'mcp-server', 'mcp-group', 'remote-mcp', 'local-mcp']),
+    providerKind: z.string().optional(),
+    status: z.enum(['pending', 'ready', 'error']),
+    componentId: z.string().min(1).optional(),
+    parameters: JsonObjectSchema.optional(),
+    inputSchema: JsonObjectSchema,
+    description: z.string(),
+    encryptedCredentials: z.string().optional(),
+    endpoint: z.string().optional(),
+    containerId: z.string().optional(),
+    serverId: z.string().optional(),
+    errorMessage: z.string().optional(),
+    registeredAt: z.string().datetime(),
+  })
+  .strict();
 
 const REGISTRY_TTL_SECONDS = 3 * 60 * 60;
 
@@ -330,19 +352,33 @@ export class ToolRegistryService implements OnModuleDestroy {
     } catch {
       throw new ServiceUnavailableException('MCP component binding is invalid');
     }
-    if (!parsedTool || typeof parsedTool !== 'object' || Array.isArray(parsedTool)) {
+    const parsedRecord = RegisteredComponentDispatchRecordSchema.safeParse(parsedTool);
+    if (!parsedRecord.success) {
       throw new ServiceUnavailableException('MCP component binding is invalid');
     }
-    const tool = parsedTool as RegisteredTool;
+    const tool = parsedRecord.data as RegisteredTool;
     if (
       tool.nodeId !== input.nodeId ||
       tool.componentId !== input.componentId ||
       tool.toolName !== input.toolName ||
       tool.type !== 'component' ||
       tool.status !== 'ready' ||
-      tool.exposedToAgent === false ||
-      computeMcpBindingFingerprint(tool, [input.descriptor]) !== input.bindingFingerprint
+      tool.exposedToAgent !== true
     ) {
+      throw new ConflictException('Live MCP component binding no longer matches its snapshot');
+    }
+
+    const component = componentRegistry.get(tool.componentId);
+    if (!component) {
+      throw new ServiceUnavailableException('MCP component definition is unavailable');
+    }
+    let currentFingerprint: string;
+    try {
+      currentFingerprint = computeMcpBindingFingerprint(tool, [input.descriptor], component);
+    } catch {
+      throw new ServiceUnavailableException('MCP component definition is invalid');
+    }
+    if (currentFingerprint !== input.bindingFingerprint) {
       throw new ConflictException('Live MCP component binding no longer matches its snapshot');
     }
 

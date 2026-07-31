@@ -62,6 +62,10 @@ if (!componentRegistry.has(COMPONENT_ID)) {
     execute: async () => ({}),
   });
 }
+const componentDefinition = componentRegistry.get(COMPONENT_ID);
+if (!componentDefinition) {
+  throw new Error('MCP invocation boundary test component was not registered');
+}
 
 const inputSchema = {
   type: 'object',
@@ -89,9 +93,11 @@ const registeredTool = {
   registeredAt: '2026-07-31T10:00:00.000Z',
 };
 
-const bindingFingerprint = computeMcpBindingFingerprint(registeredTool, [
-  { name: TOOL_NAME, description: registeredTool.description, inputSchema },
-]);
+const bindingFingerprint = computeMcpBindingFingerprint(
+  registeredTool,
+  [{ name: TOOL_NAME, description: registeredTool.description, inputSchema }],
+  componentDefinition,
+);
 
 const snapshot: McpCapabilityCatalogSnapshot = {
   id: SNAPSHOT_ID,

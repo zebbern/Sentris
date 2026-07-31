@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { componentRegistry } from '@sentris/component-sdk';
 import type { McpToolRegistrationDescriptor, ToolDescriptor } from '@sentris/shared';
 
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
@@ -39,7 +40,13 @@ export class McpRunCatalogService {
     for (const source of sources) {
       if (source.type === 'component') {
         const descriptor = componentRegistrationDescriptor(source);
-        const bindingFingerprint = computeMcpBindingFingerprint(source, [descriptor]);
+        const component = source.componentId
+          ? componentRegistry.get(source.componentId)
+          : undefined;
+        if (!component) {
+          throw new Error(`Component definition missing for tool '${source.toolName}'`);
+        }
+        const bindingFingerprint = computeMcpBindingFingerprint(source, [descriptor], component);
         claimMcpToolName(claimedNames, source.toolName);
         tools.push(componentToolDescriptor(source, descriptor, bindingFingerprint));
         sourceFingerprints.push({ sourceId: source.nodeId, bindingFingerprint });

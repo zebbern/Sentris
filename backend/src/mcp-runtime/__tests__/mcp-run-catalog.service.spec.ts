@@ -1,4 +1,14 @@
-import { describe, expect, it, vi } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
+import { z } from 'zod';
+import {
+  componentRegistry,
+  inputs,
+  outputs,
+  parameters,
+  param,
+  port,
+  type ComponentDefinition,
+} from '@sentris/component-sdk';
 import type { McpToolRegistrationDescriptor } from '@sentris/shared';
 
 import { computeMcpBindingFingerprint } from '../mcp-binding-fingerprint';
@@ -30,7 +40,50 @@ const EXTERNAL_TOOLS: McpToolRegistrationDescriptor[] = [
   },
 ];
 
+function catalogComponent(profileExposed: boolean): ComponentDefinition {
+  return {
+    id: 'test.catalog-component-binding',
+    label: 'Catalog component binding',
+    category: 'security',
+    runner: { kind: 'inline' },
+    inputs: inputs({
+      target: port(z.string(), { label: 'Target' }),
+    }),
+    outputs: outputs({}),
+    parameters: parameters({
+      profile: param(z.string().default('default'), {
+        label: 'Profile',
+        editor: 'text',
+        exposeToTool: profileExposed,
+      }),
+    }),
+    toolProvider: {
+      kind: 'component',
+      name: 'scan_target',
+      description: 'Scan one target',
+    },
+    execute: async () => ({}),
+  };
+}
+
+const CATALOG_COMPONENT = catalogComponent(true);
+
 describe('McpRunCatalogService', () => {
+  beforeEach(() => {
+    vi.spyOn(componentRegistry, 'get');
+    (
+      componentRegistry.get as unknown as {
+        mockImplementation(
+          implementation: (componentId: string) => ComponentDefinition | undefined,
+        ): void;
+      }
+    ).mockImplementation((componentId) =>
+      componentId === CATALOG_COMPONENT.id ? CATALOG_COMPONENT : undefined,
+    );
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
   it('materializes a closed component descriptor bound to its workflow node', async () => {
     const component = componentSource();
     const service = createService({ sources: [component] });
@@ -52,7 +105,7 @@ describe('McpRunCatalogService', () => {
         kind: 'component',
         sourceId: 'component-node',
         nodeId: 'component-node',
-        componentId: 'security.scan-target',
+        componentId: CATALOG_COMPONENT.id,
         bindingFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
       },
       effects: 'unknown',
@@ -149,19 +202,23 @@ describe('McpRunCatalogService', () => {
       inputSchema: { ...base.inputSchema, additionalProperties: false },
     };
 
-    const original = computeMcpBindingFingerprint(base, [publicDescriptor]);
-    const same = computeMcpBindingFingerprint(reordered, [
-      {
-        inputSchema: {
-          additionalProperties: false,
-          type: 'object',
-          properties: { target: { type: 'string' } },
-          required: ['target'],
+    const original = computeMcpBindingFingerprint(base, [publicDescriptor], CATALOG_COMPONENT);
+    const same = computeMcpBindingFingerprint(
+      reordered,
+      [
+        {
+          inputSchema: {
+            additionalProperties: false,
+            type: 'object',
+            properties: { target: { type: 'string' } },
+            required: ['target'],
+          },
+          description: base.description,
+          name: base.toolName,
         },
-        description: base.description,
-        name: base.toolName,
-      },
-    ]);
+      ],
+      CATALOG_COMPONENT,
+    );
     const variants = [
       { ...base, endpoint: 'https://changed.example.test/mcp' },
       { ...base, parameters: { first: false, nested: { b: 2, a: 1 } } },
@@ -175,7 +232,9 @@ describe('McpRunCatalogService', () => {
         ...publicDescriptor,
         inputSchema: { ...variant.inputSchema, additionalProperties: false },
       };
-      expect(computeMcpBindingFingerprint(variant, [descriptor])).not.toBe(original);
+      expect(computeMcpBindingFingerprint(variant, [descriptor], CATALOG_COMPONENT)).not.toBe(
+        original,
+      );
     }
 
     const catalog = await createService({ sources: [base] }).build({
@@ -184,6 +243,29 @@ describe('McpRunCatalogService', () => {
     });
     expect(catalog.tools[0].source.bindingFingerprint).toBe(original);
     expect(JSON.stringify(catalog)).not.toContain('ciphertext-version-1');
+  });
+
+  it('changes the materialized binding when the current component dispatch surface drifts', async () => {
+    const source = componentSource();
+    const service = createService({ sources: [source] });
+    const original = await service.build({
+      runId: 'run-1',
+      allowedNodeIds: ['component-node'],
+    });
+    (
+      componentRegistry.get as unknown as {
+        mockReturnValue(value: ComponentDefinition): void;
+      }
+    ).mockReturnValue(catalogComponent(false));
+
+    const drifted = await service.build({
+      runId: 'run-1',
+      allowedNodeIds: ['component-node'],
+    });
+
+    expect(drifted.tools[0].source.bindingFingerprint).not.toBe(
+      original.tools[0].source.bindingFingerprint,
+    );
   });
 });
 
@@ -216,7 +298,7 @@ function componentSource(): RegisteredTool {
     type: 'component',
     status: 'ready',
     exposedToAgent: true,
-    componentId: 'security.scan-target',
+    componentId: CATALOG_COMPONENT.id,
     description: 'Scan one target',
     inputSchema: {
       type: 'object',

@@ -436,35 +436,43 @@ export class McpRuntimeRepository {
     const ref = PreparedInvocationRefSchema.parse(input.ref);
     return this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as NodePgDatabase;
-      const existing = await this.readInvocation(tx, ref.invocationId);
+      let existing = await this.readInvocation(tx, ref.invocationId);
       if (!existing) {
         throw new ConflictException('MCP invocation reconciliation reference was not found');
       }
+      for (let transitionAttempt = 0; transitionAttempt < 2; transitionAttempt += 1) {
+        this.assertReferenceMatches(existing, ref);
+        if (TERMINAL_STATUSES.has(existing.invocation.status)) {
+          return this.requireTerminalResult(existing);
+        }
+        if (
+          existing.invocation.status !== 'prepared' &&
+          existing.invocation.status !== 'dispatched'
+        ) {
+          throw new ConflictException('MCP invocation cannot be reconciled from its current state');
+        }
+
+        const result = this.reconciliationResult(
+          ref.invocationId,
+          existing.invocation.status,
+          input,
+        );
+        if (await this.transitionTerminal(tx, ref, result, existing.invocation.status)) {
+          return result;
+        }
+
+        const concurrent = await this.readInvocation(tx, ref.invocationId);
+        if (!concurrent) {
+          throw new ConflictException('MCP invocation disappeared during reconciliation');
+        }
+        existing = concurrent;
+      }
+
       this.assertReferenceMatches(existing, ref);
-      if (TERMINAL_STATUSES.has(existing.invocation.status)) {
-        return this.requireTerminalResult(existing);
-      }
-      if (
-        existing.invocation.status !== 'prepared' &&
-        existing.invocation.status !== 'dispatched'
-      ) {
-        throw new ConflictException('MCP invocation cannot be reconciled from its current state');
-      }
-
-      const result = this.reconciliationResult(ref.invocationId, existing.invocation.status, input);
-      if (await this.transitionTerminal(tx, ref, result, existing.invocation.status)) {
-        return result;
-      }
-
-      const concurrent = await this.readInvocation(tx, ref.invocationId);
-      if (!concurrent) {
-        throw new ConflictException('MCP invocation disappeared during reconciliation');
-      }
-      this.assertReferenceMatches(concurrent, ref);
-      if (!TERMINAL_STATUSES.has(concurrent.invocation.status)) {
+      if (!TERMINAL_STATUSES.has(existing.invocation.status)) {
         throw new ConflictException('MCP invocation reconciliation lost its state transition');
       }
-      return this.requireTerminalResult(concurrent);
+      return this.requireTerminalResult(existing);
     });
   }
 
@@ -476,48 +484,44 @@ export class McpRuntimeRepository {
     if (!input.runId.trim()) {
       throw new ConflictException('MCP invocation run ID is required for reconciliation');
     }
-    return this.db.transaction(async (transaction) => {
-      const tx = transaction as unknown as NodePgDatabase;
-      const rows = await tx
-        .select({
-          invocation: mcpInvocationsTable,
-          attempt: mcpInvocationAttemptsTable,
-        })
-        .from(mcpInvocationsTable)
-        .innerJoin(
-          mcpInvocationAttemptsTable,
-          and(
-            eq(mcpInvocationAttemptsTable.invocationId, mcpInvocationsTable.invocationId),
-            eq(mcpInvocationAttemptsTable.attemptNumber, mcpInvocationsTable.currentAttemptNumber),
-          ),
-        )
-        .where(
-          and(
-            eq(mcpInvocationsTable.runId, input.runId),
-            inArray(mcpInvocationsTable.status, ['prepared', 'dispatched']),
-          ),
-        );
+    const rows = await this.db
+      .select({
+        invocation: mcpInvocationsTable,
+        attempt: mcpInvocationAttemptsTable,
+      })
+      .from(mcpInvocationsTable)
+      .innerJoin(
+        mcpInvocationAttemptsTable,
+        and(
+          eq(mcpInvocationAttemptsTable.invocationId, mcpInvocationsTable.invocationId),
+          eq(mcpInvocationAttemptsTable.attemptNumber, mcpInvocationsTable.currentAttemptNumber),
+        ),
+      )
+      .where(
+        and(
+          eq(mcpInvocationsTable.runId, input.runId),
+          inArray(mcpInvocationsTable.status, ['prepared', 'dispatched']),
+        ),
+      );
 
-      for (const row of rows) {
-        const existing = this.parseStoredInvocation(row);
-        const ref = this.preparedReference(existing);
-        const result = this.reconciliationResult(ref.invocationId, existing.invocation.status, {
+    let firstError: unknown;
+    for (const row of rows) {
+      const existing = this.parseStoredInvocation(row);
+      const ref = this.preparedReference(existing);
+      try {
+        await this.reconcileDispatchFailure({
+          ref,
           cause: 'cancelled',
           message: input.message,
           completedAt: input.completedAt,
         });
-        if (
-          !(await this.transitionTerminal(
-            tx,
-            ref,
-            result,
-            existing.invocation.status as 'prepared' | 'dispatched',
-          ))
-        ) {
-          throw new ConflictException('MCP invocation changed during run reconciliation');
-        }
+      } catch (error) {
+        firstError ??= error;
       }
-    });
+    }
+    if (firstError) {
+      throw firstError;
+    }
   }
 
   private parseRunAuthority(input: {

@@ -792,6 +792,57 @@ describe('McpRuntimeRepository', () => {
       ).resolves.toEqual(ambiguousResult);
     });
 
+    it('reclassifies a prepared reconciliation as ambiguous when claim wins the CAS race', async () => {
+      const ambiguousResult: ToolInvocationResult = {
+        invocationId: INVOCATION_ID,
+        status: 'ambiguous',
+        error: {
+          class: 'ambiguous-after-dispatch',
+          message: 'activity transport failed',
+          retryable: false,
+        },
+        completedAt: '2026-07-31T10:04:00.000Z',
+      };
+      const { db, calls } = createMockDb({
+        select: [[invocationRows('prepared')], [invocationRows('dispatched')]],
+        update: [[], [{}], [{}]],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'activity transport failed',
+          completedAt: ambiguousResult.completedAt,
+        }),
+      ).resolves.toEqual(ambiguousResult);
+
+      const sets = calls.filter((call) => call.method === 'set').map((call) => call.args[0]);
+      expect(sets.at(-2)).toEqual(
+        expect.objectContaining({ status: 'ambiguous', result: ambiguousResult }),
+      );
+      expect(sets.at(-1)).toEqual(expect.objectContaining({ status: 'ambiguous' }));
+    });
+
+    it('replays a terminal winner when reconciliation loses its CAS', async () => {
+      const { db } = createMockDb({
+        select: [
+          [invocationRows('prepared')],
+          [invocationRows('completed', { result: completedResult })],
+        ],
+        update: [[]],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).reconcileDispatchFailure({
+          ref,
+          cause: 'failure',
+          message: 'activity transport failed',
+          completedAt: '2026-07-31T10:04:00.000Z',
+        }),
+      ).resolves.toEqual(completedResult);
+    });
+
     it('replays terminal reconciliation and conflicts on missing or stale references', async () => {
       const terminalDb = createMockDb({
         select: [[invocationRows('completed', { result: completedResult })]],
@@ -843,7 +894,11 @@ describe('McpRuntimeRepository', () => {
       dispatched.attempt.id = secondRef.attemptId;
       dispatched.attempt.invocationId = secondRef.invocationId;
       const { db, calls } = createMockDb({
-        select: [[invocationRows('prepared'), dispatched]],
+        select: [
+          [invocationRows('prepared'), dispatched],
+          [invocationRows('prepared')],
+          [dispatched],
+        ],
         update: [
           [
             invocationRows('cancelled', {
@@ -872,6 +927,46 @@ describe('McpRuntimeRepository', () => {
       const sets = calls.filter((call) => call.method === 'set').map((call) => call.args[0]);
       expect(sets[0]).toEqual(expect.objectContaining({ status: 'cancelled' }));
       expect(sets[2]).toEqual(expect.objectContaining({ status: 'ambiguous' }));
+    });
+
+    it('continues the run sweep when one prepared invocation loses its CAS to a claim', async () => {
+      const secondInvocationId = '99999999-9999-4999-8999-999999999999';
+      const secondAttemptId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const firstPrepared = invocationRows('prepared');
+      const firstDispatched = invocationRows('dispatched');
+      const secondPrepared = invocationRows('prepared');
+      secondPrepared.invocation.invocationId = secondInvocationId;
+      secondPrepared.invocation.request = {
+        ...request,
+        invocationId: secondInvocationId,
+      };
+      secondPrepared.attempt.id = secondAttemptId;
+      secondPrepared.attempt.invocationId = secondInvocationId;
+      const { db, calls } = createMockDb({
+        select: [
+          [firstPrepared, secondPrepared],
+          [firstPrepared],
+          [firstDispatched],
+          [secondPrepared],
+        ],
+        update: [[], [{}], [{}], [{}], [{}]],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).reconcileRunInvocations({
+          runId: 'run-1',
+          message: 'run finalized',
+          completedAt: '2026-07-31T10:05:00.000Z',
+        }),
+      ).resolves.toBeUndefined();
+
+      const sets = calls.filter((call) => call.method === 'set').map((call) => call.args[0]);
+      expect(sets).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ status: 'ambiguous' }),
+          expect.objectContaining({ status: 'cancelled' }),
+        ]),
+      );
     });
   });
 

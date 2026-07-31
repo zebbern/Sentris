@@ -1,4 +1,10 @@
 import { createHash } from 'node:crypto';
+import {
+  getActionInputIds,
+  getExposedParameterIds,
+  getToolMetadata,
+  type ComponentDefinition,
+} from '@sentris/component-sdk';
 import type { JsonSchemaDocument, McpToolRegistrationDescriptor } from '@sentris/shared';
 
 export interface McpBindingSource {
@@ -21,7 +27,11 @@ export interface McpBindingSource {
 export function computeMcpBindingFingerprint(
   source: McpBindingSource,
   publicDescriptors: readonly McpToolRegistrationDescriptor[],
+  componentDefinition?: ComponentDefinition,
 ): string {
+  if (source.type === 'component' && !componentDefinition) {
+    throw new Error('Component definition is required for an MCP component binding');
+  }
   const credentialVersionHash = source.encryptedCredentials
     ? sha256(source.encryptedCredentials)
     : undefined;
@@ -44,8 +54,23 @@ export function computeMcpBindingFingerprint(
         credentialVersionHash,
       },
       publicDescriptors,
+      componentDefinition: componentDefinition
+        ? componentDispatchDefinitionProjection(componentDefinition)
+        : undefined,
     }),
   );
+}
+
+export function componentDispatchDefinitionProjection(component: ComponentDefinition): unknown {
+  const metadata = getToolMetadata(component);
+  return stableJson({
+    componentId: component.id,
+    version: component.ui?.version,
+    providerKind: component.toolProvider?.kind,
+    tool: metadata,
+    actionInputIds: [...getActionInputIds(component)].sort(),
+    exposedParameterIds: [...getExposedParameterIds(component)].sort(),
+  });
 }
 
 export function sha256(value: unknown): string {
