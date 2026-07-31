@@ -54,10 +54,20 @@ describe('AgentStreamRecorder', () => {
     });
 
     recorder.emitTextDelta('early');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(published.map((event) => event.part)).toEqual([
+      { type: 'data-text-start', data: { id: 'agent-run-1:text' } },
+    ]);
+
     await Bun.sleep(15);
     await recorder.flush();
 
-    expect(published.some((event) => event.part.type === 'text-delta')).toBe(true);
+    expect(published.map((event) => event.part)).toEqual([
+      { type: 'data-text-start', data: { id: 'agent-run-1:text' } },
+      { type: 'text-delta', id: 'agent-run-1:text', textDelta: 'early' },
+    ]);
   });
 
   it('emits only one terminal part and closes the active text id', async () => {
