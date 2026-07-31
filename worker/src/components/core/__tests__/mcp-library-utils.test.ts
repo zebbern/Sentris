@@ -21,8 +21,29 @@ const mockListTools = vi.fn(async () => ({
   tools: [
     {
       name: 'ping',
+      title: 'Ping target',
       description: 'Ping a target',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { target: { type: 'string' } },
+        unevaluatedProperties: false,
+      },
+      outputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { reachable: { type: 'boolean' } },
+      },
+      icons: [
+        {
+          src: 'https://example.test/ping.svg',
+          mimeType: 'image/svg+xml',
+          sizes: ['any'],
+          theme: 'dark',
+        },
+      ],
+      annotations: { readOnlyHint: true, idempotentHint: true },
+      _meta: { 'com.example/source': 'worker-library' },
     },
   ],
 }));
@@ -256,6 +277,37 @@ describe('mcp-library-utils', () => {
     expect(consoleLogSpy).not.toHaveBeenCalled();
     expect(mockConnect).toHaveBeenCalledTimes(1);
     expect(mockListTools).toHaveBeenCalledTimes(1);
-    expect(requests.some((request) => request.url.endsWith('/register-mcp-server'))).toBe(true);
+    const registrationRequest = requests.find((request) =>
+      request.url.endsWith('/register-mcp-server'),
+    );
+    expect(registrationRequest).toBeDefined();
+    expect(JSON.parse(String(registrationRequest?.init?.body)).tools).toEqual([
+      {
+        name: 'ping',
+        title: 'Ping target',
+        description: 'Ping a target',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { target: { type: 'string' } },
+          unevaluatedProperties: false,
+        },
+        outputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { reachable: { type: 'boolean' } },
+        },
+        icons: [
+          {
+            src: 'https://example.test/ping.svg',
+            mimeType: 'image/svg+xml',
+            sizes: ['any'],
+            theme: 'dark',
+          },
+        ],
+        annotations: { readOnlyHint: true, idempotentHint: true },
+        _meta: { 'com.example/source': 'worker-library' },
+      },
+    ]);
   });
 });

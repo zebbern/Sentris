@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { ExecutionContext } from '@sentris/component-sdk';
+import {
+  McpToolRegistrationDescriptorSchema,
+  type McpToolRegistrationDescriptor,
+} from '@sentris/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpStdioHostProxy, stopMcpStdioHostProxy } from './mcp-stdio-host-proxy';
@@ -33,14 +37,7 @@ const ResolvedConfigSchema = z.object({
   args: z.array(z.string()).optional(),
 });
 
-// Schema for discovered MCP tools
-const McpToolSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  inputSchema: z.record(z.string(), z.unknown()).optional(),
-});
-
-export type McpTool = z.infer<typeof McpToolSchema>;
+export type McpTool = McpToolRegistrationDescriptor;
 
 const PersistedMcpToolSchema = z.object({
   id: z.string(),
@@ -202,7 +199,9 @@ async function discoverToolsFromEndpoint(
       const res = await client.listTools();
       await client.close().catch(() => {});
 
-      const tools = (res.tools ?? []).map((t) => McpToolSchema.parse(t));
+      const tools = (res.tools ?? []).map((tool) =>
+        McpToolRegistrationDescriptorSchema.parse(tool),
+      );
       mcpDiagnosticLog(`[discoverTools] ✓ Discovered ${tools.length} tools on attempt ${attempt}`);
       return tools;
     } catch (error: unknown) {

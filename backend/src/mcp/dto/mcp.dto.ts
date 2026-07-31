@@ -1,13 +1,19 @@
 import { ToolInputSchema } from '@sentris/component-sdk';
+import type { JsonSchemaDocument, McpIcon, McpToolRegistrationDescriptor } from '@sentris/shared';
 
 /**
  * Tool discovered from an MCP server.
  * Matches the MCP protocol's tools/list response.
  */
-export class McpToolDefinition {
+export class McpToolDefinition implements McpToolRegistrationDescriptor {
   name!: string;
+  title?: string;
   description?: string;
-  inputSchema?: Record<string, unknown>;
+  inputSchema?: JsonSchemaDocument;
+  outputSchema?: JsonSchemaDocument;
+  icons?: McpIcon[];
+  annotations?: Record<string, unknown>;
+  _meta?: Record<string, unknown>;
 }
 
 /**

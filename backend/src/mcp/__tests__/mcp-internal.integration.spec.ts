@@ -213,8 +213,22 @@ describe('MCP Internal API (Integration)', () => {
       tools: [
         {
           name: 'search',
+          title: 'Search documents',
           description: 'Search documents',
-          inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+          inputSchema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { query: { type: 'string' } },
+            unevaluatedProperties: false,
+          },
+          outputSchema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { matches: { type: 'array', items: { type: 'string' } } },
+          },
+          icons: [{ src: 'https://example.test/search.svg', mimeType: 'image/svg+xml' }],
+          annotations: { readOnlyHint: true },
+          _meta: { 'com.example/source': 'worker-discovery' },
         },
         {
           name: 'analyze',
@@ -245,10 +259,24 @@ describe('MCP Internal API (Integration)', () => {
     expect(toolsJson).not.toBeNull();
     const tools = JSON.parse(toolsJson!);
     expect(tools.length).toBe(2);
-    expect(tools[0].name).toBe('search');
-    expect(tools[0].inputSchema).toEqual({
-      type: 'object',
-      properties: { query: { type: 'string' } },
+    expect(tools[0]).toEqual({
+      name: 'search',
+      title: 'Search documents',
+      description: 'Search documents',
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        unevaluatedProperties: false,
+      },
+      outputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { matches: { type: 'array', items: { type: 'string' } } },
+      },
+      icons: [{ src: 'https://example.test/search.svg', mimeType: 'image/svg+xml' }],
+      annotations: { readOnlyHint: true },
+      _meta: { 'com.example/source': 'worker-discovery' },
     });
   });
 

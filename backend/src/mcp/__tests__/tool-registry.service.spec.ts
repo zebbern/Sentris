@@ -147,8 +147,22 @@ describe('ToolRegistryService', () => {
       const discoveredTools = [
         {
           name: 'fetch',
+          title: 'Fetch URL',
           description: 'Fetch data',
-          inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
+          inputSchema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { url: { type: 'string', format: 'uri' } },
+            unevaluatedProperties: false,
+          },
+          outputSchema: {
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'object',
+            properties: { status: { type: 'integer' } },
+          },
+          icons: [{ src: 'https://example.test/fetch.svg', theme: 'dark' as const }],
+          annotations: { readOnlyHint: true },
+          _meta: { 'com.example/source': 'registry-test' },
         },
         {
           name: 'store',
@@ -174,10 +188,24 @@ describe('ToolRegistryService', () => {
       const tools = await service.getServerTools('run-1', 'my-mcp-server');
       expect(tools).not.toBeNull();
       expect(tools?.length).toBe(2);
-      expect(tools?.[0].name).toBe('fetch');
-      expect(tools?.[0].inputSchema).toEqual({
-        type: 'object',
-        properties: { url: { type: 'string' } },
+      expect(tools?.[0]).toEqual({
+        name: 'fetch',
+        title: 'Fetch URL',
+        description: 'Fetch data',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { url: { type: 'string', format: 'uri' } },
+          unevaluatedProperties: false,
+        },
+        outputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { status: { type: 'integer' } },
+        },
+        icons: [{ src: 'https://example.test/fetch.svg', theme: 'dark' }],
+        annotations: { readOnlyHint: true },
+        _meta: { 'com.example/source': 'registry-test' },
       });
       expect(tools?.[1].name).toBe('store');
     });

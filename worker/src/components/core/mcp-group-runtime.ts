@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { ExecutionContext } from '@sentris/component-sdk';
+import {
+  McpToolRegistrationDescriptorSchema,
+  type McpToolRegistrationDescriptor,
+} from '@sentris/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startMcpDockerServer } from './mcp-runtime';
@@ -274,11 +278,7 @@ export async function executeMcpGroupNode(
 /**
  * Schema for discovered MCP tools
  */
-interface McpTool {
-  name: string;
-  description?: string;
-  inputSchema?: Record<string, unknown>;
-}
+type McpTool = McpToolRegistrationDescriptor;
 
 /**
  * Discover tools from an MCP endpoint with exponential backoff retry.
@@ -322,11 +322,9 @@ async function discoverToolsWithRetry(
       const res = await client.listTools();
       await client.close().catch(() => {});
 
-      const tools: McpTool[] = (res.tools ?? []).map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema as Record<string, unknown> | undefined,
-      }));
+      const tools = (res.tools ?? []).map((tool) =>
+        McpToolRegistrationDescriptorSchema.parse(tool),
+      );
       mcpDiagnosticLog(
         `[discoverToolsWithRetry] ✓ Discovered ${tools.length} tools on attempt ${attempt}`,
       );

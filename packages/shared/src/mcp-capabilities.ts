@@ -104,6 +104,24 @@ export const McpIconSchema = z
   .strict();
 export type McpIcon = z.infer<typeof McpIconSchema>;
 
+/**
+ * SDK-independent MCP tool shape used by the worker-to-backend registration boundary.
+ * `_meta` intentionally retains its MCP wire name at this existing protocol boundary.
+ */
+export const McpToolRegistrationDescriptorSchema = z.object({
+  name: z.string().min(1),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  inputSchema: JsonSchemaDocumentSchema.optional(),
+  outputSchema: JsonSchemaDocumentSchema.optional(),
+  icons: z.array(McpIconSchema).optional(),
+  annotations: z.record(z.string(), z.unknown()).optional(),
+  _meta: z.record(z.string(), z.unknown()).optional(),
+});
+export type McpToolRegistrationDescriptor = z.infer<
+  typeof McpToolRegistrationDescriptorSchema
+>;
+
 export const ComponentToolSourceSchema = z
   .object({
     kind: z.literal('component'),

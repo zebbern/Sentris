@@ -20,8 +20,22 @@ const mockListTools = vi.fn(async () => ({
   tools: [
     {
       name: 'ping',
+      title: 'Ping target',
       description: 'Ping a target',
-      inputSchema: { type: 'object', properties: {} },
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { target: { type: 'string' } },
+        unevaluatedProperties: false,
+      },
+      outputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { reachable: { type: 'boolean' } },
+      },
+      icons: [{ src: 'https://example.test/ping.svg', theme: 'light' }],
+      annotations: { readOnlyHint: true },
+      _meta: { 'com.example/source': 'worker-group' },
     },
   ],
 }));
@@ -144,5 +158,26 @@ describe('mcp-group-runtime', () => {
     expect(registrationBody?.headers).toEqual({
       'x-sentris-mcp-proxy-token': 'worker-proxy-token',
     });
+    expect(registrationBody?.tools).toEqual([
+      {
+        name: 'ping',
+        title: 'Ping target',
+        description: 'Ping a target',
+        inputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { target: { type: 'string' } },
+          unevaluatedProperties: false,
+        },
+        outputSchema: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: { reachable: { type: 'boolean' } },
+        },
+        icons: [{ src: 'https://example.test/ping.svg', theme: 'light' }],
+        annotations: { readOnlyHint: true },
+        _meta: { 'com.example/source': 'worker-group' },
+      },
+    ]);
   });
 });

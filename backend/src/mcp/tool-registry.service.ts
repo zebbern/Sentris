@@ -12,6 +12,7 @@
 import { Injectable, Logger, Inject, OnModuleDestroy } from '@nestjs/common';
 import type Redis from 'ioredis';
 import { type ToolInputSchema } from '@sentris/component-sdk';
+import type { McpToolRegistrationDescriptor } from '@sentris/shared';
 import { SecretsEncryptionService } from '../secrets/secrets.encryption';
 import { RegisterComponentToolInput, RegisterMcpServerInput } from './dto/mcp.dto';
 
@@ -228,9 +229,7 @@ export class ToolRegistryService implements OnModuleDestroy {
   async getServerTools(
     runId: string,
     nodeId: string,
-  ): Promise<
-    { name: string; description?: string; inputSchema?: Record<string, unknown> }[] | null
-  > {
+  ): Promise<McpToolRegistrationDescriptor[] | null> {
     if (!this.redis) {
       return null;
     }
