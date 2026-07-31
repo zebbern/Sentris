@@ -48,6 +48,9 @@
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^6.5.0",
     "@opensearch-project/opensearch": "^3.5.1",
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@sentris/backend-client": "workspace:*",
     "@sentris/component-sdk": "workspace:*",
     "@sentris/local-runtime": "workspace:*",
@@ -83,8 +86,10 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@ai-sdk/mcp": "^1.0.66",
     "@eslint/js": "^9.39.2",
     "@nestjs/testing": "^10.4.22",
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/adm-zip": "^0.5.8",
     "@types/bcryptjs": "^3.0.0",
     "@types/cookie-parser": "^1.4.10",
