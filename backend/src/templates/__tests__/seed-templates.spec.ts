@@ -6,6 +6,10 @@ import { WorkflowGraphSchema } from '../../workflows/dto/workflow-graph.dto';
 
 const seedTemplatesDir = join(import.meta.dir, '../../../scripts/seed-templates');
 
+function readSeed(fileName: string): any {
+  return JSON.parse(readFileSync(join(seedTemplatesDir, fileName), 'utf8'));
+}
+
 const newTemplateFiles = [
   'api-surface-exposure-triage.json',
   'attack-surface-recon-analytics.json',
@@ -20,6 +24,7 @@ const newTemplateFiles = [
   'domain-email-authentication-posture.json',
   'exposed-service-cve-mapper.json',
   'exposure-to-cve-brief.json',
+  'gemini-autonomous-npm-investigator.json',
   'github-actions-supply-chain-triage.json',
   'github-repo-dependency-cve-triage.json',
   'graphql-exposure-triage.json',
@@ -101,6 +106,180 @@ describe('new seed templates', () => {
 
       seenNames.set(nameKey, fileName);
     }
+  });
+
+  it('gemini autonomous npm investigator wires source evidence, optional MCP, and named secret mapping', () => {
+    const template = readSeed('gemini-autonomous-npm-investigator.json');
+    expect(template.requiredSecrets).toEqual([
+      expect.objectContaining({ name: 'GEMINI_API_KEY', type: 'string' }),
+    ]);
+
+    const agent = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'gemini_investigator',
+    );
+    expect(agent.type).toBe('core.ai.agent');
+    expect(agent.data.config.inputOverrides).toMatchObject({
+      chatModel: { provider: 'gemini', modelId: 'gemini-2.5-flash' },
+      modelApiKey: '{{SECRET:GEMINI_API_KEY}}',
+    });
+    expect(agent.data.config.params).toMatchObject({
+      executionProfile: 'deep',
+      toolAvailability: 'best-effort',
+    });
+
+    expect(template.graph.nodes.some((node: { type: string }) => node.type === 'mcp.custom')).toBe(
+      true,
+    );
+    expect(
+      template.graph.nodes.some(
+        (node: { type: string }) => node.type === 'sentris.npm.package.source',
+      ),
+    ).toBe(true);
+    expect(
+      template.graph.nodes.some((node: { type: string }) => node.type === 'sentris.semgrep.run'),
+    ).toBe(true);
+    expect(
+      template.graph.nodes.some((node: { type: string }) => node.type === 'core.artifact.writer'),
+    ).toBe(true);
+    expect(
+      template.graph.nodes.some((node: { type: string }) => node.type === 'core.analytics.sink'),
+    ).toBe(true);
+  });
+
+  it('gemini autonomous npm investigator normalizes scoped package specs', () => {
+    const template = readSeed('gemini-autonomous-npm-investigator.json');
+    const normalizeNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'normalize_package',
+    );
+
+    expect(
+      runTemplateScript<{
+        packageSpec: string;
+        packageSpecs: string[];
+        packageName: string;
+        requestedVersion: string;
+        researchFocus: string;
+        authorizationNotes: string;
+      }>(normalizeNode.data.config.params.code, {
+        packageSpec: '@scope/pkg@1.2.3',
+        researchFocus: 'prototype pollution',
+        authorizationNotes: 'authorized',
+      }),
+    ).toEqual({
+      packageSpec: '@scope/pkg@1.2.3',
+      packageSpecs: ['@scope/pkg@1.2.3'],
+      packageName: '@scope/pkg',
+      requestedVersion: '1.2.3',
+      researchFocus: 'prototype pollution',
+      authorizationNotes: 'authorized',
+    });
+  });
+
+  it('gemini autonomous npm investigator builds a bounded evidence packet with scanner caveats', () => {
+    const template = readSeed('gemini-autonomous-npm-investigator.json');
+    const evidenceNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'build_evidence_packet',
+    );
+
+    const result = runTemplateScript<{ agentInput: string }>(evidenceNode.data.config.params.code, {
+      packageSpec: 'lodash@4.17.20',
+      packageName: 'lodash',
+      requestedVersion: '4.17.20',
+      researchFocus: 'prototype pollution',
+      authorizationNotes: 'authorized public package review',
+      registryRecords: [{ name: 'lodash', version: '4.17.20' }],
+      registryWarnings: [],
+      osvFindings: [],
+      osvSummary: {
+        warningCount: 1,
+        warning: 'OSV warning: advisory hydration incomplete.',
+      },
+      sourceEvidence: {
+        sourceBundle: '# FILE: package/index.js\nmodule.exports = {};',
+        sourceStatus: { sourceType: 'npm-tarball', usable: true },
+        packageProvenance: {
+          sourceType: 'published-package',
+          tarballUrl: 'https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz',
+        },
+        semgrepFindings: [],
+        semgrepCount: 0,
+        scannerFailure: null,
+      },
+    });
+
+    expect(result.agentInput).toContain('Published-package provenance');
+    expect(result.agentInput).toContain('https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz');
+    expect(result.agentInput).toContain('OSV warning: advisory hydration incomplete.');
+    expect(result.agentInput).toContain(
+      'Scanner outputs are leads only. Empty or failed scanner output does not prove absence of vulnerabilities.',
+    );
+  });
+
+  it('gemini autonomous npm investigator promotes only evidence-backed sidecar findings', () => {
+    const template = readSeed('gemini-autonomous-npm-investigator.json');
+    const parserNode = template.graph.nodes.find(
+      (node: { id: string }) => node.id === 'parse_agent_report',
+    );
+    const agentResponse = [
+      '# npm Security Investigation',
+      'Human-readable investigation narrative.',
+      '```sentris-findings',
+      JSON.stringify({
+        findings: [
+          {
+            title: 'Prototype mutation through unsafe path assignment',
+            severity: 'HIGH',
+            confidence: 'high',
+            vulnerabilityClass: 'prototype pollution',
+            affectedPackage: 'lodash',
+            affectedVersion: '4.17.20',
+            evidence: ['package/index.js:L10-L20'],
+            impact: 'Attacker-controlled properties reach object prototypes.',
+            verification: 'Call the exported setter with __proto__.polluted.',
+            remediation: 'Reject prototype keys before assignment.',
+          },
+          {
+            title: 'Unsubstantiated candidate',
+            severity: 'medium',
+            evidence: [],
+          },
+          'malformed entry',
+        ],
+      }),
+      '```',
+    ].join('\n');
+
+    const result = runTemplateScript<{
+      reportText: string;
+      analyticsResults: Record<string, unknown>[];
+    }>(parserNode.data.config.params.code, {
+      agentResponse,
+      packageSpec: 'lodash@4.17.20',
+      packageName: 'lodash',
+      requestedVersion: '4.17.20',
+      packageProvenance: { resolvedVersion: '4.17.20' },
+    });
+
+    expect(result.reportText).toContain('# npm Security Investigation');
+    expect(result.reportText).toContain('Human-readable investigation narrative.');
+    expect(result.analyticsResults).toEqual([
+      {
+        scanner: 'gemini-autonomous-npm',
+        severity: 'high',
+        finding_hash:
+          'lodash@4.17.20:4.17.20:prototype pollution:Prototype mutation through unsafe path assignment:package/index.js:L10-L20',
+        asset_key: 'lodash@4.17.20',
+        package: 'lodash',
+        version: '4.17.20',
+        title: 'Prototype mutation through unsafe path assignment',
+        confidence: 'high',
+        vulnerability_class: 'prototype pollution',
+        evidence: ['package/index.js:L10-L20'],
+        impact: 'Attacker-controlled properties reach object prototypes.',
+        verification: 'Call the exported setter with __proto__.polluted.',
+        remediation: 'Reject prototype keys before assignment.',
+      },
+    ]);
   });
 
   it('bounds passive subdomain discovery in live-run templates', () => {

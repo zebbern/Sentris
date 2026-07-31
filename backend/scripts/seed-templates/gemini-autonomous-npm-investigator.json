@@ -1,0 +1,829 @@
+{
+  "_metadata": {
+    "name": "Gemini Autonomous npm Investigator",
+    "description": "Autonomous Gemini investigation of an installable published npm package using registry, OSV, Semgrep, source, and optional MCP evidence.",
+    "category": "cve-research",
+    "tags": ["cve-research", "npm", "gemini", "semgrep", "osv", "mcp"],
+    "author": "sentris-team",
+    "version": "1.0.0"
+  },
+  "manifest": {
+    "name": "Gemini Autonomous npm Investigator",
+    "description": "Investigate published npm source with Gemini, bounded scanner evidence, known advisories, and optional MCP tools.",
+    "version": "1.0.0",
+    "author": "sentris-team",
+    "category": "cve-research",
+    "tags": ["cve-research", "npm", "gemini", "semgrep", "osv", "mcp"],
+    "entryPoint": "trigger_1",
+    "nodeCount": 15,
+    "edgeCount": 38
+  },
+  "graph": {
+    "name": "Gemini Autonomous npm Investigator",
+    "description": "Build a bounded published-package evidence packet for an autonomous Gemini security investigation.",
+    "nodes": [
+      {
+        "id": "trigger_1",
+        "type": "core.workflow.entrypoint",
+        "position": {
+          "x": 80,
+          "y": 320
+        },
+        "data": {
+          "label": "npm Investigation Input",
+          "config": {
+            "params": {
+              "runtimeInputs": [
+                {
+                  "id": "packageSpec",
+                  "label": "npm package and optional version",
+                  "type": "text",
+                  "required": true,
+                  "description": "Published npm package to investigate, for example lodash@4.17.20."
+                },
+                {
+                  "id": "researchFocus",
+                  "label": "Research focus",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Optional vulnerability class, code path, CVE, or research question to prioritize."
+                },
+                {
+                  "id": "authorizationNotes",
+                  "label": "Authorization notes",
+                  "type": "text",
+                  "required": false,
+                  "defaultValue": "",
+                  "description": "Scope and reporting context copied into the investigation report."
+                }
+              ]
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "normalize_package",
+        "type": "core.logic.script",
+        "position": {
+          "x": 400,
+          "y": 320
+        },
+        "data": {
+          "label": "Normalize npm Package",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "packageSpec",
+                  "type": "string"
+                },
+                {
+                  "name": "researchFocus",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "packageSpec",
+                  "type": "string"
+                },
+                {
+                  "name": "packageSpecs",
+                  "type": "list-text"
+                },
+                {
+                  "name": "packageName",
+                  "type": "string"
+                },
+                {
+                  "name": "requestedVersion",
+                  "type": "string"
+                },
+                {
+                  "name": "researchFocus",
+                  "type": "string"
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string"
+                }
+              ],
+              "code": "export function script(input) {\n  const packageSpec = String(input.packageSpec == null ? '' : input.packageSpec).trim();\n  if (!packageSpec) {\n    throw new Error('Enter one npm package name with an optional version.');\n  }\n  const separatorIndex = packageSpec.lastIndexOf('@');\n  const packageName = separatorIndex > 0 ? packageSpec.slice(0, separatorIndex) : packageSpec;\n  const requestedVersion = separatorIndex > 0 ? packageSpec.slice(separatorIndex + 1) : '';\n  return {\n    packageSpec: packageSpec,\n    packageSpecs: [packageSpec],\n    packageName: packageName,\n    requestedVersion: requestedVersion,\n    researchFocus: String(input.researchFocus == null ? '' : input.researchFocus).trim(),\n    authorizationNotes: String(input.authorizationNotes == null ? '' : input.authorizationNotes).trim()\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "npm_registry_intel",
+        "type": "sentris.npm.registry.intel",
+        "position": {
+          "x": 720,
+          "y": 40
+        },
+        "data": {
+          "label": "Fetch npm Registry Intelligence",
+          "config": {
+            "params": {
+              "maxPackages": 1,
+              "recentPublishDays": 30,
+              "includeRawMetadata": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "osv_query",
+        "type": "sentris.osv.query",
+        "position": {
+          "x": 720,
+          "y": 200
+        },
+        "data": {
+          "label": "Query Known npm Advisories",
+          "config": {
+            "params": {
+              "ecosystem": "npm",
+              "severityFloor": "low",
+              "hydrateAdvisories": true,
+              "maxAdvisoriesPerPackage": 30,
+              "includeUnknownSeverity": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "fetch_npm_source",
+        "type": "sentris.npm.package.source",
+        "position": {
+          "x": 720,
+          "y": 360
+        },
+        "data": {
+          "label": "Fetch Published npm Source",
+          "config": {
+            "params": {
+              "emitSourceBundle": true,
+              "maxFileBytes": 250000,
+              "maxTotalBytes": 4000000,
+              "maxArchiveBytes": 500000000
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "semgrep_scan",
+        "type": "sentris.semgrep.run",
+        "position": {
+          "x": 1040,
+          "y": 360
+        },
+        "data": {
+          "label": "Scan Published Source with Semgrep",
+          "config": {
+            "params": {
+              "configs": ["p/security-audit", "p/javascript", "p/typescript", "p/nodejs"],
+              "timeoutSeconds": 900,
+              "overrideContainerResources": true,
+              "containerMemoryLimit": "4g",
+              "containerCpuLimit": "2"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_semgrep_success",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1360,
+          "y": 240
+        },
+        "data": {
+          "label": "Build Semgrep Success Evidence",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "sourceBundle",
+                  "type": "string"
+                },
+                {
+                  "name": "sourceStatus",
+                  "type": "json"
+                },
+                {
+                  "name": "packageProvenance",
+                  "type": "json"
+                },
+                {
+                  "name": "semgrepFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "semgrepCount",
+                  "type": "number"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "sourceEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const sourceBundle = String(input.sourceBundle == null ? '' : input.sourceBundle);\n  const semgrepFindings = Array.isArray(input.semgrepFindings) ? input.semgrepFindings : [];\n  const sourceStatus = input.sourceStatus && typeof input.sourceStatus === 'object' ? input.sourceStatus : {};\n  const packageProvenance = input.packageProvenance && typeof input.packageProvenance === 'object' ? input.packageProvenance : null;\n  return {\n    sourceEvidence: {\n      sourceBundle: sourceBundle,\n      sourceStatus: Object.assign({}, sourceStatus, { semgrepStatus: 'completed' }),\n      packageProvenance: packageProvenance,\n      semgrepFindings: semgrepFindings,\n      semgrepCount: Number(input.semgrepCount || semgrepFindings.length),\n      scannerFailure: null,\n      scannerCaveat: null\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_semgrep_failure",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1360,
+          "y": 520
+        },
+        "data": {
+          "label": "Build Semgrep Failure Evidence",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "failure",
+                  "type": "json",
+                  "required": false
+                },
+                {
+                  "name": "sourceBundle",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "sourceStatus",
+                  "type": "json",
+                  "required": false
+                },
+                {
+                  "name": "packageProvenance",
+                  "type": "json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "sourceEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const failure = input.failure && typeof input.failure === 'object' ? input.failure : {};\n  const reason = failure.reason && typeof failure.reason === 'object' ? failure.reason : failure;\n  const rawMessage = String(reason.message || 'Unknown Semgrep failure.').trim();\n  const message = rawMessage.slice(0, 1000);\n  const sourceBundle = String(input.sourceBundle == null ? '' : input.sourceBundle);\n  const sourceStatus = input.sourceStatus && typeof input.sourceStatus === 'object' ? input.sourceStatus : {};\n  const packageProvenance = input.packageProvenance && typeof input.packageProvenance === 'object' ? input.packageProvenance : null;\n  return {\n    sourceEvidence: {\n      sourceBundle: sourceBundle,\n      sourceStatus: Object.assign({}, sourceStatus, { semgrepStatus: 'failed' }),\n      packageProvenance: packageProvenance,\n      semgrepFindings: [],\n      semgrepCount: 0,\n      scannerFailure: { stage: 'semgrep_scan', message: message },\n      scannerCaveat: 'Semgrep scan failed: ' + message\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "finalize_source_evidence",
+        "type": "core.logic.script",
+        "position": {
+          "x": 1680,
+          "y": 360
+        },
+        "data": {
+          "label": "Finalize Published Source Evidence",
+          "config": {
+            "joinStrategy": "any",
+            "params": {
+              "variables": [
+                {
+                  "name": "successEvidence",
+                  "type": "json",
+                  "required": false
+                },
+                {
+                  "name": "failureEvidence",
+                  "type": "json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "sourceEvidence",
+                  "type": "json"
+                }
+              ],
+              "code": "export function script(input) {\n  const successEvidence = input.successEvidence && typeof input.successEvidence === 'object' ? input.successEvidence : null;\n  const failureEvidence = input.failureEvidence && typeof input.failureEvidence === 'object' ? input.failureEvidence : null;\n  const sourceEvidence = successEvidence || failureEvidence;\n  if (sourceEvidence) {\n    return { sourceEvidence: sourceEvidence };\n  }\n  return {\n    sourceEvidence: {\n      sourceBundle: '',\n      sourceStatus: { sourceProvided: false, semgrepStatus: 'unavailable' },\n      packageProvenance: null,\n      semgrepFindings: [],\n      semgrepCount: 0,\n      scannerFailure: { stage: 'semgrep_scan', message: 'No source evidence branch completed.' },\n      scannerCaveat: 'No source evidence branch completed.'\n    }\n  };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "build_evidence_packet",
+        "type": "core.logic.script",
+        "position": {
+          "x": 2000,
+          "y": 240
+        },
+        "data": {
+          "label": "Build Bounded Investigation Packet",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "packageSpec",
+                  "type": "string"
+                },
+                {
+                  "name": "packageName",
+                  "type": "string"
+                },
+                {
+                  "name": "requestedVersion",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "researchFocus",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "authorizationNotes",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "registryRecords",
+                  "type": "list-json"
+                },
+                {
+                  "name": "registryWarnings",
+                  "type": "list-text"
+                },
+                {
+                  "name": "osvFindings",
+                  "type": "list-json"
+                },
+                {
+                  "name": "osvSummary",
+                  "type": "json"
+                },
+                {
+                  "name": "sourceEvidence",
+                  "type": "json"
+                }
+              ],
+              "returns": [
+                {
+                  "name": "agentInput",
+                  "type": "string"
+                }
+              ],
+              "code": "export function script(input) {\n  const toJson = function (value, maxChars) {\n    let serialized;\n    try {\n      serialized = JSON.stringify(value);\n    } catch (error) {\n      serialized = JSON.stringify({ warning: 'Value could not be serialized.' });\n    }\n    return String(serialized == null ? 'null' : serialized).slice(0, maxChars);\n  };\n  const registryRecords = (Array.isArray(input.registryRecords) ? input.registryRecords : []).slice(0, 5).map(function (record) {\n    if (!record || typeof record !== 'object' || Array.isArray(record)) return record;\n    const boundedRecord = Object.assign({}, record);\n    delete boundedRecord.rawMetadata;\n    return boundedRecord;\n  });\n  const registryWarnings = (Array.isArray(input.registryWarnings) ? input.registryWarnings : []).slice(0, 20);\n  const osvFindings = (Array.isArray(input.osvFindings) ? input.osvFindings : []).slice(0, 30);\n  const sourceEvidence = input.sourceEvidence && typeof input.sourceEvidence === 'object' ? input.sourceEvidence : {};\n  const semgrepLeads = (Array.isArray(sourceEvidence.semgrepFindings) ? sourceEvidence.semgrepFindings : []).slice(0, 100);\n  const sourceBundle = String(sourceEvidence.sourceBundle == null ? '' : sourceEvidence.sourceBundle).slice(0, 1500000);\n  const packageContext = {\n    packageSpec: String(input.packageSpec == null ? '' : input.packageSpec),\n    packageName: String(input.packageName == null ? '' : input.packageName),\n    requestedVersion: String(input.requestedVersion == null ? '' : input.requestedVersion),\n    researchFocus: String(input.researchFocus == null ? '' : input.researchFocus),\n    authorizationNotes: String(input.authorizationNotes == null ? '' : input.authorizationNotes)\n  };\n  const lines = [\n    'Investigate this installable published npm package and produce the required evidence-backed Markdown report.',\n    'Package context: ' + toJson(packageContext, 20000),\n    'npm registry records: ' + toJson(registryRecords, 100000),\n    'npm registry warnings: ' + toJson(registryWarnings, 20000),\n    'OSV findings: ' + toJson(osvFindings, 250000),\n    'OSV summary: ' + toJson(input.osvSummary && typeof input.osvSummary === 'object' ? input.osvSummary : {}, 50000),\n    'Published-package provenance: ' + toJson(sourceEvidence.packageProvenance || null, 50000),\n    'Published-package source status: ' + toJson(sourceEvidence.sourceStatus || {}, 50000),\n    'Semgrep leads (maximum 100): ' + toJson(semgrepLeads, 500000),\n    'Semgrep failure/caveat: ' + toJson({ scannerFailure: sourceEvidence.scannerFailure || null, scannerCaveat: sourceEvidence.scannerCaveat || null }, 10000),\n    'Published source bundle (maximum 1,500,000 source characters): ' + toJson(sourceBundle, 1600000),\n    'Scanner outputs are leads only. Empty or failed scanner output does not prove absence of vulnerabilities.'\n  ];\n  return { agentInput: lines.join('\\n\\n') };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "custom_mcp_tools",
+        "type": "mcp.custom",
+        "position": {
+          "x": 2000,
+          "y": 480
+        },
+        "data": {
+          "label": "Expose Optional MCP Research Tools",
+          "config": {
+            "mode": "tool",
+            "params": {
+              "enabledServers": [],
+              "useAllEnabled": true,
+              "toolExclusions": [],
+              "continueOnServerError": true
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "gemini_investigator",
+        "type": "core.ai.agent",
+        "position": {
+          "x": 2320,
+          "y": 320
+        },
+        "data": {
+          "label": "Gemini Autonomous npm Investigator",
+          "config": {
+            "params": {
+              "systemPrompt": "You are an autonomous npm security investigator reviewing an authorized, installable published npm artifact. Treat registry, OSV, Semgrep, source, and MCP outputs as evidence with explicit boundaries. Inspect the published source yourself; scanners provide leads and empty or failed scanner output is not proof of safety. Distinguish known advisory context from novel findings, challenge false positives, and never invent affected versions, source locations, exploitability, or tool observations. Return a human Markdown report using exactly these headings in this order:\n# npm Security Investigation\n## Executive Summary\n## Evidence Boundary\n## Confirmed Findings\n## Candidate Findings\n## Known Advisory Context\n## False-Positive Checks\n## Recommended Next Steps\nAfter the human report, emit exactly one fenced block labelled sentris-findings in this form:\n```sentris-findings\n{\"findings\":[]}\n```\nEach finding entry may contain title, severity, confidence, vulnerabilityClass, affectedPackage, affectedVersion, evidence, impact, verification, and remediation. evidence must contain concrete published-source paths/lines, scanner locations, or tool observations. Keep uncertain entries in Candidate Findings and omit them from the sentris-findings sidecar.",
+              "temperature": 0.2,
+              "maxTokens": 32768,
+              "memorySize": 8,
+              "executionProfile": "deep",
+              "stepLimit": 48,
+              "toolAvailability": "best-effort"
+            },
+            "inputOverrides": {
+              "chatModel": {
+                "provider": "gemini",
+                "modelId": "gemini-2.5-flash"
+              },
+              "modelApiKey": "{{SECRET:GEMINI_API_KEY}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "parse_agent_report",
+        "type": "core.logic.script",
+        "position": {
+          "x": 2640,
+          "y": 240
+        },
+        "data": {
+          "label": "Parse Evidence-backed Findings",
+          "config": {
+            "params": {
+              "variables": [
+                {
+                  "name": "agentResponse",
+                  "type": "string"
+                },
+                {
+                  "name": "packageSpec",
+                  "type": "string"
+                },
+                {
+                  "name": "packageName",
+                  "type": "string"
+                },
+                {
+                  "name": "requestedVersion",
+                  "type": "string",
+                  "required": false
+                },
+                {
+                  "name": "packageProvenance",
+                  "type": "json",
+                  "required": false
+                }
+              ],
+              "returns": [
+                {
+                  "name": "reportText",
+                  "type": "string"
+                },
+                {
+                  "name": "analyticsResults",
+                  "type": "analytics-results"
+                }
+              ],
+              "code": "export function script(input) {\n  const reportText = String(input.agentResponse == null ? '' : input.agentResponse).trim();\n  const fence = reportText.match(/```sentris-findings\\s*([\\s\\S]*?)```/i);\n  let findings = [];\n  if (fence) {\n    try {\n      const parsed = JSON.parse(fence[1]);\n      findings = parsed && Array.isArray(parsed.findings) ? parsed.findings : [];\n    } catch (error) {\n      findings = [];\n    }\n  }\n  const packageSpec = String(input.packageSpec == null ? '' : input.packageSpec).trim();\n  const packageName = String(input.packageName == null ? '' : input.packageName).trim();\n  const provenance = input.packageProvenance && typeof input.packageProvenance === 'object' ? input.packageProvenance : {};\n  const resolvedVersion = typeof provenance.resolvedVersion === 'string' ? provenance.resolvedVersion.trim() : '';\n  const allowedSeverities = ['critical', 'high', 'medium', 'low', 'info', 'unknown'];\n  const analyticsResults = findings.filter(function (finding) {\n    if (!finding || typeof finding !== 'object' || Array.isArray(finding)) return false;\n    const title = typeof finding.title === 'string' ? finding.title.trim() : '';\n    const evidence = Array.isArray(finding.evidence)\n      ? finding.evidence.filter(function (item) { return typeof item === 'string' && item.trim().length > 0; })\n      : [];\n    return title.length > 0 && evidence.length > 0;\n  }).map(function (finding) {\n    const title = finding.title.trim();\n    const evidence = finding.evidence.filter(function (item) { return typeof item === 'string' && item.trim().length > 0; }).map(function (item) { return item.trim(); });\n    const requestedSeverity = typeof finding.severity === 'string' ? finding.severity.trim().toLowerCase() : 'unknown';\n    const severity = allowedSeverities.indexOf(requestedSeverity) >= 0 ? requestedSeverity : 'unknown';\n    const affectedPackage = typeof finding.affectedPackage === 'string' ? finding.affectedPackage.trim() : '';\n    const affectedVersion = typeof finding.affectedVersion === 'string' ? finding.affectedVersion.trim() : '';\n    const vulnerabilityClass = typeof finding.vulnerabilityClass === 'string' ? finding.vulnerabilityClass.trim() : '';\n    const confidence = typeof finding.confidence === 'string' && finding.confidence.trim() ? finding.confidence.trim() : 'medium';\n    const nullableString = function (value) { return typeof value === 'string' && value.trim() ? value.trim() : null; };\n    return {\n      scanner: 'gemini-autonomous-npm',\n      severity: severity,\n      finding_hash: [packageSpec, affectedVersion || resolvedVersion || '', vulnerabilityClass || '', title, evidence[0]].join(':'),\n      asset_key: packageSpec,\n      package: affectedPackage || packageName,\n      version: affectedVersion || resolvedVersion || null,\n      title: title,\n      confidence: confidence,\n      vulnerability_class: vulnerabilityClass || null,\n      evidence: evidence,\n      impact: nullableString(finding.impact),\n      verification: nullableString(finding.verification),\n      remediation: nullableString(finding.remediation)\n    };\n  });\n  return { reportText: reportText, analyticsResults: analyticsResults };\n}"
+            },
+            "inputOverrides": {}
+          }
+        }
+      },
+      {
+        "id": "artifact_report",
+        "type": "core.artifact.writer",
+        "position": {
+          "x": 2960,
+          "y": 160
+        },
+        "data": {
+          "label": "Save Gemini npm Investigation",
+          "config": {
+            "params": {
+              "fileExtension": ".md",
+              "mimeType": "text/markdown",
+              "saveToRunArtifacts": true,
+              "publishToArtifactLibrary": false
+            },
+            "inputOverrides": {
+              "artifactName": "gemini-npm-investigation-{{date}}"
+            }
+          }
+        }
+      },
+      {
+        "id": "analytics_sink",
+        "type": "core.analytics.sink",
+        "position": {
+          "x": 2960,
+          "y": 360
+        },
+        "data": {
+          "label": "Index Gemini Evidence-backed Findings",
+          "config": {
+            "params": {
+              "dataInputs": [
+                {
+                  "id": "gemini_findings",
+                  "label": "Gemini evidence-backed findings",
+                  "sourceTag": "gemini_agent"
+                }
+              ],
+              "assetKeyField": "auto",
+              "failOnError": false
+            },
+            "inputOverrides": {}
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "trigger_1-packageSpec-normalize_package-packageSpec",
+        "source": "trigger_1",
+        "target": "normalize_package",
+        "sourceHandle": "packageSpec",
+        "targetHandle": "packageSpec"
+      },
+      {
+        "id": "trigger_1-researchFocus-normalize_package-researchFocus",
+        "source": "trigger_1",
+        "target": "normalize_package",
+        "sourceHandle": "researchFocus",
+        "targetHandle": "researchFocus"
+      },
+      {
+        "id": "trigger_1-authorizationNotes-normalize_package-authorizationNotes",
+        "source": "trigger_1",
+        "target": "normalize_package",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "normalize_package-packageSpecs-npm_registry_intel-packageSpecs",
+        "source": "normalize_package",
+        "target": "npm_registry_intel",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "normalize_package-packageSpecs-osv_query-packageSpecs",
+        "source": "normalize_package",
+        "target": "osv_query",
+        "sourceHandle": "packageSpecs",
+        "targetHandle": "packageSpecs"
+      },
+      {
+        "id": "normalize_package-packageSpec-fetch_npm_source-packageSpec",
+        "source": "normalize_package",
+        "target": "fetch_npm_source",
+        "sourceHandle": "packageSpec",
+        "targetHandle": "packageSpec"
+      },
+      {
+        "id": "normalize_package-packageSpec-build_evidence_packet-packageSpec",
+        "source": "normalize_package",
+        "target": "build_evidence_packet",
+        "sourceHandle": "packageSpec",
+        "targetHandle": "packageSpec"
+      },
+      {
+        "id": "normalize_package-packageName-build_evidence_packet-packageName",
+        "source": "normalize_package",
+        "target": "build_evidence_packet",
+        "sourceHandle": "packageName",
+        "targetHandle": "packageName"
+      },
+      {
+        "id": "normalize_package-requestedVersion-build_evidence_packet-requestedVersion",
+        "source": "normalize_package",
+        "target": "build_evidence_packet",
+        "sourceHandle": "requestedVersion",
+        "targetHandle": "requestedVersion"
+      },
+      {
+        "id": "normalize_package-researchFocus-build_evidence_packet-researchFocus",
+        "source": "normalize_package",
+        "target": "build_evidence_packet",
+        "sourceHandle": "researchFocus",
+        "targetHandle": "researchFocus"
+      },
+      {
+        "id": "normalize_package-authorizationNotes-build_evidence_packet-authorizationNotes",
+        "source": "normalize_package",
+        "target": "build_evidence_packet",
+        "sourceHandle": "authorizationNotes",
+        "targetHandle": "authorizationNotes"
+      },
+      {
+        "id": "normalize_package-packageSpec-parse_agent_report-packageSpec",
+        "source": "normalize_package",
+        "target": "parse_agent_report",
+        "sourceHandle": "packageSpec",
+        "targetHandle": "packageSpec"
+      },
+      {
+        "id": "normalize_package-packageName-parse_agent_report-packageName",
+        "source": "normalize_package",
+        "target": "parse_agent_report",
+        "sourceHandle": "packageName",
+        "targetHandle": "packageName"
+      },
+      {
+        "id": "normalize_package-requestedVersion-parse_agent_report-requestedVersion",
+        "source": "normalize_package",
+        "target": "parse_agent_report",
+        "sourceHandle": "requestedVersion",
+        "targetHandle": "requestedVersion"
+      },
+      {
+        "id": "fetch_npm_source-volumeName-semgrep_scan-volumeName",
+        "source": "fetch_npm_source",
+        "target": "semgrep_scan",
+        "sourceHandle": "volumeName",
+        "targetHandle": "volumeName"
+      },
+      {
+        "id": "fetch_npm_source-volumePath-semgrep_scan-scanPath",
+        "source": "fetch_npm_source",
+        "target": "semgrep_scan",
+        "sourceHandle": "volumePath",
+        "targetHandle": "scanPath"
+      },
+      {
+        "id": "fetch_npm_source-sourceBundle-build_semgrep_success-sourceBundle",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_success",
+        "sourceHandle": "sourceBundle",
+        "targetHandle": "sourceBundle"
+      },
+      {
+        "id": "fetch_npm_source-sourceStatus-build_semgrep_success-sourceStatus",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_success",
+        "sourceHandle": "sourceStatus",
+        "targetHandle": "sourceStatus"
+      },
+      {
+        "id": "fetch_npm_source-packageProvenance-build_semgrep_success-packageProvenance",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_success",
+        "sourceHandle": "packageProvenance",
+        "targetHandle": "packageProvenance"
+      },
+      {
+        "id": "semgrep_scan-findings-build_semgrep_success-semgrepFindings",
+        "source": "semgrep_scan",
+        "target": "build_semgrep_success",
+        "sourceHandle": "findings",
+        "targetHandle": "semgrepFindings"
+      },
+      {
+        "id": "semgrep_scan-findingCount-build_semgrep_success-semgrepCount",
+        "source": "semgrep_scan",
+        "target": "build_semgrep_success",
+        "sourceHandle": "findingCount",
+        "targetHandle": "semgrepCount"
+      },
+      {
+        "id": "semgrep_scan-error-build_semgrep_failure-trigger",
+        "source": "semgrep_scan",
+        "target": "build_semgrep_failure",
+        "kind": "error"
+      },
+      {
+        "id": "fetch_npm_source-sourceBundle-build_semgrep_failure-sourceBundle",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_failure",
+        "sourceHandle": "sourceBundle",
+        "targetHandle": "sourceBundle"
+      },
+      {
+        "id": "fetch_npm_source-sourceStatus-build_semgrep_failure-sourceStatus",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_failure",
+        "sourceHandle": "sourceStatus",
+        "targetHandle": "sourceStatus"
+      },
+      {
+        "id": "fetch_npm_source-packageProvenance-build_semgrep_failure-packageProvenance",
+        "source": "fetch_npm_source",
+        "target": "build_semgrep_failure",
+        "sourceHandle": "packageProvenance",
+        "targetHandle": "packageProvenance"
+      },
+      {
+        "id": "build_semgrep_success-sourceEvidence-finalize_source_evidence-successEvidence",
+        "source": "build_semgrep_success",
+        "target": "finalize_source_evidence",
+        "sourceHandle": "sourceEvidence",
+        "targetHandle": "successEvidence"
+      },
+      {
+        "id": "build_semgrep_failure-sourceEvidence-finalize_source_evidence-failureEvidence",
+        "source": "build_semgrep_failure",
+        "target": "finalize_source_evidence",
+        "sourceHandle": "sourceEvidence",
+        "targetHandle": "failureEvidence"
+      },
+      {
+        "id": "npm_registry_intel-records-build_evidence_packet-registryRecords",
+        "source": "npm_registry_intel",
+        "target": "build_evidence_packet",
+        "sourceHandle": "records",
+        "targetHandle": "registryRecords"
+      },
+      {
+        "id": "npm_registry_intel-warnings-build_evidence_packet-registryWarnings",
+        "source": "npm_registry_intel",
+        "target": "build_evidence_packet",
+        "sourceHandle": "warnings",
+        "targetHandle": "registryWarnings"
+      },
+      {
+        "id": "osv_query-findings-build_evidence_packet-osvFindings",
+        "source": "osv_query",
+        "target": "build_evidence_packet",
+        "sourceHandle": "findings",
+        "targetHandle": "osvFindings"
+      },
+      {
+        "id": "osv_query-summary-build_evidence_packet-osvSummary",
+        "source": "osv_query",
+        "target": "build_evidence_packet",
+        "sourceHandle": "summary",
+        "targetHandle": "osvSummary"
+      },
+      {
+        "id": "finalize_source_evidence-sourceEvidence-build_evidence_packet-sourceEvidence",
+        "source": "finalize_source_evidence",
+        "target": "build_evidence_packet",
+        "sourceHandle": "sourceEvidence",
+        "targetHandle": "sourceEvidence"
+      },
+      {
+        "id": "build_evidence_packet-agentInput-gemini_investigator-userInput",
+        "source": "build_evidence_packet",
+        "target": "gemini_investigator",
+        "sourceHandle": "agentInput",
+        "targetHandle": "userInput"
+      },
+      {
+        "id": "custom_mcp_tools-tools-gemini_investigator-tools",
+        "source": "custom_mcp_tools",
+        "target": "gemini_investigator",
+        "sourceHandle": "tools",
+        "targetHandle": "tools"
+      },
+      {
+        "id": "gemini_investigator-responseText-parse_agent_report-agentResponse",
+        "source": "gemini_investigator",
+        "target": "parse_agent_report",
+        "sourceHandle": "responseText",
+        "targetHandle": "agentResponse"
+      },
+      {
+        "id": "fetch_npm_source-packageProvenance-parse_agent_report-packageProvenance",
+        "source": "fetch_npm_source",
+        "target": "parse_agent_report",
+        "sourceHandle": "packageProvenance",
+        "targetHandle": "packageProvenance"
+      },
+      {
+        "id": "parse_agent_report-reportText-artifact_report-content",
+        "source": "parse_agent_report",
+        "target": "artifact_report",
+        "sourceHandle": "reportText",
+        "targetHandle": "content"
+      },
+      {
+        "id": "parse_agent_report-analyticsResults-analytics_sink-gemini_findings",
+        "source": "parse_agent_report",
+        "target": "analytics_sink",
+        "sourceHandle": "analyticsResults",
+        "targetHandle": "gemini_findings"
+      }
+    ],
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 0.75
+    }
+  },
+  "requiredSecrets": [
+    {
+      "name": "GEMINI_API_KEY",
+      "type": "string",
+      "description": "Gemini API key stored in Sentris Secrets and mapped into the autonomous investigator node."
+    }
+  ]
+}

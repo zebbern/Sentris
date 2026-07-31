@@ -120,6 +120,12 @@ export function createTemplateLiveAuditInputs(): TemplateLiveAuditInputs {
       authorizationNotes:
         'Live audit fixture: public read-only countries GraphQL API for non-destructive introspection and sample query validation.',
     },
+    'Gemini Autonomous npm Investigator': {
+      packageSpec: 'lodash@4.17.20',
+      researchFocus:
+        'Prioritize externally reachable prototype-pollution paths and distinguish known advisories from novel findings.',
+      authorizationNotes: 'Live audit fixture: public npm package analysis only.',
+    },
     'NPM Dependency CVE Hunt': {
       packageSpecs: ['lodash@4.17.20', 'minimist@0.0.8', 'axios@0.21.1'],
       researchNotes:
