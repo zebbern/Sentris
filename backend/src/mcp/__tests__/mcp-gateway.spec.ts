@@ -13,7 +13,7 @@ import {
   port,
   type ComponentDefinition,
 } from '@sentris/component-sdk';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 import { McpGatewayService } from '../mcp-gateway.service';
 import type { RunMcpRequestContext } from '../run-mcp-request-context';
@@ -356,6 +356,23 @@ describe('McpGatewayService', () => {
     workflowRunRepository.findByRunId.mockResolvedValue(null);
 
     await expect(service.createServerForRun(RUN_CONTEXT)).rejects.toThrow(NotFoundException);
+  });
+
+  it('rejects a null organization context for an organization-owned run', async () => {
+    workflowRunRepository.findByRunId.mockResolvedValue({ organizationId: 'org-owned' });
+
+    await expect(
+      service.createServerForRun(withRunContext({ organizationId: null })),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows a null organization context for a local null-organization run', async () => {
+    workflowRunRepository.findByRunId.mockResolvedValue({ organizationId: null });
+
+    const server = await service.createServerForRun(withRunContext({ organizationId: null }));
+    servers.push(server);
+
+    expect(server).toBeDefined();
   });
 });
 

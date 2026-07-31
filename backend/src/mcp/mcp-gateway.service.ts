@@ -106,7 +106,7 @@ export class McpGatewayService {
       throw new NotFoundException(`Workflow run ${runId} not found`);
     }
 
-    if (organizationId && run.organizationId !== organizationId) {
+    if (run.organizationId !== organizationId) {
       throw new ForbiddenException(`You do not have access to workflow run ${runId}`);
     }
   }
