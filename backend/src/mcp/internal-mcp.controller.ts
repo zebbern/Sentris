@@ -53,9 +53,18 @@ export class InternalMcpController {
 
   @Post('cleanup')
   async cleanupRun(@Body() body: CleanupRunInput) {
-    const containerIds = await this.toolRegistry.cleanupRun(body.runId);
-    await this.mcpGatewayService.cleanupRun(body.runId);
-    return { containerIds };
+    const [registryCleanup, gatewayCleanup] = await Promise.allSettled([
+      this.toolRegistry.cleanupRun(body.runId),
+      this.mcpGatewayService.cleanupRun(body.runId),
+    ]);
+
+    if (registryCleanup.status === 'rejected') {
+      throw registryCleanup.reason;
+    }
+    if (gatewayCleanup.status === 'rejected') {
+      throw gatewayCleanup.reason;
+    }
+    return { containerIds: registryCleanup.value };
   }
 
   @Post('tools-ready')

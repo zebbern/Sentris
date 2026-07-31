@@ -51,6 +51,8 @@ class MockRedis {
 describe('MCP Internal API (Integration)', () => {
   let app: INestApplication;
   let redis: MockRedis;
+  let controller: InternalMcpController;
+  let toolRegistryService: ToolRegistryService;
   const generateSessionToken = vi.fn(async () => 'mock-token');
   const cleanedGatewayRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
@@ -69,7 +71,7 @@ describe('MCP Internal API (Integration)', () => {
         return undefined;
       },
     } as any);
-    const toolRegistryService = new ToolRegistryService(mockRedis as unknown as any, encryption);
+    toolRegistryService = new ToolRegistryService(mockRedis as unknown as any, encryption);
 
     // Register InternalMcpController directly with mock providers
     // instead of importing McpModule (which cascades into dozens of modules).
@@ -124,7 +126,7 @@ describe('MCP Internal API (Integration)', () => {
 
     // Manually assign services to controller — NestJS DI may not inject
     // useValue providers into controllers compiled with Bun's TS compiler.
-    const controller = moduleFixture.get(InternalMcpController);
+    controller = moduleFixture.get(InternalMcpController);
     (controller as unknown as { toolRegistry: ToolRegistryService }).toolRegistry =
       toolRegistryService;
     (
@@ -274,6 +276,47 @@ describe('MCP Internal API (Integration)', () => {
     expect(response.body).toEqual({ containerIds: ['container-cleanup'] });
     expect(await redis.hget('mcp:run:run-cleanup:tools', 'mcp-cleanup')).toBeNull();
     expect(cleanedGatewayRuns).toEqual(['run-cleanup']);
+  });
+
+  it('awaits gateway cleanup before returning a registry cleanup error', async () => {
+    const registryError = new Error('registry cleanup failed');
+    const cleanupEvents: string[] = [];
+    const failingRegistry = {
+      cleanupRun: async () => {
+        cleanupEvents.push('registry-failed');
+        throw registryError;
+      },
+    };
+    const delayedGateway = {
+      cleanupRun: async () => {
+        cleanupEvents.push('gateway-started');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        cleanupEvents.push('gateway-settled');
+      },
+    };
+    (controller as unknown as { toolRegistry: typeof failingRegistry }).toolRegistry =
+      failingRegistry;
+    (controller as unknown as { mcpGatewayService: typeof delayedGateway }).mcpGatewayService =
+      delayedGateway;
+
+    try {
+      await expect(controller.cleanupRun({ runId: 'run-cleanup-failure' })).rejects.toBe(
+        registryError,
+      );
+      expect(cleanupEvents).toEqual(['registry-failed', 'gateway-started', 'gateway-settled']);
+    } finally {
+      (controller as unknown as { toolRegistry: ToolRegistryService }).toolRegistry =
+        toolRegistryService;
+      (
+        controller as unknown as {
+          mcpGatewayService: { cleanupRun: (runId: string) => Promise<void> };
+        }
+      ).mcpGatewayService = {
+        cleanupRun: async (runId: string) => {
+          cleanedGatewayRuns.push(runId);
+        },
+      };
+    }
   });
 
   it('rejects identity-less internal requests', async () => {
