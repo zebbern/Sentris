@@ -2,16 +2,17 @@
 
 ## Status
 
-**Accepted; implementation pending** — 2026-07-31
+**Accepted; run-gateway foundation implemented, dependent work pending** — 2026-07-31
 
 ## Context
 
-Sentris currently implements MCP transport and lifecycle behavior in multiple backend
-and worker paths. The run gateway and Studio each retain process-local transports keyed
-by `Mcp-Session-Id`; Nginx uses an affinity cookie; Redis mirrors session metadata that
-cannot recover the live transport; the worker and standalone Docker proxy each provide
-a handwritten stdio-to-HTTP JSON-RPC bridge; and discovery/client behavior is repeated
-across onboarding, groups, workflow activities, gateway proxying, and AI agents.
+Sentris historically implemented MCP transport and lifecycle behavior in multiple
+backend and worker paths. The run gateway and Studio both retained process-local
+transports keyed by `Mcp-Session-Id`; Nginx used an affinity cookie; Redis mirrored
+session metadata that could not recover the live transport; the worker and standalone
+Docker proxy each provided a handwritten stdio-to-HTTP JSON-RPC bridge; and
+discovery/client behavior was repeated across onboarding, groups, workflow activities,
+gateway proxying, and AI agents.
 
 This ownership works only while requests reach the exact process holding the transport.
 It fails under full Compose when a backend cannot reach a worker loopback listener, and
@@ -37,6 +38,26 @@ Docker, remote-tool, agent, and scanner capabilities that make Sentris useful.
 Sentris will use a **stateless dual-era MCP facade**, a **protocol-independent capability
 and invocation boundary**, **worker-owned runtime leases**, and **Temporal-owned durable
 agent/task lifecycle**.
+
+### Implementation status (2026-07-31)
+
+The inbound run-gateway foundation is implemented. Its official SDK v2 facade builds a
+request-local server from authenticated run scope and serves modern plus
+legacy-stateless clients. Run transport maps, pending initialization state, cached
+inbound servers, session IDs, affinity cookies, Redis session registration, GET/SSE and
+DELETE session lifecycle, and sticky Nginx routing have been removed from this route.
+
+Studio has not migrated: it remains a separate v1 sessionful controller on sticky
+routing and may still appear in the session registry. The outbound gateway has also not
+migrated to the canonical client/runtime manager: proxied calls deliberately use a v1
+compatibility client pool keyed by run and endpoint.
+
+SDK-independent `ExecutionScope`, grant/catalog descriptor, and invocation-planning
+contracts exist in the shared package. Durable grant and catalog-snapshot persistence,
+durable invocation attempts/results, resources and prompts at runtime, keyed Workflow
+Updates, worker runtime leases and owner routing, MCP Tasks, and workflow-granular agent
+execution remain dependent implementation plans. Nothing in this foundation slice
+claims those runtime or durability properties.
 
 ### Protocol boundary
 
@@ -314,12 +335,14 @@ duplicate ownership and version surfaces.
 
 Implementation follows the approved design at
 `docs/superpowers/specs/2026-07-31-mcp-runtime-temporal-agent-architecture-design.md`.
-Legacy session state, affinity, v1 packages, and legacy SSE support are removed after
-supported clients pass the modern or legacy-stateless path, old Tasks wire behavior has
-no supported consumer, and migration notice has shipped. If a session adapter is ever
-enabled, the versioned supported-client matrix and backend MCP module owner make a
-mandatory remove-or-explicitly-renew decision no later than its second normal release;
-renewal requires an ADR update and product approval.
+Run-gateway session state, affinity, and legacy SSE have been removed. Studio session
+state and affinity remain until Studio uses the shared facade and durable task
+projection. The explicit outbound v1 pool and remaining v1 package declarations remain
+until the runtime-manager/canonical-outbound plan is complete and their owned callers
+have migrated. If a new run-gateway session adapter is ever enabled, the versioned
+supported-client matrix and backend MCP module owner make a mandatory
+remove-or-explicitly-renew decision no later than its second normal release; renewal
+requires an ADR update and product approval.
 
 ## References
 

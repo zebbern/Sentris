@@ -494,18 +494,26 @@ not process-only liveness.
 
 ## MCP Protocol and Runtime
 
-MCP `2026-07-28` removes transport-level sessions from modern HTTP. Sentris's accepted
-target is a request-local, dual-era MCP facade backed by one capability/invocation
-boundary. Persistent stdio and Docker resources use worker-owned application leases,
-while Temporal owns durable run and agent lifecycle. See
-[ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).
+MCP `2026-07-28` removes transport-level sessions from modern HTTP. The run gateway now
+uses the official v2 request-local facade for both modern and legacy-stateless clients.
+It creates a server from authenticated run scope for each request and does not retain
+inbound transports or cached servers, issue `Mcp-Session-Id` or affinity cookies, or use
+sticky routing. Nginx sends the run route through the ordinary backend upstream.
 
-The implementation is currently migrating from the older stateful transport model.
-During that compatibility window, Nginx still applies the `mcp_affinity` cookie, Redis
-tracks `mcp:sessions:{sessionId}`, and `GET /api/v1/mcp/sessions` exposes diagnostic
-session metadata. These are legacy implementation details and must not be extended for
-modern MCP traffic. They are removed once supported clients pass the modern or
-legacy-stateless compatibility path defined by the ADR.
+The repository also has SDK-independent shared capability-catalog and invocation
+contracts. They establish the canonical domain shapes, but their durable storage and
+full runtime integration are not part of this completed foundation slice.
+
+Studio remains on its v1 sessionful controller, `mcp_affinity` routing, and Redis session
+registry while its facade migration is pending. The gateway's outbound proxy remains an
+explicit v1 client pool scoped by run and endpoint until the worker runtime manager and
+canonical outbound client are implemented.
+
+The accepted target additionally includes durable capability grants and catalog
+snapshots, invocation persistence, resources/prompts runtime behavior, Workflow Updates,
+worker-owned runtime leases for persistent stdio and Docker resources, MCP Tasks, and
+workflow-granular agents. Those are dependent plans, not current behavior. See
+[ADR: Stateless MCP Facade, Runtime Leases, and Durable Agents](./architecture/adr-stateless-mcp-runtime-and-temporal-agents.md).
 
 ---
 

@@ -287,22 +287,29 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 
 ### MCP Protocol Migration
 
-MCP `2026-07-28` removes transport-level sessions from modern HTTP. The accepted target
-is a stateless dual-era facade, canonical MCP capability/invocation layer, worker-owned
-runtime leases for live stdio/Docker resources, and Temporal-owned durable agent/task
-lifecycle. See
+MCP `2026-07-28` removes transport-level sessions from modern HTTP. The run gateway now
+uses the official v2 request-local facade for modern and legacy-stateless clients. Run
+gateway transport sessions, affinity cookies, cached inbound servers, and sticky routing
+have been removed; its requests use the ordinary backend upstream. SDK-independent
+shared capability-catalog and invocation contracts also exist.
+
+Studio remains a v1 sessionful endpoint on sticky routing, and the outbound gateway
+remains an explicit v1 run-and-endpoint-scoped compatibility pool. Durable grants and
+catalog snapshots, invocation persistence, resources/prompts runtime behavior, Workflow
+Updates, worker runtime leases, MCP Tasks, and workflow-granular agents remain dependent
+work. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.
 
-### Legacy Sticky Sessions & MCP Session Registry
+### Studio Sticky Sessions & MCP Session Registry
 
-The following describes the current compatibility implementation, not the target
-architecture:
+The following compatibility implementation is now limited to Studio, not the run
+gateway:
 
-- **Nginx** uses consistent hash on the `mcp_affinity` cookie for MCP routes, ensuring stateful MCP connections stick to the same backend instance.
-- **Redis session registry**: keys at `mcp:sessions:{sessionId}` track active MCP sessions.
-- **Admin endpoint**: `GET /api/v1/mcp/sessions` lists active MCP sessions.
+- **Nginx** uses consistent hash on the `mcp_affinity` cookie for the sessionful Studio route.
+- **Redis session registry**: keys at `mcp:sessions:{sessionId}` track active Studio sessions.
+- **Admin endpoint**: `GET /api/v1/mcp/sessions` lists those compatibility sessions; run gateway traffic does not register there.
 
 ### Observability
 

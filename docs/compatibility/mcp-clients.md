@@ -20,6 +20,20 @@ Official sources:
 - MCP TypeScript SDK: [upgrade from v1 to v2](https://ts.sdk.modelcontextprotocol.io/v2/migration/upgrade-to-v2) and [support protocol revision 2026-07-28](https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/support-2026-07-28.md).
 - MCP specification: [transports and backwards compatibility](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [protocol changelog](https://modelcontextprotocol.io/specification/2025-11-25/changelog).
 
+## Migration status
+
+The run gateway uses the official v2 request-local facade and supports modern plus
+legacy-stateless requests at one URL. It has no inbound transport/session map, cached
+server, `Mcp-Session-Id`, affinity cookie, Redis session registration, or sticky route.
+Studio remains v1 sessionful and sticky pending its own migration, so Studio sessions in
+the administrative session registry are expected.
+
+The gateway's outbound proxy is still an explicit v1 compatibility pool keyed by run
+and endpoint. Its replacement belongs to the worker runtime-manager and canonical
+outbound-client plan. SDK-independent shared catalog and invocation contracts exist,
+but durable grants/snapshots and invocation persistence, resources/prompts runtime,
+Workflow Updates, runtime leases, Tasks, and workflow-granular agents remain pending.
+
 ## Supported-client acceptance matrix
 
 | Client / retained declaration                              | Owner and purpose                                                                                         | Era/mode                                                   | Required acceptance                                                 | Removal condition                                                                                                                     |
@@ -35,3 +49,32 @@ Official sources:
 The v2 client uses `versionNegotiation: { mode: 'auto' }` to send `server/discover` and fall back to the legacy initialize handshake for a 2025-era server. The canonical inbound facade must be stateless: it emits no MCP session or affinity cookie. The MCP transport specification permits session IDs for servers that need state, but they are not part of the canonical route's acceptance boundary.
 
 A separate legacy-session adapter is forbidden unless the AI SDK compatibility test proves stateless fallback insufficient. If introduced, it must follow the ADR's two-release deletion/renewal rule.
+
+## Local run-gateway acceptance
+
+Live acceptance on 2026-07-31 used instance 0 at
+`http://127.0.0.1:3211/api/v1/mcp/gateway` and one disposable, real run record
+with a bounded five-minute token. The official v2 client in auto mode negotiated
+the modern era and listed/called the registered harmless echo tool. The current
+`@ai-sdk/mcp` client listed/called the same tool through legacy-stateless mode.
+
+Two direct POST requests, one `tools/list` and one `tools/call`, each succeeded
+without a request cookie or `Mcp-Session-Id`; neither response supplied
+`Set-Cookie` or `Mcp-Session-Id`. The administrative sessions endpoint returned
+zero run-gateway matches, and the relevant backend log window contained no old
+transport-map or session-lookup failure.
+
+Twenty sequential warm authenticated samples per operation produced these local
+request-local-route latencies:
+
+| Operation    | Samples | Median   | p95      |
+| ------------ | ------- | -------- | -------- |
+| `tools/list` | 20      | 20.92 ms | 23.45 ms |
+| `tools/call` | 20      | 45.57 ms | 79.10 ms |
+
+No trustworthy comparable pre-change baseline artifact was available, so these
+are absolute post-migration measurements only. They do not support a relative
+regression claim or justify adding descriptor caching. The optional restart
+between list and call was skipped to avoid disrupting the user's active local
+instance; focused automated coverage verifies reconstruction after a fresh
+facade/controller.
