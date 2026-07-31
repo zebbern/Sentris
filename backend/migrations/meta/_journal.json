@@ -71,6 +71,13 @@
       "when": 1785336249342,
       "tag": "0009_platform_readiness_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785531563948,
+      "tag": "0010_mcp_runtime_persistence",
+      "breakpoints": true
     }
   ]
 }

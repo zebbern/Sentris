@@ -70,6 +70,13 @@
       "sqlSha256": "253948c5b1710750d6d014c8448981481b1eb6fbfa1139e38c68a1dbcbb46469",
       "snapshotSha256": "945c2654efd8638617df8b6081099a3e67541fdc9ea7974b2c7e2b5ade0c02a3",
       "contractSha256": "950caa92a26be503bf751f6d3ed9246ce542c66acca80980ce6923afffa5727a"
+    },
+    {
+      "idx": 10,
+      "tag": "0010_mcp_runtime_persistence",
+      "sqlSha256": "0273c0b9b1014d0f373d86b8a1e7b10255fd47d8a757f7cafbf2263096cecb3e",
+      "snapshotSha256": "6e0620eab43edcc9fde91cf8b275d351820806cd82695aeed59c2e150bd667d1",
+      "contractSha256": "0af94327a6c6a9a0aaf41ea3f335517d29043d4e8dcff9335cd689e928215ad2"
     }
   ]
 }
