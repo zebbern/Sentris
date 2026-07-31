@@ -13,15 +13,24 @@
 - Work directly on `main`, as explicitly requested by the user. Do not create a branch or worktree and do not push until the user asks.
 - Use conventional DCO commits (`git commit -s`) after every independently shippable task. Preserve unrelated user edits.
 - Do not upgrade Temporal or MCP packages in this slice. On 2026-07-31 the matched Temporal packages at `1.14.1` were verified to expose `defineUpdate`, `currentUpdateInfo`, `allHandlersFinished`, and `WorkflowHandle.executeUpdate`; the newer SDK release is not required for this behavior.
-- The exact Workflow Update name is `executeToolInvocation`, the compatibility query name is `getToolInvocationProtocolVersion`, the protocol version is `1`, and the replay patch ID is `sentris-tool-invocation-update-v1`.
+- The exact Workflow Update names are `installToolInvocationManifest` and
+  `executeToolInvocation`; the compatibility query name is
+  `getToolInvocationProtocolVersion`, the protocol version is `1`, and the replay
+  patch ID is `sentris-tool-invocation-update-v1`.
 - Keep the shared domain contracts SDK-independent. The official MCP SDK may validate a snapshot JSON Schema in the backend adapter, but MCP transport/session types must not enter the shared contracts, database schema, or Workflow history.
 - `McpRuntimeModule` is a neutral database/persistence module and exports only `McpRuntimeRepository`. Catalog, authority, invocation, auth, and gateway services remain providers of `McpModule`, which already owns `ToolRegistryService`; do not introduce an `McpModule`/`WorkflowsModule` import cycle.
 - Persist no plaintext credentials, resolved headers, endpoint authorization values, or live transport/process data. Workflow history receives the bounded request, compact manifest, prepared reference, and bounded result only. A dispatch activity may receive credentials from the internal backend endpoint in memory; that response must never be returned from the activity.
 - Inline invocation input is limited to 256 KiB of UTF-8 JSON and inline result output to 1 MiB. Both must be finite JSON values; `undefined`, `NaN`, `Infinity`, functions, class instances, and cycles are rejected. Artifact-backed payloads remain a later agent-history task.
+- Invocation manifests contain at most 1024 entries and persisted/public invocation
+  error messages contain at most 8192 characters.
 - Invocation state is exactly `planned | prepared | dispatched | completed | failed | ambiguous | cancelled`. A logical invocation has a stable UUID and one or more numbered attempts; this slice creates attempt `1` only but must not prevent later reviewed-idempotent attempts.
 - One immutable grant owns exactly one immutable snapshot/manifest. Any catalog/configuration change mints a new grant plus snapshot; snapshots never refresh under an existing grant ID.
 - Durable invocation execution in this slice is explicitly run-scoped. Studio/discovery keep the shared authority vocabulary but do not create `mcp_invocations` rows until their later durable-operation plan.
 - Dispatch activities use `maximumAttempts: 1`. Preflight and ambiguity-recording activities may use three attempts because neither calls the tool. Once an attempt is `dispatched`, an uncertain outcome becomes `ambiguous`; it is never automatically executed again.
+- Reconciliation is state-aware: a failure while still `prepared` becomes a
+  pre-dispatch/deadline/cancellation terminal state, while uncertainty after
+  `dispatched` becomes `ambiguous`. Workflow finalization sweeps any remaining
+  non-terminal invocation rows for that run.
 - A backend timeout or lost response from `executeUpdate` must be returned as an error. Never fall back to the legacy signal after an Update was submitted because the Update may still execute.
 - Component tools move to Workflow Updates in this slice. Snapshot-authorized external MCP tools continue through the named v1 outbound compatibility path without a second live authorization decision; canonical outbound v2 clients, worker runtime leases, stdio/Docker ownership, and external invocation dispatch are the next plan.
 - Legacy tokens without a persisted `capabilitySnapshotId` retain the current live catalog plus signal/query path only for workflows that do not advertise protocol version `1`. Remove that compatibility path after one normal release has elapsed and all pre-deployment runs plus the three-hour maximum token TTL have expired.
@@ -389,6 +398,7 @@
 - Create: `backend/src/mcp-runtime/mcp-run-catalog.service.ts`
 - Create: `backend/src/mcp-runtime/mcp-run-authority.service.ts`
 - Create: `backend/src/mcp-runtime/mcp-tool-name.ts`
+- Create: `backend/src/mcp-runtime/mcp-binding-fingerprint.ts`
 - Create: `backend/src/mcp/mcp-legacy-outbound-compatibility.service.ts`
 - Create: `backend/src/mcp/__tests__/mcp-legacy-outbound-compatibility.service.spec.ts`
 - Create: `backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts`
@@ -422,6 +432,8 @@
   Cover:
 
   - component descriptors preserve canonical name/schema and use `sourceId = nodeId`;
+  - component descriptor input schemas are closed (`additionalProperties: false`) so
+    credential-only or unknown top-level keys cannot be injected as action inputs;
   - external names remain `${sanitize(source.toolName)}__${sanitize(upstream.name)}` and preserve full MCP metadata/schema;
   - hierarchical allowed node IDs are applied before snapshot creation;
   - config fingerprints are deterministic across object key order and change for endpoint, component parameters, tool schema, or encrypted-credential-version hash changes without persisting any secret/ciphertext;
@@ -429,6 +441,11 @@
   - protocol query `1` creates a durable token with `capabilitySnapshotId`;
   - `QueryNotRegisteredError` alone creates a legacy token without a snapshot; every other Temporal error is propagated;
   - request context parsing retains optional `invokingNodeId` and snapshot ID.
+  - every source carries a deterministic, non-secret `bindingFingerprint`, and the
+    same source configuration produces the same fingerprint in catalog construction
+    and later live-binding verification;
+  - invocation manifests reject more than
+    `MAX_INVOCATION_MANIFEST_ENTRIES = 1024` entries.
 
 - [ ] **Step 2: Run focused tests and observe RED**
 
@@ -476,9 +493,9 @@
 
   Use Redis pre-discovered server tools first and database cached tools for registered remote servers. Use the same explicitly transitional adapter for the existing live endpoint-discovery fallback when an allowed ready local source has no cached descriptor. Snapshot the discovery result once and never refresh that snapshot. Do not return/persist endpoint, credential, client, or runtime-binding objects.
 
-  Move tool-name normalization/collision rules into pure `mcp-tool-name.ts` and use it from catalog plus the remaining legacy gateway path. Set run snapshot `sourceId = nodeId` and always preserve `nodeId`. Make shared MCP `serverId` optional because local/ephemeral MCP sources legitimately have no saved server row; never invent a fake server ID from the node ID.
+  Move tool-name normalization/collision rules into pure `mcp-tool-name.ts` and use it from catalog plus the remaining legacy gateway path. Move live-binding projection and SHA-256 logic into pure `mcp-binding-fingerprint.ts`; catalog construction and Task 4 dispatch verification must call this one implementation. Set run snapshot `sourceId = nodeId`, always preserve `nodeId`, and persist the resulting non-secret `bindingFingerprint` on each source descriptor. Make shared MCP `serverId` optional because local/ephemeral MCP sources legitimately have no saved server row; never invent a fake server ID from the node ID.
 
-  Fingerprint a canonical object containing normalized source/node IDs, component IDs, parameters, endpoints/server IDs/container references, complete public descriptors, and `sha256(encryptedCredentials)` when present. Never include the encrypted value itself in the canonical object, logs, snapshot, or tests.
+  Fingerprint a canonical object containing normalized source/node IDs, component IDs, parameters, endpoints/server IDs/container references, complete public descriptors, and `sha256(encryptedCredentials)` when present. Never include the encrypted value itself in the canonical object, logs, snapshot, or tests. The overall catalog fingerprint includes every per-source binding fingerprint. Close component public input schemas so action input can contain only the fields intentionally exposed by that component.
 
 - [ ] **Step 5: Create/reuse immutable run authority**
 
@@ -544,6 +561,14 @@
 
 - Create: `backend/src/mcp-runtime/mcp-invocation.service.ts`
 - Create: `backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts`
+- Modify: `packages/shared/src/mcp-invocation.ts`
+- Modify: `packages/shared/src/__tests__/mcp-invocation.test.ts`
+- Modify: `backend/src/mcp-runtime/mcp-runtime.repository.ts`
+- Modify: `backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts`
+- Modify: `backend/src/mcp/tool-registry.service.ts`
+- Modify: focused `ToolRegistryService` tests
+- Create: `backend/src/auth/internal-only.guard.ts`
+- Create: `backend/src/auth/__tests__/internal-only.guard.spec.ts`
 - Modify: `backend/src/mcp/mcp.module.ts`
 - Modify: `backend/src/mcp/dto/mcp.dto.ts`
 - Modify: `backend/src/mcp/internal-mcp.controller.ts`
@@ -552,11 +577,13 @@
 **Interfaces:**
 
 - Consumes: durable authority/repository, `ToolRegistryService`, `WorkflowRunRepository`, component registry/schema helpers.
-- Produces internal service-token routes: `POST /internal/mcp/invocations/prepare`, `/claim`, `/complete`, `/fail`, and `/ambiguous`.
+- Produces internal service-token routes: `POST /internal/mcp/invocations/prepare`,
+  `/claim`, `/complete`, `/fail`, `/ambiguous`, `/reconcile`, and
+  `/reconcile-run`.
 
 - [ ] **Step 1: Write failing service tests for authorization, dedupe, and ambiguity**
 
-  Test that preflight rejects expired requests, run/org/grant/snapshot mismatches, unauthorized tool names, invalid snapshot-schema input, and non-component destinations. Test identical prepare replay, terminal replay, dispatched replay becoming ambiguous, and a claim response that contains resolved component credentials only in the returned dispatch context.
+  Test that preflight rejects expired requests, non-run scopes, run/org/grant/snapshot mismatches, unauthorized tool names, invalid snapshot-schema input, and non-component destinations. Test identical prepare replay, terminal replay, dispatched replay becoming ambiguous, deadline expiry between prepare and claim, and a claim response that contains resolved component credentials only in the returned dispatch context. Test that prepared reconciliation becomes failed/cancelled, dispatched reconciliation becomes ambiguous, terminal reconciliation replays the stored result, and run-finalization reconciliation closes every non-terminal invocation for that run.
 
 - [ ] **Step 2: Run the service test and observe RED**
 
@@ -571,7 +598,15 @@
   1. Parse and deadline-check the request.
   2. Load the exact authority by grant/snapshot/run/org.
   3. Re-run `assertCapabilityGrantApplies` and `resolveInvocationManifestEntry`.
-  4. Validate input against the snapshot tool's complete JSON Schema using the official backend `fromJsonSchema(...).safeParse(...)` adapter.
+  4. Validate input against the snapshot tool's complete JSON Schema through the
+     Standard Schema interface returned by the installed official adapter:
+
+     ```ts
+     const schema = fromJsonSchema<Record<string, unknown>>(descriptor.inputSchema);
+     const validation = await schema['~standard'].validate(request.input);
+     if (validation.issues) throw new BadRequestException('Invalid tool input');
+     ```
+
   5. Canonically hash the request and call repository `prepareInvocation`.
   6. Return the prepared ref plus compact manifest, or the stored terminal result.
 
@@ -579,7 +614,40 @@
 
 - [ ] **Step 4: Implement atomic claim and terminal settlement**
 
-  `claimComponentDispatch(ref)` performs `prepared -> dispatched` before returning this internal-only shape:
+  Add a durable `getInvocationForDispatch(ref)` repository read that returns the
+  parsed request plus the exact current prepared reference. Define and parse this
+  shared result instead of returning a context unconditionally:
+
+  ```ts
+  type ClaimComponentDispatchOutcome =
+    | { kind: 'dispatch'; context: ComponentInvocationDispatchContext }
+    | { kind: 'terminal'; result: ToolInvocationResult };
+  ```
+
+  The service boundary is:
+
+  ```ts
+  prepare(request: ToolInvocationRequest): Promise<PrepareToolInvocationOutcome>;
+  claimComponentDispatch(ref: PreparedInvocationRef): Promise<ClaimComponentDispatchOutcome>;
+  complete(ref: PreparedInvocationRef, result: ToolInvocationResult): Promise<ToolInvocationResult>;
+  fail(ref: PreparedInvocationRef, result: ToolInvocationResult): Promise<ToolInvocationResult>;
+  ambiguous(ref: PreparedInvocationRef, message: string, completedAt: string): Promise<ToolInvocationResult>;
+  reconcileDispatchFailure(input: {
+    ref: PreparedInvocationRef;
+    cause: 'failure' | 'deadline' | 'cancelled';
+    message: string;
+    completedAt: string;
+  }): Promise<ToolInvocationResult>;
+  reconcileRunInvocations(input: {
+    runId: string;
+    message: string;
+    completedAt: string;
+  }): Promise<void>;
+  ```
+
+  `claimComponentDispatch(ref)` validates the live binding and resolves its
+  credentials before the final `prepared -> dispatched` CAS, then immediately
+  returns this internal-only context when the claim succeeds:
 
   ```ts
   const context: ComponentInvocationDispatchContext = {
@@ -601,9 +669,21 @@
   };
   ```
 
-  Load the source by the manifest-bound node ID, require the same component ID/tool identity as the immutable descriptor, split exposed parameters exactly as the current gateway does, and resolve credentials only here. Build the shared `ComponentInvocationDispatchContext` from the durable run row and registered source; the worker activity alone maps that structural contract to `RunComponentActivityInput`. Do not log or persist the context, and do not return it from any Temporal activity.
+  Load the source by run ID plus the manifest-bound node ID, never by canonical tool name. Require exact source/node/component/tool identity, ready/exposed state, the same component registry entry, and an exact `bindingFingerprint` match before decrypting anything. Split exposed parameters exactly as the current gateway does; action input wins over exposed defaults, while registered parameters plus allowed overrides form runtime parameters. Add one strict single-read `ToolRegistryService` resolver that returns the registered tool and credentials together and distinguishes missing credentials from decryption failure. Resolve credentials only after all immutable checks pass. Build and parse the shared `ComponentInvocationDispatchContext` from the durable run row and registered source; the worker activity alone maps that structural contract to `RunComponentActivityInput`. Do not log or persist the context, and do not return it from any Temporal activity.
 
-  `complete`, `fail`, and `ambiguous` parse a bounded terminal result and settle with compare-and-set semantics. A duplicate settlement returns the stored result. A conflicting settlement throws.
+  `complete`, `fail`, and `ambiguous` parse a bounded terminal result and settle with compare-and-set semantics. A duplicate settlement returns the stored result. A conflicting settlement throws. Limit persisted/public error messages to `MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS = 8192` and use the same bound for ambiguous/reconciliation DTOs.
+
+  Add state-aware reconciliation rather than assuming every dispatch-activity failure executed the tool:
+
+  - `prepared` becomes `failed/pre-dispatch`, `failed/deadline-before-dispatch`, or
+    `cancelled` according to the supplied cause;
+  - `dispatched` becomes `ambiguous`;
+  - terminal state returns the stored result;
+  - missing or stale references conflict.
+
+  A run-scoped reconciliation method used during Workflow finalization closes
+  lingering prepared rows as cancelled and dispatched rows as ambiguous. Every
+  transition updates the logical invocation and current attempt atomically.
 
 - [ ] **Step 5: Expose internal routes with strict DTO parsing**
 
@@ -615,14 +695,22 @@
   POST internal/mcp/invocations/complete   { ref, result }
   POST internal/mcp/invocations/fail       { ref, result }
   POST internal/mcp/invocations/ambiguous  { ref, message, completedAt }
+  POST internal/mcp/invocations/reconcile  { ref, cause, message, completedAt }
+  POST internal/mcp/invocations/reconcile-run { runId, message, completedAt }
   ```
 
-  Reuse the existing internal service-token protection. Return no stack traces, token metadata, encrypted values, or resolved context from settlement routes.
+  Use strict `createZodDto` request DTOs and an explicit `ZodValidationPipe` on
+  every route; there is no global validation pipe to rely on. Apply a reusable
+  `InternalOnlyGuard` to the whole internal MCP controller so user/API-key auth
+  cannot call routes that return resolved credentials. Map expected validation,
+  authorization, conflict, and dependency failures to sanitized 400/403/409/503
+  responses. Return no stack traces, token metadata, encrypted values, or resolved
+  context from settlement routes.
 
 - [ ] **Step 6: Run focused backend verification GREEN**
 
   ```powershell
-  bun test backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts backend/src/mcp/__tests__/mcp-internal.integration.spec.ts
+  bun test packages/shared/src/__tests__/mcp-invocation.test.ts backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts backend/src/mcp/__tests__/mcp-internal.integration.spec.ts backend/src/auth/__tests__/internal-only.guard.spec.ts
   bun --cwd=backend run typecheck
   bun --cwd=backend run build
   git diff --check
@@ -650,13 +738,21 @@
 - Modify: `worker/src/temporal/workflows/index.ts`
 - Modify: `worker/src/temporal/workers/dev.worker.ts`
 - Modify: workflow mock tests that enumerate `@temporalio/workflow` exports
+- Modify: `packages/shared/package.json`
+- Modify: `packages/shared/src/mcp-invocation.ts`
+- Modify: `packages/shared/src/__tests__/mcp-invocation.test.ts`
 - Modify: `backend/src/temporal/temporal.service.ts`
 - Modify: `backend/src/temporal/__tests__/temporal.service.spec.ts`
+- Modify: `backend/src/mcp/mcp-auth.service.ts`
+- Modify: `backend/src/mcp/__tests__/mcp-auth.service.spec.ts`
 
 **Interfaces:**
 
 - Consumes: internal preflight/claim/settlement routes and shared invocation contracts.
-- Produces: `executeToolInvocation` Update, `getToolInvocationProtocolVersion` query, `TemporalService.executeWorkflowUpdate`, and handler draining before Workflow completion.
+- Produces: `installToolInvocationManifest` and `executeToolInvocation` Updates,
+  `getToolInvocationProtocolVersion` query, `TemporalService.executeWorkflowUpdate`,
+  compact Workflow-held grant manifests, and handler draining before Workflow
+  completion.
 
 - [ ] **Step 1: Write failing Temporal client, handler, and activity tests**
 
@@ -664,9 +760,14 @@
 
   - `executeWorkflowUpdate` calls `handle.executeUpdate(TOOL_INVOCATION_UPDATE_NAME, { args: [request], updateId: request.invocationId })` and propagates errors without signaling;
   - validator rejects wrong run/org, invalid request, closed acceptance, or `currentUpdateInfo().id !== invocationId`;
+  - manifest installation is keyed by grant ID, validates exact run/org scope, and
+    is idempotent only for identical content;
   - terminal preflight replay returns without dispatch;
   - prepared component work dispatches once;
-  - dispatch activity failure records `ambiguous`, never retries dispatch, and returns the stored ambiguous result;
+  - dispatch activity failure uses state-aware reconciliation, never retries
+    dispatch, and returns the stored terminal result;
+  - deadline/cancellation cancels the dispatch activity and reconciles inside a
+    non-cancellable scope;
   - activities never return the claim/credential context;
   - the protocol query returns `1` only behind the new patch path;
   - Workflow completion stops accepting Updates and waits for `allHandlersFinished` before finalization.
@@ -684,13 +785,16 @@
   ```ts
   async executeWorkflowUpdate<T>(input: {
     workflowId: string;
-    runId?: string;
+    temporalRunId?: string;
     updateName: string;
     updateId: string;
     args: unknown;
   }): Promise<T> {
-    const handle = this.workflowClient.getHandle(input.workflowId, input.runId);
-    return handle.executeUpdate<T>(input.updateName, {
+    const handle = await this.getWorkflowHandle({
+      workflowId: input.workflowId,
+      runId: input.temporalRunId,
+    });
+    return handle.executeUpdate<T, [unknown]>(input.updateName, {
       args: [input.args],
       updateId: input.updateId,
     });
@@ -699,33 +803,86 @@
 
 - [ ] **Step 4: Implement preflight and one-attempt dispatch activities**
 
-  Use `buildBackendApiUrl` plus `X-Internal-Token` and shared Zod parsing. `prepareToolInvocationActivity` calls `/prepare`. `dispatchToolInvocationActivity` calls `/claim`, maps the shared dispatch context to `RunComponentActivityInput`, invokes `runComponentActivity(...)` directly inside the same Temporal activity, normalizes JSON output (`undefined` becomes `null`), then calls `/complete` or `/fail` and returns only `ToolInvocationResult`. If the component reports a normal failure, settle `remote-tool`; if the activity process/HTTP settlement becomes uncertain, let the activity fail so the Workflow records `ambiguous` through `markToolInvocationAmbiguousActivity`.
+  Use `buildBackendApiUrl` plus `X-Internal-Token`, the activity cancellation signal,
+  heartbeats, and shared Zod parsing. Never include response bodies, claim context,
+  credentials, or stack traces in activity errors/logs.
+
+  `prepareToolInvocationActivity` calls `/prepare`, validates it, and strips the
+  manifest before returning either `{ kind: 'prepared', ref }` or a terminal result
+  to Workflow history. `dispatchToolInvocationActivity` calls `/claim`; a terminal
+  replay returns immediately, while a dispatch context stays only in activity
+  memory. Map it to `RunComponentActivityInput` with `rawParams` as well as
+  `params`, merge credentials into inputs/inputOverrides, then invoke
+  `runComponentActivity(...)` directly inside the same Temporal activity.
+
+  Normalize successful top-level `undefined` to JSON `null`; settle a returned
+  component `{ success: false }`, invalid/non-JSON output, or oversized output as a
+  bounded `remote-tool` failure because execution is known. If component execution
+  throws or `/complete`/`/fail` settlement is uncertain, let the activity fail so
+  the Workflow calls state-aware `/reconcile` in a non-cancellable scope. The
+  dispatch proxy has `maximumAttempts: 1`; prepare/reconciliation use three attempts.
+
+  Add `reconcileRunToolInvocationsActivity` and call `/reconcile-run` during final
+  Workflow cleanup so an exhausted per-call reconciliation does not leave prepared
+  or dispatched rows indefinitely.
 
 - [ ] **Step 5: Register the Update and safe completion drain**
 
-  In `updates.ts`:
+  Export a Workflow-safe shared package subpath `@sentris/shared/mcp-invocation`;
+  Workflow code must import invocation contracts through that subpath instead of
+  the broad Node-capable shared barrel. In `updates.ts` define:
 
   ```ts
+  export const installToolInvocationManifestUpdate = defineUpdate<
+    void,
+    [InstallToolInvocationManifestRequest]
+  >(INSTALL_TOOL_INVOCATION_MANIFEST_UPDATE_NAME);
+
   export const executeToolInvocationUpdate = defineUpdate<
     ToolInvocationResult,
     [ToolInvocationRequest]
   >(TOOL_INVOCATION_UPDATE_NAME);
   ```
 
-  In `sentrisWorkflowRun`, evaluate `patched('sentris-tool-invocation-update-v1')` once. For the patched path:
+  Add the exact constant `INSTALL_TOOL_INVOCATION_MANIFEST_UPDATE_NAME =
+'installToolInvocationManifest'` and a strict shared install request containing
+  `scope` plus `manifest`. In `sentrisWorkflowRun`, evaluate
+  `patched('sentris-tool-invocation-update-v1')` exactly once. For the patched path:
 
   - register `getToolInvocationProtocolVersion` returning `1`;
-  - register the Update with a synchronous validator;
-  - use retryable preflight/ambiguity proxies with `maximumAttempts: 3`;
-  - use a separate dispatch proxy with `maximumAttempts: 1`, `startToCloseTimeout: '10 minutes'`, and heartbeat timeout `30 seconds`;
-  - before terminal finalization set `acceptingToolInvocations = false`, then `await condition(allHandlersFinished)`.
+  - register manifest installation and invocation Updates with synchronous,
+    sanitized validators;
+  - store installed manifests in a deterministic map keyed by grant ID and require
+    the invocation's grant-bound manifest to have been installed;
+  - require exact run scope, `scope.runId === input.runId`, exact nullable org, and
+    Update ID equal to invocation ID;
+  - use retryable preflight/reconciliation proxies with `maximumAttempts: 3`;
+  - use a separate dispatch proxy with `maximumAttempts: 1`,
+    `startToCloseTimeout: '10 minutes'`, heartbeat timeout `30 seconds`, and
+    `ActivityCancellationType.WAIT_CANCELLATION_COMPLETED`;
+  - wrap dispatch in `CancellationScope.withTimeout` using the deterministic
+    remaining request deadline rather than `Promise.race`;
+  - convert unexpected handler errors to `ApplicationFailure` so they fail the
+    Update rather than repeatedly failing Workflow Tasks;
+  - before terminal finalization set `acceptingToolInvocations = false`, then in the
+    existing non-cancellable lifecycle scope `await condition(allHandlersFinished)`,
+    run durable invocation reconciliation, and only then finish cleanup/finalization.
 
-  Keep the old signal/query handler only for the unpatched compatibility path. Remove the unused `toolCallCompleted` completion signal from the new path; do not add a fallback from Update to signal.
+  Keep the old signal/query handler only for the unpatched compatibility path.
+  Redact `TemporalService.signalWorkflow` argument logging while that legacy path
+  can still carry component credentials. Remove the unused `toolCallCompleted`
+  completion signal from the new path; do not add a fallback from Update to signal.
+
+  After durable authority materialization and before writing a new token,
+  `McpAuthService` must install the immutable manifest with Update ID
+  `install-manifest:${grantId}`. If installation fails, no token is issued. This
+  avoids repeating the full manifest in every invocation Update while keeping
+  Workflow authorization deterministic.
 
 - [ ] **Step 6: Run focused worker/backend verification GREEN**
 
   ```powershell
-  bun test backend/src/temporal/__tests__/temporal.service.spec.ts worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts worker/src/temporal/workflows/__tests__/workflow-diagnostics.test.ts
+  bun test packages/shared/src/__tests__/mcp-invocation.test.ts backend/src/temporal/__tests__/temporal.service.spec.ts backend/src/mcp/__tests__/mcp-auth.service.spec.ts worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts worker/src/temporal/workflows/__tests__/workflow-diagnostics.test.ts worker/src/temporal/workers/__tests__/workflow-bundle.test.ts
   bun --cwd=backend run typecheck
   bun --cwd=worker run typecheck
   git diff --check
