@@ -1,6 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'bun:test';
-import type { GenerateTextResult, LanguageModelUsage, Output as AIOutput, ToolSet } from 'ai';
-import type { ExecutionContext } from '@sentris/component-sdk';
+import type {
+  FinishReason,
+  LanguageModelUsage,
+  StreamTextResult,
+  TextStreamPart,
+  ToolSet,
+} from 'ai';
+import type { AgentTraceEvent, ExecutionContext } from '@sentris/component-sdk';
 import { componentRegistry, runComponentWithRunner } from '@sentris/component-sdk';
 import type { AiAgentInput, AiAgentOutput } from '../ai-agent';
 
@@ -13,8 +19,7 @@ const createGoogleGenerativeAIMock = vi.fn(() => (modelId: string) => ({
 const createMCPClientMock = vi.fn();
 
 let toolLoopAgentSettings: unknown;
-let lastGenerateMessages: unknown;
-type GenerationResult = GenerateTextResult<ToolSet, ReturnType<typeof AIOutput.text>>;
+let lastStreamMessages: unknown;
 
 class MockToolLoopAgent {
   settings: unknown;
@@ -24,9 +29,9 @@ class MockToolLoopAgent {
     toolLoopAgentSettings = settings;
   }
 
-  async generate({ messages }: { messages: unknown }) {
-    lastGenerateMessages = messages;
-    return createGenerationResult();
+  async stream({ messages }: { messages: unknown }) {
+    lastStreamMessages = messages;
+    return createStreamResult();
   }
 }
 
@@ -78,39 +83,104 @@ function createUsage(overrides: Partial<LanguageModelUsage> = {}): LanguageModel
   };
 }
 
-function createGenerationResult(overrides: Partial<GenerationResult> = {}): GenerationResult {
-  const usage = createUsage();
+function asyncParts(parts: TextStreamPart<ToolSet>[]): AsyncIterable<TextStreamPart<ToolSet>> {
   return {
-    content: [],
-    text: 'Agent final answer',
-    reasoning: [],
-    reasoningText: undefined,
-    files: [],
-    sources: [],
-    toolCalls: [],
-    staticToolCalls: [],
-    dynamicToolCalls: [],
-    toolResults: [],
-    staticToolResults: [],
-    dynamicToolResults: [],
-    finishReason: 'stop',
-    rawFinishReason: 'stop',
-    usage,
-    totalUsage: usage,
-    warnings: undefined,
-    request: {},
-    response: {
-      id: 'resp-1',
-      timestamp: new Date(),
-      modelId: 'mock-model',
-      messages: [],
+    async *[Symbol.asyncIterator]() {
+      for (const part of parts) yield part;
     },
-    providerMetadata: undefined,
-    steps: [],
-    experimental_output: '',
-    output: '',
-    ...overrides,
   };
+}
+
+type StreamToolResult = Awaited<StreamTextResult<ToolSet, never>['toolResults']>[number];
+
+function createStreamResult(
+  options: {
+    parts?: TextStreamPart<ToolSet>[];
+    text?: string;
+    toolResults?: StreamToolResult[];
+    finishReason?: FinishReason;
+  } = {},
+): StreamTextResult<ToolSet, never> {
+  const text = options.text ?? 'Agent final answer';
+  return {
+    fullStream: asyncParts(
+      options.parts ?? [
+        { type: 'text-start', id: 'sdk-text-1' },
+        { type: 'text-delta', id: 'sdk-text-1', text },
+        { type: 'text-end', id: 'sdk-text-1' },
+        {
+          type: 'finish',
+          finishReason: options.finishReason ?? 'stop',
+          rawFinishReason: 'stop',
+          totalUsage: createUsage(),
+        },
+      ],
+    ),
+    text: Promise.resolve(text),
+    toolResults: Promise.resolve(options.toolResults ?? []),
+    finishReason: Promise.resolve(options.finishReason ?? 'stop'),
+  } as unknown as StreamTextResult<ToolSet, never>;
+}
+
+function createDeferredStreamResult(
+  fullStream: AsyncIterable<TextStreamPart<ToolSet>>,
+  results: {
+    text: PromiseLike<string>;
+    toolResults: PromiseLike<StreamToolResult[]>;
+    finishReason: PromiseLike<FinishReason>;
+  },
+): StreamTextResult<ToolSet, never> {
+  return {
+    fullStream,
+    ...results,
+  } as unknown as StreamTextResult<ToolSet, never>;
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  const deadline = Date.now() + 500;
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for condition');
+    }
+    await Bun.sleep(5);
+  }
+}
+
+function contextWithTracePublisher(published: AgentTraceEvent[]): ExecutionContext {
+  return createTestContext({
+    agentTracePublisher: {
+      publish: (event) => {
+        published.push(event);
+      },
+    },
+  });
+}
+
+function runAgent(context: ExecutionContext = createTestContext()) {
+  const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+  if (!component) {
+    throw new Error('Expected core.ai.agent to be registered');
+  }
+  return runComponentWithRunner(
+    component.runner,
+    component.execute,
+    {
+      inputs: {
+        userInput: 'Investigate the target',
+        conversationState: undefined,
+        chatModel: { provider: 'openai', modelId: 'gpt-4o-mini' },
+        modelApiKey: 'sk-test',
+      },
+      params: {
+        systemPrompt: '',
+        temperature: 0.2,
+        maxTokens: 128,
+        memorySize: 5,
+        stepLimit: 2,
+      },
+    },
+    context,
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -126,7 +196,7 @@ function expectRecord(value: unknown, label: string): Record<string, unknown> {
 
 beforeEach(() => {
   toolLoopAgentSettings = undefined;
-  lastGenerateMessages = undefined;
+  lastStreamMessages = undefined;
   stepCountIsMock.mockClear();
   createOpenAIMock.mockClear();
   createGoogleGenerativeAIMock.mockClear();
@@ -144,12 +214,12 @@ describe('core.ai.agent (refactor)', () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
 
-    vi.spyOn(MockToolLoopAgent.prototype, 'generate').mockImplementation(async function (
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockImplementation(async function (
       this: MockToolLoopAgent,
       { messages }: { messages: unknown },
     ) {
-      lastGenerateMessages = messages;
-      return createGenerationResult({ text: 'Hello agent' });
+      lastStreamMessages = messages;
+      return createStreamResult({ text: 'Hello agent' });
     });
 
     const result = await runComponentWithRunner(
@@ -189,7 +259,7 @@ describe('core.ai.agent (refactor)', () => {
     expect(settings.temperature).toBe(0.2);
     expect(stepCountIsMock).toHaveBeenCalledWith(2);
 
-    const messages = Array.isArray(lastGenerateMessages) ? lastGenerateMessages : [];
+    const messages = Array.isArray(lastStreamMessages) ? lastStreamMessages : [];
     expect(messages.at(-1)).toMatchObject({
       role: 'user',
       content: 'Hi',
@@ -228,8 +298,8 @@ describe('core.ai.agent (refactor)', () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
 
-    vi.spyOn(MockToolLoopAgent.prototype, 'generate').mockResolvedValue(
-      createGenerationResult({ text: 'Agent final answer' }),
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({ text: 'Agent final answer' }),
     );
 
     let fetchCalls = 0;
@@ -405,8 +475,8 @@ describe('core.ai.agent (refactor)', () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
 
-    vi.spyOn(MockToolLoopAgent.prototype, 'generate').mockResolvedValue(
-      createGenerationResult({ text: 'Agent final answer' }),
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({ text: 'Agent final answer' }),
     );
 
     const originalFetch = globalThis.fetch;
@@ -481,8 +551,8 @@ describe('core.ai.agent (refactor)', () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
 
-    vi.spyOn(MockToolLoopAgent.prototype, 'generate').mockResolvedValue(
-      createGenerationResult({
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
         text: 'Tool done',
         toolResults: [
           {
@@ -529,6 +599,140 @@ describe('core.ai.agent (refactor)', () => {
       toolCallId: 'call-1',
       toolName: 'ping',
       output: { type: 'json', value: { ok: true } },
+    });
+  });
+
+  test('publishes response text before the model stream completes', async () => {
+    let releaseFinish!: () => void;
+    const finishGate = new Promise<void>((resolve) => {
+      releaseFinish = resolve;
+    });
+    const published: AgentTraceEvent[] = [];
+
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockImplementation(async () => {
+      const fullStream = {
+        async *[Symbol.asyncIterator]() {
+          yield { type: 'text-start', id: 'sdk-text-1' } as const;
+          yield { type: 'text-delta', id: 'sdk-text-1', text: 'Early evidence' } as const;
+          await finishGate;
+          yield { type: 'text-end', id: 'sdk-text-1' } as const;
+          yield {
+            type: 'finish',
+            finishReason: 'stop',
+            rawFinishReason: 'stop',
+            totalUsage: createUsage(),
+          } as const;
+        },
+      };
+      return createDeferredStreamResult(fullStream, {
+        text: finishGate.then(() => 'Early evidence complete'),
+        toolResults: finishGate.then(() => []),
+        finishReason: finishGate.then(() => 'stop'),
+      });
+    });
+
+    const execution = runAgent(contextWithTracePublisher(published));
+    await waitFor(() =>
+      published.some(
+        (event) =>
+          event.part.type === 'text-delta' &&
+          typeof event.part.textDelta === 'string' &&
+          event.part.textDelta.includes('Early evidence'),
+      ),
+    );
+    expect(published.some((event) => event.part.type === 'finish')).toBe(false);
+
+    releaseFinish();
+    const result = await execution;
+    expect(result.responseText).toBe('Early evidence complete');
+  });
+
+  test('projects each streamed tool event exactly once', async () => {
+    const published: AgentTraceEvent[] = [];
+    const longToolError = { message: 'x'.repeat(2_500) };
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [
+          {
+            type: 'tool-call',
+            toolCallId: 'call-1',
+            toolName: 'lookup',
+            input: { package: 'sentris' },
+            dynamic: true,
+          },
+          {
+            type: 'tool-result',
+            toolCallId: 'call-1',
+            toolName: 'lookup',
+            input: { package: 'sentris' },
+            output: { ok: true },
+            dynamic: true,
+          },
+          {
+            type: 'tool-error',
+            toolCallId: 'call-2',
+            toolName: 'audit',
+            input: { package: 'unsafe' },
+            error: longToolError,
+            dynamic: true,
+          },
+          {
+            type: 'finish',
+            finishReason: 'stop',
+            rawFinishReason: 'stop',
+            totalUsage: createUsage(),
+          },
+        ] as TextStreamPart<ToolSet>[],
+        text: '',
+      }),
+    );
+
+    await runAgent(contextWithTracePublisher(published));
+
+    const expectations = [
+      { type: 'tool-input-available', toolCallId: 'call-1', toolName: 'lookup' },
+      { type: 'tool-output-available', toolCallId: 'call-1', toolName: 'lookup' },
+      { type: 'data-tool-error', toolCallId: 'call-2', toolName: 'audit' },
+    ] as const;
+    for (const expected of expectations) {
+      const matches = published.filter(
+        (event) =>
+          event.part.type === expected.type &&
+          (event.part.toolCallId === expected.toolCallId ||
+            (isRecord(event.part.data) && event.part.data.toolCallId === expected.toolCallId)),
+      );
+      expect(matches).toHaveLength(1);
+      const part = matches[0]!.part;
+      expect(part.toolName ?? (isRecord(part.data) ? part.data.toolName : undefined)).toBe(
+        expected.toolName,
+      );
+    }
+
+    const toolError = published.find((event) => event.part.type === 'data-tool-error');
+    const errorData = isRecord(toolError?.part.data) ? toolError.part.data : {};
+    expect(errorData.error).toStartWith('{"message":"');
+    expect(errorData.error).toContain('...(+');
+    expect((errorData.error as string).length).toBeLessThan(2_050);
+  });
+
+  test('publishes one error finish and rejects when the provider stream fails', async () => {
+    const published: AgentTraceEvent[] = [];
+    const providerError = new Error('provider stream failed');
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [{ type: 'error', error: providerError }],
+        text: '',
+      }),
+    );
+
+    await expect(runAgent(contextWithTracePublisher(published))).rejects.toBe(providerError);
+
+    const finishes = published.filter((event) => event.part.type === 'finish');
+    expect(finishes).toHaveLength(1);
+    expect(finishes[0]!.part).toMatchObject({
+      type: 'finish',
+      finishReason: 'error',
+      responseText: 'provider stream failed',
     });
   });
 });

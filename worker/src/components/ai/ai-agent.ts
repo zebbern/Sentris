@@ -3,10 +3,10 @@ import { z } from 'zod';
 import {
   ToolLoopAgent,
   stepCountIs,
-  type GenerateTextResult,
   type JSONValue,
   type ModelMessage,
-  type StepResult,
+  type StreamTextResult,
+  type TextStreamPart,
   type ToolLoopAgentSettings,
   type ToolResultPart,
   type ToolSet,
@@ -68,8 +68,7 @@ const conversationStateSchema = z.object({
 
 type ConversationState = z.infer<typeof conversationStateSchema>;
 type AgentTools = ToolSet;
-type AgentStepResult = StepResult<AgentTools>;
-type AgentGenerationResult = GenerateTextResult<AgentTools, never>;
+type AgentStreamingResult = StreamTextResult<AgentTools, never>;
 type ToolResultOutput = ToolResultPart['output'];
 interface AiSdkOverrides {
   ToolLoopAgent?: typeof ToolLoopAgent;
@@ -770,17 +769,6 @@ Loop the Conversation State output back into the next agent invocation to keep m
         temperature,
         maxOutputTokens: maxTokens,
         stopWhen: stepCountIsImpl(effectiveStepLimit),
-        onStepFinish: (stepResult: AgentStepResult) => {
-          for (const call of stepResult.toolCalls) {
-            const input = getToolInput(call);
-            agentStream.emitToolInput(call.toolCallId, call.toolName, toRecord(input));
-          }
-
-          for (const result of stepResult.toolResults) {
-            const output = getToolOutput(result);
-            agentStream.emitToolOutput(result.toolCallId, result.toolName, output);
-          }
-        },
         ...(toolsConfig ? { tools: toolsConfig } : {}),
       };
 
@@ -798,25 +786,41 @@ Loop the Conversation State output back into the next agent invocation to keep m
         },
       });
 
-      let generationResult: AgentGenerationResult;
-      try {
-        generationResult = await agent.generate({
-          messages: messagesForModel,
-        });
-      } catch (genError: unknown) {
-        const errorSummary = formatErrorForLog(genError, LOG_TRUNCATE_LIMIT);
-        context.logger.error(
-          `[AIAgent] agent.generate() FAILED (truncated): ${safeStringify(
-            errorSummary,
-            LOG_TRUNCATE_LIMIT,
-          )}`,
-        );
-        throw genError;
+      const streamingResult: AgentStreamingResult = await agent.stream({
+        messages: messagesForModel,
+      });
+      for await (const part of streamingResult.fullStream as AsyncIterable<
+        TextStreamPart<AgentTools>
+      >) {
+        switch (part.type) {
+          case 'text-delta':
+            agentStream.emitTextDelta(part.text);
+            break;
+          case 'tool-call':
+            agentStream.emitToolInput(part.toolCallId, part.toolName, toRecord(part.input));
+            break;
+          case 'tool-result':
+            agentStream.emitToolOutput(part.toolCallId, part.toolName, part.output);
+            break;
+          case 'tool-error':
+            agentStream.emitToolError(
+              part.toolCallId,
+              part.toolName,
+              safeStringify(part.error, LOG_TRUNCATE_LIMIT),
+            );
+            break;
+          case 'error':
+            throw part.error;
+        }
       }
 
-      const responseText = generationResult.text;
+      const [responseText, toolResults, finishReason] = await Promise.all([
+        streamingResult.text,
+        streamingResult.toolResults,
+        streamingResult.finishReason,
+      ]);
 
-      const toolMessages: AgentMessage[] = generationResult.toolResults.map((toolResult) => ({
+      const toolMessages: AgentMessage[] = toolResults.map((toolResult) => ({
         role: 'tool',
         content: {
           toolCallId: toolResult.toolCallId,
@@ -839,8 +843,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
         messages: updatedMessages,
       };
 
-      agentStream.emitTextDelta(responseText);
-      agentStream.emitFinish(generationResult?.finishReason ?? 'stop', responseText);
+      agentStream.emitFinish(finishReason, responseText);
       context.emitProgress({
         level: 'info',
         message: 'AI agent completed.',
@@ -856,6 +859,18 @@ Loop the Conversation State output back into the next agent invocation to keep m
         agentRunId,
         toolStatus: gatewayAccess.toolStatus,
       };
+    } catch (error: unknown) {
+      const errorSummary = formatErrorForLog(error, LOG_TRUNCATE_LIMIT);
+      context.logger.error(
+        `[AIAgent] agent.stream() FAILED (truncated): ${safeStringify(
+          errorSummary,
+          LOG_TRUNCATE_LIMIT,
+        )}`,
+      );
+      const errorMessage =
+        error instanceof Error ? error.message : safeStringify(error, LOG_TRUNCATE_LIMIT);
+      agentStream.emitFinish('error', truncateText(errorMessage, LOG_TRUNCATE_LIMIT));
+      throw error;
     } finally {
       await agentStream.settleWithoutChangingExecution();
       if (closeDiscovery) {
