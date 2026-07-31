@@ -139,15 +139,16 @@ describe('tool-helpers', () => {
       });
 
       const schema = getToolSchema(component);
+      const properties = schema.properties as Record<string, unknown>;
 
       expect(schema.type).toBe('object');
-      expect(Object.keys(schema.properties!)).toEqual(['ipAddress', 'verbose']);
-      expect(schema.properties!.ipAddress).toEqual({
+      expect(Object.keys(properties)).toEqual(['ipAddress', 'verbose']);
+      expect(properties.ipAddress).toEqual({
         type: 'string',
         description: 'IP to check',
       });
       // Zod's toJSONSchema() correctly includes default values - this is better for MCP tools
-      expect(schema.properties!.verbose).toEqual({
+      expect(properties.verbose).toEqual({
         type: 'boolean',
         description: 'Verbose',
         default: false,
@@ -178,9 +179,10 @@ describe('tool-helpers', () => {
       });
 
       const schema = getToolSchema(component);
+      const properties = schema.properties as Record<string, unknown>;
 
-      expect(Object.keys(schema.properties!)).toEqual(['url', 'timeoutMs']);
-      expect(schema.properties!.timeoutMs).toMatchObject({
+      expect(Object.keys(properties)).toEqual(['url', 'timeoutMs']);
+      expect(properties.timeoutMs).toMatchObject({
         type: 'number',
         default: 2000,
         minimum: 100,
@@ -302,11 +304,12 @@ describe('tool-helpers', () => {
       });
 
       const metadata = getToolMetadata(component);
+      const properties = metadata.inputSchema.properties as Record<string, unknown>;
 
       expect(metadata.name).toBe('check_ip_reputation');
       expect(metadata.description).toBe('Check if an IP address is malicious');
-      expect(metadata.inputSchema.properties).toHaveProperty('ipAddress');
-      expect(metadata.inputSchema.properties).not.toHaveProperty('apiKey');
+      expect(properties).toHaveProperty('ipAddress');
+      expect(properties).not.toHaveProperty('apiKey');
     });
   });
 });

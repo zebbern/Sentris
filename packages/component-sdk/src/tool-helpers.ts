@@ -5,24 +5,22 @@
  * This correctly handles z.any(), z.union(), z.enum(), etc.
  */
 
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
-import type { AnySchema, ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import type { JsonSchemaDocument } from '@sentris/shared';
+import type { ZodRawShape, ZodType } from 'zod';
 import type { ComponentDefinition, ComponentPortMetadata, PortBindingType } from './types';
 import { extractPorts } from './zod-ports';
 import { getParamMeta } from './param-meta';
 
 /**
- * Tool input schema - matches the MCP SDK's Tool.inputSchema type.
- * This is a JSON Schema object with type: 'object'.
+ * SDK-independent JSON Schema document for a tool's input.
  */
-// export type ToolInputSchema = Tool['inputSchema'];
-export type ToolInputSchema = Tool['inputSchema'];
+export type ToolInputSchema = JsonSchemaDocument;
 
 /**
  * Tool input shape for MCP server registration.
  * This is a Zod raw shape (record of schemas).
  */
-export type ToolInputShape = ZodRawShapeCompat;
+export type ToolInputShape = ZodRawShape;
 
 /**
  * Metadata for an agent-callable tool, suitable for MCP tools/list response.
@@ -147,13 +145,13 @@ function pick<T extends Record<string, unknown>, K extends string>(
 }
 
 type ZodObjectLike = {
-  shape?: Record<string, AnySchema> | (() => Record<string, AnySchema>);
+  shape?: Record<string, ZodType> | (() => Record<string, ZodType>);
   _def?: {
-    shape?: Record<string, AnySchema> | (() => Record<string, AnySchema>);
+    shape?: Record<string, ZodType> | (() => Record<string, ZodType>);
   };
 };
 
-function getObjectShape(schema: unknown): Record<string, AnySchema> | null {
+function getObjectShape(schema: unknown): Record<string, ZodType> | null {
   if (!schema || typeof schema !== 'object') {
     return null;
   }
@@ -178,7 +176,7 @@ export function getToolInputShape(component: ComponentDefinition): ToolInputShap
   }
 
   const actionInputIds = getActionInputIds(component);
-  const filtered: ToolInputShape = {};
+  const filtered: Record<string, ZodType> = {};
 
   for (const id of actionInputIds) {
     const schema = shape[id];

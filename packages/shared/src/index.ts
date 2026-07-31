@@ -7,6 +7,8 @@ export * from './schedules.js';
 export * from './webhooks.js';
 export * from './mcp.js';
 export * from './mcp-registry.js';
+export * from './mcp-capabilities.js';
+export * from './mcp-invocation.js';
 export * from './notifications.js';
 export * from './discord-webhook.js';
 export * from './findings/index.js';

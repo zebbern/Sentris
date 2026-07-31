@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ComponentCategory } from '@sentris/shared';
+import type { ComponentCategory, JsonSchemaDocument } from '@sentris/shared';
 
 import type {
   IArtifactService,
@@ -136,7 +136,7 @@ export interface ToolProviderConfig {
    * For 'component' kind, optional override for tool input schema.
    * If not provided, it's inferred from component inputs.
    */
-  inputSchema?: any;
+  inputSchema?: JsonSchemaDocument;
 
   /**
    * Optional Docker configuration for 'component' kind tools that run via Docker
