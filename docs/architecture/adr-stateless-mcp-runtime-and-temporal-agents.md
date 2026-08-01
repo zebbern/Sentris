@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; run-gateway foundation implemented, dependent work pending** — 2026-07-31
+**Accepted; run-gateway and durable component invocation slice implemented, dependent work pending** — 2026-08-01
 
 ## Context
 
@@ -39,7 +39,7 @@ Sentris will use a **stateless dual-era MCP facade**, a **protocol-independent c
 and invocation boundary**, **worker-owned runtime leases**, and **Temporal-owned durable
 agent/task lifecycle**.
 
-### Implementation status (2026-07-31)
+### Implementation status (2026-08-01)
 
 The inbound run-gateway foundation is implemented. Its official SDK v2 facade builds a
 request-local server from authenticated run scope and serves modern plus
@@ -53,11 +53,25 @@ migrated to the canonical client/runtime manager: proxied calls deliberately use
 compatibility client pool keyed by run and endpoint.
 
 SDK-independent `ExecutionScope`, grant/catalog descriptor, and invocation-planning
-contracts exist in the shared package. Durable grant and catalog-snapshot persistence,
-durable invocation attempts/results, resources and prompts at runtime, keyed Workflow
-Updates, worker runtime leases and owner routing, MCP Tasks, and workflow-granular agent
-execution remain dependent implementation plans. Nothing in this foundation slice
-claims those runtime or durability properties.
+contracts now back durable run grant/catalog materialization. New run tokens carry an
+immutable snapshot ID, the run gateway advertises exactly that snapshot, and component
+calls execute through one invocation-ID-keyed Workflow Update. The Workflow authorizes
+the compact manifest, persists one logical invocation and attempt, dispatches the typed
+component activity once, records a terminal result, and drains accepted Update handlers
+before finalization.
+
+The no-snapshot gateway branch remains only for workflows whose histories predate the
+tool-invocation protocol query and for already-issued tokens without a snapshot. Delete
+that branch only after every such pre-deployment Workflow is terminal or retired and
+Redis contains no unexpired `mcp:session:*` record without `capabilitySnapshotId` (the
+last such token has a maximum three-hour TTL). It must not receive new behavior.
+
+External snapshot tools still call through the named backend v1 compatibility pool,
+using the immutable snapshot source ID and upstream name. Remaining work is canonical
+outbound runtime ownership, durable external invocation attempts, resources/prompts
+runtime behavior, Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks,
+and workflow-granular durable agent turns. Studio also remains on its separately bounded
+v1 sessionful path.
 
 ### Protocol boundary
 
@@ -335,12 +349,15 @@ duplicate ownership and version surfaces.
 
 Implementation follows the approved design at
 `docs/superpowers/specs/2026-07-31-mcp-runtime-temporal-agent-architecture-design.md`.
-Run-gateway session state, affinity, and legacy SSE have been removed. Studio session
-state and affinity remain until Studio uses the shared facade and durable task
-projection. The explicit outbound v1 pool and remaining v1 package declarations remain
-until the runtime-manager/canonical-outbound plan is complete and their owned callers
-have migrated. If a new run-gateway session adapter is ever enabled, the versioned
-supported-client matrix and backend MCP module owner make a mandatory
+Run-gateway session state, affinity, and legacy SSE have been removed. The no-snapshot
+live-catalog/signal path remains only until every Workflow history predating the durable
+invocation protocol is terminal or retired and every token lacking
+`capabilitySnapshotId` has expired from Redis; the token TTL is capped at three hours.
+Studio session state and affinity remain until Studio uses the shared facade and durable
+task projection. The explicit outbound v1 pool and remaining v1 package declarations
+remain until the runtime-manager/canonical-outbound plan is complete and their owned
+callers have migrated. If a new run-gateway session adapter is ever enabled, the
+versioned supported-client matrix and backend MCP module owner make a mandatory
 remove-or-explicitly-renew decision no later than its second normal release; renewal
 requires an ADR update and product approval.
 

@@ -9,6 +9,7 @@ const BASELINE_TAG = '0000_v1_0_0';
 const STATEMENT_BREAKPOINT = '--> statement-breakpoint';
 const SNAPSHOT_ROOT_ID = '00000000-0000-0000-0000-000000000000';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const POSTGRES_IDENTIFIER_MAX_BYTES = 63;
 
 export interface SchemaColumn {
   schemaName: string;
@@ -809,10 +810,66 @@ export function normalizeSchemaFingerprint(fingerprint: SchemaFingerprint): Sche
   };
 }
 
+export function normalizePostgresIdentifier(identifier: string): string {
+  if (Buffer.byteLength(identifier, 'utf8') <= POSTGRES_IDENTIFIER_MAX_BYTES) {
+    return identifier;
+  }
+
+  let normalized = '';
+  let byteLength = 0;
+  for (const character of identifier) {
+    const characterByteLength = Buffer.byteLength(character, 'utf8');
+    if (byteLength + characterByteLength > POSTGRES_IDENTIFIER_MAX_BYTES) break;
+    normalized += character;
+    byteLength += characterByteLength;
+  }
+  return normalized;
+}
+
+function normalizePostgresNamedObjectsForComparison(
+  fingerprint: SchemaFingerprint,
+): SchemaFingerprint {
+  const normalizedConstraintNames = new Map<string, string>();
+  const constraints = fingerprint.constraints.map((constraint) => {
+    const normalizedName = normalizePostgresIdentifier(constraint.name);
+    const key = `${constraint.schemaName}\u0000${constraint.tableName}\u0000${normalizedName}`;
+    const existingName = normalizedConstraintNames.get(key);
+    if (existingName !== undefined && existingName !== constraint.name) {
+      throw new Error(
+        `PostgreSQL identifier collision after 63-byte normalization: constraint ${constraint.schemaName}.${constraint.tableName}.${normalizedName} (${existingName}, ${constraint.name})`,
+      );
+    }
+    normalizedConstraintNames.set(key, constraint.name);
+    return { ...constraint, name: normalizedName };
+  });
+
+  const normalizedIndexNames = new Map<string, string>();
+  const indexes = fingerprint.indexes.map((index) => {
+    const normalizedName = normalizePostgresIdentifier(index.name);
+    const key = `${index.schemaName}\u0000${normalizedName}`;
+    const existingName = normalizedIndexNames.get(key);
+    if (existingName !== undefined && existingName !== index.name) {
+      throw new Error(
+        `PostgreSQL identifier collision after 63-byte normalization: index ${index.schemaName}.${normalizedName} (${existingName}, ${index.name})`,
+      );
+    }
+    normalizedIndexNames.set(key, index.name);
+    return { ...index, name: normalizedName };
+  });
+
+  return {
+    ...fingerprint,
+    constraints,
+    indexes,
+  };
+}
+
 function normalizeSchemaFingerprintForComparison(
   fingerprint: SchemaFingerprint,
 ): SchemaFingerprint {
-  const normalized = normalizeSchemaFingerprint(fingerprint);
+  const normalized = normalizePostgresNamedObjectsForComparison(
+    normalizeSchemaFingerprint(fingerprint),
+  );
   const textColumnsByTable = new Map<string, Set<string>>();
   for (const column of normalized.columns) {
     if (!isTextColumnType(column.dataType)) continue;

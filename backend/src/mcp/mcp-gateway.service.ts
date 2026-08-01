@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -12,10 +13,18 @@ import {
   getToolInputShape,
 } from '@sentris/component-sdk';
 import { fromJsonSchema, McpServer } from '@modelcontextprotocol/server';
-import type { McpToolRegistrationDescriptor } from '@sentris/shared';
+import {
+  TOOL_INVOCATION_UPDATE_NAME,
+  ToolInvocationRequestSchema,
+  ToolInvocationResultSchema,
+  type McpToolRegistrationDescriptor,
+  type ToolDescriptor,
+  type ToolInvocationResult,
+} from '@sentris/shared';
 import { z } from 'zod';
 
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+import { McpRuntimeRepository } from '../mcp-runtime/mcp-runtime.repository';
 import {
   claimMcpToolName,
   externalMcpToolName,
@@ -26,7 +35,7 @@ import { TraceRepository } from '../trace/trace.repository';
 import type { TraceEventType } from '../trace/types';
 import { WorkflowRunRepository } from '../workflows/repository/workflow-run.repository';
 import { McpLegacyOutboundCompatibilityService } from './mcp-legacy-outbound-compatibility.service';
-import type { RunMcpRequestContext } from './run-mcp-request-context';
+import { toRunExecutionScope, type RunMcpRequestContext } from './run-mcp-request-context';
 import { ToolRegistryService, type RegisteredTool } from './tool-registry.service';
 
 @Injectable()
@@ -40,13 +49,23 @@ export class McpGatewayService {
     private readonly workflowRunRepository: WorkflowRunRepository,
     private readonly traceRepository: TraceRepository,
     private readonly mcpServersRepository: McpServersRepository,
+    private readonly mcpRuntimeRepository: McpRuntimeRepository,
   ) {}
 
   async createServerForRun(context: RunMcpRequestContext): Promise<McpServer> {
     await this.validateRunAccess(context.runId, context.organizationId);
     const server = new McpServer({ name: 'sentris-flow-gateway', version: '1.0.0' });
     const registeredToolNames = new Set<string>();
-    await this.registerTools(server, context, registeredToolNames);
+    if (context.capabilitySnapshotId) {
+      await this.registerSnapshotTools(
+        server,
+        context,
+        context.capabilitySnapshotId,
+        registeredToolNames,
+      );
+    } else {
+      await this.registerLegacyLiveTools(server, context, registeredToolNames);
+    }
     this.logger.log(
       `[createServerForRun] Registered ${registeredToolNames.size} tools for run ${context.runId}`,
     );
@@ -63,7 +82,211 @@ export class McpGatewayService {
     }
   }
 
-  private async registerTools(
+  private async registerSnapshotTools(
+    server: McpServer,
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    registeredToolNames: Set<string>,
+  ): Promise<void> {
+    const authority = await this.mcpRuntimeRepository.getAuthority({
+      capabilityGrantId: context.capabilityGrantId,
+      capabilitySnapshotId,
+      runId: context.runId,
+      organizationId: context.organizationId,
+    });
+    if (!authority) {
+      throw new ForbiddenException('MCP capability snapshot does not match the run authority');
+    }
+
+    const externalDescriptors = authority.snapshot.tools.filter(
+      (
+        descriptor,
+      ): descriptor is ToolDescriptor & {
+        source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
+      } => descriptor.source.kind === 'mcp',
+    );
+    const externalSources = externalDescriptors.length
+      ? await this.resolveSnapshotExternalSources(context.runId, externalDescriptors)
+      : new Map<string, RegisteredTool>();
+
+    for (const descriptor of authority.snapshot.tools) {
+      claimMcpToolName(registeredToolNames, descriptor.canonicalName);
+      if (descriptor.source.kind === 'component') {
+        this.registerSnapshotComponentTool(server, context, capabilitySnapshotId, {
+          ...descriptor,
+          source: descriptor.source,
+        });
+      } else {
+        const source = externalSources.get(descriptor.source.sourceId);
+        if (!source) {
+          throw new NotFoundException(
+            `External MCP source ${descriptor.source.sourceId} is unavailable for run ${context.runId}`,
+          );
+        }
+        this.registerSnapshotExternalTool(server, context.runId, source, {
+          ...descriptor,
+          source: descriptor.source,
+        });
+      }
+    }
+  }
+
+  private async resolveSnapshotExternalSources(
+    runId: string,
+    descriptors: readonly (ToolDescriptor & {
+      source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
+    })[],
+  ): Promise<Map<string, RegisteredTool>> {
+    const requiredSourceIds = new Set(descriptors.map((descriptor) => descriptor.source.sourceId));
+    const registered = await this.toolRegistry.getToolsForRun(runId);
+    const sources = new Map<string, RegisteredTool>();
+    for (const source of registered) {
+      if (!requiredSourceIds.has(source.nodeId)) continue;
+      if (source.type === 'component') {
+        throw new ForbiddenException(
+          `External MCP source ${source.nodeId} does not match its immutable snapshot binding`,
+        );
+      }
+      if (sources.has(source.nodeId)) {
+        throw new ForbiddenException(`Duplicate MCP runtime source mapping: ${source.nodeId}`);
+      }
+      sources.set(source.nodeId, source);
+    }
+    return sources;
+  }
+
+  private registerSnapshotComponentTool(
+    server: McpServer,
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    descriptor: ToolDescriptor & {
+      source: Extract<ToolDescriptor['source'], { kind: 'component' }>;
+    },
+  ): void {
+    this.registerSnapshotDescriptor(server, descriptor, async (args) => {
+      const startedAt = Date.now();
+      await this.logToolCall(
+        context.runId,
+        descriptor.canonicalName,
+        'STARTED',
+        descriptor.source.nodeId,
+      );
+      try {
+        const now = new Date();
+        const request = ToolInvocationRequestSchema.parse({
+          invocationId: randomUUID(),
+          scope: toRunExecutionScope(context),
+          capabilitySnapshotId,
+          toolName: descriptor.canonicalName,
+          input: args,
+          requestedAt: now.toISOString(),
+          deadlineAt: new Date(now.getTime() + 5 * 60_000).toISOString(),
+        });
+        const result = ToolInvocationResultSchema.parse(
+          await this.temporalService.executeWorkflowUpdate<ToolInvocationResult>({
+            workflowId: context.runId,
+            updateName: TOOL_INVOCATION_UPDATE_NAME,
+            updateId: request.invocationId,
+            args: request,
+          }),
+        );
+        if (result.status === 'completed') {
+          await this.logToolCall(
+            context.runId,
+            descriptor.canonicalName,
+            'COMPLETED',
+            descriptor.source.nodeId,
+            { duration: Date.now() - startedAt, output: result.output },
+          );
+          const response = {
+            content: [{ type: 'text' as const, text: JSON.stringify(result.output, null, 2) }],
+          };
+          return isRecord(result.output)
+            ? { ...response, structuredContent: result.output }
+            : response;
+        }
+
+        const message = result.error?.message ?? `Tool invocation ended with ${result.status}`;
+        await this.logToolCall(
+          context.runId,
+          descriptor.canonicalName,
+          'FAILED',
+          descriptor.source.nodeId,
+          { duration: Date.now() - startedAt, error: message },
+        );
+        return mcpToolError(message);
+      } catch (error) {
+        const message = safeErrorMessage(error);
+        await this.logToolCall(
+          context.runId,
+          descriptor.canonicalName,
+          'FAILED',
+          descriptor.source.nodeId,
+          { duration: Date.now() - startedAt, error: message },
+        );
+        return mcpToolError(message);
+      }
+    });
+  }
+
+  private registerSnapshotExternalTool(
+    server: McpServer,
+    runId: string,
+    source: RegisteredTool,
+    descriptor: ToolDescriptor & {
+      source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
+    },
+  ): void {
+    this.registerSnapshotDescriptor(server, descriptor, async (args) => {
+      const startedAt = Date.now();
+      const nodeRef = `mcp:${descriptor.canonicalName}`;
+      await this.logToolCall(runId, descriptor.canonicalName, 'STARTED', nodeRef);
+      try {
+        const result = await this.legacyOutbound.callTool(
+          runId,
+          source,
+          descriptor.source.upstreamName,
+          args,
+        );
+        await this.logToolCall(runId, descriptor.canonicalName, 'COMPLETED', nodeRef, {
+          duration: Date.now() - startedAt,
+          output: result,
+        });
+        return result;
+      } catch (error) {
+        const message = safeErrorMessage(error);
+        await this.logToolCall(runId, descriptor.canonicalName, 'FAILED', nodeRef, {
+          duration: Date.now() - startedAt,
+          error: message,
+        });
+        return mcpToolError(message);
+      }
+    });
+  }
+
+  private registerSnapshotDescriptor(
+    server: McpServer,
+    descriptor: ToolDescriptor,
+    callback: (args: Record<string, unknown>) => Promise<unknown>,
+  ): void {
+    server.registerTool(
+      descriptor.canonicalName,
+      {
+        title: descriptor.title,
+        description: descriptor.description,
+        inputSchema: fromJsonSchema<Record<string, unknown>>(descriptor.inputSchema),
+        outputSchema: descriptor.outputSchema
+          ? fromJsonSchema<Record<string, unknown>>(descriptor.outputSchema)
+          : undefined,
+        icons: descriptor.icons,
+        annotations: descriptor.annotations,
+        _meta: descriptor.meta,
+      },
+      callback as never,
+    );
+  }
+
+  private async registerLegacyLiveTools(
     server: McpServer,
     context: RunMcpRequestContext,
     registeredToolNames: Set<string>,
@@ -74,7 +297,7 @@ export class McpGatewayService {
     for (const tool of registered.filter((candidate) => candidate.type === 'component')) {
       if (tool.exposedToAgent === false) continue;
       claimMcpToolName(registeredToolNames, tool.toolName);
-      this.registerComponentTool(server, context.runId, tool);
+      this.registerLegacyComponentTool(server, context.runId, tool);
     }
 
     const externalSources = registered
@@ -86,7 +309,7 @@ export class McpGatewayService {
         for (const upstream of tools) {
           const canonicalName = externalMcpToolName(source.toolName, upstream.name);
           claimMcpToolName(registeredToolNames, canonicalName);
-          this.registerExternalTool(server, context.runId, source, upstream, canonicalName);
+          this.registerLegacyExternalTool(server, context.runId, source, upstream, canonicalName);
         }
       } catch (error) {
         if (error instanceof McpToolNameCollisionError) throw error;
@@ -95,7 +318,11 @@ export class McpGatewayService {
     }
   }
 
-  private registerComponentTool(server: McpServer, runId: string, tool: RegisteredTool): void {
+  private registerLegacyComponentTool(
+    server: McpServer,
+    runId: string,
+    tool: RegisteredTool,
+  ): void {
     const component = tool.componentId ? componentRegistry.get(tool.componentId) : null;
     const inputShape = component ? getToolInputShape(component) : undefined;
     server.registerTool(
@@ -153,7 +380,7 @@ export class McpGatewayService {
     );
   }
 
-  private registerExternalTool(
+  private registerLegacyExternalTool(
     server: McpServer,
     runId: string,
     source: RegisteredTool,
@@ -326,4 +553,19 @@ function isNodeAllowed(nodeId: string, allowedNodeIds: readonly string[]): boole
     allowedNodeIds.length === 0 ||
     allowedNodeIds.some((allowed) => nodeId === allowed || nodeId.startsWith(`${allowed}/`))
   );
+}
+
+function mcpToolError(message: string) {
+  return {
+    content: [{ type: 'text' as const, text: `Error: ${message}` }],
+    isError: true,
+  };
+}
+
+function safeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

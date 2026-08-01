@@ -5,7 +5,49 @@ import {
   createMigrationArtifactManifest,
   type AppliedMigration,
   type MigrationPlan,
+  type SchemaConstraint,
 } from '../migrations/checked-migrations';
+
+const LONG_MCP_FOREIGN_KEYS = [
+  {
+    tableName: 'mcp_capability_snapshots',
+    name: 'mcp_capability_snapshots_capability_grant_id_mcp_capability_grants_id_fk',
+    column: 'capability_grant_id',
+    referencedTableName: 'mcp_capability_grants',
+    referencedColumn: 'id',
+  },
+  {
+    tableName: 'mcp_invocation_attempts',
+    name: 'mcp_invocation_attempts_invocation_id_mcp_invocations_invocation_id_fk',
+    column: 'invocation_id',
+    referencedTableName: 'mcp_invocations',
+    referencedColumn: 'invocation_id',
+  },
+  {
+    tableName: 'mcp_invocations',
+    name: 'mcp_invocations_capability_snapshot_id_mcp_capability_snapshots_id_fk',
+    column: 'capability_snapshot_id',
+    referencedTableName: 'mcp_capability_snapshots',
+    referencedColumn: 'id',
+  },
+] as const;
+
+function mcpForeignKey(input: (typeof LONG_MCP_FOREIGN_KEYS)[number]): SchemaConstraint {
+  return {
+    schemaName: 'public',
+    tableName: input.tableName,
+    name: input.name,
+    type: 'foreignKey',
+    columns: [input.column],
+    nullsNotDistinct: null,
+    expression: null,
+    referencedSchemaName: 'public',
+    referencedTableName: input.referencedTableName,
+    referencedColumns: [input.referencedColumn],
+    onUpdate: 'no action',
+    onDelete: 'restrict',
+  };
+}
 
 function createPlan(): MigrationPlan {
   const snapshot = {
@@ -124,6 +166,83 @@ describe('database migration startup guard', () => {
 
     await expect(assertDatabaseMigrationsCurrent(database, plan)).rejects.toThrow(
       'Database schema drift detected',
+    );
+  });
+
+  it('accepts PostgreSQL-truncated MCP foreign-key names', async () => {
+    const plan = createPlan();
+    const ledger = plan.migrations.map(({ idx, tag, checksum }) => ({ idx, tag, checksum }));
+    const expectedSchema = plan.migrations.at(-1)!.schema;
+    expectedSchema.constraints.push(...LONG_MCP_FOREIGN_KEYS.map(mcpForeignKey));
+    expectedSchema.indexes.push({
+      schemaName: 'public',
+      tableName: 'mcp_invocations',
+      name: 'mcp_invocations_organization_capability_snapshot_created_at_durable_lookup_idx',
+      isUnique: false,
+      method: 'btree',
+      columns: [
+        {
+          expression: 'organization_id',
+          isExpression: false,
+          asc: true,
+          nulls: 'last',
+          opclass: null,
+        },
+      ],
+      where: null,
+      with: {},
+    });
+    const actualSchema = structuredClone(expectedSchema);
+    actualSchema.constraints = actualSchema.constraints.map((constraint) => ({
+      ...constraint,
+      name: constraint.name.slice(0, 63),
+    }));
+    actualSchema.indexes = actualSchema.indexes.map((index) => ({
+      ...index,
+      name: index.name.slice(0, 63),
+    }));
+    const database = {
+      ...reader(ledger, plan),
+      async inspectPublicSchema() {
+        return actualSchema;
+      },
+    };
+
+    await expect(assertDatabaseMigrationsCurrent(database, plan)).resolves.toBe(2);
+  });
+
+  it('still rejects non-name drift when PostgreSQL truncates an MCP foreign-key name', async () => {
+    const plan = createPlan();
+    const ledger = plan.migrations.map(({ idx, tag, checksum }) => ({ idx, tag, checksum }));
+    const expectedSchema = plan.migrations.at(-1)!.schema;
+    expectedSchema.constraints.push(mcpForeignKey(LONG_MCP_FOREIGN_KEYS[0]));
+    const actualSchema = structuredClone(expectedSchema);
+    actualSchema.constraints[0]!.name = actualSchema.constraints[0]!.name.slice(0, 63);
+    actualSchema.constraints[0]!.onDelete = 'cascade';
+    const database = {
+      ...reader(ledger, plan),
+      async inspectPublicSchema() {
+        return actualSchema;
+      },
+    };
+
+    await expect(assertDatabaseMigrationsCurrent(database, plan)).rejects.toThrow(
+      'Database schema drift detected',
+    );
+  });
+
+  it('rejects expected identifiers that collide after PostgreSQL truncation', async () => {
+    const plan = createPlan();
+    const ledger = plan.migrations.map(({ idx, tag, checksum }) => ({ idx, tag, checksum }));
+    const expectedSchema = plan.migrations.at(-1)!.schema;
+    const first = mcpForeignKey(LONG_MCP_FOREIGN_KEYS[0]);
+    expectedSchema.constraints.push(first, {
+      ...first,
+      name: `${first.name}_collision`,
+    });
+
+    await expect(assertDatabaseMigrationsCurrent(reader(ledger, plan), plan)).rejects.toThrow(
+      'PostgreSQL identifier collision',
     );
   });
 });

@@ -250,4 +250,61 @@ describe('mock.agent', () => {
       },
     ]);
   });
+
+  test('calls the OSV component tool with deterministic vulnerable package arguments', async () => {
+    const component = componentRegistry.get('mock.agent');
+    expect(component).toBeDefined();
+    const mockCallTool = vi.fn().mockResolvedValue({
+      isError: false,
+      content: [{ type: 'text', text: '{"findings":[{"id":"GHSA-test"}]}' }],
+    });
+
+    class MockClient {
+      connect = vi.fn().mockResolvedValue(undefined);
+      listTools = vi.fn().mockResolvedValue({
+        tools: [
+          {
+            name: 'osv_dependency_query',
+            description: 'Query OSV package vulnerabilities',
+          },
+        ],
+      });
+      callTool = mockCallTool;
+      close = vi.fn().mockResolvedValue(undefined);
+    }
+
+    class MockTransport {
+      constructor(
+        public url: URL,
+        public options: any,
+      ) {}
+    }
+
+    const result = await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      { inputs: {}, params: { callTools: true, maxToolCalls: 1 } },
+      createTestContext({
+        metadata: {
+          runId: 'test-run',
+          componentRef: 'mock.agent',
+          connectedToolNodeIds: ['osv'],
+          mockAgentOverrides: {
+            Client: MockClient as any,
+            StreamableHTTPClientTransport: MockTransport as any,
+            getGatewaySessionToken: vi.fn().mockResolvedValue('osv-token'),
+          },
+        } as any,
+      }),
+    );
+
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: 'osv_dependency_query',
+      arguments: { packageSpecs: ['lodash@4.17.20'] },
+    });
+    expect((result.toolCallResults as { toolName: string; success: boolean }[])[0]).toMatchObject({
+      toolName: 'osv_dependency_query',
+      success: true,
+    });
+  });
 });

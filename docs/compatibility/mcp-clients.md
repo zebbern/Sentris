@@ -30,9 +30,22 @@ the administrative session registry are expected.
 
 The gateway's outbound proxy is still an explicit v1 compatibility pool keyed by run
 and endpoint. Its replacement belongs to the worker runtime-manager and canonical
-outbound-client plan. SDK-independent shared catalog and invocation contracts exist,
-but durable grants/snapshots and invocation persistence, resources/prompts runtime,
-Workflow Updates, runtime leases, Tasks, and workflow-granular agents remain pending.
+outbound-client plan. New runs materialize an immutable grant/catalog snapshot, advertise
+that persisted snapshot, and invoke component tools through one keyed Workflow Update
+with durable logical-invocation and attempt rows. External snapshot tools deliberately
+remain on the named v1 backend adapter, selected by their immutable source ID and
+upstream tool name.
+
+The live-catalog/signal path is retained only for pre-deployment Workflow histories that
+do not register the invocation protocol query and for already-issued tokens without
+`capabilitySnapshotId`. Its exact deletion condition is: every such Workflow is terminal
+or retired and Redis has no remaining `mcp:session:*` record without a snapshot ID. A
+legacy token can live for at most three hours, and this branch receives no new behavior.
+
+Remaining migration work is canonical outbound runtime ownership, durable external
+invocation attempts, resources/prompts runtime behavior, Continue-As-New rollover,
+MCP Tasks, and workflow-granular durable agent turns. Studio's v1 sessionful route is a
+separate compatibility boundary.
 
 ## Supported-client acceptance matrix
 

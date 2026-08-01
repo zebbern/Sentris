@@ -294,10 +294,15 @@ have been removed; its requests use the ordinary backend upstream. SDK-independe
 shared capability-catalog and invocation contracts also exist.
 
 Studio remains a v1 sessionful endpoint on sticky routing, and the outbound gateway
-remains an explicit v1 run-and-endpoint-scoped compatibility pool. Durable grants and
-catalog snapshots, invocation persistence, resources/prompts runtime behavior, Workflow
-Updates, worker runtime leases, MCP Tasks, and workflow-granular agents remain dependent
-work. See
+remains an explicit v1 run-and-endpoint-scoped compatibility pool. New runs materialize
+immutable grants/catalog snapshots; the run gateway lists the persisted snapshot and
+component calls use keyed Workflow Updates with durable invocation attempts. The legacy
+live-catalog/signal path is only for pre-deployment Workflow histories and unexpired
+tokens without `capabilitySnapshotId`; remove it after those histories are terminal or
+retired and Redis has no such token (maximum token TTL: three hours). Remaining work is
+canonical outbound runtime ownership, durable external invocation attempts,
+resources/prompts runtime behavior, Continue-As-New, MCP Tasks, and workflow-granular
+agent turns. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.

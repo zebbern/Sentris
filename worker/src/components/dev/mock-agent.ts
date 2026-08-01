@@ -20,6 +20,7 @@ const TEST_TOOL_CALLS: Record<string, Record<string, unknown>> = {
   abuseipdb_check: { ipAddress: '8.8.8.8' },
   virustotal_lookup: { indicator: '8.8.8.8' },
   fetch: { url: 'https://example.com', max_length: 1200 },
+  osv_dependency_query: { packageSpecs: ['lodash@4.17.20'] },
 };
 
 /**
