@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'bun:test';
-import { componentRegistry, ServiceError } from '@sentris/component-sdk';
+import { componentRegistry, ConfigurationError, ServiceError } from '@sentris/component-sdk';
 import * as SDK from '@sentris/component-sdk';
 import { IsolatedContainerVolume } from '../../../utils/isolated-volume';
 import * as utils from '../utils';
@@ -166,6 +166,41 @@ describe('core.ai.claude-code', () => {
     const runnerCall = runSpy.mock.calls[0][0];
     expect(runnerCall.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('oauth-token-value');
     expect(runnerCall.env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('rejects non-Anthropic provider models before starting runtime dependencies', async () => {
+    const component = componentRegistry.get('core.ai.claude-code');
+    if (!component) throw new Error('Component not found');
+
+    await expect(
+      component.execute(
+        {
+          inputs: {
+            task: 'Triage findings',
+            model: {
+              provider: 'openai',
+              modelId: 'gpt-5',
+              apiKey: 'sk-openai-test',
+            },
+          },
+          params: {},
+        },
+        {
+          runId: 'unsupported-provider-run',
+          componentRef: 'unsupported-provider-ref',
+          organizationId: 'org-1',
+          metadata: { connectedToolNodeIds: [], organizationId: 'org-1' },
+          logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+          emitProgress: vi.fn(),
+        } as never,
+      ),
+    ).rejects.toMatchObject({
+      type: 'ConfigurationError',
+      message: "Claude Code only supports Anthropic provider models; received 'openai'.",
+      configKey: 'model.provider',
+    } satisfies Partial<ConfigurationError>);
+    expect(utils.getGatewaySessionToken).not.toHaveBeenCalled();
+    expect(runSpy).not.toHaveBeenCalled();
   });
 
   it('sanitizes structured JSON reports prefixed with Claude Code logs', async () => {

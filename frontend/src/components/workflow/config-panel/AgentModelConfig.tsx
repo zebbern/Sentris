@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
-import { isLlmModelProvider } from '@sentris/shared';
+import { isLlmModelProvider, LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,10 @@ import { SecretSelect } from '@/components/inputs/SecretSelect';
 import { useAnthropicModels } from '@/hooks/queries/useAgentModelQueries';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { ReadinessSummary } from '@/features/agent-readiness/ReadinessSummary';
-import { evaluateLlmProviderReadiness } from '@/features/agent-readiness/readiness';
+import {
+  evaluateLlmProviderReadiness,
+  isLlmProviderAccepted,
+} from '@/features/agent-readiness/readiness';
 import {
   AGENT_MODEL_OPTIONS_BY_PROVIDER,
   AGENT_MODEL_PROVIDER_OPTIONS,
@@ -32,6 +35,8 @@ export interface AgentModelConfigProps {
   inputId: string;
   value: unknown;
   connectedSource?: string;
+  connectedProviderId?: LlmModelProvider;
+  acceptedProviderIds?: readonly LlmModelProvider[];
   onChange: (inputId: string, value: AgentModelConfigValue) => void;
 }
 
@@ -54,6 +59,8 @@ export function AgentModelConfig({
   inputId,
   value,
   connectedSource,
+  connectedProviderId,
+  acceptedProviderIds,
   onChange,
 }: AgentModelConfigProps) {
   const isClaudeCode = componentId === 'core.ai.claude-code';
@@ -165,6 +172,8 @@ export function AgentModelConfig({
   const readinessRows = evaluateLlmProviderReadiness({
     value,
     connectedSource,
+    connectedProviderId,
+    acceptedProviderIds,
     supportedAuthModes: isClaudeCode ? ['api_key', 'subscription_oauth'] : ['api_key'],
     secrets: {
       items: secretsQuery.data ?? [],
@@ -172,6 +181,10 @@ export function AgentModelConfig({
       error: secretsQuery.error,
     },
   });
+  const connectedProviderError =
+    Boolean(connectedSource) &&
+    connectedProviderId !== undefined &&
+    !isLlmProviderAccepted(connectedProviderId, acceptedProviderIds);
 
   return (
     <CollapsibleSection
@@ -181,16 +194,29 @@ export function AgentModelConfig({
     >
       <div className="mt-2 space-y-3">
         <p className="text-xs text-muted-foreground leading-relaxed">
-          Pick a model and credential here, or connect an Anthropic/OpenAI Provider node to the
-          Model port on the canvas.
+          Pick a model and credential here, or connect{' '}
+          {isClaudeCode ? 'an Anthropic Provider node' : 'a Provider node'} to the Model port on the
+          canvas.
         </p>
 
         {connectedSource ? (
-          <div className="flex items-start gap-2 rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
-            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <div
+            className={
+              connectedProviderError
+                ? 'flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive'
+                : 'flex items-start gap-2 rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400'
+            }
+          >
+            {connectedProviderError ? (
+              <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            ) : (
+              <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            )}
             <span>
-              Using provider connected from {connectedSource}. Disconnect that wire to configure
-              inline.
+              {connectedProviderError && connectedProviderId
+                ? `${LLM_PROVIDER_CATALOG[connectedProviderId].label} is not supported by this model port. `
+                : `Using provider connected from ${connectedSource}. `}
+              Disconnect that wire to configure inline.
             </span>
           </div>
         ) : (

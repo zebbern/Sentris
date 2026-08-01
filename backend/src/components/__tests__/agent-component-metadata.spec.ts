@@ -44,14 +44,39 @@ describe('agent component metadata API payload', () => {
       expect(listedInput).toEqual(
         expect.objectContaining({
           editor: 'llm-provider',
-          connectionType: {
+          connectionType: expect.objectContaining({
             kind: 'contract',
             name: 'core.ai.llm-provider.v1',
             credential: true,
-          },
+          }),
         }),
       );
       expect(fetchedInput).toEqual(listedInput);
+    }
+
+    expect(
+      listed
+        .find((component) => component.id === 'core.ai.claude-code')
+        ?.inputs.find((input) => input.id === 'model')?.connectionType,
+    ).toEqual(expect.objectContaining({ acceptedProviderIds: ['anthropic'] }));
+
+    for (const [componentId, providerId] of [
+      ['core.provider.anthropic', 'anthropic'],
+      ['core.provider.gemini', 'gemini'],
+      ['core.provider.openai', 'openai'],
+      ['core.provider.openrouter', 'openrouter'],
+    ] as const) {
+      const listedOutput = listed
+        .find((component) => component.id === componentId)
+        ?.outputs.find((output) => output.id === 'chatModel');
+      const fetchedOutput = controller
+        .getComponent(componentId)
+        .outputs.find((output) => output.id === 'chatModel');
+
+      expect(listedOutput?.connectionType).toEqual(
+        expect.objectContaining({ producedProviderId: providerId }),
+      );
+      expect(fetchedOutput).toEqual(listedOutput);
     }
 
     const listedLegacyInput = listed

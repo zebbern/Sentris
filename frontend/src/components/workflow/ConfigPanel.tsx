@@ -12,7 +12,11 @@ import { ConfigPanelMcpServer } from './config-panel/ConfigPanelMcpServer';
 import { ConfigPanelParameters } from './config-panel/ConfigPanelParameters';
 import { ConfigPanelInputs } from './config-panel/ConfigPanelInputs';
 import { AgentModelConfig } from './config-panel/AgentModelConfig';
-import { findLlmProviderInput } from '@/features/agent-readiness/readiness';
+import {
+  findLlmProviderInput,
+  getAcceptedLlmProviderIds,
+  getProducedLlmProviderId,
+} from '@/features/agent-readiness/readiness';
 import { ConfigPanelOutputs } from './config-panel/ConfigPanelOutputs';
 import { ConfigPanelSchedules } from './config-panel/ConfigPanelSchedules';
 import { ConfigPanelExamples } from './config-panel/ConfigPanelExamples';
@@ -232,6 +236,17 @@ export function ConfigPanel({
         return (sourceNode?.data as FrontendNodeData)?.label || llmConnection.source;
       })()
     : undefined;
+  const connectedProviderId = llmConnection
+    ? (() => {
+        const sourceNode = getNodes().find((node) => node.id === llmConnection.source);
+        const sourceData = sourceNode?.data as FrontendNodeData | undefined;
+        const sourceRef = sourceData?.componentId ?? sourceData?.componentSlug;
+        const sourceComponent = sourceRef ? getComponent(sourceRef) : null;
+        return sourceComponent
+          ? getProducedLlmProviderId(sourceComponent.outputs, llmConnection.sourceHandle)
+          : undefined;
+      })()
+    : undefined;
 
   return (
     <div
@@ -292,6 +307,8 @@ export function ConfigPanel({
               inputId={llmInput.id}
               value={inputOverrides[llmInput.id]}
               connectedSource={connectedSource}
+              connectedProviderId={connectedProviderId}
+              acceptedProviderIds={getAcceptedLlmProviderIds(llmInput)}
               onChange={handleInputOverrideChange}
             />
           ) : null}

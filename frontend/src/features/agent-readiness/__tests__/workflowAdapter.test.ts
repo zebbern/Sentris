@@ -30,7 +30,11 @@ const agentComponent = (id = 'core.ai.agent', inputId = 'chatModel') =>
         id: inputId,
         label: 'Model',
         editor: 'llm-provider',
-        connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+        connectionType: {
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          ...(id === 'core.ai.claude-code' ? { acceptedProviderIds: ['anthropic'] } : {}),
+        },
       },
       { id: 'tools', label: 'Tools', connectionType: { kind: 'contract', name: 'mcp.tool' } },
     ],
@@ -44,6 +48,25 @@ const customMcpComponent = {
   name: 'Custom MCP',
   inputs: [],
   outputs: [],
+  parameters: [],
+} as unknown as ComponentMetadata;
+
+const openAiProviderComponent = {
+  id: 'core.provider.openai',
+  slug: 'openai-provider',
+  name: 'OpenAI Provider',
+  inputs: [],
+  outputs: [
+    {
+      id: 'chatModel',
+      label: 'LLM Provider Config',
+      connectionType: {
+        kind: 'contract',
+        name: 'core.ai.llm-provider.v1',
+        producedProviderId: 'openai',
+      },
+    },
+  ],
   parameters: [],
 } as unknown as ComponentMetadata;
 
@@ -104,6 +127,7 @@ function evaluate(input: {
   const components = new Map<string, ComponentMetadata>([
     [component.id, component],
     [customMcpComponent.id, customMcpComponent],
+    [openAiProviderComponent.id, openAiProviderComponent],
   ]);
 
   return evaluateWorkflowAgentNodeReadiness({
@@ -163,6 +187,39 @@ describe('evaluateWorkflowAgentNodeReadiness', () => {
         expect.objectContaining({ kind: 'credential', label: 'Connected' }),
       ]),
     );
+  });
+
+  it('blocks a connected provider excluded by the target model port capability', () => {
+    const component = agentComponent('core.ai.claude-code', 'model');
+    const agent = node('agent', component.id);
+    const provider = node('provider', openAiProviderComponent.id, undefined, 'Primary OpenAI');
+
+    const rows = evaluate({
+      component,
+      agent,
+      nodes: [agent, provider],
+      edges: [
+        {
+          id: 'provider-to-agent',
+          source: 'provider',
+          sourceHandle: 'chatModel',
+          target: 'agent',
+          targetHandle: 'model',
+        },
+      ],
+    });
+
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'model',
+          state: 'error',
+          label: 'Unsupported provider',
+          blocksExecution: true,
+        }),
+      ]),
+    );
+    expect(rows.filter((row) => row.kind === 'credential')).toEqual([]);
   });
 
   it('evaluates only mcp.custom edges connected to the tools handle', () => {

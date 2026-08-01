@@ -4934,6 +4934,31 @@
                                 "credential": {
                                   "type": "boolean",
                                   "nullable": true
+                                },
+                                "acceptedProviderIds": {
+                                  "type": "array",
+                                  "nullable": true,
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "anthropic",
+                                      "openai",
+                                      "gemini",
+                                      "openrouter",
+                                      "zai-coding-plan"
+                                    ]
+                                  }
+                                },
+                                "producedProviderId": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "enum": [
+                                    "anthropic",
+                                    "openai",
+                                    "gemini",
+                                    "openrouter",
+                                    "zai-coding-plan"
+                                  ]
                                 }
                               },
                               "required": [
@@ -5013,6 +5038,31 @@
                                 "credential": {
                                   "type": "boolean",
                                   "nullable": true
+                                },
+                                "acceptedProviderIds": {
+                                  "type": "array",
+                                  "nullable": true,
+                                  "items": {
+                                    "type": "string",
+                                    "enum": [
+                                      "anthropic",
+                                      "openai",
+                                      "gemini",
+                                      "openrouter",
+                                      "zai-coding-plan"
+                                    ]
+                                  }
+                                },
+                                "producedProviderId": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "enum": [
+                                    "anthropic",
+                                    "openai",
+                                    "gemini",
+                                    "openrouter",
+                                    "zai-coding-plan"
+                                  ]
                                 }
                               },
                               "required": [
@@ -5269,6 +5319,31 @@
                               "credential": {
                                 "type": "boolean",
                                 "nullable": true
+                              },
+                              "acceptedProviderIds": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "anthropic",
+                                    "openai",
+                                    "gemini",
+                                    "openrouter",
+                                    "zai-coding-plan"
+                                  ]
+                                }
+                              },
+                              "producedProviderId": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "anthropic",
+                                  "openai",
+                                  "gemini",
+                                  "openrouter",
+                                  "zai-coding-plan"
+                                ]
                               }
                             },
                             "required": [
@@ -5348,6 +5423,31 @@
                               "credential": {
                                 "type": "boolean",
                                 "nullable": true
+                              },
+                              "acceptedProviderIds": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "anthropic",
+                                    "openai",
+                                    "gemini",
+                                    "openrouter",
+                                    "zai-coding-plan"
+                                  ]
+                                }
+                              },
+                              "producedProviderId": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "anthropic",
+                                  "openai",
+                                  "gemini",
+                                  "openrouter",
+                                  "zai-coding-plan"
+                                ]
                               }
                             },
                             "required": [

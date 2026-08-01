@@ -179,6 +179,33 @@ describe('arePortTypesCompatible', () => {
         ),
       ).toBe(true);
     });
+
+    it('rejects known unsupported LLM providers while preserving unknown producers', () => {
+      const target: ConnectionType = {
+        kind: 'contract',
+        name: 'core.ai.llm-provider.v1',
+        credential: true,
+        acceptedProviderIds: ['anthropic'],
+      };
+
+      expect(
+        arePortTypesCompatible(
+          {
+            kind: 'contract',
+            name: 'core.ai.llm-provider.v1',
+            credential: true,
+            producedProviderId: 'openai',
+          },
+          target,
+        ),
+      ).toBe(false);
+      expect(
+        arePortTypesCompatible(
+          { kind: 'contract', name: 'core.ai.llm-provider.v1', credential: true },
+          target,
+        ),
+      ).toBe(true);
+    });
   });
 
   describe('list types', () => {

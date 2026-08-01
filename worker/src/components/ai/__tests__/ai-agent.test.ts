@@ -7,7 +7,12 @@ import type {
   ToolSet,
 } from 'ai';
 import type { AgentTraceEvent, ExecutionContext } from '@sentris/component-sdk';
-import { componentRegistry, runComponentWithRunner } from '@sentris/component-sdk';
+import {
+  componentRegistry,
+  ConfigurationError,
+  runComponentWithRunner,
+} from '@sentris/component-sdk';
+import type { LlmProviderConfig } from '@sentris/contracts';
 import type { AiAgentInput, AiAgentOutput } from '../ai-agent';
 
 const stepCountIsMock = vi.fn((limit: number) => ({ type: 'step-count', limit }));
@@ -187,15 +192,7 @@ function runAgent(context: ExecutionContext = createTestContext()) {
   );
 }
 
-function runAgentWithCredentials(
-  chatModel: {
-    provider: 'openai';
-    modelId: string;
-    apiKey?: string;
-    apiKeySecretId?: string;
-  },
-  modelApiKey?: string,
-) {
+function runAgentWithCredentials(chatModel: LlmProviderConfig, modelApiKey?: string) {
   const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
   if (!component) {
     throw new Error('Expected core.ai.agent to be registered');
@@ -283,6 +280,41 @@ describe('core.ai.agent (refactor)', () => {
       'The stored credential selected for "openai" could not be resolved. Reselect it in Model & API Key.',
     );
   });
+
+  test.each([
+    [
+      'subscription OAuth mode',
+      {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        authMode: 'subscription_oauth',
+      },
+    ],
+    [
+      'OAuth token secret reference',
+      {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        oauthTokenSecretId: 'unresolved-oauth-credential-id',
+      },
+    ],
+  ] satisfies readonly (readonly [string, LlmProviderConfig])[])(
+    'rejects canonical Anthropic %s instead of falling back to a legacy API key',
+    async (_label, chatModel) => {
+      let caughtError: unknown;
+      try {
+        await runAgentWithCredentials(chatModel, 'legacy-key');
+      } catch (error: unknown) {
+        caughtError = error;
+      }
+
+      expect(caughtError).toBeInstanceOf(ConfigurationError);
+      expect(caughtError).toMatchObject({
+        message:
+          'Anthropic subscription OAuth is not supported by AI SDK Agent. Select an Anthropic API key credential instead.',
+      });
+    },
+  );
 
   test('reports a clear stored-secret configuration error when neither canonical nor legacy credentials exist', async () => {
     await expect(

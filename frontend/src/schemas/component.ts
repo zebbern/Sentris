@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COMPONENT_CATEGORIES } from '@sentris/shared';
+import { COMPONENT_CATEGORIES, LLM_PROVIDER_IDS } from '@sentris/shared';
 
 export const ComponentRunnerSchema = z
   .object({
@@ -33,6 +33,8 @@ const ConnectionContractSchema = z.object({
   kind: z.literal('contract'),
   name: z.string().min(1),
   credential: z.boolean().optional(),
+  acceptedProviderIds: z.array(z.enum(LLM_PROVIDER_IDS)).min(1).optional(),
+  producedProviderId: z.enum(LLM_PROVIDER_IDS).optional(),
 });
 
 const ConnectionAnySchema = z.object({

@@ -85,6 +85,30 @@ describe('canConnect', () => {
         ),
       ).toBe(false);
     });
+
+    it('rejects known unsupported LLM providers while preserving unknown producers', () => {
+      const target = {
+        kind: 'contract' as const,
+        name: 'core.ai.llm-provider.v1',
+        credential: true,
+        acceptedProviderIds: ['anthropic' as const],
+      };
+
+      expect(
+        canConnect(
+          {
+            kind: 'contract',
+            name: 'core.ai.llm-provider.v1',
+            credential: true,
+            producedProviderId: 'openai',
+          },
+          target,
+        ),
+      ).toBe(false);
+      expect(
+        canConnect({ kind: 'contract', name: 'core.ai.llm-provider.v1', credential: true }, target),
+      ).toBe(true);
+    });
   });
 
   describe('list compatibility', () => {

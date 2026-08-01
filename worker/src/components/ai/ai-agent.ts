@@ -331,6 +331,24 @@ function selectAgentApiKey(
   chatModel: LlmProviderConfig,
   legacyModelApiKey?: string,
 ): string {
+  if (chatModel.provider === 'anthropic') {
+    const oauthConfigKey =
+      chatModel.authMode === 'subscription_oauth'
+        ? 'authMode'
+        : chatModel.oauthTokenSecretId?.trim()
+          ? 'oauthTokenSecretId'
+          : chatModel.oauthToken?.trim()
+            ? 'oauthToken'
+            : undefined;
+
+    if (oauthConfigKey) {
+      throw new ConfigurationError(
+        'Anthropic subscription OAuth is not supported by AI SDK Agent. Select an Anthropic API key credential instead.',
+        { configKey: oauthConfigKey, details: { provider } },
+      );
+    }
+  }
+
   const canonical = chatModel.apiKey?.trim();
   if (canonical) {
     return canonical;

@@ -7,6 +7,8 @@ import {
   evaluateLlmProviderReadiness,
   evaluateMcpToolsReadiness,
   findLlmProviderInput,
+  getAcceptedLlmProviderIds,
+  getProducedLlmProviderId,
   type AgentReadinessRow,
   type CatalogState,
   type McpSelection,
@@ -97,9 +99,23 @@ export function evaluateWorkflowAgentNodeReadiness(input: {
   const connectedProvider = input.edges.find(
     (edge) => edge.target === input.node.id && edge.targetHandle === llmInput.id,
   );
+  const connectedProviderNode = connectedProvider
+    ? input.nodes.find((node) => node.id === connectedProvider.source)
+    : undefined;
+  const connectedProviderComponent = input.getComponent(
+    connectedProviderNode ? componentRef(connectedProviderNode) : undefined,
+  );
   const rows = evaluateLlmProviderReadiness({
     value: inputOverrides(input.node)[llmInput.id],
     connectedSource: connectedProvider ? sourceLabel(connectedProvider, input.nodes) : undefined,
+    connectedProviderId:
+      connectedProvider && connectedProviderComponent
+        ? getProducedLlmProviderId(
+            connectedProviderComponent.outputs,
+            connectedProvider.sourceHandle,
+          )
+        : undefined,
+    acceptedProviderIds: getAcceptedLlmProviderIds(llmInput),
     supportedAuthModes:
       input.component.id === 'core.ai.claude-code'
         ? ['api_key', 'subscription_oauth']

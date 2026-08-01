@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ComponentCategory, JsonSchemaDocument } from '@sentris/shared';
+import type { ComponentCategory, JsonSchemaDocument, LlmModelProvider } from '@sentris/shared';
 
 import type {
   IArtifactService,
@@ -178,6 +178,10 @@ export interface ConnectionType {
   name?: string;
   element?: ConnectionType;
   credential?: boolean;
+  /** LLM provider IDs accepted by a core.ai.llm-provider.v1 input contract. */
+  acceptedProviderIds?: LlmModelProvider[];
+  /** LLM provider ID emitted by a core.ai.llm-provider.v1 output contract. */
+  producedProviderId?: LlmModelProvider;
 }
 
 declare const PortBrand: unique symbol;

@@ -1,4 +1,5 @@
 import type { ConnectionType, InputPort } from '@/schemas/component';
+import type { LlmModelProvider } from '@sentris/shared';
 
 const primitiveLabelMap: Record<string, string> = {
   any: 'any',
@@ -36,6 +37,8 @@ interface ContractPort {
   kind: 'contract';
   name?: string;
   credential?: boolean;
+  acceptedProviderIds?: LlmModelProvider[];
+  producedProviderId?: LlmModelProvider;
 }
 
 const isPrimitive = (dataType: ConnectionType): dataType is PrimitivePort =>
@@ -84,7 +87,17 @@ const comparePortTypes = (source: ConnectionType, target: ConnectionType): boole
   }
 
   if (isContract(source) && isContract(target)) {
-    return source.name === target.name && source.credential === target.credential;
+    if (source.name !== target.name || source.credential !== target.credential) {
+      return false;
+    }
+    if (
+      source.producedProviderId &&
+      target.acceptedProviderIds &&
+      !target.acceptedProviderIds.includes(source.producedProviderId)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   if (isList(source) && isList(target)) {

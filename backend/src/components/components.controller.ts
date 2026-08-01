@@ -1,6 +1,7 @@
 import { Controller, Get, Logger, NotFoundException, Param, Post, Body } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
+import { LLM_PROVIDER_IDS } from '@sentris/shared';
 
 // Ensure all worker components are registered before accessing the registry
 import '@sentris/worker/components';
@@ -13,6 +14,19 @@ import {
 } from '@sentris/component-sdk';
 import { categorizeComponent, getCategoryConfig } from './utils/categorization';
 import { ResolvePortsDto, ResolvePortsSchema } from './dto/components.dto';
+
+const llmProviderCapabilitySchemaProperties = {
+  acceptedProviderIds: {
+    type: 'array' as const,
+    nullable: true,
+    items: { type: 'string' as const, enum: [...LLM_PROVIDER_IDS] },
+  },
+  producedProviderId: {
+    type: 'string' as const,
+    nullable: true,
+    enum: [...LLM_PROVIDER_IDS],
+  },
+};
 
 function serializeComponent(entry: CachedComponentMetadata) {
   const component = entry.definition;
@@ -134,6 +148,7 @@ export class ComponentsController {
                     name: { type: 'string', nullable: true },
                     element: { type: 'object', nullable: true },
                     credential: { type: 'boolean', nullable: true },
+                    ...llmProviderCapabilitySchemaProperties,
                   },
                   required: ['kind'],
                   additionalProperties: true,
@@ -178,6 +193,7 @@ export class ComponentsController {
                     name: { type: 'string', nullable: true },
                     element: { type: 'object', nullable: true },
                     credential: { type: 'boolean', nullable: true },
+                    ...llmProviderCapabilitySchemaProperties,
                   },
                   required: ['kind'],
                   additionalProperties: true,
@@ -303,6 +319,7 @@ export class ComponentsController {
                   name: { type: 'string', nullable: true },
                   element: { type: 'object', nullable: true },
                   credential: { type: 'boolean', nullable: true },
+                  ...llmProviderCapabilitySchemaProperties,
                 },
                 required: ['kind'],
                 additionalProperties: true,
@@ -347,6 +364,7 @@ export class ComponentsController {
                   name: { type: 'string', nullable: true },
                   element: { type: 'object', nullable: true },
                   credential: { type: 'boolean', nullable: true },
+                  ...llmProviderCapabilitySchemaProperties,
                 },
                 required: ['kind'],
                 additionalProperties: true,

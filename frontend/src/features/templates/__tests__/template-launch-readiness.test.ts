@@ -16,7 +16,11 @@ const agent = (id = 'core.ai.agent', inputId = 'chatModel') =>
         id: inputId,
         label: 'Model',
         editor: 'llm-provider',
-        connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+        connectionType: {
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          ...(id === 'core.ai.claude-code' ? { acceptedProviderIds: ['anthropic'] } : {}),
+        },
       },
     ],
     outputs: [],
@@ -31,6 +35,26 @@ const customMcp = {
   outputs: [],
   parameters: [],
 } as unknown as ComponentMetadata;
+
+const provider = (providerId: 'anthropic' | 'openai', defaultModel: string) =>
+  ({
+    id: `core.provider.${providerId}`,
+    slug: `${providerId}-provider`,
+    name: `${providerId} Provider`,
+    inputs: [],
+    outputs: [
+      {
+        id: 'chatModel',
+        label: 'LLM Provider Config',
+        connectionType: {
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          producedProviderId: providerId,
+        },
+      },
+    ],
+    parameters: [{ id: 'model', label: 'Model', type: 'text', default: defaultModel }],
+  }) as unknown as ComponentMetadata;
 
 const unmarkedComponent = {
   id: 'core.process.unmarked',
@@ -311,6 +335,129 @@ describe('template launch readiness', () => {
       label: 'Anthropic · claude-sonnet-5',
       blocksCreation: false,
     });
+  });
+
+  it('blocks an inline provider excluded by the Claude Code model port capability', () => {
+    const claude = agent('core.ai.claude-code');
+    const requirements = parse(
+      {
+        nodes: [
+          {
+            id: 'claude',
+            type: claude.id,
+            data: {
+              config: {
+                inputOverrides: {
+                  chatModel: { provider: 'openai', modelId: 'gpt-5' },
+                },
+              },
+            },
+          },
+        ],
+        edges: [],
+      },
+      [claude, customMcp],
+    );
+
+    expect(evaluate(requirements).find((row) => row.kind === 'model')).toMatchObject({
+      state: 'error',
+      label: 'OpenAI · gpt-5',
+      detail: 'This component accepts Anthropic provider models; OpenAI is not supported.',
+      blocksCreation: true,
+    });
+  });
+
+  it('uses connected provider output capability metadata instead of a stale inline model', () => {
+    const claude = agent('core.ai.claude-code');
+    const openai = provider('openai', 'gpt-5');
+    const requirements = parse(
+      {
+        nodes: [
+          {
+            id: 'provider',
+            type: openai.id,
+            data: { config: { params: { model: 'gpt-5.1' } } },
+          },
+          {
+            id: 'claude',
+            type: claude.id,
+            data: {
+              config: {
+                inputOverrides: {
+                  chatModel: { provider: 'anthropic', modelId: 'stale-inline-model' },
+                },
+              },
+            },
+          },
+        ],
+        edges: [
+          {
+            source: 'provider',
+            sourceHandle: 'chatModel',
+            target: 'claude',
+            targetHandle: 'chatModel',
+          },
+        ],
+      },
+      [claude, openai, customMcp],
+    );
+
+    expect(requirements.models).toEqual([
+      expect.objectContaining({ provider: 'openai', modelId: 'gpt-5.1' }),
+    ]);
+    expect(evaluate(requirements).find((row) => row.kind === 'model')).toMatchObject({
+      state: 'error',
+      label: 'OpenAI · gpt-5.1',
+      blocksCreation: true,
+    });
+  });
+
+  it('does not reuse stale inline config for a connected producer with unknown provider identity', () => {
+    const claude = agent('core.ai.claude-code');
+    const customProvider = {
+      id: 'custom.provider',
+      slug: 'custom-provider',
+      name: 'Custom Provider',
+      inputs: [],
+      outputs: [
+        {
+          id: 'chatModel',
+          label: 'LLM Provider Config',
+          connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+        },
+      ],
+      parameters: [],
+    } as unknown as ComponentMetadata;
+    const requirements = parse(
+      {
+        nodes: [
+          { id: 'provider', type: customProvider.id },
+          {
+            id: 'claude',
+            type: claude.id,
+            data: {
+              config: {
+                inputOverrides: {
+                  chatModel: { provider: 'openai', modelId: 'stale-inline-model' },
+                },
+              },
+            },
+          },
+        ],
+        edges: [
+          {
+            source: 'provider',
+            sourceHandle: 'chatModel',
+            target: 'claude',
+            targetHandle: 'chatModel',
+          },
+        ],
+      },
+      [claude, customProvider, customMcp],
+    );
+
+    expect(requirements.models).toEqual([]);
+    expect(evaluate(requirements).some((row) => row.kind === 'model')).toBe(false);
   });
 
   it('blocks mixed Claude Code and generic OAuth configurations regardless of node order', () => {

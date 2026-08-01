@@ -95,7 +95,51 @@ const mockOpenCodeComponent = {
   ],
 };
 
-let flowEdges: { source: string; target: string; targetHandle?: string }[] = [];
+const mockClaudeCodeComponent = {
+  ...mockAgentComponent,
+  id: 'core.ai.claude-code',
+  slug: 'claude-code-agent',
+  name: 'Claude Code Agent',
+  inputs: [
+    {
+      id: 'model',
+      label: 'Model',
+      editor: 'llm-provider' as const,
+      connectionType: {
+        kind: 'contract' as const,
+        name: 'core.ai.llm-provider.v1',
+        acceptedProviderIds: ['anthropic' as const],
+      },
+      required: true,
+    },
+  ],
+};
+
+const mockOpenAiProviderComponent = {
+  ...mockComponent,
+  id: 'core.provider.openai',
+  slug: 'openai-provider',
+  name: 'OpenAI Provider',
+  inputs: [],
+  outputs: [
+    {
+      id: 'chatModel',
+      label: 'LLM Provider Config',
+      connectionType: {
+        kind: 'contract' as const,
+        name: 'core.ai.llm-provider.v1',
+        producedProviderId: 'openai' as const,
+      },
+    },
+  ],
+};
+
+let flowEdges: {
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+}[] = [];
 let flowNodes: { id: string; data: Partial<FrontendNodeData> }[] = [];
 
 let isComponentsLoading = false;
@@ -109,11 +153,15 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
             'core.scanner.nmap': mockComponent,
             'core.ai.agent': mockAgentComponent,
             'core.ai.opencode': mockOpenCodeComponent,
+            'core.ai.claude-code': mockClaudeCodeComponent,
+            'core.provider.openai': mockOpenAiProviderComponent,
           },
           slugIndex: {
             'nmap-scan': 'core.scanner.nmap',
             'ai-agent': 'core.ai.agent',
             opencode: 'core.ai.opencode',
+            'claude-code-agent': 'core.ai.claude-code',
+            'openai-provider': 'core.provider.openai',
           },
         },
     isLoading: isComponentsLoading,
@@ -403,5 +451,32 @@ describe('ConfigPanel', () => {
       screen.getByText(/Using provider connected from Configured provider/),
     ).toBeInTheDocument();
     expect(screen.queryByText('Select stored secret')).toBeNull();
+  });
+
+  it('shows an incompatible connected provider as an error instead of ready', () => {
+    flowEdges = [
+      {
+        source: 'provider-1',
+        target: 'node-1',
+        targetHandle: 'model',
+        sourceHandle: 'chatModel',
+      },
+    ];
+    flowNodes = [
+      {
+        id: 'provider-1',
+        data: { label: 'Primary OpenAI', componentId: 'core.provider.openai' },
+      },
+    ];
+    const node = createSelectedNode({
+      componentId: 'core.ai.claude-code',
+      componentSlug: 'claude-code-agent',
+    });
+
+    render(<ConfigPanel selectedNode={node} onClose={mock(() => {})} />);
+
+    expect(screen.getByText(/OpenAI is not supported by this model port/)).toBeInTheDocument();
+    expect(screen.getByText(/Unsupported provider/)).toBeInTheDocument();
+    expect(screen.queryByText(/Using provider connected from Primary OpenAI/)).toBeNull();
   });
 });

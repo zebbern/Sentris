@@ -8136,6 +8136,9 @@ export interface operations {
                                 name?: string | null;
                                 element?: Record<string, never> | null;
                                 credential?: boolean | null;
+                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
+                                /** @enum {string|null} */
+                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
                             } & {
                                 [key: string]: unknown;
                             };
@@ -8156,6 +8159,9 @@ export interface operations {
                                 name?: string | null;
                                 element?: Record<string, never> | null;
                                 credential?: boolean | null;
+                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
+                                /** @enum {string|null} */
+                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
                             } & {
                                 [key: string]: unknown;
                             };
@@ -8242,6 +8248,9 @@ export interface operations {
                                 name?: string | null;
                                 element?: Record<string, never> | null;
                                 credential?: boolean | null;
+                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
+                                /** @enum {string|null} */
+                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
                             } & {
                                 [key: string]: unknown;
                             };
@@ -8262,6 +8271,9 @@ export interface operations {
                                 name?: string | null;
                                 element?: Record<string, never> | null;
                                 credential?: boolean | null;
+                                acceptedProviderIds?: ("anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan")[] | null;
+                                /** @enum {string|null} */
+                                producedProviderId?: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan" | null;
                             } & {
                                 [key: string]: unknown;
                             };

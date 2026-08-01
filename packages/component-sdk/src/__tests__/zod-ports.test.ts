@@ -365,7 +365,12 @@ describe('extractPorts', () => {
         label: 'Model',
         editor: 'llm-provider',
         hidden: true,
-        connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1', credential: true },
+        connectionType: {
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          credential: true,
+          acceptedProviderIds: ['anthropic'],
+        },
       }),
     });
 
@@ -378,6 +383,7 @@ describe('extractPorts', () => {
           kind: 'contract',
           name: 'core.ai.llm-provider.v1',
           credential: true,
+          acceptedProviderIds: ['anthropic'],
         },
       }),
     ]);

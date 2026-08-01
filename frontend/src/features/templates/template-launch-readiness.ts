@@ -1,13 +1,15 @@
 import type { ComponentMetadata } from '@/schemas/component';
 import type { SecretSummary } from '@/schemas/secret';
 import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpServerQueries';
-import { isLlmModelProvider, LLM_PROVIDER_CATALOG } from '@sentris/shared';
+import { isLlmModelProvider, LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { getMcpAgentReadiness } from '@/lib/mcpReadiness';
 import {
   evaluateCredentialMappingReadiness,
   evaluateLlmModelReadiness,
   evaluateMcpToolsReadiness,
   findLlmProviderInput,
+  getAcceptedLlmProviderIds,
+  getProducedLlmProviderId,
   type AgentReadinessRow,
   type CatalogState,
   type LlmAuthMode,
@@ -30,6 +32,7 @@ interface TemplateModelRequirementMember {
   inputId: string;
   rawValue: Record<string, unknown>;
   supportedAuthModes: readonly LlmAuthMode[];
+  acceptedProviderIds?: readonly LlmModelProvider[];
 }
 
 export interface TemplateMcpRequirement {
@@ -108,6 +111,41 @@ function supportedAuthModes(componentId: string): readonly LlmAuthMode[] {
   return componentId === 'core.ai.claude-code' ? ['api_key', 'subscription_oauth'] : ['api_key'];
 }
 
+function connectedProviderValue(input: {
+  node: Record<string, unknown>;
+  inputId: string;
+  nodesById: ReadonlyMap<string, Record<string, unknown>>;
+  edges: readonly Record<string, unknown>[];
+  resolveComponent: (ref: string) => ComponentMetadata | null;
+}): { connected: boolean; value?: Record<string, unknown> } {
+  const nodeId = nonEmptyString(input.node.id);
+  if (!nodeId) return { connected: false };
+
+  const edge = input.edges.find(
+    (candidate) => candidate.target === nodeId && candidate.targetHandle === input.inputId,
+  );
+  if (!edge) return { connected: false };
+
+  const sourceId = nonEmptyString(edge.source);
+  const source = sourceId ? input.nodesById.get(sourceId) : undefined;
+  if (!source) return { connected: true };
+
+  const sourceComponent = componentForNode(source, input.resolveComponent);
+  if (!sourceComponent) return { connected: true };
+  const provider = getProducedLlmProviderId(
+    sourceComponent.outputs,
+    nonEmptyString(edge.sourceHandle),
+  );
+  if (!provider) return { connected: true };
+
+  const configuredModelId = nonEmptyString(params(source).model);
+  const defaultModelId = nonEmptyString(
+    sourceComponent.parameters.find((parameter) => parameter.id === 'model')?.default,
+  );
+  const modelId = configuredModelId ?? defaultModelId;
+  return { connected: true, value: modelId ? { provider, modelId } : undefined };
+}
+
 export function parseTemplateLaunchRequirements(
   graph: Record<string, unknown> | undefined,
   resolveComponent: (ref: string) => ComponentMetadata | null,
@@ -132,7 +170,16 @@ export function parseTemplateLaunchRequirements(
     const llmInput = findLlmProviderInput(component.inputs);
     if (!llmInput) continue;
 
-    const rawValue = inputOverrides(node)[llmInput.id];
+    const connectedProvider = connectedProviderValue({
+      node,
+      inputId: llmInput.id,
+      nodesById,
+      edges,
+      resolveComponent,
+    });
+    const rawValue = connectedProvider.connected
+      ? connectedProvider.value
+      : inputOverrides(node)[llmInput.id];
     if (!isRecord(rawValue)) continue;
 
     const provider = rawValue.provider;
@@ -145,6 +192,7 @@ export function parseTemplateLaunchRequirements(
       inputId: llmInput.id,
       rawValue,
       supportedAuthModes: supportedAuthModes(component.id),
+      acceptedProviderIds: getAcceptedLlmProviderIds(llmInput),
     };
     const existing = models.get(key);
     if (existing) {
@@ -286,6 +334,7 @@ export function evaluateTemplateLaunchReadiness(input: {
             evaluateLlmModelReadiness({
               value: member.rawValue,
               supportedAuthModes: member.supportedAuthModes,
+              acceptedProviderIds: member.acceptedProviderIds,
             }),
           );
           const readiness = memberReadiness.find((row) => row.blocksCreation) ?? memberReadiness[0];

@@ -238,7 +238,17 @@ export function canConnect(source: ConnectionType, target: ConnectionType): bool
 
   // Contract to contract: strict name match
   if (source.kind === 'contract' && target.kind === 'contract') {
-    return source.name === target.name && source.credential === target.credential;
+    if (source.name !== target.name || source.credential !== target.credential) {
+      return false;
+    }
+    if (
+      source.producedProviderId &&
+      target.acceptedProviderIds &&
+      !target.acceptedProviderIds.includes(source.producedProviderId)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   // List to list: recursive element check

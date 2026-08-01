@@ -10,7 +10,11 @@ import {
   port,
   param,
 } from '@sentris/component-sdk';
-import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
+import {
+  LLMProviderSchema,
+  llmProviderContractName,
+  type LlmProviderConfig,
+} from '@sentris/contracts';
 
 const DEFAULT_MODEL = 'openrouter/auto';
 const DEFAULT_BASE_URL = process.env.OPENROUTER_BASE_URL ?? 'https://openrouter.ai/api/v1';
@@ -87,6 +91,12 @@ const outputSchema = outputs({
     label: 'LLM Provider Config',
     description:
       'Portable provider payload (provider, model, overrides) for wiring into AI Agent or one-shot nodes.',
+    connectionType: {
+      kind: 'contract',
+      name: llmProviderContractName,
+      credential: true,
+      producedProviderId: 'openrouter',
+    },
   }),
 });
 

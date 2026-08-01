@@ -3,6 +3,10 @@ import { componentRegistry } from '@sentris/component-sdk';
 import '../ai-agent';
 import '../opencode';
 import '../claude-code-agent';
+import '../anthropic-provider';
+import '../gemini-provider';
+import '../openai-provider';
+import '../openrouter-provider';
 
 const MODEL_PORTS = [
   ['core.ai.agent', 'chatModel'],
@@ -20,11 +24,44 @@ describe('agent model port metadata', () => {
       expect(input).toEqual(
         expect.objectContaining({
           editor: 'llm-provider',
-          connectionType: {
+          connectionType: expect.objectContaining({
             kind: 'contract',
             name: 'core.ai.llm-provider.v1',
             credential: true,
-          },
+          }),
+        }),
+      );
+    }
+
+    expect(
+      componentRegistry
+        .getMetadata('core.ai.claude-code')
+        ?.inputs?.find((candidate) => candidate.id === 'model')?.connectionType,
+    ).toEqual(
+      expect.objectContaining({
+        acceptedProviderIds: ['anthropic'],
+      }),
+    );
+  });
+
+  it('publishes the provider identity emitted by each provider component', () => {
+    const providers = [
+      ['core.provider.anthropic', 'anthropic'],
+      ['core.provider.gemini', 'gemini'],
+      ['core.provider.openai', 'openai'],
+      ['core.provider.openrouter', 'openrouter'],
+    ] as const;
+
+    for (const [componentId, providerId] of providers) {
+      expect(
+        componentRegistry
+          .getMetadata(componentId)
+          ?.outputs?.find((candidate) => candidate.id === 'chatModel')?.connectionType,
+      ).toEqual(
+        expect.objectContaining({
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          producedProviderId: providerId,
         }),
       );
     }

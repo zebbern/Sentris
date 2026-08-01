@@ -10,6 +10,7 @@ import {
   parameters,
   port,
   param,
+  ConfigurationError,
   ServiceError,
   ContainerError,
   stripAnsiCodes,
@@ -80,7 +81,12 @@ const inputSchema = inputs({
       label: 'Model',
       description: 'Select a stored provider credential or connect a provider configuration.',
       editor: 'llm-provider',
-      connectionType: { kind: 'contract', name: llmProviderContractName, credential: true },
+      connectionType: {
+        kind: 'contract',
+        name: llmProviderContractName,
+        credential: true,
+        acceptedProviderIds: ['anthropic'],
+      },
     },
   ),
   tools: port(z.unknown().optional().describe('Anchor for tool-mode nodes.'), {
@@ -262,6 +268,20 @@ function toClaudeAuthModel(model: unknown): ClaudeAuthModel | undefined {
   };
 }
 
+function assertSupportedClaudeProvider(model: unknown): void {
+  if (!isRecord(model) || typeof model.provider !== 'string' || model.provider === 'anthropic') {
+    return;
+  }
+
+  throw new ConfigurationError(
+    `Claude Code only supports Anthropic provider models; received '${model.provider}'.`,
+    {
+      configKey: 'model.provider',
+      details: { supportedProviderIds: ['anthropic'], receivedProviderId: model.provider },
+    },
+  );
+}
+
 function getClaudeEffort(model: unknown): string | undefined {
   if (!isRecord(model) || model.provider !== 'anthropic') {
     return undefined;
@@ -329,6 +349,7 @@ const definition = defineComponent({
   },
   async execute({ inputs, params }, context) {
     const { task, context: taskContext, model, supplementaryInputA, supplementaryInputB } = inputs;
+    assertSupportedClaudeProvider(model);
     const {
       systemPrompt,
       providerConfig,

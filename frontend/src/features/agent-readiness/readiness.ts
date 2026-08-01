@@ -1,7 +1,7 @@
-import { isLlmModelProvider } from '@sentris/shared';
+import { isLlmModelProvider, LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpServerQueries';
 import { getMcpAgentReadiness } from '@/lib/mcpReadiness';
-import type { InputPort } from '@/schemas/component';
+import type { InputPort, OutputPort } from '@/schemas/component';
 import type { SecretSummary } from '@/schemas/secret';
 
 export type AgentReadinessKind = 'model' | 'credential' | 'mcp-tools';
@@ -102,12 +102,82 @@ export function findLlmProviderInput(inputs: readonly InputPort[]): InputPort | 
   return inputs.find(isLlmProviderInput);
 }
 
+export function getAcceptedLlmProviderIds(
+  input: InputPort,
+): readonly LlmModelProvider[] | undefined {
+  if (
+    input.connectionType?.kind !== 'contract' ||
+    input.connectionType.name !== 'core.ai.llm-provider.v1' ||
+    !Array.isArray(input.connectionType.acceptedProviderIds)
+  ) {
+    return undefined;
+  }
+
+  const providerIds = input.connectionType.acceptedProviderIds.filter(isLlmModelProvider);
+  return providerIds.length > 0 ? providerIds : undefined;
+}
+
+export function getProducedLlmProviderId(
+  outputs: readonly OutputPort[],
+  outputId?: string | null,
+): LlmModelProvider | undefined {
+  const candidates = outputId
+    ? outputs.filter((output) => output.id === outputId)
+    : outputs.filter(
+        (output) =>
+          output.connectionType?.kind === 'contract' &&
+          output.connectionType.name === 'core.ai.llm-provider.v1',
+      );
+  if (!outputId && candidates.length !== 1) return undefined;
+
+  const providerId = candidates[0]?.connectionType?.producedProviderId;
+  return isLlmModelProvider(providerId) ? providerId : undefined;
+}
+
+export function isLlmProviderAccepted(
+  providerId: LlmModelProvider,
+  acceptedProviderIds: readonly LlmModelProvider[] | undefined,
+): boolean {
+  return !acceptedProviderIds || acceptedProviderIds.includes(providerId);
+}
+
+function unsupportedProviderRow(
+  providerId: LlmModelProvider,
+  acceptedProviderIds: readonly LlmModelProvider[] | undefined,
+): AgentReadinessRow | undefined {
+  if (!acceptedProviderIds || isLlmProviderAccepted(providerId, acceptedProviderIds)) {
+    return undefined;
+  }
+
+  const acceptedLabels = acceptedProviderIds.map(
+    (acceptedProviderId) => LLM_PROVIDER_CATALOG[acceptedProviderId].label,
+  );
+  const accepted = acceptedLabels.join(' or ');
+  return row(
+    'model',
+    'error',
+    'Unsupported provider',
+    `This component accepts ${accepted} provider models; ${LLM_PROVIDER_CATALOG[providerId].label} is not supported.`,
+    true,
+    true,
+  );
+}
+
 export function evaluateLlmModelReadiness(input: {
   value: unknown;
   connectedSource?: string;
+  connectedProviderId?: LlmModelProvider;
+  acceptedProviderIds?: readonly LlmModelProvider[];
   supportedAuthModes?: readonly LlmAuthMode[];
 }): AgentReadinessRow {
   if (nonEmptyString(input.connectedSource)) {
+    if (input.connectedProviderId) {
+      const unsupported = unsupportedProviderRow(
+        input.connectedProviderId,
+        input.acceptedProviderIds,
+      );
+      if (unsupported) return unsupported;
+    }
     return row(
       'model',
       'ready',
@@ -129,6 +199,9 @@ export function evaluateLlmModelReadiness(input: {
       true,
     );
   }
+
+  const unsupported = unsupportedProviderRow(value.provider, input.acceptedProviderIds);
+  if (unsupported) return unsupported;
 
   if (!hasSupportedAuthMode(value, supportedModes(input.supportedAuthModes))) {
     return row(
@@ -242,6 +315,8 @@ export function evaluateLlmCredentialReadiness(input: {
 export function evaluateLlmProviderReadiness(input: {
   value: unknown;
   connectedSource?: string;
+  connectedProviderId?: LlmModelProvider;
+  acceptedProviderIds?: readonly LlmModelProvider[];
   supportedAuthModes?: readonly LlmAuthMode[];
   secrets: CatalogState<Pick<SecretSummary, 'id' | 'name'>>;
 }): AgentReadinessRow[] {
