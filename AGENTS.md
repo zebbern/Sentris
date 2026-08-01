@@ -170,6 +170,15 @@ be used in startup, reset, or other operational paths.
 
 ### Engineering and Product Decision Preferences
 
+- Keep TypeScript imports at file scope unless a real runtime-loading or code-splitting
+  boundary requires a dynamic import. Switches over closed unions or enums must be
+  exhaustive, using a `never` check or an equivalent compile-time assertion.
+- Do not land unwired scaffolding. New APIs, maps, helpers, services, or modules must
+  participate in a real end-to-end control path, and documentation or release claims
+  must describe behavior that is actually reachable.
+- When changing concurrent or shared state, state whether ownership is global,
+  per-organization, per-run, per-session, or per-channel. Keep lookup, mutation,
+  cleanup, and default-key behavior symmetric, and verify isolation between owners.
 - Fix the underlying ownership, lifecycle, or abstraction problem. Do not stack local
   patches, compatibility shims, duplicated state, or parallel implementations when a
   shared root-cause fix is practical.
