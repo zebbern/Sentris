@@ -158,16 +158,6 @@ export function buildAgentModelOverride(
     };
   }
 
-  if (normalized.apiKey) {
-    return {
-      provider: normalized.provider,
-      modelId: normalized.modelId,
-      ...(componentId === 'core.ai.claude-code' ? { authMode: 'api_key' as const } : {}),
-      ...effortFragment,
-      apiKey: normalized.apiKey,
-    };
-  }
-
   return {
     provider: normalized.provider,
     modelId: normalized.modelId,

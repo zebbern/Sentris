@@ -367,6 +367,17 @@ describe('inputSupportsManualValue', () => {
     expect(inputSupportsManualValue(inputPort({ editor: 'secret' }))).toBe(true);
   });
 
+  it('treats llm-provider as a manually configurable contract input', () => {
+    expect(
+      inputSupportsManualValue(
+        inputPort({
+          editor: 'llm-provider',
+          connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+        }),
+      ),
+    ).toBe(true);
+  });
+
   it('returns true for secret primitive type', () => {
     expect(
       inputSupportsManualValue(

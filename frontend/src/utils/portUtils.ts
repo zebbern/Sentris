@@ -148,6 +148,7 @@ export const inputSupportsManualValue = (input: InputPort): boolean => {
   const isSecret =
     input.editor === 'secret' || isPrimitiveAnd(normalized, (name) => name === 'secret');
   return (
+    input.editor === 'llm-provider' ||
     isPrimitiveAnd(
       normalized,
       (name) => name === 'text' || name === 'number' || name === 'boolean',

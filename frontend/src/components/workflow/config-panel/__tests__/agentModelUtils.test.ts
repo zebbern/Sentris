@@ -170,4 +170,18 @@ describe('agentModelUtils', () => {
     );
     expect('effort' in result).toBe(false);
   });
+
+  it('drops a historical raw api key when saving an edited model', () => {
+    const result = buildAgentModelOverride(
+      {
+        provider: 'openai',
+        modelId: 'gpt-future-9000',
+        apiKey: 'historical-raw-key',
+      },
+      'core.ai.agent',
+    );
+
+    expect(result).toEqual({ provider: 'openai', modelId: 'gpt-future-9000' });
+    expect('apiKey' in result).toBe(false);
+  });
 });

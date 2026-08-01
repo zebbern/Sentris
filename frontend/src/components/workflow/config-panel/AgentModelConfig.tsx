@@ -8,8 +8,10 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { LeanSelect, type SelectOption } from '@/components/inputs/LeanSelect';
 import { SecretSelect } from '@/components/inputs/SecretSelect';
 import { useAnthropicModels } from '@/hooks/queries/useAgentModelQueries';
+import { useSecrets } from '@/hooks/queries/useSecretQueries';
+import { ReadinessSummary } from '@/features/agent-readiness/ReadinessSummary';
+import { evaluateLlmProviderReadiness } from '@/features/agent-readiness/readiness';
 import {
-  AGENT_MODEL_COMPONENT_IDS,
   AGENT_MODEL_OPTIONS_BY_PROVIDER,
   AGENT_MODEL_PROVIDER_OPTIONS,
   CLAUDE_EFFORT_LEVEL_OPTIONS,
@@ -27,10 +29,10 @@ import {
 
 export interface AgentModelConfigProps {
   componentId: string;
-  modelValue: unknown;
-  hasConnection: boolean;
-  connectedSummary?: string;
-  onChange: (value: unknown) => void;
+  inputId: string;
+  value: unknown;
+  connectedSource?: string;
+  onChange: (inputId: string, value: AgentModelConfigValue) => void;
 }
 
 const CLAUDE_AUTH_OPTIONS: SelectOption[] = [
@@ -44,26 +46,19 @@ const EFFORT_OPTIONS: SelectOption[] = CLAUDE_EFFORT_LEVEL_OPTIONS.map((option) 
   description: option.description,
 }));
 
-export function supportsInlineAgentModelConfig(componentId: string): boolean {
-  return AGENT_MODEL_COMPONENT_IDS.has(componentId);
-}
-
 export const isAgentModelProviderValue: (value: unknown) => value is AgentModelProvider =
   isLlmModelProvider;
 
 export function AgentModelConfig({
   componentId,
-  modelValue,
-  hasConnection,
-  connectedSummary,
+  inputId,
+  value,
+  connectedSource,
   onChange,
 }: AgentModelConfigProps) {
-  if (!supportsInlineAgentModelConfig(componentId)) {
-    return null;
-  }
-
   const isClaudeCode = componentId === 'core.ai.claude-code';
-  const config = normalizeAgentModelConfig(modelValue, componentId);
+  const config = normalizeAgentModelConfig(value, componentId);
+  const secretsQuery = useSecrets();
   const authMode: ClaudeAuthMode = config.authMode ?? 'api_key';
   const effort: ClaudeEffortLevel = config.effort ?? 'default';
 
@@ -102,7 +97,7 @@ export function AgentModelConfig({
     modelOptions.find((option) => option.value === config.modelId)?.label ?? config.modelId;
 
   const applyConfig = (next: AgentModelConfigValue) => {
-    onChange(buildAgentModelOverride(next, componentId));
+    onChange(inputId, buildAgentModelOverride(next, componentId));
   };
 
   const handleProviderChange = (provider: string | number | undefined) => {
@@ -167,6 +162,16 @@ export function AgentModelConfig({
 
   const liveFetchFailed =
     Boolean(liveFetchSecretId) && (modelsQuery.data?.source === 'error' || modelsQuery.isError);
+  const readinessRows = evaluateLlmProviderReadiness({
+    value,
+    connectedSource,
+    supportedAuthModes: isClaudeCode ? ['api_key', 'subscription_oauth'] : ['api_key'],
+    secrets: {
+      items: secretsQuery.data ?? [],
+      isLoading: secretsQuery.isLoading,
+      error: secretsQuery.error,
+    },
+  });
 
   return (
     <CollapsibleSection
@@ -180,12 +185,12 @@ export function AgentModelConfig({
           Model port on the canvas.
         </p>
 
-        {hasConnection ? (
+        {connectedSource ? (
           <div className="flex items-start gap-2 rounded-md border border-green-500/30 bg-green-500/5 px-3 py-2 text-xs text-green-700 dark:text-green-400">
             <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Using provider connected from {connectedSummary || 'another node'}. Disconnect that
-              wire to configure inline.
+              Using provider connected from {connectedSource}. Disconnect that wire to configure
+              inline.
             </span>
           </div>
         ) : (
@@ -224,15 +229,15 @@ export function AgentModelConfig({
                 loading={isClaudeCode && modelsQuery.isFetching}
                 onRefresh={liveFetchSecretId ? () => void modelsQuery.refetch() : undefined}
               />
+              <Input
+                id="agent-model-custom-id"
+                value={config.modelId}
+                onChange={(event) => handleCustomModelChange(event.target.value)}
+                placeholder="Or type an exact model id"
+                className="h-8 text-xs"
+              />
               {isClaudeCode ? (
                 <>
-                  <Input
-                    id="agent-model-custom-id"
-                    value={config.modelId}
-                    onChange={(event) => handleCustomModelChange(event.target.value)}
-                    placeholder="Or type an exact model id (e.g. claude-opus-4-8)"
-                    className="h-8 text-xs"
-                  />
                   {liveModels.length > 0 ? (
                     <p className="text-[10px] text-muted-foreground">
                       Showing {liveModels.length} live models from your API key.
@@ -334,7 +339,7 @@ export function AgentModelConfig({
               </div>
             )}
 
-            {!hasRequiredCredential ? (
+            {!hasRequiredCredential && (
               <div className="flex items-center gap-1.5 text-destructive text-[11px]">
                 <AlertCircle className="h-3 w-3" />
                 <span>
@@ -343,14 +348,10 @@ export function AgentModelConfig({
                     : 'API key secret is required when not using a provider connection'}
                 </span>
               </div>
-            ) : (
-              <div className="flex items-center gap-1.5 text-primary text-[11px]">
-                <CheckCircle2 className="h-3 w-3" />
-                <span>Model configuration ready</span>
-              </div>
             )}
           </>
         )}
+        <ReadinessSummary rows={readinessRows} />
       </div>
     </CollapsibleSection>
   );

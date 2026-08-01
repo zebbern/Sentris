@@ -57,6 +57,47 @@ const mockComponent = {
   examples: [],
 };
 
+const mockAgentComponent = {
+  ...mockComponent,
+  id: 'core.ai.agent',
+  slug: 'ai-agent',
+  name: 'AI Agent',
+  inputs: [
+    {
+      id: 'chatModel',
+      label: 'Chat model',
+      editor: 'llm-provider' as const,
+      connectionType: { kind: 'contract' as const, name: 'core.ai.llm-provider.v1' },
+      required: true,
+    },
+    {
+      id: 'model',
+      label: 'Legacy model',
+      hidden: true,
+      connectionType: { kind: 'primitive' as const, name: 'text' as const },
+    },
+  ],
+};
+
+const mockOpenCodeComponent = {
+  ...mockAgentComponent,
+  id: 'core.ai.opencode',
+  slug: 'opencode',
+  name: 'OpenCode',
+  inputs: [
+    {
+      id: 'llmConfig',
+      label: 'LLM configuration',
+      editor: 'llm-provider' as const,
+      connectionType: { kind: 'contract' as const, name: 'core.ai.llm-provider.v1' },
+      required: true,
+    },
+  ],
+};
+
+let flowEdges: { source: string; target: string; targetHandle?: string }[] = [];
+let flowNodes: { id: string; data: Partial<FrontendNodeData> }[] = [];
+
 let isComponentsLoading = false;
 
 mock.module('@/hooks/queries/useComponentQueries', () => ({
@@ -64,8 +105,16 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
     data: isComponentsLoading
       ? undefined
       : {
-          byId: { 'core.scanner.nmap': mockComponent },
-          slugIndex: { 'nmap-scan': 'core.scanner.nmap' },
+          byId: {
+            'core.scanner.nmap': mockComponent,
+            'core.ai.agent': mockAgentComponent,
+            'core.ai.opencode': mockOpenCodeComponent,
+          },
+          slugIndex: {
+            'nmap-scan': 'core.scanner.nmap',
+            'ai-agent': 'core.ai.agent',
+            opencode: 'core.ai.opencode',
+          },
         },
     isLoading: isComponentsLoading,
     error: null,
@@ -75,14 +124,34 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
   getComponentFromCache: () => null,
 }));
 
+mock.module('@/hooks/queries/useSecretQueries', () => ({
+  useSecrets: () => ({
+    data: [{ id: 'secret-1', name: 'OPENAI_API_KEY' }],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+mock.module('@/hooks/queries/useAgentModelQueries', () => ({
+  useAnthropicModels: () => ({ data: undefined, isFetching: false, isError: false }),
+}));
+
+mock.module('@/components/inputs/SecretSelect', () => ({
+  SecretSelect: ({ onChange }: { onChange: (value: string) => void }) => (
+    <button type="button" onClick={() => onChange('secret-1')}>
+      Select stored secret
+    </button>
+  ),
+}));
+
 mock.module('@xyflow/react', () => ({
   ReactFlowProvider: ({ children }: any) => children,
   NodeResizer: () => null,
   Handle: ({ id, ...rest }: any) => <div data-testid={`handle-${id}`} {...rest} />,
   Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
   useReactFlow: () => ({
-    getEdges: () => [],
-    getNodes: () => [],
+    getEdges: () => flowEdges,
+    getNodes: () => flowNodes,
     setEdges: () => {},
     setNodes: () => {},
   }),
@@ -175,6 +244,8 @@ describe('ConfigPanel', () => {
     cleanup();
     isComponentsLoading = false;
     hideConfigInfoSections = true;
+    flowEdges = [];
+    flowNodes = [];
     setHideConfigInfoSections.mockClear();
   });
 
@@ -261,5 +332,76 @@ describe('ConfigPanel', () => {
     expect(screen.getByLabelText('Hide info sections?')).toBeInTheDocument();
     expect(screen.getByText('Documentation')).toBeInTheDocument();
     expect(screen.getByText('Outputs')).toBeInTheDocument();
+  });
+
+  it('uses the editor-marked chatModel input for core.ai.agent', () => {
+    const onUpdateNode = mock(() => {});
+    const node = createSelectedNode({
+      componentId: 'core.ai.agent',
+      componentSlug: 'ai-agent',
+      config: { params: {}, inputOverrides: { model: { provider: 'openai', modelId: 'wrong' } } },
+    });
+
+    render(
+      <ConfigPanel selectedNode={node} onClose={mock(() => {})} onUpdateNode={onUpdateNode} />,
+    );
+    expect(screen.queryByText('Chat model')).toBeNull();
+    expect(screen.queryByText('Legacy model')).toBeNull();
+    fireEvent.click(screen.getByText('Select stored secret'));
+
+    expect(onUpdateNode).toHaveBeenCalledWith(
+      'node-1',
+      expect.objectContaining({
+        config: expect.objectContaining({
+          inputOverrides: expect.objectContaining({
+            chatModel: expect.objectContaining({ apiKeySecretId: 'secret-1' }),
+          }),
+        }),
+      }),
+    );
+    const updateCalls = (
+      onUpdateNode as unknown as {
+        mock: { calls: [string, { config: { inputOverrides: Record<string, unknown> } }][] };
+      }
+    ).mock.calls;
+    const override = updateCalls[0]![1].config.inputOverrides;
+    expect(override.model).toEqual({ provider: 'openai', modelId: 'wrong' });
+    expect(override.chatModel).not.toHaveProperty('apiKey');
+  });
+
+  it('keeps the editor-marked model input for OpenCode without a component port map', () => {
+    const onUpdateNode = mock(() => {});
+    const node = createSelectedNode({
+      componentId: 'core.ai.opencode',
+      componentSlug: 'opencode',
+      config: { params: {}, inputOverrides: {} },
+    });
+
+    render(
+      <ConfigPanel selectedNode={node} onClose={mock(() => {})} onUpdateNode={onUpdateNode} />,
+    );
+    fireEvent.click(screen.getByText('Select stored secret'));
+
+    const updateCalls = (
+      onUpdateNode as unknown as {
+        mock: { calls: [string, { config: { inputOverrides: Record<string, unknown> } }][] };
+      }
+    ).mock.calls;
+    expect(updateCalls[0]![1].config.inputOverrides).toMatchObject({
+      llmConfig: { apiKeySecretId: 'secret-1' },
+    });
+  });
+
+  it('disables inline controls when the semantic model port is connected', () => {
+    flowEdges = [{ source: 'provider-1', target: 'node-1', targetHandle: 'chatModel' }];
+    flowNodes = [{ id: 'provider-1', data: { label: 'Configured provider' } }];
+    const node = createSelectedNode({ componentId: 'core.ai.agent', componentSlug: 'ai-agent' });
+
+    render(<ConfigPanel selectedNode={node} onClose={mock(() => {})} />);
+
+    expect(
+      screen.getByText(/Using provider connected from Configured provider/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Select stored secret')).toBeNull();
   });
 });

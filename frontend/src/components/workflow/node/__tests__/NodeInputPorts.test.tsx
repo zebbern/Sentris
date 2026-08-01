@@ -158,4 +158,22 @@ describe('NodeInputPorts', () => {
     expect(screen.getByTestId('handle-port-alpha')).toBeInTheDocument();
     expect(screen.getByTestId('handle-port-beta')).toBeInTheDocument();
   });
+
+  it('does not render a hidden legacy input handle', () => {
+    render(
+      <NodeInputPorts
+        id="node-1"
+        componentInputs={[
+          createInputPort({ id: 'chatModel', label: 'Chat model' }),
+          createInputPort({ id: 'model', label: 'Legacy model', hidden: true }),
+        ]}
+        isToolMode={false}
+        inputOverrides={{}}
+        getComponent={stubGetComponent}
+      />,
+    );
+
+    expect(screen.getByTestId('handle-chatModel')).toBeInTheDocument();
+    expect(screen.queryByTestId('handle-model')).toBeNull();
+  });
 });

@@ -24,7 +24,6 @@ import {
 import type { InputPort } from '@/schemas/component';
 import type { FrontendNodeData, InputMapping } from '@/schemas/node';
 import type { Edge, Node as RFNode } from '@xyflow/react';
-import { supportsInlineAgentModelConfig } from './AgentModelConfig';
 
 export interface ConfigPanelInputsProps {
   componentInputs: InputPort[];
@@ -52,10 +51,10 @@ export function ConfigPanelInputs({
   onInputOverrideChange,
 }: ConfigPanelInputsProps) {
   const visibleInputs = componentInputs.filter((input) => {
-    if (isEntryPointComponent && input.id === '__runtimeData') {
+    if (input.hidden || input.editor === 'llm-provider') {
       return false;
     }
-    if (supportsInlineAgentModelConfig(componentId) && input.id === 'model') {
+    if (isEntryPointComponent && input.id === '__runtimeData') {
       return false;
     }
     if (isToolMode && !isCredentialInput(input)) {
@@ -74,21 +73,7 @@ export function ConfigPanelInputs({
   return (
     <CollapsibleSection title="Inputs" count={inputCount} defaultOpen={true}>
       <div className="space-y-0 mt-2">
-        {componentInputs.map((input, index) => {
-          // Skip __runtimeData input for Entry Point
-          if (isEntryPointComponent && input.id === '__runtimeData') {
-            return null;
-          }
-
-          if (supportsInlineAgentModelConfig(componentId) && input.id === 'model') {
-            return null;
-          }
-
-          // Filter out non-credential inputs in tool mode
-          if (isToolMode && !isCredentialInput(input)) {
-            return null;
-          }
-
+        {visibleInputs.map((input, index) => {
           // Handle tools port with multiple connections
           const isToolsPort = input.id === 'tools';
           const toolEdges = isToolsPort

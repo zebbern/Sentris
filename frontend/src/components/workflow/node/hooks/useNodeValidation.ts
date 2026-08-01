@@ -21,7 +21,7 @@ const manualValueProvidedForInput = (
   if (hasConnection && !manualOverridesPort(input)) return false;
   const manualCandidate = inputOverrides[input.id];
   if (manualCandidate === undefined || manualCandidate === null) return false;
-  if (input.id === 'model' && isManualAgentModelValue(manualCandidate)) return true;
+  if (input.editor === 'llm-provider' && isManualAgentModelValue(manualCandidate)) return true;
   if (typeof manualCandidate === 'string') return manualCandidate.trim().length > 0;
   return true;
 };

@@ -31,8 +31,9 @@ export function NodeInputPorts({
   const { getNodes, getEdges } = useReactFlow();
   const { data: secrets = [] } = useSecrets();
 
-  const configInputs = componentInputs.filter(isCredentialInput);
-  const visibleInputs = isToolMode ? configInputs : componentInputs;
+  const presentationInputs = componentInputs.filter((input) => !input.hidden);
+  const configInputs = presentationInputs.filter(isCredentialInput);
+  const visibleInputs = isToolMode ? configInputs : presentationInputs;
 
   if (visibleInputs.length === 0 && !isToolMode) return null;
 

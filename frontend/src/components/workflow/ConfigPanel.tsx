@@ -12,6 +12,7 @@ import { ConfigPanelMcpServer } from './config-panel/ConfigPanelMcpServer';
 import { ConfigPanelParameters } from './config-panel/ConfigPanelParameters';
 import { ConfigPanelInputs } from './config-panel/ConfigPanelInputs';
 import { AgentModelConfig } from './config-panel/AgentModelConfig';
+import { findLlmProviderInput } from '@/features/agent-readiness/readiness';
 import { ConfigPanelOutputs } from './config-panel/ConfigPanelOutputs';
 import { ConfigPanelSchedules } from './config-panel/ConfigPanelSchedules';
 import { ConfigPanelExamples } from './config-panel/ConfigPanelExamples';
@@ -219,12 +220,16 @@ export function ConfigPanel({
     (value): value is string => Boolean(value && value.trim().length > 0),
   );
 
-  const modelConnection = nodeData.inputs?.model;
-  const modelHasConnection = Boolean(modelConnection);
-  const modelConnectedSummary = modelConnection
+  const llmInput = findLlmProviderInput(componentInputs);
+  const llmConnection = llmInput
+    ? getEdges().find(
+        (edge) => edge.target === selectedNode.id && edge.targetHandle === llmInput.id,
+      )
+    : undefined;
+  const connectedSource = llmConnection
     ? (() => {
-        const sourceNode = getNodes().find((n) => n.id === modelConnection.source);
-        return (sourceNode?.data as FrontendNodeData)?.label || modelConnection.source;
+        const sourceNode = getNodes().find((node) => node.id === llmConnection.source);
+        return (sourceNode?.data as FrontendNodeData)?.label || llmConnection.source;
       })()
     : undefined;
 
@@ -281,13 +286,15 @@ export function ConfigPanel({
             onParamValueChange={handleParamValueChange}
           />
 
-          <AgentModelConfig
-            componentId={component.id}
-            modelValue={inputOverrides.model}
-            hasConnection={modelHasConnection}
-            connectedSummary={modelConnectedSummary}
-            onChange={(value) => handleInputOverrideChange('model', value)}
-          />
+          {llmInput ? (
+            <AgentModelConfig
+              componentId={component.id}
+              inputId={llmInput.id}
+              value={inputOverrides[llmInput.id]}
+              connectedSource={connectedSource}
+              onChange={handleInputOverrideChange}
+            />
+          ) : null}
 
           <ConfigPanelInputs
             componentInputs={componentInputs}

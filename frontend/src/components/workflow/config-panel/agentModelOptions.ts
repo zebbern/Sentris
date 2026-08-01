@@ -8,8 +8,6 @@ import {
 
 export type AgentModelProvider = LlmModelProvider;
 
-export const AGENT_MODEL_COMPONENT_IDS = new Set(['core.ai.opencode', 'core.ai.claude-code']);
-
 export const AGENT_MODEL_PROVIDER_OPTIONS = LLM_PROVIDER_IDS.map((provider) => ({
   label: LLM_PROVIDER_CATALOG[provider].label,
   value: provider,
