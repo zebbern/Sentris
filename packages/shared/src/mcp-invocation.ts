@@ -5,6 +5,7 @@ import {
   type ExecutionScope,
   ExecutionScopeSchema,
   type McpCapabilityCatalogSnapshot,
+  McpRuntimeFenceSchema,
   type ToolDescriptor,
 } from './mcp-capabilities.js';
 
@@ -163,6 +164,110 @@ function isWithinInlineJsonByteLimit(value: JsonValue, maximumBytes: number): bo
     return false;
   }
 }
+
+const BoundedMcpOperationArgumentsSchema = JsonObjectSchema.refine(
+  (input) => isWithinInlineJsonByteLimit(input, MAX_INLINE_INVOCATION_INPUT_BYTES),
+  { message: 'MCP operation input exceeds 262144 UTF-8 bytes' },
+);
+
+const PromptArgumentsSchema = z
+  .record(z.string(), z.string())
+  .refine((input) => isWithinInlineJsonByteLimit(input, MAX_INLINE_INVOCATION_INPUT_BYTES), {
+    message: 'MCP operation input exceeds 262144 UTF-8 bytes',
+  });
+
+export const McpOperationSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('tool-call'),
+      name: z.string().min(1),
+      arguments: BoundedMcpOperationArgumentsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('resource-read'),
+      uri: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('prompt-get'),
+      name: z.string().min(1),
+      arguments: PromptArgumentsSchema,
+    })
+    .strict(),
+]);
+export type McpOperation = z.infer<typeof McpOperationSchema>;
+
+export const McpRuntimeOperationRequestSchema = z
+  .object({
+    operationId: z.string().uuid(),
+    fence: McpRuntimeFenceSchema,
+    operation: McpOperationSchema,
+    requestedAt: z.string().datetime(),
+    deadlineAt: z.string().datetime(),
+  })
+  .strict()
+  .superRefine(({ requestedAt, deadlineAt }, context) => {
+    if (new Date(deadlineAt) < new Date(requestedAt)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['deadlineAt'],
+        message: 'MCP operation deadline must not be before requestedAt',
+      });
+    }
+  });
+export type McpRuntimeOperationRequest = z.infer<typeof McpRuntimeOperationRequestSchema>;
+
+const McpOperationTerminalShape = {
+  operationId: z.string().uuid(),
+  completedAt: z.string().datetime(),
+};
+
+export const McpOperationResultSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      ...McpOperationTerminalShape,
+      kind: z.literal('completed'),
+      output: JsonValueSchema.refine(
+        (output) => isWithinInlineJsonByteLimit(output, MAX_INLINE_INVOCATION_OUTPUT_BYTES),
+        { message: 'MCP operation output exceeds 1048576 UTF-8 bytes' },
+      ),
+    })
+    .strict(),
+  z
+    .object({
+      ...McpOperationTerminalShape,
+      kind: z.literal('remote-failure'),
+      message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
+      retryable: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      ...McpOperationTerminalShape,
+      kind: z.literal('cancelled'),
+      message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
+    })
+    .strict(),
+  z
+    .object({
+      ...McpOperationTerminalShape,
+      kind: z.literal('ambiguous'),
+      message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
+    })
+    .strict(),
+  z
+    .object({
+      ...McpOperationTerminalShape,
+      kind: z.literal('input-required-unsupported'),
+      message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
+      retryable: z.literal(false),
+    })
+    .strict(),
+]);
+export type McpOperationResult = z.infer<typeof McpOperationResultSchema>;
 
 export const InvocationManifestEntrySchema = z
   .object({

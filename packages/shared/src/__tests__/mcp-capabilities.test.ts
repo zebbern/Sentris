@@ -13,7 +13,27 @@ import {
 const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
 const SNAPSHOT_ID = '33333333-3333-4333-8333-333333333333';
+const RUNTIME_ID = '44444444-4444-4444-8444-444444444444';
+const OWNER_EPOCH = '55555555-5555-4555-8555-555555555555';
 const EXPIRES_AT = '2026-08-01T12:00:00.000Z';
+const HASH = 'a'.repeat(64);
+
+const runtimeKey = {
+  sourceId: 'mcp:github',
+  transport: 'http' as const,
+  configFingerprint: HASH,
+  organizationId: null,
+  principalPartitionHash: 'b'.repeat(64),
+  credentialReference: 'secret:mcp-github',
+  credentialGeneration: 7,
+};
+
+const fence = {
+  runtimeId: RUNTIME_ID,
+  ownerId: 'worker-3',
+  ownerEpoch: OWNER_EPOCH,
+  leaseGeneration: 4,
+};
 
 describe('ExecutionScopeSchema', () => {
   it.each([
@@ -245,5 +265,197 @@ describe('capability descriptors', () => {
     };
 
     expect(McpCapabilityCatalogSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+  });
+});
+
+describe('MCP runtime ownership contracts', () => {
+  it('parses a strict nullable-organization runtime key without resolved credentials', async () => {
+    const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+    const schema = runtimeContracts.McpRuntimeKeySchema;
+
+    expect(schema.parse(runtimeKey)).toEqual(runtimeKey);
+    expect(schema.safeParse({ ...runtimeKey, configFingerprint: 'not-a-hash' }).success).toBe(
+      false,
+    );
+    expect(
+      schema.safeParse({ ...runtimeKey, principalPartitionHash: 'C'.repeat(64) }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({ ...runtimeKey, resolvedHeaders: { authorization: 'secret' } }).success,
+    ).toBe(false);
+    expect(schema.safeParse({ ...runtimeKey, token: 'secret' }).success).toBe(false);
+
+    const serialized = JSON.stringify(schema.parse(runtimeKey));
+    expect(serialized).toContain('"credentialReference":"secret:mcp-github"');
+    expect(serialized).toContain('"credentialGeneration":7');
+    expect(serialized).not.toContain('resolvedHeaders');
+    expect(serialized).not.toContain('authorization');
+    expect(serialized).not.toContain('token');
+  });
+
+  it('requires paired credential reference and generation values', async () => {
+    const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+    const schema = runtimeContracts.McpRuntimeKeySchema;
+
+    expect(
+      schema.parse({
+        ...runtimeKey,
+        credentialReference: null,
+        credentialGeneration: null,
+      }),
+    ).toEqual({
+      ...runtimeKey,
+      credentialReference: null,
+      credentialGeneration: null,
+    });
+    expect(
+      schema.safeParse({ ...runtimeKey, credentialReference: null, credentialGeneration: 7 })
+        .success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...runtimeKey,
+        credentialReference: 'secret:mcp-github',
+        credentialGeneration: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('acquires with an unfenced candidate owner and rejects leaked owner internals', async () => {
+    const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+    const schema = runtimeContracts.McpRuntimeAcquireRequestSchema;
+    const request = {
+      runtimeKey,
+      candidateOwner: {
+        ownerId: 'worker-3',
+        ownerEpoch: OWNER_EPOCH,
+        ownerAddress: 'http://sentris-worker-3:9200',
+      },
+    };
+
+    expect(schema.parse(request)).toEqual(request);
+    expect(schema.safeParse({ ...request, fence }).success).toBe(false);
+    expect(
+      schema.safeParse({
+        ...request,
+        candidateOwner: { ...request.candidateOwner, ownerEpoch: 'stable-worker-name' },
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...request,
+        candidateOwner: {
+          ...request.candidateOwner,
+          ownerAddress: 'http://token@sentris-worker-3:9200',
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...request,
+        candidateOwner: { ...request.candidateOwner, processId: 1234 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each(['ready', 'draining'] as const)(
+    'validates the complete returned fence and direct %s runtime reference',
+    async (state) => {
+      const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+      const fenceSchema = runtimeContracts.McpRuntimeFenceSchema;
+      const refSchema = runtimeContracts.McpRuntimeRefSchema;
+      const ref = {
+        fence,
+        protocolEra: 'modern' as const,
+        protocolVersion: '2026-07-28',
+        ownerAddress: 'https://sentris-worker-3.internal:9200',
+        state,
+        leaseExpiresAt: EXPIRES_AT,
+        capabilityFingerprint: 'c'.repeat(64),
+      };
+
+      expect(fenceSchema.parse(fence)).toEqual(fence);
+      expect(fenceSchema.safeParse({ ...fence, ownerEpoch: 'worker-boot' }).success).toBe(false);
+      expect(fenceSchema.safeParse({ ...fence, leaseGeneration: 0 }).success).toBe(false);
+      expect(refSchema.parse(ref)).toEqual(ref);
+      expect(refSchema.safeParse({ ...ref, ownerAddress: 'sentris-worker-3:9200' }).success).toBe(
+        false,
+      );
+      expect(
+        refSchema.safeParse({ ...ref, containerEndpoint: 'http://container:3000' }).success,
+      ).toBe(false);
+      expect(refSchema.safeParse({ ...ref, token: 'secret' }).success).toBe(false);
+    },
+  );
+
+  it('keeps owner routing and negotiated identity unpublished while starting', async () => {
+    const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+    const schema = runtimeContracts.McpRuntimeRefSchema;
+    const startingRef = {
+      fence,
+      protocolEra: null,
+      protocolVersion: null,
+      ownerAddress: null,
+      state: 'starting' as const,
+      leaseExpiresAt: EXPIRES_AT,
+      capabilityFingerprint: null,
+    };
+
+    expect(schema.parse(startingRef)).toEqual(startingRef);
+    expect(
+      schema.safeParse({
+        ...startingRef,
+        ownerAddress: 'http://sentris-worker-3:9200',
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...startingRef,
+        state: 'ready',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('parses strict runtime health and complete capability catalog shapes', async () => {
+    const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
+    const health = {
+      fence,
+      state: 'ready' as const,
+      status: 'healthy' as const,
+      checkedAt: '2026-08-01T11:59:00.000Z',
+      leaseExpiresAt: EXPIRES_AT,
+    };
+    const catalog = {
+      protocolEra: 'modern' as const,
+      protocolVersion: '2026-07-28',
+      capabilityFingerprint: 'd'.repeat(64),
+      tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
+    };
+
+    expect(runtimeContracts.McpRuntimeHealthSchema.parse(health)).toEqual(health);
+    expect(
+      runtimeContracts.McpRuntimeHealthSchema.safeParse({ ...health, resolvedToken: 'secret' })
+        .success,
+    ).toBe(false);
+    expect(runtimeContracts.McpCatalogSchema.parse(catalog)).toEqual(catalog);
+    expect(
+      runtimeContracts.McpCatalogSchema.safeParse({
+        ...catalog,
+        capabilityFingerprint: HASH.slice(1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('exports the SDK-independent runtime schemas from the shared entry point', async () => {
+    const shared = (await import('../index.js')) as Record<string, any>;
+
+    expect(typeof shared.McpRuntimeKeySchema?.parse).toBe('function');
+    expect(typeof shared.McpRuntimeAcquireRequestSchema?.parse).toBe('function');
+    expect(typeof shared.McpRuntimeRefSchema?.parse).toBe('function');
+    expect(typeof shared.McpRuntimeHealthSchema?.parse).toBe('function');
+    expect(typeof shared.McpCatalogSchema?.parse).toBe('function');
   });
 });

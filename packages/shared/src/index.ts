@@ -7,6 +7,7 @@ export * from './schedules.js';
 export * from './webhooks.js';
 export * from './mcp.js';
 export * from './mcp-registry.js';
+// SDK-independent MCP runtime ownership and durable-operation contracts.
 export * from './mcp-capabilities.js';
 export * from './mcp-invocation.js';
 export * from './notifications.js';

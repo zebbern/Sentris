@@ -2,6 +2,124 @@ import { z } from 'zod';
 
 export const MCP_CAPABILITY_CONTRACT_VERSION = '1' as const;
 
+const Sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/);
+
+export const McpRuntimeTransportSchema = z.enum(['http', 'stdio']);
+export type McpRuntimeTransport = z.infer<typeof McpRuntimeTransportSchema>;
+
+export const McpRuntimeStateSchema = z.enum(['starting', 'ready', 'draining']);
+export type McpRuntimeState = z.infer<typeof McpRuntimeStateSchema>;
+
+export const McpProtocolEraSchema = z.enum(['modern', 'legacy']);
+export type McpProtocolEra = z.infer<typeof McpProtocolEraSchema>;
+
+export const McpRuntimeOwnerAddressSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return (
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        url.username === '' &&
+        url.password === ''
+      );
+    } catch {
+      return false;
+    }
+  }, 'Expected an HTTP(S) owner URL without embedded credentials');
+export type McpRuntimeOwnerAddress = z.infer<typeof McpRuntimeOwnerAddressSchema>;
+
+export const McpRuntimeKeySchema = z
+  .object({
+    sourceId: z.string().min(1),
+    transport: McpRuntimeTransportSchema,
+    configFingerprint: Sha256HexSchema,
+    organizationId: z.string().min(1).nullable(),
+    principalPartitionHash: Sha256HexSchema,
+    credentialReference: z.string().min(1).nullable(),
+    credentialGeneration: z.number().int().positive().nullable(),
+  })
+  .strict()
+  .superRefine((key, context) => {
+    if ((key.credentialReference === null) !== (key.credentialGeneration === null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['credentialGeneration'],
+        message: 'Credential reference and generation must both be present or both be null',
+      });
+    }
+  });
+export type McpRuntimeKey = z.infer<typeof McpRuntimeKeySchema>;
+
+export const McpRuntimeFenceSchema = z
+  .object({
+    runtimeId: z.string().uuid(),
+    ownerId: z.string().min(1),
+    ownerEpoch: z.string().uuid(),
+    leaseGeneration: z.number().int().positive(),
+  })
+  .strict();
+export type McpRuntimeFence = z.infer<typeof McpRuntimeFenceSchema>;
+
+export const McpRuntimeAcquireRequestSchema = z
+  .object({
+    runtimeKey: McpRuntimeKeySchema,
+    candidateOwner: z
+      .object({
+        ownerId: z.string().min(1),
+        ownerEpoch: z.string().uuid(),
+        ownerAddress: McpRuntimeOwnerAddressSchema,
+      })
+      .strict(),
+  })
+  .strict();
+export type McpRuntimeAcquireRequest = z.infer<typeof McpRuntimeAcquireRequestSchema>;
+
+const McpRuntimeRefBaseShape = {
+  fence: McpRuntimeFenceSchema,
+  leaseExpiresAt: z.string().datetime(),
+};
+
+const publishedMcpRuntimeRef = (state: 'ready' | 'draining') =>
+  z
+    .object({
+      ...McpRuntimeRefBaseShape,
+      protocolEra: McpProtocolEraSchema,
+      protocolVersion: z.string().min(1),
+      ownerAddress: McpRuntimeOwnerAddressSchema,
+      state: z.literal(state),
+      capabilityFingerprint: Sha256HexSchema,
+    })
+    .strict();
+
+export const McpRuntimeRefSchema = z.discriminatedUnion('state', [
+  z
+    .object({
+      ...McpRuntimeRefBaseShape,
+      protocolEra: z.null(),
+      protocolVersion: z.null(),
+      ownerAddress: z.null(),
+      state: z.literal('starting'),
+      capabilityFingerprint: z.null(),
+    })
+    .strict(),
+  publishedMcpRuntimeRef('ready'),
+  publishedMcpRuntimeRef('draining'),
+]);
+export type McpRuntimeRef = z.infer<typeof McpRuntimeRefSchema>;
+
+export const McpRuntimeHealthSchema = z
+  .object({
+    fence: McpRuntimeFenceSchema,
+    state: McpRuntimeStateSchema,
+    status: z.enum(['healthy', 'unhealthy', 'unknown']),
+    checkedAt: z.string().datetime(),
+    leaseExpiresAt: z.string().datetime(),
+  })
+  .strict();
+export type McpRuntimeHealth = z.infer<typeof McpRuntimeHealthSchema>;
+
 export const ExecutionScopeSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -203,6 +321,19 @@ export const PromptDescriptorSchema = CapabilityMetadataSchema.extend({
   ),
 }).strict();
 export type PromptDescriptor = z.infer<typeof PromptDescriptorSchema>;
+
+export const McpCatalogSchema = z
+  .object({
+    protocolEra: McpProtocolEraSchema,
+    protocolVersion: z.string().min(1),
+    capabilityFingerprint: Sha256HexSchema,
+    tools: z.array(ToolDescriptorSchema),
+    resources: z.array(ResourceDescriptorSchema),
+    resourceTemplates: z.array(ResourceTemplateDescriptorSchema),
+    prompts: z.array(PromptDescriptorSchema),
+  })
+  .strict();
+export type McpCatalog = z.infer<typeof McpCatalogSchema>;
 
 export const McpCapabilityCatalogSnapshotSchema = z
   .object({

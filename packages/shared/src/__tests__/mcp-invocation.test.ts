@@ -12,6 +12,7 @@ import {
   MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
   PrepareToolInvocationOutcomeSchema,
   resolveInvocationManifestEntry,
+  TOOL_INVOCATION_UPDATE_NAME,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   type InvocationManifest,
@@ -25,6 +26,15 @@ const OTHER_GRANT_ID = '22222222-2222-4222-8222-222222222222';
 const SNAPSHOT_ID = '33333333-3333-4333-8333-333333333333';
 const INVOCATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ATTEMPT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const RUNTIME_ID = '44444444-4444-4444-8444-444444444444';
+const OWNER_EPOCH = '55555555-5555-4555-8555-555555555555';
+
+const runtimeFence = {
+  runtimeId: RUNTIME_ID,
+  ownerId: 'worker-3',
+  ownerEpoch: OWNER_EPOCH,
+  leaseGeneration: 4,
+};
 
 const scope: ExecutionScope = {
   kind: 'run',
@@ -220,6 +230,125 @@ describe('ToolInvocationResultSchema', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('generic MCP operation contracts', () => {
+  it('parses each operation discriminant with bounded SDK-independent inputs', async () => {
+    const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
+    const schema = operationContracts.McpOperationSchema;
+
+    expect(
+      schema.parse({
+        kind: 'tool-call',
+        name: 'search_code',
+        arguments: { query: 'repo:sentris security', page: 1 },
+      }),
+    ).toEqual({
+      kind: 'tool-call',
+      name: 'search_code',
+      arguments: { query: 'repo:sentris security', page: 1 },
+    });
+    expect(schema.parse({ kind: 'resource-read', uri: 'repo://sentris/main/README.md' })).toEqual({
+      kind: 'resource-read',
+      uri: 'repo://sentris/main/README.md',
+    });
+    expect(
+      schema.parse({
+        kind: 'prompt-get',
+        name: 'review_finding',
+        arguments: { severity: 'high', findingId: 'F-42' },
+      }),
+    ).toEqual({
+      kind: 'prompt-get',
+      name: 'review_finding',
+      arguments: { severity: 'high', findingId: 'F-42' },
+    });
+    expect(
+      schema.safeParse({ kind: 'prompt-get', name: 'review_finding', arguments: { count: 2 } })
+        .success,
+    ).toBe(false);
+    expect(schema.safeParse({ kind: 'resource-read', uri: '' }).success).toBe(false);
+    expect(
+      schema.safeParse({
+        kind: 'tool-call',
+        name: 'search_code',
+        arguments: { count: Number.POSITIVE_INFINITY },
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        kind: 'tool-call',
+        name: 'search_code',
+        arguments: { text: 'x'.repeat(262_144) },
+      }).success,
+    ).toBe(false);
+    expect(schema.safeParse({ kind: 'tasks-create', name: 'unsupported' }).success).toBe(false);
+  });
+
+  it('requires the complete acquire-returned fence on operation requests', async () => {
+    const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
+    const schema = operationContracts.McpRuntimeOperationRequestSchema;
+    const operationRequest = {
+      operationId: INVOCATION_ID,
+      fence: runtimeFence,
+      operation: { kind: 'resource-read' as const, uri: 'repo://sentris/main/README.md' },
+      requestedAt: '2026-08-01T10:00:00.000Z',
+      deadlineAt: '2026-08-01T10:05:00.000Z',
+    };
+
+    expect(schema.parse(operationRequest)).toEqual(operationRequest);
+    const { fence: _fence, ...unfencedRequest } = operationRequest;
+    expect(schema.safeParse(unfencedRequest).success).toBe(false);
+    expect(schema.safeParse({ ...operationRequest, token: 'secret' }).success).toBe(false);
+    expect(
+      schema.safeParse({ ...operationRequest, deadlineAt: '2026-08-01T09:59:59.999Z' }).success,
+    ).toBe(false);
+  });
+
+  it('parses completed, remote failure, cancellation, ambiguity, and input-required results', async () => {
+    const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
+    const schema = operationContracts.McpOperationResultSchema;
+    const terminalBase = {
+      operationId: INVOCATION_ID,
+      completedAt: '2026-08-01T10:01:00.000Z',
+    };
+    const results = [
+      { ...terminalBase, kind: 'completed', output: { content: [{ type: 'text', text: 'ok' }] } },
+      {
+        ...terminalBase,
+        kind: 'remote-failure',
+        message: 'Upstream MCP server rejected the operation.',
+        retryable: false,
+      },
+      { ...terminalBase, kind: 'cancelled', message: 'Workflow cancelled.' },
+      { ...terminalBase, kind: 'ambiguous', message: 'Owner lost after dispatch.' },
+      {
+        ...terminalBase,
+        kind: 'input-required-unsupported',
+        message: 'The MCP server requires additional input.',
+        retryable: false,
+      },
+    ];
+
+    for (const result of results) {
+      expect(schema.parse(result)).toEqual(result);
+    }
+
+    expect(schema.safeParse({ ...results[4], retryable: true }).success).toBe(false);
+    expect(schema.safeParse({ ...results[1], output: { leaked: true } }).success).toBe(false);
+    expect(
+      schema.safeParse({
+        ...results[0],
+        output: { text: 'x'.repeat(1_048_576) },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps the existing tool request and Workflow update wire projection unchanged', () => {
+    expect(ToolInvocationRequestSchema.parse(request)).toEqual(request);
+    expect(JSON.parse(JSON.stringify(ToolInvocationRequestSchema.parse(request)))).toEqual(request);
+    expect(TOOL_INVOCATION_UPDATE_NAME).toBe('executeToolInvocation');
   });
 });
 
