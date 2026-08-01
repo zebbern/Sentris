@@ -100,7 +100,10 @@ export function normalizeAgentModelConfig(
   };
 }
 
-export function isManualAgentModelValue(value: unknown): boolean {
+export function isManualAgentModelValue(
+  value: unknown,
+  supportedAuthModes: readonly ClaudeAuthMode[] = ['api_key'],
+): boolean {
   if (!isRecord(value)) {
     return false;
   }
@@ -111,7 +114,10 @@ export function isManualAgentModelValue(value: unknown): boolean {
     return false;
   }
 
-  const authMode = isClaudeAuthMode(value.authMode) ? value.authMode : 'api_key';
+  const authMode = value.authMode === undefined ? 'api_key' : value.authMode;
+  if (!isClaudeAuthMode(authMode) || !supportedAuthModes.includes(authMode)) {
+    return false;
+  }
 
   if (authMode === 'subscription_oauth') {
     return (

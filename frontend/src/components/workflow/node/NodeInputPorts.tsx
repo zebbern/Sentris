@@ -8,6 +8,7 @@ import { inputSupportsManualValue, isCredentialInput } from '@/utils/portUtils';
 import { manualValueProvidedForInput } from './hooks/useNodeValidation';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { getSecretLabel } from '@/api/secrets';
+import type { ClaudeAuthMode } from '@/components/workflow/config-panel/agentModelUtils';
 
 export interface NodeInputPortsProps {
   id: string;
@@ -15,6 +16,7 @@ export interface NodeInputPortsProps {
   isToolMode: boolean;
   inputOverrides: Record<string, unknown>;
   getComponent: (ref: string) => ComponentMetadata | null;
+  supportedLlmAuthModes?: readonly ClaudeAuthMode[];
 }
 
 /**
@@ -27,6 +29,7 @@ export function NodeInputPorts({
   isToolMode,
   inputOverrides,
   getComponent,
+  supportedLlmAuthModes,
 }: NodeInputPortsProps) {
   const { getNodes, getEdges } = useReactFlow();
   const { data: secrets = [] } = useSecrets();
@@ -50,6 +53,7 @@ export function NodeInputPorts({
             getNodes={getNodes}
             getEdges={getEdges}
             secrets={secrets}
+            supportedLlmAuthModes={supportedLlmAuthModes}
           />
         ))}
       </div>
@@ -72,6 +76,7 @@ function InputPortRow({
   getNodes,
   getEdges,
   secrets,
+  supportedLlmAuthModes,
 }: {
   input: InputPort;
   id: string;
@@ -80,6 +85,7 @@ function InputPortRow({
   getNodes: ReturnType<typeof useReactFlow>['getNodes'];
   getEdges: ReturnType<typeof useReactFlow>['getEdges'];
   secrets: SecretSummary[];
+  supportedLlmAuthModes?: readonly ClaudeAuthMode[];
 }) {
   const edges = getEdges();
   const isToolsPort = input.id === 'tools';
@@ -91,7 +97,12 @@ function InputPortRow({
     : edges.find((edge) => edge.target === id && edge.targetHandle === input.id);
   const hasConnection = isToolsPort ? connections.length > 0 : Boolean(connection);
   const manualCandidate = inputOverrides[input.id];
-  const manualValueProvided = manualValueProvidedForInput(input, hasConnection, inputOverrides);
+  const manualValueProvided = manualValueProvidedForInput(
+    input,
+    hasConnection,
+    inputOverrides,
+    supportedLlmAuthModes,
+  );
 
   // Resolve source info
   let sourceInfo: string | null = null;

@@ -127,10 +127,15 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<Node<FrontendNodeDa
     component,
   });
   const componentParameters = component?.parameters ?? [];
+  const supportedLlmAuthModes =
+    component?.id === 'core.ai.claude-code'
+      ? (['api_key', 'subscription_oauth'] as const)
+      : undefined;
   const { hasUnfilledRequired, requiredParams, inputOverrides } = useNodeValidation({
     componentParameters,
     componentInputs,
     nodeData,
+    supportedLlmAuthModes,
   });
 
   // ── Effects ──────────────────────────────────────────────────────────
@@ -401,6 +406,7 @@ const WorkflowNodeInner = ({ data, selected, id }: NodeProps<Node<FrontendNodeDa
             isToolMode={isToolMode}
             inputOverrides={inputOverrides}
             getComponent={getComponent}
+            supportedLlmAuthModes={supportedLlmAuthModes}
           />
         )}
 

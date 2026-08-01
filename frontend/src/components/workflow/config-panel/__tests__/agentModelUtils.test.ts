@@ -27,13 +27,28 @@ describe('agentModelUtils', () => {
 
   it('treats subscription oauth secret as manual value', () => {
     expect(
-      isManualAgentModelValue({
-        provider: 'anthropic',
-        modelId: 'claude-sonnet-4-6',
-        authMode: 'subscription_oauth',
-        oauthTokenSecretId: 'oauth-secret-1',
-      }),
+      isManualAgentModelValue(
+        {
+          provider: 'anthropic',
+          modelId: 'claude-sonnet-4-6',
+          authMode: 'subscription_oauth',
+          oauthTokenSecretId: 'oauth-secret-1',
+        },
+        ['api_key', 'subscription_oauth'],
+      ),
     ).toBe(true);
+  });
+
+  it('rejects subscription oauth unless the caller declares support', () => {
+    const oauthModel = {
+      provider: 'anthropic',
+      modelId: 'claude-sonnet-4-6',
+      authMode: 'subscription_oauth',
+      oauthTokenSecretId: 'oauth-secret-1',
+    };
+
+    expect(isManualAgentModelValue(oauthModel)).toBe(false);
+    expect(isManualAgentModelValue(oauthModel, ['api_key', 'subscription_oauth'])).toBe(true);
   });
 
   it('persists provider and model even without a secret', () => {
