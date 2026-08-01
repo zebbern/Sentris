@@ -1,3 +1,4 @@
+import { isLlmModelProvider } from '@sentris/shared';
 import {
   AGENT_MODEL_OPTIONS_BY_PROVIDER,
   DEFAULT_AGENT_MODEL_BY_COMPONENT,
@@ -27,13 +28,7 @@ export function isClaudeAuthMode(value: unknown): value is ClaudeAuthMode {
 }
 
 export function isAgentModelProvider(value: unknown): value is AgentModelProvider {
-  return (
-    value === 'anthropic' ||
-    value === 'openai' ||
-    value === 'gemini' ||
-    value === 'openrouter' ||
-    value === 'zai-coding-plan'
-  );
+  return isLlmModelProvider(value);
 }
 
 function normalizeAuthMode(value: unknown, componentId: string): ClaudeAuthMode {
@@ -47,7 +42,7 @@ export function normalizeAgentModelConfig(
   value: unknown,
   componentId: string,
 ): AgentModelConfigValue {
-  const defaults =
+  const defaults: { provider: AgentModelProvider; modelId: string } =
     DEFAULT_AGENT_MODEL_BY_COMPONENT[componentId] ??
     DEFAULT_AGENT_MODEL_BY_COMPONENT['core.ai.opencode'];
 

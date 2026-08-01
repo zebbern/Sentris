@@ -21,3 +21,4 @@ export * from './env.js';
 export * from './csv.js';
 export * from './trust-profile.js';
 export * from './telemetry.js';
+export * from './ai-model-catalog.js';

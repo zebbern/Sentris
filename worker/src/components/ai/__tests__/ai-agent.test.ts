@@ -11,7 +11,12 @@ import { componentRegistry, runComponentWithRunner } from '@sentris/component-sd
 import type { AiAgentInput, AiAgentOutput } from '../ai-agent';
 
 const stepCountIsMock = vi.fn((limit: number) => ({ type: 'step-count', limit }));
-const createOpenAIMock = vi.fn(() => (modelId: string) => ({ provider: 'openai', modelId }));
+const createOpenAIMock = vi.fn(() =>
+  Object.assign(
+    (modelId: string) => ({ provider: 'openai', modelId }),
+    { chat: (modelId: string) => ({ provider: 'openrouter', modelId }) },
+  ),
+);
 const createGoogleGenerativeAIMock = vi.fn(() => (modelId: string) => ({
   provider: 'gemini',
   modelId,
@@ -324,6 +329,84 @@ describe('core.ai.agent (refactor)', () => {
       provider: 'gemini',
       modelId: 'gemini-3.5-flash',
     });
+  });
+
+  test.each([
+    ['openai', 'gpt-4o-mini'],
+    ['gemini', 'gemini-3.5-flash'],
+    ['openrouter', 'openai/gpt-4o-mini'],
+    ['anthropic', 'claude-sonnet-4-6'],
+    ['zai-coding-plan', 'gpt-4o-mini'],
+  ] as const)('preserves the %s fallback model for graphs without a model ID', async (provider, modelId) => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      {
+        inputs: {
+          userInput: 'Investigate the target',
+          chatModel: { provider, modelId: '' },
+          modelApiKey: 'test-model-key',
+        },
+        params: { systemPrompt: '', temperature: 0.2, maxTokens: 128, memorySize: 4 },
+      },
+      createTestContext(),
+    );
+
+    const settings = expectRecord(toolLoopAgentSettings, 'agent settings');
+    expect(settings.model).toMatchObject({ modelId });
+  });
+
+  test('uses the Z.AI Coding Plan base URL when no URL is configured on the graph', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      {
+        inputs: {
+          userInput: 'Investigate the target',
+          chatModel: { provider: 'zai-coding-plan', modelId: 'glm-5.1' },
+          modelApiKey: 'test-zai-key',
+        },
+        params: { systemPrompt: '', temperature: 0.2, maxTokens: 128, memorySize: 4 },
+      },
+      createTestContext(),
+    );
+
+    expect(createOpenAIMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseURL: 'https://api.z.ai/api/coding/paas/v4' }),
+    );
+  });
+
+  test('uses an explicit Z.AI base URL instead of the Coding Plan default', async () => {
+    const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+    expect(component).toBeDefined();
+
+    await runComponentWithRunner(
+      component!.runner,
+      component!.execute,
+      {
+        inputs: {
+          userInput: 'Investigate the target',
+          chatModel: {
+            provider: 'zai-coding-plan',
+            modelId: 'glm-5.1',
+            baseUrl: 'https://zai.example.test/v4',
+          },
+          modelApiKey: 'test-zai-key',
+        },
+        params: { systemPrompt: '', temperature: 0.2, maxTokens: 128, memorySize: 4 },
+      },
+      createTestContext(),
+    );
+
+    expect(createOpenAIMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ baseURL: 'https://zai.example.test/v4' }),
+    );
   });
 
   test('discovers gateway tools and passes them to the agent', async () => {

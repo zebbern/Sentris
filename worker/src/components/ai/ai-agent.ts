@@ -28,6 +28,7 @@ import {
   param,
 } from '@sentris/component-sdk';
 import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
+import { LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { AgentStreamRecorder } from './agent-stream-recorder';
 import {
   AGENT_EXECUTION_PROFILE_OPTIONS,
@@ -35,7 +36,7 @@ import {
   getAgentExecutionProfileConfig,
 } from './agent-execution-profile';
 
-type ModelProvider = 'openai' | 'gemini' | 'openrouter' | 'zai-coding-plan' | 'anthropic';
+type ModelProvider = LlmModelProvider;
 
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL ?? '';
 const GEMINI_BASE_URL = process.env.GEMINI_BASE_URL ?? '';
@@ -50,6 +51,27 @@ const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_MAX_TOKENS = 1024;
 const DEFAULT_MEMORY_SIZE = 8;
 const LOG_TRUNCATE_LIMIT = 2000;
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported LLM provider: ${String(value)}`);
+}
+
+function getDefaultProviderBaseUrl(provider: ModelProvider): string {
+  switch (provider) {
+    case 'openai':
+      return OPENAI_BASE_URL;
+    case 'anthropic':
+      return ANTHROPIC_BASE_URL;
+    case 'gemini':
+      return GEMINI_BASE_URL;
+    case 'openrouter':
+      return OPENROUTER_BASE_URL;
+    case 'zai-coding-plan':
+      return process.env.ZAI_BASE_URL ?? LLM_PROVIDER_CATALOG[provider].defaultBaseUrl!;
+    default:
+      return assertNever(provider);
+  }
+}
 
 import { DEFAULT_GATEWAY_URL } from './utils';
 import { getToolAvailabilityPrompt, prepareAgentGatewayAccess } from './agent-tool-access';
@@ -714,13 +736,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
       const baseUrl =
         explicitBaseUrl && explicitBaseUrl.length > 0
           ? explicitBaseUrl
-          : effectiveProvider === 'gemini'
-            ? GEMINI_BASE_URL
-            : effectiveProvider === 'openrouter'
-              ? OPENROUTER_BASE_URL
-              : effectiveProvider === 'anthropic'
-                ? ANTHROPIC_BASE_URL
-                : OPENAI_BASE_URL;
+          : getDefaultProviderBaseUrl(effectiveProvider);
 
       const sanitizedHeaders =
         chatModel && (chatModel.provider === 'openai' || chatModel.provider === 'openrouter')

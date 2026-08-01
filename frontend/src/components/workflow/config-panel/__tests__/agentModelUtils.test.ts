@@ -9,7 +9,7 @@ describe('agentModelUtils', () => {
   it('normalizes partial model config with defaults', () => {
     expect(normalizeAgentModelConfig(undefined, 'core.ai.claude-code')).toEqual({
       provider: 'anthropic',
-      modelId: 'claude-sonnet-4-6',
+      modelId: 'claude-sonnet-5',
       authMode: 'api_key',
       effort: 'default',
     });
@@ -123,6 +123,17 @@ describe('agentModelUtils', () => {
         'core.ai.claude-code',
       ).modelId,
     ).toBe('claude-future-9000');
+  });
+
+  it('uses each component provider recommendation when no model config exists', () => {
+    expect(normalizeAgentModelConfig(undefined, 'core.ai.agent')).toMatchObject({
+      provider: 'openai',
+      modelId: 'gpt-5.6-terra',
+    });
+    expect(normalizeAgentModelConfig(undefined, 'core.ai.opencode')).toMatchObject({
+      provider: 'openai',
+      modelId: 'gpt-5.6-terra',
+    });
   });
 
   it('persists effort for claude-code when not default', () => {

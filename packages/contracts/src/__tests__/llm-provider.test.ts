@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { getPortMeta } from '@sentris/component-sdk';
+import { LLM_PROVIDER_CATALOG, LLM_PROVIDER_IDS } from '@sentris/shared';
 
 import {
   llmProviderContractName,
@@ -147,6 +148,16 @@ describe('LLMProviderSchema', () => {
     it('rejects missing modelId field', () => {
       expect(() => schema.parse({ provider: 'openai' })).toThrow();
     });
+  });
+
+  it('parses every provider and recommended model from the shared catalog', () => {
+    for (const provider of LLM_PROVIDER_IDS) {
+      const catalogEntry = LLM_PROVIDER_CATALOG[provider];
+      expect(schema.parse({ provider, modelId: catalogEntry.recommendedModelId })).toMatchObject({
+        provider,
+        modelId: catalogEntry.recommendedModelId,
+      });
+    }
   });
 
   it('has correct port metadata', () => {
