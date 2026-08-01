@@ -17,6 +17,10 @@
     "./finding-observation-id": {
       "types": "./src/findings/findingObservationId.ts",
       "import": "./src/findings/findingObservationId.ts"
+    },
+    "./mcp-invocation": {
+      "types": "./src/mcp-invocation.ts",
+      "import": "./src/mcp-invocation.ts"
     }
   },
   "license": "MIT",

@@ -1,6 +1,10 @@
 import {
+  ActivityCancellationType,
   ApplicationFailure,
   CancellationScope,
+  allHandlersFinished,
+  condition,
+  currentUpdateInfo,
   defineQuery,
   isCancellation,
   patched,
@@ -26,6 +30,11 @@ import { handleForEachLoopInWorkflow } from './for-each-workflow-handler.js';
 import { handleToolModeRegistration } from './tool-mode-handler.js';
 import { handleHumanInput } from './human-input-handler.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
+import {
+  registerToolInvocationUpdateHandlers,
+  type ToolInvocationUpdateController,
+  type ToolInvocationWorkflowActivities,
+} from './tool-invocation-update-handler.js';
 import { workflowDiagnosticLog } from '../workflow-diagnostics.js';
 import {
   resolveHumanInputSignal,
@@ -35,6 +44,10 @@ import {
   type ToolCallResult,
 } from '../signals.js';
 import type { ExecutionTriggerMetadata, PreparedRunPayload } from '@sentris/shared';
+import {
+  TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
+  TOOL_INVOCATION_PROTOCOL_VERSION,
+} from '@sentris/shared/mcp-invocation';
 import type {
   RunComponentActivityInput,
   RunComponentActivityOutput,
@@ -55,6 +68,7 @@ import type {
 const FOR_EACH_BODY_ACTIVITY_TIMEOUT = '135 minutes';
 const PERSIST_CHILD_START_PATCH_ID = 'sentris-persist-child-start-v1';
 const RUN_METADATA_LIFECYCLE_PATCH_ID = 'sentris-run-metadata-lifecycle-v1';
+const TOOL_INVOCATION_UPDATE_PATCH_ID = 'sentris-tool-invocation-update-v1';
 
 const {
   runComponentActivity: _runComponentActivity,
@@ -125,11 +139,35 @@ const { recordTraceEventActivity: persistTraceEventActivity } = proxyActivities<
   startToCloseTimeout: '1 minute',
 });
 
+const {
+  prepareToolInvocationActivity,
+  reconcileToolInvocationActivity,
+  reconcileRunToolInvocationsActivity,
+} = proxyActivities<ToolInvocationWorkflowActivities>({
+  startToCloseTimeout: '2 minutes',
+  heartbeatTimeout: '30 seconds',
+  retry: {
+    maximumAttempts: 3,
+  },
+});
+
+const { dispatchToolInvocationActivity } = proxyActivities<
+  Pick<ToolInvocationWorkflowActivities, 'dispatchToolInvocationActivity'>
+>({
+  startToCloseTimeout: '10 minutes',
+  heartbeatTimeout: '30 seconds',
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  retry: {
+    maximumAttempts: 1,
+  },
+});
+
 export async function sentrisWorkflowRun(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
   const durableTerminalFinalization = patched('sentris-durable-terminal-finalization-v1');
   const durableRunMetadataLifecycle = patched(RUN_METADATA_LIFECYCLE_PATCH_ID);
+  const durableToolInvocationUpdates = patched(TOOL_INVOCATION_UPDATE_PATCH_ID);
   const results = new Map<string, unknown>();
   const actionsByRef = new Map<string, WorkflowAction>(
     input.definition.actions.map((action) => [action.ref, action]),
@@ -154,105 +192,133 @@ export async function sentrisWorkflowRun(
     }
   });
 
-  // Track pending tool calls and their results (for MCP gateway)
-  const pendingToolCalls = new Map<
-    string,
-    { request: ToolCallRequest; resolve: (result: ToolCallResult) => void }
-  >();
-  const toolCallResults = new Map<string, ToolCallResult>();
-
-  // Set up signal handler for tool call execution requests
-  setHandler(executeToolCallSignal, async (request: ToolCallRequest) => {
-    // Prevent duplicate execution of the same callId
-    if (toolCallResults.has(request.callId)) {
-      console.warn(`[Workflow] Duplicate tool call ignored: ${request.callId}`);
-      return;
-    }
-
-    workflowDiagnosticLog(
-      `[Workflow] Received tool call signal: callId=${request.callId}, componentId=${request.componentId}`,
+  let toolInvocationUpdates: ToolInvocationUpdateController | undefined;
+  if (durableToolInvocationUpdates) {
+    setHandler(
+      defineQuery<number>(TOOL_INVOCATION_PROTOCOL_QUERY_NAME),
+      () => TOOL_INVOCATION_PROTOCOL_VERSION,
     );
+    toolInvocationUpdates = registerToolInvocationUpdateHandlers(
+      {
+        runId: input.runId,
+        organizationId: input.organizationId ?? null,
+        activities: {
+          prepareToolInvocationActivity,
+          dispatchToolInvocationActivity,
+          reconcileToolInvocationActivity,
+          reconcileRunToolInvocationsActivity,
+        },
+      },
+      {
+        setHandler,
+        handlerRuntime: {
+          currentUpdateId: () => currentUpdateInfo()?.id,
+          withTimeout: (timeout, callback) => CancellationScope.withTimeout(timeout, callback),
+          nonCancellable: (callback) => CancellationScope.nonCancellable(callback),
+          isCancellation,
+          applicationFailure: (message, type) => ApplicationFailure.nonRetryable(message, type),
+        },
+      },
+    );
+  } else {
+    // Legacy compatibility for Workflow histories created before keyed Updates.
+    const pendingToolCalls = new Map<
+      string,
+      { request: ToolCallRequest; resolve: (result: ToolCallResult) => void }
+    >();
+    const toolCallResults = new Map<string, ToolCallResult>();
 
-    // Execute the component via runComponentActivity with timeout protection
-    const TOOL_CALL_TIMEOUT_MS = 300000; // 5 minutes
-    try {
-      const activityOutput = await Promise.race([
-        _runComponentActivity({
-          runId: input.runId,
-          workflowId: input.workflowId,
-          workflowVersionId: input.workflowVersionId,
-          organizationId: input.organizationId,
-          scopeId: input.scopeId ?? null,
-          action: {
-            ref: `tool-call:${request.callId}`,
-            componentId: request.componentId,
-          },
-          // Merge credentials (pre-bound) with agent-provided arguments
-          inputs: {
-            ...(request.credentials ?? {}),
-            ...request.arguments,
-          },
-          params: request.parameters ?? {},
-          // Pass credentials as inputOverrides so resolveSecretInputOverrides
-          // in runComponentActivity resolves secret names to actual values.
-          inputOverrides: request.credentials ?? {},
-          metadata: {
-            streamId: request.callId,
-          },
-        }),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Tool call timed out after ${TOOL_CALL_TIMEOUT_MS}ms`)),
-            TOOL_CALL_TIMEOUT_MS,
+    setHandler(executeToolCallSignal, async (request: ToolCallRequest) => {
+      // Prevent duplicate execution of the same callId
+      if (toolCallResults.has(request.callId)) {
+        console.warn(`[Workflow] Duplicate tool call ignored: ${request.callId}`);
+        return;
+      }
+
+      workflowDiagnosticLog(
+        `[Workflow] Received tool call signal: callId=${request.callId}, componentId=${request.componentId}`,
+      );
+
+      // Execute the component via runComponentActivity with timeout protection
+      const TOOL_CALL_TIMEOUT_MS = 300000; // 5 minutes
+      try {
+        const activityOutput = await Promise.race([
+          _runComponentActivity({
+            runId: input.runId,
+            workflowId: input.workflowId,
+            workflowVersionId: input.workflowVersionId,
+            organizationId: input.organizationId,
+            scopeId: input.scopeId ?? null,
+            action: {
+              ref: `tool-call:${request.callId}`,
+              componentId: request.componentId,
+            },
+            // Merge credentials (pre-bound) with agent-provided arguments
+            inputs: {
+              ...(request.credentials ?? {}),
+              ...request.arguments,
+            },
+            params: request.parameters ?? {},
+            // Pass credentials as inputOverrides so resolveSecretInputOverrides
+            // in runComponentActivity resolves secret names to actual values.
+            inputOverrides: request.credentials ?? {},
+            metadata: {
+              streamId: request.callId,
+            },
+          }),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Tool call timed out after ${TOOL_CALL_TIMEOUT_MS}ms`)),
+              TOOL_CALL_TIMEOUT_MS,
+            ),
           ),
-        ),
-      ]);
+        ]);
 
-      const result: ToolCallResult = {
-        callId: request.callId,
-        success: true,
-        output: (activityOutput as { output: unknown }).output,
-        completedAt: new Date().toISOString(),
-      };
+        const result: ToolCallResult = {
+          callId: request.callId,
+          success: true,
+          output: (activityOutput as { output: unknown }).output,
+          completedAt: new Date().toISOString(),
+        };
 
-      toolCallResults.set(request.callId, result);
-      workflowDiagnosticLog(
-        `[Workflow] Tool call completed: callId=${request.callId}, success=true`,
-      );
+        toolCallResults.set(request.callId, result);
+        workflowDiagnosticLog(
+          `[Workflow] Tool call completed: callId=${request.callId}, success=true`,
+        );
 
-      // Resolve any pending waiters
-      const pending = pendingToolCalls.get(request.callId);
-      if (pending) {
-        pending.resolve(result);
+        // Resolve any pending waiters
+        const pending = pendingToolCalls.get(request.callId);
+        if (pending) {
+          pending.resolve(result);
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const result: ToolCallResult = {
+          callId: request.callId,
+          success: false,
+          error: errorMessage,
+          completedAt: new Date().toISOString(),
+        };
+
+        toolCallResults.set(request.callId, result);
+        workflowDiagnosticLog(
+          `[Workflow] Tool call failed: callId=${request.callId}, error=${errorMessage}`,
+        );
+
+        const pending = pendingToolCalls.get(request.callId);
+        if (pending) {
+          pending.resolve(result);
+        }
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const result: ToolCallResult = {
-        callId: request.callId,
-        success: false,
-        error: errorMessage,
-        completedAt: new Date().toISOString(),
-      };
+    });
 
-      toolCallResults.set(request.callId, result);
-      workflowDiagnosticLog(
-        `[Workflow] Tool call failed: callId=${request.callId}, error=${errorMessage}`,
-      );
-
-      const pending = pendingToolCalls.get(request.callId);
-      if (pending) {
-        pending.resolve(result);
-      }
-    }
-  });
-
-  // Set up query handler for tool call results
-  setHandler(
-    defineQuery<ToolCallResult | null, [string]>('getToolCallResult'),
-    (callId: string) => {
-      return toolCallResults.get(callId) ?? null;
-    },
-  );
+    setHandler(
+      defineQuery<ToolCallResult | null, [string]>('getToolCallResult'),
+      (callId: string) => {
+        return toolCallResults.get(callId) ?? null;
+      },
+    );
+  }
 
   workflowDiagnosticLog(`[Workflow] Starting sentris workflow run: ${input.runId}`);
   workflowDiagnosticLog(
@@ -288,11 +354,18 @@ export async function sentrisWorkflowRun(
   };
 
   const finalizeLifecycle = async (): Promise<void> => {
+    toolInvocationUpdates?.stopAccepting();
     workflowDiagnosticLog(
       `[Workflow] Cleaning up MCP containers for run ${input.runId} (status=${terminalStatus})`,
     );
     if (durableTerminalFinalization) {
       await CancellationScope.nonCancellable(async () => {
+        if (toolInvocationUpdates) {
+          await condition(allHandlersFinished);
+          await toolInvocationUpdates.reconcileRun().catch(() => {
+            console.error(`[Workflow] Failed to reconcile tool invocations for run ${input.runId}`);
+          });
+        }
         await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
           console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);
         });

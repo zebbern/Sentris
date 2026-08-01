@@ -28,6 +28,7 @@ function makeMockWorkflowHandle(overrides: Record<string, unknown> = {}) {
     terminate: vi.fn().mockResolvedValue(undefined),
     signal: vi.fn().mockResolvedValue(undefined),
     query: vi.fn().mockResolvedValue({ count: 42 }),
+    executeUpdate: vi.fn().mockResolvedValue({ status: 'completed' }),
     ...overrides,
   };
 }
@@ -78,15 +79,6 @@ vi.mock('@temporalio/client', () => ({
   WorkflowClient: vi.fn().mockImplementation(() => mockWorkflowClient),
   ScheduleClient: vi.fn().mockImplementation(() => mockScheduleClient),
   ScheduleOverlapPolicy: { SKIP: 1, BUFFER_ONE: 2, ALLOW_ALL: 3 },
-}));
-
-vi.mock('@sentris/worker/workflows', () => ({
-  sentrisWorkflowRun: vi.fn(),
-  testMinimalWorkflow: vi.fn(),
-  scheduleTriggerWorkflow: vi.fn(),
-  mcpDiscoveryWorkflow: vi.fn(),
-  mcpGroupDiscoveryWorkflow: vi.fn(),
-  webhookParsingWorkflow: vi.fn(),
 }));
 
 const mockConfigService = {
@@ -140,6 +132,10 @@ describe('TemporalService', () => {
       expect(result.runId).toBe('run-abc');
       expect(result.taskQueue).toBe('test-queue');
       expect(mockWorkflowClient.start).toHaveBeenCalledTimes(1);
+      expect(mockWorkflowClient.start).toHaveBeenCalledWith(
+        'sentrisWorkflowRun',
+        expect.any(Object),
+      );
     });
 
     it('uses provided workflowId and taskQueue', async () => {
@@ -267,6 +263,60 @@ describe('TemporalService', () => {
       await expect(
         service.signalWorkflow({ workflowId: 'x', signalName: 'test', args: {} }),
       ).rejects.toThrow('not found');
+    });
+
+    it('does not log signal arguments that may contain credentials', async () => {
+      const log = vi.fn();
+      (service as unknown as { logger: { log: typeof log } }).logger.log = log;
+
+      await service.signalWorkflow({
+        workflowId: 'wf-123',
+        signalName: 'executeToolCall',
+        args: { credentials: { token: 'secret-value' } },
+      });
+
+      expect(log).toHaveBeenCalledWith('Sending signal executeToolCall to workflow wf-123');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('secret-value');
+    });
+  });
+
+  describe('executeWorkflowUpdate', () => {
+    it('executes a keyed Update on the requested Workflow run without signaling', async () => {
+      const request = {
+        invocationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        input: { package: 'lodash' },
+      };
+
+      const result = await service.executeWorkflowUpdate<{ status: string }>({
+        workflowId: 'wf-123',
+        temporalRunId: 'run-abc',
+        updateName: 'executeToolInvocation',
+        updateId: request.invocationId,
+        args: request,
+      });
+
+      expect(result).toEqual({ status: 'completed' });
+      expect(mockWorkflowClient.getHandle).toHaveBeenCalledWith('wf-123', 'run-abc');
+      expect(mockWorkflowHandle.executeUpdate).toHaveBeenCalledWith('executeToolInvocation', {
+        args: [request],
+        updateId: request.invocationId,
+      });
+      expect(mockWorkflowHandle.signal).not.toHaveBeenCalled();
+    });
+
+    it('propagates Update failures without falling back to a signal', async () => {
+      mockWorkflowHandle.executeUpdate.mockRejectedValueOnce(new Error('Update rejected'));
+
+      await expect(
+        service.executeWorkflowUpdate({
+          workflowId: 'wf-123',
+          updateName: 'executeToolInvocation',
+          updateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          args: {},
+        }),
+      ).rejects.toThrow('Update rejected');
+
+      expect(mockWorkflowHandle.signal).not.toHaveBeenCalled();
     });
   });
 

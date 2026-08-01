@@ -133,6 +133,40 @@ describe('ToolInvocationRequestSchema', () => {
   });
 });
 
+describe('InstallToolInvocationManifestRequestSchema', () => {
+  const manifest: InvocationManifest = {
+    capabilitySnapshotId: SNAPSHOT_ID,
+    capabilityGrantId: GRANT_ID,
+    version: '1',
+    entries: [
+      {
+        toolName: 'osv_query',
+        sourceId: 'component:osv',
+        destination: 'component-activity',
+        retryPolicy: 'pre-dispatch-only',
+      },
+    ],
+  };
+
+  it('accepts only a strict scope-bound immutable manifest install request', async () => {
+    const invocationModule = (await import('../mcp-invocation.js')) as Record<string, any>;
+    expect(typeof invocationModule.InstallToolInvocationManifestRequestSchema?.parse).toBe(
+      'function',
+    );
+    const installSchema = invocationModule.InstallToolInvocationManifestRequestSchema;
+    const install = { scope, manifest };
+
+    expect(installSchema.parse(install)).toEqual(install);
+    expect(() => installSchema.parse({ ...install, extra: true })).toThrow();
+    expect(() =>
+      installSchema.parse({
+        scope: { ...scope, capabilityGrantId: OTHER_GRANT_ID },
+        manifest,
+      }),
+    ).toThrow('Invocation manifest does not match the execution scope grant');
+  });
+});
+
 describe('ToolInvocationResultSchema', () => {
   const completedResult = {
     invocationId: INVOCATION_ID,

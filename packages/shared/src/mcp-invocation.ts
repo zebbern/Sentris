@@ -9,6 +9,8 @@ import {
 } from './mcp-capabilities.js';
 
 export const TOOL_INVOCATION_UPDATE_NAME = 'executeToolInvocation' as const;
+export const INSTALL_TOOL_INVOCATION_MANIFEST_UPDATE_NAME =
+  'installToolInvocationManifest' as const;
 export const TOOL_INVOCATION_PROTOCOL_QUERY_NAME = 'getToolInvocationProtocolVersion' as const;
 export const TOOL_INVOCATION_PROTOCOL_VERSION = 1 as const;
 export const MAX_INLINE_INVOCATION_INPUT_BYTES = 256 * 1024;
@@ -186,6 +188,25 @@ export const InvocationManifestSchema = z
   .strict()
   .readonly();
 export type InvocationManifest = z.infer<typeof InvocationManifestSchema>;
+
+export const InstallToolInvocationManifestRequestSchema = z
+  .object({
+    scope: ExecutionScopeSchema,
+    manifest: InvocationManifestSchema,
+  })
+  .strict()
+  .superRefine(({ scope, manifest }, context) => {
+    if (scope.capabilityGrantId !== manifest.capabilityGrantId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['manifest', 'capabilityGrantId'],
+        message: 'Invocation manifest does not match the execution scope grant',
+      });
+    }
+  });
+export type InstallToolInvocationManifestRequest = z.infer<
+  typeof InstallToolInvocationManifestRequestSchema
+>;
 
 export const ToolInvocationRequestSchema = z
   .object({

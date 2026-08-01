@@ -37,6 +37,12 @@ import {
   cacheDiscoveryResultActivity,
 } from '../activities/mcp-discovery.activity';
 import { executeWebhookParsingScriptActivity } from '../activities/webhook-parsing.activity';
+import {
+  dispatchToolInvocationActivity,
+  prepareToolInvocationActivity,
+  reconcileRunToolInvocationsActivity,
+  reconcileToolInvocationActivity,
+} from '../activities/mcp-invocation.activity';
 import { logHeartbeat } from '../../utils/debug-logger';
 import { validateWorkerEnv } from '../../config/env.validate';
 import {
@@ -201,6 +207,10 @@ async function main() {
     discoverMcpGroupToolsActivity,
     cacheDiscoveryResultActivity,
     executeWebhookParsingScriptActivity,
+    prepareToolInvocationActivity,
+    dispatchToolInvocationActivity,
+    reconcileToolInvocationActivity,
+    reconcileRunToolInvocationsActivity,
   };
 
   console.log(`🏗️ Creating Temporal worker...`);

@@ -30,6 +30,19 @@ const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 const UUID_V5_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DURABLE_GRANT_ID = '11111111-1111-5111-8111-111111111111';
 const DURABLE_SNAPSHOT_ID = '22222222-2222-5222-8222-222222222222';
+const DURABLE_MANIFEST = {
+  capabilityGrantId: DURABLE_GRANT_ID,
+  capabilitySnapshotId: DURABLE_SNAPSHOT_ID,
+  version: '1' as const,
+  entries: [
+    {
+      toolName: 'osv_query',
+      sourceId: 'component:osv',
+      destination: 'component-activity' as const,
+      retryPolicy: 'pre-dispatch-only' as const,
+    },
+  ],
+};
 
 describe('McpAuthService', () => {
   it.each([
@@ -177,6 +190,79 @@ describe('McpAuthService', () => {
     expect(materialize).toHaveBeenCalledTimes(1);
   });
 
+  it('installs the immutable manifest before writing a durable token', async () => {
+    const redis = new MockRedis();
+    const executeWorkflowUpdate = vi.fn(async () => {
+      expect(redis.sets).toHaveLength(0);
+    });
+    const service = createService(
+      redis,
+      vi.fn(async () => 1),
+      vi.fn(async () => durableAuthority('run-install', 'org-install', 'invoking-agent')),
+      executeWorkflowUpdate,
+    );
+
+    await service.generateSessionToken(
+      'run-install',
+      'org-install',
+      'agent-install',
+      ['node-a'],
+      900,
+      'invoking-agent',
+    );
+
+    expect(executeWorkflowUpdate).toHaveBeenCalledWith({
+      workflowId: 'run-install',
+      updateName: 'installToolInvocationManifest',
+      updateId: `install-manifest:${DURABLE_GRANT_ID}`,
+      args: {
+        scope: {
+          kind: 'run',
+          runId: 'run-install',
+          organizationId: 'org-install',
+          capabilityGrantId: DURABLE_GRANT_ID,
+          invokingNodeId: 'invoking-agent',
+        },
+        manifest: DURABLE_MANIFEST,
+      },
+    });
+    expect(redis.sets).toHaveLength(1);
+  });
+
+  it('does not issue a token when manifest installation fails', async () => {
+    const redis = new MockRedis();
+    const service = createService(
+      redis,
+      vi.fn(async () => 1),
+      vi.fn(async () => durableAuthority('run-install', null)),
+      vi.fn(async () => {
+        throw new Error('manifest rejected');
+      }),
+    );
+
+    await expect(service.generateSessionToken('run-install', null)).rejects.toThrow(
+      'manifest rejected',
+    );
+    expect(redis.sets).toHaveLength(0);
+  });
+
+  it('does not mistake a manifest Update registration failure for a legacy workflow', async () => {
+    const redis = new MockRedis();
+    const service = createService(
+      redis,
+      vi.fn(async () => 1),
+      vi.fn(async () => durableAuthority('run-install', null)),
+      vi.fn(async () => {
+        throw new QueryNotRegisteredError('Update is not registered', grpcStatus.INVALID_ARGUMENT);
+      }),
+    );
+
+    await expect(service.generateSessionToken('run-install', null)).rejects.toThrow(
+      'Update is not registered',
+    );
+    expect(redis.sets).toHaveLength(0);
+  });
+
   it('issues only a bounded legacy token when the workflow query is not registered', async () => {
     const redis = new MockRedis();
     const materialize = vi.fn(async () => durableAuthority());
@@ -221,14 +307,32 @@ function createService(
     1,
   materialize: (input: unknown) => Promise<ReturnType<typeof durableAuthority>> = async () =>
     durableAuthority(),
+  executeWorkflowUpdate: (input: unknown) => Promise<unknown> = async () => undefined,
 ): McpAuthService {
-  return new McpAuthService(redis as never, { queryWorkflow } as never, { materialize } as never);
+  return new McpAuthService(
+    redis as never,
+    { queryWorkflow, executeWorkflowUpdate } as never,
+    { materialize } as never,
+  );
 }
 
-function durableAuthority() {
+function durableAuthority(
+  runId = 'run-grant',
+  organizationId: string | null = 'org-grant',
+  invokingNodeId?: string,
+) {
   return {
     grant: { id: DURABLE_GRANT_ID },
-    snapshot: { id: DURABLE_SNAPSHOT_ID },
-    manifest: {},
+    snapshot: {
+      id: DURABLE_SNAPSHOT_ID,
+      scope: {
+        kind: 'run' as const,
+        runId,
+        organizationId,
+        capabilityGrantId: DURABLE_GRANT_ID,
+        ...(invokingNodeId !== undefined && { invokingNodeId }),
+      },
+    },
+    manifest: DURABLE_MANIFEST,
   };
 }

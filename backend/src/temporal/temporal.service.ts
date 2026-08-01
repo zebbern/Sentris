@@ -18,16 +18,6 @@ import {
   type WorkflowOptions,
 } from '@temporalio/client';
 
-// Import workflow functions (for type safety during client.start())
-// Note: Actual implementation runs in the worker
-import {
-  sentrisWorkflowRun,
-  testMinimalWorkflow,
-  scheduleTriggerWorkflow,
-  mcpDiscoveryWorkflow,
-  mcpGroupDiscoveryWorkflow,
-  webhookParsingWorkflow,
-} from '@sentris/worker/workflows';
 import type { ExecutionTriggerMetadata, ScheduleOverlapPolicy } from '@sentris/shared';
 
 export interface StartWorkflowOptions {
@@ -126,8 +116,8 @@ export class TemporalService implements OnModuleDestroy {
       `Starting Temporal workflow ${options.workflowType} (workflowId=${workflowId}, taskQueue=${taskQueue}, args=${argsSummary})`,
     );
 
-    // Map workflow type string to function reference
-    const workflowFn = this.getWorkflowFunction(options.workflowType);
+    // Validate workflow names before asking Temporal to start them.
+    const workflowType = this.getWorkflowType(options.workflowType);
 
     // Propagate correlation ID (X-Request-Id) via memo so the worker can
     // read it from workflowInfo().memo and include it in log entries.
@@ -136,10 +126,10 @@ export class TemporalService implements OnModuleDestroy {
       memo['correlationId'] = options.correlationId;
     }
 
-    const handle = await client.start(workflowFn, {
+    const handle = await client.start(workflowType, {
       workflowId,
       taskQueue,
-      args: (options.args ?? []) as Parameters<typeof workflowFn>,
+      args: options.args ?? [],
       memo,
       searchAttributes: options.searchAttributes as WorkflowOptions['searchAttributes'],
       workflowExecutionTimeout: '2 hours',
@@ -156,20 +146,15 @@ export class TemporalService implements OnModuleDestroy {
     };
   }
 
-  private getWorkflowFunction(workflowType: string) {
+  private getWorkflowType(workflowType: string): string {
     switch (workflowType) {
       case 'sentrisWorkflowRun':
-        return sentrisWorkflowRun;
       case 'testMinimalWorkflow':
-        return testMinimalWorkflow;
       case 'scheduleTriggerWorkflow':
-        return scheduleTriggerWorkflow;
       case 'mcpDiscoveryWorkflow':
-        return mcpDiscoveryWorkflow;
       case 'mcpGroupDiscoveryWorkflow':
-        return mcpGroupDiscoveryWorkflow;
       case 'webhookParsingWorkflow':
-        return webhookParsingWorkflow;
+        return workflowType;
       default:
         throw new Error(`Unknown workflow type: ${workflowType}`);
     }
@@ -214,10 +199,25 @@ export class TemporalService implements OnModuleDestroy {
     args: unknown;
   }): Promise<void> {
     const handle = await this.getWorkflowHandle({ workflowId: input.workflowId });
-    this.logger.log(
-      `Sending signal ${input.signalName} to workflow ${input.workflowId} with args: ${JSON.stringify(input.args)}`,
-    );
+    this.logger.log(`Sending signal ${input.signalName} to workflow ${input.workflowId}`);
     await handle.signal(input.signalName, input.args);
+  }
+
+  async executeWorkflowUpdate<T>(input: {
+    workflowId: string;
+    temporalRunId?: string;
+    updateName: string;
+    updateId: string;
+    args: unknown;
+  }): Promise<T> {
+    const handle = await this.getWorkflowHandle({
+      workflowId: input.workflowId,
+      runId: input.temporalRunId,
+    });
+    return handle.executeUpdate<T, [unknown]>(input.updateName, {
+      args: [input.args],
+      updateId: input.updateId,
+    });
   }
 
   /**

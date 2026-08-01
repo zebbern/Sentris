@@ -32,6 +32,10 @@ const markRunStartedActivity = vi.fn(async () => ({
   temporalRunId: 'temporal-child-run',
   duplicate: false,
 }));
+const prepareToolInvocationActivity = vi.fn();
+const dispatchToolInvocationActivity = vi.fn();
+const reconcileToolInvocationActivity = vi.fn();
+const reconcileRunToolInvocationsActivity = vi.fn(async () => {});
 const startChild = vi.fn();
 
 const workflowActivities = {
@@ -47,6 +51,10 @@ const workflowActivities = {
   expireHumanInputRequestActivity,
   prepareRunPayloadActivity,
   markRunStartedActivity,
+  prepareToolInvocationActivity,
+  dispatchToolInvocationActivity,
+  reconcileToolInvocationActivity,
+  reconcileRunToolInvocationsActivity,
 };
 
 class MockApplicationFailure extends Error {
@@ -66,19 +74,40 @@ class MockApplicationFailure extends Error {
 
 class MockCancelledFailure extends Error {}
 const nonCancellable = vi.fn(async (callback: () => Promise<void>) => callback());
+const withTimeout = vi.fn(async (_timeout: number, callback: () => Promise<unknown>) => callback());
 const patched = vi.fn((_patchId: string) => true);
+const setHandler = vi.fn();
+const condition = vi.fn(async (predicate: () => boolean) => predicate());
+const allHandlersFinished = vi.fn(() => true);
+let currentUpdateId: string | undefined;
+const activityProxyOptions: Record<string, unknown>[] = [];
+const proxyActivities = vi.fn((options: Record<string, unknown>) => {
+  activityProxyOptions.push(options);
+  return new Proxy(
+    {},
+    {
+      get: (_target, property) => workflowActivities[property as keyof typeof workflowActivities],
+    },
+  );
+});
 
 vi.mock('@temporalio/workflow', () => ({
+  ActivityCancellationType: { WAIT_CANCELLATION_COMPLETED: 'WAIT_CANCELLATION_COMPLETED' },
   ApplicationFailure: MockApplicationFailure,
-  CancellationScope: { nonCancellable },
-  condition: vi.fn(async (predicate: () => boolean) => predicate()),
+  CancellationScope: { nonCancellable, withTimeout },
+  allHandlersFinished,
+  condition,
+  currentUpdateInfo: vi.fn(() =>
+    currentUpdateId === undefined ? undefined : { id: currentUpdateId },
+  ),
   defineQuery: vi.fn((name: string) => name),
   defineSignal: vi.fn((name: string) => name),
+  defineUpdate: vi.fn((name: string) => name),
   getExternalWorkflowHandle: vi.fn(() => ({ cancel: vi.fn(async () => {}) })),
   isCancellation: vi.fn((error: unknown) => error instanceof MockCancelledFailure),
   patched,
-  proxyActivities: vi.fn(() => workflowActivities),
-  setHandler: vi.fn(),
+  proxyActivities,
+  setHandler,
   sleep: vi.fn(async () => {}),
   startChild,
   workflowInfo: vi.fn(() => ({ workflowId: 'workflow-info-id' })),
@@ -92,6 +121,14 @@ let handleToolModeRegistration: typeof import('../tool-mode-handler').handleTool
 let handleSubWorkflowCall: typeof import('../sub-workflow-handler').handleSubWorkflowCall;
 
 const originalDebugWorkflow = process.env.SENTRIS_DEBUG_WORKFLOW;
+
+function handlerDefinitionName(definition: unknown): string | undefined {
+  if (typeof definition === 'string') return definition;
+  if (definition && typeof definition === 'object' && 'name' in definition) {
+    return typeof definition.name === 'string' ? definition.name : undefined;
+  }
+  return undefined;
+}
 
 function quietWorkflowInput(): RunWorkflowActivityInput {
   return {
@@ -141,6 +178,11 @@ describe('workflow orchestration diagnostics', () => {
     delete process.env.SENTRIS_DEBUG_WORKFLOW;
     vi.clearAllMocks();
     patched.mockReturnValue(true);
+    currentUpdateId = undefined;
+    allHandlersFinished.mockReturnValue(true);
+    condition.mockImplementation(async (predicate) => predicate());
+    nonCancellable.mockImplementation(async (callback) => callback());
+    withTimeout.mockImplementation(async (_timeout, callback) => callback());
   });
 
   afterEach(() => {
@@ -174,6 +216,190 @@ describe('workflow orchestration diagnostics', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
+  });
+
+  test('registers protocol version 1 and Workflow Updates only on the patched path', async () => {
+    await sentrisWorkflowRun(quietWorkflowInput());
+
+    const protocolRegistration = setHandler.mock.calls.find(
+      ([definition]) => handlerDefinitionName(definition) === 'getToolInvocationProtocolVersion',
+    );
+    expect(protocolRegistration?.[1]()).toBe(1);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'installToolInvocationManifest',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeToolInvocation',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeToolCall',
+      ),
+    ).toBe(false);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'getToolCallResult',
+      ),
+    ).toBe(false);
+    expect(
+      patched.mock.calls.filter(([patchId]) => patchId === 'sentris-tool-invocation-update-v1'),
+    ).toHaveLength(1);
+  });
+
+  test('wires non-enumerable Temporal activity proxies with one-attempt dispatch', async () => {
+    let releaseMetadata!: () => void;
+    setRunMetadataActivity.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseMetadata = resolve;
+        }),
+    );
+    const workflow = sentrisWorkflowRun(quietWorkflowInput());
+    const grantId = '11111111-1111-4111-8111-111111111111';
+    const snapshotId = '22222222-2222-4222-8222-222222222222';
+    const invocationId = '33333333-3333-4333-8333-333333333333';
+    const scope = {
+      kind: 'run' as const,
+      runId: 'quiet-workflow-run',
+      organizationId: null,
+      capabilityGrantId: grantId,
+    };
+    const install = {
+      scope,
+      manifest: {
+        capabilitySnapshotId: snapshotId,
+        capabilityGrantId: grantId,
+        version: '1' as const,
+        entries: [
+          {
+            toolName: 'osv_query',
+            sourceId: 'component:osv',
+            destination: 'component-activity' as const,
+            retryPolicy: 'pre-dispatch-only' as const,
+          },
+        ],
+      },
+    };
+    const invocation = {
+      invocationId,
+      scope,
+      capabilitySnapshotId: snapshotId,
+      toolName: 'osv_query',
+      input: { package: 'lodash' },
+      requestedAt: '2099-07-31T10:00:00.000Z',
+      deadlineAt: '2099-07-31T10:05:00.000Z',
+    };
+    const terminal = {
+      invocationId,
+      status: 'completed' as const,
+      output: { vulnerabilities: [] },
+      completedAt: '2099-07-31T10:00:01.000Z',
+    };
+    prepareToolInvocationActivity.mockResolvedValueOnce({ kind: 'terminal', result: terminal });
+    const installRegistration = setHandler.mock.calls.find(
+      ([definition]) => handlerDefinitionName(definition) === 'installToolInvocationManifest',
+    );
+    const executeRegistration = setHandler.mock.calls.find(
+      ([definition]) => handlerDefinitionName(definition) === 'executeToolInvocation',
+    );
+
+    currentUpdateId = `install-manifest:${grantId}`;
+    installRegistration?.[2]?.validator(install);
+    installRegistration?.[1](install);
+    currentUpdateId = invocationId;
+    executeRegistration?.[2]?.validator(invocation);
+
+    await expect(executeRegistration?.[1](invocation)).resolves.toEqual(terminal);
+    expect(
+      activityProxyOptions.some(
+        (options) =>
+          (options.retry as { maximumAttempts?: number } | undefined)?.maximumAttempts === 1 &&
+          options.cancellationType === 'WAIT_CANCELLATION_COMPLETED' &&
+          options.startToCloseTimeout === '10 minutes' &&
+          options.heartbeatTimeout === '30 seconds',
+      ),
+    ).toBe(true);
+
+    releaseMetadata();
+    await workflow;
+  });
+
+  test('retains the legacy tool signal and query only for pre-Update histories', async () => {
+    patched.mockImplementation((patchId) => patchId !== 'sentris-tool-invocation-update-v1');
+
+    await sentrisWorkflowRun(quietWorkflowInput());
+
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeToolCall',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'getToolCallResult',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'getToolInvocationProtocolVersion',
+      ),
+    ).toBe(false);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeToolInvocation',
+      ),
+    ).toBe(false);
+  });
+
+  test('closes Update acceptance, drains handlers, and reconciles invocations before finalization', async () => {
+    const order: string[] = [];
+    condition.mockImplementationOnce(async (predicate) => {
+      order.push('drain');
+      const installRegistration = setHandler.mock.calls.find(
+        ([definition]) => handlerDefinitionName(definition) === 'installToolInvocationManifest',
+      );
+      currentUpdateId = 'install-manifest:11111111-1111-4111-8111-111111111111';
+      expect(() =>
+        installRegistration?.[2]?.validator({
+          scope: {
+            kind: 'run',
+            runId: 'quiet-workflow-run',
+            organizationId: null,
+            capabilityGrantId: '11111111-1111-4111-8111-111111111111',
+          },
+          manifest: {
+            capabilitySnapshotId: '22222222-2222-4222-8222-222222222222',
+            capabilityGrantId: '11111111-1111-4111-8111-111111111111',
+            version: '1',
+            entries: [],
+          },
+        }),
+      ).toThrow();
+      return predicate();
+    });
+    reconcileRunToolInvocationsActivity.mockImplementationOnce(async () => {
+      order.push('reconcile');
+    });
+    cleanupRunResourcesActivity.mockImplementationOnce(async () => {
+      order.push('cleanup');
+    });
+    finalizeRunActivity.mockImplementationOnce(async () => {
+      order.push('finalize');
+    });
+
+    await sentrisWorkflowRun(quietWorkflowInput());
+
+    expect(condition).toHaveBeenCalledWith(allHandlersFinished);
+    expect(reconcileRunToolInvocationsActivity).toHaveBeenCalledWith({
+      runId: 'quiet-workflow-run',
+      message: expect.any(String),
+      completedAt: expect.any(String),
+    });
+    expect(order).toEqual(['drain', 'reconcile', 'cleanup', 'finalize']);
   });
 
   test('preserves cancellation and finalizes the run as CANCELLED in a non-cancellable scope', async () => {
