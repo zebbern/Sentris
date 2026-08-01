@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { getMcpAgentReadiness } from '../utils';
+import { getMcpAgentReadiness } from '../mcpReadiness';
 
 describe('getMcpAgentReadiness', () => {
   it('marks disabled servers as disabled', () => {

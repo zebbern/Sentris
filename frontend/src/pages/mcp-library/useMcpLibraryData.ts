@@ -4,7 +4,7 @@ import type { McpHealthStatus } from '@sentris/shared';
 import type { McpServerResponse, McpToolResponse } from '@/hooks/queries/useMcpServerQueries';
 import type { McpGroupResponse, McpGroupTemplateResponse } from '@/services/mcpGroupsApi';
 import type { AgentReadiness, TransportType } from './types';
-import { getMcpAgentReadiness } from './utils';
+import { getMcpAgentReadiness } from '@/lib/mcpReadiness';
 
 interface UseMcpLibraryDataOptions {
   servers: McpServerResponse[];

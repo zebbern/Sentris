@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { CreateMcpServer, UpdateMcpServer } from '@sentris/shared';
 import { getApiAuthHeaders, API_BASE_URL } from '@/services/api';
 import { mcpDiscoveryApi } from '@/services/mcpDiscoveryApi';
@@ -64,18 +64,24 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   return response.json();
 }
 
-export function useMcpServers() {
+export function useMcpServers(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.mcpServers.all(),
-    queryFn: () => apiRequest<McpServerResponse[]>('/api/v1/mcp-servers'),
+    queryFn:
+      options?.enabled === false
+        ? skipToken
+        : () => apiRequest<McpServerResponse[]>('/api/v1/mcp-servers'),
     staleTime: 120_000,
   });
 }
 
-export function useMcpAllTools() {
+export function useMcpAllTools(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.mcpServers.tools(),
-    queryFn: () => apiRequest<McpToolResponse[]>('/api/v1/mcp-servers/tools'),
+    queryFn:
+      options?.enabled === false
+        ? skipToken
+        : () => apiRequest<McpToolResponse[]>('/api/v1/mcp-servers/tools'),
     staleTime: 120_000,
   });
 }

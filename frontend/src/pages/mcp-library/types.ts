@@ -1,4 +1,5 @@
 import type { McpHealthStatus } from '@sentris/shared';
+export type { AgentReadiness, AgentReadinessStatus, ToolCounts } from '@/lib/mcpReadiness';
 
 export const TRANSPORT_TYPES = [
   { value: 'http', label: 'HTTP' },
@@ -58,19 +59,6 @@ export interface DiscoveryStatusState {
 export interface DiscoveryCacheEntry {
   cacheToken: string;
   tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-}
-
-export interface ToolCounts {
-  enabled: number;
-  total: number;
-}
-
-export type AgentReadinessStatus = 'ready' | 'needs-test' | 'no-tools' | 'unhealthy' | 'disabled';
-
-export interface AgentReadiness {
-  status: AgentReadinessStatus;
-  label: string;
-  tone: 'success' | 'warning' | 'destructive' | 'muted';
 }
 
 export interface ConnectionInfo {

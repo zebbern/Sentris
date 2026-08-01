@@ -14,7 +14,7 @@ import {
 import { Cloud, HelpCircle, Package, Trash2, Wrench, RefreshCw, Loader } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { McpHealthStatus } from '@sentris/shared';
-import type { AgentReadiness, ToolCounts } from './types';
+import type { AgentReadiness, ToolCounts } from '@/lib/mcpReadiness';
 import { getGroupTheme } from './utils';
 import { GroupLogo } from './GroupLogo';
 import { HealthIndicator } from './HealthIndicator';

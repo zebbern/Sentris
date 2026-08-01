@@ -7,7 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { Package, Plug, Plus, Wrench, Edit3, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AgentReadiness, TransportType, ToolCounts } from './types';
+import type { TransportType } from './types';
+import type { AgentReadiness, ToolCounts } from '@/lib/mcpReadiness';
 import { HealthIndicator } from './HealthIndicator';
 import { TransportBadge } from './TransportBadge';
 import { ConnectionCell } from './ConnectionCell';

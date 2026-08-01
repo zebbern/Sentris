@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { queryKeys } from '@/lib/queryKeys';
 import type {
@@ -11,11 +11,10 @@ import type {
 export function useSecrets(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.secrets.all(),
-    queryFn: () => api.secrets.list(),
+    queryFn: options?.enabled === false ? skipToken : () => api.secrets.list(),
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     select: (data: SecretSummary[]) => [...data].sort((a, b) => a.name.localeCompare(b.name)),
-    enabled: options?.enabled,
   });
 }
 
