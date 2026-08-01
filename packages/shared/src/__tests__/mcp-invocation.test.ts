@@ -306,6 +306,30 @@ describe('generic MCP operation contracts', () => {
     ).toBe(false);
   });
 
+  it.each([
+    [
+      'tool name',
+      { kind: 'tool-call' as const, name: 'x'.repeat(262_144), arguments: {} },
+    ],
+    [
+      'prompt name',
+      { kind: 'prompt-get' as const, name: 'x'.repeat(262_144), arguments: {} },
+    ],
+    ['resource URI', { kind: 'resource-read' as const, uri: 'x'.repeat(262_144) }],
+  ])('rejects an oversized %s in the complete operation request', async (_name, operation) => {
+    const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
+
+    expect(
+      operationContracts.McpRuntimeOperationRequestSchema.safeParse({
+        operationId: INVOCATION_ID,
+        fence: runtimeFence,
+        operation,
+        requestedAt: '2026-08-01T10:00:00.000Z',
+        deadlineAt: '2026-08-01T10:05:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+
   it('parses completed, remote failure, cancellation, ambiguity, and input-required results', async () => {
     const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
     const schema = operationContracts.McpOperationResultSchema;

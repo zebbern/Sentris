@@ -209,6 +209,11 @@ export const McpRuntimeOperationRequestSchema = z
     deadlineAt: z.string().datetime(),
   })
   .strict()
+  .refine(
+    (request) =>
+      isWithinInlineJsonByteLimit(request as JsonObject, MAX_INLINE_INVOCATION_INPUT_BYTES),
+    { message: 'MCP operation request exceeds 262144 UTF-8 bytes' },
+  )
   .superRefine(({ requestedAt, deadlineAt }, context) => {
     if (new Date(deadlineAt) < new Date(requestedAt)) {
       context.addIssue({
