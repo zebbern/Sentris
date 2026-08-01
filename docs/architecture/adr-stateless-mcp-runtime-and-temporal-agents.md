@@ -363,6 +363,7 @@ requires an ADR update and product approval.
 
 ## References
 
+- `docs/architecture/research/mcp-v2-runtime-sdk-2.0.0.md`
 - `docs/architecture/adr-self-hosted-trust-profiles.md`
 - `docs/architecture/adr-worker-capability-and-credential-boundaries.md`
 - `docs/architecture/adr-supported-docker-dind-topology.md`
