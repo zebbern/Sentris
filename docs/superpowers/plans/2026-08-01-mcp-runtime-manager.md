@@ -13,7 +13,7 @@
 - Work directly on `main`, as explicitly requested by the user. Do not create a branch or worktree and do not push. Use conventional DCO commits (`git commit -s`) after each independently shippable task and preserve unrelated user changes.
 - Before any local dev, Compose, curl, E2E, or benchmark command, run `bun run instance show` (or `just instance show`) and record the intended `SENTRIS_INSTANCE`. Do not silently target an instance.
 - Treat `docs/architecture/research/mcp-v2-runtime-sdk-2.0.0.md` and `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` as the tracked compatibility boundary. Re-check the exact installed v2 declarations and linked official primary documentation when implementation starts; do not depend on ignored `.superpowers/sdd` notes or remembered APIs.
-- Add only exact `@modelcontextprotocol/client@2.0.0` as a worker production dependency before importing it. Do not rely on the backend dev dependency or a hoisted install. `@modelcontextprotocol/node` is the backend's Node server adapter and is not an outbound worker dependency.
+- Keep only exact `@modelcontextprotocol/client@2.0.0` as a worker production dependency. Task 2 may add exact server packages as test-only fixture dependencies; do not rely on a backend dependency or a hoisted install. `@modelcontextprotocol/node` is the backend's Node server adapter and is not an outbound worker dependency.
 - Construct the v2 client with explicit `versionNegotiation: { mode: 'auto' }`; the installed client's default is legacy. Cache `prior` negotiation verdicts only for a bounded TTL and under organization, principal/auth subject, endpoint/config fingerprint, credential reference, and credential generation. A cached legacy verdict must expire.
 - Modern `2026-07-28` HTTP has independent requests: no initialize exchange, transport session, GET event stream, resume token, affinity, or sticky routing. Never project the legacy transport's `sessionId`, `resumeStream`, or reconnect behavior onto a modern runtime.
 - The official SDK owns MCP negotiation, validation, HTTP/stdio framing, transport cancellation, progress callbacks, and response caching. Sentris owns leases, epoch/generation fencing, process/container supervision, durable attempts, cross-worker routing, monotonic/rate-limited progress and Temporal heartbeats, and unknown-outcome classification.
@@ -30,7 +30,7 @@
 - Host stdio uses the official `StdioClientTransport`. Docker stdio uses that same transport with a bounded `docker run --rm -i` command and Sentris labels; Docker HTTP uses a labeled container plus an owner-private direct endpoint. Reconciliation remains responsible for containers left by a dead CLI/worker. Delete the handwritten stdio/Docker HTTP bridges and their process-local target maps after cutover.
 - Discovery materializes every advertised family: tools, concrete resources, resource templates, and prompts. `resources/read` and `prompts/get` are runtime operations, not discovery. Cap automatic pagination at the installed client's `listMaxPages: 64` and fail a catalog that exceeds it rather than silently truncating.
 - Preserve the current immutable grant/snapshot and binding-fingerprint rules. Authority/config identity is derived only from execution scope, source binding/config fingerprint, auth partition, credential reference/generation, negotiated protocol identity, and the complete capability fingerprint. Owner ID/address/epoch, lease generation/state/expiry, PID, and container identity are excluded. Owner failover increments only `leaseGeneration` and reuses unchanged authority/snapshot IDs after rediscovery confirms the same capability fingerprint. A real credential/config/protocol/capability change mints new authority; it never changes an existing snapshot.
-- Use the canonical v2 client for modern and initialize-era Streamable HTTP. An HTTP `400`, `404`, or `405` whose body is empty or is not a recognized modern JSON-RPC error may create a fresh v2 `Client` with the deprecated v2 `SSEClientTransport`; never fall back on authentication failures, timeouts, or arbitrary 5xx responses. Do not add a v1 outbound adapter unless a conformance test proves a supported incompatibility and the user explicitly approves that new seam. Compatibility session objects never escape the adapter.
+- Use the canonical v2 client for modern and initialize-era Streamable HTTP. Only the initial HTTP `connect` may use a public fetch wrapper to capture its final non-OK response; a matching caught `SdkHttpError` with HTTP `400`, `404`, or `405` may create a fresh v2 `Client` with the deprecated v2 `SSEClientTransport` only when that captured body is blank or is not a recognized modern JSON-RPC error. Never fall back on authentication failures, timeouts/no capture, recognized JSON-RPC errors, or arbitrary 5xx responses; never inspect SDK-private error body fields or classifiers. Do not add a v1 outbound adapter unless a conformance test proves a supported incompatibility and the user explicitly approves that new seam. Compatibility session objects never escape the adapter.
 - Treat SDK-normalized results as the public contract; do not depend on a visible wire `resultType: 'complete'`. Server self-information is metadata/accessor state and must never determine Sentris authority identity, authorization-partition/cache-store ownership, credential selection, or runtime identity. The SDK may use it internally to namespace entries inside an already authorization-isolated per-client cache store.
 - No mandatory managed service may be introduced. Use the existing Redis, Postgres, Temporal, and worker processes for the normal locally hosted path.
 - Temporal fairness remains optional/preview and is not required for normal local hosting. Preserve organization scope in durable attempt and scheduling contracts so fairness can be enabled later only when measured backlog evidence justifies it.
@@ -125,43 +125,55 @@
 - Create: `worker/src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts`
 - Create: `worker/src/mcp-runtime/__tests__/fixtures/mcp-conformance-servers.ts`
 - Modify: `worker/src/config/env.schema.ts`
+- Modify: `worker/package.json`
+- Modify: `bun.lock`
 
 **Interfaces:**
 
 - `McpClientAdapter.connect`, `discover`, `callTool`, `readResource`, `getPrompt`, and `close` are the only transport-facing API used by later tasks. Modern readiness comes from fenced local lifecycle state and, when remote validation is required, an allowed idempotent operation; protocol ping is legacy-era only and remains private to that path.
 - Normalizes official SDK results into shared Sentris descriptors/results while retaining title, icons, annotations, `_meta` as `meta`, named content variants, resource contents, and prompt messages.
 
-- [ ] **Step 1: Write modern/legacy conformance tests**
+- [ ] **Step 1: Install official test-only fixtures**
 
-  Use official in-process fixtures to prove: explicit auto negotiation reaches modern `2026-07-28`; modern HTTP sends independent requests without session/resume state; the same canonical v2 client handles initialize-era sessionful Streamable HTTP; stdio negotiates once and owns its child; and only HTTP `400`, `404`, or `405` with an empty/unrecognized-modern-error body can create a fresh v2 client with the deprecated v2 `SSEClientTransport`. Prove authentication failures, timeouts, recognized modern JSON-RPC errors, and arbitrary 5xx responses never fall back. Cover all four list families, `callTool` with the snapshotted `toolDefinition`, `readResource`, `getPrompt`, normalized named result variants without relying on a visible wire `resultType: 'complete'`, and the 64-page cap.
+  Retain only exact `@modelcontextprotocol/client@2.0.0` in production dependencies. Add the following exact development dependencies solely for Task 2 conformance fixtures; never add `@modelcontextprotocol/node` to the worker:
+
+  ```powershell
+  bun --cwd=worker add --dev --exact @modelcontextprotocol/server@2.0.0 @modelcontextprotocol/server-legacy@2.0.0
+  ```
+
+- [ ] **Step 2: Write modern/legacy conformance tests**
+
+  Use official fixtures: public v2 request-local `WebStandardStreamableHTTPServerTransport` for modern HTTP; a sessionful v2 WebStandard transport whose server restricts `supportedProtocolVersions` to `2025-11-25` for initialize-era HTTP; official v2 server stdio in a child process; and frozen official `@modelcontextprotocol/server-legacy/sse` only for the very-old SSE test. Prove explicit auto negotiation reaches modern `2026-07-28`; modern HTTP sends independent requests without session/resume state; and the same canonical v2 client handles initialize-era sessionful Streamable HTTP. With stdio auto negotiation, assert one owned/live session child plus one disposed negotiation-probe sibling, not one total spawn.
+
+  Inject the public Streamable HTTP `fetch` wrapper only during the initial connection, cloning and retaining the final non-OK status/body. Prove fallback creates a fresh v2 client plus deprecated v2 `SSEClientTransport` only for a caught `SdkHttpError` whose captured status matches `400`, `404`, or `405` and whose body is blank or fails public `parseJSONRPCMessage`/`isJSONRPCErrorResponse`. Prove authentication failures, timeouts/no captured response, recognized modern JSON-RPC errors, arbitrary 5xx responses, and any post-connect operation failure construct zero fallback clients/transports. Cover all four list families, `callTool` with the snapshotted `toolDefinition`, `readResource`, `getPrompt`, normalized named result variants without relying on a visible wire `resultType: 'complete'`, and the 64-page cap.
 
   Also test a distinct client and cache store for each complete authorization partition, defense-in-depth `cachePartition`, bounded auth-scoped `prior` expiry, credential-generation invalidation, 401 refresh bounded to one SDK retry, cancellation, idle timeout, `maxTotalTimeout`, Sentris-owned monotonic/rate-limited progress, and typed input-required rejection. Prove server self-information is retained as metadata and may namespace SDK-internal entries only after the client/cache-store ownership boundary is selected; it cannot select credentials, Sentris authorization partitions/cache ownership, authority, or runtime identity.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 3: Run RED**
 
   ```powershell
   bun test worker/src/mcp-runtime/__tests__/mcp-client-adapter.spec.ts worker/src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts
   ```
 
-- [ ] **Step 3: Implement the adapter**
+- [ ] **Step 4: Implement the adapter**
 
   Construct one `Client` and one response-cache store per complete authorization partition with explicit auto negotiation, `listMaxPages: 64`, required defense-in-depth `cachePartition`, and `inputRequired: { autoFulfill: false }`. Call `client.connect(transport, { prior, signal, timeout })`, record `getProtocolEra()`, `getNegotiatedProtocolVersion()`, and `getDiscoverResult()`, then conditionally list every advertised family. Use `cacheMode: 'refresh'` only for list tools/prompts/resources/templates and `readResource`; never pass it to `getPrompt` or `callTool`. Supply the snapshotted `toolDefinition` on tool calls.
 
   For operations, pass an operation-scoped signal, idle timeout, `resetTimeoutOnProgress: true`, and bounded `maxTotalTimeout`. Sentris validates monotonic progress, rate-limits callbacks, and emits bounded Temporal heartbeats. Pass `allowInputRequired: true`, detect `isInputRequiredResult`, and map it to Sentris's non-retryable `input-required-unsupported` result. Normalize SDK public results without testing for a visible wire completion discriminator.
 
-  `McpClientFactory` selects the official v2 `StreamableHTTPClientTransport` for modern and initialize-era HTTP and the official v2 `StdioClientTransport` for stdio. `McpSseCompatibilityAdapter` may create a fresh v2 `Client` plus the deprecated v2 `SSEClientTransport` only after HTTP `400`, `404`, or `405` with an empty/unrecognized-modern-error body. Keep all session/resume state private to that object. Do not add a v1 outbound adapter without a failing conformance test and explicit user approval. Never retry a call when the request may have reached the server.
+  `McpClientFactory` selects the official v2 `StreamableHTTPClientTransport` for modern and initialize-era HTTP and the official v2 `StdioClientTransport` for stdio. During the initial HTTP `connect` only, inject the public transport `fetch` wrapper, clone and retain the final non-OK response, and admit `McpSseCompatibilityAdapter` only when a caught `SdkHttpError` matches that captured `400`, `404`, or `405` response and its body is blank or is not a public `parseJSONRPCMessage`/`isJSONRPCErrorResponse` modern error. Never use SDK-private `data.text` or private classifiers. The compatibility adapter then creates a fresh v2 `Client` plus deprecated v2 `SSEClientTransport`; keep all session/resume state private to that object. No post-connect adapter method may invoke it or retry an operation. Do not add a v1 outbound adapter without a failing conformance test and explicit user approval.
 
-- [ ] **Step 4: Run GREEN and typecheck**
+- [ ] **Step 5: Run GREEN and typecheck**
 
   ```powershell
   bun test worker/src/mcp-runtime/__tests__/mcp-client-adapter.spec.ts worker/src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts
   bun --cwd=worker run typecheck
   ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
   ```powershell
-  git add worker/src/mcp-runtime worker/src/config/env.schema.ts
+  git add worker/src/mcp-runtime worker/src/config/env.schema.ts worker/package.json bun.lock
   git commit -s -m "feat: add canonical MCP v2 client adapter"
   ```
 
