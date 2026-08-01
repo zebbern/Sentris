@@ -23,6 +23,10 @@ export interface ValidationResult {
   error?: string;
 }
 
+function assertNever(value: never): never {
+  throw new Error(`Unsupported port editor: ${value}`);
+}
+
 function getEnumValueTypes(def: ZodDef): string[] {
   if (Array.isArray(def.values)) {
     return def.values.map((value) => typeof value);
@@ -57,8 +61,11 @@ function editorToConnectionType(editor?: PortMeta['editor']): ConnectionType | u
     case 'textarea':
     case 'select':
       return { kind: 'primitive', name: 'text' };
-    default:
+    case 'llm-provider':
+    case undefined:
       return undefined;
+    default:
+      return assertNever(editor);
   }
 }
 

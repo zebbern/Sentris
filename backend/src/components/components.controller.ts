@@ -149,9 +149,11 @@ export class ComponentsController {
                     'multi-select',
                     'json',
                     'secret',
+                    'llm-provider',
                   ],
                   nullable: true,
                 },
+                hidden: { type: 'boolean', nullable: true },
                 required: { type: 'boolean' },
                 description: { type: 'string', nullable: true },
                 valuePriority: {
@@ -316,9 +318,11 @@ export class ComponentsController {
                   'multi-select',
                   'json',
                   'secret',
+                  'llm-provider',
                 ],
                 nullable: true,
               },
+              hidden: { type: 'boolean', nullable: true },
               required: { type: 'boolean' },
               description: { type: 'string', nullable: true },
               valuePriority: {

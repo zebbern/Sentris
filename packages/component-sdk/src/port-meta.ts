@@ -25,8 +25,17 @@ export interface PortMeta {
   branchColor?: 'green' | 'red' | 'amber' | 'blue' | 'purple' | 'slate';
   /** Connection type override for unions/complex types */
   connectionType?: ConnectionType | string;
-  /** Editor type override (e.g., 'textarea', 'select', 'secret') */
-  editor?: 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'multi-select' | 'json' | 'secret';
+  /** Editor type override (e.g., 'textarea', 'select', 'secret', 'llm-provider') */
+  editor?:
+    | 'text'
+    | 'textarea'
+    | 'number'
+    | 'boolean'
+    | 'select'
+    | 'multi-select'
+    | 'json'
+    | 'secret'
+    | 'llm-provider';
   /** Allow z.any() or z.unknown() - must be explicitly set */
   allowAny?: boolean;
   /** Reason for using z.any()/z.unknown() (required when allowAny=true) */

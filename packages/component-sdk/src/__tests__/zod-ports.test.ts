@@ -359,6 +359,30 @@ describe('extractPorts', () => {
     expect(port.hidden).toBe(true);
   });
 
+  it('preserves llm-provider editor and hidden metadata without changing a declared contract', () => {
+    const schema = z.object({
+      model: withPortMeta(z.object({ provider: z.string() }), {
+        label: 'Model',
+        editor: 'llm-provider',
+        hidden: true,
+        connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1', credential: true },
+      }),
+    });
+
+    expect(extractPorts(schema)).toEqual([
+      expect.objectContaining({
+        id: 'model',
+        editor: 'llm-provider',
+        hidden: true,
+        connectionType: {
+          kind: 'contract',
+          name: 'core.ai.llm-provider.v1',
+          credential: true,
+        },
+      }),
+    ]);
+  });
+
   it('derives connectionType for each port', () => {
     const schema = z.object({
       text: withPortMeta(z.string(), { label: 'Text' }),

@@ -8140,7 +8140,8 @@ export interface operations {
                                 [key: string]: unknown;
                             };
                             /** @enum {string|null} */
-                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | null;
+                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | "llm-provider" | null;
+                            hidden?: boolean | null;
                             required?: boolean;
                             description?: string | null;
                             /** @enum {string|null} */
@@ -8245,7 +8246,8 @@ export interface operations {
                                 [key: string]: unknown;
                             };
                             /** @enum {string|null} */
-                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | null;
+                            editor?: "text" | "textarea" | "number" | "boolean" | "select" | "multi-select" | "json" | "secret" | "llm-provider" | null;
+                            hidden?: boolean | null;
                             required?: boolean;
                             description?: string | null;
                             /** @enum {string|null} */

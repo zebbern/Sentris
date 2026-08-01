@@ -128,21 +128,26 @@ const inputSchema = inputs({
         provider: 'openai',
         modelId: DEFAULT_OPENAI_MODEL,
       })
-      .describe('Chat model configuration (provider, model ID, API key, base URL).'),
+      .describe('Chat model provider and model configuration.'),
     {
       label: 'Chat Model',
-      description:
-        'Provider configuration. Example: {"provider":"gemini","modelId":"gemini-3.5-flash","apiKey":"gm-..."}',
+      description: 'Select a stored provider credential or connect a provider configuration.',
+      editor: 'llm-provider',
       connectionType: { kind: 'contract', name: llmProviderContractName, credential: true },
     },
   ),
   modelApiKey: port(
-    z.string().optional().describe('Optional API key override supplied via a Secret Loader node.'),
+    z
+      .string()
+      .optional()
+      .describe('Legacy compatibility input for a secret supplied by a connected Secret Loader.'),
     {
       label: 'Model API Key',
-      description: 'Optional override API key supplied via a Secret Loader output.',
+      description:
+        'Legacy compatibility input for a connected Secret Loader secret; prefer stored provider credentials.',
       editor: 'secret',
       connectionType: { kind: 'primitive', name: 'secret' },
+      hidden: true,
     },
   ),
   tools: port(

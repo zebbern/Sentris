@@ -4951,8 +4951,13 @@
                                 "select",
                                 "multi-select",
                                 "json",
-                                "secret"
+                                "secret",
+                                "llm-provider"
                               ],
+                              "nullable": true
+                            },
+                            "hidden": {
+                              "type": "boolean",
                               "nullable": true
                             },
                             "required": {
@@ -5281,8 +5286,13 @@
                               "select",
                               "multi-select",
                               "json",
-                              "secret"
+                              "secret",
+                              "llm-provider"
                             ],
+                            "nullable": true
+                          },
+                          "hidden": {
+                            "type": "boolean",
                             "nullable": true
                           },
                           "required": {

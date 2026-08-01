@@ -20,6 +20,7 @@ const PortEditorTypes = [
   'multi-select',
   'json',
   'secret',
+  'llm-provider',
 ] as const;
 export const PortEditorTypeEnum = z.enum(PortEditorTypes);
 
@@ -69,6 +70,7 @@ export const InputPortSchema = z.object({
   label: z.string(),
   connectionType: ConnectionTypeSchema.optional().default(DEFAULT_TEXT_CONNECTION),
   editor: PortEditorTypeEnum.optional(),
+  hidden: z.boolean().optional(),
   required: z.boolean().optional(),
   description: z.string().optional(),
   valuePriority: z.enum(['manual-first', 'connection-first']).optional(),

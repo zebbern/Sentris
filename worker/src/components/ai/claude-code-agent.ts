@@ -78,7 +78,8 @@ const inputSchema = inputs({
       .describe('Model configuration for the agent.'),
     {
       label: 'Model',
-      description: 'LLM provider configuration (Anthropic recommended).',
+      description: 'Select a stored provider credential or connect a provider configuration.',
+      editor: 'llm-provider',
       connectionType: { kind: 'contract', name: llmProviderContractName, credential: true },
     },
   ),

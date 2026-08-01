@@ -317,7 +317,8 @@ export interface ComponentPortMetadata {
     | 'select'
     | 'multi-select'
     | 'json'
-    | 'secret';
+    | 'secret'
+    | 'llm-provider';
   required?: boolean;
   description?: string;
   valuePriority?: 'manual-first' | 'connection-first';
