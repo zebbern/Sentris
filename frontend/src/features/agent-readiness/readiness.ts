@@ -129,6 +129,17 @@ export function evaluateLlmModelReadiness(input: {
     );
   }
 
+  if (!hasSupportedAuthMode(value, supportedModes(input.supportedAuthModes))) {
+    return row(
+      'model',
+      'error',
+      'Unsupported authentication',
+      'This component does not support the configured authentication mode.',
+      true,
+      true,
+    );
+  }
+
   return row('model', 'ready', 'Ready', 'Provider and model are configured.', false, false);
 }
 
@@ -233,7 +244,8 @@ export function evaluateLlmProviderReadiness(input: {
   supportedAuthModes?: readonly LlmAuthMode[];
   secrets: CatalogState<Pick<SecretSummary, 'id' | 'name'>>;
 }): AgentReadinessRow[] {
-  return [evaluateLlmModelReadiness(input), evaluateLlmCredentialReadiness(input)];
+  const model = evaluateLlmModelReadiness(input);
+  return model.state === 'error' ? [model] : [model, evaluateLlmCredentialReadiness(input)];
 }
 
 export function evaluateCredentialMappingReadiness(input: {

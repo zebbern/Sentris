@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,13 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useUseTemplate, type Template } from '@/hooks/queries/useTemplateQueries';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
+import { useComponents } from '@/hooks/queries/useComponentQueries';
+import { useMcpAllTools, useMcpServers } from '@/hooks/queries/useMcpServerQueries';
+import { ReadinessSummary } from '@/features/agent-readiness/ReadinessSummary';
+import {
+  evaluateTemplateLaunchReadiness,
+  parseTemplateLaunchRequirements,
+} from './template-launch-readiness';
 import { Link } from 'react-router-dom';
 
 interface UseTemplateModalProps {
@@ -32,15 +39,110 @@ export function UseTemplateModal({
   const useTemplateMutation = useUseTemplate();
   const isLoading = useTemplateMutation.isPending;
   const requiredSecrets = template.requiredSecrets || [];
+  const componentsQuery = useComponents();
+  const requirements = useMemo(() => {
+    const index = componentsQuery.data;
+    if (!index) return { models: [], mcp: [] };
+    return parseTemplateLaunchRequirements(template.graph, (ref) => {
+      const direct = index.byId[ref];
+      if (direct) return direct;
+      const id = index.slugIndex[ref];
+      return id ? (index.byId[id] ?? null) : null;
+    });
+  }, [componentsQuery.data, template.graph]);
+  const needsMcp = open && requirements.mcp.length > 0;
   const {
     data: availableSecrets = [],
     isLoading: isLoadingSecrets,
     error: secretsError,
   } = useSecrets({ enabled: open && requiredSecrets.length > 0 });
+  const {
+    data: mcpServers = [],
+    isLoading: isLoadingMcpServers,
+    error: mcpServersError,
+  } = useMcpServers({ enabled: needsMcp });
+  const {
+    data: mcpTools = [],
+    isLoading: isLoadingMcpTools,
+    error: mcpToolsError,
+  } = useMcpAllTools({ enabled: needsMcp });
 
   const [workflowName, setWorkflowName] = useState(template.name);
   const [secretMappings, setSecretMappings] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+
+  const requiredSecretNames = useMemo(
+    () => requiredSecrets.map((secret) => secret.name),
+    [requiredSecrets],
+  );
+  const hasUnmappedSecrets = useMemo(
+    () => requiredSecretNames.some((name) => !secretMappings[name]),
+    [requiredSecretNames, secretMappings],
+  );
+  const readinessRows = useMemo(
+    () =>
+      evaluateTemplateLaunchReadiness({
+        requirements,
+        requiredSecretNames,
+        secretMappings,
+        secrets: {
+          items: availableSecrets,
+          isLoading: isLoadingSecrets,
+          error: secretsError ?? null,
+        },
+        mcpServers: {
+          items: mcpServers,
+          isLoading: isLoadingMcpServers,
+          error: mcpServersError ?? null,
+        },
+        mcpTools: {
+          items: mcpTools,
+          isLoading: isLoadingMcpTools,
+          error: mcpToolsError ?? null,
+        },
+        componentCatalog: {
+          isLoading: componentsQuery.isLoading,
+          error: componentsQuery.error ?? null,
+        },
+      }),
+    [
+      availableSecrets,
+      componentsQuery.error,
+      componentsQuery.isLoading,
+      isLoadingMcpServers,
+      isLoadingMcpTools,
+      isLoadingSecrets,
+      mcpServers,
+      mcpServersError,
+      mcpTools,
+      mcpToolsError,
+      requiredSecretNames,
+      requirements,
+      secretMappings,
+      secretsError,
+    ],
+  );
+  const displayReadinessRows = useMemo(
+    () =>
+      readinessRows.map((row) => {
+        if (row.kind !== 'credential') return row;
+        if (requiredSecrets.length === 0)
+          return { ...row, label: 'Credentials', detail: 'Not required' };
+        const mappedCount = requiredSecretNames.filter((name) =>
+          Boolean(secretMappings[name]),
+        ).length;
+        return {
+          ...row,
+          label: 'Credentials',
+          detail:
+            row.state === 'ready'
+              ? `${mappedCount}/${requiredSecrets.length} mapped`
+              : 'Needs mapping',
+        };
+      }),
+    [readinessRows, requiredSecretNames, requiredSecrets.length, secretMappings],
+  );
+  const blocksCreation = readinessRows.some((row) => row.blocksCreation);
 
   // Reset state when template or open changes to avoid stale data (#3)
   useEffect(() => {
@@ -206,6 +308,25 @@ export function UseTemplateModal({
             </div>
           )}
 
+          <section className="space-y-2" aria-labelledby="run-readiness-heading">
+            <h3 id="run-readiness-heading" className="text-sm font-medium">
+              Run readiness
+            </h3>
+            <ReadinessSummary rows={displayReadinessRows} />
+            {requirements.mcp.length > 0 && (
+              <Link
+                to="/mcp-library"
+                className="text-xs text-primary underline-offset-4 hover:underline"
+              >
+                Manage MCP servers in the MCP library
+              </Link>
+            )}
+            <p aria-live="polite" aria-atomic="true" className="sr-only">
+              Run readiness.{' '}
+              {displayReadinessRows.map((row) => `${row.label}: ${row.detail}`).join(' ')}
+            </p>
+          </section>
+
           {/* Error message */}
           {error && (
             <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/50">
@@ -225,11 +346,7 @@ export function UseTemplateModal({
             </Button>
             <Button
               type="submit"
-              disabled={
-                isLoading ||
-                (requiredSecrets.length > 0 &&
-                  (isLoadingSecrets || availableSecrets.length === 0 || Boolean(secretsError)))
-              }
+              disabled={isLoading || hasUnmappedSecrets || blocksCreation}
               className="gap-2"
             >
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}

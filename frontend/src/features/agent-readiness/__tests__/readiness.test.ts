@@ -130,6 +130,38 @@ describe('agent readiness', () => {
     ).toMatchObject({ state: 'ready', label: 'Mapped' });
   });
 
+  it('blocks unsupported OAuth in model readiness without duplicating it in composed readiness', () => {
+    const value = {
+      provider: 'openai',
+      modelId: 'gpt-5',
+      authMode: 'subscription_oauth',
+      oauthTokenSecretId: 'secret-1',
+    };
+
+    expect(evaluateLlmModelReadiness({ value, supportedAuthModes: ['api_key'] })).toMatchObject({
+      state: 'error',
+      label: 'Unsupported authentication',
+      blocksCreation: true,
+      blocksExecution: true,
+    });
+    expect(
+      evaluateLlmProviderReadiness({ value, supportedAuthModes: ['api_key'], secrets }),
+    ).toEqual([expect.objectContaining({ kind: 'model', label: 'Unsupported authentication' })]);
+  });
+
+  it('keeps OAuth model readiness ready when the component declares that capability', () => {
+    expect(
+      evaluateLlmModelReadiness({
+        value: {
+          provider: 'anthropic',
+          modelId: 'claude-sonnet-5',
+          authMode: 'subscription_oauth',
+        },
+        supportedAuthModes: ['api_key', 'subscription_oauth'],
+      }),
+    ).toMatchObject({ state: 'ready', blocksCreation: false, blocksExecution: false });
+  });
+
   it('reports a legacy inline key as degraded but executable', () => {
     expect(
       evaluateLlmCredentialReadiness({

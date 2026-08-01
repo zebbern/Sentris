@@ -245,16 +245,32 @@ describe('evaluateWorkflowAgentNodeReadiness', () => {
     const openCode = agentComponent('core.ai.opencode');
     const claude = agentComponent('core.ai.claude-code');
 
-    expect(
-      evaluate({ component: generic, agent: node('agent', generic.id, config) }).find(
-        (row) => row.kind === 'credential',
-      ),
-    ).toMatchObject({ state: 'error', blocksExecution: true });
-    expect(
-      evaluate({ component: openCode, agent: node('agent', openCode.id, config) }).find(
-        (row) => row.kind === 'credential',
-      ),
-    ).toMatchObject({ state: 'error', blocksExecution: true });
+    const genericRows = evaluate({ component: generic, agent: node('agent', generic.id, config) });
+    const openCodeRows = evaluate({
+      component: openCode,
+      agent: node('agent', openCode.id, config),
+    });
+
+    expect(genericRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'model',
+          label: 'Unsupported authentication',
+          blocksExecution: true,
+        }),
+      ]),
+    );
+    expect(genericRows.filter((row) => row.kind === 'credential')).toEqual([]);
+    expect(openCodeRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'model',
+          label: 'Unsupported authentication',
+          blocksExecution: true,
+        }),
+      ]),
+    );
+    expect(openCodeRows.filter((row) => row.kind === 'credential')).toEqual([]);
     expect(
       evaluate({ component: claude, agent: node('agent', claude.id, config) }).find(
         (row) => row.kind === 'credential',

@@ -2,6 +2,7 @@ import { describe, it, expect, mock, afterEach, beforeEach } from 'bun:test';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { createDialogMock } from '@/test/mocks/dialog';
 import type { Template } from '@/types/templates';
+import type { ComponentMetadata } from '@/schemas/component';
 import { MemoryRouter } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,27 @@ let mockSecrets = [
 ];
 let mockSecretsLoading = false;
 let mockSecretsError: Error | null = null;
+let mockComponentIndex:
+  | { byId: Record<string, ComponentMetadata>; slugIndex: Record<string, string> }
+  | undefined;
+let mockComponentsLoading = false;
+let mockComponentsError: Error | null = null;
+let mockMcpServers: Record<string, unknown>[] = [];
+let mockMcpTools: Record<string, unknown>[] = [];
+let mockMcpServersLoading = false;
+let mockMcpToolsLoading = false;
+let mockMcpServersError: Error | null = null;
+let mockMcpToolsError: Error | null = null;
+const mockUseMcpServers = mock((_options?: { enabled?: boolean }) => ({
+  data: mockMcpServers,
+  isLoading: mockMcpServersLoading,
+  error: mockMcpServersError,
+}));
+const mockUseMcpAllTools = mock((_options?: { enabled?: boolean }) => ({
+  data: mockMcpTools,
+  isLoading: mockMcpToolsLoading,
+  error: mockMcpToolsError,
+}));
 
 mock.module('@/hooks/queries/useTemplateQueries', () => ({
   useUseTemplate: () => ({
@@ -42,6 +64,19 @@ mock.module('@/hooks/queries/useSecretQueries', () => ({
     isLoading: mockSecretsLoading,
     error: mockSecretsError,
   }),
+}));
+
+mock.module('@/hooks/queries/useComponentQueries', () => ({
+  useComponents: () => ({
+    data: mockComponentIndex,
+    isLoading: mockComponentsLoading,
+    error: mockComponentsError,
+  }),
+}));
+
+mock.module('@/hooks/queries/useMcpServerQueries', () => ({
+  useMcpServers: mockUseMcpServers,
+  useMcpAllTools: mockUseMcpAllTools,
 }));
 
 import { UseTemplateModal } from '../UseTemplateModal';
@@ -74,6 +109,80 @@ function createMockTemplate(overrides: Partial<Template> = {}): Template {
     ...overrides,
   };
 }
+
+function component(id = 'core.ai.agent', inputId = 'chatModel'): ComponentMetadata {
+  return {
+    id,
+    slug: id,
+    name: 'AI Agent',
+    type: 'process',
+    category: 'transform',
+    categoryConfig: { label: 'AI', color: '#000', description: '', emoji: '🤖' },
+    inputs: [
+      {
+        id: inputId,
+        label: 'Model',
+        editor: 'llm-provider',
+        connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+      },
+    ],
+    outputs: [],
+    parameters: [],
+    version: '1.0.0',
+    description: '',
+    documentation: null,
+    documentationUrl: null,
+    icon: null,
+    logo: null,
+    author: null,
+    isLatest: true,
+    deprecated: false,
+    example: null,
+    runner: { kind: 'inline' },
+    examples: [],
+    toolProvider: null,
+    toolSchema: null,
+  };
+}
+
+function setComponentCatalog(...components: ComponentMetadata[]) {
+  mockComponentIndex = {
+    byId: Object.fromEntries(components.map((item) => [item.id, item])),
+    slugIndex: Object.fromEntries(components.map((item) => [item.slug, item.id])),
+  };
+}
+
+const modelGraph = (modelId = 'gpt-5') => ({
+  nodes: [
+    {
+      id: 'agent-1',
+      type: 'core.ai.agent',
+      data: { config: { inputOverrides: { chatModel: { provider: 'openai', modelId } } } },
+    },
+  ],
+  edges: [],
+});
+
+const mcpGraph = (policy: 'required' | 'best-effort' = 'required') => ({
+  nodes: [
+    {
+      id: 'mcp-1',
+      type: 'mcp.custom',
+      data: { config: { params: { useAllEnabled: true }, inputOverrides: {} } },
+    },
+    {
+      id: 'agent-1',
+      type: 'core.ai.agent',
+      data: {
+        config: {
+          params: { toolAvailability: policy },
+          inputOverrides: { chatModel: { provider: 'openai', modelId: 'gpt-5' } },
+        },
+      },
+    },
+  ],
+  edges: [{ source: 'mcp-1', target: 'agent-1', targetHandle: 'tools' }],
+});
 
 function renderModal(
   templateOverrides: Partial<Template> = {},
@@ -123,6 +232,21 @@ describe('UseTemplateModal', () => {
     ];
     mockSecretsLoading = false;
     mockSecretsError = null;
+    mockComponentsLoading = false;
+    mockComponentsError = null;
+    setComponentCatalog(component(), {
+      ...component('mcp.custom'),
+      name: 'Custom MCP',
+      inputs: [],
+    });
+    mockMcpServers = [];
+    mockMcpTools = [];
+    mockMcpServersLoading = false;
+    mockMcpToolsLoading = false;
+    mockMcpServersError = null;
+    mockMcpToolsError = null;
+    mockUseMcpServers.mockClear();
+    mockUseMcpAllTools.mockClear();
   });
 
   afterEach(() => {
@@ -222,7 +346,7 @@ describe('UseTemplateModal', () => {
       requiredSecrets: [{ name: 'API_KEY', type: 'string' }],
     });
 
-    fireEvent.click(screen.getByText('Create & Run'));
+    fireEvent.submit(screen.getByRole('button', { name: 'Create & Run' }).closest('form')!);
 
     await waitFor(() => {
       expect(screen.getByText(/for each required credential/)).toBeTruthy();
@@ -278,5 +402,130 @@ describe('UseTemplateModal', () => {
     renderModal({}, { open: false });
 
     expect(screen.queryByText(/Configure & Run/)).toBeNull();
+  });
+
+  it('shows the configured provider and model before creation', () => {
+    renderModal({ graph: modelGraph() });
+
+    expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
+      'OpenAI · gpt-5',
+    );
+  });
+
+  it('deduplicates identical model configurations and shows the agent count', () => {
+    renderModal({
+      graph: {
+        nodes: [
+          ...modelGraph().nodes,
+          {
+            id: 'agent-2',
+            type: 'core.ai.agent',
+            data: {
+              config: { inputOverrides: { chatModel: { provider: 'openai', modelId: 'gpt-5' } } },
+            },
+          },
+        ],
+        edges: [],
+      },
+    });
+
+    expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
+      'OpenAI · gpt-5 (2 agents)',
+    );
+  });
+
+  it('shows required credentials as needing mapping and disables creation', () => {
+    renderModal({ requiredSecrets: [{ name: 'API_KEY', type: 'string' }] });
+
+    expect(screen.getByText('Needs mapping')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create & Run' })).toBeDisabled();
+  });
+
+  it('shows required credentials as mapped and enables creation after selection', () => {
+    renderModal({ requiredSecrets: [{ name: 'API_KEY', type: 'string' }] });
+
+    fireEvent.change(screen.getByLabelText('API_KEY'), { target: { value: 'secret-api' } });
+
+    expect(screen.getByText('1/1 mapped')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create & Run' })).not.toBeDisabled();
+  });
+
+  it('shows optional MCP with no enabled servers without blocking creation', () => {
+    renderModal({ graph: mcpGraph('best-effort') });
+
+    expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
+      'MCP tools (optional)',
+    );
+    expect(screen.getByText('No enabled servers.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create & Run' })).not.toBeDisabled();
+  });
+
+  it('shows ready and attention MCP server counts from current server and tool data', () => {
+    mockMcpServers = [
+      {
+        id: 'server-1',
+        name: 'Ready',
+        enabled: true,
+        lastHealthStatus: 'healthy',
+      },
+      {
+        id: 'server-2',
+        name: 'Attention',
+        enabled: true,
+        lastHealthStatus: 'unhealthy',
+      },
+    ];
+    mockMcpTools = [
+      {
+        id: 'tool-1',
+        toolName: 'search',
+        serverId: 'server-1',
+        serverName: 'Ready',
+        enabled: true,
+      },
+      {
+        id: 'tool-2',
+        toolName: 'search',
+        serverId: 'server-2',
+        serverName: 'Attention',
+        enabled: true,
+      },
+    ];
+    renderModal({ graph: mcpGraph() });
+
+    expect(screen.getByText('1 ready, 1 needs attention.')).toBeTruthy();
+  });
+
+  it('shows MCP status unavailable without blocking a best-effort template', () => {
+    mockMcpServersError = Error('offline');
+    renderModal({ graph: mcpGraph('best-effort') });
+
+    expect(screen.getByText('Status unavailable.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Create & Run' })).not.toBeDisabled();
+  });
+
+  it('does not query or render MCP readiness for templates without an MCP connection', () => {
+    renderModal({ graph: modelGraph() });
+
+    expect(mockUseMcpServers).toHaveBeenCalledWith({ enabled: false });
+    expect(screen.queryByText('MCP tools')).toBeNull();
+  });
+
+  it('shows model readiness unavailable when component metadata cannot load', () => {
+    mockComponentIndex = undefined;
+    mockComponentsError = Error('offline');
+    renderModal({ graph: modelGraph() });
+
+    expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
+      'Model status unavailable',
+    );
+    expect(screen.getByRole('button', { name: 'Create & Run' })).toBeDisabled();
+  });
+
+  it('announces readiness changes through a polite live region', () => {
+    renderModal({ graph: modelGraph() });
+
+    const liveRegion = document.querySelector('[aria-live="polite"][aria-atomic="true"]');
+    expect(liveRegion?.textContent).toContain('Run readiness');
   });
 });
