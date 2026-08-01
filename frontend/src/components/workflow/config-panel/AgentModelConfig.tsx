@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { isLlmModelProvider } from '@sentris/shared';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -46,6 +47,9 @@ const EFFORT_OPTIONS: SelectOption[] = CLAUDE_EFFORT_LEVEL_OPTIONS.map((option) 
 export function supportsInlineAgentModelConfig(componentId: string): boolean {
   return AGENT_MODEL_COMPONENT_IDS.has(componentId);
 }
+
+export const isAgentModelProviderValue: (value: unknown) => value is AgentModelProvider =
+  isLlmModelProvider;
 
 export function AgentModelConfig({
   componentId,
@@ -349,15 +353,5 @@ export function AgentModelConfig({
         )}
       </div>
     </CollapsibleSection>
-  );
-}
-
-function isAgentModelProviderValue(value: string): value is AgentModelProvider {
-  return (
-    value === 'anthropic' ||
-    value === 'openai' ||
-    value === 'gemini' ||
-    value === 'openrouter' ||
-    value === 'zai-coding-plan'
   );
 }
