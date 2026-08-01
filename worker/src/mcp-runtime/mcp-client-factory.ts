@@ -11,6 +11,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type { McpRuntimeKey } from '@sentris/shared';
 
 import { McpClientAdapter } from './mcp-client-adapter';
+import { serializeMcpRuntimeKey } from './mcp-runtime-identity';
 import {
   McpSseCompatibilityAdapter,
   isEligibleSseFallback,
@@ -42,15 +43,7 @@ interface ConnectFlight {
 }
 
 function partitionFor(key: McpRuntimeKey): string {
-  return JSON.stringify([
-    key.sourceId,
-    key.transport,
-    key.configFingerprint,
-    key.organizationId,
-    key.principalPartitionHash,
-    key.credentialReference,
-    key.credentialGeneration,
-  ]);
+  return serializeMcpRuntimeKey(key);
 }
 
 function keyFor(key: McpRuntimeKey): string {

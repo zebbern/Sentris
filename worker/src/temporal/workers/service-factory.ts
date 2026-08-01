@@ -11,7 +11,8 @@ import Redis from 'ioredis';
 import { Kafka, logLevel as KafkaLogLevel } from 'kafkajs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'minio';
-import { ConfigurationError } from '@sentris/component-sdk';
+import { ConfigurationError, resolveDockerResourceScope } from '@sentris/component-sdk';
+import type { McpRuntimeAcquireRequest } from '@sentris/shared';
 import { getTopicResolver } from '../../common/kafka-topic-resolver';
 import * as schema from '../../adapters/schema';
 import {
@@ -27,7 +28,100 @@ import {
 import { createKafkaReadiness } from '../../health/kafka-readiness';
 import type { KafkaReadiness } from '../../health/readiness-checks';
 import { PostgresDurableKafkaFallback } from '../../common/durable-kafka-fallback';
+import { mcpRuntimeEnvSchema, mcpRuntimeRedisUrlSchema } from '../../config/env.schema';
+import {
+  createMcpRuntimeLeaseKeyPrefix,
+  createMcpRuntimeProcessIdentity,
+} from '../../mcp-runtime/mcp-runtime-identity';
+import { McpRuntimeLeaseRepository } from '../../mcp-runtime/mcp-runtime-lease.repository';
+import { createMcpRuntimeRedisClient } from '../../mcp-runtime/mcp-runtime-redis';
 import { resolveWorkerRuntimeTimeouts } from './runtime-timeouts';
+
+// ── MCP runtime lease composition seam ────────────────────────────────
+
+export type McpRuntimeRedisClientFactory = (redisUrl: string, commandTimeoutMs: number) => Redis;
+
+export interface McpRuntimeLeaseServiceFactoryOptions {
+  redisClientFactory?: McpRuntimeRedisClientFactory;
+}
+
+export interface McpRuntimeLeaseServices {
+  leaseRepository: McpRuntimeLeaseRepository;
+  processIdentity: McpRuntimeAcquireRequest['candidateOwner'];
+  close: () => Promise<void>;
+}
+
+/**
+ * Task 3 -> Task 4 migration seam. Task 4 must call this once during worker
+ * boot and close the returned ownership handle during shutdown. It remains
+ * deliberately uninstantiated here so importing this module cannot create a
+ * module-global Redis connection.
+ */
+export async function createMcpRuntimeLeaseServices(
+  options: McpRuntimeLeaseServiceFactoryOptions = {},
+): Promise<McpRuntimeLeaseServices> {
+  const config = mcpRuntimeEnvSchema.parse(process.env);
+  const configuredRedisUrl = config.MCP_RUNTIME_REDIS_URL ?? process.env.TERMINAL_REDIS_URL;
+  if (!configuredRedisUrl) {
+    throw new ConfigurationError(
+      'MCP runtime Redis requires MCP_RUNTIME_REDIS_URL or TERMINAL_REDIS_URL',
+      { configKey: 'MCP_RUNTIME_REDIS_URL' },
+    );
+  }
+  const redisUrl = mcpRuntimeRedisUrlSchema.parse(configuredRedisUrl);
+  if (!config.MCP_RUNTIME_OWNER_ID) {
+    throw new ConfigurationError(
+      'MCP_RUNTIME_OWNER_ID is required to create MCP runtime lease services',
+      { configKey: 'MCP_RUNTIME_OWNER_ID' },
+    );
+  }
+  if (!config.MCP_RUNTIME_OWNER_URL) {
+    throw new ConfigurationError(
+      'MCP_RUNTIME_OWNER_URL is required to create MCP runtime lease services',
+      { configKey: 'MCP_RUNTIME_OWNER_URL' },
+    );
+  }
+
+  const processIdentity = createMcpRuntimeProcessIdentity({
+    ownerId: config.MCP_RUNTIME_OWNER_ID,
+    ownerAddress: config.MCP_RUNTIME_OWNER_URL,
+  });
+  const redisClientFactory = options.redisClientFactory ?? createMcpRuntimeRedisClient;
+  const redis = redisClientFactory(redisUrl, config.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS);
+
+  try {
+    await redis.connect();
+    const pingResponse = await redis.ping();
+    if (pingResponse !== 'PONG') {
+      throw new Error('MCP runtime Redis ping returned an unexpected response');
+    }
+
+    const leaseRepository = new McpRuntimeLeaseRepository(redis, {
+      keyPrefix: createMcpRuntimeLeaseKeyPrefix(resolveDockerResourceScope()),
+      startingTtlMs: config.MCP_RUNTIME_STARTING_TTL_MS,
+      readyTtlMs: config.MCP_RUNTIME_LEASE_TTL_MS,
+    });
+    let closePromise: Promise<void> | undefined;
+
+    return {
+      leaseRepository,
+      processIdentity,
+      close: () => {
+        closePromise ??= (async () => {
+          try {
+            await redis.quit();
+          } finally {
+            redis.disconnect(false);
+          }
+        })();
+        return closePromise;
+      },
+    };
+  } catch (error: unknown) {
+    redis.disconnect(false);
+    throw error;
+  }
+}
 
 // ── Database ────────────────────────────────────────────────────────────
 

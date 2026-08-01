@@ -67,6 +67,90 @@ describe('workerEnvSchema', () => {
     }
   });
 
+  it('defaults the MCP runtime lease timings without requiring runtime ownership', () => {
+    const result = workerEnvSchema.safeParse(validEnv());
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS).toBe(5_000);
+      expect(result.data.MCP_RUNTIME_STARTING_TTL_MS).toBe(120_000);
+      expect(result.data.MCP_RUNTIME_LEASE_TTL_MS).toBe(60_000);
+      expect(result.data.MCP_RUNTIME_RENEWAL_INTERVAL_MS).toBe(15_000);
+      expect(result.data.MCP_RUNTIME_REDIS_URL).toBeUndefined();
+      expect(result.data.MCP_RUNTIME_OWNER_ID).toBeUndefined();
+      expect(result.data.MCP_RUNTIME_OWNER_URL).toBeUndefined();
+    }
+  });
+
+  it('accepts dedicated Redis and direct HTTP endpoints for the MCP runtime', () => {
+    const result = workerEnvSchema.safeParse(
+      validEnv({
+        MCP_RUNTIME_REDIS_URL: 'rediss://redis.internal:6380/2',
+        MCP_RUNTIME_OWNER_ID: 'worker-instance-7',
+        MCP_RUNTIME_OWNER_URL: 'https://worker-7.internal:9200',
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.MCP_RUNTIME_REDIS_URL).toBe('rediss://redis.internal:6380/2');
+      expect(result.data.MCP_RUNTIME_OWNER_ID).toBe('worker-instance-7');
+      expect(result.data.MCP_RUNTIME_OWNER_URL).toBe('https://worker-7.internal:9200');
+    }
+  });
+
+  it('rejects non-Redis runtime storage URLs and invalid owner URLs', () => {
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_REDIS_URL: 'https://redis.internal:6379' }))
+        .success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({ MCP_RUNTIME_OWNER_URL: 'redis://worker-7.internal:9200' }),
+      ).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({ MCP_RUNTIME_OWNER_URL: 'https://user:secret@worker-7.internal:9200' }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('rejects MCP runtime timings outside their operational bounds', () => {
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '60001' }))
+        .success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_STARTING_TTL_MS: '86400001' })).success,
+    ).toBe(false);
+    expect(workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_LEASE_TTL_MS: '0' })).success).toBe(
+      false,
+    );
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_RENEWAL_INTERVAL_MS: '-1' })).success,
+    ).toBe(false);
+  });
+
+  it('requires three renewal intervals to fit within the ready lease TTL', () => {
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_LEASE_TTL_MS: '60000',
+          MCP_RUNTIME_RENEWAL_INTERVAL_MS: '20000',
+        }),
+      ).success,
+    ).toBe(true);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_LEASE_TTL_MS: '60000',
+          MCP_RUNTIME_RENEWAL_INTERVAL_MS: '20001',
+        }),
+      ).success,
+    ).toBe(false);
+  });
+
   it('rejects zero or negative orphan reconciliation bounds', () => {
     expect(
       workerEnvSchema.safeParse(

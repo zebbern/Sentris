@@ -5,8 +5,70 @@ import {
   minioConfigSchema,
   secretStoreKeySchema,
   kafkaBrokersSchema,
+  McpRuntimeOwnerAddressSchema,
   resolveSentrisTrustProfile,
 } from '@sentris/shared';
+
+const MCP_RUNTIME_MAX_COMMAND_TIMEOUT_MS = 60_000;
+const MCP_RUNTIME_MAX_TTL_MS = 24 * 60 * 60 * 1_000;
+
+export const mcpRuntimeRedisUrlSchema = z.url().refine((value) => {
+  const protocol = new URL(value).protocol;
+  return protocol === 'redis:' || protocol === 'rediss:';
+}, 'Expected a redis:// or rediss:// URL');
+
+const mcpRuntimeEnvShape = {
+  MCP_RUNTIME_REDIS_URL: mcpRuntimeRedisUrlSchema.optional(),
+  MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_COMMAND_TIMEOUT_MS)
+    .optional()
+    .default(5_000),
+  MCP_RUNTIME_STARTING_TTL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(120_000),
+  MCP_RUNTIME_LEASE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(60_000),
+  MCP_RUNTIME_RENEWAL_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(15_000),
+  MCP_RUNTIME_OWNER_ID: z.string().min(1).optional(),
+  MCP_RUNTIME_OWNER_URL: McpRuntimeOwnerAddressSchema.optional(),
+};
+
+interface McpRuntimeTimingConfig {
+  MCP_RUNTIME_LEASE_TTL_MS: number;
+  MCP_RUNTIME_RENEWAL_INTERVAL_MS: number;
+}
+
+function validateMcpRuntimeTiming(data: McpRuntimeTimingConfig, ctx: z.RefinementCtx): void {
+  if (data.MCP_RUNTIME_RENEWAL_INTERVAL_MS * 3 > data.MCP_RUNTIME_LEASE_TTL_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_RENEWAL_INTERVAL_MS'],
+      message: 'MCP runtime renewal interval must be at most one third of the lease TTL',
+    });
+  }
+}
+
+export const mcpRuntimeEnvSchema = z
+  .object(mcpRuntimeEnvShape)
+  .superRefine(validateMcpRuntimeTiming);
 
 export const workerEnvSchema = z
   .object({
@@ -23,6 +85,9 @@ export const workerEnvSchema = z
 
     // Same-worker loopback stdio discovery is an explicit trusted-local capability.
     MCP_DISCOVERY_TRUSTED_LOCAL_STDIO: z.enum(['true', 'false']).optional().default('false'),
+
+    // --- Canonical MCP runtime lease ownership (wired by Task 4) ---
+    ...mcpRuntimeEnvShape,
 
     // --- Optional Kafka client IDs ---
     EVENT_KAFKA_CLIENT_ID: z.string().optional().default('sentris-worker-events'),
@@ -92,6 +157,8 @@ export const workerEnvSchema = z
   .merge(temporalConfigSchema)
   .merge(minioConfigSchema)
   .superRefine((data, ctx) => {
+    validateMcpRuntimeTiming(data, ctx);
+
     let trustProfile: ReturnType<typeof resolveSentrisTrustProfile> | undefined;
     try {
       trustProfile = resolveSentrisTrustProfile(data);
