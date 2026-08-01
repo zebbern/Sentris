@@ -172,8 +172,28 @@
 
 - [ ] **Step 6: Commit**
 
+  Inspect the worktree before staging. Stage the seven new Task 2 files directly, then use patch staging for the shared existing files. If another task edited any shared file, leave its hunks unstaged and coordinate rather than absorbing them into this commit.
+
   ```powershell
-  git add worker/src/mcp-runtime worker/src/config/env.schema.ts worker/package.json bun.lock
+  git status --short
+  git add -- worker/src/mcp-runtime/mcp-client-adapter.ts worker/src/mcp-runtime/mcp-client-adapter.types.ts worker/src/mcp-runtime/mcp-client-factory.ts worker/src/mcp-runtime/mcp-sse-compatibility.adapter.ts worker/src/mcp-runtime/__tests__/mcp-client-adapter.spec.ts worker/src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts worker/src/mcp-runtime/__tests__/fixtures/mcp-conformance-servers.ts
+  git add -p -- worker/src/config/env.schema.ts worker/package.json bun.lock
+  $expected = @(
+    'bun.lock',
+    'worker/package.json',
+    'worker/src/config/env.schema.ts',
+    'worker/src/mcp-runtime/__tests__/fixtures/mcp-conformance-servers.ts',
+    'worker/src/mcp-runtime/__tests__/mcp-client-adapter.spec.ts',
+    'worker/src/mcp-runtime/__tests__/mcp-client-conformance.spec.ts',
+    'worker/src/mcp-runtime/mcp-client-adapter.ts',
+    'worker/src/mcp-runtime/mcp-client-adapter.types.ts',
+    'worker/src/mcp-runtime/mcp-client-factory.ts',
+    'worker/src/mcp-runtime/mcp-sse-compatibility.adapter.ts'
+  ) | Sort-Object
+  $actual = @(git diff --cached --name-only | Sort-Object)
+  $difference = Compare-Object $expected $actual
+  if ($difference) { $difference | Format-Table -AutoSize; throw 'Task 2 staged-path manifest mismatch' }
+  git diff --cached --check
   git commit -s -m "feat: add canonical MCP v2 client adapter"
   ```
 
