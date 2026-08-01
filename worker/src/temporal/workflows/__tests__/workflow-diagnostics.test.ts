@@ -323,6 +323,26 @@ describe('workflow orchestration diagnostics', () => {
           options.heartbeatTimeout === '30 seconds',
       ),
     ).toBe(true);
+    expect(
+      activityProxyOptions.some((options) => {
+        const retry = options.retry as
+          | {
+              maximumAttempts?: number;
+              initialInterval?: string;
+              maximumInterval?: string;
+              backoffCoefficient?: number;
+            }
+          | undefined;
+        return (
+          options.startToCloseTimeout === '2 minutes' &&
+          options.heartbeatTimeout === '30 seconds' &&
+          retry?.maximumAttempts === undefined &&
+          retry?.initialInterval === '5 seconds' &&
+          retry.maximumInterval === '1 minute' &&
+          retry.backoffCoefficient === 2
+        );
+      }),
+    ).toBe(true);
 
     releaseMetadata();
     await workflow;
@@ -400,6 +420,17 @@ describe('workflow orchestration diagnostics', () => {
       completedAt: expect.any(String),
     });
     expect(order).toEqual(['drain', 'reconcile', 'cleanup', 'finalize']);
+  });
+
+  test('does not swallow final reconciliation failure or terminalize the run', async () => {
+    const outage = new Error('backend reconciliation unavailable');
+    reconcileRunToolInvocationsActivity.mockRejectedValueOnce(outage);
+
+    await expect(sentrisWorkflowRun(quietWorkflowInput())).rejects.toBe(outage);
+
+    expect(nonCancellable).toHaveBeenCalled();
+    expect(cleanupRunResourcesActivity).not.toHaveBeenCalled();
+    expect(finalizeRunActivity).not.toHaveBeenCalled();
   });
 
   test('preserves cancellation and finalizes the run as CANCELLED in a non-cancellable scope', async () => {

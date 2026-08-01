@@ -382,14 +382,8 @@ export class ToolRegistryService implements OnModuleDestroy {
       throw new ConflictException('Live MCP component binding no longer matches its snapshot');
     }
 
-    if (!tool.encryptedCredentials) {
-      return { tool, credentials: null };
-    }
-
     try {
-      const encryptionMaterial = JSON.parse(tool.encryptedCredentials);
-      const decrypted = await this.encryption.decrypt(encryptionMaterial);
-      return { tool, credentials: JsonObjectSchema.parse(JSON.parse(decrypted)) };
+      return { tool, credentials: await this.decryptToolCredentials(tool) };
     } catch {
       this.logger.error(`Unable to resolve credentials for MCP component node ${input.nodeId}`);
       throw new ServiceUnavailableException('MCP component credentials are unavailable');
@@ -397,26 +391,39 @@ export class ToolRegistryService implements OnModuleDestroy {
   }
 
   /**
+   * Decrypt credentials from the supplied registration without consulting mutable registry state.
+   */
+  async decryptToolCredentials(tool: RegisteredTool): Promise<Record<string, unknown> | null> {
+    if (!tool.encryptedCredentials) {
+      return null;
+    }
+
+    const encryptionMaterial = JSON.parse(tool.encryptedCredentials);
+    const decrypted = await this.encryption.decrypt(encryptionMaterial);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(decrypted);
+    } catch (error) {
+      // Older remote MCP registrations may contain a raw bearer token.
+      if (tool.type === 'remote-mcp') {
+        return { authToken: decrypted };
+      }
+      throw error;
+    }
+    return JsonObjectSchema.parse(parsed);
+  }
+
+  /**
    * Decrypt and return credentials for a tool
    */
   async getToolCredentials(runId: string, nodeId: string): Promise<Record<string, unknown> | null> {
     const tool = await this.getTool(runId, nodeId);
-    if (!tool?.encryptedCredentials) {
+    if (!tool) {
       return null;
     }
 
     try {
-      const encryptionMaterial = JSON.parse(tool.encryptedCredentials);
-      const decrypted = await this.encryption.decrypt(encryptionMaterial);
-      try {
-        return JSON.parse(decrypted);
-      } catch (e) {
-        // Fallback for tools that might have stored raw strings (e.g. older remote-mcp implementations)
-        if (tool.type === 'remote-mcp') {
-          return { authToken: decrypted };
-        }
-        throw e;
-      }
+      return await this.decryptToolCredentials(tool);
     } catch (error) {
       this.logger.error(`Failed to decrypt credentials for tool ${nodeId}:`, error);
       return null;

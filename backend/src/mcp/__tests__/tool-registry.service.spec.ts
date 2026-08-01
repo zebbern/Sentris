@@ -756,6 +756,36 @@ describe('ToolRegistryService', () => {
       const creds = await service.getToolCredentials('run-1', 'mcp-with-auth');
       expect(creds).toEqual({ Authorization: 'Bearer my-token' });
     });
+
+    it('decrypts the supplied captured record without reading a replacement registration', async () => {
+      await service.registerMcpServer({
+        runId: 'run-1',
+        nodeId: 'mcp-with-auth',
+        serverName: 'Auth Server',
+        transport: 'http',
+        endpoint: 'http://localhost:8080',
+        headers: { Authorization: 'Bearer captured-token' },
+        tools: [],
+      });
+      const captured = await service.getTool('run-1', 'mcp-with-auth');
+      if (!captured) throw new Error('fixture registration failed');
+
+      await service.registerMcpServer({
+        runId: 'run-1',
+        nodeId: 'mcp-with-auth',
+        serverName: 'Auth Server',
+        transport: 'http',
+        endpoint: 'http://localhost:8080',
+        headers: { Authorization: 'Bearer replacement-token' },
+        tools: [],
+      });
+      redis.hgetCalls.length = 0;
+
+      await expect(service.decryptToolCredentials(captured)).resolves.toEqual({
+        Authorization: 'Bearer captured-token',
+      });
+      expect(redis.hgetCalls).toEqual([]);
+    });
   });
 
   describe('areAllToolsReady', () => {

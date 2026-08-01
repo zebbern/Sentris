@@ -8,6 +8,7 @@ import type {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { McpToolRegistrationDescriptor } from '@sentris/shared';
 
+import { sha256 } from '../mcp-runtime/mcp-binding-fingerprint';
 import { ToolRegistryService, type RegisteredTool } from './tool-registry.service';
 
 const CALL_TIMEOUT_MS = 30_000;
@@ -27,16 +28,17 @@ export class McpLegacyOutboundCompatibilityService {
   ): Promise<McpToolRegistrationDescriptor[]> {
     if (!source.endpoint) return [];
 
+    const key = this.clientKey(runId, source.endpoint, this.liveBindingIdentity(source));
     let client: LegacyMcpClient | undefined;
     try {
-      const headers = await this.getRequestHeaders(runId, source);
-      client = await this.getOrCreateClient(runId, source.endpoint, headers);
+      const headers = await this.getRequestHeaders(source);
+      client = await this.getOrCreateClient(key, source.endpoint, headers);
       const response = await client.listTools();
       return (response.tools ?? []).map(convertLegacyDiscoveredTool);
     } catch (error) {
       this.logger.error(`Legacy MCP discovery failed for ${source.endpoint}: ${error}`);
       if (client) {
-        await this.evictClient(this.clientKey(runId, source.endpoint), client);
+        await this.evictClient(key, client);
       }
       return [];
     }
@@ -47,17 +49,20 @@ export class McpLegacyOutboundCompatibilityService {
     source: RegisteredTool,
     upstreamName: string,
     args: Record<string, unknown>,
+    bindingFingerprint?: string,
   ): Promise<CallToolResult> {
     if (!source.endpoint) {
       throw new Error(`Missing endpoint for external source ${source.toolName}`);
     }
 
-    const headers = await this.getRequestHeaders(runId, source);
+    const identity = bindingFingerprint ?? this.liveBindingIdentity(source);
+    const key = this.clientKey(runId, source.endpoint, identity);
+    const headers = await this.getRequestHeaders(source);
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_CALL_ATTEMPTS; attempt += 1) {
       let client: LegacyMcpClient | undefined;
       try {
-        client = await this.getOrCreateClient(runId, source.endpoint, headers);
+        client = await this.getOrCreateClient(key, source.endpoint, headers);
         const result = await Promise.race([
           client.callTool({ name: upstreamName, arguments: args }),
           new Promise<never>((_, reject) =>
@@ -72,7 +77,7 @@ export class McpLegacyOutboundCompatibilityService {
         lastError = error;
         this.logger.warn(`Legacy MCP tool call attempt ${attempt} failed: ${error}`);
         if (client) {
-          await this.evictClient(this.clientKey(runId, source.endpoint), client);
+          await this.evictClient(key, client);
         }
         if (attempt < MAX_CALL_ATTEMPTS) {
           await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
@@ -98,11 +103,10 @@ export class McpLegacyOutboundCompatibilityService {
   }
 
   private async getOrCreateClient(
-    runId: string,
+    key: string,
     endpoint: string,
     headers: Record<string, string>,
   ): Promise<LegacyMcpClient> {
-    const key = this.clientKey(runId, endpoint);
     const existing = this.clients.get(key);
     if (existing) return existing;
 
@@ -144,11 +148,8 @@ export class McpLegacyOutboundCompatibilityService {
     return client;
   }
 
-  private async getRequestHeaders(
-    runId: string,
-    source: RegisteredTool,
-  ): Promise<Record<string, string>> {
-    const credentials = await this.toolRegistry.getToolCredentials(runId, source.nodeId);
+  private async getRequestHeaders(source: RegisteredTool): Promise<Record<string, string>> {
+    const credentials = await this.toolRegistry.decryptToolCredentials(source);
     if (!credentials) return {};
 
     if (typeof credentials.authToken === 'string' && Object.keys(credentials).length === 1) {
@@ -166,8 +167,22 @@ export class McpLegacyOutboundCompatibilityService {
     return headers;
   }
 
-  private clientKey(runId: string, endpoint: string): string {
-    return `${runId}\u0000${endpoint}`;
+  private liveBindingIdentity(source: RegisteredTool): string {
+    return sha256({
+      nodeId: source.nodeId,
+      toolName: source.toolName,
+      type: source.type,
+      providerKind: source.providerKind,
+      componentId: source.componentId,
+      endpoint: source.endpoint,
+      containerId: source.containerId,
+      serverId: source.serverId,
+      encryptedCredentials: source.encryptedCredentials,
+    });
+  }
+
+  private clientKey(runId: string, endpoint: string, bindingIdentity: string): string {
+    return `${runId}\u0000${endpoint}\u0000${bindingIdentity}`;
   }
 
   private async evictClient(key: string, client: LegacyMcpClient): Promise<void> {

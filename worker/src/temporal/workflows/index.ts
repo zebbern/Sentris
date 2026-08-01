@@ -139,15 +139,28 @@ const { recordTraceEventActivity: persistTraceEventActivity } = proxyActivities<
   startToCloseTimeout: '1 minute',
 });
 
-const {
-  prepareToolInvocationActivity,
-  reconcileToolInvocationActivity,
-  reconcileRunToolInvocationsActivity,
-} = proxyActivities<ToolInvocationWorkflowActivities>({
+const { prepareToolInvocationActivity, reconcileToolInvocationActivity } = proxyActivities<
+  Pick<
+    ToolInvocationWorkflowActivities,
+    'prepareToolInvocationActivity' | 'reconcileToolInvocationActivity'
+  >
+>({
   startToCloseTimeout: '2 minutes',
   heartbeatTimeout: '30 seconds',
   retry: {
     maximumAttempts: 3,
+  },
+});
+
+const { reconcileRunToolInvocationsActivity } = proxyActivities<
+  Pick<ToolInvocationWorkflowActivities, 'reconcileRunToolInvocationsActivity'>
+>({
+  startToCloseTimeout: '2 minutes',
+  heartbeatTimeout: '30 seconds',
+  retry: {
+    initialInterval: '5 seconds',
+    maximumInterval: '1 minute',
+    backoffCoefficient: 2,
   },
 });
 
@@ -362,9 +375,7 @@ export async function sentrisWorkflowRun(
       await CancellationScope.nonCancellable(async () => {
         if (toolInvocationUpdates) {
           await condition(allHandlersFinished);
-          await toolInvocationUpdates.reconcileRun().catch(() => {
-            console.error(`[Workflow] Failed to reconcile tool invocations for run ${input.runId}`);
-          });
+          await toolInvocationUpdates.reconcileRun();
         }
         await cleanupRunResourcesActivity({ runId: input.runId }).catch((err: unknown) => {
           console.error(`[Workflow] Failed to cleanup MCP containers for run ${input.runId}`, err);

@@ -274,8 +274,12 @@ describe('McpGatewayService', () => {
   );
 
   it('calls an external snapshot descriptor through its source mapping and named v1 adapter', async () => {
-    const immutableSource = externalSource('external-node', 'Snapshot Server');
-    mcpRuntimeRepository.getAuthority.mockResolvedValue(externalAuthority(immutableSource));
+    const immutableSource = {
+      ...externalSource('external-node', 'Snapshot Server'),
+      encryptedCredentials: 'captured-ciphertext',
+    };
+    const authority = externalAuthority(immutableSource);
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
     (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
       externalSource('unrelated-node', 'Unrelated'),
       immutableSource,
@@ -284,6 +288,13 @@ describe('McpGatewayService', () => {
       { name: 'changed-after-snapshot', inputSchema: { type: 'object' } },
     ]);
     const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      {
+        ...immutableSource,
+        encryptedCredentials: 'replacement-ciphertext',
+        registeredAt: '2026-07-31T10:01:00.000Z',
+      },
+    ]);
 
     const listed = await client.listTools();
     const called = await client.callTool({
@@ -311,8 +322,10 @@ describe('McpGatewayService', () => {
       immutableSource,
       'lookup.events',
       { query: 'critical' },
+      authority.snapshot.tools[0]!.source.bindingFingerprint,
     );
     expect(called.content).toEqual([{ type: 'text', text: 'proxied' }]);
+    expect(toolRegistry.getToolsForRun).toHaveBeenCalledTimes(1);
     expect(toolRegistry.getServerTools).not.toHaveBeenCalled();
     expect(temporalService.executeWorkflowUpdate).not.toHaveBeenCalled();
   });

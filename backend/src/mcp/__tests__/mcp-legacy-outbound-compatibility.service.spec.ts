@@ -52,9 +52,11 @@ describe('McpLegacyOutboundCompatibilityService', () => {
     expect(client.listTools).toHaveBeenCalledTimes(2);
   });
 
-  it('resolves registry headers and converts v1 call results at the adapter boundary', async () => {
-    const getToolCredentials = jest.fn().mockResolvedValue({ 'x-sentris-token': 'secret-token' });
-    const service = createService(getToolCredentials);
+  it('resolves captured source headers and converts v1 call results at the adapter boundary', async () => {
+    const decryptToolCredentials = jest
+      .fn()
+      .mockResolvedValue({ 'x-sentris-token': 'secret-token' });
+    const service = createService({ decryptToolCredentials });
     const client = fakeClient({
       result: {
         content: [{ type: 'text', text: 'result' }],
@@ -85,6 +87,103 @@ describe('McpLegacyOutboundCompatibilityService', () => {
       name: 'lookup',
       arguments: { query: 'critical' },
     });
+  });
+
+  it('uses credentials from the captured snapshot source without a registry re-read', async () => {
+    const captured = source({ encryptedCredentials: 'captured-ciphertext' });
+    const decryptToolCredentials = jest.fn(async (tool: RegisteredTool) =>
+      tool.encryptedCredentials === 'captured-ciphertext'
+        ? { Authorization: 'Bearer captured-token' }
+        : { Authorization: 'Bearer replacement-token' },
+    );
+    const getToolCredentials = jest
+      .fn()
+      .mockResolvedValue({ Authorization: 'Bearer replacement-token' });
+    const service = createService({ decryptToolCredentials, getToolCredentials });
+    const client = fakeClient();
+    const connect = jest
+      .spyOn(
+        service as unknown as { connectLegacyOutboundClient: () => Promise<unknown> },
+        'connectLegacyOutboundClient',
+      )
+      .mockResolvedValue(client);
+
+    await service.callTool('run-1', captured, 'lookup', { query: 'critical' }, 'a'.repeat(64));
+
+    expect(decryptToolCredentials).toHaveBeenCalledWith(captured);
+    expect(getToolCredentials).not.toHaveBeenCalled();
+    expect(connect).toHaveBeenCalledWith('https://mcp.example.test/mcp', {
+      Authorization: 'Bearer captured-token',
+    });
+  });
+
+  it('does not reuse a same-endpoint client across different validated bindings', async () => {
+    const decryptToolCredentials = jest.fn(async (tool: RegisteredTool) => ({
+      Authorization: `Bearer ${tool.encryptedCredentials}`,
+    }));
+    const service = createService({ decryptToolCredentials });
+    const firstClient = fakeClient();
+    const secondClient = fakeClient();
+    const connect = jest
+      .spyOn(
+        service as unknown as { connectLegacyOutboundClient: () => Promise<unknown> },
+        'connectLegacyOutboundClient',
+      )
+      .mockResolvedValueOnce(firstClient)
+      .mockResolvedValueOnce(secondClient);
+
+    const first = service.callTool(
+      'run-1',
+      source({ encryptedCredentials: 'credential-a' }),
+      'lookup',
+      { query: 'first' },
+      'a'.repeat(64),
+    );
+    const second = service.callTool(
+      'run-1',
+      source({ nodeId: 'external-node-b', encryptedCredentials: 'credential-b' }),
+      'lookup',
+      { query: 'second' },
+      'b'.repeat(64),
+    );
+    await Promise.all([first, second]);
+
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(connect).toHaveBeenNthCalledWith(1, 'https://mcp.example.test/mcp', {
+      Authorization: 'Bearer credential-a',
+    });
+    expect(connect).toHaveBeenNthCalledWith(2, 'https://mcp.example.test/mcp', {
+      Authorization: 'Bearer credential-b',
+    });
+    expect(firstClient.callTool).toHaveBeenCalledTimes(1);
+    expect(secondClient.callTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('rotates a legacy live client when its captured credentials change', async () => {
+    const decryptToolCredentials = jest.fn(async (tool: RegisteredTool) => ({
+      Authorization: `Bearer ${tool.encryptedCredentials}`,
+    }));
+    const service = createService({ decryptToolCredentials });
+    const firstClient = fakeClient();
+    const secondClient = fakeClient();
+    const connect = jest
+      .spyOn(
+        service as unknown as { connectLegacyOutboundClient: () => Promise<unknown> },
+        'connectLegacyOutboundClient',
+      )
+      .mockResolvedValueOnce(firstClient)
+      .mockResolvedValueOnce(secondClient);
+
+    await service.callTool('run-1', source({ encryptedCredentials: 'credential-a' }), 'lookup', {
+      query: 'first',
+    });
+    await service.callTool('run-1', source({ encryptedCredentials: 'credential-b' }), 'lookup', {
+      query: 'second',
+    });
+
+    expect(connect).toHaveBeenCalledTimes(2);
+    expect(firstClient.callTool).toHaveBeenCalledTimes(1);
+    expect(secondClient.callTool).toHaveBeenCalledTimes(1);
   });
 
   it('cleans only the requested run pool', async () => {
@@ -287,13 +386,19 @@ describe('McpLegacyOutboundCompatibilityService', () => {
   });
 });
 
-function createService(getToolCredentials = jest.fn().mockResolvedValue(null)) {
+function createService(
+  overrides: {
+    decryptToolCredentials?: (tool: RegisteredTool) => Promise<Record<string, unknown> | null>;
+    getToolCredentials?: (runId: string, nodeId: string) => Promise<Record<string, unknown> | null>;
+  } = {},
+) {
   return new McpLegacyOutboundCompatibilityService({
-    getToolCredentials,
+    decryptToolCredentials: overrides.decryptToolCredentials ?? jest.fn().mockResolvedValue(null),
+    getToolCredentials: overrides.getToolCredentials ?? jest.fn().mockResolvedValue(null),
   } as unknown as ToolRegistryService);
 }
 
-function source(): RegisteredTool {
+function source(overrides: Partial<RegisteredTool> = {}): RegisteredTool {
   return {
     nodeId: 'external-node',
     toolName: 'External',
@@ -303,6 +408,7 @@ function source(): RegisteredTool {
     inputSchema: { type: 'object' },
     endpoint: 'https://mcp.example.test/mcp',
     registeredAt: '2026-07-31T10:00:00.000Z',
+    ...overrides,
   };
 }
 

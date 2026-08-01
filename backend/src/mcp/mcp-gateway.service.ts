@@ -277,6 +277,7 @@ export class McpGatewayService {
           source,
           descriptor.source.upstreamName,
           args,
+          descriptor.source.bindingFingerprint,
         );
         await this.logToolCall(runId, descriptor.canonicalName, 'COMPLETED', nodeRef, {
           duration: Date.now() - startedAt,
