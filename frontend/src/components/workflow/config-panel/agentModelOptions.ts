@@ -17,10 +17,13 @@ export const AGENT_MODEL_PROVIDER_OPTIONS = LLM_PROVIDER_IDS.map((provider) => (
 
 export const AGENT_MODEL_OPTIONS_BY_PROVIDER = LLM_PROVIDER_IDS.reduce<
   Record<AgentModelProvider, readonly LlmModelOption[]>
->((options, provider) => {
-  options[provider] = LLM_PROVIDER_CATALOG[provider].models;
-  return options;
-}, {} as Record<AgentModelProvider, readonly LlmModelOption[]>);
+>(
+  (options, provider) => {
+    options[provider] = LLM_PROVIDER_CATALOG[provider].models;
+    return options;
+  },
+  {} as Record<AgentModelProvider, readonly LlmModelOption[]>,
+);
 
 export const DEFAULT_AGENT_MODEL_BY_COMPONENT: Record<
   string,

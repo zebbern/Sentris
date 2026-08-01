@@ -17,7 +17,9 @@ describe('agentModelOptions', () => {
       })),
     );
     for (const provider of LLM_PROVIDER_IDS) {
-      expect(AGENT_MODEL_OPTIONS_BY_PROVIDER[provider]).toEqual(LLM_PROVIDER_CATALOG[provider].models);
+      expect(AGENT_MODEL_OPTIONS_BY_PROVIDER[provider]).toEqual(
+        LLM_PROVIDER_CATALOG[provider].models,
+      );
     }
   });
 
