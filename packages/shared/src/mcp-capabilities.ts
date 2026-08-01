@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const MCP_CAPABILITY_CONTRACT_VERSION = '1' as const;
+export const MCP_LEGACY_CAPABILITY_CONTRACT_VERSION = '1' as const;
+export const MCP_CAPABILITY_CONTRACT_VERSION = '2' as const;
 
 const Sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
@@ -433,17 +434,48 @@ export const McpCatalogSchema = z
   .strict();
 export type McpCatalog = z.infer<typeof McpCatalogSchema>;
 
-export const McpCapabilityCatalogSnapshotSchema = z
+export const McpSnapshotRuntimeBindingSchema = z
   .object({
-    id: z.string().uuid(),
-    scope: ExecutionScopeSchema,
-    version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
-    configFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-    tools: z.array(ToolDescriptorSchema),
-    resources: z.array(ResourceDescriptorSchema),
-    resourceTemplates: z.array(ResourceTemplateDescriptorSchema),
-    prompts: z.array(PromptDescriptorSchema),
-    createdAt: z.string().datetime(),
+    runtimeKey: McpRuntimeKeySchema,
+    protocolEra: McpProtocolEraSchema,
+    protocolVersion: z.string().min(1),
+    capabilityFingerprint: Sha256HexSchema,
   })
   .strict();
+export type McpSnapshotRuntimeBinding = z.infer<typeof McpSnapshotRuntimeBindingSchema>;
+
+const McpCapabilityCatalogSnapshotBaseShape = {
+  id: z.string().uuid(),
+  scope: ExecutionScopeSchema,
+  configFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  tools: z.array(ToolDescriptorSchema),
+  resources: z.array(ResourceDescriptorSchema),
+  resourceTemplates: z.array(ResourceTemplateDescriptorSchema),
+  prompts: z.array(PromptDescriptorSchema),
+  createdAt: z.string().datetime(),
+} as const;
+
+export const LegacyMcpCapabilityCatalogSnapshotSchema = z
+  .object({
+    ...McpCapabilityCatalogSnapshotBaseShape,
+    version: z.literal(MCP_LEGACY_CAPABILITY_CONTRACT_VERSION),
+  })
+  .strict();
+export const DurableMcpCapabilityCatalogSnapshotSchema = z
+  .object({
+    ...McpCapabilityCatalogSnapshotBaseShape,
+    version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
+    runtimeBindings: z.record(z.string().min(1), McpSnapshotRuntimeBindingSchema),
+  })
+  .strict();
+export const McpCapabilityCatalogSnapshotSchema = z.discriminatedUnion('version', [
+  LegacyMcpCapabilityCatalogSnapshotSchema,
+  DurableMcpCapabilityCatalogSnapshotSchema,
+]);
 export type McpCapabilityCatalogSnapshot = z.infer<typeof McpCapabilityCatalogSnapshotSchema>;
+
+export function mcpSnapshotRuntimeBindings(
+  snapshot: McpCapabilityCatalogSnapshot,
+): Readonly<Record<string, McpSnapshotRuntimeBinding>> {
+  return snapshot.version === MCP_CAPABILITY_CONTRACT_VERSION ? snapshot.runtimeBindings : {};
+}

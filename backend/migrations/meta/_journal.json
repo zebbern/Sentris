@@ -85,6 +85,13 @@
       "when": 1785572153145,
       "tag": "0011_mcp_server_secret_references",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785596735894,
+      "tag": "0012_generalize_mcp_runtime_operations",
+      "breakpoints": true
     }
   ]
 }

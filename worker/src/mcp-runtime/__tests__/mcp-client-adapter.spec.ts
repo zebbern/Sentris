@@ -51,6 +51,8 @@ describe('McpClientAdapter', () => {
           { type: 'resource_link', name: 'report', uri: 'file:///report.txt' },
         ],
         structuredContent: { ok: true },
+        isError: true,
+        description: 'Prompt context',
         _meta: { request: 'metadata' },
       }),
     ).toEqual({
@@ -70,7 +72,105 @@ describe('McpClientAdapter', () => {
         { type: 'resource_link', name: 'report', uri: 'file:///report.txt' },
       ],
       structuredContent: { ok: true },
+      isError: true,
+      description: 'Prompt context',
       meta: { request: 'metadata' },
+    });
+  });
+
+  test('normalizes only MCP protocol metadata positions', () => {
+    const adapter = new McpClientAdapter({} as never);
+
+    expect(
+      adapter.normalizeResult({
+        content: [
+          {
+            type: 'text',
+            text: 'hello',
+            _meta: { nested: { _meta: { business: true } } },
+            opaquePayload: { _meta: { business: true } },
+          },
+          {
+            type: 'resource',
+            _meta: { block: true },
+            resource: {
+              uri: 'fixture://embedded',
+              text: 'embedded',
+              _meta: { nested: { _meta: { business: true } } },
+              opaquePayload: { _meta: { business: true } },
+            },
+          },
+        ],
+        contents: [
+          {
+            uri: 'fixture://report',
+            text: 'report',
+            _meta: { nested: { _meta: { business: true } } },
+            opaquePayload: { _meta: { business: true } },
+          },
+        ],
+        messages: [
+          {
+            role: 'user',
+            _meta: { opaqueMessageData: true },
+            content: {
+              type: 'text',
+              text: 'prompt',
+              _meta: { nested: { _meta: { business: true } } },
+              opaquePayload: { _meta: { business: true } },
+            },
+          },
+        ],
+        structuredContent: {
+          _meta: { business: true },
+          nested: { _meta: { alsoBusiness: true } },
+        },
+        _meta: { nested: { _meta: { business: true } } },
+      } as never),
+    ).toEqual({
+      content: [
+        {
+          type: 'text',
+          text: 'hello',
+          meta: { nested: { _meta: { business: true } } },
+          opaquePayload: { _meta: { business: true } },
+        },
+        {
+          type: 'resource',
+          meta: { block: true },
+          resource: {
+            uri: 'fixture://embedded',
+            text: 'embedded',
+            meta: { nested: { _meta: { business: true } } },
+            opaquePayload: { _meta: { business: true } },
+          },
+        },
+      ],
+      contents: [
+        {
+          uri: 'fixture://report',
+          text: 'report',
+          meta: { nested: { _meta: { business: true } } },
+          opaquePayload: { _meta: { business: true } },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          _meta: { opaqueMessageData: true },
+          content: {
+            type: 'text',
+            text: 'prompt',
+            meta: { nested: { _meta: { business: true } } },
+            opaquePayload: { _meta: { business: true } },
+          },
+        },
+      ],
+      structuredContent: {
+        _meta: { business: true },
+        nested: { _meta: { alsoBusiness: true } },
+      },
+      meta: { nested: { _meta: { business: true } } },
     });
   });
 
@@ -156,7 +256,7 @@ describe('McpClientAdapter', () => {
         {
           role: 'user',
           content: { type: 'text', text: 'hello', meta: { content: true } },
-          meta: { message: true },
+          _meta: { message: true },
         },
       ],
     });

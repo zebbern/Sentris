@@ -69,6 +69,22 @@ describe('McpRunAuthorityService', () => {
               meta: { category: 'investigation' },
             },
           ],
+          runtimeBindings: {
+            'external-node': {
+              runtimeKey: {
+                sourceId: 'saved-server',
+                transport: 'http' as const,
+                configFingerprint: 'c'.repeat(64),
+                organizationId: 'org-1',
+                principalPartitionHash: 'd'.repeat(64),
+                credentialReference: 'mcp-server:saved-server',
+                credentialGeneration: 7,
+              },
+              protocolEra: 'modern' as const,
+              protocolVersion: '2026-07-28',
+              capabilityFingerprint: 'e'.repeat(64),
+            },
+          },
           configFingerprint,
         })),
       } as never,
@@ -79,6 +95,7 @@ describe('McpRunAuthorityService', () => {
       organizationId: 'org-1',
       invokingNodeId: 'agent-node',
       allowedNodeIds: [' tool-b ', 'tool-a', 'tool-b'],
+      contractVersion: '2' as const,
     };
 
     const first = await service.materialize(input);
@@ -133,20 +150,68 @@ describe('McpRunAuthorityService', () => {
         meta: { category: 'investigation' },
       }),
     ]);
+    if (first.snapshot.version !== '2') throw new Error('Expected v2 authority');
+    expect(first.snapshot.runtimeBindings).toEqual({
+      'external-node': expect.objectContaining({
+        protocolEra: 'modern',
+        protocolVersion: '2026-07-28',
+        capabilityFingerprint: 'e'.repeat(64),
+      }),
+    });
     expect(first.manifest.entries).toEqual([
       {
-        toolName: 'scan_target',
+        operationKind: 'prompt-get',
+        operationTarget: 'investigate-event',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'sentris://events/{eventId}',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'sentris://events/latest',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'tool-call',
+        operationTarget: 'scan_target',
         sourceId: 'component-node',
         destination: 'component-activity',
         retryPolicy: 'pre-dispatch-only',
       },
     ]);
 
+    const legacy = await service.materialize({ ...input, contractVersion: '1' });
+    expect(legacy.grant.id).not.toBe(first.grant.id);
+    expect(legacy.snapshot.version).toBe('1');
+    expect(legacy.snapshot).not.toHaveProperty('runtimeBindings');
+    expect(legacy.manifest).toEqual(
+      expect.objectContaining({
+        version: '1',
+        entries: [
+          {
+            toolName: 'scan_target',
+            sourceId: 'component-node',
+            destination: 'component-activity',
+            retryPolicy: 'pre-dispatch-only',
+          },
+        ],
+      }),
+    );
+
     configFingerprint = FINGERPRINT_B;
     const changed = await service.materialize(input);
     expect(changed.grant.id).not.toBe(first.grant.id);
     expect(changed.snapshot.id).not.toBe(first.snapshot.id);
-    expect(stored.size).toBe(2);
+    expect(stored.size).toBe(3);
   });
 });
 

@@ -13,6 +13,8 @@ import type {
   ClaimComponentDispatchOutcome,
   InvocationManifest,
   McpCapabilityCatalogSnapshot,
+  McpOperationDispatchPlan,
+  McpOperationInvocationRequest,
   PreparedInvocationRef,
   PrepareToolInvocationOutcome,
   ToolInvocationRequest,
@@ -229,6 +231,7 @@ function createHarness(
   const repository = {
     getAuthority: vi.fn(async () => authority),
     prepareInvocation,
+    prepareOperation: vi.fn(async (input: Record<string, unknown>) => input),
     getInvocationForDispatch: vi.fn(async () => ({
       request: overrides.requestForDispatch ?? request,
       ref,
@@ -275,6 +278,250 @@ function createHarness(
 }
 
 describe('McpInvocationService', () => {
+  it('binds exact and templated resource payloads to immutable source authority', async () => {
+    const sourceId = 'mcp:github';
+    const runtimeBinding = {
+      runtimeKey: {
+        sourceId: 'github-server',
+        transport: 'http' as const,
+        configFingerprint: 'b'.repeat(64),
+        organizationId: 'org-1',
+        principalPartitionHash: 'c'.repeat(64),
+        credentialReference: 'mcp-server:github-server',
+        credentialGeneration: 7,
+      },
+      protocolEra: 'modern' as const,
+      protocolVersion: '2026-07-28',
+      capabilityFingerprint: 'd'.repeat(64),
+    };
+    const externalSnapshot: McpCapabilityCatalogSnapshot = {
+      ...snapshot,
+      version: '2',
+      runtimeBindings: { [sourceId]: runtimeBinding },
+      tools: [],
+      resources: [{ sourceId, uri: 'repo://README.md', name: 'README' }],
+      resourceTemplates: [{ sourceId, uriTemplate: 'repo://{+path}', name: 'Repository file' }],
+      prompts: [],
+    };
+    const externalManifest: InvocationManifest = {
+      ...manifest,
+      version: '2',
+      entries: [
+        {
+          operationKind: 'resource-read',
+          operationTarget: 'repo://README.md',
+          sourceId,
+          destination: 'mcp-activity',
+          retryPolicy: 'reviewed-idempotent',
+        },
+        {
+          operationKind: 'resource-read',
+          operationTarget: 'repo://{+path}',
+          sourceId,
+          destination: 'mcp-activity',
+          retryPolicy: 'reviewed-idempotent',
+        },
+      ],
+    };
+    const harness = createHarness({
+      authority: {
+        grant: { ...grant, sources: [{ sourceId, toolAccess: { mode: 'all' } }] },
+        snapshot: externalSnapshot,
+        manifest: externalManifest,
+      },
+    });
+    const generic = (authorizationTarget: string, uri: string): McpOperationInvocationRequest => ({
+      invocationId: INVOCATION_ID,
+      scope: request.scope,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      sourceId,
+      authorizationTarget,
+      operation: { kind: 'resource-read', uri },
+      requestedAt: request.requestedAt,
+      deadlineAt: request.deadlineAt,
+    });
+
+    await expect(
+      (
+        harness.service as unknown as {
+          prepareOperation(input: McpOperationInvocationRequest): Promise<unknown>;
+        }
+      ).prepareOperation(generic('repo://README.md', 'repo://README.md')),
+    ).resolves.toBeDefined();
+    await expect(
+      (
+        harness.service as unknown as {
+          prepareOperation(input: McpOperationInvocationRequest): Promise<unknown>;
+        }
+      ).prepareOperation(generic('repo://{+path}', 'repo://src/index.ts')),
+    ).resolves.toBeDefined();
+    expect(harness.repository.prepareOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtimeBinding,
+        dispatchOperation: { kind: 'resource-read', uri: 'repo://src/index.ts' },
+      }),
+    );
+  });
+
+  it.each([
+    ['tool name', { kind: 'tool-call' as const, name: 'other', arguments: {} }, 'github.search'],
+    ['prompt name', { kind: 'prompt-get' as const, name: 'other', arguments: {} }, 'review'],
+    [
+      'exact resource URI',
+      { kind: 'resource-read' as const, uri: 'repo://other.md' },
+      'repo://README.md',
+    ],
+    [
+      'resource template',
+      { kind: 'resource-read' as const, uri: 'other://src/index.ts' },
+      'repo://{+path}',
+    ],
+  ])(
+    'rejects a valid manifest target paired with a different %s payload',
+    async (_name, operation, authorizationTarget) => {
+      const sourceId = 'mcp:github';
+      const externalSnapshot: McpCapabilityCatalogSnapshot = {
+        ...snapshot,
+        version: '2',
+        runtimeBindings: {
+          [sourceId]: {
+            runtimeKey: {
+              sourceId: 'github-server',
+              transport: 'http',
+              configFingerprint: 'b'.repeat(64),
+              organizationId: 'org-1',
+              principalPartitionHash: 'c'.repeat(64),
+              credentialReference: null,
+              credentialGeneration: null,
+            },
+            protocolEra: 'modern',
+            protocolVersion: '2026-07-28',
+            capabilityFingerprint: 'd'.repeat(64),
+          },
+        },
+        tools: [
+          {
+            canonicalName: 'github.search',
+            displayName: 'Search',
+            inputSchema: { type: 'object' },
+            source: {
+              kind: 'mcp',
+              sourceId,
+              serverId: 'github-server',
+              upstreamName: 'search',
+              bindingFingerprint: 'e'.repeat(64),
+            },
+            effects: 'read-only',
+            effectsSource: 'mcp-annotation',
+            retryPolicy: 'reviewed-idempotent',
+          },
+        ],
+        resources: [{ sourceId, uri: 'repo://README.md', name: 'README' }],
+        resourceTemplates: [{ sourceId, uriTemplate: 'repo://{+path}', name: 'Repository file' }],
+        prompts: [{ sourceId, name: 'review', arguments: [] }],
+      };
+      const entry = {
+        operationKind: operation.kind,
+        operationTarget: authorizationTarget,
+        sourceId,
+        destination: 'mcp-activity' as const,
+        retryPolicy: 'reviewed-idempotent' as const,
+      };
+      const harness = createHarness({
+        authority: {
+          grant: { ...grant, sources: [{ sourceId, toolAccess: { mode: 'all' } }] },
+          snapshot: externalSnapshot,
+          manifest: { ...manifest, version: '2', entries: [entry] },
+        },
+      });
+      const generic: McpOperationInvocationRequest = {
+        invocationId: INVOCATION_ID,
+        scope: request.scope,
+        capabilitySnapshotId: SNAPSHOT_ID,
+        sourceId,
+        authorizationTarget,
+        operation,
+        requestedAt: request.requestedAt,
+        deadlineAt: request.deadlineAt,
+      };
+
+      await expect(
+        (
+          harness.service as unknown as {
+            prepareOperation(input: McpOperationInvocationRequest): Promise<unknown>;
+          }
+        ).prepareOperation(generic),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(harness.repository.prepareOperation).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects an acquired runtime identity that differs from the immutable dispatch binding', async () => {
+    const { service, repository } = createHarness();
+    const runtimeBinding = {
+      runtimeKey: {
+        sourceId: 'saved-server',
+        transport: 'http' as const,
+        configFingerprint: 'a'.repeat(64),
+        organizationId: 'org-1',
+        principalPartitionHash: 'b'.repeat(64),
+        credentialReference: null,
+        credentialGeneration: null,
+      },
+      protocolEra: 'modern' as const,
+      protocolVersion: '2026-07-28',
+      capabilityFingerprint: 'c'.repeat(64),
+    };
+    const plan: McpOperationDispatchPlan = {
+      ref: {
+        invocationId: INVOCATION_ID,
+        attemptId: ATTEMPT_ID,
+        attemptNumber: 1,
+        capabilitySnapshotId: SNAPSHOT_ID,
+        capabilityGrantId: GRANT_ID,
+        operationKind: 'resource-read',
+        operationTarget: 'repo://{+path}',
+        toolName: null,
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+        preparedAt: '2026-07-31T10:00:01.000Z',
+      },
+      manifestEntry: {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://{+path}',
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      runtimeBinding,
+      operation: { kind: 'resource-read', uri: 'repo://src/index.ts' },
+      requestedAt: '2026-07-31T10:00:00.000Z',
+      deadlineAt: '2099-07-31T10:05:00.000Z',
+    };
+
+    await expect(
+      service.claimMcpOperationDispatch({
+        plan,
+        runtimeRef: {
+          fence: {
+            runtimeId: '88888888-8888-4888-8888-888888888888',
+            ownerId: 'worker-1',
+            ownerEpoch: '99999999-9999-4999-8999-999999999999',
+            leaseGeneration: 1,
+          },
+          protocolEra: 'modern',
+          protocolVersion: '2026-07-28',
+          ownerAddress: 'http://worker-1.internal:9301',
+          state: 'ready',
+          leaseExpiresAt: '2099-07-31T10:10:00.000Z',
+          capabilityFingerprint: 'd'.repeat(64),
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.getAuthority).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed, expired, and non-run requests before persistence', async () => {
     const { service, repository } = createHarness();
 

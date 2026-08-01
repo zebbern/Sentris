@@ -1,7 +1,11 @@
 import { ToolInputSchema } from '@sentris/component-sdk';
 import {
   MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
+  ClaimMcpOperationDispatchRequestSchema,
+  McpOperationInvocationRequestSchema,
   PreparedInvocationRefSchema,
+  ReconcileMcpOperationDispatchRequestSchema,
+  SettleMcpOperationAttemptRequestSchema,
   McpRuntimeKeySchema,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
@@ -157,6 +161,20 @@ export const ReconcileRunMcpInvocationsBodySchema = z
 export class ReconcileRunMcpInvocationsBody extends createZodDto(
   ReconcileRunMcpInvocationsBodySchema,
 ) {}
+
+export const PrepareMcpOperationBodySchema = z
+  .object({ request: McpOperationInvocationRequestSchema })
+  .strict();
+export class PrepareMcpOperationBody extends createZodDto(PrepareMcpOperationBodySchema) {}
+
+export const ClaimMcpOperationBodySchema = ClaimMcpOperationDispatchRequestSchema;
+export class ClaimMcpOperationBody extends createZodDto(ClaimMcpOperationBodySchema) {}
+
+export const SettleMcpOperationBodySchema = SettleMcpOperationAttemptRequestSchema;
+export class SettleMcpOperationBody extends createZodDto(SettleMcpOperationBodySchema) {}
+
+export const ReconcileMcpOperationBodySchema = ReconcileMcpOperationDispatchRequestSchema;
+export class ReconcileMcpOperationBody extends createZodDto(ReconcileMcpOperationBodySchema) {}
 
 export const ResolveMcpRuntimeDefinitionBodySchema = z
   .object({ runtimeKey: McpRuntimeKeySchema })

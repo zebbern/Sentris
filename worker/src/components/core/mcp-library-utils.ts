@@ -68,17 +68,11 @@ export function filterMcpToolsForServer(
       ? new Set(serverRecords.filter((tool) => tool.enabled).map((tool) => tool.toolName))
       : null;
   const exclusions = new Set(toolExclusions);
-  const finalTools = liveTools.filter(
+  return liveTools.filter(
     (tool) =>
       (enabledToolNames === null || enabledToolNames.has(tool.name)) &&
       !exclusions.has(buildMcpToolExclusionKey(serverId, tool.name)),
   );
-
-  if (finalTools.length === 0) {
-    throw new Error(`No MCP tools remain enabled for server ${serverId}`);
-  }
-
-  return finalTools;
 }
 
 /**

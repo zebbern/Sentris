@@ -1,21 +1,46 @@
 import { isDeepStrictEqual } from 'node:util';
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import {
   CapabilityGrantSchema,
   InvocationManifestEntrySchema,
   InvocationManifestSchema,
+  ClaimMcpOperationDispatchRequestSchema,
+  McpOperationInvocationRequestSchema,
+  McpOperationDispatchPlanSchema,
+  McpOperationManifestEntrySchema,
+  McpOperationSchema,
+  McpOperationResultSchema,
+  ReconcileMcpOperationDispatchRequestSchema,
+  McpRuntimeFenceSchema,
+  SettleMcpOperationAttemptRequestSchema,
+  McpSnapshotRuntimeBindingSchema,
+  PreparedMcpOperationRefSchema,
+  PrepareMcpOperationOutcomeSchema,
   McpCapabilityCatalogSnapshotSchema,
   PreparedInvocationRefSchema,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   assertCapabilityGrantApplies,
+  resolveMcpOperationManifestEntry,
   type CapabilityGrant,
   type InvocationManifest,
   type InvocationManifestEntry,
+  type ClaimMcpOperationDispatchRequest,
   type McpCapabilityCatalogSnapshot,
+  type McpOperation,
+  type McpOperationDispatchPlan,
+  type McpOperationInvocationRequest,
+  type McpOperationManifestEntry,
+  type McpOperationResult,
+  type McpRuntimeFence,
+  type McpSnapshotRuntimeBinding,
+  type PreparedMcpOperationRef,
+  type PrepareMcpOperationOutcome,
+  type ReconcileMcpOperationDispatchRequest,
+  type SettleMcpOperationAttemptRequest,
   type PreparedInvocationRef,
   type PrepareToolInvocationOutcome,
   type ToolInvocationRequest,
@@ -31,6 +56,7 @@ import {
   type McpCapabilitySnapshotRecord,
   type McpInvocationAttemptRecord,
   type McpInvocationRecord,
+  type McpInvocationOperationKind,
   type McpInvocationStatus,
 } from '../database/schema';
 
@@ -77,6 +103,29 @@ interface StoredInvocationRows {
 interface ParsedInvocationRows extends StoredInvocationRows {
   request: ToolInvocationRequest;
   result: ToolInvocationResult | null;
+}
+
+interface ParsedMcpOperationRows {
+  invocation: Omit<McpInvocationRecord, 'operationKind' | 'operationTarget'> & {
+    operationKind: McpInvocationOperationKind;
+    operationTarget: string;
+  };
+  attempt: McpInvocationAttemptRecord;
+  request: McpOperationInvocationRequest;
+  result: McpOperationResult | null;
+}
+
+export type ClaimMcpOperationAttemptOutcome =
+  | { kind: 'claimed' }
+  | { kind: 'terminal'; result: McpOperationResult }
+  | { kind: 'ambiguous'; result: McpOperationResult };
+
+export interface McpOperationForDispatch {
+  request: McpOperationInvocationRequest;
+  ref: PreparedMcpOperationRef;
+  status: McpInvocationStatus;
+  result: McpOperationResult | null;
+  fence: McpRuntimeFence | null;
 }
 
 function stableJsonValue(value: unknown): unknown {
@@ -224,6 +273,284 @@ export class McpRuntimeRepository {
     return rows ? this.parseStoredAuthority(rows) : null;
   }
 
+  async prepareOperation(input: {
+    request: McpOperationInvocationRequest;
+    dispatchOperation: McpOperation;
+    requestHash: string;
+    entry: McpOperationManifestEntry;
+    runtimeBinding?: McpSnapshotRuntimeBinding;
+    manifest: InvocationManifest;
+  }): Promise<PrepareMcpOperationOutcome> {
+    const prepared = this.parseMcpOperationPreparation(input);
+    return this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as NodePgDatabase;
+      const preparedAt = new Date();
+      const [insertedInvocation] = await tx
+        .insert(mcpInvocationsTable)
+        .values({
+          invocationId: prepared.request.invocationId,
+          runId: prepared.request.scope.runId,
+          organizationId: prepared.request.scope.organizationId,
+          capabilityGrantId: prepared.request.scope.capabilityGrantId,
+          capabilitySnapshotId: prepared.request.capabilitySnapshotId,
+          operationKind: prepared.entry.operationKind,
+          operationTarget: prepared.entry.operationTarget,
+          toolName:
+            prepared.entry.operationKind === 'tool-call' ? prepared.entry.operationTarget : null,
+          requestHash: input.requestHash,
+          request: prepared.request,
+          status: 'prepared',
+          currentAttemptNumber: 1,
+          result: null,
+          createdAt: preparedAt,
+          updatedAt: preparedAt,
+          terminalAt: null,
+        })
+        .onConflictDoNothing({ target: mcpInvocationsTable.invocationId })
+        .returning();
+
+      if (insertedInvocation) {
+        const [insertedAttempt] = await tx
+          .insert(mcpInvocationAttemptsTable)
+          .values({
+            invocationId: prepared.request.invocationId,
+            attemptNumber: 1,
+            sourceId: prepared.entry.sourceId,
+            destination: prepared.entry.destination,
+            retryPolicy: prepared.entry.retryPolicy,
+            runtimeId: null,
+            ownerId: null,
+            ownerEpoch: null,
+            leaseGeneration: null,
+            status: 'prepared',
+            preparedAt,
+            dispatchedAt: null,
+            completedAt: null,
+          })
+          .returning();
+        if (!insertedAttempt) {
+          throw new Error('Unable to persist MCP operation attempt');
+        }
+        const rows = this.parseStoredMcpOperation({
+          invocation: insertedInvocation,
+          attempt: insertedAttempt,
+        });
+        return PrepareMcpOperationOutcomeSchema.parse({
+          kind: 'prepared',
+          plan: this.mcpOperationPlan(
+            rows,
+            prepared.entry,
+            prepared.dispatchOperation,
+            prepared.runtimeBinding,
+          ),
+          manifest: prepared.manifest,
+        });
+      }
+
+      const existing = await this.readMcpOperation(tx, prepared.request.invocationId);
+      if (!existing) {
+        throw new ConflictException(
+          'MCP operation invocation ID was claimed without a readable invocation',
+        );
+      }
+      this.assertMcpOperationReplay(existing, prepared.request, input.requestHash);
+      if (TERMINAL_STATUSES.has(existing.invocation.status)) {
+        return {
+          kind: 'terminal',
+          result: this.requireMcpOperationResult(existing),
+        };
+      }
+      if (
+        existing.invocation.status !== 'prepared' &&
+        existing.invocation.status !== 'dispatched'
+      ) {
+        throw new ConflictException('MCP operation is not reusable from its current state');
+      }
+      return PrepareMcpOperationOutcomeSchema.parse({
+        kind: 'prepared',
+        plan: this.mcpOperationPlan(
+          existing,
+          prepared.entry,
+          prepared.dispatchOperation,
+          prepared.runtimeBinding,
+        ),
+        manifest: prepared.manifest,
+      });
+    });
+  }
+
+  async claimOperationAttempt(
+    input: ClaimMcpOperationDispatchRequest,
+  ): Promise<ClaimMcpOperationAttemptOutcome> {
+    const claimed = ClaimMcpOperationDispatchRequestSchema.parse(input);
+    const { ref } = claimed.plan;
+    const fence = claimed.runtimeRef?.fence ?? null;
+    return this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as NodePgDatabase;
+      const dispatchedAt = new Date();
+      const [claimedInvocation] = await tx
+        .update(mcpInvocationsTable)
+        .set({ status: 'dispatched', updatedAt: dispatchedAt })
+        .where(
+          and(
+            eq(mcpInvocationsTable.invocationId, ref.invocationId),
+            eq(mcpInvocationsTable.currentAttemptNumber, ref.attemptNumber),
+            eq(mcpInvocationsTable.capabilityGrantId, ref.capabilityGrantId),
+            eq(mcpInvocationsTable.capabilitySnapshotId, ref.capabilitySnapshotId),
+            this.mcpOperationIdentityMatches(ref),
+            eq(mcpInvocationsTable.status, 'prepared'),
+          ),
+        )
+        .returning();
+
+      if (claimedInvocation) {
+        const [claimedAttempt] = await tx
+          .update(mcpInvocationAttemptsTable)
+          .set({
+            status: 'dispatched',
+            runtimeId: fence?.runtimeId ?? null,
+            ownerId: fence?.ownerId ?? null,
+            ownerEpoch: fence?.ownerEpoch ?? null,
+            leaseGeneration: fence?.leaseGeneration ?? null,
+            dispatchedAt,
+          })
+          .where(
+            and(
+              eq(mcpInvocationAttemptsTable.id, ref.attemptId),
+              eq(mcpInvocationAttemptsTable.invocationId, ref.invocationId),
+              eq(mcpInvocationAttemptsTable.attemptNumber, ref.attemptNumber),
+              eq(mcpInvocationAttemptsTable.preparedAt, new Date(ref.preparedAt)),
+              eq(mcpInvocationAttemptsTable.sourceId, ref.sourceId),
+              eq(mcpInvocationAttemptsTable.destination, ref.destination),
+              eq(mcpInvocationAttemptsTable.retryPolicy, ref.retryPolicy),
+              isNull(mcpInvocationAttemptsTable.runtimeId),
+              isNull(mcpInvocationAttemptsTable.ownerId),
+              isNull(mcpInvocationAttemptsTable.ownerEpoch),
+              isNull(mcpInvocationAttemptsTable.leaseGeneration),
+              eq(mcpInvocationAttemptsTable.status, 'prepared'),
+            ),
+          )
+          .returning();
+        if (!claimedAttempt) {
+          throw new ConflictException('Prepared MCP operation attempt could not be claimed');
+        }
+        return { kind: 'claimed' };
+      }
+
+      const existing = await this.readMcpOperation(tx, ref.invocationId);
+      if (!existing) {
+        throw new NotFoundException('MCP operation attempt was not found');
+      }
+      this.assertMcpOperationReference(existing, ref);
+      if (TERMINAL_STATUSES.has(existing.invocation.status)) {
+        const result = this.requireMcpOperationResult(existing);
+        return result.kind === 'ambiguous'
+          ? { kind: 'ambiguous', result }
+          : { kind: 'terminal', result };
+      }
+      if (existing.invocation.status !== 'dispatched') {
+        throw new ConflictException(
+          'MCP operation attempt cannot be claimed from its current state',
+        );
+      }
+      const capturedFence = this.capturedFence(existing);
+      const result = McpOperationResultSchema.parse({
+        operationId: ref.invocationId,
+        kind: 'ambiguous',
+        message: 'MCP operation attempt was already dispatched',
+        completedAt: new Date().toISOString(),
+      });
+      if (await this.transitionMcpOperationTerminal(tx, ref, capturedFence, result, 'dispatched')) {
+        return { kind: 'ambiguous', result };
+      }
+      const concurrent = await this.requireCurrentMcpOperation(tx, ref);
+      const concurrentResult = this.requireMcpOperationResult(concurrent);
+      return concurrentResult.kind === 'ambiguous'
+        ? { kind: 'ambiguous', result: concurrentResult }
+        : { kind: 'terminal', result: concurrentResult };
+    });
+  }
+
+  async getMcpOperationForDispatch(
+    reference: PreparedMcpOperationRef,
+  ): Promise<McpOperationForDispatch> {
+    const ref = PreparedMcpOperationRefSchema.parse(reference);
+    const existing = await this.readMcpOperation(this.db, ref.invocationId);
+    if (!existing) {
+      throw new ConflictException('MCP operation attempt was not found');
+    }
+    this.assertMcpOperationReference(existing, ref);
+    return {
+      request: existing.request,
+      ref: this.preparedMcpOperationReference(existing),
+      status: existing.invocation.status,
+      result: existing.result,
+      fence: this.capturedFence(existing),
+    };
+  }
+
+  async settleMcpOperationAttempt(
+    input: SettleMcpOperationAttemptRequest,
+  ): Promise<McpOperationResult> {
+    const { ref, fence, result } = SettleMcpOperationAttemptRequestSchema.parse(input);
+    if (result.operationId !== ref.invocationId) {
+      throw new ConflictException('MCP operation result belongs to a different invocation');
+    }
+    return this.settleMcpOperationTerminal(ref, fence, result);
+  }
+
+  async reconcileMcpOperationDispatchFailure(
+    input: ReconcileMcpOperationDispatchRequest,
+  ): Promise<McpOperationResult> {
+    const parsed = ReconcileMcpOperationDispatchRequestSchema.parse(input);
+    return this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as NodePgDatabase;
+      let existing = await this.readMcpOperation(tx, parsed.ref.invocationId);
+      if (!existing) {
+        throw new ConflictException('MCP operation reconciliation reference was not found');
+      }
+      for (let transitionAttempt = 0; transitionAttempt < 2; transitionAttempt += 1) {
+        this.assertMcpOperationReference(existing, parsed.ref);
+        if (TERMINAL_STATUSES.has(existing.invocation.status)) {
+          return this.requireMcpOperationResult(existing);
+        }
+        if (
+          existing.invocation.status !== 'prepared' &&
+          existing.invocation.status !== 'dispatched'
+        ) {
+          throw new ConflictException('MCP operation cannot be reconciled from its current state');
+        }
+        const result = this.mcpOperationReconciliationResult(
+          parsed.ref.invocationId,
+          existing.invocation.status,
+          parsed,
+        );
+        const fence = this.capturedFence(existing);
+        if (
+          await this.transitionMcpOperationTerminal(
+            tx,
+            parsed.ref,
+            fence,
+            result,
+            existing.invocation.status,
+          )
+        ) {
+          return result;
+        }
+        const concurrent = await this.readMcpOperation(tx, parsed.ref.invocationId);
+        if (!concurrent) {
+          throw new ConflictException('MCP operation disappeared during reconciliation');
+        }
+        existing = concurrent;
+      }
+      this.assertMcpOperationReference(existing, parsed.ref);
+      if (!TERMINAL_STATUSES.has(existing.invocation.status)) {
+        throw new ConflictException('MCP operation reconciliation lost its state transition');
+      }
+      return this.requireMcpOperationResult(existing);
+    });
+  }
+
   async prepareInvocation(input: {
     request: ToolInvocationRequest;
     requestHash: string;
@@ -242,6 +569,8 @@ export class McpRuntimeRepository {
           organizationId: prepared.request.scope.organizationId,
           capabilityGrantId: prepared.request.scope.capabilityGrantId,
           capabilitySnapshotId: prepared.request.capabilitySnapshotId,
+          operationKind: 'tool-call',
+          operationTarget: prepared.request.toolName,
           toolName: prepared.request.toolName,
           requestHash: input.requestHash,
           request: prepared.request,
@@ -264,6 +593,10 @@ export class McpRuntimeRepository {
             sourceId: prepared.entry.sourceId,
             destination: prepared.entry.destination,
             retryPolicy: prepared.entry.retryPolicy,
+            runtimeId: null,
+            ownerId: null,
+            ownerEpoch: null,
+            leaseGeneration: null,
             status: 'prepared',
             preparedAt,
             dispatchedAt: null,
@@ -506,15 +839,24 @@ export class McpRuntimeRepository {
 
     let firstError: unknown;
     for (const row of rows) {
-      const existing = this.parseStoredInvocation(row);
-      const ref = this.preparedReference(existing);
       try {
-        await this.reconcileDispatchFailure({
-          ref,
-          cause: 'cancelled',
-          message: input.message,
-          completedAt: input.completedAt,
-        });
+        if (isMcpOperationRequestJson(row.invocation.request)) {
+          const existing = this.parseStoredMcpOperation(row);
+          await this.reconcileMcpOperationDispatchFailure({
+            ref: this.preparedMcpOperationReference(existing),
+            cause: 'cancelled',
+            message: input.message,
+            completedAt: input.completedAt,
+          });
+        } else {
+          const existing = this.parseStoredInvocation(row);
+          await this.reconcileDispatchFailure({
+            ref: this.preparedReference(existing),
+            cause: 'cancelled',
+            message: input.message,
+            completedAt: input.completedAt,
+          });
+        }
       } catch (error) {
         firstError ??= error;
       }
@@ -592,6 +934,487 @@ export class McpRuntimeRepository {
     return rows ? this.parseStoredAuthority(rows) : null;
   }
 
+  private parseMcpOperationPreparation(input: {
+    request: McpOperationInvocationRequest;
+    dispatchOperation: McpOperation;
+    requestHash: string;
+    entry: McpOperationManifestEntry;
+    runtimeBinding?: McpSnapshotRuntimeBinding;
+    manifest: InvocationManifest;
+  }): {
+    request: McpOperationInvocationRequest & {
+      scope: Extract<McpOperationInvocationRequest['scope'], { kind: 'run' }>;
+    };
+    dispatchOperation: McpOperation;
+    entry: McpOperationManifestEntry;
+    runtimeBinding?: McpSnapshotRuntimeBinding;
+    manifest: InvocationManifest;
+  } {
+    if (!LOWERCASE_SHA256.test(input.requestHash)) {
+      throw new Error('MCP operation request hash must be a lowercase SHA-256 digest');
+    }
+    const request = McpOperationInvocationRequestSchema.parse(input.request);
+    const dispatchOperation = McpOperationSchema.parse(input.dispatchOperation);
+    const entry = McpOperationManifestEntrySchema.parse(input.entry);
+    const manifest = InvocationManifestSchema.parse(input.manifest);
+    const runtimeBinding =
+      input.runtimeBinding === undefined
+        ? undefined
+        : McpSnapshotRuntimeBindingSchema.parse(input.runtimeBinding);
+    if (request.scope.kind !== 'run') {
+      throw new ConflictException('MCP durable operations must be run-scoped');
+    }
+    const authorized = resolveMcpOperationManifestEntry(manifest, request);
+    if (
+      !isDeepStrictEqual(authorized, entry) ||
+      dispatchOperation.kind !== request.operation.kind
+    ) {
+      throw new ConflictException('MCP operation does not match its invocation manifest');
+    }
+    if (entry.destination === 'mcp-activity' && !runtimeBinding) {
+      throw new ConflictException('Outbound MCP operation has no immutable runtime binding');
+    }
+    if (entry.destination === 'component-activity' && runtimeBinding) {
+      throw new ConflictException('Component operation cannot claim an MCP runtime binding');
+    }
+    return {
+      request: request as McpOperationInvocationRequest & {
+        scope: Extract<McpOperationInvocationRequest['scope'], { kind: 'run' }>;
+      },
+      dispatchOperation,
+      entry,
+      ...(runtimeBinding !== undefined && { runtimeBinding }),
+      manifest,
+    };
+  }
+
+  private async readMcpOperation(
+    executor: NodePgDatabase,
+    invocationId: string,
+  ): Promise<ParsedMcpOperationRows | null> {
+    const [rows] = await executor
+      .select({
+        invocation: mcpInvocationsTable,
+        attempt: mcpInvocationAttemptsTable,
+      })
+      .from(mcpInvocationsTable)
+      .innerJoin(
+        mcpInvocationAttemptsTable,
+        and(
+          eq(mcpInvocationAttemptsTable.invocationId, mcpInvocationsTable.invocationId),
+          eq(mcpInvocationAttemptsTable.attemptNumber, mcpInvocationsTable.currentAttemptNumber),
+        ),
+      )
+      .where(eq(mcpInvocationsTable.invocationId, invocationId))
+      .limit(1);
+    return rows ? this.parseStoredMcpOperation(rows) : null;
+  }
+
+  private parseStoredMcpOperation(rows: StoredInvocationRows): ParsedMcpOperationRows {
+    const operationIdentity = this.normalizeMcpOperationIdentity(rows.invocation);
+    const invocation = { ...rows.invocation, ...operationIdentity };
+    const genericRequest = McpOperationInvocationRequestSchema.safeParse(invocation.request);
+    const request = genericRequest.success
+      ? genericRequest.data
+      : this.projectLegacyToolRequest(invocation.request, rows.attempt.sourceId);
+    const result = this.parseMcpOperationResult(invocation.result);
+    const expectedToolName =
+      invocation.operationKind === 'tool-call' ? invocation.operationTarget : null;
+    if (
+      request.invocationId !== invocation.invocationId ||
+      request.scope.kind !== 'run' ||
+      request.scope.runId !== invocation.runId ||
+      request.scope.organizationId !== invocation.organizationId ||
+      request.scope.capabilityGrantId !== invocation.capabilityGrantId ||
+      request.capabilitySnapshotId !== invocation.capabilitySnapshotId ||
+      request.operation.kind !== invocation.operationKind ||
+      request.authorizationTarget !== invocation.operationTarget ||
+      invocation.toolName !== expectedToolName
+    ) {
+      throw new ConflictException('Persisted MCP operation columns do not match request JSON');
+    }
+    if (
+      rows.attempt.invocationId !== invocation.invocationId ||
+      rows.attempt.attemptNumber !== invocation.currentAttemptNumber ||
+      rows.attempt.status !== invocation.status
+    ) {
+      throw new ConflictException('Persisted MCP operation current-attempt projection diverged');
+    }
+    const fenceValues = [
+      rows.attempt.runtimeId,
+      rows.attempt.ownerId,
+      rows.attempt.ownerEpoch,
+      rows.attempt.leaseGeneration,
+    ];
+    const hasFence = fenceValues.every((value) => value !== null);
+    if (!hasFence && fenceValues.some((value) => value !== null)) {
+      throw new ConflictException(
+        'Persisted MCP operation attempt has an incomplete runtime fence',
+      );
+    }
+    if (
+      invocation.status === 'dispatched' &&
+      rows.attempt.destination === 'mcp-activity' &&
+      !hasFence
+    ) {
+      throw new ConflictException('Dispatched MCP operation attempt has no captured runtime fence');
+    }
+    if (rows.attempt.destination === 'component-activity' && hasFence) {
+      throw new ConflictException('Component MCP operation attempt cannot capture a runtime fence');
+    }
+    if (
+      TERMINAL_STATUSES.has(invocation.status) !== (result !== null) ||
+      (result &&
+        (mcpOperationResultStatus(result) !== invocation.status ||
+          result.operationId !== invocation.invocationId))
+    ) {
+      throw new ConflictException('Persisted MCP operation terminal result is inconsistent');
+    }
+    return { invocation, attempt: rows.attempt, request, result };
+  }
+
+  private normalizeMcpOperationIdentity(invocation: McpInvocationRecord): {
+    operationKind: McpInvocationOperationKind;
+    operationTarget: string;
+  } {
+    if (invocation.operationKind === null && invocation.operationTarget === null) {
+      if (invocation.toolName === null) {
+        throw new ConflictException('Legacy MCP invocation has no tool projection');
+      }
+      return { operationKind: 'tool-call', operationTarget: invocation.toolName };
+    }
+    if (invocation.operationKind === null || invocation.operationTarget === null) {
+      throw new ConflictException('Persisted MCP operation identity is incomplete');
+    }
+    return {
+      operationKind: invocation.operationKind,
+      operationTarget: invocation.operationTarget,
+    };
+  }
+
+  private projectLegacyToolRequest(
+    rawRequest: unknown,
+    sourceId: string,
+  ): McpOperationInvocationRequest {
+    const request = ToolInvocationRequestSchema.parse(rawRequest);
+    return McpOperationInvocationRequestSchema.parse({
+      invocationId: request.invocationId,
+      scope: request.scope,
+      capabilitySnapshotId: request.capabilitySnapshotId,
+      sourceId,
+      authorizationTarget: request.toolName,
+      operation: { kind: 'tool-call', name: request.toolName, arguments: request.input },
+      requestedAt: request.requestedAt,
+      deadlineAt: request.deadlineAt,
+    });
+  }
+
+  private parseMcpOperationResult(rawResult: unknown): McpOperationResult | null {
+    if (rawResult === null) return null;
+    const genericResult = McpOperationResultSchema.safeParse(rawResult);
+    if (genericResult.success) return genericResult.data;
+    const legacyResult = ToolInvocationResultSchema.parse(rawResult);
+    if (legacyResult.status === 'completed') {
+      return McpOperationResultSchema.parse({
+        operationId: legacyResult.invocationId,
+        kind: 'completed',
+        output: legacyResult.output,
+        completedAt: legacyResult.completedAt,
+      });
+    }
+    const error = legacyResult.error;
+    if (!error) {
+      throw new ConflictException('Legacy MCP invocation terminal result has no error');
+    }
+    const kind =
+      legacyResult.status === 'ambiguous'
+        ? 'ambiguous'
+        : legacyResult.status === 'cancelled'
+          ? 'cancelled'
+          : 'remote-failure';
+    return McpOperationResultSchema.parse({
+      operationId: legacyResult.invocationId,
+      kind,
+      message: error.message,
+      ...(kind === 'remote-failure' && { retryable: error.retryable }),
+      completedAt: legacyResult.completedAt,
+    });
+  }
+
+  private mcpOperationIdentityMatches(ref: PreparedMcpOperationRef) {
+    const generalized = and(
+      eq(mcpInvocationsTable.operationKind, ref.operationKind),
+      eq(mcpInvocationsTable.operationTarget, ref.operationTarget),
+      ref.toolName === null
+        ? isNull(mcpInvocationsTable.toolName)
+        : eq(mcpInvocationsTable.toolName, ref.toolName),
+    );
+    if (ref.operationKind !== 'tool-call' || ref.toolName === null) return generalized;
+    return or(
+      generalized,
+      and(
+        isNull(mcpInvocationsTable.operationKind),
+        isNull(mcpInvocationsTable.operationTarget),
+        eq(mcpInvocationsTable.toolName, ref.toolName),
+      ),
+    );
+  }
+
+  private preparedMcpOperationReference(rows: ParsedMcpOperationRows): PreparedMcpOperationRef {
+    if (!rows.attempt.preparedAt) {
+      throw new ConflictException('MCP operation attempt has no preparation timestamp');
+    }
+    return PreparedMcpOperationRefSchema.parse({
+      invocationId: rows.invocation.invocationId,
+      attemptId: rows.attempt.id,
+      attemptNumber: rows.attempt.attemptNumber,
+      capabilitySnapshotId: rows.invocation.capabilitySnapshotId,
+      capabilityGrantId: rows.invocation.capabilityGrantId,
+      operationKind: rows.invocation.operationKind,
+      operationTarget: rows.invocation.operationTarget,
+      toolName: rows.invocation.toolName,
+      sourceId: rows.attempt.sourceId,
+      destination: rows.attempt.destination,
+      retryPolicy: rows.attempt.retryPolicy,
+      preparedAt: rows.attempt.preparedAt.toISOString(),
+    });
+  }
+
+  private mcpOperationPlan(
+    rows: ParsedMcpOperationRows,
+    manifestEntry: McpOperationManifestEntry,
+    operation: McpOperation,
+    runtimeBinding?: McpSnapshotRuntimeBinding,
+  ): McpOperationDispatchPlan {
+    return McpOperationDispatchPlanSchema.parse({
+      ref: this.preparedMcpOperationReference(rows),
+      manifestEntry,
+      operation,
+      requestedAt: rows.request.requestedAt,
+      deadlineAt: rows.request.deadlineAt,
+      ...(runtimeBinding !== undefined && { runtimeBinding }),
+    });
+  }
+
+  private assertMcpOperationReplay(
+    rows: ParsedMcpOperationRows,
+    request: McpOperationInvocationRequest,
+    requestHash: string,
+  ): void {
+    if (rows.invocation.requestHash !== requestHash) {
+      throw new ConflictException(
+        'MCP operation invocation ID was already used for a different request hash',
+      );
+    }
+    if (
+      rows.invocation.invocationId !== request.invocationId ||
+      request.scope.kind !== 'run' ||
+      rows.invocation.runId !== request.scope.runId ||
+      rows.invocation.organizationId !== request.scope.organizationId ||
+      rows.invocation.capabilityGrantId !== request.scope.capabilityGrantId ||
+      rows.invocation.capabilitySnapshotId !== request.capabilitySnapshotId ||
+      rows.invocation.operationKind !== request.operation.kind ||
+      rows.invocation.operationTarget !== request.authorizationTarget
+    ) {
+      throw new ConflictException('MCP operation replay crossed its persisted run authority');
+    }
+  }
+
+  private assertMcpOperationReference(
+    rows: ParsedMcpOperationRows,
+    ref: PreparedMcpOperationRef,
+  ): void {
+    if (
+      rows.invocation.currentAttemptNumber !== ref.attemptNumber ||
+      rows.attempt.attemptNumber !== ref.attemptNumber ||
+      rows.attempt.id !== ref.attemptId
+    ) {
+      throw new ConflictException('Prepared MCP operation reference is not the current attempt');
+    }
+    if (
+      rows.invocation.invocationId !== ref.invocationId ||
+      rows.invocation.capabilityGrantId !== ref.capabilityGrantId ||
+      rows.invocation.capabilitySnapshotId !== ref.capabilitySnapshotId ||
+      rows.invocation.operationKind !== ref.operationKind ||
+      rows.invocation.operationTarget !== ref.operationTarget ||
+      rows.invocation.toolName !== ref.toolName ||
+      rows.attempt.invocationId !== ref.invocationId ||
+      rows.attempt.preparedAt?.toISOString() !== ref.preparedAt ||
+      rows.attempt.sourceId !== ref.sourceId ||
+      rows.attempt.destination !== ref.destination ||
+      rows.attempt.retryPolicy !== ref.retryPolicy
+    ) {
+      throw new ConflictException('Prepared MCP operation reference does not match persistence');
+    }
+  }
+
+  private requireMcpOperationResult(rows: ParsedMcpOperationRows): McpOperationResult {
+    if (!rows.result) {
+      throw new ConflictException('Terminal MCP operation has no validated result');
+    }
+    return rows.result;
+  }
+
+  private capturedFence(rows: ParsedMcpOperationRows): McpRuntimeFence | null {
+    if (
+      rows.attempt.runtimeId === null &&
+      rows.attempt.ownerId === null &&
+      rows.attempt.ownerEpoch === null &&
+      rows.attempt.leaseGeneration === null
+    ) {
+      return null;
+    }
+    return McpRuntimeFenceSchema.parse({
+      runtimeId: rows.attempt.runtimeId,
+      ownerId: rows.attempt.ownerId,
+      ownerEpoch: rows.attempt.ownerEpoch,
+      leaseGeneration: rows.attempt.leaseGeneration,
+    });
+  }
+
+  private async transitionMcpOperationTerminal(
+    executor: NodePgDatabase,
+    ref: PreparedMcpOperationRef,
+    fence: McpRuntimeFence | null,
+    result: McpOperationResult,
+    fromStatus: 'prepared' | 'dispatched',
+  ): Promise<boolean> {
+    const completedAt = new Date(result.completedAt);
+    const status = mcpOperationResultStatus(result);
+    const [settledInvocation] = await executor
+      .update(mcpInvocationsTable)
+      .set({ status, result, updatedAt: completedAt, terminalAt: completedAt })
+      .where(
+        and(
+          eq(mcpInvocationsTable.invocationId, ref.invocationId),
+          eq(mcpInvocationsTable.currentAttemptNumber, ref.attemptNumber),
+          eq(mcpInvocationsTable.capabilityGrantId, ref.capabilityGrantId),
+          eq(mcpInvocationsTable.capabilitySnapshotId, ref.capabilitySnapshotId),
+          this.mcpOperationIdentityMatches(ref),
+          eq(mcpInvocationsTable.status, fromStatus),
+        ),
+      )
+      .returning();
+    if (!settledInvocation) return false;
+
+    const [settledAttempt] = await executor
+      .update(mcpInvocationAttemptsTable)
+      .set({ status, completedAt })
+      .where(
+        and(
+          eq(mcpInvocationAttemptsTable.id, ref.attemptId),
+          eq(mcpInvocationAttemptsTable.invocationId, ref.invocationId),
+          eq(mcpInvocationAttemptsTable.attemptNumber, ref.attemptNumber),
+          eq(mcpInvocationAttemptsTable.preparedAt, new Date(ref.preparedAt)),
+          eq(mcpInvocationAttemptsTable.sourceId, ref.sourceId),
+          eq(mcpInvocationAttemptsTable.destination, ref.destination),
+          eq(mcpInvocationAttemptsTable.retryPolicy, ref.retryPolicy),
+          fence === null
+            ? isNull(mcpInvocationAttemptsTable.runtimeId)
+            : eq(mcpInvocationAttemptsTable.runtimeId, fence.runtimeId),
+          fence === null
+            ? isNull(mcpInvocationAttemptsTable.ownerId)
+            : eq(mcpInvocationAttemptsTable.ownerId, fence.ownerId),
+          fence === null
+            ? isNull(mcpInvocationAttemptsTable.ownerEpoch)
+            : eq(mcpInvocationAttemptsTable.ownerEpoch, fence.ownerEpoch),
+          fence === null
+            ? isNull(mcpInvocationAttemptsTable.leaseGeneration)
+            : eq(mcpInvocationAttemptsTable.leaseGeneration, fence.leaseGeneration),
+          eq(mcpInvocationAttemptsTable.status, fromStatus),
+        ),
+      )
+      .returning();
+    if (!settledAttempt) {
+      throw new ConflictException('MCP operation attempt could not be settled');
+    }
+    return true;
+  }
+
+  private async settleMcpOperationTerminal(
+    ref: PreparedMcpOperationRef,
+    fence: McpRuntimeFence | null,
+    result: McpOperationResult,
+  ): Promise<McpOperationResult> {
+    return this.db.transaction(async (transaction) => {
+      const tx = transaction as unknown as NodePgDatabase;
+      const existing = await this.requireCurrentMcpOperation(tx, ref);
+      this.assertMcpOperationSettlementFence(existing, fence);
+      if (existing.invocation.status === 'dispatched') {
+        if (await this.transitionMcpOperationTerminal(tx, ref, fence, result, 'dispatched')) {
+          return result;
+        }
+        const concurrent = await this.requireCurrentMcpOperation(tx, ref);
+        this.assertMcpOperationSettlementFence(concurrent, fence);
+        const storedResult = this.requireMcpOperationResult(concurrent);
+        if (!isDeepStrictEqual(storedResult, result)) {
+          throw new ConflictException('MCP operation terminal replay conflicts with stored result');
+        }
+        return storedResult;
+      }
+      if (!TERMINAL_STATUSES.has(existing.invocation.status)) {
+        throw new ConflictException('MCP operation attempt can only settle from dispatched state');
+      }
+      const storedResult = this.requireMcpOperationResult(existing);
+      if (!isDeepStrictEqual(storedResult, result)) {
+        throw new ConflictException('MCP operation terminal replay conflicts with stored result');
+      }
+      return storedResult;
+    });
+  }
+
+  private assertMcpOperationSettlementFence(
+    rows: ParsedMcpOperationRows,
+    fence: McpRuntimeFence | null,
+  ): void {
+    if (!isDeepStrictEqual(this.capturedFence(rows), fence)) {
+      throw new ConflictException('MCP operation settlement used a stale runtime fence');
+    }
+  }
+
+  private mcpOperationReconciliationResult(
+    operationId: string,
+    state: McpInvocationStatus,
+    input: ReconcileMcpOperationDispatchRequest,
+  ): McpOperationResult {
+    if (state === 'dispatched') {
+      return McpOperationResultSchema.parse({
+        operationId,
+        kind: 'ambiguous',
+        message: input.message,
+        completedAt: input.completedAt,
+      });
+    }
+    if (state !== 'prepared') {
+      throw new ConflictException('MCP operation is not reconcilable from its current state');
+    }
+    if (input.cause === 'cancelled') {
+      return McpOperationResultSchema.parse({
+        operationId,
+        kind: 'cancelled',
+        message: input.message,
+        completedAt: input.completedAt,
+      });
+    }
+    return McpOperationResultSchema.parse({
+      operationId,
+      kind: 'remote-failure',
+      message: input.message,
+      retryable: input.cause === 'failure',
+      completedAt: input.completedAt,
+    });
+  }
+
+  private async requireCurrentMcpOperation(
+    executor: NodePgDatabase,
+    ref: PreparedMcpOperationRef,
+  ): Promise<ParsedMcpOperationRows> {
+    const existing = await this.readMcpOperation(executor, ref.invocationId);
+    if (!existing) throw new NotFoundException('MCP operation attempt was not found');
+    this.assertMcpOperationReference(existing, ref);
+    return existing;
+  }
+
   private parseInvocationPreparation(input: {
     request: ToolInvocationRequest;
     requestHash: string;
@@ -613,10 +1436,19 @@ export class McpRuntimeRepository {
     if (request.scope.kind !== 'run') {
       throw new ConflictException('MCP durable invocations must be run-scoped');
     }
+    const legacyEntry =
+      'toolName' in entry
+        ? entry
+        : {
+            toolName: entry.operationTarget,
+            sourceId: entry.sourceId,
+            destination: entry.destination,
+            retryPolicy: entry.retryPolicy,
+          };
     if (
       manifest.capabilityGrantId !== request.scope.capabilityGrantId ||
       manifest.capabilitySnapshotId !== request.capabilitySnapshotId ||
-      entry.toolName !== request.toolName ||
+      legacyEntry.toolName !== request.toolName ||
       !manifest.entries.some((candidate) => isDeepStrictEqual(candidate, entry))
     ) {
       throw new ConflictException('MCP invocation does not match its invocation manifest');
@@ -625,7 +1457,7 @@ export class McpRuntimeRepository {
       request: request as ToolInvocationRequest & {
         scope: Extract<ToolInvocationRequest['scope'], { kind: 'run' }>;
       },
-      entry,
+      entry: legacyEntry,
       manifest,
     };
   }
@@ -901,5 +1733,29 @@ export class McpRuntimeRepository {
     }
     this.assertReferenceMatches(existing, ref);
     return existing;
+  }
+}
+
+function isMcpOperationRequestJson(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'operation' in value &&
+    'authorizationTarget' in value &&
+    'sourceId' in value
+  );
+}
+
+function mcpOperationResultStatus(result: McpOperationResult): McpInvocationStatus {
+  switch (result.kind) {
+    case 'completed':
+      return 'completed';
+    case 'remote-failure':
+    case 'input-required-unsupported':
+      return 'failed';
+    case 'cancelled':
+      return 'cancelled';
+    case 'ambiguous':
+      return 'ambiguous';
   }
 }

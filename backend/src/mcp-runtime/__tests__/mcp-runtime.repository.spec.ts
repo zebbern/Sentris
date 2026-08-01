@@ -6,6 +6,12 @@ import type {
   InvocationManifest,
   InvocationManifestEntry,
   McpCapabilityCatalogSnapshot,
+  McpOperationInvocationRequest,
+  McpOperationManifestEntry,
+  McpOperationResult,
+  McpReadyRuntimeRef,
+  McpSnapshotRuntimeBinding,
+  PreparedMcpOperationRef,
   PreparedInvocationRef,
   ToolInvocationRequest,
   ToolInvocationResult,
@@ -107,6 +113,77 @@ const completedResult: ToolInvocationResult = {
   invocationId: INVOCATION_ID,
   status: 'completed',
   output: { findings: 1 },
+  completedAt: '2026-07-31T10:02:00.000Z',
+};
+
+const operationRequest: McpOperationInvocationRequest = {
+  invocationId: INVOCATION_ID,
+  scope: request.scope,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  sourceId: 'mcp:github',
+  authorizationTarget: 'repo://{path}',
+  operation: { kind: 'resource-read', uri: 'repo://src/index.ts' },
+  requestedAt: request.requestedAt,
+  deadlineAt: request.deadlineAt,
+};
+
+const operationEntry: McpOperationManifestEntry = {
+  operationKind: 'resource-read',
+  operationTarget: 'repo://{path}',
+  sourceId: 'mcp:github',
+  destination: 'mcp-activity',
+  retryPolicy: 'reviewed-idempotent',
+};
+
+const runtimeBinding: McpSnapshotRuntimeBinding = {
+  runtimeKey: {
+    sourceId: 'github-server',
+    transport: 'http',
+    configFingerprint: 'f'.repeat(64),
+    organizationId: 'org-1',
+    principalPartitionHash: '1'.repeat(64),
+    credentialReference: 'mcp-server:github-server',
+    credentialGeneration: 7,
+  },
+  protocolEra: 'modern',
+  protocolVersion: '2026-07-28',
+  capabilityFingerprint: '2'.repeat(64),
+};
+
+const runtimeRef: McpReadyRuntimeRef = {
+  fence: {
+    runtimeId: '55555555-5555-4555-8555-555555555555',
+    ownerId: 'worker-1',
+    ownerEpoch: '66666666-6666-4666-8666-666666666666',
+    leaseGeneration: 4,
+  },
+  leaseExpiresAt: '2026-07-31T10:10:00.000Z',
+  protocolEra: runtimeBinding.protocolEra,
+  protocolVersion: runtimeBinding.protocolVersion,
+  ownerAddress: 'http://worker-1.internal:9301',
+  state: 'ready',
+  capabilityFingerprint: runtimeBinding.capabilityFingerprint,
+};
+
+const operationRef: PreparedMcpOperationRef = {
+  invocationId: INVOCATION_ID,
+  attemptId: ATTEMPT_ID,
+  attemptNumber: 1,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  capabilityGrantId: GRANT_ID,
+  operationKind: 'resource-read',
+  operationTarget: 'repo://{path}',
+  toolName: null,
+  sourceId: operationEntry.sourceId,
+  destination: operationEntry.destination,
+  retryPolicy: operationEntry.retryPolicy,
+  preparedAt: '2026-07-31T10:01:00.000Z',
+};
+
+const completedOperationResult: McpOperationResult = {
+  operationId: INVOCATION_ID,
+  kind: 'completed',
+  output: { contents: [] },
   completedAt: '2026-07-31T10:02:00.000Z',
 };
 
@@ -237,6 +314,48 @@ function invocationRows(
   };
 }
 
+function operationRows(
+  status: 'prepared' | 'dispatched' | 'completed' | 'failed' | 'ambiguous' | 'cancelled',
+  result: McpOperationResult | null = null,
+) {
+  return {
+    invocation: {
+      invocationId: INVOCATION_ID,
+      runId: 'run-1',
+      organizationId: 'org-1',
+      capabilityGrantId: GRANT_ID,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      operationKind: 'resource-read',
+      operationTarget: 'repo://{path}',
+      toolName: null,
+      requestHash: REQUEST_HASH,
+      request: operationRequest,
+      status,
+      currentAttemptNumber: 1,
+      result,
+      createdAt: new Date('2026-07-31T10:01:00.000Z'),
+      updatedAt: new Date('2026-07-31T10:01:00.000Z'),
+      terminalAt: result ? new Date(result.completedAt) : null,
+    },
+    attempt: {
+      id: ATTEMPT_ID,
+      invocationId: INVOCATION_ID,
+      attemptNumber: 1,
+      sourceId: operationEntry.sourceId,
+      destination: operationEntry.destination,
+      retryPolicy: operationEntry.retryPolicy,
+      runtimeId: status === 'prepared' ? null : runtimeRef.fence.runtimeId,
+      ownerId: status === 'prepared' ? null : runtimeRef.fence.ownerId,
+      ownerEpoch: status === 'prepared' ? null : runtimeRef.fence.ownerEpoch,
+      leaseGeneration: status === 'prepared' ? null : runtimeRef.fence.leaseGeneration,
+      status,
+      preparedAt: new Date('2026-07-31T10:01:00.000Z'),
+      dispatchedAt: status === 'prepared' ? null : new Date('2026-07-31T10:01:30.000Z'),
+      completedAt: result ? new Date(result.completedAt) : null,
+    },
+  };
+}
+
 function sqlContainsParamValue(node: unknown, value: unknown): boolean {
   if (!node || typeof node !== 'object') return false;
   const candidate = node as {
@@ -294,6 +413,219 @@ function sqlContainsText(node: unknown, text: string): boolean {
 }
 
 describe('McpRuntimeRepository', () => {
+  describe('generic MCP operation attempts', () => {
+    it('normalizes a legacy tool-only row when the new backend reads it', async () => {
+      const legacyRows = invocationRows('prepared');
+      Object.assign(legacyRows.invocation, {
+        operationKind: null,
+        operationTarget: null,
+      });
+      Object.assign(legacyRows.attempt, {
+        runtimeId: null,
+        ownerId: null,
+        ownerEpoch: null,
+        leaseGeneration: null,
+      });
+      const projectedRequest: McpOperationInvocationRequest = {
+        invocationId: request.invocationId,
+        scope: request.scope,
+        capabilitySnapshotId: request.capabilitySnapshotId,
+        sourceId: entry.sourceId,
+        authorizationTarget: request.toolName,
+        operation: { kind: 'tool-call', name: request.toolName, arguments: request.input },
+        requestedAt: request.requestedAt,
+        deadlineAt: request.deadlineAt,
+      };
+      const projectedEntry: McpOperationManifestEntry = {
+        operationKind: 'tool-call',
+        operationTarget: request.toolName,
+        sourceId: entry.sourceId,
+        destination: entry.destination,
+        retryPolicy: entry.retryPolicy,
+      };
+      const { db } = createMockDb({ insert: [[]], select: [[legacyRows]] });
+      const repository = new McpRuntimeRepository(db);
+      const prepareOperation = (
+        repository as unknown as {
+          prepareOperation(input: unknown): Promise<{ plan: { ref: PreparedMcpOperationRef } }>;
+        }
+      ).prepareOperation.bind(repository);
+
+      const outcome = await prepareOperation({
+        request: projectedRequest,
+        dispatchOperation: projectedRequest.operation,
+        requestHash: REQUEST_HASH,
+        entry: projectedEntry,
+        manifest: { ...manifest, version: '2', entries: [projectedEntry] },
+      });
+
+      expect(outcome.plan.ref).toEqual(
+        expect.objectContaining({
+          operationKind: 'tool-call',
+          operationTarget: 'component.scan',
+          toolName: 'component.scan',
+        }),
+      );
+    });
+
+    it('persists operation identity with nullable tool compatibility and an unfenced prepared attempt', async () => {
+      const rows = operationRows('prepared');
+      const { db, calls } = createMockDb({
+        insert: [[rows.invocation], [rows.attempt]],
+      });
+      const repository = new McpRuntimeRepository(db);
+      const prepareOperation = (
+        repository as unknown as {
+          prepareOperation(input: unknown): Promise<unknown>;
+        }
+      ).prepareOperation.bind(repository);
+
+      await prepareOperation({
+        request: operationRequest,
+        dispatchOperation: operationRequest.operation,
+        requestHash: REQUEST_HASH,
+        entry: operationEntry,
+        runtimeBinding,
+        manifest: { ...manifest, version: '2', entries: [operationEntry] },
+      });
+
+      const values = calls.filter((call) => call.method === 'values').map((call) => call.args[0]);
+      expect(values[0]).toEqual(
+        expect.objectContaining({
+          operationKind: 'resource-read',
+          operationTarget: 'repo://{path}',
+          toolName: null,
+          organizationId: 'org-1',
+        }),
+      );
+      expect(values[1]).toEqual(
+        expect.objectContaining({
+          runtimeId: null,
+          ownerId: null,
+          ownerEpoch: null,
+          leaseGeneration: null,
+        }),
+      );
+    });
+
+    it('captures the exact acquired runtime fence in the current-attempt claim CAS', async () => {
+      const prepared = operationRows('prepared');
+      const dispatched = operationRows('dispatched');
+      const { db, calls } = createMockDb({
+        update: [[dispatched.invocation], [dispatched.attempt]],
+      });
+      const repository = new McpRuntimeRepository(db);
+      const claimOperationAttempt = (
+        repository as unknown as {
+          claimOperationAttempt(input: unknown): Promise<unknown>;
+        }
+      ).claimOperationAttempt.bind(repository);
+
+      await expect(
+        claimOperationAttempt({
+          plan: {
+            ref: {
+              invocationId: INVOCATION_ID,
+              attemptId: ATTEMPT_ID,
+              attemptNumber: 1,
+              capabilitySnapshotId: SNAPSHOT_ID,
+              capabilityGrantId: GRANT_ID,
+              operationKind: 'resource-read',
+              operationTarget: 'repo://{path}',
+              toolName: null,
+              sourceId: operationEntry.sourceId,
+              destination: operationEntry.destination,
+              retryPolicy: operationEntry.retryPolicy,
+              preparedAt: prepared.attempt.preparedAt.toISOString(),
+            },
+            manifestEntry: operationEntry,
+            runtimeBinding,
+            operation: operationRequest.operation,
+            requestedAt: operationRequest.requestedAt,
+            deadlineAt: operationRequest.deadlineAt,
+          },
+          runtimeRef,
+        }),
+      ).resolves.toEqual({ kind: 'claimed' });
+
+      const attemptClaim = calls
+        .filter((call) => call.method === 'set')
+        .map((call) => call.args[0])
+        .find((value) => (value as { runtimeId?: unknown }).runtimeId !== undefined);
+      expect(attemptClaim).toEqual(
+        expect.objectContaining({
+          runtimeId: runtimeRef.fence.runtimeId,
+          ownerId: runtimeRef.fence.ownerId,
+          ownerEpoch: runtimeRef.fence.ownerEpoch,
+          leaseGeneration: runtimeRef.fence.leaseGeneration,
+          status: 'dispatched',
+        }),
+      );
+    });
+
+    it('settles only through the exact fence captured by the dispatched attempt', async () => {
+      const dispatched = operationRows('dispatched');
+      const terminal = operationRows('completed', completedOperationResult);
+      const { db, calls } = createMockDb({
+        select: [[dispatched]],
+        update: [[terminal.invocation], [terminal.attempt]],
+      });
+
+      await expect(
+        new McpRuntimeRepository(db).settleMcpOperationAttempt({
+          ref: operationRef,
+          fence: runtimeRef.fence,
+          result: completedOperationResult,
+        }),
+      ).resolves.toEqual(completedOperationResult);
+
+      const attemptWhere = calls.filter((call) => call.method === 'where')[2]?.args[0];
+      expect(sqlContainsParamValue(attemptWhere, runtimeRef.fence.runtimeId)).toBe(true);
+      expect(sqlContainsParamValue(attemptWhere, runtimeRef.fence.ownerId)).toBe(true);
+      expect(sqlContainsParamValue(attemptWhere, runtimeRef.fence.ownerEpoch)).toBe(true);
+      expect(sqlContainsParamValue(attemptWhere, runtimeRef.fence.leaseGeneration)).toBe(true);
+    });
+
+    it('rejects a later owner fence before attempting settlement', async () => {
+      const dispatched = operationRows('dispatched');
+      const { db, calls } = createMockDb({ select: [[dispatched]] });
+
+      await expect(
+        new McpRuntimeRepository(db).settleMcpOperationAttempt({
+          ref: operationRef,
+          fence: { ...runtimeRef.fence, leaseGeneration: runtimeRef.fence.leaseGeneration + 1 },
+          result: completedOperationResult,
+        }),
+      ).rejects.toThrow('stale runtime fence');
+      expect(calls.filter((call) => call.method === 'update')).toHaveLength(0);
+    });
+
+    it('reconciles owner loss after dispatch as ambiguous with the captured fence', async () => {
+      const dispatched = operationRows('dispatched');
+      const { db, calls } = createMockDb({
+        select: [[dispatched]],
+        update: [
+          [{ ...dispatched.invocation, status: 'ambiguous' }],
+          [{ ...dispatched.attempt, status: 'ambiguous' }],
+        ],
+      });
+
+      const result = await new McpRuntimeRepository(db).reconcileMcpOperationDispatchFailure({
+        ref: operationRef,
+        cause: 'failure',
+        message: 'Runtime owner died after dispatch',
+        completedAt: '2026-07-31T10:03:00.000Z',
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({ operationId: INVOCATION_ID, kind: 'ambiguous' }),
+      );
+      const attemptWhere = calls.filter((call) => call.method === 'where')[2]?.args[0];
+      expect(sqlContainsParamValue(attemptWhere, runtimeRef.fence.leaseGeneration)).toBe(true);
+      expect(calls.filter((call) => call.method === 'insert')).toHaveLength(0);
+    });
+  });
+
   describe('immutable run authority', () => {
     it('returns the concurrent winner after normalizing generated IDs and timestamps', async () => {
       const winnerGrantId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';

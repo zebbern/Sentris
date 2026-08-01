@@ -36,6 +36,9 @@ const prepareToolInvocationActivity = vi.fn();
 const dispatchToolInvocationActivity = vi.fn();
 const reconcileToolInvocationActivity = vi.fn();
 const reconcileRunToolInvocationsActivity = vi.fn(async () => {});
+const prepareMcpOperationActivity = vi.fn();
+const dispatchMcpOperationActivity = vi.fn();
+const reconcileMcpOperationActivity = vi.fn();
 const startChild = vi.fn();
 
 const workflowActivities = {
@@ -55,6 +58,9 @@ const workflowActivities = {
   dispatchToolInvocationActivity,
   reconcileToolInvocationActivity,
   reconcileRunToolInvocationsActivity,
+  prepareMcpOperationActivity,
+  dispatchMcpOperationActivity,
+  reconcileMcpOperationActivity,
 };
 
 class MockApplicationFailure extends Error {
@@ -177,7 +183,7 @@ describe('workflow orchestration diagnostics', () => {
   beforeEach(() => {
     delete process.env.SENTRIS_DEBUG_WORKFLOW;
     vi.clearAllMocks();
-    patched.mockReturnValue(true);
+    patched.mockImplementation(() => true);
     currentUpdateId = undefined;
     allHandlersFinished.mockReturnValue(true);
     condition.mockImplementation(async (predicate) => predicate());
@@ -225,6 +231,10 @@ describe('workflow orchestration diagnostics', () => {
       ([definition]) => handlerDefinitionName(definition) === 'getToolInvocationProtocolVersion',
     );
     expect(protocolRegistration?.[1]()).toBe(1);
+    const operationProtocolRegistration = setHandler.mock.calls.find(
+      ([definition]) => handlerDefinitionName(definition) === 'getMcpOperationProtocolVersion',
+    );
+    expect(operationProtocolRegistration?.[1]()).toBe(1);
     expect(
       setHandler.mock.calls.some(
         ([definition]) => handlerDefinitionName(definition) === 'installToolInvocationManifest',
@@ -248,6 +258,36 @@ describe('workflow orchestration diagnostics', () => {
     expect(
       patched.mock.calls.filter(([patchId]) => patchId === 'sentris-tool-invocation-update-v1'),
     ).toHaveLength(1);
+    expect(
+      patched.mock.calls.filter(([patchId]) => patchId === 'sentris-mcp-operation-update-v1'),
+    ).toHaveLength(1);
+  });
+
+  test('does not advertise generic MCP operations to a mixed legacy-tool history', async () => {
+    patched.mockImplementation((patchId) => patchId !== 'sentris-mcp-operation-update-v1');
+
+    await sentrisWorkflowRun(quietWorkflowInput());
+
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'getToolInvocationProtocolVersion',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'getMcpOperationProtocolVersion',
+      ),
+    ).toBe(false);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeToolInvocation',
+      ),
+    ).toBe(true);
+    expect(
+      setHandler.mock.calls.some(
+        ([definition]) => handlerDefinitionName(definition) === 'executeMcpOperation',
+      ),
+    ).toBe(false);
   });
 
   test('wires non-enumerable Temporal activity proxies with one-attempt dispatch', async () => {
@@ -313,7 +353,7 @@ describe('workflow orchestration diagnostics', () => {
     currentUpdateId = invocationId;
     executeRegistration?.[2]?.validator(invocation);
 
-    await expect(executeRegistration?.[1](invocation)).resolves.toEqual(terminal);
+    expect(await executeRegistration?.[1](invocation)).toEqual(terminal);
     expect(
       activityProxyOptions.some(
         (options) =>

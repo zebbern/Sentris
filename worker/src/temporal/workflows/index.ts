@@ -32,6 +32,7 @@ import { handleHumanInput } from './human-input-handler.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
 import {
   registerToolInvocationUpdateHandlers,
+  type McpOperationWorkflowActivities,
   type ToolInvocationUpdateController,
   type ToolInvocationWorkflowActivities,
 } from './tool-invocation-update-handler.js';
@@ -45,6 +46,8 @@ import {
 } from '../signals.js';
 import type { ExecutionTriggerMetadata, PreparedRunPayload } from '@sentris/shared';
 import {
+  MCP_OPERATION_PROTOCOL_QUERY_NAME,
+  MCP_OPERATION_PROTOCOL_VERSION,
   TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
   TOOL_INVOCATION_PROTOCOL_VERSION,
 } from '@sentris/shared/mcp-invocation';
@@ -69,6 +72,7 @@ const FOR_EACH_BODY_ACTIVITY_TIMEOUT = '135 minutes';
 const PERSIST_CHILD_START_PATCH_ID = 'sentris-persist-child-start-v1';
 const RUN_METADATA_LIFECYCLE_PATCH_ID = 'sentris-run-metadata-lifecycle-v1';
 const TOOL_INVOCATION_UPDATE_PATCH_ID = 'sentris-tool-invocation-update-v1';
+const MCP_OPERATION_UPDATE_PATCH_ID = 'sentris-mcp-operation-update-v1';
 
 const {
   runComponentActivity: _runComponentActivity,
@@ -175,12 +179,34 @@ const { dispatchToolInvocationActivity } = proxyActivities<
   },
 });
 
+const { prepareMcpOperationActivity, reconcileMcpOperationActivity } = proxyActivities<
+  Pick<
+    McpOperationWorkflowActivities,
+    'prepareMcpOperationActivity' | 'reconcileMcpOperationActivity'
+  >
+>({
+  startToCloseTimeout: '2 minutes',
+  heartbeatTimeout: '30 seconds',
+  retry: { maximumAttempts: 3 },
+});
+
+const { dispatchMcpOperationActivity } = proxyActivities<
+  Pick<McpOperationWorkflowActivities, 'dispatchMcpOperationActivity'>
+>({
+  startToCloseTimeout: '10 minutes',
+  heartbeatTimeout: '30 seconds',
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  retry: { maximumAttempts: 1 },
+});
+
 export async function sentrisWorkflowRun(
   input: RunWorkflowActivityInput,
 ): Promise<RunWorkflowActivityOutput> {
   const durableTerminalFinalization = patched('sentris-durable-terminal-finalization-v1');
   const durableRunMetadataLifecycle = patched(RUN_METADATA_LIFECYCLE_PATCH_ID);
   const durableToolInvocationUpdates = patched(TOOL_INVOCATION_UPDATE_PATCH_ID);
+  const durableMcpOperationUpdates =
+    durableToolInvocationUpdates && patched(MCP_OPERATION_UPDATE_PATCH_ID);
   const results = new Map<string, unknown>();
   const actionsByRef = new Map<string, WorkflowAction>(
     input.definition.actions.map((action) => [action.ref, action]),
@@ -211,6 +237,12 @@ export async function sentrisWorkflowRun(
       defineQuery<number>(TOOL_INVOCATION_PROTOCOL_QUERY_NAME),
       () => TOOL_INVOCATION_PROTOCOL_VERSION,
     );
+    if (durableMcpOperationUpdates) {
+      setHandler(
+        defineQuery<number>(MCP_OPERATION_PROTOCOL_QUERY_NAME),
+        () => MCP_OPERATION_PROTOCOL_VERSION,
+      );
+    }
     toolInvocationUpdates = registerToolInvocationUpdateHandlers(
       {
         runId: input.runId,
@@ -221,6 +253,15 @@ export async function sentrisWorkflowRun(
           reconcileToolInvocationActivity,
           reconcileRunToolInvocationsActivity,
         },
+        ...(durableMcpOperationUpdates
+          ? {
+              operationActivities: {
+                prepareMcpOperationActivity,
+                dispatchMcpOperationActivity,
+                reconcileMcpOperationActivity,
+              },
+            }
+          : {}),
       },
       {
         setHandler,

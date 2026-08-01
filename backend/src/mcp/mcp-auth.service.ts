@@ -4,6 +4,10 @@ import Redis from 'ioredis';
 import { QueryNotRegisteredError } from '@temporalio/client';
 import {
   INSTALL_TOOL_INVOCATION_MANIFEST_UPDATE_NAME,
+  MCP_CAPABILITY_CONTRACT_VERSION,
+  MCP_LEGACY_CAPABILITY_CONTRACT_VERSION,
+  MCP_OPERATION_PROTOCOL_QUERY_NAME,
+  MCP_OPERATION_PROTOCOL_VERSION,
   TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
   TOOL_INVOCATION_PROTOCOL_VERSION,
 } from '@sentris/shared';
@@ -60,6 +64,9 @@ export class McpAuthService {
     const normalizedAllowedNodeIds = normalizeRunMcpAllowedNodeIds(allowedNodeIds);
     let authority: Awaited<ReturnType<McpRunAuthorityService['materialize']>> | undefined;
     let useLegacyProtocol = false;
+    let contractVersion:
+      | typeof MCP_LEGACY_CAPABILITY_CONTRACT_VERSION
+      | typeof MCP_CAPABILITY_CONTRACT_VERSION = MCP_CAPABILITY_CONTRACT_VERSION;
     try {
       const version = await this.temporalService.queryWorkflow<number>({
         workflowId: runId,
@@ -74,11 +81,24 @@ export class McpAuthService {
     }
 
     if (!useLegacyProtocol) {
+      try {
+        const operationVersion = await this.temporalService.queryWorkflow<number>({
+          workflowId: runId,
+          queryType: MCP_OPERATION_PROTOCOL_QUERY_NAME,
+        });
+        if (operationVersion !== MCP_OPERATION_PROTOCOL_VERSION) {
+          throw new Error(`Unsupported MCP operation protocol version: ${operationVersion}`);
+        }
+      } catch (error) {
+        if (!(error instanceof QueryNotRegisteredError)) throw error;
+        contractVersion = MCP_LEGACY_CAPABILITY_CONTRACT_VERSION;
+      }
       authority = await this.runAuthority.materialize({
         runId,
         organizationId,
         ...(invokingNodeId !== undefined && { invokingNodeId }),
         allowedNodeIds: normalizedAllowedNodeIds,
+        contractVersion,
       });
       await this.temporalService.executeWorkflowUpdate<undefined>({
         workflowId: runId,

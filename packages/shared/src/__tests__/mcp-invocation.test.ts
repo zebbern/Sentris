@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import * as mcpInvocationContracts from '../mcp-invocation.js';
 import type {
   CapabilityGrant,
   ExecutionScope,
@@ -10,14 +11,25 @@ import {
   buildInvocationManifest,
   ClaimComponentDispatchOutcomeSchema,
   MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
+  MCP_OPERATION_PROTOCOL_QUERY_NAME,
+  MCP_OPERATION_PROTOCOL_VERSION,
   PrepareToolInvocationOutcomeSchema,
   resolveInvocationManifestEntry,
   TOOL_INVOCATION_UPDATE_NAME,
+  TOOL_INVOCATION_PROTOCOL_QUERY_NAME,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   type InvocationManifest,
   type InvocationManifestEntry,
 } from '../mcp-invocation.js';
+
+describe('MCP operation protocol negotiation', () => {
+  it('exports a generic protocol query distinct from the legacy tool protocol', () => {
+    expect(MCP_OPERATION_PROTOCOL_QUERY_NAME).toBe('getMcpOperationProtocolVersion');
+    expect(MCP_OPERATION_PROTOCOL_VERSION).toBe(1);
+    expect(MCP_OPERATION_PROTOCOL_QUERY_NAME).not.toBe(TOOL_INVOCATION_PROTOCOL_QUERY_NAME);
+  });
+});
 
 type Mutable<T> = { -readonly [Key in keyof T]: T[Key] };
 
@@ -175,6 +187,29 @@ describe('InstallToolInvocationManifestRequestSchema', () => {
       }),
     ).toThrow('Invocation manifest does not match the execution scope grant');
   });
+
+  it('keeps legacy tool manifests and durable generic manifests on distinct versions', async () => {
+    const invocationModule = (await import('../mcp-invocation.js')) as Record<string, any>;
+    const schema = invocationModule.InvocationManifestSchema;
+    const legacyEntry = manifest.entries[0];
+    const genericEntry = {
+      operationKind: 'tool-call',
+      operationTarget: 'osv_query',
+      sourceId: 'component:osv',
+      destination: 'component-activity',
+      retryPolicy: 'pre-dispatch-only',
+    };
+
+    expect(schema.safeParse({ ...manifest, version: '1', entries: [genericEntry] }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...manifest, version: '2', entries: [legacyEntry] }).success).toBe(
+      false,
+    );
+    expect(schema.safeParse({ ...manifest, version: '2', entries: [genericEntry] }).success).toBe(
+      true,
+    );
+  });
 });
 
 describe('ToolInvocationResultSchema', () => {
@@ -205,9 +240,7 @@ describe('ToolInvocationResultSchema', () => {
     expect(() =>
       ToolInvocationResultSchema.parse({ ...completedResult, error: failedResult.error }),
     ).toThrow();
-    expect(() =>
-      ToolInvocationResultSchema.parse({ ...failedResult, output: null }),
-    ).toThrow();
+    expect(() => ToolInvocationResultSchema.parse({ ...failedResult, output: null })).toThrow();
     expect(() => ToolInvocationResultSchema.parse({ ...failedResult, error: undefined })).toThrow();
   });
 
@@ -307,14 +340,8 @@ describe('generic MCP operation contracts', () => {
   });
 
   it.each([
-    [
-      'tool name',
-      { kind: 'tool-call' as const, name: 'x'.repeat(262_144), arguments: {} },
-    ],
-    [
-      'prompt name',
-      { kind: 'prompt-get' as const, name: 'x'.repeat(262_144), arguments: {} },
-    ],
+    ['tool name', { kind: 'tool-call' as const, name: 'x'.repeat(262_144), arguments: {} }],
+    ['prompt name', { kind: 'prompt-get' as const, name: 'x'.repeat(262_144), arguments: {} }],
     ['resource URI', { kind: 'resource-read' as const, uri: 'x'.repeat(262_144) }],
   ])('rejects an oversized %s in the complete operation request', async (_name, operation) => {
     const operationContracts = (await import('../mcp-invocation.js')) as Record<string, any>;
@@ -455,6 +482,105 @@ describe('PrepareToolInvocationOutcomeSchema', () => {
   });
 });
 
+describe('durable MCP operation dispatch contracts', () => {
+  it('carries immutable operation authority to a fence-capturing dispatch claim', () => {
+    const contracts = mcpInvocationContracts as Record<string, unknown>;
+    const preparedSchema = contracts.PrepareMcpOperationOutcomeSchema as
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
+    const claimSchema = contracts.ClaimMcpOperationDispatchRequestSchema as
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
+    const prepared = {
+      kind: 'prepared' as const,
+      plan: {
+        ref: {
+          invocationId: INVOCATION_ID,
+          attemptId: ATTEMPT_ID,
+          attemptNumber: 1,
+          capabilitySnapshotId: SNAPSHOT_ID,
+          capabilityGrantId: GRANT_ID,
+          operationKind: 'resource-read' as const,
+          operationTarget: 'repo://{path}',
+          toolName: null,
+          sourceId: 'mcp:github',
+          destination: 'mcp-activity' as const,
+          retryPolicy: 'reviewed-idempotent' as const,
+          preparedAt: '2026-07-31T10:00:01.000Z',
+        },
+        manifestEntry: {
+          operationKind: 'resource-read' as const,
+          operationTarget: 'repo://{path}',
+          sourceId: 'mcp:github',
+          destination: 'mcp-activity' as const,
+          retryPolicy: 'reviewed-idempotent' as const,
+        },
+        runtimeBinding: {
+          runtimeKey: {
+            sourceId: 'github-server',
+            transport: 'http' as const,
+            configFingerprint: 'a'.repeat(64),
+            organizationId: 'org-123',
+            principalPartitionHash: 'b'.repeat(64),
+            credentialReference: 'mcp-server:github-server',
+            credentialGeneration: 7,
+          },
+          protocolEra: 'modern' as const,
+          protocolVersion: '2026-07-28',
+          capabilityFingerprint: 'c'.repeat(64),
+        },
+        operation: { kind: 'resource-read' as const, uri: 'repo://src/index.ts' },
+        requestedAt: '2026-07-31T10:00:00.000Z',
+        deadlineAt: '2026-07-31T10:05:00.000Z',
+      },
+      manifest: {
+        capabilitySnapshotId: SNAPSHOT_ID,
+        capabilityGrantId: GRANT_ID,
+        version: '1' as const,
+        entries: [],
+      },
+    };
+    const acquiredRef = {
+      fence: runtimeFence,
+      leaseExpiresAt: '2026-07-31T10:10:00.000Z',
+      protocolEra: 'modern' as const,
+      protocolVersion: '2026-07-28',
+      ownerAddress: 'http://worker-3.internal:9301',
+      state: 'ready' as const,
+      capabilityFingerprint: 'c'.repeat(64),
+    };
+
+    expect(preparedSchema?.safeParse(prepared)).toEqual({ success: true, data: prepared });
+    expect(claimSchema?.safeParse({ plan: prepared.plan, runtimeRef: acquiredRef })).toEqual({
+      success: true,
+      data: { plan: prepared.plan, runtimeRef: acquiredRef },
+    });
+  });
+
+  it('rejects a tool reference whose nullable compatibility projection drifts', () => {
+    const contracts = mcpInvocationContracts as Record<string, unknown>;
+    const schema = contracts.PreparedMcpOperationRefSchema as
+      | { safeParse(value: unknown): { success: boolean } }
+      | undefined;
+    expect(
+      schema?.safeParse({
+        invocationId: INVOCATION_ID,
+        attemptId: ATTEMPT_ID,
+        attemptNumber: 1,
+        capabilitySnapshotId: SNAPSHOT_ID,
+        capabilityGrantId: GRANT_ID,
+        operationKind: 'tool-call',
+        operationTarget: 'github.search_code',
+        toolName: null,
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'pre-dispatch-only',
+        preparedAt: '2026-07-31T10:00:01.000Z',
+      }).success,
+    ).toBe(false);
+  });
+});
+
 const grant: CapabilityGrant = {
   id: GRANT_ID,
   organizationId: 'org-123',
@@ -504,10 +630,7 @@ function componentTool(
   };
 }
 
-function mcpTool(
-  canonicalName: string,
-  overrides: Partial<ToolDescriptor> = {},
-): ToolDescriptor {
+function mcpTool(canonicalName: string, overrides: Partial<ToolDescriptor> = {}): ToolDescriptor {
   return {
     canonicalName,
     displayName: canonicalName,
@@ -530,8 +653,9 @@ function snapshot(tools: ToolDescriptor[]): McpCapabilityCatalogSnapshot {
   return {
     id: SNAPSHOT_ID,
     scope,
-    version: '1',
+    version: '2',
     configFingerprint: 'a'.repeat(64),
+    runtimeBindings: {},
     tools,
     resources: [],
     resourceTemplates: [],
@@ -654,6 +778,101 @@ describe('assertCapabilityGrantApplies', () => {
 });
 
 describe('buildInvocationManifest', () => {
+  it('authorizes every operation family by kind, immutable target, and source identity', () => {
+    const manifest = buildInvocationManifest(
+      {
+        ...snapshot([mcpTool('github.search_code')]),
+        resources: [
+          { sourceId: 'mcp:github', uri: 'repo://README.md', name: 'README' },
+          { sourceId: 'mcp:other', uri: 'repo://README.md', name: 'Other README' },
+        ],
+        resourceTemplates: [
+          {
+            sourceId: 'mcp:github',
+            uriTemplate: 'repo://{path}',
+            name: 'Repository file',
+          },
+        ],
+        prompts: [
+          { sourceId: 'mcp:github', name: 'review', arguments: [] },
+          { sourceId: 'mcp:other', name: 'review', arguments: [] },
+        ],
+      },
+      {
+        ...grant,
+        sources: [
+          ...grant.sources,
+          { sourceId: 'mcp:other', toolAccess: { mode: 'all' as const } },
+        ],
+      },
+    );
+
+    expect(manifest.entries).toEqual([
+      {
+        operationKind: 'prompt-get',
+        operationTarget: 'review',
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'prompt-get',
+        operationTarget: 'review',
+        sourceId: 'mcp:other',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://{path}',
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://README.md',
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://README.md',
+        sourceId: 'mcp:other',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'tool-call',
+        operationTarget: 'github.search_code',
+        sourceId: 'mcp:github',
+        destination: 'mcp-activity',
+        retryPolicy: 'pre-dispatch-only',
+      },
+    ]);
+  });
+
+  it('parses a keyed generic operation request without parallel operation contracts', () => {
+    const genericRequest = {
+      invocationId: INVOCATION_ID,
+      scope,
+      capabilitySnapshotId: SNAPSHOT_ID,
+      sourceId: 'mcp:github',
+      authorizationTarget: 'repo://{path}',
+      operation: { kind: 'resource-read' as const, uri: 'repo://src/index.ts' },
+      requestedAt: '2026-07-31T10:00:00.000Z',
+      deadlineAt: '2026-07-31T10:05:00.000Z',
+    };
+
+    const contracts = mcpInvocationContracts as Record<string, unknown>;
+    expect(contracts.MCP_OPERATION_UPDATE_NAME).toBe('executeMcpOperation');
+    const schema = contracts.McpOperationInvocationRequestSchema as
+      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
+      | undefined;
+    expect(schema?.safeParse(genericRequest)).toEqual({ success: true, data: genericRequest });
+  });
+
   it('sorts authorized entries and maps component and MCP destinations', () => {
     const manifest = buildInvocationManifest(
       snapshot([
@@ -679,22 +898,25 @@ describe('buildInvocationManifest', () => {
     expect(manifest).toEqual({
       capabilitySnapshotId: SNAPSHOT_ID,
       capabilityGrantId: GRANT_ID,
-      version: '1',
+      version: '2',
       entries: [
         {
-          toolName: 'github.create_issue',
+          operationKind: 'tool-call',
+          operationTarget: 'github.create_issue',
           sourceId: 'mcp:github',
           destination: 'mcp-activity',
           retryPolicy: 'reviewed-idempotent',
         },
         {
-          toolName: 'github.search_code',
+          operationKind: 'tool-call',
+          operationTarget: 'github.search_code',
           sourceId: 'mcp:github',
           destination: 'mcp-activity',
           retryPolicy: 'pre-dispatch-only',
         },
         {
-          toolName: 'scanner.scan_target',
+          operationKind: 'tool-call',
+          operationTarget: 'scanner.scan_target',
           sourceId: 'component:scanner',
           destination: 'component-activity',
           retryPolicy: 'reviewed-idempotent',
@@ -704,7 +926,10 @@ describe('buildInvocationManifest', () => {
   });
 
   it('keeps schemas, descriptions, endpoints, credentials, and catalog metadata out', () => {
-    const manifest = buildInvocationManifest(snapshot([componentTool('scanner.scan_target')]), grant);
+    const manifest = buildInvocationManifest(
+      snapshot([componentTool('scanner.scan_target')]),
+      grant,
+    );
     const serialized = JSON.stringify(manifest);
 
     expect(serialized).not.toContain('inputSchema');
@@ -720,10 +945,7 @@ describe('buildInvocationManifest', () => {
   it('rejects duplicate canonical tool names', () => {
     expect(() =>
       buildInvocationManifest(
-        snapshot([
-          componentTool('duplicate.tool'),
-          mcpTool('duplicate.tool'),
-        ]),
+        snapshot([componentTool('duplicate.tool'), mcpTool('duplicate.tool')]),
         grant,
       ),
     ).toThrow(/duplicate/i);
@@ -772,7 +994,7 @@ describe('buildInvocationManifest', () => {
     expect(() => {
       (manifest.entries[0] as Mutable<InvocationManifestEntry>).retryPolicy = 'pre-dispatch-only';
     }).toThrow(TypeError);
-    expect(manifest.entries).toEqual([originalEntry]);
+    expect([...(manifest.entries as readonly InvocationManifestEntry[])]).toEqual([originalEntry]);
   });
 });
 
@@ -795,7 +1017,14 @@ describe('resolveInvocationManifestEntry', () => {
   });
 
   it.each([
-    ['scope grant', { scope: { ...scope, capabilityGrantId: OTHER_GRANT_ID }, capabilitySnapshotId: SNAPSHOT_ID, toolName: 'scanner.scan_target' }],
+    [
+      'scope grant',
+      {
+        scope: { ...scope, capabilityGrantId: OTHER_GRANT_ID },
+        capabilitySnapshotId: SNAPSHOT_ID,
+        toolName: 'scanner.scan_target',
+      },
+    ],
     ['snapshot', { scope, capabilitySnapshotId: OTHER_GRANT_ID, toolName: 'scanner.scan_target' }],
     ['tool', { scope, capabilitySnapshotId: SNAPSHOT_ID, toolName: 'scanner.missing' }],
   ] as const)('rejects an unbound %s lookup', (_name, input) => {

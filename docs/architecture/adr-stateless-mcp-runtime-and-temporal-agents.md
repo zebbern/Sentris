@@ -48,17 +48,26 @@ inbound servers, session IDs, affinity cookies, Redis session registration, GET/
 DELETE session lifecycle, and sticky Nginx routing have been removed from this route.
 
 Studio has not migrated: it remains a separate v1 sessionful controller on sticky
-routing and may still appear in the session registry. The outbound gateway has also not
-migrated to the canonical client/runtime manager: proxied calls deliberately use a v1
-compatibility client pool keyed by run and endpoint.
+routing and may still appear in the session registry. The run gateway now dispatches
+runtime-bound saved-server operations through the canonical worker runtime manager;
+the outbound v1 pool remains only behind the compatibility boundaries described below.
 
 SDK-independent `ExecutionScope`, grant/catalog descriptor, and invocation-planning
-contracts now back durable run grant/catalog materialization. New run tokens carry an
-immutable snapshot ID, the run gateway advertises exactly that snapshot, and component
-calls execute through one invocation-ID-keyed Workflow Update. The Workflow authorizes
-the compact manifest, persists one logical invocation and attempt, dispatches the typed
-component activity once, records a terminal result, and drains accepted Update handlers
-before finalization.
+contracts now back durable run grant/catalog materialization. Capability contract v2
+adds an immutable, secret-free runtime binding for every saved source. New run tokens
+carry an immutable snapshot ID, the run gateway advertises exactly that snapshot, and
+component plus runtime-bound MCP tool, resource-read, and prompt-get calls execute
+through invocation-ID-keyed Workflow Updates. The Workflow authorizes the compact v2
+manifest; retryable preflight persists one logical invocation and attempt; dispatch
+acquires the snapshotted runtime, verifies its protocol era, configuration version, and
+capability fingerprint, captures the exact owner fence before the first upstream byte,
+and settles or marks ambiguity against that fence. Accepted Update handlers drain before
+Workflow finalization. Exact resources and templates use stable, source-qualified
+`sentris-mcp://resource/...` facade identifiers so identical upstream URIs from different
+servers remain independently addressable. The gateway translates those identifiers at
+the boundary, rewrites returned resource links into the same namespace, and resolves
+templates to the same durable resource-read operation after authoritative preflight
+matching.
 
 The no-snapshot gateway branch remains only for workflows whose histories predate the
 tool-invocation protocol query and for already-issued tokens without a snapshot. Delete
@@ -68,13 +77,36 @@ last such token has a maximum three-hour TTL). It must not receive new behavior.
 
 Saved-server discovery now crosses a secret-free Temporal boundary and uses the canonical
 worker-owned runtime manager plus the official v2 client. It returns a complete catalog
-containing tools, resources, resource templates, and prompts. External snapshot tool
-calls still use the named backend v1 compatibility pool and immutable snapshot source ID;
-moving those calls onto durable runtime-backed attempts is the next migration boundary.
-Remaining work is durable external invocation dispatch, resources/prompts execution
-behavior, Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks, and
-workflow-granular durable agent turns. Studio also remains on its separately bounded v1
-sessionful path.
+containing tools, resources, resource templates, and prompts. An explicitly empty tool
+policy is persisted distinctly from a missing policy so a resources/prompts-only saved
+server can still materialize a closed catalog. Durable attempts preserve the generic
+operation identity and exact runtime fence. Migration `0012` is the expand phase of a
+rolling-compatible database change: `operation_kind` and `operation_target` remain
+nullable only for canonical old-backend rows, while new writes populate both and database
+checks reject partial identities. The nullable legacy `tool_name` projection and the
+tool-shaped repository/service methods exist only to replay pre-Task-7 Workflow histories,
+not as a second permanent invocation architecture. Task 8 must backfill rows written by
+old binaries before enforcing the generic identity `NOT NULL` contract.
+
+Two outbound compatibility boundaries remain. Contract-v1 snapshots have no runtime
+bindings and continue through the existing tool-only path owned by the backend MCP
+gateway and the permanent Temporal patch boundary. Remove that path only after all v1
+tokens have expired and every Workflow history that can execute the old Update is
+terminal or retired. Contract-v2 snapshots whose tool-only sources are still unbound
+also use the explicitly named compatibility path; Task 8 owns migrating those callers
+to saved-source runtime bindings, after which the gateway fallback and outbound v1 pool
+can be deleted. A v2 unbound source never gains resource or prompt behavior.
+
+The contract-v2 rollout is coordinated across backend and worker. The legacy tool protocol
+query and the generic MCP-operation protocol query are distinct: the backend issues v2
+authority only when the target Workflow advertises the generic protocol. A mixed history
+that advertises only the legacy tool protocol receives a v1 authority and continues through
+the legacy activities; a history advertising neither receives no snapshot. This supports
+worker-first/backend-second deployment without routing a v1 manifest through new backend
+operation endpoints. Remaining work is
+Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks, workflow-granular
+durable agent turns, the Task 8 unbound-source migration, and the separately bounded
+Studio v1 sessionful migration.
 
 ### Protocol boundary
 
@@ -378,12 +410,17 @@ live-catalog/signal path remains only until every Workflow history predating the
 invocation protocol is terminal or retired and every token lacking
 `capabilitySnapshotId` has expired from Redis; the token TTL is capped at three hours.
 Studio session state and affinity remain until Studio uses the shared facade and durable
-task projection. The explicit outbound v1 pool and remaining v1 package declarations
-remain until the runtime-manager/canonical-outbound plan is complete and their owned
-callers have migrated. If a new run-gateway session adapter is ever enabled, the
-versioned supported-client matrix and backend MCP module owner make a mandatory
-remove-or-explicitly-renew decision no later than its second normal release; renewal
-requires an ADR update and product approval.
+task projection. The backend MCP gateway owns the contract-v1 snapshot/tool-projection
+boundary and removes it only after old tokens and Workflow histories are expired,
+terminal, or retired. Task 8 owns migrating every contract-v2 unbound tool-only caller;
+once that inventory is empty, remove its fallback together with the outbound v1 pool.
+Task 8 also owns the database contract phase: backfill any legacy-null operation identities,
+prove that no old backend writers remain, then enforce `operation_kind` and
+`operation_target` as non-null. The legacy repository/service tool projection is removed
+in the same reviewed replay migration, after the production history inventory passes. If
+a new run-gateway session adapter is ever enabled, the versioned supported-client matrix
+and backend MCP module owner make a mandatory remove-or-explicitly-renew decision no
+later than its second normal release; renewal requires an ADR update and product approval.
 
 ## References
 

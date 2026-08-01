@@ -3,6 +3,7 @@ import { componentRegistry } from '@sentris/component-sdk';
 import type {
   McpCatalog,
   McpRuntimeKey,
+  McpSnapshotRuntimeBinding,
   McpToolRegistrationDescriptor,
   PromptDescriptor,
   ResourceDescriptor,
@@ -23,6 +24,7 @@ export interface BuiltRunCatalog {
   resources: ResourceDescriptor[];
   resourceTemplates: ResourceTemplateDescriptor[];
   prompts: PromptDescriptor[];
+  runtimeBindings: Record<string, McpSnapshotRuntimeBinding>;
   configFingerprint: string;
 }
 
@@ -132,11 +134,17 @@ export class McpRunCatalogService {
     resourceTemplates.sort(compareResourceTemplates);
     prompts.sort(comparePrompts);
     sourceFingerprints.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
+    const runtimeBindings = Object.fromEntries(
+      sourceFingerprints.flatMap(({ sourceId, runtimeIdentity }) =>
+        runtimeIdentity ? [[sourceId, runtimeIdentity] as const] : [],
+      ),
+    );
     return {
       tools,
       resources,
       resourceTemplates,
       prompts,
+      runtimeBindings,
       configFingerprint: sha256({
         sourceFingerprints,
         tools,

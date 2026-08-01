@@ -242,7 +242,7 @@ export class ToolRegistryService implements OnModuleDestroy {
     await this.redis.hset(key, nodeId, JSON.stringify(tool));
 
     // Also store the discovered tools for the gateway to use
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
       const toolsKey = `mcp:run:${runId}:server:${nodeId}:tools`;
       await this.redis.set(toolsKey, JSON.stringify(tools));
       await this.redis.expire(toolsKey, REGISTRY_TTL_SECONDS);
@@ -251,7 +251,7 @@ export class ToolRegistryService implements OnModuleDestroy {
       );
     } else {
       this.logger.log(
-        `Registered MCP server: ${serverName} (no tools pre-discovered) (node: ${nodeId}, run: ${runId})`,
+        `Registered MCP server: ${serverName} (tool policy missing) (node: ${nodeId}, run: ${runId})`,
       );
     }
 

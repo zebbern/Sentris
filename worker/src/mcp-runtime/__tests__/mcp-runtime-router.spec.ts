@@ -11,6 +11,7 @@ import {
   McpRuntimeInternalClient,
   McpRuntimeInternalHttpError,
 } from '../mcp-runtime-internal.client';
+import { InputRequiredUnsupportedError } from '../mcp-client-adapter';
 import { McpRuntimeFenceLostError, type McpRuntimeManager } from '../mcp-runtime-manager';
 import { McpRuntimeRouter } from '../mcp-runtime-router';
 
@@ -285,9 +286,69 @@ describe('McpRuntimeRouter', () => {
     expect(result.reason).toBeInstanceOf(McpRuntimeFenceLostError);
     expect((result.reason as Error).cause).toBeInstanceOf(McpRuntimeInternalHttpError);
   });
+
+  test('turns a remote input-required sentinel into the same typed terminal as local execution', async () => {
+    const remoteFence: McpRuntimeFence = {
+      ...localFence,
+      ownerId: 'worker-9',
+      ownerEpoch: REMOTE_OWNER_EPOCH,
+    };
+    const post = mock(async () => {
+      throw new McpRuntimeInternalHttpError(
+        422,
+        'MCP server requires interactive input',
+        'MCP_INPUT_REQUIRED_UNSUPPORTED',
+      );
+    });
+    const router = new McpRuntimeRouter(managerStub(), {
+      post,
+    } as unknown as McpRuntimeInternalClient);
+
+    await expect(
+      router.execute(
+        acquisition(readyRef(remoteFence, 'http://worker-9.internal:9301')),
+        {
+          kind: 'invoke',
+          name: 'interactive',
+          args: {},
+          context: { idleTimeoutMs: 1_000, maxTotalTimeoutMs: 5_000 },
+        },
+        new AbortController().signal,
+      ),
+    ).rejects.toBeInstanceOf(InputRequiredUnsupportedError);
+  });
 });
 
 describe('McpRuntimeInternalClient boundaries', () => {
+  test('parses the bounded owner error code needed for typed terminal translation', async () => {
+    const fetchFn = mock(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: 'MCP server requires interactive input',
+            code: 'MCP_INPUT_REQUIRED_UNSUPPORTED',
+          }),
+          { status: 422, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    const client = new McpRuntimeInternalClient({ token: INTERNAL_TOKEN, fetchFn });
+
+    const result = await settled(
+      client.post(
+        'http://worker-3.internal:9301',
+        '/mcp-runtime/invoke',
+        {},
+        new AbortController().signal,
+      ),
+    );
+
+    expect(result.status).toBe('rejected');
+    expect(result.reason).toBeInstanceOf(McpRuntimeInternalHttpError);
+    expect((result.reason as McpRuntimeInternalHttpError).code).toBe(
+      'MCP_INPUT_REQUIRED_UNSUPPORTED',
+    );
+  });
+
   test('rejects generic and public owner addresses before dispatch', async () => {
     const fetchFn = mock(async () => new Response('{}'));
     const client = new McpRuntimeInternalClient({ token: INTERNAL_TOKEN, fetchFn });

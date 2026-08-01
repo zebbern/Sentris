@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   CapabilityGrantSchema,
   MCP_CAPABILITY_CONTRACT_VERSION,
+  MCP_LEGACY_CAPABILITY_CONTRACT_VERSION,
   McpCapabilityCatalogSnapshotSchema,
   buildInvocationManifest,
   type CapabilityGrant,
@@ -25,6 +26,9 @@ export class McpRunAuthorityService {
     organizationId: string | null;
     invokingNodeId?: string;
     allowedNodeIds: readonly string[];
+    contractVersion:
+      | typeof MCP_LEGACY_CAPABILITY_CONTRACT_VERSION
+      | typeof MCP_CAPABILITY_CONTRACT_VERSION;
   }): Promise<StoredMcpAuthority> {
     const allowedNodeIds = normalizeAllowedNodeIds(input.allowedNodeIds);
     const built = await this.catalog.build({
@@ -34,7 +38,7 @@ export class McpRunAuthorityService {
       allowedNodeIds,
     });
     const authorityKey = sha256([
-      MCP_CAPABILITY_CONTRACT_VERSION,
+      input.contractVersion,
       {
         kind: 'run',
         runId: input.runId,
@@ -75,8 +79,11 @@ export class McpRunAuthorityService {
     const snapshot: McpCapabilityCatalogSnapshot = McpCapabilityCatalogSnapshotSchema.parse({
       id: snapshotId,
       scope,
-      version: MCP_CAPABILITY_CONTRACT_VERSION,
+      version: input.contractVersion,
       configFingerprint: built.configFingerprint,
+      ...(input.contractVersion === MCP_CAPABILITY_CONTRACT_VERSION && {
+        runtimeBindings: built.runtimeBindings,
+      }),
       tools: built.tools,
       resources: built.resources,
       resourceTemplates: built.resourceTemplates,

@@ -1,22 +1,29 @@
 import { z } from 'zod';
 import {
   MCP_CAPABILITY_CONTRACT_VERSION,
+  MCP_LEGACY_CAPABILITY_CONTRACT_VERSION,
   type CapabilityGrant,
   type ExecutionScope,
   ExecutionScopeSchema,
   type McpCapabilityCatalogSnapshot,
+  McpReadyRuntimeRefSchema,
   McpRuntimeFenceSchema,
+  McpSnapshotRuntimeBindingSchema,
   type ToolDescriptor,
 } from './mcp-capabilities.js';
 
 export const TOOL_INVOCATION_UPDATE_NAME = 'executeToolInvocation' as const;
+export const MCP_OPERATION_UPDATE_NAME = 'executeMcpOperation' as const;
 export const INSTALL_TOOL_INVOCATION_MANIFEST_UPDATE_NAME =
   'installToolInvocationManifest' as const;
 export const TOOL_INVOCATION_PROTOCOL_QUERY_NAME = 'getToolInvocationProtocolVersion' as const;
 export const TOOL_INVOCATION_PROTOCOL_VERSION = 1 as const;
+export const MCP_OPERATION_PROTOCOL_QUERY_NAME = 'getMcpOperationProtocolVersion' as const;
+export const MCP_OPERATION_PROTOCOL_VERSION = 1 as const;
 export const MAX_INLINE_INVOCATION_INPUT_BYTES = 256 * 1024;
 export const MAX_INLINE_INVOCATION_OUTPUT_BYTES = 1024 * 1024;
 export const MAX_INVOCATION_MANIFEST_ENTRIES = 1024;
+export const MAX_MCP_OPERATION_TARGET_CHARS = 8_192;
 export const MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS = 8192;
 
 export const InvocationAttemptStatusSchema = z.enum([
@@ -43,9 +50,7 @@ export const ToolInvocationFailureClassSchema = z.enum([
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 
-type JsonTraversalFrame =
-  | { kind: 'enter'; value: unknown }
-  | { kind: 'exit'; value: object };
+type JsonTraversalFrame = { kind: 'enter'; value: unknown } | { kind: 'exit'; value: object };
 
 function isPlainJsonObject(value: unknown): value is JsonObject {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -200,6 +205,37 @@ export const McpOperationSchema = z.discriminatedUnion('kind', [
 ]);
 export type McpOperation = z.infer<typeof McpOperationSchema>;
 
+export const McpOperationInvocationRequestSchema = z
+  .object({
+    invocationId: z.string().uuid(),
+    scope: ExecutionScopeSchema,
+    capabilitySnapshotId: z.string().uuid(),
+    sourceId: z.string().min(1),
+    authorizationTarget: z.string().min(1).max(MAX_MCP_OPERATION_TARGET_CHARS),
+    operation: McpOperationSchema,
+    requestedAt: z.string().datetime(),
+    deadlineAt: z.string().datetime(),
+  })
+  .strict()
+  .refine(
+    (request) =>
+      isWithinInlineJsonByteLimit(
+        request as unknown as JsonObject,
+        MAX_INLINE_INVOCATION_INPUT_BYTES,
+      ),
+    { message: 'MCP operation invocation exceeds 262144 UTF-8 bytes' },
+  )
+  .superRefine(({ requestedAt, deadlineAt }, context) => {
+    if (new Date(deadlineAt) < new Date(requestedAt)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['deadlineAt'],
+        message: 'MCP operation invocation deadline must not be before requestedAt',
+      });
+    }
+  });
+export type McpOperationInvocationRequest = z.infer<typeof McpOperationInvocationRequestSchema>;
+
 export const McpRuntimeOperationRequestSchema = z
   .object({
     operationId: z.string().uuid(),
@@ -274,7 +310,7 @@ export const McpOperationResultSchema = z.discriminatedUnion('kind', [
 ]);
 export type McpOperationResult = z.infer<typeof McpOperationResultSchema>;
 
-export const InvocationManifestEntrySchema = z
+export const LegacyInvocationManifestEntrySchema = z
   .object({
     toolName: z.string().min(1),
     sourceId: z.string().min(1),
@@ -283,20 +319,57 @@ export const InvocationManifestEntrySchema = z
   })
   .strict()
   .readonly();
+export type LegacyInvocationManifestEntry = z.infer<typeof LegacyInvocationManifestEntrySchema>;
+
+export const McpOperationManifestEntrySchema = z
+  .object({
+    operationKind: z.enum(['tool-call', 'resource-read', 'prompt-get']),
+    operationTarget: z.string().min(1).max(MAX_MCP_OPERATION_TARGET_CHARS),
+    sourceId: z.string().min(1),
+    destination: z.enum(['component-activity', 'mcp-activity']),
+    retryPolicy: z.enum(['pre-dispatch-only', 'reviewed-idempotent']),
+  })
+  .strict()
+  .readonly();
+export type McpOperationManifestEntry = z.infer<typeof McpOperationManifestEntrySchema>;
+
+export const InvocationManifestEntrySchema = z.union([
+  LegacyInvocationManifestEntrySchema,
+  McpOperationManifestEntrySchema,
+]);
 export type InvocationManifestEntry = z.infer<typeof InvocationManifestEntrySchema>;
 
-export const InvocationManifestSchema = z
+const InvocationManifestBaseShape = {
+  capabilitySnapshotId: z.string().uuid(),
+  capabilityGrantId: z.string().uuid(),
+} as const;
+
+export const LegacyInvocationManifestSchema = z
   .object({
-    capabilitySnapshotId: z.string().uuid(),
-    capabilityGrantId: z.string().uuid(),
-    version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
+    ...InvocationManifestBaseShape,
+    version: z.literal(MCP_LEGACY_CAPABILITY_CONTRACT_VERSION),
     entries: z
-      .array(InvocationManifestEntrySchema)
+      .array(LegacyInvocationManifestEntrySchema)
       .max(MAX_INVOCATION_MANIFEST_ENTRIES)
       .readonly(),
   })
   .strict()
   .readonly();
+export const DurableMcpOperationInvocationManifestSchema = z
+  .object({
+    ...InvocationManifestBaseShape,
+    version: z.literal(MCP_CAPABILITY_CONTRACT_VERSION),
+    entries: z
+      .array(McpOperationManifestEntrySchema)
+      .max(MAX_INVOCATION_MANIFEST_ENTRIES)
+      .readonly(),
+  })
+  .strict()
+  .readonly();
+export const InvocationManifestSchema = z.discriminatedUnion('version', [
+  LegacyInvocationManifestSchema,
+  DurableMcpOperationInvocationManifestSchema,
+]);
 export type InvocationManifest = z.infer<typeof InvocationManifestSchema>;
 
 export const InstallToolInvocationManifestRequestSchema = z
@@ -358,6 +431,214 @@ export const PreparedInvocationRefSchema = z
   })
   .strict();
 export type PreparedInvocationRef = z.infer<typeof PreparedInvocationRefSchema>;
+
+export const PreparedMcpOperationRefSchema = z
+  .object({
+    invocationId: z.string().uuid(),
+    attemptId: z.string().uuid(),
+    attemptNumber: z.number().int().positive(),
+    capabilitySnapshotId: z.string().uuid(),
+    capabilityGrantId: z.string().uuid(),
+    operationKind: z.enum(['tool-call', 'resource-read', 'prompt-get']),
+    operationTarget: z.string().min(1).max(MAX_MCP_OPERATION_TARGET_CHARS),
+    toolName: z.string().min(1).max(128).nullable(),
+    sourceId: z.string().min(1),
+    destination: z.enum(['component-activity', 'mcp-activity']),
+    retryPolicy: z.enum(['pre-dispatch-only', 'reviewed-idempotent']),
+    preparedAt: z.string().datetime(),
+  })
+  .strict()
+  .superRefine((ref, context) => {
+    const expectedToolName = ref.operationKind === 'tool-call' ? ref.operationTarget : null;
+    if (ref.toolName !== expectedToolName) {
+      context.addIssue({
+        code: 'custom',
+        path: ['toolName'],
+        message: 'Tool compatibility name must match the durable operation target',
+      });
+    }
+    if (ref.destination === 'component-activity' && ref.operationKind !== 'tool-call') {
+      context.addIssue({
+        code: 'custom',
+        path: ['destination'],
+        message: 'Only tool calls may dispatch to component activities',
+      });
+    }
+  });
+export type PreparedMcpOperationRef = z.infer<typeof PreparedMcpOperationRefSchema>;
+
+const McpOperationDispatchPlanBaseShape = {
+  ref: PreparedMcpOperationRefSchema,
+  manifestEntry: McpOperationManifestEntrySchema,
+  operation: McpOperationSchema,
+  requestedAt: z.string().datetime(),
+  deadlineAt: z.string().datetime(),
+};
+
+export const McpOperationDispatchPlanSchema = z
+  .union([
+    z
+      .object({
+        ...McpOperationDispatchPlanBaseShape,
+        runtimeBinding: McpSnapshotRuntimeBindingSchema,
+      })
+      .strict(),
+    z.object(McpOperationDispatchPlanBaseShape).strict(),
+  ])
+  .superRefine((plan, context) => {
+    const { ref, manifestEntry, operation } = plan;
+    if (
+      manifestEntry.operationKind !== ref.operationKind ||
+      manifestEntry.operationTarget !== ref.operationTarget ||
+      manifestEntry.sourceId !== ref.sourceId ||
+      manifestEntry.destination !== ref.destination ||
+      manifestEntry.retryPolicy !== ref.retryPolicy ||
+      operation.kind !== ref.operationKind
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'MCP operation dispatch plan does not match its immutable authority',
+      });
+    }
+    if (ref.destination === 'mcp-activity' && !('runtimeBinding' in plan)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeBinding'],
+        message: 'Outbound MCP dispatch requires a snapshotted runtime binding',
+      });
+    }
+    if (ref.destination === 'component-activity' && 'runtimeBinding' in plan) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeBinding'],
+        message: 'Component dispatch must not claim an MCP runtime binding',
+      });
+    }
+    if (new Date(plan.deadlineAt) < new Date(plan.requestedAt)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['deadlineAt'],
+        message: 'MCP operation dispatch deadline must not be before requestedAt',
+      });
+    }
+  });
+export type McpOperationDispatchPlan = z.infer<typeof McpOperationDispatchPlanSchema>;
+
+export const PrepareMcpOperationOutcomeSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('prepared'),
+      plan: McpOperationDispatchPlanSchema,
+      manifest: InvocationManifestSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal('terminal'), result: McpOperationResultSchema }).strict(),
+]);
+export type PrepareMcpOperationOutcome = z.infer<typeof PrepareMcpOperationOutcomeSchema>;
+
+export const ClaimMcpOperationDispatchRequestSchema = z
+  .object({
+    plan: McpOperationDispatchPlanSchema,
+    runtimeRef: McpReadyRuntimeRefSchema.optional(),
+  })
+  .strict()
+  .superRefine((claim, context) => {
+    const { plan, runtimeRef } = claim;
+    if (plan.ref.destination === 'component-activity') {
+      if ('runtimeBinding' in plan || runtimeRef !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Component dispatch claims cannot include an MCP runtime',
+        });
+      }
+      return;
+    }
+    if (!('runtimeBinding' in plan) || runtimeRef === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Outbound dispatch claims require an acquired MCP runtime',
+      });
+      return;
+    }
+    if (
+      plan.runtimeBinding.protocolEra !== runtimeRef.protocolEra ||
+      plan.runtimeBinding.protocolVersion !== runtimeRef.protocolVersion ||
+      plan.runtimeBinding.capabilityFingerprint !== runtimeRef.capabilityFingerprint
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeRef'],
+        message: 'Acquired MCP runtime does not match the immutable snapshot binding',
+      });
+    }
+  });
+export type ClaimMcpOperationDispatchRequest = z.infer<
+  typeof ClaimMcpOperationDispatchRequestSchema
+>;
+
+export const McpOperationComponentDispatchContextSchema = z
+  .object({
+    ref: PreparedMcpOperationRefSchema,
+    run: z
+      .object({
+        runId: z.string().min(1),
+        workflowId: z.string().uuid(),
+        workflowVersionId: z.string().uuid(),
+        organizationId: z.string().min(1).nullable(),
+        scopeId: z.string().uuid(),
+      })
+      .strict(),
+    component: z
+      .object({
+        nodeId: z.string().min(1),
+        componentId: z.string().min(1),
+        arguments: JsonObjectSchema,
+        parameters: JsonObjectSchema,
+        credentials: JsonObjectSchema.optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type McpOperationComponentDispatchContext = z.infer<
+  typeof McpOperationComponentDispatchContextSchema
+>;
+
+export const ClaimMcpOperationDispatchOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('claimed') }).strict(),
+  z
+    .object({
+      kind: z.literal('component-dispatch'),
+      context: McpOperationComponentDispatchContextSchema,
+    })
+    .strict(),
+  z.object({ kind: z.literal('terminal'), result: McpOperationResultSchema }).strict(),
+]);
+export type ClaimMcpOperationDispatchOutcome = z.infer<
+  typeof ClaimMcpOperationDispatchOutcomeSchema
+>;
+
+export const SettleMcpOperationAttemptRequestSchema = z
+  .object({
+    ref: PreparedMcpOperationRefSchema,
+    fence: McpRuntimeFenceSchema.nullable(),
+    result: McpOperationResultSchema,
+  })
+  .strict();
+export type SettleMcpOperationAttemptRequest = z.infer<
+  typeof SettleMcpOperationAttemptRequestSchema
+>;
+
+export const ReconcileMcpOperationDispatchRequestSchema = z
+  .object({
+    ref: PreparedMcpOperationRefSchema,
+    cause: z.enum(['failure', 'deadline', 'cancelled']),
+    message: z.string().min(1).max(MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS),
+    completedAt: z.string().datetime(),
+  })
+  .strict();
+export type ReconcileMcpOperationDispatchRequest = z.infer<
+  typeof ReconcileMcpOperationDispatchRequestSchema
+>;
 
 export const ToolInvocationErrorSchema = z
   .object({
@@ -471,14 +752,9 @@ export const ClaimComponentDispatchOutcomeSchema = z.discriminatedUnion('kind', 
     .strict(),
   z.object({ kind: z.literal('terminal'), result: ToolInvocationResultSchema }).strict(),
 ]);
-export type ClaimComponentDispatchOutcome = z.infer<
-  typeof ClaimComponentDispatchOutcomeSchema
->;
+export type ClaimComponentDispatchOutcome = z.infer<typeof ClaimComponentDispatchOutcomeSchema>;
 
-export function assertCapabilityGrantApplies(
-  scope: ExecutionScope,
-  grant: CapabilityGrant,
-): void {
+export function assertCapabilityGrantApplies(scope: ExecutionScope, grant: CapabilityGrant): void {
   if (scope.capabilityGrantId !== grant.id) {
     throw new Error('Capability grant does not match the execution scope');
   }
@@ -517,9 +793,7 @@ export function assertCapabilityGrantApplies(
   }
 }
 
-function manifestRetryPolicy(
-  tool: ToolDescriptor,
-): InvocationManifestEntry['retryPolicy'] {
+function manifestRetryPolicy(tool: ToolDescriptor): McpOperationManifestEntry['retryPolicy'] {
   if (
     tool.retryPolicy === 'reviewed-idempotent' &&
     (tool.effectsSource === 'sentris-contract' || tool.effectsSource === 'operator-policy')
@@ -548,7 +822,7 @@ export function buildInvocationManifest(
     grant.sources.map((source) => [source.sourceId, source.toolAccess] as const),
   );
 
-  const entries = snapshot.tools
+  const toolEntries = snapshot.tools
     .filter((tool) => {
       const access = accessBySource.get(tool.source.sourceId);
       return (
@@ -556,19 +830,70 @@ export function buildInvocationManifest(
         (access?.mode === 'subset' && access.names.includes(tool.canonicalName))
       );
     })
-    .map<InvocationManifestEntry>((tool) => ({
-      toolName: tool.canonicalName,
+    .map<McpOperationManifestEntry>((tool) => ({
+      operationKind: 'tool-call',
+      operationTarget: tool.canonicalName,
       sourceId: tool.source.sourceId,
       destination: tool.source.kind === 'component' ? 'component-activity' : 'mcp-activity',
       retryPolicy: manifestRetryPolicy(tool),
-    }))
-    .sort((left, right) => {
-      if (left.toolName < right.toolName) return -1;
-      if (left.toolName > right.toolName) return 1;
-      return 0;
-    });
+    }));
+  const grantedSources = new Set(grant.sources.map((source) => source.sourceId));
+  const resourceEntries: McpOperationManifestEntry[] = [
+    ...snapshot.resources.map((resource) => ({
+      operationKind: 'resource-read' as const,
+      operationTarget: resource.uri,
+      sourceId: resource.sourceId,
+      destination: 'mcp-activity' as const,
+      retryPolicy: 'reviewed-idempotent' as const,
+    })),
+    ...snapshot.resourceTemplates.map((template) => ({
+      operationKind: 'resource-read' as const,
+      operationTarget: template.uriTemplate,
+      sourceId: template.sourceId,
+      destination: 'mcp-activity' as const,
+      retryPolicy: 'reviewed-idempotent' as const,
+    })),
+  ].filter((entry) => grantedSources.has(entry.sourceId));
+  const promptEntries: McpOperationManifestEntry[] = snapshot.prompts
+    .filter((prompt) => grantedSources.has(prompt.sourceId))
+    .map((prompt) => ({
+      operationKind: 'prompt-get',
+      operationTarget: prompt.name,
+      sourceId: prompt.sourceId,
+      destination: 'mcp-activity',
+      retryPolicy: 'reviewed-idempotent',
+    }));
+  const entries = [...toolEntries, ...resourceEntries, ...promptEntries].sort(
+    (left, right) =>
+      left.operationKind.localeCompare(right.operationKind) ||
+      left.operationTarget.localeCompare(right.operationTarget) ||
+      left.sourceId.localeCompare(right.sourceId),
+  );
+  const identities = new Set<string>();
+  for (const entry of entries) {
+    const identity = `${entry.operationKind}\0${entry.operationTarget}\0${entry.sourceId}`;
+    if (identities.has(identity)) {
+      throw new Error(
+        `Duplicate MCP operation manifest entry: ${entry.operationKind} ${entry.operationTarget} ${entry.sourceId}`,
+      );
+    }
+    identities.add(identity);
+  }
 
-  return InvocationManifestSchema.parse({
+  if (snapshot.version === MCP_LEGACY_CAPABILITY_CONTRACT_VERSION) {
+    return LegacyInvocationManifestSchema.parse({
+      capabilitySnapshotId: snapshot.id,
+      capabilityGrantId: grant.id,
+      version: MCP_LEGACY_CAPABILITY_CONTRACT_VERSION,
+      entries: toolEntries.map((entry) => ({
+        toolName: entry.operationTarget,
+        sourceId: entry.sourceId,
+        destination: entry.destination,
+        retryPolicy: entry.retryPolicy,
+      })),
+    });
+  }
+  return DurableMcpOperationInvocationManifestSchema.parse({
     capabilitySnapshotId: snapshot.id,
     capabilityGrantId: grant.id,
     version: MCP_CAPABILITY_CONTRACT_VERSION,
@@ -583,7 +908,7 @@ export function resolveInvocationManifestEntry(
     capabilitySnapshotId: string;
     toolName: string;
   },
-): InvocationManifestEntry {
+): LegacyInvocationManifestEntry {
   if (input.scope.capabilityGrantId !== manifest.capabilityGrantId) {
     throw new Error('Invocation manifest does not match the execution scope grant');
   }
@@ -592,10 +917,61 @@ export function resolveInvocationManifestEntry(
     throw new Error('Invocation manifest does not match the capability snapshot');
   }
 
-  const entry = manifest.entries.find((candidate) => candidate.toolName === input.toolName);
+  const entry = manifest.entries.find(
+    (candidate) =>
+      ('toolName' in candidate && candidate.toolName === input.toolName) ||
+      ('operationKind' in candidate &&
+        candidate.operationKind === 'tool-call' &&
+        candidate.operationTarget === input.toolName),
+  );
   if (!entry) {
     throw new Error(`Tool is not authorized by the invocation manifest: ${input.toolName}`);
   }
 
-  return entry;
+  if ('toolName' in entry) return entry;
+  return LegacyInvocationManifestEntrySchema.parse({
+    toolName: entry.operationTarget,
+    sourceId: entry.sourceId,
+    destination: entry.destination,
+    retryPolicy: entry.retryPolicy,
+  });
+}
+
+export function resolveMcpOperationManifestEntry(
+  manifest: InvocationManifest,
+  input: McpOperationInvocationRequest,
+): McpOperationManifestEntry {
+  if (input.scope.capabilityGrantId !== manifest.capabilityGrantId) {
+    throw new Error('Invocation manifest does not match the execution scope grant');
+  }
+  if (input.capabilitySnapshotId !== manifest.capabilitySnapshotId) {
+    throw new Error('Invocation manifest does not match the capability snapshot');
+  }
+  const entry = manifest.entries.find((candidate) => {
+    if ('toolName' in candidate) {
+      return (
+        input.operation.kind === 'tool-call' &&
+        candidate.toolName === input.authorizationTarget &&
+        candidate.sourceId === input.sourceId
+      );
+    }
+    return (
+      candidate.operationKind === input.operation.kind &&
+      candidate.operationTarget === input.authorizationTarget &&
+      candidate.sourceId === input.sourceId
+    );
+  });
+  if (!entry) {
+    throw new Error(
+      `MCP operation is not authorized by the invocation manifest: ${input.operation.kind} ${input.authorizationTarget}`,
+    );
+  }
+  if ('operationKind' in entry) return entry;
+  return McpOperationManifestEntrySchema.parse({
+    operationKind: 'tool-call',
+    operationTarget: entry.toolName,
+    sourceId: entry.sourceId,
+    destination: entry.destination,
+    retryPolicy: entry.retryPolicy,
+  });
 }

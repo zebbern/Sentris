@@ -562,7 +562,7 @@ describe('MCP Library Integration Tests', () => {
       ]);
     });
 
-    test('continues after exact filtering leaves one optional server with zero tools', async () => {
+    test('registers an explicit empty policy when exact filtering leaves a server with zero tools', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       setupFetchMocks(
         [
@@ -625,11 +625,15 @@ describe('MCP Library Integration Tests', () => {
           url.includes('/register-mcp-server') && init?.method === 'POST',
       );
       expect(result).toEqual({});
-      expect(registerCalls).toHaveLength(1);
-      expect(JSON.parse(String(registerCalls[0][1].body)).serverId).toBe('working-server');
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No MCP tools remain enabled for server empty-server'),
-      );
+      expect(registerCalls).toHaveLength(2);
+      const registrations = new Map<string, { tools: unknown[] }>();
+      for (const [, init] of registerCalls as [string, RequestInit][]) {
+        const body = JSON.parse(String(init.body)) as { serverId: string; tools: unknown[] };
+        registrations.set(body.serverId, body);
+      }
+      expect(registrations.get('empty-server')?.tools).toEqual([]);
+      expect(registrations.get('working-server')?.tools).toHaveLength(1);
+      expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
     });
 

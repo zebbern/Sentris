@@ -1,4 +1,6 @@
+import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -12,20 +14,35 @@ import {
   getExposedParameterIds,
   getToolInputShape,
 } from '@sentris/component-sdk';
-import { fromJsonSchema, McpServer } from '@modelcontextprotocol/server';
+import { fromJsonSchema, McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import {
+  MCP_OPERATION_UPDATE_NAME,
+  McpOperationInvocationRequestSchema,
+  McpOperationResultSchema,
+  mcpSnapshotRuntimeBindings,
   TOOL_INVOCATION_UPDATE_NAME,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   type McpToolRegistrationDescriptor,
+  type McpOperation,
+  type McpOperationResult,
+  type JsonObject,
+  type PromptDescriptor,
+  type ResourceDescriptor,
+  type ResourceTemplateDescriptor,
   type ToolDescriptor,
   type ToolInvocationResult,
 } from '@sentris/shared';
 import { z } from 'zod';
 
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+import type { AuthContext } from '../auth/types';
+import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 import { computeMcpBindingFingerprint } from '../mcp-runtime/mcp-binding-fingerprint';
-import { McpRuntimeRepository } from '../mcp-runtime/mcp-runtime.repository';
+import {
+  McpRuntimeRepository,
+  type StoredMcpAuthority,
+} from '../mcp-runtime/mcp-runtime.repository';
 import {
   claimMcpToolName,
   externalMcpToolName,
@@ -51,6 +68,7 @@ export class McpGatewayService {
     private readonly traceRepository: TraceRepository,
     private readonly mcpServersRepository: McpServersRepository,
     private readonly mcpRuntimeRepository: McpRuntimeRepository,
+    private readonly runtimeConfigService: McpServerRuntimeConfigService,
   ) {}
 
   async createServerForRun(context: RunMcpRequestContext): Promise<McpServer> {
@@ -99,6 +117,7 @@ export class McpGatewayService {
       throw new ForbiddenException('MCP capability snapshot does not match the run authority');
     }
 
+    const runtimeBindings = mcpSnapshotRuntimeBindings(authority.snapshot);
     const externalDescriptors = authority.snapshot.tools.filter(
       (
         descriptor,
@@ -106,8 +125,18 @@ export class McpGatewayService {
         source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
       } => descriptor.source.kind === 'mcp',
     );
-    const externalSources = externalDescriptors.length
-      ? await this.resolveSnapshotExternalSources(context.runId, externalDescriptors)
+    const externalSourceIds = new Set([
+      ...externalDescriptors.map((descriptor) => descriptor.source.sourceId),
+      ...(authority.snapshot.version === '2'
+        ? [
+            ...authority.snapshot.resources.map((descriptor) => descriptor.sourceId),
+            ...authority.snapshot.resourceTemplates.map((descriptor) => descriptor.sourceId),
+            ...authority.snapshot.prompts.map((descriptor) => descriptor.sourceId),
+          ]
+        : []),
+    ]);
+    const externalSources = externalSourceIds.size
+      ? await this.resolveSnapshotExternalSources(context, authority.snapshot, externalDescriptors)
       : new Map<string, RegisteredTool>();
 
     for (const descriptor of authority.snapshot.tools) {
@@ -124,27 +153,57 @@ export class McpGatewayService {
             `External MCP source ${descriptor.source.sourceId} is unavailable for run ${context.runId}`,
           );
         }
-        this.registerSnapshotExternalTool(server, context.runId, source, {
-          ...descriptor,
-          source: descriptor.source,
-        });
+        this.registerSnapshotExternalTool(
+          server,
+          context,
+          capabilitySnapshotId,
+          source,
+          runtimeBindings[descriptor.source.sourceId] !== undefined,
+          { ...descriptor, source: descriptor.source },
+        );
       }
     }
+
+    this.registerSnapshotResources(
+      server,
+      context,
+      capabilitySnapshotId,
+      authority.snapshot.version === '2' ? authority.snapshot.resources : [],
+      authority.snapshot.version === '2' ? authority.snapshot.resourceTemplates : [],
+      externalSources,
+    );
+    this.registerSnapshotPrompts(
+      server,
+      context,
+      capabilitySnapshotId,
+      authority.snapshot.version === '2' ? authority.snapshot.prompts : [],
+      externalSources,
+    );
   }
 
   private async resolveSnapshotExternalSources(
-    runId: string,
+    context: RunMcpRequestContext,
+    snapshot: StoredMcpAuthority['snapshot'],
     descriptors: readonly (ToolDescriptor & {
       source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
     })[],
   ): Promise<Map<string, RegisteredTool>> {
-    const requiredSourceIds = new Set(descriptors.map((descriptor) => descriptor.source.sourceId));
+    const requiredSourceIds = new Set([
+      ...descriptors.map((descriptor) => descriptor.source.sourceId),
+      ...(snapshot.version === '2'
+        ? [
+            ...snapshot.resources.map((descriptor) => descriptor.sourceId),
+            ...snapshot.resourceTemplates.map((descriptor) => descriptor.sourceId),
+            ...snapshot.prompts.map((descriptor) => descriptor.sourceId),
+          ]
+        : []),
+    ]);
     const descriptorsBySource = new Map<string, typeof descriptors>();
     for (const descriptor of descriptors) {
       const sourceId = descriptor.source.sourceId;
       descriptorsBySource.set(sourceId, [...(descriptorsBySource.get(sourceId) ?? []), descriptor]);
     }
-    const registered = await this.toolRegistry.getToolsForRun(runId);
+    const registered = await this.toolRegistry.getToolsForRun(context.runId);
     const sources = new Map<string, RegisteredTool>();
     for (const source of registered) {
       if (!requiredSourceIds.has(source.nodeId)) continue;
@@ -156,31 +215,71 @@ export class McpGatewayService {
       if (sources.has(source.nodeId)) {
         throw new ForbiddenException(`Duplicate MCP runtime source mapping: ${source.nodeId}`);
       }
-      const snapshotDescriptors = descriptorsBySource.get(source.nodeId) ?? [];
-      const expectedFingerprint = snapshotDescriptors[0]?.source.bindingFingerprint;
-      if (
-        !expectedFingerprint ||
-        snapshotDescriptors.some(
-          (descriptor) => descriptor.source.bindingFingerprint !== expectedFingerprint,
-        )
-      ) {
+      const runtimeBinding = mcpSnapshotRuntimeBindings(snapshot)[source.nodeId];
+      if (!runtimeBinding) {
+        if (
+          snapshot.version === '2' &&
+          (snapshot.resources.some((descriptor) => descriptor.sourceId === source.nodeId) ||
+            snapshot.resourceTemplates.some(
+              (descriptor) => descriptor.sourceId === source.nodeId,
+            ) ||
+            snapshot.prompts.some((descriptor) => descriptor.sourceId === source.nodeId))
+        ) {
+          throw new ForbiddenException(
+            `External MCP source ${source.nodeId} has no matching immutable runtime binding`,
+          );
+        }
+      } else if (!source.serverId || source.serverId !== runtimeBinding.runtimeKey.sourceId) {
         throw new ForbiddenException(
-          `External MCP source ${source.nodeId} has inconsistent snapshot bindings`,
+          `External MCP source ${source.nodeId} has no matching immutable runtime binding`,
         );
+      } else {
+        const currentRuntimeKey = await this.runtimeConfigService.buildRuntimeKey(
+          runPrincipal(context.runId, context.organizationId),
+          source.serverId,
+        );
+        if (!isDeepStrictEqual(currentRuntimeKey, runtimeBinding.runtimeKey)) {
+          throw new ForbiddenException(
+            `External MCP source ${source.nodeId} no longer matches its immutable runtime binding`,
+          );
+        }
       }
-      const currentFingerprint = computeMcpBindingFingerprint(
-        source,
-        snapshotDescriptors
-          .slice()
-          .sort((left, right) => left.source.upstreamName.localeCompare(right.source.upstreamName))
-          .map(externalSnapshotRegistrationDescriptor),
-      );
-      if (currentFingerprint !== expectedFingerprint) {
-        throw new ForbiddenException(
-          `External MCP source ${source.nodeId} no longer matches its immutable snapshot binding`,
+      const snapshotDescriptors = descriptorsBySource.get(source.nodeId) ?? [];
+      if (snapshotDescriptors.length > 0) {
+        const expectedFingerprint = snapshotDescriptors[0]?.source.bindingFingerprint;
+        if (
+          !expectedFingerprint ||
+          snapshotDescriptors.some(
+            (descriptor) => descriptor.source.bindingFingerprint !== expectedFingerprint,
+          )
+        ) {
+          throw new ForbiddenException(
+            `External MCP source ${source.nodeId} has inconsistent snapshot bindings`,
+          );
+        }
+        const currentFingerprint = computeMcpBindingFingerprint(
+          source,
+          snapshotDescriptors
+            .slice()
+            .sort((left, right) =>
+              left.source.upstreamName.localeCompare(right.source.upstreamName),
+            )
+            .map(externalSnapshotRegistrationDescriptor),
         );
+        if (currentFingerprint !== expectedFingerprint) {
+          throw new ForbiddenException(
+            `External MCP source ${source.nodeId} no longer matches its immutable snapshot binding`,
+          );
+        }
       }
       sources.set(source.nodeId, source);
+    }
+    for (const sourceId of requiredSourceIds) {
+      if (!sources.has(sourceId)) {
+        throw new NotFoundException(
+          `External MCP source ${sourceId} is unavailable for run ${context.runId}`,
+        );
+      }
     }
     return sources;
   }
@@ -261,8 +360,10 @@ export class McpGatewayService {
 
   private registerSnapshotExternalTool(
     server: McpServer,
-    runId: string,
-    source: RegisteredTool,
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    liveSource: RegisteredTool,
+    hasRuntimeBinding: boolean,
     descriptor: ToolDescriptor & {
       source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
     },
@@ -270,23 +371,43 @@ export class McpGatewayService {
     this.registerSnapshotDescriptor(server, descriptor, async (args) => {
       const startedAt = Date.now();
       const nodeRef = `mcp:${descriptor.canonicalName}`;
-      await this.logToolCall(runId, descriptor.canonicalName, 'STARTED', nodeRef);
+      await this.logToolCall(context.runId, descriptor.canonicalName, 'STARTED', nodeRef);
       try {
-        const result = await this.legacyOutbound.callTool(
-          runId,
-          source,
-          descriptor.source.upstreamName,
-          args,
-          descriptor.source.bindingFingerprint,
+        if (!hasRuntimeBinding) {
+          const output = await this.legacyOutbound.callTool(
+            context.runId,
+            liveSource,
+            descriptor.source.upstreamName,
+            args,
+            descriptor.source.bindingFingerprint,
+          );
+          await this.logToolCall(context.runId, descriptor.canonicalName, 'COMPLETED', nodeRef, {
+            duration: Date.now() - startedAt,
+            output,
+          });
+          return output;
+        }
+        const result = await this.executeSnapshotOperation(
+          context,
+          capabilitySnapshotId,
+          descriptor.source.sourceId,
+          descriptor.canonicalName,
+          {
+            kind: 'tool-call',
+            name: descriptor.canonicalName,
+            arguments: args as JsonObject,
+          },
         );
-        await this.logToolCall(runId, descriptor.canonicalName, 'COMPLETED', nodeRef, {
+        if (result.kind !== 'completed') throw new Error(result.message);
+        const output = toolFacadeResult(result.output, descriptor.source.sourceId);
+        await this.logToolCall(context.runId, descriptor.canonicalName, 'COMPLETED', nodeRef, {
           duration: Date.now() - startedAt,
-          output: result,
+          output,
         });
-        return result;
+        return output;
       } catch (error) {
         const message = safeErrorMessage(error);
-        await this.logToolCall(runId, descriptor.canonicalName, 'FAILED', nodeRef, {
+        await this.logToolCall(context.runId, descriptor.canonicalName, 'FAILED', nodeRef, {
           duration: Date.now() - startedAt,
           error: message,
         });
@@ -314,6 +435,136 @@ export class McpGatewayService {
         _meta: descriptor.meta,
       },
       callback as never,
+    );
+  }
+
+  private registerSnapshotResources(
+    server: McpServer,
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    resources: readonly ResourceDescriptor[],
+    templates: readonly ResourceTemplateDescriptor[],
+    externalSources: ReadonlyMap<string, RegisteredTool>,
+  ): void {
+    const registeredUris = new Set<string>();
+    for (const descriptor of resources) {
+      const source = requireSnapshotSource(externalSources, descriptor.sourceId, context.runId);
+      const facadeName = externalMcpToolName(source.toolName, descriptor.name);
+      const facadeUri = resourceFacadeUri(descriptor.sourceId, descriptor.uri);
+      if (registeredUris.has(facadeUri)) continue;
+      registeredUris.add(facadeUri);
+      server.registerResource(facadeName, facadeUri, resourceMetadata(descriptor), async (uri) => {
+        const upstreamUri = upstreamResourceUri(descriptor.sourceId, uri.href);
+        if (upstreamUri !== descriptor.uri) {
+          throw new Error(`MCP resource facade URI does not match ${descriptor.uri}`);
+        }
+        const result = await this.executeSnapshotOperation(
+          context,
+          capabilitySnapshotId,
+          descriptor.sourceId,
+          descriptor.uri,
+          { kind: 'resource-read', uri: upstreamUri },
+        );
+        return resourceFacadeResult(result, descriptor.sourceId);
+      });
+    }
+    for (const descriptor of templates) {
+      const source = requireSnapshotSource(externalSources, descriptor.sourceId, context.runId);
+      const facadeName = externalMcpToolName(source.toolName, descriptor.name);
+      const facadeTemplate = resourceFacadeUri(descriptor.sourceId, descriptor.uriTemplate);
+      if (registeredUris.has(facadeTemplate)) continue;
+      registeredUris.add(facadeTemplate);
+      server.registerResource(
+        facadeName,
+        new ResourceTemplate(facadeTemplate, { list: undefined }),
+        resourceMetadata(descriptor),
+        async (uri) => {
+          const upstreamUri = upstreamResourceUri(descriptor.sourceId, uri.href);
+          const result = await this.executeSnapshotOperation(
+            context,
+            capabilitySnapshotId,
+            descriptor.sourceId,
+            descriptor.uriTemplate,
+            { kind: 'resource-read', uri: upstreamUri },
+          );
+          return resourceFacadeResult(result, descriptor.sourceId);
+        },
+      );
+    }
+  }
+
+  private registerSnapshotPrompts(
+    server: McpServer,
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    prompts: readonly PromptDescriptor[],
+    externalSources: ReadonlyMap<string, RegisteredTool>,
+  ): void {
+    const names = new Set<string>();
+    for (const descriptor of prompts) {
+      const source = requireSnapshotSource(externalSources, descriptor.sourceId, context.runId);
+      const facadeName = externalMcpToolName(source.toolName, descriptor.name);
+      claimFacadeIdentity(names, facadeName, 'prompt name');
+      const shape = Object.fromEntries(
+        descriptor.arguments.map((argument) => {
+          const value = argument.description
+            ? z.string().describe(argument.description)
+            : z.string();
+          return [argument.name, argument.required ? value : value.optional()];
+        }),
+      );
+      server.registerPrompt(
+        facadeName,
+        {
+          title: descriptor.title,
+          description: descriptor.description,
+          argsSchema: z.object(shape),
+          icons: descriptor.icons,
+          _meta: descriptor.meta,
+        },
+        async (args) => {
+          const result = await this.executeSnapshotOperation(
+            context,
+            capabilitySnapshotId,
+            descriptor.sourceId,
+            descriptor.name,
+            {
+              kind: 'prompt-get',
+              name: descriptor.name,
+              arguments: args as Record<string, string>,
+            },
+          );
+          return promptFacadeResult(result, descriptor.sourceId);
+        },
+      );
+    }
+  }
+
+  private async executeSnapshotOperation(
+    context: RunMcpRequestContext,
+    capabilitySnapshotId: string,
+    sourceId: string,
+    authorizationTarget: string,
+    operation: McpOperation,
+  ): Promise<McpOperationResult> {
+    const now = new Date();
+    const request = McpOperationInvocationRequestSchema.parse({
+      invocationId: randomUUID(),
+      scope: toRunExecutionScope(context),
+      capabilitySnapshotId,
+      sourceId,
+      authorizationTarget,
+      operation,
+      requestedAt: now.toISOString(),
+      deadlineAt: new Date(now.getTime() + 5 * 60_000).toISOString(),
+    });
+    return McpOperationResultSchema.parse(
+      await this.temporalService.executeWorkflowUpdate<McpOperationResult>({
+        workflowId: context.runId,
+        updateName: MCP_OPERATION_UPDATE_NAME,
+        updateId: request.invocationId,
+        args: request,
+      }),
     );
   }
 
@@ -594,6 +845,150 @@ function externalSnapshotRegistrationDescriptor(
     ...(descriptor.annotations !== undefined && { annotations: descriptor.annotations }),
     ...(descriptor.meta !== undefined && { _meta: descriptor.meta }),
   };
+}
+
+function runPrincipal(runId: string, organizationId: string | null): AuthContext {
+  return {
+    userId: `run:${runId}`,
+    organizationId,
+    roles: ['MEMBER'],
+    isAuthenticated: true,
+    provider: 'sentris-run',
+  };
+}
+
+function requireSnapshotSource(
+  sources: ReadonlyMap<string, RegisteredTool>,
+  sourceId: string,
+  runId: string,
+): RegisteredTool {
+  const source = sources.get(sourceId);
+  if (!source) {
+    throw new NotFoundException(`External MCP source ${sourceId} is unavailable for run ${runId}`);
+  }
+  return source;
+}
+
+function claimFacadeIdentity(identities: Set<string>, identity: string, kind: string): void {
+  if (identities.has(identity)) {
+    throw new ForbiddenException(`MCP ${kind} collision: ${identity}`);
+  }
+  identities.add(identity);
+}
+
+function resourceMetadata(descriptor: ResourceDescriptor | ResourceTemplateDescriptor) {
+  return {
+    ...(descriptor.title !== undefined && { title: descriptor.title }),
+    ...(descriptor.description !== undefined && { description: descriptor.description }),
+    ...(descriptor.mimeType !== undefined && { mimeType: descriptor.mimeType }),
+    ...(descriptor.icons !== undefined && { icons: descriptor.icons }),
+    ...(descriptor.annotations !== undefined && { annotations: descriptor.annotations }),
+    ...(descriptor.meta !== undefined && { _meta: descriptor.meta }),
+    ...('size' in descriptor && descriptor.size !== undefined && { size: descriptor.size }),
+  };
+}
+
+function operationOutputRecord(output: unknown): Record<string, unknown> {
+  if (!isRecord(output)) {
+    throw new Error('MCP operation returned an invalid facade result');
+  }
+  return output;
+}
+
+function toolFacadeResult(output: unknown, sourceId?: string) {
+  const record = operationOutputRecord(output);
+  if (!Array.isArray(record.content)) {
+    throw new Error('MCP tool operation returned no content');
+  }
+  return denormalizeProtocolMetadata({
+    ...record,
+    content: record.content.map((content) => denormalizeContentMetadata(content, sourceId)),
+  });
+}
+
+function resourceFacadeResult(result: McpOperationResult, sourceId: string) {
+  if (result.kind !== 'completed') throw new Error(result.message);
+  const output = operationOutputRecord(result.output);
+  if (!Array.isArray(output.contents)) {
+    throw new Error('MCP resource operation returned no contents');
+  }
+  return denormalizeProtocolMetadata({
+    ...output,
+    contents: output.contents.map((content) =>
+      denormalizeResourceContentsMetadata(content, sourceId),
+    ),
+  }) as never;
+}
+
+function promptFacadeResult(result: McpOperationResult, sourceId: string) {
+  if (result.kind !== 'completed') throw new Error(result.message);
+  const output = operationOutputRecord(result.output);
+  if (!Array.isArray(output.messages)) {
+    throw new Error('MCP prompt operation returned no messages');
+  }
+  return denormalizeProtocolMetadata({
+    ...output,
+    messages: output.messages.map((message) => denormalizePromptMessageMetadata(message, sourceId)),
+  }) as never;
+}
+
+function denormalizePromptMessageMetadata(message: unknown, sourceId: string): unknown {
+  if (!isRecord(message)) return message;
+  return {
+    ...message,
+    content: denormalizeContentMetadata(message.content, sourceId),
+  };
+}
+
+function denormalizeContentMetadata(content: unknown, sourceId?: string): unknown {
+  if (!isRecord(content)) return content;
+  let result = content;
+  if (sourceId && content.type === 'resource_link' && typeof content.uri === 'string') {
+    result = { ...result, uri: resourceFacadeUri(sourceId, content.uri) };
+  }
+  if (content.type === 'resource' && isRecord(content.resource)) {
+    result = {
+      ...result,
+      resource: denormalizeResourceContentsMetadata(content.resource, sourceId),
+    };
+  }
+  return denormalizeProtocolMetadata(result);
+}
+
+function denormalizeResourceContentsMetadata(content: unknown, sourceId?: string): unknown {
+  if (!isRecord(content)) return content;
+  return denormalizeProtocolMetadata({
+    ...content,
+    ...(sourceId && typeof content.uri === 'string'
+      ? { uri: resourceFacadeUri(sourceId, content.uri) }
+      : {}),
+  });
+}
+
+function denormalizeProtocolMetadata(value: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(value, 'meta')) return value;
+  const { meta, ...withoutMeta } = value;
+  return Object.prototype.hasOwnProperty.call(withoutMeta, '_meta')
+    ? withoutMeta
+    : { ...withoutMeta, _meta: meta };
+}
+
+function resourceFacadeUri(sourceId: string, upstreamUri: string): string {
+  return `${resourceFacadePrefix(sourceId)}${upstreamUri}`;
+}
+
+function upstreamResourceUri(sourceId: string, facadeUri: string): string {
+  const prefix = resourceFacadePrefix(sourceId);
+  if (!facadeUri.startsWith(prefix)) {
+    throw new Error(`MCP resource facade URI does not match source ${sourceId}`);
+  }
+  const upstreamUri = facadeUri.slice(prefix.length);
+  if (!upstreamUri) throw new Error('MCP resource facade URI has no upstream URI');
+  return upstreamUri;
+}
+
+function resourceFacadePrefix(sourceId: string): string {
+  return `sentris-mcp://resource/${Buffer.from(sourceId, 'utf8').toString('base64url')}/`;
 }
 
 function isNodeAllowed(nodeId: string, allowedNodeIds: readonly string[]): boolean {

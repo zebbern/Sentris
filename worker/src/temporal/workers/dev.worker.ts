@@ -41,7 +41,11 @@ import {
 import { executeWebhookParsingScriptActivity } from '../activities/webhook-parsing.activity';
 import {
   dispatchToolInvocationActivity,
+  dispatchMcpOperationActivity,
+  initializeMcpInvocationActivities,
+  prepareMcpOperationActivity,
   prepareToolInvocationActivity,
+  reconcileMcpOperationActivity,
   reconcileRunToolInvocationsActivity,
   reconcileToolInvocationActivity,
 } from '../activities/mcp-invocation.activity';
@@ -222,6 +226,7 @@ async function main() {
     });
     cleanupSteps.push({ name: 'MCP runtime services', close: () => mcpRuntime.close() });
     initializeMcpRuntimeDiscoveryActivities(mcpRuntime.router);
+    initializeMcpInvocationActivities(mcpRuntime.router);
     console.log(
       `✅ MCP runtime owner ready (${workerConfig.MCP_RUNTIME_OWNER_ID} at ${workerConfig.MCP_RUNTIME_OWNER_URL})`,
     );
@@ -251,6 +256,9 @@ async function main() {
       prepareToolInvocationActivity,
       dispatchToolInvocationActivity,
       reconcileToolInvocationActivity,
+      prepareMcpOperationActivity,
+      dispatchMcpOperationActivity,
+      reconcileMcpOperationActivity,
       reconcileRunToolInvocationsActivity,
     };
 

@@ -7,6 +7,8 @@ import { McpGroupsService } from '../mcp-groups/mcp-groups.service';
 import { McpAuthService } from './mcp-auth.service';
 import {
   CleanupRunInput,
+  ClaimMcpOperationBody,
+  ClaimMcpOperationBodySchema,
   AmbiguousMcpInvocationBody,
   AmbiguousMcpInvocationBodySchema,
   ClaimMcpInvocationBody,
@@ -14,6 +16,10 @@ import {
   GenerateTokenInput,
   PrepareMcpInvocationBody,
   PrepareMcpInvocationBodySchema,
+  PrepareMcpOperationBody,
+  PrepareMcpOperationBodySchema,
+  ReconcileMcpOperationBody,
+  ReconcileMcpOperationBodySchema,
   ReconcileMcpInvocationBody,
   ReconcileMcpInvocationBodySchema,
   ReconcileRunMcpInvocationsBody,
@@ -25,6 +31,8 @@ import {
   RegisterMcpServerInput,
   SettleMcpInvocationBody,
   SettleMcpInvocationBodySchema,
+  SettleMcpOperationBody,
+  SettleMcpOperationBodySchema,
   ToolsReadyInput,
 } from './dto/mcp.dto';
 import { InternalOnlyGuard } from '../auth/internal-only.guard';
@@ -164,5 +172,37 @@ export class InternalMcpController {
   ) {
     await this.invocationService.reconcileRunInvocations(body);
     return { success: true };
+  }
+
+  @Post('operations/prepare')
+  prepareOperation(
+    @Body(new ZodValidationPipe(PrepareMcpOperationBodySchema))
+    body: PrepareMcpOperationBody,
+  ) {
+    return this.invocationService.prepareOperation(body.request);
+  }
+
+  @Post('operations/claim')
+  claimOperation(
+    @Body(new ZodValidationPipe(ClaimMcpOperationBodySchema))
+    body: ClaimMcpOperationBody,
+  ) {
+    return this.invocationService.claimMcpOperationDispatch(body);
+  }
+
+  @Post('operations/settle')
+  settleOperation(
+    @Body(new ZodValidationPipe(SettleMcpOperationBodySchema))
+    body: SettleMcpOperationBody,
+  ) {
+    return this.invocationService.settleMcpOperation(body);
+  }
+
+  @Post('operations/reconcile')
+  reconcileOperation(
+    @Body(new ZodValidationPipe(ReconcileMcpOperationBodySchema))
+    body: ReconcileMcpOperationBody,
+  ) {
+    return this.invocationService.reconcileMcpOperationDispatch(body);
   }
 }

@@ -1,0 +1,14 @@
+ALTER TABLE "mcp_invocations" ALTER COLUMN "tool_name" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD COLUMN "runtime_id" uuid;--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD COLUMN "owner_id" text;--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD COLUMN "owner_epoch" uuid;--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD COLUMN "lease_generation" integer;--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD COLUMN "operation_kind" varchar(32);--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD COLUMN "operation_target" text;--> statement-breakpoint
+UPDATE "mcp_invocations" SET "operation_kind" = 'tool-call', "operation_target" = "tool_name";--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD CONSTRAINT "mcp_invocation_attempts_lease_generation_check" CHECK ("mcp_invocation_attempts"."lease_generation" IS NULL OR "mcp_invocation_attempts"."lease_generation" > 0);--> statement-breakpoint
+ALTER TABLE "mcp_invocation_attempts" ADD CONSTRAINT "mcp_invocation_attempts_runtime_fence_check" CHECK ("mcp_invocation_attempts"."runtime_id" IS NULL AND "mcp_invocation_attempts"."owner_id" IS NULL AND "mcp_invocation_attempts"."owner_epoch" IS NULL AND "mcp_invocation_attempts"."lease_generation" IS NULL OR "mcp_invocation_attempts"."runtime_id" IS NOT NULL AND "mcp_invocation_attempts"."owner_id" IS NOT NULL AND "mcp_invocation_attempts"."owner_epoch" IS NOT NULL AND "mcp_invocation_attempts"."lease_generation" IS NOT NULL);--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD CONSTRAINT "mcp_invocations_operation_kind_check" CHECK ("mcp_invocations"."operation_kind" IN ('tool-call', 'resource-read', 'prompt-get'));--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD CONSTRAINT "mcp_invocations_operation_target_check" CHECK (char_length("mcp_invocations"."operation_target") >= 1 AND char_length("mcp_invocations"."operation_target") <= 8192);--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD CONSTRAINT "mcp_invocations_operation_identity_check" CHECK ("mcp_invocations"."operation_kind" IS NULL AND "mcp_invocations"."operation_target" IS NULL OR "mcp_invocations"."operation_kind" IS NOT NULL AND "mcp_invocations"."operation_target" IS NOT NULL);--> statement-breakpoint
+ALTER TABLE "mcp_invocations" ADD CONSTRAINT "mcp_invocations_tool_projection_check" CHECK ("mcp_invocations"."operation_kind" IS NULL AND "mcp_invocations"."operation_target" IS NULL AND "mcp_invocations"."tool_name" IS NOT NULL OR "mcp_invocations"."operation_kind" = 'tool-call' AND "mcp_invocations"."tool_name" IS NOT NULL AND "mcp_invocations"."tool_name" = "mcp_invocations"."operation_target" OR "mcp_invocations"."operation_kind" <> 'tool-call' AND "mcp_invocations"."tool_name" IS NULL);

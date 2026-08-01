@@ -253,8 +253,9 @@ describe('capability descriptors', () => {
         capabilityGrantId: GRANT_ID,
         expiresAt: EXPIRES_AT,
       },
-      version: '1' as const,
+      version: '2' as const,
       configFingerprint: 'a'.repeat(64),
+      runtimeBindings: {},
       tools: [],
       resources: [],
       resourceTemplates: [],
@@ -263,6 +264,79 @@ describe('capability descriptors', () => {
     };
 
     expect(McpCapabilityCatalogSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+  });
+
+  it('parses legacy persisted snapshots without runtime bindings as an unbound catalog', () => {
+    const legacySnapshot = {
+      id: SNAPSHOT_ID,
+      scope: {
+        kind: 'run' as const,
+        organizationId: null,
+        runId: 'legacy-run',
+        capabilityGrantId: GRANT_ID,
+      },
+      version: '1' as const,
+      configFingerprint: HASH,
+      tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
+      createdAt: '2026-07-31T10:00:00.000Z',
+    };
+
+    expect(McpCapabilityCatalogSnapshotSchema.parse(legacySnapshot)).toEqual(legacySnapshot);
+    expect(
+      McpCapabilityCatalogSnapshotSchema.safeParse({
+        ...legacySnapshot,
+        runtimeBindings: {},
+      }).success,
+    ).toBe(false);
+    expect(
+      McpCapabilityCatalogSnapshotSchema.safeParse({
+        ...legacySnapshot,
+        version: '2',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires a strict secret-free runtime binding for each saved source', () => {
+    const snapshot = {
+      id: SNAPSHOT_ID,
+      scope: {
+        kind: 'run' as const,
+        organizationId: null,
+        runId: 'run-1',
+        capabilityGrantId: GRANT_ID,
+      },
+      version: '2' as const,
+      configFingerprint: HASH,
+      runtimeBindings: {
+        'saved-node': {
+          runtimeKey,
+          protocolEra: 'modern' as const,
+          protocolVersion: '2026-07-28',
+          capabilityFingerprint: 'c'.repeat(64),
+        },
+      },
+      tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
+      createdAt: '2026-07-31T10:00:00.000Z',
+    };
+
+    expect(McpCapabilityCatalogSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    expect(
+      McpCapabilityCatalogSnapshotSchema.safeParse({
+        ...snapshot,
+        runtimeBindings: {
+          'saved-node': {
+            ...snapshot.runtimeBindings['saved-node'],
+            accessToken: 'must-not-be-persisted',
+          },
+        },
+      }).success,
+    ).toBe(false);
   });
 });
 

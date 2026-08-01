@@ -160,21 +160,26 @@ describe('mcp-library-utils', () => {
     expect(result.map((tool) => tool.name)).toEqual(['ping', 'status']);
   });
 
-  test('throws a clear error when no tools remain after filtering', () => {
-    expect(() =>
+  test('returns an explicit empty tool policy when no tools remain after filtering', () => {
+    expect(
       filterMcpToolsForServer(
         'server-a',
         [liveTools[0]],
         [persistedTool('server-a', 'ping', false)],
       ),
-    ).toThrow('No MCP tools remain enabled for server server-a');
+    ).toEqual([]);
   });
 
-  test('stops a started stdio proxy exactly once when filtering leaves zero tools', async () => {
-    const fetchMock: typeof fetch = async (input: string | URL | Request) => {
+  test('registers a started stdio resource/prompt-only server with an empty tool policy', async () => {
+    const requests: { url: string; init?: RequestInit }[] = [];
+    const fetchMock: typeof fetch = async (input: string | URL | Request, init?: RequestInit) => {
       const url = input instanceof Request ? input.url : String(input);
+      requests.push({ url, init });
       if (url.endsWith('/api/v1/mcp-servers/stdio-server/resolve')) {
         return Response.json({ headers: {}, args: [] });
+      }
+      if (url.endsWith('/api/v1/internal/mcp/register-mcp-server')) {
+        return Response.json({ success: true });
       }
       return new Response('not found', { status: 404 });
     };
@@ -185,14 +190,15 @@ describe('mcp-library-utils', () => {
       componentRef: 'mcp.custom',
     });
 
-    await expect(
-      registerServerTools(stdioServer, context, {
-        persistedTools: [persistedTool('stdio-server', 'ping', false)],
-      }),
-    ).rejects.toThrow('No MCP tools remain enabled for server stdio-server');
+    await registerServerTools(stdioServer, context, {
+      persistedTools: [persistedTool('stdio-server', 'ping', false)],
+    });
 
-    expect(mockStopMcpStdioHostProxy).toHaveBeenCalledTimes(1);
-    expect(mockStopMcpStdioHostProxy).toHaveBeenCalledWith('host-mcp-proxy-test');
+    const registration = requests.find(({ url }) =>
+      url.endsWith('/api/v1/internal/mcp/register-mcp-server'),
+    );
+    expect(JSON.parse(String(registration?.init?.body))).toMatchObject({ tools: [] });
+    expect(mockStopMcpStdioHostProxy).not.toHaveBeenCalled();
   });
 
   test('stops a started stdio proxy once on registration failure and preserves that error', async () => {

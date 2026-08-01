@@ -19,6 +19,7 @@ export class McpRuntimeInternalHttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -89,9 +90,11 @@ export class McpRuntimeInternalClient {
     });
     const responseText = await readBoundedResponse(response, this.maxResponseBytes);
     if (!response.ok) {
+      const publicFailure = parsePublicError(responseText, response.status);
       throw new McpRuntimeInternalHttpError(
         response.status,
-        publicErrorMessage(responseText, response.status),
+        publicFailure.message,
+        publicFailure.code,
       );
     }
     if (!responseText) return undefined as T;
@@ -195,15 +198,23 @@ async function readBoundedResponse(response: Response, maxBytes: number): Promis
   return new TextDecoder().decode(output);
 }
 
-function publicErrorMessage(body: string, status: number): string {
-  if (!body) return `MCP runtime owner request failed with status ${status}`;
+function parsePublicError(body: string, status: number): { message: string; code?: string } {
+  const fallback = `MCP runtime owner request failed with status ${status}`;
+  if (!body) return { message: fallback };
   try {
-    const parsed = JSON.parse(body) as { error?: unknown };
-    if (typeof parsed.error === 'string' && parsed.error.length <= 1_024) return parsed.error;
+    const parsed = JSON.parse(body) as { error?: unknown; code?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.length <= 1_024) {
+      return {
+        message: parsed.error,
+        ...(typeof parsed.code === 'string' && parsed.code.length <= 128
+          ? { code: parsed.code }
+          : {}),
+      };
+    }
   } catch {
     // The owner error body is deliberately not reflected when it is not a bounded JSON error.
   }
-  return `MCP runtime owner request failed with status ${status}`;
+  return { message: fallback };
 }
 
 function positiveBoundedInteger(value: number, label: string, maximum: number): number {

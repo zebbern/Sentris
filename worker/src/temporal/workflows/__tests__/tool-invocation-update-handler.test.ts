@@ -76,6 +76,83 @@ const completedResult = {
   completedAt: '2099-07-31T10:00:02.000Z',
 };
 
+const operationManifest = {
+  capabilitySnapshotId: SNAPSHOT_ID,
+  capabilityGrantId: GRANT_ID,
+  version: '2' as const,
+  entries: [
+    {
+      operationKind: 'resource-read' as const,
+      operationTarget: 'repo://{+path}',
+      sourceId: 'mcp:github',
+      destination: 'mcp-activity' as const,
+      retryPolicy: 'reviewed-idempotent' as const,
+    },
+    {
+      operationKind: 'tool-call' as const,
+      operationTarget: 'osv_query',
+      sourceId: 'component:osv',
+      destination: 'component-activity' as const,
+      retryPolicy: 'pre-dispatch-only' as const,
+    },
+  ],
+};
+
+const operationRequest = {
+  invocationId: INVOCATION_ID,
+  scope,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  sourceId: 'mcp:github',
+  authorizationTarget: 'repo://{+path}',
+  operation: { kind: 'resource-read' as const, uri: 'repo://src/index.ts' },
+  requestedAt: request.requestedAt,
+  deadlineAt: request.deadlineAt,
+};
+
+const operationRef = {
+  invocationId: INVOCATION_ID,
+  attemptId: ATTEMPT_ID,
+  attemptNumber: 1,
+  capabilitySnapshotId: SNAPSHOT_ID,
+  capabilityGrantId: GRANT_ID,
+  operationKind: 'resource-read' as const,
+  operationTarget: 'repo://{+path}',
+  toolName: null,
+  sourceId: 'mcp:github',
+  destination: 'mcp-activity' as const,
+  retryPolicy: 'reviewed-idempotent' as const,
+  preparedAt: ref.preparedAt,
+};
+
+const operationPlan = {
+  ref: operationRef,
+  manifestEntry: operationManifest.entries[0],
+  runtimeBinding: {
+    runtimeKey: {
+      sourceId: 'github-server',
+      transport: 'http' as const,
+      configFingerprint: 'a'.repeat(64),
+      organizationId: 'org-123',
+      principalPartitionHash: 'b'.repeat(64),
+      credentialReference: 'mcp-server:github-server',
+      credentialGeneration: 7,
+    },
+    protocolEra: 'modern' as const,
+    protocolVersion: '2026-07-28',
+    capabilityFingerprint: 'c'.repeat(64),
+  },
+  operation: operationRequest.operation,
+  requestedAt: operationRequest.requestedAt,
+  deadlineAt: operationRequest.deadlineAt,
+};
+
+const completedOperationResult = {
+  operationId: INVOCATION_ID,
+  kind: 'completed' as const,
+  output: { contents: [] },
+  completedAt: completedResult.completedAt,
+};
+
 let handlerModule: Record<string, any>;
 
 beforeAll(async () => {
@@ -129,6 +206,48 @@ function register(overrides: Record<string, unknown> = {}) {
   return { activities, controller: created.controller };
 }
 
+function registerGeneric(overrides: Record<string, unknown> = {}) {
+  const activities = createActivities();
+  const operationActivities = {
+    prepareMcpOperationActivity: vi.fn(async () => ({
+      kind: 'prepared' as const,
+      plan: operationPlan,
+    })),
+    dispatchMcpOperationActivity: vi.fn(async () => completedOperationResult),
+    reconcileMcpOperationActivity: vi.fn(async () => completedOperationResult),
+    ...overrides,
+  };
+  const created = handlerModule.createToolInvocationUpdateHandlers(
+    {
+      runId: 'run-123',
+      organizationId: 'org-123',
+      activities,
+      operationActivities,
+    },
+    {
+      currentUpdateId: () => currentUpdateId,
+      withTimeout,
+      nonCancellable,
+      isCancellation: (error: unknown) => error instanceof MockCancelledFailure,
+      applicationFailure: (message: string, type: string) =>
+        MockApplicationFailure.nonRetryable(message, type),
+    },
+  );
+  registrations.set('installToolInvocationManifest', {
+    handler: created.install.handler,
+    options: { validator: created.install.validator },
+  });
+  registrations.set('executeToolInvocation', {
+    handler: created.execute.handler,
+    options: { validator: created.execute.validator },
+  });
+  registrations.set('executeMcpOperation', {
+    handler: created.operation.handler,
+    options: { validator: created.operation.validator },
+  });
+  return { activities, operationActivities, controller: created.controller };
+}
+
 function updateRegistration(name: string) {
   const registration = registrations.get(name);
   expect(registration).toBeDefined();
@@ -144,7 +263,101 @@ function installManifest(): void {
   registration.handler(install);
 }
 
+function installOperationManifest(): void {
+  currentUpdateId = `install-manifest:${GRANT_ID}`;
+  const registration = updateRegistration('installToolInvocationManifest');
+  const install = { scope, manifest: operationManifest };
+  registration.options!.validator!(install);
+  registration.handler(install);
+}
+
 describe('registerToolInvocationUpdateHandlers', () => {
+  it('authorizes and dispatches resource operations through the generic keyed handler', async () => {
+    const { operationActivities } = registerGeneric();
+    installOperationManifest();
+    currentUpdateId = INVOCATION_ID;
+    const execute = updateRegistration('executeMcpOperation');
+
+    execute.options!.validator!(operationRequest);
+    await expect(execute.handler(operationRequest)).resolves.toEqual(completedOperationResult);
+    expect(operationActivities.prepareMcpOperationActivity).toHaveBeenCalledWith(operationRequest);
+    expect(operationActivities.dispatchMcpOperationActivity).toHaveBeenCalledWith(operationPlan);
+  });
+
+  it('defers concrete resource-template matching to the backend preflight activity', () => {
+    registerGeneric();
+    installOperationManifest();
+    currentUpdateId = INVOCATION_ID;
+    const execute = updateRegistration('executeMcpOperation');
+
+    expect(() =>
+      execute.options!.validator!({
+        ...operationRequest,
+        operation: { kind: 'resource-read', uri: 'https://attacker.example/secret' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('projects legacy tool Updates through the generic operation handler on the patched branch', async () => {
+    const projectedPlan = {
+      ...operationPlan,
+      ref: {
+        ...operationRef,
+        operationKind: 'tool-call' as const,
+        operationTarget: 'osv_query',
+        toolName: 'osv_query',
+        sourceId: 'component:osv',
+        destination: 'component-activity' as const,
+        retryPolicy: 'pre-dispatch-only' as const,
+      },
+      manifestEntry: operationManifest.entries[1],
+      operation: { kind: 'tool-call' as const, name: 'osv_query', arguments: request.input },
+      runtimeBinding: undefined,
+    };
+    delete (projectedPlan as Record<string, unknown>).runtimeBinding;
+    const projectedResult = { ...completedOperationResult, output: { vulnerabilities: [] } };
+    const { activities, operationActivities } = registerGeneric({
+      prepareMcpOperationActivity: vi.fn(async () => ({
+        kind: 'prepared' as const,
+        plan: projectedPlan,
+      })),
+      dispatchMcpOperationActivity: vi.fn(async () => projectedResult),
+    });
+    installOperationManifest();
+    currentUpdateId = INVOCATION_ID;
+
+    await expect(updateRegistration('executeToolInvocation').handler(request)).resolves.toEqual(
+      completedResult,
+    );
+    expect(activities.prepareToolInvocationActivity).not.toHaveBeenCalled();
+    expect(operationActivities.prepareMcpOperationActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceId: 'component:osv',
+        authorizationTarget: 'osv_query',
+        operation: { kind: 'tool-call', name: 'osv_query', arguments: request.input },
+      }),
+    );
+  });
+
+  it('keeps legacy tool activities for a v1 manifest when generic activities are available', async () => {
+    const prepareMcpOperationActivity = vi.fn(async () => {
+      throw new Error('v1 manifest must not use generic operation activities');
+    });
+    const { activities, operationActivities } = registerGeneric({
+      prepareMcpOperationActivity,
+    });
+    installManifest();
+    currentUpdateId = INVOCATION_ID;
+
+    await expect(updateRegistration('executeToolInvocation').handler(request)).resolves.toEqual(
+      completedResult,
+    );
+    expect(activities.prepareToolInvocationActivity).toHaveBeenCalledWith(request);
+    expect(activities.dispatchToolInvocationActivity).toHaveBeenCalledWith(ref);
+    expect(operationActivities.prepareMcpOperationActivity).not.toHaveBeenCalled();
+    expect(operationActivities.dispatchMcpOperationActivity).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed, cross-run, cross-organization, closed, and wrongly keyed invocations', () => {
     const { controller } = register();
     installManifest();

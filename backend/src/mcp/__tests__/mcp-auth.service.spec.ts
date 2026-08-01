@@ -33,10 +33,11 @@ const DURABLE_SNAPSHOT_ID = '22222222-2222-5222-8222-222222222222';
 const DURABLE_MANIFEST = {
   capabilityGrantId: DURABLE_GRANT_ID,
   capabilitySnapshotId: DURABLE_SNAPSHOT_ID,
-  version: '1' as const,
+  version: '2' as const,
   entries: [
     {
-      toolName: 'osv_query',
+      operationKind: 'tool-call' as const,
+      operationTarget: 'osv_query',
       sourceId: 'component:osv',
       destination: 'component-activity' as const,
       retryPolicy: 'pre-dispatch-only' as const,
@@ -98,6 +99,7 @@ describe('McpAuthService', () => {
       organizationId: 'org-grant',
       invokingNodeId: 'agent-node',
       allowedNodeIds: ['node-a', 'node-b'],
+      contractVersion: '2',
     });
 
     const firstValidation = await service.validateToken(token);
@@ -168,9 +170,9 @@ describe('McpAuthService', () => {
     expect(new Set(grantIds).size).toBe(variants.length);
   });
 
-  it('queries protocol version 1 before materializing durable token authority', async () => {
+  it('queries both protocol versions before materializing v2 token authority', async () => {
     const redis = new MockRedis();
-    const queryWorkflow = vi.fn(async () => 1);
+    const queryWorkflow = vi.fn(async (_input: { workflowId: string; queryType: string }) => 1);
     const materialize = vi.fn(async () => durableAuthority());
     const service = createService(redis, queryWorkflow, materialize);
 
@@ -183,11 +185,60 @@ describe('McpAuthService', () => {
       'invoking-agent',
     );
 
-    expect(queryWorkflow).toHaveBeenCalledWith({
-      workflowId: 'run-protocol',
-      queryType: 'getToolInvocationProtocolVersion',
-    });
+    expect(queryWorkflow.mock.calls).toEqual([
+      [
+        {
+          workflowId: 'run-protocol',
+          queryType: 'getToolInvocationProtocolVersion',
+        },
+      ],
+      [
+        {
+          workflowId: 'run-protocol',
+          queryType: 'getMcpOperationProtocolVersion',
+        },
+      ],
+    ]);
+    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({ contractVersion: '2' }));
     expect(materialize).toHaveBeenCalledTimes(1);
+  });
+
+  it('materializes only v1 authority for a mixed legacy-tool workflow history', async () => {
+    const redis = new MockRedis();
+    const queryWorkflow = vi.fn(async ({ queryType }: { queryType: string }) => {
+      if (queryType === 'getToolInvocationProtocolVersion') return 1;
+      throw new QueryNotRegisteredError('query is not registered', grpcStatus.INVALID_ARGUMENT);
+    });
+    const legacyManifest = {
+      capabilityGrantId: DURABLE_GRANT_ID,
+      capabilitySnapshotId: DURABLE_SNAPSHOT_ID,
+      version: '1' as const,
+      entries: [
+        {
+          toolName: 'osv_query',
+          sourceId: 'component:osv',
+          destination: 'component-activity' as const,
+          retryPolicy: 'pre-dispatch-only' as const,
+        },
+      ],
+    };
+    const materialize = vi.fn(async () => ({
+      ...durableAuthority(),
+      manifest: legacyManifest,
+    }));
+    const executeWorkflowUpdate = vi.fn(async () => undefined);
+    const service = createService(redis, queryWorkflow, materialize, executeWorkflowUpdate);
+
+    await service.generateSessionToken('mixed-run', null, 'agent', ['node-a']);
+
+    expect(materialize).toHaveBeenCalledWith(expect.objectContaining({ contractVersion: '1' }));
+    expect(executeWorkflowUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: expect.objectContaining({ manifest: legacyManifest }),
+      }),
+    );
+    const metadata = JSON.parse(redis.sets[0].value) as Record<string, unknown>;
+    expect(metadata.capabilitySnapshotId).toBe(DURABLE_SNAPSHOT_ID);
   });
 
   it('installs the immutable manifest before writing a durable token', async () => {
@@ -305,8 +356,7 @@ function createService(
   redis: MockRedis,
   queryWorkflow: (input: { workflowId: string; queryType: string }) => Promise<number> = async () =>
     1,
-  materialize: (input: unknown) => Promise<ReturnType<typeof durableAuthority>> = async () =>
-    durableAuthority(),
+  materialize: (input: unknown) => Promise<unknown> = async () => durableAuthority(),
   executeWorkflowUpdate: (input: unknown) => Promise<unknown> = async () => undefined,
 ): McpAuthService {
   return new McpAuthService(

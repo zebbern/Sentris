@@ -566,6 +566,20 @@ describe('ToolRegistryService', () => {
       expect(tools).toBeNull();
     });
 
+    it('preserves an explicit empty tool policy for resource/prompt-only servers', async () => {
+      await service.registerMcpServer({
+        runId: 'run-1',
+        nodeId: 'resource-server',
+        serverName: 'Resources',
+        serverId: '11111111-1111-4111-8111-111111111111',
+        transport: 'http',
+        endpoint: 'http://localhost:8080',
+        tools: [],
+      });
+
+      expect(await service.getServerTools('run-1', 'resource-server')).toEqual([]);
+    });
+
     it('returns null for server without pre-discovered tools', async () => {
       await service.registerMcpServer({
         runId: 'run-1',

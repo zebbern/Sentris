@@ -12,6 +12,7 @@ import {
   type McpRuntimeInternalServerLogger,
 } from '../mcp-runtime-internal.server';
 import { McpRuntimeFenceLostError, type McpRuntimeManager } from '../mcp-runtime-manager';
+import { InputRequiredUnsupportedError } from '../mcp-client-adapter';
 
 const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
@@ -184,6 +185,21 @@ describe('MCP runtime internal server', () => {
         code: 'MCP_RUNTIME_FENCE_LOST',
       });
       expect(discover).toHaveBeenCalledWith(fence, HOLDER_ID);
+    });
+  });
+
+  test('preserves the typed input-required terminal across the owner boundary', async () => {
+    const invoke = mock(async () => {
+      throw new InputRequiredUnsupportedError('MCP server requires interactive input');
+    });
+    await withServer({ manager: managerStub({ invoke }) }, async (baseUrl) => {
+      const response = await post(baseUrl, '/mcp-runtime/invoke', invokeBody({}), INTERNAL_TOKEN);
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        code: 'MCP_INPUT_REQUIRED_UNSUPPORTED',
+        error: 'MCP server requires interactive input',
+      });
     });
   });
 

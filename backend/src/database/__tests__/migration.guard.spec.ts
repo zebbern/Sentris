@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { resolve } from 'node:path';
 import { assertDatabaseMigrationsCurrent } from '../migration.guard';
 import {
   buildMigrationPlan,
   createMigrationArtifactManifest,
+  loadMigrationPlan,
   type AppliedMigration,
   type MigrationPlan,
   type SchemaConstraint,
@@ -115,6 +117,33 @@ function reader(ledger: AppliedMigration[] | null, plan = createPlan()) {
 }
 
 describe('database migration startup guard', () => {
+  it('expands generalized MCP operations while preserving legacy tool-only inserts', () => {
+    const plan = loadMigrationPlan(resolve(__dirname, '../../../migrations'));
+    const migration = plan.migrations.find(
+      (candidate) => candidate.tag === '0012_generalize_mcp_runtime_operations',
+    );
+
+    expect(migration).toBeDefined();
+    const sql = migration!.sql;
+    const addKind = sql.indexOf('ADD COLUMN "operation_kind" varchar(32);');
+    const addTarget = sql.indexOf('ADD COLUMN "operation_target" text;');
+    const backfill = sql.indexOf(
+      'UPDATE "mcp_invocations" SET "operation_kind" = \'tool-call\', "operation_target" = "tool_name";',
+    );
+
+    expect(addKind).toBeGreaterThanOrEqual(0);
+    expect(addTarget).toBeGreaterThan(addKind);
+    expect(backfill).toBeGreaterThan(addTarget);
+    expect(sql).not.toContain('ALTER COLUMN "operation_kind" SET NOT NULL;');
+    expect(sql).not.toContain('ALTER COLUMN "operation_target" SET NOT NULL;');
+    expect(sql).toContain(
+      '"mcp_invocations"."operation_kind" IS NULL AND "mcp_invocations"."operation_target" IS NULL',
+    );
+    expect(sql).toContain(
+      '"mcp_invocations"."operation_kind" IS NULL AND "mcp_invocations"."operation_target" IS NULL AND "mcp_invocations"."tool_name" IS NOT NULL',
+    );
+  });
+
   it('rejects a database with no checked migration ledger', async () => {
     await expect(assertDatabaseMigrationsCurrent(reader(null), createPlan())).rejects.toThrow(
       'Database has no checked migration ledger. Run `bun run migrate`',

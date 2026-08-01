@@ -13,7 +13,7 @@ import {
   type McpRuntimeRef,
 } from '@sentris/shared';
 
-import type { NormalizedMcpResult } from './mcp-client-adapter';
+import { InputRequiredUnsupportedError, type NormalizedMcpResult } from './mcp-client-adapter';
 import type { McpOperationContext } from './mcp-client-adapter.types';
 import {
   McpRuntimeFenceLostError,
@@ -248,6 +248,12 @@ export class McpRuntimeRouter {
 }
 
 function translateRemoteError(error: unknown): unknown {
+  if (
+    error instanceof McpRuntimeInternalHttpError &&
+    error.code === 'MCP_INPUT_REQUIRED_UNSUPPORTED'
+  ) {
+    return new InputRequiredUnsupportedError('MCP server requires interactive input');
+  }
   if (error instanceof McpRuntimeInternalHttpError && error.status === 409) {
     return new McpRuntimeFenceLostError('MCP runtime owner rejected a stale fence', {
       cause: error,

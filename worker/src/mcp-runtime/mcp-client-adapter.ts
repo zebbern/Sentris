@@ -7,11 +7,8 @@ import {
   type Tool,
 } from '@modelcontextprotocol/client';
 import {
-  PromptDescriptor,
   PromptDescriptorSchema,
-  ResourceDescriptor,
   ResourceDescriptorSchema,
-  ResourceTemplateDescriptor,
   ResourceTemplateDescriptorSchema,
   ToolDescriptor,
   ToolDescriptorSchema,
@@ -29,6 +26,8 @@ import type {
 interface ResultWithMeta {
   content?: ContentBlock[];
   structuredContent?: unknown;
+  isError?: boolean;
+  description?: string;
   _meta?: Record<string, unknown>;
 }
 export interface NormalizedMcpResult {
@@ -36,6 +35,8 @@ export interface NormalizedMcpResult {
   contents?: unknown[];
   messages?: unknown[];
   structuredContent?: unknown;
+  isError?: boolean;
+  description?: string;
   meta?: Record<string, unknown>;
 }
 
@@ -45,10 +46,6 @@ export class InputRequiredUnsupportedError
 {
   readonly kind = 'input-required-unsupported' as const;
   readonly retryable = false as const;
-
-  constructor(message: string) {
-    super(message);
-  }
 }
 
 export class McpClientAdapter {
@@ -194,16 +191,20 @@ export class McpClientAdapter {
 
   normalizeResult(result: ResultWithMeta): NormalizedMcpResult {
     return {
-      ...(result.content ? { content: result.content.map((content) => renameMeta(content)) } : {}),
+      ...(result.content
+        ? { content: result.content.map((content) => normalizeContentMetadata(content)) }
+        : {}),
       ...('contents' in result && Array.isArray(result.contents)
-        ? { contents: result.contents.map((content) => renameMeta(content)) }
+        ? { contents: result.contents.map((content) => normalizeResourceContentsMetadata(content)) }
         : {}),
       ...('messages' in result && Array.isArray(result.messages)
-        ? { messages: result.messages.map((message) => renameMeta(message)) }
+        ? { messages: result.messages.map((message) => normalizePromptMessageMetadata(message)) }
         : {}),
       ...(result.structuredContent === undefined
         ? {}
         : { structuredContent: result.structuredContent }),
+      ...(result.isError === undefined ? {} : { isError: result.isError }),
+      ...(result.description === undefined ? {} : { description: result.description }),
       ...(result._meta ? { meta: result._meta } : {}),
     };
   }
@@ -291,19 +292,38 @@ export class McpClientAdapter {
   }
 }
 
-function renameMeta<T extends Record<string, unknown>>(value: T): T {
-  return normalizeMetadata(value) as T;
+function renameMeta(value: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(value, '_meta')) return value;
+  const { _meta, ...withoutMeta } = value;
+  return { ...withoutMeta, meta: _meta };
 }
 
-function normalizeMetadata(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(normalizeMetadata);
-  if (typeof value !== 'object' || value === null) return value;
-  const record = value as Record<string, unknown>;
-  const normalized: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(record)) {
-    normalized[key === '_meta' ? 'meta' : key] = normalizeMetadata(child);
+function normalizeContentMetadata(content: unknown): unknown {
+  if (!isRecord(content)) return content;
+  const normalized = renameMeta(content);
+  if (normalized.type === 'resource' && isRecord(normalized.resource)) {
+    return {
+      ...normalized,
+      resource: normalizeResourceContentsMetadata(normalized.resource),
+    };
   }
   return normalized;
+}
+
+function normalizeResourceContentsMetadata(content: unknown): unknown {
+  return isRecord(content) ? renameMeta(content) : content;
+}
+
+function normalizePromptMessageMetadata(message: unknown): unknown {
+  if (!isRecord(message)) return message;
+  return {
+    ...message,
+    content: normalizeContentMetadata(message.content),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function recordOrEmpty(value: unknown): Record<string, unknown> {

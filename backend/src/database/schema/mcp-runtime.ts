@@ -29,6 +29,7 @@ export type McpInvocationStatus =
 
 export type McpInvocationDestination = 'component-activity' | 'mcp-activity';
 export type McpInvocationRetryPolicy = 'pre-dispatch-only' | 'reviewed-idempotent';
+export type McpInvocationOperationKind = 'tool-call' | 'resource-read' | 'prompt-get';
 
 export const mcpCapabilityGrantsTable = pgTable(
   'mcp_capability_grants',
@@ -82,7 +83,9 @@ export const mcpInvocationsTable = pgTable(
     capabilitySnapshotId: uuid('capability_snapshot_id')
       .notNull()
       .references(() => mcpCapabilitySnapshotsTable.id, { onDelete: 'restrict' }),
-    toolName: varchar('tool_name', { length: 128 }).notNull(),
+    operationKind: varchar('operation_kind', { length: 32 }).$type<McpInvocationOperationKind>(),
+    operationTarget: text('operation_target'),
+    toolName: varchar('tool_name', { length: 128 }),
     requestHash: varchar('request_hash', { length: 64 }).notNull(),
     request: jsonb('request').$type<unknown>().notNull(),
     status: varchar('status', { length: 32 }).$type<McpInvocationStatus>().notNull(),
@@ -105,6 +108,22 @@ export const mcpInvocationsTable = pgTable(
     requestHashCheck: check(
       'mcp_invocations_request_hash_check',
       sql`${table.requestHash} ~ '^[a-f0-9]{64}$'`,
+    ),
+    operationKindCheck: check(
+      'mcp_invocations_operation_kind_check',
+      sql`${table.operationKind} IN ('tool-call', 'resource-read', 'prompt-get')`,
+    ),
+    operationTargetCheck: check(
+      'mcp_invocations_operation_target_check',
+      sql`char_length(${table.operationTarget}) >= 1 AND char_length(${table.operationTarget}) <= 8192`,
+    ),
+    operationIdentityCheck: check(
+      'mcp_invocations_operation_identity_check',
+      sql`${table.operationKind} IS NULL AND ${table.operationTarget} IS NULL OR ${table.operationKind} IS NOT NULL AND ${table.operationTarget} IS NOT NULL`,
+    ),
+    toolProjectionCheck: check(
+      'mcp_invocations_tool_projection_check',
+      sql`${table.operationKind} IS NULL AND ${table.operationTarget} IS NULL AND ${table.toolName} IS NOT NULL OR ${table.operationKind} = 'tool-call' AND ${table.toolName} IS NOT NULL AND ${table.toolName} = ${table.operationTarget} OR ${table.operationKind} <> 'tool-call' AND ${table.toolName} IS NULL`,
     ),
     statusCheck: check(
       'mcp_invocations_status_check',
@@ -130,6 +149,10 @@ export const mcpInvocationAttemptsTable = pgTable(
     retryPolicy: varchar('retry_policy', { length: 32 })
       .$type<McpInvocationRetryPolicy>()
       .notNull(),
+    runtimeId: uuid('runtime_id'),
+    ownerId: text('owner_id'),
+    ownerEpoch: uuid('owner_epoch'),
+    leaseGeneration: integer('lease_generation'),
     status: varchar('status', { length: 32 }).$type<McpInvocationStatus>().notNull(),
     preparedAt: timestamp('prepared_at', { withTimezone: true }),
     dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
@@ -144,6 +167,14 @@ export const mcpInvocationAttemptsTable = pgTable(
     attemptNumberCheck: check(
       'mcp_invocation_attempts_attempt_number_check',
       sql`${table.attemptNumber} > 0`,
+    ),
+    leaseGenerationCheck: check(
+      'mcp_invocation_attempts_lease_generation_check',
+      sql`${table.leaseGeneration} IS NULL OR ${table.leaseGeneration} > 0`,
+    ),
+    runtimeFenceCheck: check(
+      'mcp_invocation_attempts_runtime_fence_check',
+      sql`${table.runtimeId} IS NULL AND ${table.ownerId} IS NULL AND ${table.ownerEpoch} IS NULL AND ${table.leaseGeneration} IS NULL OR ${table.runtimeId} IS NOT NULL AND ${table.ownerId} IS NOT NULL AND ${table.ownerEpoch} IS NOT NULL AND ${table.leaseGeneration} IS NOT NULL`,
     ),
     destinationCheck: check(
       'mcp_invocation_attempts_destination_check',

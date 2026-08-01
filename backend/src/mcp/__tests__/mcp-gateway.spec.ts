@@ -45,6 +45,7 @@ describe('McpGatewayService', () => {
   };
   let workflowRunRepository: { findByRunId: ReturnType<typeof jest.fn> };
   let mcpRuntimeRepository: { getAuthority: ReturnType<typeof jest.fn> };
+  let runtimeConfigService: { buildRuntimeKey: ReturnType<typeof jest.fn> };
   const clients: Client[] = [];
   const servers: McpServer[] = [];
 
@@ -64,13 +65,22 @@ describe('McpGatewayService', () => {
     temporalService = {
       signalWorkflow: jest.fn().mockResolvedValue(undefined),
       queryWorkflow: jest.fn().mockResolvedValue({ success: true, output: { finding: true } }),
-      executeWorkflowUpdate: jest.fn().mockResolvedValue(completedInvocationResult()),
+      executeWorkflowUpdate: jest
+        .fn()
+        .mockImplementation(async ({ updateName }) =>
+          updateName === 'executeMcpOperation'
+            ? completedOperationResult()
+            : completedInvocationResult(),
+        ),
     };
     workflowRunRepository = {
       findByRunId: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
     };
     mcpRuntimeRepository = {
       getAuthority: jest.fn().mockResolvedValue(componentAuthority()),
+    };
+    runtimeConfigService = {
+      buildRuntimeKey: jest.fn().mockResolvedValue(savedRuntimeKey()),
     };
 
     service = new McpGatewayService(
@@ -84,6 +94,7 @@ describe('McpGatewayService', () => {
       } as never,
       { listTools: jest.fn().mockResolvedValue([]) } as never,
       mcpRuntimeRepository as never,
+      runtimeConfigService as never,
     );
   });
 
@@ -273,7 +284,7 @@ describe('McpGatewayService', () => {
     },
   );
 
-  it('calls an external snapshot descriptor through its source mapping and named v1 adapter', async () => {
+  it('calls an external snapshot descriptor through one generic keyed Workflow Update', async () => {
     const immutableSource = {
       ...externalSource('external-node', 'Snapshot Server'),
       encryptedCredentials: 'captured-ciphertext',
@@ -317,17 +328,531 @@ describe('McpGatewayService', () => {
         _meta: { 'x-source': 'snapshot' },
       },
     ]);
+    expect(legacyOutbound.callTool).not.toHaveBeenCalled();
+    expect(temporalService.executeWorkflowUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowId: 'run-1',
+        updateName: 'executeMcpOperation',
+        updateId: expect.any(String),
+        args: expect.objectContaining({
+          sourceId: 'external-node',
+          authorizationTarget: 'Snapshot_Server__lookup_events',
+          operation: {
+            kind: 'tool-call',
+            name: 'Snapshot_Server__lookup_events',
+            arguments: { query: 'critical' },
+          },
+        }),
+      }),
+    );
+    expect(called.content).toEqual([{ type: 'text', text: 'durable' }]);
+    expect(called.isError).toBe(true);
+    expect(toolRegistry.getToolsForRun).toHaveBeenCalledTimes(1);
+    expect(toolRegistry.getServerTools).not.toHaveBeenCalled();
+    expect(temporalService.executeWorkflowUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('denormalizes only protocol metadata in durable tool results', async () => {
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(externalAuthority());
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('external-node', 'Snapshot Server'),
+    ]);
+    temporalService.executeWorkflowUpdate.mockResolvedValue({
+      operationId: '33333333-3333-4333-8333-333333333333',
+      kind: 'completed',
+      output: {
+        meta: { resultProtocolMetadata: true },
+        content: [
+          {
+            type: 'text',
+            text: 'durable metadata',
+            meta: { contentProtocolMetadata: true },
+          },
+          {
+            type: 'text',
+            text: 'already denormalized',
+            _meta: {
+              retained: true,
+              nestedBusinessValue: { meta: { business: true } },
+            },
+          },
+          {
+            type: 'resource_link',
+            uri: 'repo://README.md',
+            name: 'README',
+            meta: { linkProtocolMetadata: true },
+          },
+          {
+            type: 'resource_link',
+            uri: expectedResourceFacadeUri('external-node', 'repo://opaque-prefix-shaped-value'),
+            name: 'Opaque prefix-shaped upstream URI',
+          },
+          {
+            type: 'resource',
+            meta: { blockProtocolMetadata: true },
+            resource: {
+              uri: 'repo://embedded.txt',
+              text: 'embedded',
+              meta: { resourceProtocolMetadata: true },
+            },
+          },
+        ],
+        structuredContent: {
+          meta: { business: true },
+          nested: { meta: { alsoBusiness: true } },
+        },
+      },
+      completedAt: '2026-07-31T10:05:00.000Z',
+    });
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    const called = await client.callTool({
+      name: 'Snapshot_Server__lookup_events',
+      arguments: { query: 'critical' },
+    });
+
+    expect(called).toMatchObject({
+      _meta: { resultProtocolMetadata: true },
+      content: [
+        {
+          type: 'text',
+          text: 'durable metadata',
+          _meta: { contentProtocolMetadata: true },
+        },
+        {
+          type: 'text',
+          text: 'already denormalized',
+          _meta: {
+            retained: true,
+            nestedBusinessValue: { meta: { business: true } },
+          },
+        },
+        {
+          type: 'resource_link',
+          uri: expectedResourceFacadeUri('external-node', 'repo://README.md'),
+          name: 'README',
+          _meta: { linkProtocolMetadata: true },
+        },
+        {
+          type: 'resource_link',
+          uri: expectedResourceFacadeUri(
+            'external-node',
+            expectedResourceFacadeUri('external-node', 'repo://opaque-prefix-shaped-value'),
+          ),
+          name: 'Opaque prefix-shaped upstream URI',
+        },
+        {
+          type: 'resource',
+          _meta: { blockProtocolMetadata: true },
+          resource: {
+            uri: expectedResourceFacadeUri('external-node', 'repo://embedded.txt'),
+            text: 'embedded',
+            _meta: { resourceProtocolMetadata: true },
+          },
+        },
+      ],
+      structuredContent: {
+        meta: { business: true },
+        nested: { meta: { alsoBusiness: true } },
+      },
+    });
+  });
+
+  it('keeps legacy unbound snapshot tools on the explicit v1 compatibility path', async () => {
+    const source = { ...externalSource('external-node', 'Snapshot Server') };
+    delete (source as { serverId?: string }).serverId;
+    const durableAuthority = externalAuthority(source);
+    if (durableAuthority.snapshot.version !== '2') throw new Error('Expected v2 fixture');
+    const { runtimeBindings: _runtimeBindings, ...legacySnapshot } = durableAuthority.snapshot;
+    const authority: StoredMcpAuthority = {
+      ...durableAuthority,
+      snapshot: {
+        ...legacySnapshot,
+        version: '1',
+        resources: [{ sourceId: 'external-node', uri: 'repo://ignored', name: 'Ignored' }],
+        prompts: [{ sourceId: 'external-node', name: 'ignored', arguments: [] }],
+      },
+      manifest: {
+        capabilitySnapshotId: SNAPSHOT_ID,
+        capabilityGrantId: RUN_CONTEXT.capabilityGrantId,
+        version: '1',
+        entries: [
+          {
+            toolName: 'Snapshot_Server__lookup_events',
+            sourceId: 'external-node',
+            destination: 'mcp-activity',
+            retryPolicy: 'reviewed-idempotent',
+          },
+        ],
+      },
+    };
+    const registerResource = jest.spyOn(McpServer.prototype, 'registerResource');
+    const registerPrompt = jest.spyOn(McpServer.prototype, 'registerPrompt');
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([source]);
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    const called = await client.callTool({
+      name: 'Snapshot_Server__lookup_events',
+      arguments: { query: 'critical' },
+    });
+
+    expect(called.content).toEqual([{ type: 'text', text: 'proxied' }]);
     expect(legacyOutbound.callTool).toHaveBeenCalledWith(
       'run-1',
-      immutableSource,
+      source,
       'lookup.events',
       { query: 'critical' },
       authority.snapshot.tools[0]!.source.bindingFingerprint,
     );
-    expect(called.content).toEqual([{ type: 'text', text: 'proxied' }]);
-    expect(toolRegistry.getToolsForRun).toHaveBeenCalledTimes(1);
-    expect(toolRegistry.getServerTools).not.toHaveBeenCalled();
+    expect(registerResource).not.toHaveBeenCalled();
+    expect(registerPrompt).not.toHaveBeenCalled();
+    registerResource.mockRestore();
+    registerPrompt.mockRestore();
     expect(temporalService.executeWorkflowUpdate).not.toHaveBeenCalled();
+    expect(runtimeConfigService.buildRuntimeKey).not.toHaveBeenCalled();
+  });
+
+  it('keeps v2 unbound tool-only sources on the owned compatibility path', async () => {
+    const source = { ...externalSource('external-node', 'Snapshot Server') };
+    delete (source as { serverId?: string }).serverId;
+    const authority = externalAuthority(source);
+    if (authority.snapshot.version !== '2') throw new Error('Expected v2 fixture');
+    authority.snapshot.runtimeBindings = {};
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([source]);
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    await client.callTool({
+      name: 'Snapshot_Server__lookup_events',
+      arguments: { query: 'critical' },
+    });
+
+    expect(legacyOutbound.callTool).toHaveBeenCalledWith(
+      'run-1',
+      source,
+      'lookup.events',
+      { query: 'critical' },
+      authority.snapshot.tools[0]!.source.bindingFingerprint,
+    );
+    expect(temporalService.executeWorkflowUpdate).not.toHaveBeenCalled();
+  });
+
+  it('registers exact/template resources and prompts from the immutable snapshot', async () => {
+    const authority = externalAuthorityWithFacade();
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('external-node', 'Snapshot Server'),
+    ]);
+    temporalService.executeWorkflowUpdate.mockImplementation(async ({ args }) => {
+      const operation = args.operation as { kind: string; uri?: string };
+      if (operation.kind === 'resource-read') {
+        return {
+          operationId: args.invocationId,
+          kind: 'completed',
+          output: {
+            contents: [
+              {
+                uri: operation.uri!,
+                text: 'snapshot resource',
+                meta: { resourceProtocolMetadata: true },
+              },
+            ],
+          },
+          completedAt: '2026-07-31T10:05:00.000Z',
+        };
+      }
+      return {
+        operationId: args.invocationId,
+        kind: 'completed',
+        output: {
+          description: 'Snapshot prompt description',
+          meta: { promptResultProtocolMetadata: true },
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'resource_link',
+                uri: 'repo://README.md',
+                name: 'README',
+                meta: { promptContentProtocolMetadata: true },
+              },
+            },
+          ],
+        },
+        completedAt: '2026-07-31T10:05:00.000Z',
+      };
+    });
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    expect((await client.listResources()).resources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          uri: expectedResourceFacadeUri('external-node', 'repo://README.md'),
+        }),
+      ]),
+    );
+    expect((await client.listResourceTemplates()).resourceTemplates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          uriTemplate: expectedResourceFacadeUri('external-node', 'repo://{+path}'),
+        }),
+      ]),
+    );
+    await expect(
+      client.readResource({
+        uri: expectedResourceFacadeUri('external-node', 'repo://README.md'),
+      }),
+    ).resolves.toMatchObject({
+      contents: [
+        expect.objectContaining({
+          uri: expectedResourceFacadeUri('external-node', 'repo://README.md'),
+          text: 'snapshot resource',
+          _meta: { resourceProtocolMetadata: true },
+        }),
+      ],
+    });
+    await expect(
+      client.readResource({
+        uri: expectedResourceFacadeUri('external-node', 'repo://src/index.ts'),
+      }),
+    ).resolves.toMatchObject({
+      contents: [
+        expect.objectContaining({
+          uri: expectedResourceFacadeUri('external-node', 'repo://src/index.ts'),
+          text: 'snapshot resource',
+        }),
+      ],
+    });
+    expect((await client.listPrompts()).prompts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Snapshot_Server__review' })]),
+    );
+    await expect(
+      client.getPrompt({ name: 'Snapshot_Server__review', arguments: { focus: 'auth' } }),
+    ).resolves.toMatchObject({
+      _meta: { promptResultProtocolMetadata: true },
+      description: 'Snapshot prompt description',
+      messages: [
+        expect.objectContaining({
+          role: 'user',
+          content: {
+            type: 'resource_link',
+            uri: expectedResourceFacadeUri('external-node', 'repo://README.md'),
+            name: 'README',
+            _meta: { promptContentProtocolMetadata: true },
+          },
+        }),
+      ],
+    });
+
+    expect(
+      temporalService.executeWorkflowUpdate.mock.calls.map(([call]) => call.args.operation.kind),
+    ).toEqual(['resource-read', 'resource-read', 'prompt-get']);
+  });
+
+  it('namespaces duplicate resource URIs by source and routes reads upstream', async () => {
+    const authority = externalAuthorityWithFacade();
+    if (authority.snapshot.version !== '2' || authority.manifest.version !== '2') {
+      throw new Error('Expected v2 fixture');
+    }
+    const secondKey = {
+      ...savedRuntimeKey(),
+      sourceId: 'saved-server-2',
+      credentialReference: 'mcp-server:saved-server-2',
+    };
+    authority.snapshot.runtimeBindings['second-node'] = {
+      ...authority.snapshot.runtimeBindings['external-node']!,
+      runtimeKey: secondKey,
+    };
+    authority.snapshot.resources.push({
+      sourceId: 'second-node',
+      uri: 'repo://README.md',
+      name: 'Repository README',
+    });
+    authority.snapshot.resourceTemplates.push({
+      sourceId: 'second-node',
+      uriTemplate: 'repo://{+path}',
+      name: 'Repository file',
+    });
+    authority.snapshot.prompts.push({
+      sourceId: 'second-node',
+      name: 'review',
+      arguments: [],
+    });
+    authority.grant.sources.push({ sourceId: 'second-node', toolAccess: { mode: 'all' } });
+    authority.manifest = {
+      ...authority.manifest,
+      entries: [
+        ...authority.manifest.entries,
+        {
+          operationKind: 'resource-read',
+          operationTarget: 'repo://README.md',
+          sourceId: 'second-node',
+          destination: 'mcp-activity',
+          retryPolicy: 'reviewed-idempotent',
+        },
+        {
+          operationKind: 'resource-read',
+          operationTarget: 'repo://{+path}',
+          sourceId: 'second-node',
+          destination: 'mcp-activity',
+          retryPolicy: 'reviewed-idempotent',
+        },
+        {
+          operationKind: 'prompt-get',
+          operationTarget: 'review',
+          sourceId: 'second-node',
+          destination: 'mcp-activity',
+          retryPolicy: 'reviewed-idempotent',
+        },
+      ],
+    };
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('external-node', 'Snapshot Server'),
+      { ...externalSource('second-node', 'Second Server'), serverId: 'saved-server-2' },
+    ]);
+    runtimeConfigService.buildRuntimeKey.mockImplementation(async (_principal, serverId) =>
+      serverId === 'saved-server-2' ? secondKey : savedRuntimeKey(),
+    );
+    temporalService.executeWorkflowUpdate.mockImplementation(async ({ args }) => {
+      const operation = args.operation as { kind: string; uri?: string };
+      if (operation.kind !== 'resource-read' || !operation.uri) {
+        return completedOperationResult();
+      }
+      return {
+        operationId: args.invocationId,
+        kind: 'completed',
+        output: {
+          meta: { resultProtocolMetadata: args.sourceId },
+          contents: [
+            {
+              uri: operation.uri,
+              text: `${args.sourceId}:${operation.uri}`,
+              meta: { resourceProtocolMetadata: true },
+            },
+          ],
+        },
+        completedAt: '2026-07-31T10:05:00.000Z',
+      };
+    });
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    const firstExactUri = expectedResourceFacadeUri('external-node', 'repo://README.md');
+    const secondExactUri = expectedResourceFacadeUri('second-node', 'repo://README.md');
+    const firstTemplate = expectedResourceFacadeUri('external-node', 'repo://{+path}');
+    const secondTemplate = expectedResourceFacadeUri('second-node', 'repo://{+path}');
+
+    expect((await client.listResources()).resources).toEqual([
+      expect.objectContaining({
+        name: 'Snapshot_Server__Repository_README',
+        uri: firstExactUri,
+      }),
+      expect.objectContaining({
+        name: 'Second_Server__Repository_README',
+        uri: secondExactUri,
+      }),
+    ]);
+    expect((await client.listResourceTemplates()).resourceTemplates).toEqual([
+      expect.objectContaining({
+        name: 'Snapshot_Server__Repository_file',
+        uriTemplate: firstTemplate,
+      }),
+      expect.objectContaining({
+        name: 'Second_Server__Repository_file',
+        uriTemplate: secondTemplate,
+      }),
+    ]);
+    expect((await client.listPrompts()).prompts.map((prompt) => prompt.name)).toEqual([
+      'Snapshot_Server__review',
+      'Second_Server__review',
+    ]);
+
+    const reads = [
+      await client.readResource({ uri: firstExactUri }),
+      await client.readResource({ uri: secondExactUri }),
+      await client.readResource({
+        uri: expectedResourceFacadeUri('external-node', 'repo://src/index.ts'),
+      }),
+      await client.readResource({
+        uri: expectedResourceFacadeUri('second-node', 'repo://src/index.ts'),
+      }),
+    ];
+
+    expect(reads.map((read) => read.contents[0]?.uri)).toEqual([
+      firstExactUri,
+      secondExactUri,
+      expectedResourceFacadeUri('external-node', 'repo://src/index.ts'),
+      expectedResourceFacadeUri('second-node', 'repo://src/index.ts'),
+    ]);
+    expect(reads[0]).toMatchObject({
+      _meta: { resultProtocolMetadata: 'external-node' },
+      contents: [{ _meta: { resourceProtocolMetadata: true } }],
+    });
+    expect(
+      temporalService.executeWorkflowUpdate.mock.calls.map(([call]) => ({
+        sourceId: call.args.sourceId,
+        authorizationTarget: call.args.authorizationTarget,
+        operationUri: call.args.operation.uri,
+      })),
+    ).toEqual([
+      {
+        sourceId: 'external-node',
+        authorizationTarget: 'repo://README.md',
+        operationUri: 'repo://README.md',
+      },
+      {
+        sourceId: 'second-node',
+        authorizationTarget: 'repo://README.md',
+        operationUri: 'repo://README.md',
+      },
+      {
+        sourceId: 'external-node',
+        authorizationTarget: 'repo://{+path}',
+        operationUri: 'repo://src/index.ts',
+      },
+      {
+        sourceId: 'second-node',
+        authorizationTarget: 'repo://{+path}',
+        operationUri: 'repo://src/index.ts',
+      },
+    ]);
+  });
+
+  it('deduplicates repeated same-source resources without hiding other capabilities', async () => {
+    const authority = externalAuthorityWithFacade();
+    if (authority.snapshot.version !== '2') throw new Error('Expected v2 fixture');
+    authority.snapshot.resources.push({
+      ...authority.snapshot.resources[0]!,
+      title: 'Duplicate exact resource',
+    });
+    authority.snapshot.resourceTemplates.push({
+      ...authority.snapshot.resourceTemplates[0]!,
+      title: 'Duplicate resource template',
+    });
+    authority.snapshot.resourceTemplates.push({
+      ...authority.snapshot.resourceTemplates[0]!,
+      uriTemplate: authority.snapshot.resources[0]!.uri,
+      title: 'Unreachable literal template',
+    });
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('external-node', 'Snapshot Server'),
+    ]);
+    const client = await connectToGateway(service, DURABLE_RUN_CONTEXT, clients, servers);
+
+    expect((await client.listResources()).resources).toEqual([
+      expect.objectContaining({ title: 'README' }),
+    ]);
+    expect((await client.listResourceTemplates()).resourceTemplates).toEqual([
+      expect.objectContaining({ title: 'Repository file' }),
+    ]);
+    expect((await client.listPrompts()).prompts).toEqual([
+      expect.objectContaining({ name: 'Snapshot_Server__review' }),
+    ]);
+    expect((await client.listTools()).tools).toEqual([
+      expect.objectContaining({ name: 'Snapshot_Server__lookup_events' }),
+    ]);
   });
 
   it('rejects an external snapshot when its live binding fingerprint changed', async () => {
@@ -342,6 +867,32 @@ describe('McpGatewayService', () => {
     );
     expect(legacyOutbound.callTool).not.toHaveBeenCalled();
   });
+
+  it.each(['resource', 'prompt'] as const)(
+    'rejects a snapshotted %s facade when its live runtime binding changed',
+    async (family) => {
+      const authority = externalAuthorityWithFacade();
+      authority.snapshot.tools = [];
+      authority.snapshot.resources = family === 'resource' ? authority.snapshot.resources : [];
+      authority.snapshot.resourceTemplates =
+        family === 'resource' ? authority.snapshot.resourceTemplates : [];
+      authority.snapshot.prompts = family === 'prompt' ? authority.snapshot.prompts : [];
+      mcpRuntimeRepository.getAuthority.mockResolvedValue(authority);
+      (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+        externalSource('external-node', 'Snapshot Server'),
+      ]);
+      runtimeConfigService.buildRuntimeKey.mockResolvedValue({
+        ...savedRuntimeKey(),
+        credentialGeneration: 8,
+      });
+
+      await expect(service.createServerForRun(DURABLE_RUN_CONTEXT)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(temporalService.executeWorkflowUpdate).not.toHaveBeenCalled();
+      expect(legacyOutbound.callTool).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects a snapshot, grant, run, or organization mismatch before tool registration', async () => {
     mcpRuntimeRepository.getAuthority.mockResolvedValue(null);
@@ -515,6 +1066,7 @@ function externalSource(
 ) {
   return {
     nodeId,
+    serverId: 'saved-server-1',
     toolName,
     type: 'mcp-server',
     endpoint,
@@ -535,6 +1087,31 @@ function completedInvocationResult() {
     output: { finding: true },
     completedAt: '2026-07-31T10:05:00.000Z',
   };
+}
+
+function completedOperationResult() {
+  return {
+    operationId: '33333333-3333-4333-8333-333333333333',
+    kind: 'completed' as const,
+    output: { content: [{ type: 'text', text: 'durable' }], isError: true },
+    completedAt: '2026-07-31T10:05:00.000Z',
+  };
+}
+
+function savedRuntimeKey() {
+  return {
+    sourceId: 'saved-server-1',
+    transport: 'http' as const,
+    configFingerprint: 'f'.repeat(64),
+    organizationId: 'org-1',
+    principalPartitionHash: '1'.repeat(64),
+    credentialReference: 'mcp-server:saved-server-1',
+    credentialGeneration: 7,
+  };
+}
+
+function expectedResourceFacadeUri(sourceId: string, upstreamUri: string): string {
+  return `sentris-mcp://resource/${Buffer.from(sourceId, 'utf8').toString('base64url')}/${upstreamUri}`;
 }
 
 function componentAuthority(): StoredMcpAuthority {
@@ -612,6 +1189,68 @@ function externalAuthority(
   return authorityFor([tool]);
 }
 
+function externalAuthorityWithFacade(): StoredMcpAuthority {
+  const authority = externalAuthority();
+  if (authority.snapshot.version !== '2' || authority.manifest.version !== '2') {
+    throw new Error('Expected v2 authority fixture');
+  }
+  authority.snapshot.resources = [
+    {
+      sourceId: 'external-node',
+      uri: 'repo://README.md',
+      name: 'Repository README',
+      title: 'README',
+      mimeType: 'text/markdown',
+    },
+  ];
+  authority.snapshot.resourceTemplates = [
+    {
+      sourceId: 'external-node',
+      uriTemplate: 'repo://{+path}',
+      name: 'Repository file',
+      title: 'Repository file',
+      mimeType: 'text/plain',
+    },
+  ];
+  authority.snapshot.prompts = [
+    {
+      sourceId: 'external-node',
+      name: 'review',
+      title: 'Review repository',
+      description: 'Review one area',
+      arguments: [{ name: 'focus', description: 'Review focus', required: true }],
+    },
+  ];
+  authority.manifest = {
+    ...authority.manifest,
+    entries: [
+      ...authority.manifest.entries,
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://README.md',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'resource-read',
+        operationTarget: 'repo://{+path}',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+      {
+        operationKind: 'prompt-get',
+        operationTarget: 'review',
+        sourceId: 'external-node',
+        destination: 'mcp-activity',
+        retryPolicy: 'reviewed-idempotent',
+      },
+    ],
+  };
+  return authority;
+}
+
 function authorityFor(tools: StoredMcpAuthority['snapshot']['tools']): StoredMcpAuthority {
   const createdAt = '2026-07-31T10:00:00.000Z';
   return {
@@ -633,8 +1272,21 @@ function authorityFor(tools: StoredMcpAuthority['snapshot']['tools']): StoredMcp
         organizationId: 'org-1',
         capabilityGrantId: RUN_CONTEXT.capabilityGrantId,
       },
-      version: '1',
+      version: '2',
       configFingerprint: 'c'.repeat(64),
+      runtimeBindings: Object.fromEntries(
+        tools
+          .filter((tool) => tool.source.kind === 'mcp')
+          .map((tool) => [
+            tool.source.sourceId,
+            {
+              runtimeKey: savedRuntimeKey(),
+              protocolEra: 'modern' as const,
+              protocolVersion: '2026-07-28',
+              capabilityFingerprint: '2'.repeat(64),
+            },
+          ]),
+      ),
       tools,
       resources: [],
       resourceTemplates: [],
@@ -644,9 +1296,10 @@ function authorityFor(tools: StoredMcpAuthority['snapshot']['tools']): StoredMcp
     manifest: {
       capabilitySnapshotId: SNAPSHOT_ID,
       capabilityGrantId: RUN_CONTEXT.capabilityGrantId,
-      version: '1',
+      version: '2',
       entries: tools.map((tool) => ({
-        toolName: tool.canonicalName,
+        operationKind: 'tool-call' as const,
+        operationTarget: tool.canonicalName,
         sourceId: tool.source.sourceId,
         destination: tool.source.kind === 'component' ? 'component-activity' : 'mcp-activity',
         retryPolicy: tool.retryPolicy,

@@ -23,6 +23,7 @@ import {
   MCP_RUNTIME_ROUTED_OPERATION_OVERHEAD_MS,
   resolveMcpRuntimeRoutedRequestTimeout,
 } from './mcp-runtime-limits';
+import { InputRequiredUnsupportedError } from './mcp-client-adapter';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 9301;
@@ -371,6 +372,13 @@ class InvalidBodyError extends Error {
 class UnsupportedMediaTypeError extends Error {}
 
 function mapError(error: unknown): { status: number; message: string; code?: string } {
+  if (error instanceof InputRequiredUnsupportedError) {
+    return {
+      status: 422,
+      message: 'MCP server requires interactive input',
+      code: 'MCP_INPUT_REQUIRED_UNSUPPORTED',
+    };
+  }
   if (error instanceof McpRuntimeFenceError) {
     return { status: 409, message: 'MCP runtime fence is stale', code: error.code };
   }

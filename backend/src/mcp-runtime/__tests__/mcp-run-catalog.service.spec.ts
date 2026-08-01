@@ -298,6 +298,14 @@ describe('McpRunCatalogService', () => {
       'saved-server',
     );
     expect(discoverSavedServer).toHaveBeenCalledWith(SAVED_RUNTIME_KEY);
+    expect(catalog.runtimeBindings).toEqual({
+      'saved-node': {
+        runtimeKey: SAVED_RUNTIME_KEY,
+        protocolEra: 'modern',
+        protocolVersion: '2026-07-28',
+        capabilityFingerprint: 'c'.repeat(64),
+      },
+    });
     expect(JSON.stringify(discoverSavedServer.mock.calls[0])).not.toContain('secret');
     expect(JSON.stringify(discoverSavedServer.mock.calls[0])).not.toContain('example.test/mcp');
     expect(discoverTools).toHaveBeenCalledTimes(1);
