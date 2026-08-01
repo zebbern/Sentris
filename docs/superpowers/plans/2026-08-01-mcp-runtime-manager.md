@@ -19,6 +19,7 @@
 - The official SDK owns MCP negotiation, validation, HTTP/stdio framing, transport cancellation, progress callbacks, and response caching. Sentris owns leases, epoch/generation fencing, process/container supervision, durable attempts, cross-worker routing, monotonic/rate-limited progress and Temporal heartbeats, and unknown-outcome classification.
 - Redis and Postgres may contain credential references and credential versions, but never resolved tokens, plaintext headers, OAuth values, stdio environment secrets, tool arguments/results, or child-process environment. Resolved credentials exist only in the current owner process and are cleared on release/fence.
 - Partition runtime reuse, negotiation verdicts, subscriptions, and immutable discovery by organization/principal plus credential reference and credential generation. Each complete authorization partition owns a distinct v2 client and response-cache store; set `cachePartition` as defense in depth, but do not rely on it alone because SDK-public cache entries remain shared within one store. Credential rotation produces a different runtime key/config identity; it must not mutate a live runtime in place. This credential generation is immutable configuration input and is not the ephemeral Redis lease generation.
+- Saved MCP servers persist secret-reference IDs in separate header and argument columns when configuration is created or updated, so partial updates cannot overwrite the other source's dependency metadata. Runtime-key generation reads only the active transport's referenced secret-version metadata and exact versions are pinned through value resolution; it never resolves a value before the owner wins its reservation. Rows predating migration `0011_mcp_server_secret_references` have a null active-transport reference column and temporarily use the organization-wide active-version set so rotation remains correct without decrypting legacy configuration. Re-saving the active configuration indexes precise dependencies. Remove this legacy fallback after an upgrade audit proves no active reference columns remain null; it is an explicit migration boundary, not a second permanent identity scheme.
 - Use both idle timeout and `maxTotalTimeout`; progress may reset the idle deadline but never extend the total deadline indefinitely. Map Temporal cancellation to an operation-scoped `AbortSignal`. Do not close a shared modern HTTP transport to cancel one request.
 - Configure `inputRequired: { autoFulfill: false }`, pass `allowInputRequired: true`, detect `isInputRequiredResult`, and map it to a typed non-retryable `input-required-unsupported` result. Do not configure anonymous process-local input callbacks. Keep durable human/model input behind the existing workflow-granular agent-turn boundary.
 - MCP Tasks are explicitly out of scope. The installed TypeScript SDK 2.0.0 does not implement the current `io.modelcontextprotocol/tasks` extension. Do not recreate the draft or call the deprecated v1 `experimental.tasks`; add support only after maintained official TypeScript support, a pinned extension version, and conformance tests exist.
@@ -342,7 +343,7 @@
 
 - [ ] **Step 3: Implement router and listener**
 
-  Start one runtime listener per worker process. For PM2 instance `N`, use `9200 + N*100` unless explicitly overridden; advertise `http://127.0.0.1:<port>` for local PM2 and the unique Compose service URL in Compose. Reuse the existing internal service credential with constant-time validation, body limits, deadlines, request IDs, and redacted structured logging. Validate the live lease again on the owner immediately before dispatch; the caller's earlier lookup is not sufficient fencing.
+  Start one runtime listener per worker process. Local PM2 allocates a canonical worker port block at `18000 + N*10`: health at offset `0`, the Docker proxy at `1`, and the runtime owner at `2`. Advertise `http://127.0.0.1:<owner-port>` for local PM2 and the unique Compose service URL in Compose. Reuse the existing internal service credential with constant-time validation, body limits, deadlines, request IDs, and redacted structured logging. Validate the live lease again on the owner immediately before dispatch; the caller's earlier lookup is not sufficient fencing.
 
 - [ ] **Step 4: Run GREEN**
 
@@ -447,9 +448,9 @@
 **Files:**
 
 - Modify: `backend/src/database/schema/mcp-runtime.ts`
-- Create: `backend/migrations/0011_generalize_mcp_runtime_operations.sql`
+- Create: `backend/migrations/0012_generalize_mcp_runtime_operations.sql`
 - Modify: `backend/migrations/meta/_journal.json`
-- Create/Modify: generated `backend/migrations/meta/0011_snapshot.json`
+- Create/Modify: generated `backend/migrations/meta/0012_snapshot.json`
 - Modify: `backend/src/database/__tests__/migration.guard.spec.ts`
 - Modify: `backend/src/mcp-runtime/mcp-runtime.repository.ts`
 - Modify: `backend/src/mcp-runtime/mcp-invocation.service.ts`
@@ -501,7 +502,7 @@
 
 - [ ] **Step 3: Generalize persistence without breaking old histories**
 
-  Migration `0011` adds `operation_kind` and `operation_target`, backfills every existing row as `tool-call` from `tool_name`, then makes the new fields non-null. It also adds nullable current-attempt fence columns (`runtime_id`, `owner_id`, `owner_epoch`, `lease_generation`) to `mcp_invocation_attempts`; they are null while prepared and written atomically by dispatch claim. Drop only the `tool_name NOT NULL` constraint; retain/populate `tool_name` for tool calls until all histories that serialize `PreparedInvocationRef.toolName` are retired. Add a kind check, bounded target validation, and positive lease-generation check in schema/service code. Generate and seal the migration using the repository command; do not hand-edit metadata after generation.
+  Migration `0012` adds `operation_kind` and `operation_target`, backfills every existing row as `tool-call` from `tool_name`, then makes the new fields non-null. It also adds nullable current-attempt fence columns (`runtime_id`, `owner_id`, `owner_epoch`, `lease_generation`) to `mcp_invocation_attempts`; they are null while prepared and written atomically by dispatch claim. Drop only the `tool_name NOT NULL` constraint; retain/populate `tool_name` for tool calls until all histories that serialize `PreparedInvocationRef.toolName` are retired. Add a kind check, bounded target validation, and positive lease-generation check in schema/service code. Generate and seal the migration using the repository command; do not hand-edit metadata after generation.
 
   The dispatch activity resolves no credentials itself. It first acquires by persisted runtime key plus its local candidate-owner identity, then passes the returned runtime reference and snapshotted capability definition to the dispatch-claim CAS. That CAS writes the exact fence to the current attempt and marks it `dispatched` before the first possible upstream byte. The router invokes only with the same returned fence. Settlement and ambiguity reconciliation compare the attempt-captured fence; a later owner fence cannot settle an earlier attempt. Map cancellation/deadline/remote/input-required failures and settle bounded JSON only. Progress is activity-heartbeated/rate-limited and does not flood Workflow history.
 
@@ -651,7 +652,7 @@
 
 **Interfaces:**
 
-- The Compose override runs two ordinary workers plus acceptance-only, worker-specific Temporal activity queues (`sentris-mcp-runtime-test-a` and `sentris-mcp-runtime-test-b`) with distinct stable owner IDs, random process epochs, and unique network aliases/direct addresses (`http://sentris-worker-a:9200` and `http://sentris-worker-b:9200`); neither address is a load-balanced alias. The placement workflow targets these queues explicitly and every activity result reports its observed executor owner ID/epoch.
+- The Compose override runs two ordinary workers plus acceptance-only, worker-specific Temporal activity queues (`sentris-mcp-runtime-test-a` and `sentris-mcp-runtime-test-b`) with distinct stable owner IDs, random process epochs, and unique network aliases/direct addresses (`http://sentris-worker-a:9301` and `http://sentris-worker-b:9301`); neither address is a load-balanced alias. The placement workflow targets these queues explicitly and every activity result reports its observed executor owner ID/epoch.
 - Benchmark artifacts use the existing schema-v2 host/instance/revision identity. The exact clean execution baseline is `64c02afa1c592edcb5c00c802524c74857ef4870`; revision-pair comparison applies to pre-existing `mcp.catalog`, warmed `mcp.tool_call`, and agent-turn metrics. Brand-new resource/prompt metrics use same-candidate parity against a normalized small warmed tool-call fixture, and their first clean passing artifact becomes the revision baseline for later releases.
 
 - [ ] **Step 1: Write RED acceptance and benchmark-runner tests**

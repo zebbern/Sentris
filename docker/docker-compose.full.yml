@@ -403,6 +403,11 @@ services:
       - LOKI_URL=http://loki:3100
       - TERMINAL_REDIS_URL=redis://redis:6379
       - TERMINAL_REDIS_COMMAND_TIMEOUT_MS=${TERMINAL_REDIS_COMMAND_TIMEOUT_MS:-10000}
+      - MCP_RUNTIME_REDIS_URL=redis://redis:6379
+      - MCP_RUNTIME_OWNER_ID=sentris-worker-${SENTRIS_INSTANCE:-0}
+      - MCP_RUNTIME_OWNER_URL=http://sentris-worker:9301
+      - MCP_RUNTIME_LISTEN_HOST=0.0.0.0
+      - MCP_RUNTIME_LISTEN_PORT=9301
       - DOCKER_HOST=tcp://dind:2376
       - DOCKER_TLS_VERIFY=1
       - DOCKER_CERT_PATH=/certs/client
@@ -438,6 +443,7 @@ services:
     expose:
       - '9100'
       - '9101'
+      - '9301'
     depends_on:
       postgres:
         condition: service_healthy

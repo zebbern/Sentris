@@ -25,6 +25,12 @@ describe('Docker resource scope', () => {
       'sentris.temporalNamespace': 'sentris-prod',
       'sentris.temporalTaskQueue': 'sentris-prod-workers',
     });
+    expect(resourceScope?.createDockerResourceScopeLabels(scope!)).toEqual({
+      'sentris.deploymentId': 'sentris-prod-eu',
+      'sentris.instance': '3',
+      'sentris.temporalNamespace': 'sentris-prod',
+      'sentris.temporalTaskQueue': 'sentris-prod-workers',
+    });
   });
 
   it('rejects label values that cannot be matched exactly by cleanup filters', async () => {

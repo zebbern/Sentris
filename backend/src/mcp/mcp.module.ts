@@ -27,6 +27,7 @@ import { McpRunCatalogService } from '../mcp-runtime/mcp-run-catalog.service';
 import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service';
 import { McpInvocationService } from '../mcp-runtime/mcp-invocation.service';
 import { InternalOnlyGuard } from '../auth/internal-only.guard';
+import { McpServersModule } from '../mcp-servers/mcp-servers.module';
 
 @Global()
 @Module({
@@ -38,6 +39,7 @@ import { InternalOnlyGuard } from '../auth/internal-only.guard';
     DatabaseModule,
     McpGroupsModule,
     McpRuntimeModule,
+    McpServersModule,
   ],
   controllers: [
     McpGatewayController,

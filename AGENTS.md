@@ -135,6 +135,10 @@ bun --cwd=backend run generate:openapi
 bun --cwd=packages/backend-client run generate
 ```
 
+Backend startup and OpenAPI generation intentionally use `backend/scripts/build-app.ts`.
+Do not switch them back to direct `bun src/*.ts` execution: Nest requires legacy
+decorator metadata that Bun's bundler emits but its direct TypeScript runtime does not.
+
 ### Testing
 
 ```bash
@@ -292,7 +296,9 @@ Frontend ←→ Backend ←→ Temporal ←→ Worker
 ### Health Checks
 
 - **Backend**: `GET /health` (liveness) and `GET /health/ready` (readiness) via Terminus. Indicators: Postgres, Redis, Temporal, and all enabled Kafka ingest consumers.
-- **Worker**: `GET :9100+N*100/health` per worker instance.
+- **Worker (local PM2)**: `GET :18000+N*10/health` per worker instance. The
+  instance's Docker MCP proxy uses offset `+1` and runtime owner uses offset `+2`.
+  Production Compose keeps fixed internal ports `9100`, `9101`, and `9301`.
 
 ### MCP Protocol Migration
 
@@ -308,9 +314,20 @@ immutable grants/catalog snapshots; the run gateway lists the persisted snapshot
 component calls use keyed Workflow Updates with durable invocation attempts. The legacy
 live-catalog/signal path is only for pre-deployment Workflow histories and unexpired
 tokens without `capabilitySnapshotId`; remove it after those histories are terminal or
-retired and Redis has no such token (maximum token TTL: three hours). Remaining work is
-canonical outbound runtime ownership, durable external invocation attempts,
-resources/prompts runtime behavior, Continue-As-New, MCP Tasks, and workflow-granular
+retired and Redis has no such token (maximum token TTL: three hours).
+
+Saved-server discovery now uses the worker-owned, Redis-lease-fenced runtime manager and
+the official v2 client. Worker instances own HTTP/host-stdio/Docker transports, route one
+hop to the exact owner when needed, resolve version-pinned credentials only after lease
+reservation, and release discovery runtimes in Temporal cleanup. Complete immutable
+catalogs preserve tools, resources, resource templates, and prompts. Acquisitions include
+a caller-supplied holder ID; durable callers must derive it from stable execution identity
+so retries reuse the same holder, and every operation/release must carry that holder plus
+the full fence. Do not add another backend/worker MCP client or bypass this runtime
+boundary.
+
+Remaining work is durable external invocation dispatch through this runtime,
+resources/prompts execution behavior, Continue-As-New, MCP Tasks, and workflow-granular
 agent turns. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in

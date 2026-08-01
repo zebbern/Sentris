@@ -202,7 +202,7 @@ describe('dev script instance runtime', () => {
       {
         id: 'worker-health',
         label: 'Worker health',
-        url: 'http://127.0.0.1:9300/health',
+        url: 'http://127.0.0.1:18020/health',
       },
     ]);
   });

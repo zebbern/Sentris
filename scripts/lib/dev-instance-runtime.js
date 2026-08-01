@@ -229,8 +229,27 @@ function getInstanceFrontendPort(instance) {
   return 5173 + validateInstance(instance, 'instance') * 100;
 }
 
+const LOCAL_WORKER_PORT_BASE = 18000;
+const LOCAL_WORKER_PORT_STRIDE = 10;
+
+function getInstanceWorkerPort(instance, offset) {
+  return (
+    LOCAL_WORKER_PORT_BASE +
+    validateInstance(instance, 'instance') * LOCAL_WORKER_PORT_STRIDE +
+    offset
+  );
+}
+
 function getInstanceWorkerHealthPort(instance) {
-  return 9100 + validateInstance(instance, 'instance') * 100;
+  return getInstanceWorkerPort(instance, 0);
+}
+
+function getInstanceMcpDockerProxyPort(instance) {
+  return getInstanceWorkerPort(instance, 1);
+}
+
+function getInstanceMcpRuntimeOwnerPort(instance) {
+  return getInstanceWorkerPort(instance, 2);
 }
 
 function getInstanceTemporalName(instance) {
@@ -609,6 +628,9 @@ module.exports = {
   createPm2AppNames,
   ensureInstanceEnvFiles,
   formatDevHealthProbeResult,
+  getInstanceMcpDockerProxyPort,
+  getInstanceMcpRuntimeOwnerPort,
+  getInstanceWorkerHealthPort,
   parseDevScriptArgs,
   probeDevHealthTarget,
   resolvePm2Command,

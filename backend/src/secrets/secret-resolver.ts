@@ -5,14 +5,48 @@
  * Secret reference format: {{secret:SECRET_ID}}
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SecretsService } from './secrets.service';
 import type { AuthContext } from '../auth/types';
 
 const SECRET_REF_REGEX = /\{\{secret:([a-f0-9-]+)\}\}/gi;
 
+export interface McpSecretReferences {
+  headers: string[];
+  args: string[];
+}
+
+/**
+ * Extracts stable secret dependency metadata without reading any secret value.
+ * Keeping header and argument references separate lets partial MCP server updates
+ * replace one source without losing the dependencies owned by the other.
+ */
+export function extractMcpSecretReferences(
+  headers: Record<string, string> | null | undefined,
+  args: string[] | null | undefined,
+): McpSecretReferences {
+  return {
+    headers: extractSecretReferenceIds(headers ? Object.values(headers) : []),
+    args: extractSecretReferenceIds(args ?? []),
+  };
+}
+
+function extractSecretReferenceIds(values: string[]): string[] {
+  const references = new Set<string>();
+  for (const value of values) {
+    const regex = new RegExp(SECRET_REF_REGEX.source, SECRET_REF_REGEX.flags);
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(value)) !== null) {
+      references.add(match[1]!.toLowerCase());
+    }
+  }
+  return [...references].sort();
+}
+
 export interface ResolveSecretsOptions {
   auth: AuthContext | null;
+  /** Exact immutable versions captured while deriving a runtime identity. */
+  secretVersions?: ReadonlyMap<string, number>;
 }
 
 export interface ResolvedConfig {
@@ -22,8 +56,6 @@ export interface ResolvedConfig {
 
 @Injectable()
 export class SecretResolver {
-  private readonly logger = new Logger(SecretResolver.name);
-
   constructor(private readonly secretsService: SecretsService) {}
 
   /**
@@ -41,13 +73,12 @@ export class SecretResolver {
     while ((match = regex.exec(value)) !== null) {
       const secretId = match[1];
       if (!replacements.has(secretId)) {
-        try {
-          const secretValue = await this.secretsService.getSecretValue(auth, secretId);
-          replacements.set(secretId, secretValue.value);
-        } catch (error) {
-          this.logger.error(`Failed to resolve secret ${secretId}:`, error);
-          replacements.set(secretId, ''); // Replace with empty string on error
+        const pinnedVersion = options.secretVersions?.get(secretId.toLowerCase());
+        if (options.secretVersions && pinnedVersion === undefined) {
+          throw new Error(`Secret ${secretId} is missing from the pinned runtime identity`);
         }
+        const secretValue = await this.secretsService.getSecretValue(auth, secretId, pinnedVersion);
+        replacements.set(secretId, secretValue.value);
       }
     }
 

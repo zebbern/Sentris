@@ -10,6 +10,7 @@ import type {
   Client,
   ConnectOptions,
   DiscoverResult,
+  FetchLike,
   Implementation,
   InMemoryResponseCacheStore,
   ServerCapabilities,
@@ -72,6 +73,7 @@ export interface McpHttpConnectionInput {
   endpoint: URL;
   requestInit?: RequestInit;
   authProvider?: AuthProvider;
+  fetch?: FetchLike;
   runtimeKey: McpRuntimeKey;
   signal: AbortSignal;
   timeout: number;

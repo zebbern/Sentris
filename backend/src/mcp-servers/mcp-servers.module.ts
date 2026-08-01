@@ -9,6 +9,8 @@ import { McpServersController } from './mcp-servers.controller';
 import { McpServersEncryptionService } from './mcp-servers.encryption';
 import { McpServersRepository } from './mcp-servers.repository';
 import { McpServersService } from './mcp-servers.service';
+import { McpServerRuntimeConfigService } from './mcp-server-runtime-config.service';
+import { McpSavedServerDiscoveryService } from './mcp-saved-server-discovery.service';
 import type { RedisConfig } from '../config';
 
 // Redis injection token - must match the one in mcp-servers.service.ts
@@ -19,6 +21,8 @@ const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
   controllers: [McpServersController],
   providers: [
     McpServersService,
+    McpServerRuntimeConfigService,
+    McpSavedServerDiscoveryService,
     McpServersRepository,
     McpServersEncryptionService,
     {
@@ -31,6 +35,6 @@ const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
       inject: [ConfigService],
     },
   ],
-  exports: [McpServersService],
+  exports: [McpServersService, McpServerRuntimeConfigService, McpSavedServerDiscoveryService],
 })
 export class McpServersModule {}

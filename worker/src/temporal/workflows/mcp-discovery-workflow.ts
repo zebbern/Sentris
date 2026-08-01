@@ -5,10 +5,13 @@ import {
   setHandler,
   workflowInfo,
 } from '@temporalio/workflow';
-import type { McpTool } from '@sentris/shared';
+import type { McpCatalog, McpRuntimeKey } from '@sentris/shared';
+import { SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS } from '../../mcp-runtime/mcp-runtime-limits';
+import type { McpTool } from '../types';
 
 // Input DTO for MCP discovery workflow
-export interface DiscoveryInput {
+export interface InlineDiscoveryInput {
+  mode?: 'inline-legacy';
   transport: 'http' | 'stdio';
   name: string;
   endpoint?: string;
@@ -19,11 +22,20 @@ export interface DiscoveryInput {
   cacheToken?: string;
 }
 
+export interface SavedServerDiscoveryInput {
+  mode: 'saved-server';
+  runtimeKey: McpRuntimeKey;
+  cacheToken?: string;
+}
+
+export type DiscoveryInput = InlineDiscoveryInput | SavedServerDiscoveryInput;
+
 // Output DTO for MCP discovery workflow
 export interface DiscoveryResult {
   workflowId: string;
   status: 'running' | 'completed' | 'failed';
   tools?: McpTool[];
+  catalog?: McpCatalog;
   toolCount?: number;
   error?: string;
   errorCode?: string;
@@ -33,6 +45,7 @@ export interface DiscoveryResult {
 export interface DiscoveryQueryResult {
   status: 'running' | 'completed' | 'failed';
   tools?: McpTool[];
+  catalog?: McpCatalog;
   toolCount?: number;
   error?: string;
   errorCode?: string;
@@ -124,6 +137,17 @@ const { discoverMcpToolsActivity, discoverMcpGroupToolsActivity, cacheDiscoveryR
     heartbeatTimeout: '10 seconds',
   });
 
+const { discoverSavedMcpRuntimeActivity } = proxyActivities<{
+  discoverSavedMcpRuntimeActivity(input: {
+    runtimeKey: McpRuntimeKey;
+  }): Promise<{ catalog: McpCatalog }>;
+}>({
+  startToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
+  scheduleToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS * 2,
+  heartbeatTimeout: '20 seconds',
+  retry: { maximumAttempts: 2 },
+});
+
 /**
  * MCP Discovery Workflow
  *
@@ -143,6 +167,44 @@ export async function mcpDiscoveryWorkflow(input: DiscoveryInput): Promise<Disco
 
   // Set up query handler for polling discovery status
   setHandler(defineQuery<DiscoveryQueryResult>('getDiscoveryResult'), () => discoveryResult);
+
+  if (input.mode === 'saved-server') {
+    try {
+      const { catalog } = await discoverSavedMcpRuntimeActivity({ runtimeKey: input.runtimeKey });
+      const tools = catalog.tools.map((tool) => ({
+        name: tool.source.kind === 'mcp' ? tool.source.upstreamName : tool.canonicalName,
+        ...(tool.description === undefined ? {} : { description: tool.description }),
+        inputSchema: tool.inputSchema,
+      }));
+      if (input.cacheToken) {
+        try {
+          await cacheDiscoveryResultActivity({
+            cacheToken: input.cacheToken,
+            tools,
+            workflowId,
+          });
+        } catch (cacheError: unknown) {
+          console.error('[mcpDiscoveryWorkflow] Failed to cache discovery results:', cacheError);
+        }
+      }
+      discoveryResult = {
+        status: 'completed',
+        tools,
+        toolCount: tools.length,
+        catalog,
+      };
+      return { workflowId, ...discoveryResult };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isNonRetryable = error instanceof ApplicationFailure && error.nonRetryable;
+      discoveryResult = {
+        status: 'failed',
+        error: errorMessage,
+        errorCode: isNonRetryable ? 'NON_RETRYABLE_FAILURE' : 'ACTIVITY_FAILURE',
+      };
+      return { workflowId, ...discoveryResult };
+    }
+  }
 
   // Step 1: Validate input
   if (input.transport === 'http' && !input.endpoint) {

@@ -4,6 +4,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const {
+  getInstanceMcpDockerProxyPort,
+  getInstanceMcpRuntimeOwnerPort,
+  getInstanceWorkerHealthPort,
+} = require('./scripts/lib/dev-instance-runtime.js');
 
 /**
  * Resolve the real bun binary path. On Windows, PM2 resolves 'bun' to
@@ -15,12 +20,19 @@ function resolveBun() {
   try {
     const result = execSync('where.exe bun.exe', { encoding: 'utf8', timeout: 5000 });
     const paths = result.trim().split(/\r?\n/);
-    const realBun = paths.find(p => !p.toLowerCase().endsWith('.cmd'));
+    const realBun = paths.find((p) => !p.toLowerCase().endsWith('.cmd'));
     if (realBun) return realBun.trim();
   } catch (_) {
     // where.exe failed — try known fallback locations.
   }
-  const fallback = path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'bun', 'bin', 'bun.exe');
+  const fallback = path.join(
+    process.env.APPDATA || '',
+    'npm',
+    'node_modules',
+    'bun',
+    'bin',
+    'bun.exe',
+  );
   try {
     fs.accessSync(fallback);
     return fallback;
@@ -38,12 +50,17 @@ function isLinuxMusl() {
   }
 
   try {
-    const report = typeof process.report?.getReport === 'function' ? process.report.getReport() : null;
+    const report =
+      typeof process.report?.getReport === 'function' ? process.report.getReport() : null;
     if (report?.header?.glibcVersionRuntime) {
       return false;
     }
     if (Array.isArray(report?.sharedObjects)) {
-      if (report.sharedObjects.some((file) => file.includes('libc.musl-') || file.includes('ld-musl-'))) {
+      if (
+        report.sharedObjects.some(
+          (file) => file.includes('libc.musl-') || file.includes('ld-musl-'),
+        )
+      ) {
         return true;
       }
     }
@@ -88,13 +105,17 @@ function getSwcTargets() {
       return musl ? ['linux-x64-musl', 'linux-x64-gnu'] : ['linux-x64-gnu', 'linux-x64-musl'];
     }
     if (arch === 'arm64') {
-      return musl ? ['linux-arm64-musl', 'linux-arm64-gnu'] : ['linux-arm64-gnu', 'linux-arm64-musl'];
+      return musl
+        ? ['linux-arm64-musl', 'linux-arm64-gnu']
+        : ['linux-arm64-gnu', 'linux-arm64-musl'];
     }
     if (arch === 'arm') {
       return ['linux-arm-gnueabihf'];
     }
     if (arch === 'riscv64') {
-      return musl ? ['linux-riscv64-musl', 'linux-riscv64-gnu'] : ['linux-riscv64-gnu', 'linux-riscv64-musl'];
+      return musl
+        ? ['linux-riscv64-musl', 'linux-riscv64-gnu']
+        : ['linux-riscv64-gnu', 'linux-riscv64-musl'];
     }
     if (arch === 's390x') {
       return ['linux-s390x-gnu'];
@@ -137,7 +158,13 @@ function getSwcTargets() {
 function collectCandidatePaths(target) {
   const candidates = [];
   const bunDir = path.join(__dirname, 'node_modules', '.bun');
-  const aggregateDir = path.join(bunDir, 'node_modules', '@swc', `core-${target}`, `swc.${target}.node`);
+  const aggregateDir = path.join(
+    bunDir,
+    'node_modules',
+    '@swc',
+    `core-${target}`,
+    `swc.${target}.node`,
+  );
 
   if (aggregateDir && fs.existsSync(aggregateDir)) {
     candidates.push(aggregateDir);
@@ -190,16 +217,17 @@ function resolveSwcBinaryPath() {
 
 const swcBinaryPath = resolveSwcBinaryPath();
 if (!swcBinaryPath) {
-  console.warn('Unable to automatically resolve SWC native binary; Temporal workers will use default resolution.');
+  console.warn(
+    'Unable to automatically resolve SWC native binary; Temporal workers will use default resolution.',
+  );
 }
 
 // Resolve the tsx binary path cross-platform. Bun installs `.exe` on Windows
 // instead of the extensionless scripts that npm/yarn create.
 function resolveTsxBinary() {
   const basePath = path.join(__dirname, 'node_modules', '.bin', 'tsx');
-  const candidates = process.platform === 'win32'
-    ? [basePath + '.exe', basePath + '.cmd', basePath]
-    : [basePath];
+  const candidates =
+    process.platform === 'win32' ? [basePath + '.exe', basePath + '.cmd', basePath] : [basePath];
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
@@ -230,7 +258,10 @@ function loadFrontendEnv(envFilePath) {
           const key = match[1].trim();
           let value = match[2].trim();
           // Remove surrounding quotes if present
-          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+          ) {
             value = value.slice(1, -1);
           }
           // Only include VITE_* variables for frontend
@@ -266,7 +297,10 @@ function loadWorkerEnv() {
           const key = match[1].trim();
           let value = match[2].trim();
           // Remove surrounding quotes if present
-          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+          ) {
             value = value.slice(1, -1);
           }
           env[key] = value;
@@ -295,7 +329,8 @@ const devInstanceEnv = isProduction
   ? {}
   : {
       DATABASE_URL: instanceDatabaseUrl,
-      SECRET_STORE_MASTER_KEY: process.env.SECRET_STORE_MASTER_KEY || 'SentrisLocalDevKey32Bytes!!!!!!!',
+      SECRET_STORE_MASTER_KEY:
+        process.env.SECRET_STORE_MASTER_KEY || 'SentrisLocalDevKey32Bytes!!!!!!!',
     };
 
 // Environment-specific configuration
@@ -344,11 +379,21 @@ function getInstancePort(basePort, instance) {
   return basePort + parseInt(instance) * 100;
 }
 
+const mcpRuntimeListenPort =
+  process.env.MCP_RUNTIME_LISTEN_PORT || String(getInstanceMcpRuntimeOwnerPort(instanceNum));
+const mcpRuntimeOwnerId = process.env.MCP_RUNTIME_OWNER_ID || `sentris-worker-${instanceNum}`;
+const mcpRuntimeOwnerUrl =
+  process.env.MCP_RUNTIME_OWNER_URL || `http://127.0.0.1:${mcpRuntimeListenPort}`;
+const mcpDockerProxyPort =
+  process.env.MCP_DOCKER_PROXY_PORT || String(getInstanceMcpDockerProxyPort(instanceNum));
+const mcpDockerProxyPublicBaseUrl =
+  process.env.MCP_DOCKER_PROXY_PUBLIC_BASE_URL || `http://127.0.0.1:${mcpDockerProxyPort}`;
+
 // Get env file (use instance-specific if it exists, otherwise fall back to root)
 function resolveEnvFile(appName, instance) {
   const instancePath = getInstanceEnvFile(appName, instance);
   const rootPath = __dirname + `/${appName}/.env`;
-  
+
   if (fs.existsSync(instancePath)) {
     return instancePath;
   }
@@ -374,10 +419,13 @@ module.exports = {
         LOG_KAFKA_BROKERS: process.env.LOG_KAFKA_BROKERS || 'localhost:9092',
         LOG_KAFKA_TOPIC: process.env.LOG_KAFKA_TOPIC || 'telemetry.logs',
         LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `sentris-backend-${instanceNum}`,
-        LOG_KAFKA_GROUP_ID: process.env.LOG_KAFKA_GROUP_ID || `sentris-backend-log-consumer-${instanceNum}`,
+        LOG_KAFKA_GROUP_ID:
+          process.env.LOG_KAFKA_GROUP_ID || `sentris-backend-log-consumer-${instanceNum}`,
         EVENT_KAFKA_TOPIC: process.env.EVENT_KAFKA_TOPIC || 'telemetry.events',
-        EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `sentris-backend-events-${instanceNum}`,
-        EVENT_KAFKA_GROUP_ID: process.env.EVENT_KAFKA_GROUP_ID || `sentris-event-ingestor-${instanceNum}`,
+        EVENT_KAFKA_CLIENT_ID:
+          process.env.EVENT_KAFKA_CLIENT_ID || `sentris-backend-events-${instanceNum}`,
+        EVENT_KAFKA_GROUP_ID:
+          process.env.EVENT_KAFKA_GROUP_ID || `sentris-event-ingestor-${instanceNum}`,
         NODE_IO_KAFKA_TOPIC: process.env.NODE_IO_KAFKA_TOPIC || 'telemetry.node-io',
         NODE_IO_KAFKA_CLIENT_ID:
           process.env.NODE_IO_KAFKA_CLIENT_ID || `sentris-backend-node-io-${instanceNum}`,
@@ -427,19 +475,28 @@ module.exports = {
           SENTRIS_INSTANCE: instanceNum,
           NAPI_RS_FORCE_WASI: '1',
           INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN || 'local-internal-token',
-          SENTRIS_API_BASE_URL: process.env.SENTRIS_API_BASE_URL || `http://localhost:${getInstancePort(3211, instanceNum)}/api/v1`,
+          SENTRIS_API_BASE_URL:
+            process.env.SENTRIS_API_BASE_URL ||
+            `http://localhost:${getInstancePort(3211, instanceNum)}/api/v1`,
           ...devInstanceEnv,
           TERMINAL_REDIS_URL: process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379',
           LOG_KAFKA_BROKERS: process.env.LOG_KAFKA_BROKERS || 'localhost:9092',
           LOG_KAFKA_TOPIC: process.env.LOG_KAFKA_TOPIC || 'telemetry.logs',
           LOG_KAFKA_CLIENT_ID: process.env.LOG_KAFKA_CLIENT_ID || `sentris-worker-${instanceNum}`,
           EVENT_KAFKA_TOPIC: process.env.EVENT_KAFKA_TOPIC || 'telemetry.events',
-          EVENT_KAFKA_CLIENT_ID: process.env.EVENT_KAFKA_CLIENT_ID || `sentris-worker-events-${instanceNum}`,
+          EVENT_KAFKA_CLIENT_ID:
+            process.env.EVENT_KAFKA_CLIENT_ID || `sentris-worker-events-${instanceNum}`,
           TEMPORAL_ADDRESS: process.env.TEMPORAL_ADDRESS || 'localhost:7233',
           TEMPORAL_NAMESPACE: `sentris-dev-${instanceNum}`,
           TEMPORAL_TASK_QUEUE: `sentris-dev-${instanceNum}`,
+          MCP_RUNTIME_OWNER_ID: mcpRuntimeOwnerId,
+          MCP_RUNTIME_OWNER_URL: mcpRuntimeOwnerUrl,
+          MCP_RUNTIME_LISTEN_HOST: process.env.MCP_RUNTIME_LISTEN_HOST || '127.0.0.1',
+          MCP_RUNTIME_LISTEN_PORT: mcpRuntimeListenPort,
+          MCP_DOCKER_PROXY_PORT: mcpDockerProxyPort,
+          MCP_DOCKER_PROXY_PUBLIC_BASE_URL: mcpDockerProxyPublicBaseUrl,
           SKIP_CONTAINER_CLEANUP: process.env.SKIP_CONTAINER_CLEANUP || 'false',
-          WORKER_HEALTH_PORT: getInstancePort(9100, instanceNum),
+          WORKER_HEALTH_PORT: getInstanceWorkerHealthPort(instanceNum),
         },
         swcBinaryPath ? { SWC_BINARY_PATH: swcBinaryPath } : {},
       ),
@@ -461,6 +518,18 @@ module.exports = {
           TEMPORAL_NAMESPACE: 'sentris-dev',
           NODE_ENV: 'development',
           NAPI_RS_FORCE_WASI: '1',
+          INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN || 'local-internal-token',
+          TERMINAL_REDIS_URL:
+            process.env.TERMINAL_REDIS_URL ||
+            workerEnv.TERMINAL_REDIS_URL ||
+            'redis://localhost:6379',
+          WORKER_HEALTH_PORT: '18100',
+          MCP_DOCKER_PROXY_PORT: '18101',
+          MCP_DOCKER_PROXY_PUBLIC_BASE_URL: 'http://127.0.0.1:18101',
+          MCP_RUNTIME_OWNER_ID: 'sentris-test-worker',
+          MCP_RUNTIME_OWNER_URL: 'http://127.0.0.1:18102',
+          MCP_RUNTIME_LISTEN_HOST: '127.0.0.1',
+          MCP_RUNTIME_LISTEN_PORT: '18102',
         },
         swcBinaryPath ? { SWC_BINARY_PATH: swcBinaryPath } : {},
       ),

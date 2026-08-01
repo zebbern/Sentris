@@ -22,12 +22,15 @@ export const McpRuntimeOwnerAddressSchema = z
       return (
         (url.protocol === 'http:' || url.protocol === 'https:') &&
         url.username === '' &&
-        url.password === ''
+        url.password === '' &&
+        url.pathname === '/' &&
+        url.search === '' &&
+        url.hash === ''
       );
     } catch {
       return false;
     }
-  }, 'Expected an HTTP(S) owner URL without embedded credentials');
+  }, 'Expected an HTTP(S) owner origin without credentials, path, query, or fragment');
 export type McpRuntimeOwnerAddress = z.infer<typeof McpRuntimeOwnerAddressSchema>;
 
 export const McpRuntimeKeySchema = z
@@ -52,6 +55,89 @@ export const McpRuntimeKeySchema = z
   });
 export type McpRuntimeKey = z.infer<typeof McpRuntimeKeySchema>;
 
+const McpRuntimeDefinitionBaseSchema = z
+  .object({
+    sourceId: z.string().min(1),
+    configFingerprint: Sha256HexSchema,
+    bindingFingerprint: Sha256HexSchema,
+    expectedCapabilityFingerprint: Sha256HexSchema.optional(),
+    authority: z
+      .object({
+        authorityId: z.string().min(1),
+        snapshotId: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const McpRuntimeEnvironmentSchema = z.record(z.string().min(1), z.string());
+const McpRuntimeArgumentsSchema = z.array(z.string()).max(128);
+const McpDockerOpaqueOptionSchema = z
+  .string()
+  .min(1)
+  .max(8_192)
+  .refine((value) => !value.includes('\0'), 'Docker option values may not contain NUL bytes');
+const McpDockerEntrypointSchema = z
+  .string()
+  .max(8_192)
+  .refine((value) => !value.includes('\0'), 'Docker entrypoints may not contain NUL bytes');
+const McpDockerRuntimeDefinitionShape = {
+  image: z.string().min(1),
+  command: McpRuntimeArgumentsSchema.optional(),
+  environment: McpRuntimeEnvironmentSchema.optional(),
+  network: z.string().min(1).optional(),
+  volumes: z.array(McpDockerOpaqueOptionSchema).max(64).optional(),
+  mounts: z.array(McpDockerOpaqueOptionSchema).max(64).optional(),
+  workingDirectory: z
+    .string()
+    .min(1)
+    .max(4_096)
+    .refine(
+      (value) => !value.includes('\0'),
+      'Docker working directories may not contain NUL bytes',
+    )
+    .optional(),
+  user: z
+    .string()
+    .min(1)
+    .max(256)
+    .refine((value) => !value.includes('\0'), 'Docker users may not contain NUL bytes')
+    .optional(),
+  entrypoint: McpDockerEntrypointSchema.optional(),
+  readOnlyRootFilesystem: z.boolean().optional(),
+  init: z.boolean().optional(),
+} as const;
+
+export const McpResolvedRuntimeDefinitionSchema = z.discriminatedUnion('kind', [
+  McpRuntimeDefinitionBaseSchema.extend({
+    kind: z.literal('remote-http'),
+    endpoint: z.url(),
+    headers: z.record(z.string().min(1), z.string()).optional(),
+    allowedInternalHosts: z.array(z.string().min(1)).max(64).optional(),
+  }).strict(),
+  McpRuntimeDefinitionBaseSchema.extend({
+    kind: z.literal('host-stdio'),
+    command: z.string().min(1),
+    args: McpRuntimeArgumentsSchema.optional(),
+    cwd: z.string().min(1).optional(),
+    environment: McpRuntimeEnvironmentSchema.optional(),
+    allowedCwdRoots: z.array(z.string().min(1)).max(64).optional(),
+  }).strict(),
+  McpRuntimeDefinitionBaseSchema.extend({
+    kind: z.literal('docker-stdio'),
+    ...McpDockerRuntimeDefinitionShape,
+  }).strict(),
+  McpRuntimeDefinitionBaseSchema.extend({
+    kind: z.literal('docker-http'),
+    ...McpDockerRuntimeDefinitionShape,
+    containerPort: z.number().int().positive().max(65_535),
+    endpointPath: z.string().startsWith('/').optional(),
+    dindHost: z.string().min(1).optional(),
+  }).strict(),
+]);
+export type McpResolvedRuntimeDefinition = z.infer<typeof McpResolvedRuntimeDefinitionSchema>;
+
 export const McpRuntimeFenceSchema = z
   .object({
     runtimeId: z.string().uuid(),
@@ -61,6 +147,9 @@ export const McpRuntimeFenceSchema = z
   })
   .strict();
 export type McpRuntimeFence = z.infer<typeof McpRuntimeFenceSchema>;
+
+export const McpRuntimeHolderIdSchema = z.string().uuid();
+export type McpRuntimeHolderId = z.infer<typeof McpRuntimeHolderIdSchema>;
 
 export const McpRuntimeAcquireRequestSchema = z
   .object({
@@ -81,7 +170,7 @@ const McpRuntimeRefBaseShape = {
   leaseExpiresAt: z.string().datetime(),
 };
 
-const publishedMcpRuntimeRef = (state: 'ready' | 'draining') =>
+const publishedMcpRuntimeRef = <TState extends 'ready' | 'draining'>(state: TState) =>
   z
     .object({
       ...McpRuntimeRefBaseShape,
@@ -92,6 +181,9 @@ const publishedMcpRuntimeRef = (state: 'ready' | 'draining') =>
       capabilityFingerprint: Sha256HexSchema,
     })
     .strict();
+
+export const McpReadyRuntimeRefSchema = publishedMcpRuntimeRef('ready');
+export type McpReadyRuntimeRef = z.infer<typeof McpReadyRuntimeRefSchema>;
 
 export const McpRuntimeRefSchema = z.discriminatedUnion('state', [
   z
@@ -104,10 +196,18 @@ export const McpRuntimeRefSchema = z.discriminatedUnion('state', [
       capabilityFingerprint: z.null(),
     })
     .strict(),
-  publishedMcpRuntimeRef('ready'),
+  McpReadyRuntimeRefSchema,
   publishedMcpRuntimeRef('draining'),
 ]);
 export type McpRuntimeRef = z.infer<typeof McpRuntimeRefSchema>;
+
+export const McpRuntimeAcquisitionSchema = z
+  .object({
+    ref: McpReadyRuntimeRefSchema,
+    holderId: McpRuntimeHolderIdSchema,
+  })
+  .strict();
+export type McpRuntimeAcquisition = z.infer<typeof McpRuntimeAcquisitionSchema>;
 
 export const McpRuntimeHealthSchema = z
   .object({
@@ -236,9 +336,7 @@ export const McpToolRegistrationDescriptorSchema = z.object({
   annotations: z.record(z.string(), z.unknown()).optional(),
   _meta: z.record(z.string(), z.unknown()).optional(),
 });
-export type McpToolRegistrationDescriptor = z.infer<
-  typeof McpToolRegistrationDescriptorSchema
->;
+export type McpToolRegistrationDescriptor = z.infer<typeof McpToolRegistrationDescriptorSchema>;
 
 export const ComponentToolSourceSchema = z
   .object({
@@ -348,6 +446,4 @@ export const McpCapabilityCatalogSnapshotSchema = z
     createdAt: z.string().datetime(),
   })
   .strict();
-export type McpCapabilityCatalogSnapshot = z.infer<
-  typeof McpCapabilityCatalogSnapshotSchema
->;
+export type McpCapabilityCatalogSnapshot = z.infer<typeof McpCapabilityCatalogSnapshotSchema>;

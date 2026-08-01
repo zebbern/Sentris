@@ -88,10 +88,20 @@ just instance-env show 5
 
 Ports are offset by `N * 100`:
 
-| Service  | Base | Instance 0 | Instance 1 | Instance 2 | Instance 5 |
-| -------- | ---- | ---------- | ---------- | ---------- | ---------- |
-| Frontend | 5173 | 5173       | 5273       | 5373       | 5673       |
-| Backend  | 3211 | 3211       | 3311       | 3411       | 3711       |
+| Service                   | Formula        | Instance 0 | Instance 1 | Instance 2 | Instance 5 |
+| ------------------------- | -------------- | ---------- | ---------- | ---------- | ---------- |
+| Frontend                  | `5173 + N*100` | 5173       | 5273       | 5373       | 5673       |
+| Backend                   | `3211 + N*100` | 3211       | 3311       | 3411       | 3711       |
+| Worker health (local)     | `18000 + N*10` | 18000      | 18010      | 18020      | 18050      |
+| MCP Docker proxy (local)  | `18001 + N*10` | 18001      | 18011      | 18021      | 18051      |
+| MCP runtime owner (local) | `18002 + N*10` | 18002      | 18012      | 18022      | 18052      |
+
+The three local worker listeners use one non-overlapping ten-port block per instance.
+Keeping this allocation in `scripts/lib/dev-instance-runtime.js` prevents collisions
+with shared infrastructure such as OpenSearch (`9200`/`9600`) and with another worker's
+listener. The Docker proxy and runtime owner are internal application endpoints. PM2
+binds the runtime owner to loopback and advertises the exact instance address;
+production Compose keeps its separate fixed internal ports.
 
 Shared infra (fixed ports, same for all instances):
 
@@ -105,6 +115,7 @@ Shared infra (fixed ports, same for all instances):
 | Redpanda Console | 8082        |
 | MinIO API/UI     | 9000 / 9001 |
 | Loki             | 3100        |
+| OpenSearch       | 9200        |
 
 ## Nginx Limitation
 

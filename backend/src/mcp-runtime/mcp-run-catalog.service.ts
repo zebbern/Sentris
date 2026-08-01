@@ -1,8 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { componentRegistry } from '@sentris/component-sdk';
-import type { McpToolRegistrationDescriptor, ToolDescriptor } from '@sentris/shared';
+import type {
+  McpCatalog,
+  McpRuntimeKey,
+  McpToolRegistrationDescriptor,
+  PromptDescriptor,
+  ResourceDescriptor,
+  ResourceTemplateDescriptor,
+  ToolDescriptor,
+} from '@sentris/shared';
 
-import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+import type { AuthContext } from '../auth/types';
+import { McpSavedServerDiscoveryService } from '../mcp-servers/mcp-saved-server-discovery.service';
+import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 import { McpLegacyOutboundCompatibilityService } from '../mcp/mcp-legacy-outbound-compatibility.service';
 import { ToolRegistryService, type RegisteredTool } from '../mcp/tool-registry.service';
 import { computeMcpBindingFingerprint, sha256 } from './mcp-binding-fingerprint';
@@ -10,6 +20,9 @@ import { claimMcpToolName, externalMcpToolName } from './mcp-tool-name';
 
 export interface BuiltRunCatalog {
   tools: ToolDescriptor[];
+  resources: ResourceDescriptor[];
+  resourceTemplates: ResourceTemplateDescriptor[];
+  prompts: PromptDescriptor[];
   configFingerprint: string;
 }
 
@@ -17,12 +30,15 @@ export interface BuiltRunCatalog {
 export class McpRunCatalogService {
   constructor(
     private readonly toolRegistry: ToolRegistryService,
-    private readonly mcpServersRepository: McpServersRepository,
     private readonly legacyOutbound: McpLegacyOutboundCompatibilityService,
+    private readonly runtimeConfig: McpServerRuntimeConfigService,
+    private readonly savedServerDiscovery: McpSavedServerDiscoveryService,
   ) {}
 
   async build(input: {
     runId: string;
+    organizationId: string | null;
+    invokingNodeId?: string;
     allowedNodeIds: readonly string[];
   }): Promise<BuiltRunCatalog> {
     const allowedNodeIds = normalizeAllowedNodeIds(input.allowedNodeIds);
@@ -34,8 +50,20 @@ export class McpRunCatalogService {
       .sort((left, right) => left.nodeId.localeCompare(right.nodeId));
 
     const tools: ToolDescriptor[] = [];
+    const resources: ResourceDescriptor[] = [];
+    const resourceTemplates: ResourceTemplateDescriptor[] = [];
+    const prompts: PromptDescriptor[] = [];
     const claimedNames = new Set<string>();
-    const sourceFingerprints: { sourceId: string; bindingFingerprint: string }[] = [];
+    const sourceFingerprints: {
+      sourceId: string;
+      bindingFingerprint: string;
+      runtimeIdentity?: {
+        runtimeKey: McpRuntimeKey;
+        protocolEra: McpCatalog['protocolEra'];
+        protocolVersion: string;
+        capabilityFingerprint: string;
+      };
+    }[] = [];
 
     for (const source of sources) {
       if (source.type === 'component') {
@@ -53,47 +81,175 @@ export class McpRunCatalogService {
         continue;
       }
 
-      const discovered = (await this.discoverExternalTools(input.runId, source)).sort(
-        (left, right) => left.name.localeCompare(right.name),
-      );
-      const bindingFingerprint = computeMcpBindingFingerprint(source, discovered);
-      sourceFingerprints.push({ sourceId: source.nodeId, bindingFingerprint });
-      for (const upstream of discovered) {
+      const discovered = await this.discoverExternalCatalog(input, source);
+      const registrations = discovered.tools
+        .map(toRegistrationDescriptor)
+        .sort((left, right) => left.name.localeCompare(right.name));
+      const bindingFingerprint = computeMcpBindingFingerprint(source, registrations);
+      sourceFingerprints.push({
+        sourceId: source.nodeId,
+        bindingFingerprint,
+        ...(discovered.kind === 'saved'
+          ? {
+              runtimeIdentity: {
+                runtimeKey: discovered.runtimeKey,
+                protocolEra: discovered.catalog.protocolEra,
+                protocolVersion: discovered.catalog.protocolVersion,
+                capabilityFingerprint: discovered.catalog.capabilityFingerprint,
+              },
+            }
+          : {}),
+      });
+      for (const upstream of registrations) {
         const canonicalName = externalMcpToolName(source.toolName, upstream.name);
         claimMcpToolName(claimedNames, canonicalName);
         tools.push(externalToolDescriptor(source, upstream, canonicalName, bindingFingerprint));
       }
+      if (discovered.kind === 'saved') {
+        resources.push(
+          ...discovered.catalog.resources.map((descriptor) => ({
+            ...descriptor,
+            sourceId: source.nodeId,
+          })),
+        );
+        resourceTemplates.push(
+          ...discovered.catalog.resourceTemplates.map((descriptor) => ({
+            ...descriptor,
+            sourceId: source.nodeId,
+          })),
+        );
+        prompts.push(
+          ...discovered.catalog.prompts.map((descriptor) => ({
+            ...descriptor,
+            sourceId: source.nodeId,
+          })),
+        );
+      }
     }
 
     tools.sort((left, right) => left.canonicalName.localeCompare(right.canonicalName));
+    resources.sort(compareResources);
+    resourceTemplates.sort(compareResourceTemplates);
+    prompts.sort(comparePrompts);
     sourceFingerprints.sort((left, right) => left.sourceId.localeCompare(right.sourceId));
     return {
       tools,
-      configFingerprint: sha256({ sourceFingerprints, tools }),
+      resources,
+      resourceTemplates,
+      prompts,
+      configFingerprint: sha256({
+        sourceFingerprints,
+        tools,
+        resources,
+        resourceTemplates,
+        prompts,
+      }),
     };
   }
 
-  private async discoverExternalTools(
-    runId: string,
+  private async discoverExternalCatalog(
+    input: {
+      runId: string;
+      organizationId: string | null;
+      invokingNodeId?: string;
+    },
     source: RegisteredTool,
-  ): Promise<McpToolRegistrationDescriptor[]> {
-    const cached = await this.toolRegistry.getServerTools(runId, source.nodeId);
-    if (cached && cached.length > 0) return cached;
-
-    if (source.type === 'mcp-server' || source.type === 'local-mcp') {
-      return source.endpoint ? this.legacyOutbound.discoverTools(runId, source) : [];
+  ): Promise<
+    | { kind: 'saved'; runtimeKey: McpRuntimeKey; catalog: McpCatalog; tools: ToolDescriptor[] }
+    | { kind: 'legacy-tool-only'; tools: McpToolRegistrationDescriptor[] }
+  > {
+    if (source.serverId) {
+      const policyTools = await this.toolRegistry.getServerTools(input.runId, source.nodeId);
+      if (!policyTools) {
+        throw new Error(
+          `MCP tool policy missing for saved server '${source.serverId}' at node '${source.nodeId}'`,
+        );
+      }
+      const allowedToolNames = new Set(policyTools.map((tool) => tool.name));
+      const runtimeKey = await this.runtimeConfig.buildRuntimeKey(
+        runPrincipal(input.runId, input.organizationId),
+        source.serverId,
+      );
+      const catalog = await this.savedServerDiscovery.discover(runtimeKey);
+      return {
+        kind: 'saved',
+        runtimeKey,
+        catalog,
+        tools: catalog.tools.filter((tool) =>
+          allowedToolNames.has(toRegistrationDescriptor(tool).name),
+        ),
+      };
     }
 
-    if (!source.serverId) return [];
-    const records = await this.mcpServersRepository.listTools(source.serverId);
-    return records
-      .filter((record) => record.enabled)
-      .map((record) => ({
-        name: record.toolName,
-        description: record.description ?? undefined,
-        inputSchema: (record.inputSchema as Record<string, unknown> | null) ?? undefined,
-      }));
+    const cached = await this.toolRegistry.getServerTools(input.runId, source.nodeId);
+    if (cached && cached.length > 0) return { kind: 'legacy-tool-only', tools: cached };
+
+    if (source.type === 'mcp-server' || source.type === 'local-mcp') {
+      return {
+        kind: 'legacy-tool-only',
+        tools: source.endpoint ? await this.legacyOutbound.discoverTools(input.runId, source) : [],
+      };
+    }
+
+    return { kind: 'legacy-tool-only', tools: [] };
   }
+}
+
+function runPrincipal(runId: string, organizationId: string | null): AuthContext {
+  return {
+    userId: `run:${runId}`,
+    organizationId,
+    roles: ['MEMBER'],
+    isAuthenticated: true,
+    provider: 'sentris-run',
+  };
+}
+
+function toRegistrationDescriptor(
+  descriptor: ToolDescriptor | McpToolRegistrationDescriptor,
+): McpToolRegistrationDescriptor {
+  if (!('canonicalName' in descriptor)) return descriptor;
+  if (descriptor.source.kind !== 'mcp') {
+    throw new Error('Saved MCP runtime catalog returned a non-MCP tool source');
+  }
+  return {
+    name: descriptor.source.upstreamName,
+    ...(descriptor.title !== undefined && { title: descriptor.title }),
+    ...(descriptor.description !== undefined && { description: descriptor.description }),
+    inputSchema: descriptor.inputSchema,
+    ...(descriptor.outputSchema !== undefined && { outputSchema: descriptor.outputSchema }),
+    ...(descriptor.icons !== undefined && { icons: descriptor.icons }),
+    ...(descriptor.annotations !== undefined && { annotations: descriptor.annotations }),
+    ...(descriptor.meta !== undefined && { _meta: descriptor.meta }),
+  };
+}
+
+function compareResources(left: ResourceDescriptor, right: ResourceDescriptor): number {
+  return compareCapabilityKeys(
+    `${left.sourceId}\u0000${left.uri}\u0000${left.name}`,
+    `${right.sourceId}\u0000${right.uri}\u0000${right.name}`,
+  );
+}
+
+function compareResourceTemplates(
+  left: ResourceTemplateDescriptor,
+  right: ResourceTemplateDescriptor,
+): number {
+  return compareCapabilityKeys(
+    `${left.sourceId}\u0000${left.uriTemplate}\u0000${left.name}`,
+    `${right.sourceId}\u0000${right.uriTemplate}\u0000${right.name}`,
+  );
+}
+
+function comparePrompts(left: PromptDescriptor, right: PromptDescriptor): number {
+  return compareCapabilityKeys(
+    `${left.sourceId}\u0000${left.name}`,
+    `${right.sourceId}\u0000${right.name}`,
+  );
+}
+
+function compareCapabilityKeys(left: string, right: string): number {
+  return left.localeCompare(right);
 }
 
 function componentRegistrationDescriptor(source: RegisteredTool): McpToolRegistrationDescriptor {

@@ -48,6 +48,11 @@ describe('worker dependency readiness checks', () => {
           calls.push('kafka');
         },
       },
+      mcpRuntime: {
+        check: async () => {
+          calls.push('mcp-runtime');
+        },
+      },
       backend: {
         apiBaseUrl: 'http://backend:3211/api/v1',
         internalToken: 'worker-token',
@@ -67,6 +72,7 @@ describe('worker dependency readiness checks', () => {
       workerState: {
         acceptingTasks: true,
         maintenanceError: undefined,
+        mcpRuntimeError: undefined,
         telemetryError: undefined,
       },
     });
@@ -82,6 +88,7 @@ describe('worker dependency readiness checks', () => {
     expect(results).toEqual({
       worker: { status: 'ok' },
       maintenance: { status: 'ok' },
+      mcpRuntime: { status: 'ok' },
       telemetry: { status: 'ok' },
       temporal: { status: 'ok' },
       docker: { status: 'ok' },
@@ -96,6 +103,7 @@ describe('worker dependency readiness checks', () => {
     expect(calls).toContain('minio:sentris-files');
     expect(calls).toContain('redis');
     expect(calls).toContain('kafka');
+    expect(calls).toContain('mcp-runtime');
     expect(calls).toContain('backend:http://backend:3211/api/v1/internal/health/worker-ready');
     expect(dockerExec).toHaveBeenCalledTimes(1);
   });
@@ -152,6 +160,34 @@ describe('worker dependency readiness checks', () => {
     expect(await checks?.backend()).toEqual({ status: 'not_configured' });
   });
 
+  it('fails MCP readiness when its lease probe fails even with no inventoried resources', async () => {
+    const readiness = await import('../readiness-checks').catch(() => undefined);
+    const checks = readiness?.createWorkerReadinessChecks({
+      temporalConnection: {
+        workflowService: { getSystemInfo: async () => ({}) },
+      },
+      databasePool: { query: async () => ({ rows: [{ '?column?': 1 }] }) },
+      minio: {
+        client: { bucketExists: async () => true },
+        bucketName: 'sentris-files',
+      },
+      kafka: { check: async () => undefined },
+      mcpRuntime: {
+        check: async () => {
+          throw new Error('runtime Redis unavailable');
+        },
+      },
+      dockerExec: async () => ({ stdout: '27.5.1\n', stderr: '' }),
+      dockerEnv: {},
+      workerState: { acceptingTasks: true },
+    });
+
+    expect(await checks?.mcpRuntime()).toEqual({
+      status: 'unhealthy',
+      message: 'runtime Redis unavailable',
+    });
+  });
+
   it('fails closed for unavailable storage, missing callback credentials, and maintenance errors', async () => {
     const readiness = await import('../readiness-checks').catch(() => undefined);
     const checks = readiness?.createWorkerReadinessChecks({
@@ -174,6 +210,7 @@ describe('worker dependency readiness checks', () => {
       workerState: {
         acceptingTasks: false,
         maintenanceError: 'orphan volume removal failed',
+        mcpRuntimeError: 'MCP runtime lease reconciliation failed',
         telemetryError: 'Kafka and the durable PostgreSQL fallback are unavailable',
       },
     });
@@ -185,6 +222,10 @@ describe('worker dependency readiness checks', () => {
     expect(await checks?.maintenance()).toEqual({
       status: 'unhealthy',
       message: 'orphan volume removal failed',
+    });
+    expect(await checks?.mcpRuntime()).toEqual({
+      status: 'unhealthy',
+      message: 'MCP runtime lease reconciliation failed',
     });
     expect(await checks?.telemetry()).toEqual({
       status: 'unhealthy',

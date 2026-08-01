@@ -124,6 +124,11 @@ describe('production worker and DIND topology', () => {
     expect(env.MCP_DOCKER_PROXY_PORT).toBe('9101');
     expect(env.MCP_DOCKER_PROXY_PUBLIC_BASE_URL).toBe('http://worker:9101');
     expect(env.MCP_DOCKER_PROXY_TOKEN).toBe('${MCP_DOCKER_PROXY_TOKEN:-}');
+    expect(env.MCP_RUNTIME_REDIS_URL).toBe('redis://redis:6379');
+    expect(env.MCP_RUNTIME_OWNER_ID).toBe('sentris-worker-${SENTRIS_INSTANCE:-0}');
+    expect(env.MCP_RUNTIME_OWNER_URL).toBe('http://sentris-worker:9301');
+    expect(env.MCP_RUNTIME_LISTEN_HOST).toBe('0.0.0.0');
+    expect(env.MCP_RUNTIME_LISTEN_PORT).toBe('9301');
     expect(env.WORKER_ORPHAN_MIN_AGE_MS).toBe('${WORKER_ORPHAN_MIN_AGE_MS:-3600000}');
     expect(env.WORKER_ORPHAN_INTERVAL_MS).toBe('${WORKER_ORPHAN_INTERVAL_MS:-900000}');
     expect(env.WORKER_ORPHAN_MAX_RESOURCES).toBe('${WORKER_ORPHAN_MAX_RESOURCES:-100}');
@@ -211,14 +216,15 @@ describe('production worker and DIND topology', () => {
     const worker = compose.services.worker;
     const dockerfile = await readFile(dockerfilePath, 'utf8');
 
-    expect(worker.expose).toEqual(expect.arrayContaining(['9100', '9101']));
+    expect(worker.expose).toEqual(expect.arrayContaining(['9100', '9101', '9301']));
+    expect(worker.ports).toBeUndefined();
     expect(worker.healthcheck?.test).toEqual([
       'CMD',
       'curl',
       '-sf',
       'http://localhost:9100/health/ready',
     ]);
-    expect(dockerfile).toContain('EXPOSE 9100 9101');
+    expect(dockerfile).toContain('EXPOSE 9100 9101 9301');
     expect(dockerfile).toContain('curl -sf http://localhost:9100/health/ready');
     expect(dockerfile).toContain('curl -sf http://localhost:3211/api/v1/health');
   });

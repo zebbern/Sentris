@@ -17,6 +17,7 @@ import {
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -29,13 +30,221 @@ import type {
 } from '../types';
 import { workflowDiagnosticLog } from '../workflow-diagnostics';
 import Redis from 'ioredis';
-import { resolveSentrisTrustProfile } from '@sentris/shared';
+import {
+  McpCatalogSchema,
+  McpRuntimeKeySchema,
+  resolveSentrisTrustProfile,
+  type McpCatalog,
+  type McpRuntimeAcquisition,
+  type McpRuntimeKey,
+} from '@sentris/shared';
+import type { McpRuntimeRouter } from '../../mcp-runtime/mcp-runtime-router';
+import { SAVED_MCP_RUNTIME_DISCOVERY_RELEASE_TIMEOUT_MS } from '../../mcp-runtime/mcp-runtime-limits';
 
 // Initialize Redis for caching
 const redisUrl =
   process.env.REDIS_URL || process.env.TERMINAL_REDIS_URL || 'redis://localhost:6379';
 const redis = new Redis(redisUrl);
 const MAX_HTTP_REDIRECTS = 5;
+const MAX_MCP_RUNTIME_HOLDER_TOUCH_INTERVAL_MS = 5_000;
+
+let mcpRuntimeRouter: McpRuntimeRouter | undefined;
+
+export function initializeMcpRuntimeDiscoveryActivities(router: McpRuntimeRouter): void {
+  mcpRuntimeRouter = router;
+}
+
+export interface SavedMcpRuntimeDiscoveryInput {
+  runtimeKey: McpRuntimeKey;
+}
+
+export interface SavedMcpRuntimeDiscoveryOutput {
+  catalog: McpCatalog;
+}
+
+/** Canonical saved-server discovery path. Its Temporal boundary is secret-free. */
+export async function discoverSavedMcpRuntimeActivity(
+  input: SavedMcpRuntimeDiscoveryInput,
+): Promise<SavedMcpRuntimeDiscoveryOutput> {
+  if (!mcpRuntimeRouter) throw new Error('MCP runtime discovery activities are not initialized');
+  const context = Context.current();
+  const runtimeKey = McpRuntimeKeySchema.parse(input.runtimeKey);
+  const holderId = savedDiscoveryHolderId(context.info, runtimeKey);
+  const heartbeatTimer = setInterval(() => context.heartbeat('mcp-runtime:starting'), 5_000);
+  heartbeatTimer.unref?.();
+  let runtimeAcquisition: McpRuntimeAcquisition | undefined;
+  let holderKeepalive: McpRuntimeHolderKeepalive | undefined;
+  let primaryError: unknown;
+  let output: SavedMcpRuntimeDiscoveryOutput | undefined;
+  try {
+    try {
+      context.heartbeat('mcp-runtime:acquire');
+      runtimeAcquisition = await mcpRuntimeRouter.acquire(
+        runtimeKey,
+        holderId,
+        context.cancellationSignal,
+      );
+      holderKeepalive = startMcpRuntimeHolderKeepalive(
+        mcpRuntimeRouter,
+        runtimeAcquisition,
+        context.cancellationSignal,
+        context.heartbeat.bind(context),
+      );
+      context.heartbeat('mcp-runtime:discover');
+      const catalog = await mcpRuntimeRouter.execute(
+        runtimeAcquisition,
+        { kind: 'discover' },
+        context.cancellationSignal,
+      );
+      context.heartbeat('mcp-runtime:catalog-ready');
+      output = { catalog: McpCatalogSchema.parse(catalog) };
+    } catch (error: unknown) {
+      primaryError = error;
+    }
+    if (holderKeepalive) {
+      try {
+        await holderKeepalive.stop();
+      } catch (keepaliveError: unknown) {
+        if (primaryError === undefined) {
+          primaryError = keepaliveError;
+        } else {
+          console.error(
+            '[MCP Runtime Discovery] Holder keepalive failed after the primary activity failure:',
+            keepaliveError instanceof Error ? keepaliveError.name : 'UnknownError',
+          );
+        }
+      }
+    }
+    if (runtimeAcquisition) {
+      context.heartbeat('mcp-runtime:release');
+      try {
+        await mcpRuntimeRouter.execute(
+          runtimeAcquisition,
+          { kind: 'release' },
+          AbortSignal.timeout(SAVED_MCP_RUNTIME_DISCOVERY_RELEASE_TIMEOUT_MS),
+        );
+      } catch (cleanupError: unknown) {
+        if (primaryError === undefined) throw cleanupError;
+        console.error(
+          '[MCP Runtime Discovery] Fenced release failed after the primary activity failure:',
+          cleanupError instanceof Error ? cleanupError.name : 'UnknownError',
+        );
+      }
+    }
+    if (primaryError !== undefined) throw primaryError;
+    if (!output) throw new Error('MCP runtime discovery completed without a catalog');
+    return output;
+  } finally {
+    clearInterval(heartbeatTimer);
+  }
+}
+
+interface McpRuntimeHolderKeepalive {
+  stop(): Promise<void>;
+}
+
+function startMcpRuntimeHolderKeepalive(
+  router: McpRuntimeRouter,
+  initialAcquisition: McpRuntimeAcquisition,
+  activitySignal: AbortSignal,
+  heartbeat: (details?: unknown) => void,
+): McpRuntimeHolderKeepalive {
+  const controller = new AbortController();
+  const stopped = new Error('MCP runtime holder keepalive stopped');
+  let acquisition = initialAcquisition;
+  let stopRequested = false;
+  let failure: unknown;
+  let stopFlight: Promise<void> | undefined;
+  const abortFromActivity = () => controller.abort(activitySignal.reason);
+  if (activitySignal.aborted) {
+    abortFromActivity();
+  } else {
+    activitySignal.addEventListener('abort', abortFromActivity, { once: true });
+  }
+
+  const flight = (async () => {
+    try {
+      while (!controller.signal.aborted) {
+        await waitForAbortableDelay(
+          holderTouchDelay(acquisition.ref.leaseExpiresAt),
+          controller.signal,
+        );
+        heartbeat('mcp-runtime:holder-touch');
+        const ref = await router.execute(acquisition, { kind: 'touch' }, controller.signal);
+        if (ref.state !== 'ready')
+          throw new Error('MCP runtime holder touch did not resolve ready');
+        acquisition = { ...acquisition, ref };
+      }
+    } catch (error: unknown) {
+      if (!stopRequested) failure = error;
+    }
+  })();
+
+  return {
+    stop() {
+      stopFlight ??= (async () => {
+        stopRequested = true;
+        activitySignal.removeEventListener('abort', abortFromActivity);
+        controller.abort(stopped);
+        await flight;
+        if (failure !== undefined) throw failure;
+      })();
+      return stopFlight;
+    },
+  };
+}
+
+function holderTouchDelay(leaseExpiresAt: string): number {
+  const remainingMs = Date.parse(leaseExpiresAt) - Date.now();
+  if (!Number.isFinite(remainingMs)) return 1;
+  return Math.max(
+    1,
+    Math.min(MAX_MCP_RUNTIME_HOLDER_TOUCH_INTERVAL_MS, Math.floor(remainingMs / 3)),
+  );
+}
+
+function waitForAbortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, milliseconds);
+    const abort = () => {
+      cleanup();
+      reject(signal.reason);
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener('abort', abort);
+    };
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+function savedDiscoveryHolderId(
+  activityInfo: ReturnType<typeof Context.current>['info'],
+  runtimeKey: McpRuntimeKey,
+): McpRuntimeAcquisition['holderId'] {
+  const digest = createHash('sha256')
+    .update(
+      JSON.stringify([
+        'sentris:mcp-runtime-holder:v2',
+        activityInfo.workflowExecution.workflowId,
+        activityInfo.workflowExecution.runId,
+        activityInfo.activityId,
+        activityInfo.attempt,
+        runtimeKey.sourceId,
+        runtimeKey.configFingerprint,
+        runtimeKey.organizationId,
+        runtimeKey.principalPartitionHash,
+        runtimeKey.credentialReference,
+        runtimeKey.credentialGeneration,
+      ]),
+    )
+    .digest('hex');
+  return `${digest.slice(0, 8)}-${digest.slice(8, 12)}-5${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+}
 
 /**
  * Same-worker stdio executes the requested command directly on this worker and

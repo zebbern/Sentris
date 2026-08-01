@@ -1,14 +1,17 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { beforeEach, describe, expect, it, mock, vi } from 'bun:test';
+import type { McpCatalog, McpRuntimeKey } from '@sentris/shared';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import { McpServersService } from '../mcp-servers.service';
-import type { McpServersRepository } from '../mcp-servers.repository';
-import type { McpServersEncryptionService } from '../mcp-servers.encryption';
-import type { SecretResolver } from '../../secrets/secret-resolver';
 import type { AuditLogService } from '../../audit/audit-log.service';
+import { DEFAULT_ORGANIZATION_ID } from '../../auth/constants';
 import type { AuthContext } from '../../auth/types';
 import type { McpServerRecord, McpServerToolRecord } from '../../database/schema';
-import { DEFAULT_ORGANIZATION_ID } from '../../auth/constants';
+import type { SecretResolver } from '../../secrets/secret-resolver';
+import type { McpServerRuntimeConfigService } from '../mcp-server-runtime-config.service';
+import type { McpSavedServerDiscoveryService } from '../mcp-saved-server-discovery.service';
+import type { McpServersEncryptionService } from '../mcp-servers.encryption';
+import type { McpServersRepository } from '../mcp-servers.repository';
+import { McpServersService } from '../mcp-servers.service';
 
 const now = new Date('2024-06-01T00:00:00.000Z');
 const authContext: AuthContext = {
@@ -19,32 +22,50 @@ const authContext: AuthContext = {
   provider: 'test',
 };
 
-const mockMcpConnect = vi.fn(async () => {});
-const mockMcpListTools = vi.fn(async () => ({
-  tools: [
-    {
-      name: 'fetch_url',
-      description: 'Fetches a URL',
-      inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
-    },
-  ],
-}));
-const mockMcpClose = vi.fn(async () => {});
-const mockMcpTransport = vi.fn();
+const CONFIG_FINGERPRINT = 'a'.repeat(64);
+const PRINCIPAL_PARTITION_HASH = 'b'.repeat(64);
+const CAPABILITY_FINGERPRINT = 'c'.repeat(64);
 
-class MockMcpClient {
-  connect = mockMcpConnect;
-  listTools = mockMcpListTools;
-  close = mockMcpClose;
+function makeRuntimeKey(transport: 'http' | 'stdio'): McpRuntimeKey {
+  return {
+    sourceId: 'server-1',
+    transport,
+    configFingerprint: CONFIG_FINGERPRINT,
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    principalPartitionHash: PRINCIPAL_PARTITION_HASH,
+    credentialReference: 'mcp-server:server-1',
+    credentialGeneration: now.getTime(),
+  };
 }
 
-mock.module('@modelcontextprotocol/sdk/client/index.js', () => ({
-  Client: MockMcpClient,
-}));
-
-mock.module('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
-  StreamableHTTPClientTransport: mockMcpTransport,
-}));
+function makeCatalog(): McpCatalog {
+  return {
+    protocolEra: 'modern',
+    protocolVersion: '2026-07-28',
+    capabilityFingerprint: CAPABILITY_FINGERPRINT,
+    tools: [
+      {
+        canonicalName: 'server-1__fetch_url',
+        displayName: 'Fetch URL',
+        description: 'Fetches a URL',
+        inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
+        source: {
+          kind: 'mcp',
+          sourceId: 'server-1',
+          serverId: 'server-1',
+          upstreamName: 'fetch_url',
+          bindingFingerprint: CONFIG_FINGERPRINT,
+        },
+        effects: 'unknown',
+        effectsSource: 'unknown',
+        retryPolicy: 'pre-dispatch-only',
+      },
+    ],
+    resources: [],
+    resourceTemplates: [],
+    prompts: [],
+  };
+}
 
 function makeServerRecord(overrides: Partial<McpServerRecord> = {}): McpServerRecord {
   return {
@@ -56,6 +77,8 @@ function makeServerRecord(overrides: Partial<McpServerRecord> = {}): McpServerRe
     command: null,
     args: null,
     headers: null,
+    headerSecretReferences: [],
+    argSecretReferences: [],
     enabled: true,
     healthCheckUrl: null,
     lastHealthCheck: null,
@@ -88,8 +111,9 @@ describe('McpServersService', () => {
   let encryption: Record<string, ReturnType<typeof vi.fn>>;
   let secretResolver: Record<string, ReturnType<typeof vi.fn>>;
   let auditLog: Record<string, ReturnType<typeof vi.fn>>;
-  let configSvc: Record<string, ReturnType<typeof vi.fn>>;
   let redis: Record<string, ReturnType<typeof vi.fn>>;
+  let runtimeConfigService: Record<string, ReturnType<typeof vi.fn>>;
+  let savedServerDiscovery: Record<string, ReturnType<typeof vi.fn>>;
   let mutationExecutor: { insert: ReturnType<typeof vi.fn> };
   let service: McpServersService;
 
@@ -130,21 +154,22 @@ describe('McpServersService', () => {
       record: vi.fn(),
       recordDurableWithExecutor: vi.fn(async () => undefined),
     };
-    configSvc = { get: vi.fn() };
     redis = { get: vi.fn(), del: vi.fn() };
-    mockMcpConnect.mockClear();
-    mockMcpListTools.mockClear();
-    mockMcpClose.mockClear();
-    mockMcpTransport.mockClear();
+    runtimeConfigService = {
+      buildRuntimeKey: vi.fn(async () => makeRuntimeKey('http')),
+    };
+    savedServerDiscovery = {
+      discover: vi.fn(async () => makeCatalog()),
+    };
 
     service = new McpServersService(
       repo as unknown as McpServersRepository,
       encryption as unknown as McpServersEncryptionService,
       secretResolver as unknown as SecretResolver,
       redis as any,
-      null,
       auditLog as unknown as AuditLogService,
-      configSvc as any,
+      runtimeConfigService as unknown as McpServerRuntimeConfigService,
+      savedServerDiscovery as unknown as McpSavedServerDiscoveryService,
     );
   });
 
@@ -252,6 +277,77 @@ describe('McpServersService', () => {
       headers: { Authorization: 'Bearer tok' },
     });
     expect(encryption.encryptHeaders).toHaveBeenCalledWith({ Authorization: 'Bearer tok' });
+  });
+
+  it('encrypts and indexes stdio environment credentials when creating a server', async () => {
+    const secretId = '00000000-0000-4000-8000-000000000001';
+    const encryptedHeaders = { ciphertext: 'ct', iv: 'iv', authTag: 'tag', keyId: 'k1' };
+    repo.list.mockResolvedValue([]);
+    mockMutationResult(
+      repo.create,
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'docker',
+        args: ['run', '-i', '--rm', 'mcp/example'],
+        headers: encryptedHeaders,
+        headerSecretReferences: [secretId],
+      }),
+      1,
+    );
+    encryption.encryptHeaders.mockResolvedValue(encryptedHeaders);
+
+    const result = await service.createServer(authContext, {
+      name: 'authenticated-stdio',
+      transportType: 'stdio',
+      command: 'docker',
+      args: ['run', '-i', '--rm', 'mcp/example'],
+      headers: { 'env:API_TOKEN': `{{secret:${secretId}}}` },
+    });
+
+    expect(encryption.encryptHeaders).toHaveBeenCalledWith({
+      'env:API_TOKEN': `{{secret:${secretId}}}`,
+    });
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: encryptedHeaders,
+        headerSecretReferences: [secretId],
+        argSecretReferences: [],
+      }),
+      expect.any(Function),
+    );
+    expect(result.hasHeaders).toBe(true);
+    expect(result.headerKeys).toEqual(['env:API_TOKEN']);
+  });
+
+  it('indexes only HTTP header dependencies while creating an HTTP server', async () => {
+    const secretId = '00000000-0000-4000-8000-000000000001';
+    repo.list.mockResolvedValue([]);
+    mockMutationResult(repo.create, makeServerRecord(), 1);
+    encryption.encryptHeaders.mockResolvedValue({
+      ciphertext: 'ct',
+      iv: 'iv',
+      authTag: 'tag',
+      keyId: 'k1',
+    });
+
+    await service.createServer(authContext, {
+      name: 'test',
+      transportType: 'http',
+      endpoint: 'https://mcp.example.test/mcp',
+      headers: { Authorization: `Bearer {{secret:${secretId}}}` },
+      args: [`--token={{secret:${secretId}}}`],
+    });
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: null,
+        args: null,
+        headerSecretReferences: [secretId],
+        argSecretReferences: [],
+      }),
+      expect.any(Function),
+    );
   });
 
   it('rejects creation when a duplicate name exists', async () => {
@@ -366,6 +462,66 @@ describe('McpServersService', () => {
     expect(encryption.encryptHeaders).toHaveBeenCalledWith({ 'X-Key': 'secret' });
   });
 
+  it('re-encrypts active stdio environment credentials during update', async () => {
+    const secretId = '00000000-0000-4000-8000-000000000002';
+    const encryptedHeaders = { ciphertext: 'ct2', iv: 'iv2', authTag: 'tag2', keyId: 'k2' };
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'docker',
+        args: ['run', '-i', '--rm', 'mcp/example'],
+        headers: { ciphertext: 'old', iv: 'old-iv', authTag: 'old-tag', keyId: 'k1' },
+      }),
+    );
+    mockMutationResult(
+      repo.update,
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'docker',
+        args: ['run', '-i', '--rm', 'mcp/example'],
+        headers: encryptedHeaders,
+        headerSecretReferences: [secretId],
+      }),
+      3,
+    );
+    encryption.encryptHeaders.mockResolvedValue(encryptedHeaders);
+
+    await service.updateServer(authContext, 'server-1', {
+      headers: { 'env:API_TOKEN': `{{secret:${secretId}}}` },
+    });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      'server-1',
+      expect.objectContaining({
+        headers: encryptedHeaders,
+        headerSecretReferences: [secretId],
+      }),
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('leaves stored stdio environment credentials intact on unrelated updates', async () => {
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'mcp-server',
+        args: [],
+        headers: { ciphertext: 'ct', iv: 'iv', authTag: 'tag', keyId: 'k1' },
+        headerSecretReferences: ['00000000-0000-4000-8000-000000000001'],
+      }),
+    );
+    mockMutationResult(repo.update, makeServerRecord({ name: 'renamed' }), 3);
+
+    await service.updateServer(authContext, 'server-1', { name: 'renamed' });
+
+    expect(repo.update.mock.calls[0]?.[1]).not.toHaveProperty('headers');
+    expect(repo.update.mock.calls[0]?.[1]).not.toHaveProperty('headerSecretReferences');
+  });
+
   it('clears headers when null is provided', async () => {
     repo.findById.mockResolvedValue(
       makeServerRecord({ headers: { ciphertext: 'ct', iv: 'iv', authTag: 'tag', keyId: 'k1' } }),
@@ -375,6 +531,71 @@ describe('McpServersService', () => {
     expect(repo.update).toHaveBeenCalledWith(
       'server-1',
       expect.objectContaining({ headers: null }),
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('updates argument dependencies without rewriting the header dependency column', async () => {
+    const headerSecretId = '00000000-0000-4000-8000-000000000001';
+    const argumentSecretId = '00000000-0000-4000-8000-000000000002';
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'mcp-server',
+        args: [`--token={{secret:${argumentSecretId}}}`],
+        headerSecretReferences: [headerSecretId],
+        argSecretReferences: [argumentSecretId],
+      }),
+    );
+    mockMutationResult(repo.update, makeServerRecord(), 3);
+
+    await service.updateServer(authContext, 'server-1', { args: [] });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      'server-1',
+      expect.objectContaining({
+        argSecretReferences: [],
+      }),
+      expect.any(Object),
+      expect.any(Function),
+    );
+    expect(repo.update.mock.calls[0]?.[1]).not.toHaveProperty('headerSecretReferences');
+    expect(encryption.decryptHeaders).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes inactive HTTP fields when switching to stdio', async () => {
+    const argumentSecretId = '00000000-0000-4000-8000-000000000002';
+    repo.findById.mockResolvedValue(makeServerRecord());
+    mockMutationResult(
+      repo.update,
+      makeServerRecord({
+        transportType: 'stdio',
+        endpoint: null,
+        command: 'mcp-server',
+        args: [`--token={{secret:${argumentSecretId}}}`],
+        headers: null,
+      }),
+      4,
+    );
+
+    await service.updateServer(authContext, 'server-1', {
+      transportType: 'stdio',
+      command: 'mcp-server',
+      args: [`--token={{secret:${argumentSecretId}}}`],
+    });
+
+    expect(repo.update).toHaveBeenCalledWith(
+      'server-1',
+      expect.objectContaining({
+        endpoint: null,
+        headers: null,
+        headerSecretReferences: [],
+        command: 'mcp-server',
+        args: [`--token={{secret:${argumentSecretId}}}`],
+        argSecretReferences: [argumentSecretId],
+      }),
       expect.any(Object),
       expect.any(Function),
     );
@@ -428,8 +649,19 @@ describe('McpServersService', () => {
     expect(result[0].serverName).toBe('test-mcp-server');
   });
 
-  it('tests HTTP MCP servers with the MCP client and persists discovered tools', async () => {
-    repo.findById.mockResolvedValue(makeServerRecord());
+  it('tests HTTP MCP servers through the secret-free saved-server workflow input', async () => {
+    const runtimeKey = makeRuntimeKey('http');
+    runtimeConfigService.buildRuntimeKey.mockResolvedValue(runtimeKey);
+    repo.findById.mockResolvedValue(
+      makeServerRecord({
+        headers: {
+          ciphertext: 'encrypted-bearer-token',
+          iv: 'iv',
+          authTag: 'tag',
+          keyId: 'key-1',
+        },
+      }),
+    );
     repo.upsertTools.mockResolvedValue([]);
     repo.updateHealthStatus.mockResolvedValue(undefined);
 
@@ -437,12 +669,16 @@ describe('McpServersService', () => {
 
     expect(result).toEqual({
       success: true,
-      message: 'Connection successful (1 tools available)',
+      message: 'Connection successful (1 tools discovered)',
       toolCount: 1,
     });
-    expect(mockMcpConnect).toHaveBeenCalledTimes(1);
-    expect(mockMcpListTools).toHaveBeenCalledTimes(1);
-    expect(mockMcpClose).toHaveBeenCalledTimes(1);
+    expect(runtimeConfigService.buildRuntimeKey).toHaveBeenCalledWith(authContext, 'server-1');
+    expect(savedServerDiscovery.discover).toHaveBeenCalledWith(runtimeKey);
+    const serializedWorkflowInput = JSON.stringify(savedServerDiscovery.discover.mock.calls[0]);
+    expect(serializedWorkflowInput).not.toContain('encrypted-bearer-token');
+    expect(serializedWorkflowInput).not.toContain('localhost:3100');
+    expect(encryption.decryptHeaders).not.toHaveBeenCalled();
+    expect(secretResolver.resolveMcpConfig).not.toHaveBeenCalled();
     expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
       {
         toolName: 'fetch_url',
@@ -455,29 +691,9 @@ describe('McpServersService', () => {
     });
   });
 
-  it('tests STDIO MCP servers through discovery workflow and persists discovered tools', async () => {
-    const temporalService = {
-      startWorkflow: vi.fn(async () => ({
-        workflowId: 'mcp-discovery-workflow-1',
-        runId: 'run-1',
-        taskQueue: 'sentris-worker-0',
-      })),
-      getWorkflowResult: vi.fn(async () => ({
-        status: 'completed',
-        tools: [{ name: 'fetch', description: 'Fetch URL', inputSchema: { type: 'object' } }],
-        toolCount: 1,
-      })),
-    };
-    service = new McpServersService(
-      repo as unknown as McpServersRepository,
-      encryption as unknown as McpServersEncryptionService,
-      secretResolver as unknown as SecretResolver,
-      redis as any,
-      temporalService as any,
-      auditLog as unknown as AuditLogService,
-      configSvc as any,
-    );
-    configSvc.get.mockReturnValue({ taskQueue: 'sentris-worker-0' });
+  it('tests STDIO MCP servers through the same saved-server runtime workflow', async () => {
+    const runtimeKey = makeRuntimeKey('stdio');
+    runtimeConfigService.buildRuntimeKey.mockResolvedValue(runtimeKey);
     repo.findById.mockResolvedValue(
       makeServerRecord({
         transportType: 'stdio',
@@ -496,21 +712,13 @@ describe('McpServersService', () => {
       message: 'Connection successful (1 tools discovered)',
       toolCount: 1,
     });
-    expect(temporalService.startWorkflow).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workflowType: 'mcpDiscoveryWorkflow',
-        taskQueue: 'sentris-worker-0',
-        args: [
-          expect.objectContaining({
-            transport: 'stdio',
-            command: 'mcp-fetch',
-            args: ['--stdio'],
-          }),
-        ],
-      }),
-    );
+    expect(savedServerDiscovery.discover).toHaveBeenCalledWith(runtimeKey);
     expect(repo.upsertTools).toHaveBeenCalledWith('server-1', [
-      { toolName: 'fetch', description: 'Fetch URL', inputSchema: { type: 'object' } },
+      {
+        toolName: 'fetch_url',
+        description: 'Fetches a URL',
+        inputSchema: { type: 'object', properties: { url: { type: 'string' } } },
+      },
     ]);
     expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'healthy', {
       organizationId: DEFAULT_ORGANIZATION_ID,
@@ -518,27 +726,10 @@ describe('McpServersService', () => {
   });
 
   it('marks STDIO MCP servers unhealthy when discovery workflow returns failed status', async () => {
-    const temporalService = {
-      startWorkflow: vi.fn(async () => ({
-        workflowId: 'mcp-discovery-workflow-2',
-        runId: 'run-2',
-        taskQueue: 'sentris-worker-0',
-      })),
-      getWorkflowResult: vi.fn(async () => ({
-        status: 'failed',
-        error: 'Failed to parse JSON',
-      })),
-    };
-    service = new McpServersService(
-      repo as unknown as McpServersRepository,
-      encryption as unknown as McpServersEncryptionService,
-      secretResolver as unknown as SecretResolver,
-      redis as any,
-      temporalService as any,
-      auditLog as unknown as AuditLogService,
-      configSvc as any,
+    runtimeConfigService.buildRuntimeKey.mockResolvedValue(makeRuntimeKey('stdio'));
+    savedServerDiscovery.discover.mockRejectedValue(
+      new Error('MCP saved-server discovery failed: Failed to parse JSON'),
     );
-    configSvc.get.mockReturnValue({ taskQueue: 'sentris-worker-0' });
     repo.findById.mockResolvedValue(
       makeServerRecord({
         transportType: 'stdio',
@@ -552,7 +743,24 @@ describe('McpServersService', () => {
 
     expect(result).toEqual({
       success: false,
-      message: 'Connection test failed: Failed to parse JSON',
+      message: 'MCP saved-server discovery failed: Failed to parse JSON',
+    });
+    expect(repo.upsertTools).not.toHaveBeenCalled();
+    expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'unhealthy', {
+      organizationId: DEFAULT_ORGANIZATION_ID,
+    });
+  });
+
+  it('rejects a partial tool-only result from the saved-server workflow', async () => {
+    savedServerDiscovery.discover.mockRejectedValue(new Error('Invalid MCP catalog'));
+    repo.findById.mockResolvedValue(makeServerRecord());
+    repo.updateHealthStatus.mockResolvedValue(undefined);
+
+    const result = await service.testServerConnection(authContext, 'server-1');
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Invalid MCP catalog',
     });
     expect(repo.upsertTools).not.toHaveBeenCalled();
     expect(repo.updateHealthStatus).toHaveBeenCalledWith('server-1', 'unhealthy', {

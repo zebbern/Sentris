@@ -1,55 +1,21 @@
-import 'reflect-metadata';
+import { resolve } from 'node:path';
 
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { buildBackendEntrypoint } from './build-app';
 
-import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { cleanupOpenApiDoc } from 'nestjs-zod';
-
-async function generateOpenApi() {
-  // Skip ingest services that require external connections during OpenAPI generation
-  process.env.SKIP_INGEST_SERVICES = 'true';
-  process.env.SENTRIS_SKIP_MIGRATION_CHECK = 'true';
-  // Ensure encryption services can bootstrap during schema generation.
-  // This key is only used to construct the Nest application for OpenAPI output.
-  process.env.SECRET_STORE_MASTER_KEY =
-    process.env.SECRET_STORE_MASTER_KEY ?? 'sentris-openapi-master-key-32bxx';
-  process.env.INTEGRATION_STORE_MASTER_KEY =
-    process.env.INTEGRATION_STORE_MASTER_KEY ?? 'sentris-openapi-master-key-32bxx';
-
-  const { AppModule } = await import('../src/app.module');
-
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn'],
-  });
-
-  // Set global prefix to match production
-  app.setGlobalPrefix('api/v1');
-
-  const config = new DocumentBuilder()
-    .setTitle('Sentris Flow API')
-    .setDescription('Sentris backend API specification')
-    .setVersion('0.1.0')
-    .addServer('/api/v1', 'API v1')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  const cleaned = cleanupOpenApiDoc(document);
-  const repoRootSpecPath = join(__dirname, '..', '..', 'openapi.json');
-  const payload = JSON.stringify(cleaned, null, 2);
-
-  writeFileSync(repoRootSpecPath, payload);
-  await app.close();
-}
-
-console.log('Script started');
-generateOpenApi()
-  .then(() => {
-    console.log('Script finished successfully');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('Failed to generate OpenAPI spec', error);
-    process.exit(1);
-  });
+const backendRoot = resolve(import.meta.dir, '..');
+const bundlePath = await buildBackendEntrypoint({
+  entrypoint: 'scripts/generate-openapi.runtime.ts',
+  outdir: 'build/openapi',
+});
+const child = Bun.spawn([process.execPath, bundlePath], {
+  cwd: backendRoot,
+  env: {
+    ...process.env,
+    SENTRIS_OPENAPI_OUTPUT: resolve(backendRoot, '..', 'openapi.json'),
+  },
+  stdin: 'inherit',
+  stdout: 'inherit',
+  stderr: 'inherit',
+});
+const exitCode = await child.exited;
+if (exitCode !== 0) throw new Error(`OpenAPI generator exited with code ${exitCode}`);

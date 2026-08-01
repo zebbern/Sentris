@@ -3,12 +3,10 @@ import {
   CapabilityGrantSchema,
   ExecutionScopeSchema,
   McpCapabilityCatalogSnapshotSchema,
+  McpResolvedRuntimeDefinitionSchema,
   ToolDescriptorSchema,
 } from '../mcp-capabilities.js';
-import {
-  InvocationManifestSchema,
-  MAX_INVOCATION_MANIFEST_ENTRIES,
-} from '../mcp-invocation.js';
+import { InvocationManifestSchema, MAX_INVOCATION_MANIFEST_ENTRIES } from '../mcp-invocation.js';
 
 const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
@@ -269,6 +267,38 @@ describe('capability descriptors', () => {
 });
 
 describe('MCP runtime ownership contracts', () => {
+  it('preserves the bounded Docker container options needed by saved stdio servers', () => {
+    const definition = {
+      sourceId: 'server-a',
+      configFingerprint: HASH,
+      bindingFingerprint: 'b'.repeat(64),
+      kind: 'docker-stdio' as const,
+      image: 'example/mcp:latest',
+      command: ['serve'],
+      volumes: ['cache:/data:ro', 'C:\\Work Space:/workspace'],
+      mounts: ['type=bind,src=/source path,dst=/workspace,readonly'],
+      workingDirectory: '/workspace',
+      user: '1000:1000',
+      entrypoint: '',
+      readOnlyRootFilesystem: true,
+      init: true,
+    };
+
+    expect(McpResolvedRuntimeDefinitionSchema.parse(definition)).toEqual(definition);
+    expect(
+      McpResolvedRuntimeDefinitionSchema.safeParse({
+        ...definition,
+        volumes: Array.from({ length: 65 }, (_, index) => `volume-${index}:/data`),
+      }).success,
+    ).toBe(false);
+    expect(
+      McpResolvedRuntimeDefinitionSchema.safeParse({
+        ...definition,
+        mounts: ['type=bind,src=/safe,dst=/data\0escaped'],
+      }).success,
+    ).toBe(false);
+  });
+
   it('parses a strict nullable-organization runtime key without resolved credentials', async () => {
     const runtimeContracts = (await import('../mcp-capabilities.js')) as Record<string, any>;
     const schema = runtimeContracts.McpRuntimeKeySchema;

@@ -51,6 +51,11 @@ SENTRIS_PUBLIC_API_BASE_URL=https://sentris.example.net
 MCP_DISCOVERY_TRUSTED_LOCAL_STDIO=false
 ```
 
+The bundled Compose topology assigns the worker a stable MCP runtime owner ID
+and advertises its direct `sentris-worker:9301` address. That listener is
+available only on the Compose application network; it is not published on the
+host and uses `INTERNAL_SERVICE_TOKEN` for worker-to-worker requests.
+
 The production frontend image is built once. At container startup it writes a
 whitelisted public `runtime-config.js`; changing a `VITE_*` setting requires a
 container restart, not an image rebuild. These values are browser-visible and

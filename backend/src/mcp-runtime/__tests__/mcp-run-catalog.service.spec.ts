@@ -9,7 +9,7 @@ import {
   port,
   type ComponentDefinition,
 } from '@sentris/component-sdk';
-import type { McpToolRegistrationDescriptor } from '@sentris/shared';
+import type { McpCatalog, McpRuntimeKey, McpToolRegistrationDescriptor } from '@sentris/shared';
 
 import { computeMcpBindingFingerprint } from '../mcp-binding-fingerprint';
 import { McpRunCatalogService } from '../mcp-run-catalog.service';
@@ -39,6 +39,99 @@ const EXTERNAL_TOOLS: McpToolRegistrationDescriptor[] = [
     _meta: { 'x-upstream': 'redis-discovery' },
   },
 ];
+
+const SAVED_RUNTIME_KEY: McpRuntimeKey = {
+  sourceId: 'saved-server',
+  transport: 'http',
+  configFingerprint: 'a'.repeat(64),
+  organizationId: 'org-1',
+  principalPartitionHash: 'b'.repeat(64),
+  credentialReference: 'mcp-server:saved-server',
+  credentialGeneration: 7,
+};
+
+const SAVED_CATALOG: McpCatalog = {
+  protocolEra: 'modern',
+  protocolVersion: '2026-07-28',
+  capabilityFingerprint: 'c'.repeat(64),
+  tools: [
+    {
+      canonicalName: 'lookup.events',
+      displayName: 'Lookup events',
+      title: 'Lookup events',
+      description: 'Search upstream events',
+      inputSchema: EXTERNAL_TOOLS[0]!.inputSchema!,
+      outputSchema: EXTERNAL_TOOLS[0]!.outputSchema,
+      icons: EXTERNAL_TOOLS[0]!.icons,
+      annotations: EXTERNAL_TOOLS[0]!.annotations,
+      meta: EXTERNAL_TOOLS[0]!._meta,
+      source: {
+        kind: 'mcp',
+        sourceId: 'saved-server',
+        serverId: 'saved-server',
+        upstreamName: 'lookup.events',
+        bindingFingerprint: SAVED_RUNTIME_KEY.configFingerprint,
+      },
+      effects: 'read-only',
+      effectsSource: 'mcp-annotation',
+      retryPolicy: 'reviewed-idempotent',
+    },
+    {
+      canonicalName: 'dangerous.admin',
+      displayName: 'Dangerous admin',
+      inputSchema: { type: 'object' },
+      source: {
+        kind: 'mcp',
+        sourceId: 'saved-server',
+        serverId: 'saved-server',
+        upstreamName: 'dangerous.admin',
+        bindingFingerprint: SAVED_RUNTIME_KEY.configFingerprint,
+      },
+      effects: 'unknown',
+      effectsSource: 'unknown',
+      retryPolicy: 'pre-dispatch-only',
+    },
+  ],
+  resources: [
+    {
+      sourceId: 'saved-server',
+      uri: 'sentris://events/latest',
+      name: 'Latest events',
+      title: 'Latest security events',
+      description: 'The latest normalized events',
+      mimeType: 'application/json',
+      size: 42,
+      icons: [{ src: 'https://example.test/resource.svg', theme: 'dark' }],
+      annotations: { audience: ['assistant'] },
+      meta: { retention: 'short' },
+    },
+  ],
+  resourceTemplates: [
+    {
+      sourceId: 'saved-server',
+      uriTemplate: 'sentris://events/{eventId}',
+      name: 'Event by ID',
+      title: 'Security event',
+      description: 'Loads one event',
+      mimeType: 'application/json',
+      icons: [{ src: 'https://example.test/template.svg', mimeType: 'image/svg+xml' }],
+      annotations: { priority: 0.8 },
+      meta: { stable: true },
+    },
+  ],
+  prompts: [
+    {
+      sourceId: 'saved-server',
+      name: 'investigate-event',
+      title: 'Investigate event',
+      description: 'Build an investigation plan',
+      arguments: [{ name: 'eventId', description: 'Event identifier', required: true }],
+      icons: [{ src: 'https://example.test/prompt.svg' }],
+      annotations: { audience: ['assistant'] },
+      meta: { category: 'investigation' },
+    },
+  ],
+};
 
 function catalogComponent(profileExposed: boolean): ComponentDefinition {
   return {
@@ -88,7 +181,11 @@ describe('McpRunCatalogService', () => {
     const component = componentSource();
     const service = createService({ sources: [component] });
 
-    const catalog = await service.build({ runId: 'run-1', allowedNodeIds: ['component-node'] });
+    const catalog = await service.build({
+      runId: 'run-1',
+      organizationId: null,
+      allowedNodeIds: ['component-node'],
+    });
 
     expect(catalog.tools).toHaveLength(1);
     expect(catalog.tools[0]).toEqual({
@@ -124,7 +221,11 @@ describe('McpRunCatalogService', () => {
         nodeId === included.nodeId ? EXTERNAL_TOOLS : [{ name: 'must-not-leak' }],
     });
 
-    const catalog = await service.build({ runId: 'run-1', allowedNodeIds: ['parent'] });
+    const catalog = await service.build({
+      runId: 'run-1',
+      organizationId: null,
+      allowedNodeIds: ['parent'],
+    });
 
     expect(catalog.tools).toEqual([
       {
@@ -151,37 +252,100 @@ describe('McpRunCatalogService', () => {
     ]);
   });
 
-  it('uses database descriptors before the live fallback and snapshots live discovery once', async () => {
+  it('uses complete saved-server runtime catalogs and preserves every family and metadata field', async () => {
     const saved = externalSource('saved-node', 'Saved', undefined, 'saved-server');
     saved.type = 'remote-mcp';
+    saved.encryptedCredentials = 'encrypted-run-secret';
     const local = externalSource('local-node', 'Local');
     local.type = 'local-mcp';
-    const listTools = vi.fn(async () => [
-      {
-        toolName: 'saved-search',
-        description: 'Saved search',
-        inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
-        enabled: true,
-      },
-    ]);
     const discoverTools = vi.fn(async () => [
       { name: 'live-search', inputSchema: { type: 'object' } },
     ]);
+    const buildRuntimeKey = vi.fn(async () => SAVED_RUNTIME_KEY);
+    const discoverSavedServer = vi.fn(async () => SAVED_CATALOG);
     const service = createService({
       sources: [saved, local],
-      getServerTools: async () => null,
-      listTools,
+      getServerTools: async (_runId, nodeId) => (nodeId === saved.nodeId ? EXTERNAL_TOOLS : null),
       discoverTools,
+      buildRuntimeKey,
+      discoverSavedServer,
     });
 
-    const catalog = await service.build({ runId: 'run-1', allowedNodeIds: [] });
+    const catalog = await service.build({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      invokingNodeId: 'agent-node',
+      allowedNodeIds: [],
+    });
 
     expect(catalog.tools.map((tool) => tool.canonicalName)).toEqual([
       'Local__live-search',
-      'Saved__saved-search',
+      'Saved__lookup_events',
     ]);
-    expect(listTools).toHaveBeenCalledTimes(1);
+    expect(catalog.resources).toEqual([{ ...SAVED_CATALOG.resources[0], sourceId: 'saved-node' }]);
+    expect(catalog.resourceTemplates).toEqual([
+      { ...SAVED_CATALOG.resourceTemplates[0], sourceId: 'saved-node' },
+    ]);
+    expect(catalog.prompts).toEqual([{ ...SAVED_CATALOG.prompts[0], sourceId: 'saved-node' }]);
+    expect(buildRuntimeKey).toHaveBeenCalledWith(
+      {
+        userId: 'run:run-1',
+        organizationId: 'org-1',
+        roles: ['MEMBER'],
+        isAuthenticated: true,
+        provider: 'sentris-run',
+      },
+      'saved-server',
+    );
+    expect(discoverSavedServer).toHaveBeenCalledWith(SAVED_RUNTIME_KEY);
+    expect(JSON.stringify(discoverSavedServer.mock.calls[0])).not.toContain('secret');
+    expect(JSON.stringify(discoverSavedServer.mock.calls[0])).not.toContain('example.test/mcp');
     expect(discoverTools).toHaveBeenCalledTimes(1);
+    expect(catalog.configFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(catalog)).not.toContain('encrypted-run-secret');
+
+    const changedPromptMetadata = structuredClone(SAVED_CATALOG);
+    changedPromptMetadata.prompts[0]!.meta = { category: 'changed-investigation' };
+    const changed = await createService({
+      sources: [saved, local],
+      getServerTools: async (_runId, nodeId) => (nodeId === saved.nodeId ? EXTERNAL_TOOLS : null),
+      discoverTools,
+      buildRuntimeKey,
+      discoverSavedServer: async () => changedPromptMetadata,
+    }).build({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      invokingNodeId: 'agent-node',
+      allowedNodeIds: [],
+    });
+    expect(changed.configFingerprint).not.toBe(catalog.configFingerprint);
+
+    const rotated = await createService({
+      sources: [saved, local],
+      getServerTools: async (_runId, nodeId) => (nodeId === saved.nodeId ? EXTERNAL_TOOLS : null),
+      discoverTools,
+      buildRuntimeKey: async () => ({ ...SAVED_RUNTIME_KEY, credentialGeneration: 8 }),
+      discoverSavedServer,
+    }).build({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      invokingNodeId: 'agent-node',
+      allowedNodeIds: [],
+    });
+    expect(rotated.configFingerprint).not.toBe(catalog.configFingerprint);
+  });
+
+  it('fails closed when a saved-server run has no registered tool policy', async () => {
+    const saved = externalSource('saved-node', 'Saved', undefined, 'saved-server');
+    const service = createService({ sources: [saved], getServerTools: async () => null });
+
+    await expect(
+      service.build({
+        runId: 'run-1',
+        organizationId: 'org-1',
+        allowedNodeIds: [],
+      }),
+    ).rejects.toThrow("MCP tool policy missing for saved server 'saved-server'");
   });
 
   it('fingerprints canonical non-secret bindings deterministically and changes on every binding input', async () => {
@@ -239,6 +403,7 @@ describe('McpRunCatalogService', () => {
 
     const catalog = await createService({ sources: [base] }).build({
       runId: 'run-1',
+      organizationId: null,
       allowedNodeIds: ['component-node'],
     });
     expect(catalog.tools[0].source.bindingFingerprint).toBe(original);
@@ -250,6 +415,7 @@ describe('McpRunCatalogService', () => {
     const service = createService({ sources: [source] });
     const original = await service.build({
       runId: 'run-1',
+      organizationId: null,
       allowedNodeIds: ['component-node'],
     });
     (
@@ -260,6 +426,7 @@ describe('McpRunCatalogService', () => {
 
     const drifted = await service.build({
       runId: 'run-1',
+      organizationId: null,
       allowedNodeIds: ['component-node'],
     });
 
@@ -275,19 +442,25 @@ function createService(input: {
     runId: string,
     nodeId: string,
   ) => Promise<McpToolRegistrationDescriptor[] | null>;
-  listTools?: (serverId: string) => Promise<unknown[]>;
   discoverTools?: (
     runId: string,
     source: RegisteredTool,
   ) => Promise<McpToolRegistrationDescriptor[]>;
+  buildRuntimeKey?: (...args: unknown[]) => Promise<McpRuntimeKey>;
+  discoverSavedServer?: (runtimeKey: McpRuntimeKey) => Promise<McpCatalog>;
 }): McpRunCatalogService {
   return new McpRunCatalogService(
     {
       getToolsForRun: async () => input.sources,
       getServerTools: input.getServerTools ?? (async () => null),
     } as never,
-    { listTools: input.listTools ?? (async () => []) } as never,
     { discoverTools: input.discoverTools ?? (async () => []) } as never,
+    {
+      buildRuntimeKey: input.buildRuntimeKey ?? (async () => SAVED_RUNTIME_KEY),
+    } as never,
+    {
+      discover: input.discoverSavedServer ?? (async () => SAVED_CATALOG),
+    } as never,
   );
 }
 

@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'bun:test';
 import type Redis from 'ioredis';
 import type { McpRuntimeKey } from '@sentris/shared';
+import type { McpRuntimeInternalServerHandle } from '../../../mcp-runtime/mcp-runtime-internal.server';
+import type { McpRuntimeManager } from '../../../mcp-runtime/mcp-runtime-manager';
+import type { McpRuntimeReconcilerHandle } from '../../../mcp-runtime/mcp-runtime-reconciler';
 
-import { createDatabasePool, createMcpRuntimeLeaseServices } from '../service-factory';
+import {
+  closeMcpRuntimeParts,
+  createDatabasePool,
+  createMcpRuntimeLeaseServices,
+} from '../service-factory';
 
 const MCP_RUNTIME_ENV_KEYS = [
   'MCP_RUNTIME_REDIS_URL',
@@ -88,10 +95,60 @@ class FakeMcpRuntimeRedisClient {
 
 function configureMcpRuntimeOwner(): void {
   process.env.MCP_RUNTIME_OWNER_ID = 'worker-instance-7';
-  process.env.MCP_RUNTIME_OWNER_URL = 'https://worker-7.internal:9200';
+  process.env.MCP_RUNTIME_OWNER_URL = 'https://worker-7.internal:9301';
 }
 
 describe('worker service factory', () => {
+  it('starts manager drain while the internal listener is still closing', async () => {
+    const listenerClose = deferred<undefined>();
+    const events: string[] = [];
+    const manager = {
+      beginShutdown() {
+        events.push('manager-begin-shutdown');
+      },
+      async close() {
+        events.push('manager-close-start');
+      },
+    } as unknown as McpRuntimeManager;
+    const internalServer = {
+      host: '127.0.0.1',
+      port: 9301,
+      async checkReadiness() {},
+      async close() {
+        events.push('listener-close-start');
+        await listenerClose.promise;
+        events.push('listener-close-end');
+      },
+    } satisfies McpRuntimeInternalServerHandle;
+    const reconciler = {
+      runNow: async () => ({
+        driversExamined: 0,
+        inventoried: 0,
+        examined: 0,
+        preserved: 0,
+        reaped: 0,
+        remaining: 0,
+        truncated: false,
+        failures: [],
+      }),
+      async close() {
+        events.push('reconciler-close');
+      },
+    } satisfies McpRuntimeReconcilerHandle;
+
+    const closing = closeMcpRuntimeParts(manager, internalServer, reconciler, async () => {
+      events.push('lease-close');
+    });
+    await Promise.resolve();
+
+    expect(events).toContain('manager-close-start');
+    expect(events).toContain('listener-close-start');
+    expect(events).not.toContain('listener-close-end');
+    listenerClose.resolve(undefined);
+    await closing;
+    expect(events.at(-1)).toBe('lease-close');
+  });
+
   it('keeps the worker alive when an idle PostgreSQL client reports an error', async () => {
     const previousDatabaseUrl = process.env.DATABASE_URL;
     process.env.DATABASE_URL = 'postgresql://sentris:sentris@postgres:5432/sentris';
@@ -173,14 +230,23 @@ describe('worker service factory', () => {
     expect(client.connectCalls).toBe(1);
     expect(client.pingCalls).toBe(1);
     expect(services.processIdentity.ownerId).toBe('worker-instance-7');
-    expect(services.processIdentity.ownerAddress).toBe('https://worker-7.internal:9200');
+    expect(services.processIdentity.ownerAddress).toBe('https://worker-7.internal:9301');
     expect(services.processIdentity.ownerEpoch).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
+    expect(services.resourceScope).toEqual({
+      deploymentId: 'local',
+      instanceId: '0',
+      temporalNamespace: 'sentris-dev',
+      temporalTaskQueue: 'sentris-default',
+    });
 
     await expect(services.leaseRepository.read(RUNTIME_KEY)).resolves.toBeNull();
     expect(client.lastGetKey?.startsWith('mcp:runtime:scope:')).toBe(true);
     expect(client.lastGetKey).toContain(':lease:{');
+
+    await services.checkReadiness();
+    expect(client.pingCalls).toBe(2);
 
     await services.close();
   });
@@ -271,3 +337,11 @@ describe('worker service factory', () => {
     expect(client.disconnectCalls).toBe(1);
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}

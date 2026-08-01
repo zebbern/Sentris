@@ -2,6 +2,7 @@ import { ToolInputSchema } from '@sentris/component-sdk';
 import {
   MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
   PreparedInvocationRefSchema,
+  McpRuntimeKeySchema,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   type JsonSchemaDocument,
@@ -155,4 +156,11 @@ export const ReconcileRunMcpInvocationsBodySchema = z
   .strict();
 export class ReconcileRunMcpInvocationsBody extends createZodDto(
   ReconcileRunMcpInvocationsBodySchema,
+) {}
+
+export const ResolveMcpRuntimeDefinitionBodySchema = z
+  .object({ runtimeKey: McpRuntimeKeySchema })
+  .strict();
+export class ResolveMcpRuntimeDefinitionBody extends createZodDto(
+  ResolveMcpRuntimeDefinitionBodySchema,
 ) {}

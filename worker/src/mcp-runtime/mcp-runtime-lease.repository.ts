@@ -164,6 +164,28 @@ export class McpRuntimeLeaseRepository {
     return stored.ref;
   }
 
+  async matchesFenceByHash(
+    runtimeKeyHashInput: string,
+    fenceInput: McpRuntimeFence,
+  ): Promise<boolean> {
+    const runtimeKeyHash = Sha256HexSchema.parse(runtimeKeyHashInput);
+    const fence = McpRuntimeFenceSchema.parse(fenceInput);
+    const leaseKey = this.leaseKey(runtimeKeyHash);
+    const encoded = await this.redis.get(leaseKey);
+    if (encoded === null) return false;
+    const remainingTtlMs = await this.redis.pttl(leaseKey);
+    if (remainingTtlMs === -2 || remainingTtlMs === 0) return false;
+    if (!Number.isSafeInteger(remainingTtlMs) || remainingTtlMs < 0) {
+      throw new Error('Stored MCP runtime lease is missing its required expiry');
+    }
+
+    const stored = decodeStoredLease(encoded);
+    if (hashMcpRuntimeKey(stored.runtimeKey) !== runtimeKeyHash) {
+      throw new Error('Stored MCP runtime key does not match its lease key');
+    }
+    return completeFenceEquals(stored.ref.fence, fence);
+  }
+
   async publishReady(
     runtimeKeyInput: McpRuntimeKey,
     fenceInput: McpRuntimeFence,
@@ -361,6 +383,15 @@ function assertRuntimeIdentity(
   ) {
     throw new Error('Stored MCP runtime key does not match the requested lease identity');
   }
+}
+
+function completeFenceEquals(left: McpRuntimeFence, right: McpRuntimeFence): boolean {
+  return (
+    left.runtimeId === right.runtimeId &&
+    left.ownerId === right.ownerId &&
+    left.ownerEpoch === right.ownerEpoch &&
+    left.leaseGeneration === right.leaseGeneration
+  );
 }
 
 function parseScriptTuple(raw: unknown): [number, string | undefined] {

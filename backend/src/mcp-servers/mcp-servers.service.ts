@@ -6,12 +6,10 @@ import {
   Inject,
   Optional,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 import { McpServersEncryptionService } from './mcp-servers.encryption';
 import { McpServersRepository, type McpServerUpdateData } from './mcp-servers.repository';
-import { TemporalService } from '../temporal/temporal.service';
 import type { AuthContext } from '../auth/types';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -25,8 +23,9 @@ import type {
   TestEnabledServerResponse,
 } from './dto/mcp-servers.dto';
 import type { McpServerRecord, McpServerToolRecord } from '../database/schema';
-import { SecretResolver } from '../secrets/secret-resolver';
-import type { TemporalTaskConfig } from '../config';
+import { SecretResolver, extractMcpSecretReferences } from '../secrets/secret-resolver';
+import { McpServerRuntimeConfigService } from './mcp-server-runtime-config.service';
+import { McpSavedServerDiscoveryService } from './mcp-saved-server-discovery.service';
 
 // Redis injection token - defined as const to avoid circular dependency
 const MCP_SERVERS_REDIS = 'MCP_SERVERS_REDIS';
@@ -40,9 +39,9 @@ export class McpServersService {
     private readonly encryption: McpServersEncryptionService,
     private readonly secretResolver: SecretResolver,
     @Optional() @Inject(MCP_SERVERS_REDIS) private readonly redis: Redis | null,
-    @Optional() private readonly temporalService: TemporalService | null,
     private readonly auditLogService: AuditLogService,
-    private readonly configService: ConfigService,
+    private readonly runtimeConfigService: McpServerRuntimeConfigService,
+    private readonly savedServerDiscovery: McpSavedServerDiscoveryService,
   ) {}
 
   private mapServerToResponse(
@@ -227,15 +226,18 @@ export class McpServersService {
       );
     }
 
+    const secretReferences = extractMcpSecretReferences(input.headers, input.args);
     const server = await this.repository.create(
       {
         name: input.name.trim(),
         description: input.description?.trim() || null,
         transportType: input.transportType,
-        endpoint: input.endpoint || null,
-        command: input.command || null,
-        args: input.args || null,
+        endpoint: input.transportType === 'http' ? input.endpoint || null : null,
+        command: input.transportType === 'stdio' ? input.command || null : null,
+        args: input.transportType === 'stdio' ? input.args || null : null,
         headers: encryptedHeaders,
+        headerSecretReferences: secretReferences.headers,
+        argSecretReferences: input.transportType === 'stdio' ? secretReferences.args : [],
         healthCheckUrl: input.healthCheckUrl || null,
         enabled: input.enabled ?? true,
         organizationId,
@@ -330,8 +332,11 @@ export class McpServersService {
 
     // If transport type is changing, validate the new config
     const effectiveTransportType = input.transportType ?? current.transportType;
-    const effectiveEndpoint = input.endpoint !== undefined ? input.endpoint : current.endpoint;
-    const effectiveCommand = input.command !== undefined ? input.command : current.command;
+    const transportChanged = effectiveTransportType !== current.transportType;
+    const effectiveEndpoint =
+      input.endpoint !== undefined ? input.endpoint : transportChanged ? null : current.endpoint;
+    const effectiveCommand =
+      input.command !== undefined ? input.command : transportChanged ? null : current.command;
 
     if (
       input.transportType !== undefined ||
@@ -367,25 +372,63 @@ export class McpServersService {
       updates.endpoint = input.endpoint;
     }
 
-    if (input.command !== undefined) {
-      updates.command = input.command;
-    }
+    if (effectiveTransportType === 'http') {
+      if (transportChanged || input.command !== undefined || current.command !== null) {
+        updates.command = null;
+      }
+      if (transportChanged || input.args !== undefined || current.args !== null) {
+        updates.args = null;
+        updates.argSecretReferences = [];
+      }
 
-    if (input.args !== undefined) {
-      updates.args = input.args;
-    }
-
-    if (input.headers !== undefined) {
-      if (input.headers === null) {
+      if (input.headers !== undefined) {
+        if (input.headers && Object.keys(input.headers).length > 0) {
+          const material = await this.encryption.encryptHeaders(input.headers);
+          updates.headers = {
+            ciphertext: material.ciphertext,
+            iv: material.iv,
+            authTag: material.authTag,
+            keyId: material.keyId,
+          };
+        } else {
+          updates.headers = null;
+        }
+        updates.headerSecretReferences = extractMcpSecretReferences(input.headers, null).headers;
+      } else if (transportChanged) {
         updates.headers = null;
-      } else if (Object.keys(input.headers).length > 0) {
-        const material = await this.encryption.encryptHeaders(input.headers);
-        updates.headers = {
-          ciphertext: material.ciphertext,
-          iv: material.iv,
-          authTag: material.authTag,
-          keyId: material.keyId,
-        };
+        updates.headerSecretReferences = [];
+      }
+    } else {
+      if (transportChanged || input.command !== undefined) {
+        updates.command = effectiveCommand;
+      }
+      if (input.args !== undefined) {
+        updates.args = input.args;
+        updates.argSecretReferences = extractMcpSecretReferences(null, input.args).args;
+      } else if (transportChanged) {
+        updates.args = null;
+        updates.argSecretReferences = [];
+      }
+
+      if (transportChanged || input.endpoint !== undefined || current.endpoint !== null) {
+        updates.endpoint = null;
+      }
+      if (input.headers !== undefined) {
+        if (input.headers && Object.keys(input.headers).length > 0) {
+          const material = await this.encryption.encryptHeaders(input.headers);
+          updates.headers = {
+            ciphertext: material.ciphertext,
+            iv: material.iv,
+            authTag: material.authTag,
+            keyId: material.keyId,
+          };
+        } else {
+          updates.headers = null;
+        }
+        updates.headerSecretReferences = extractMcpSecretReferences(input.headers, null).headers;
+      } else if (transportChanged) {
+        updates.headers = null;
+        updates.headerSecretReferences = [];
       }
     }
 
@@ -593,8 +636,7 @@ export class McpServersService {
 
   /**
    * Test connection to an MCP server.
-   * - HTTP: Direct MCP protocol test (fast, validates endpoint is reachable)
-   * - STDIO: Uses Temporal workflow to properly test via worker (spawns container, tests, cleans up)
+   * Both HTTP and stdio use the canonical worker-owned runtime path.
    *
    * Health status is persisted to the database and returned with server data.
    * Tools are discovered and saved to database during test.
@@ -618,80 +660,27 @@ export class McpServersService {
         command: server.command,
       });
 
-      // For HTTP: do actual connection test
-      if (server.transportType === 'http') {
-        return await this.testHttpConnectionDirect(server, organizationId);
+      if (!auth) {
+        throw new Error('MCP runtime discovery services are unavailable');
       }
 
-      // For STDIO: use Temporal workflow to properly test via worker
-      if (!this.temporalService) {
-        throw new Error('TemporalService not available - cannot test stdio servers');
-      }
+      const runtimeKey = await this.runtimeConfigService.buildRuntimeKey(auth, server.id);
+      this.logger.log(`Testing MCP server ${server.id} through a worker-owned runtime`);
 
-      this.logger.log(`Testing stdio server ${server.id} via Temporal workflow`);
+      const catalog = await this.savedServerDiscovery.discover(runtimeKey);
+      const discoveredTools = catalog.tools.map((tool) => ({
+        name: tool.source.kind === 'mcp' ? tool.source.upstreamName : tool.canonicalName,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      }));
+      await this.repository.upsertTools(id, this.mapDiscoveredTools(discoveredTools));
 
-      // Start discovery workflow
-      const temporalCfg = this.configService.get<TemporalTaskConfig>('temporalTask')!;
-      const workflowResult = await this.temporalService.startWorkflow({
-        workflowType: 'mcpDiscoveryWorkflow',
-        taskQueue: temporalCfg.taskQueue,
-        args: [
-          {
-            transport: 'stdio',
-            name: server.name,
-            command: server.command,
-            args: server.args,
-          } as const,
-        ],
-      });
-
-      // Wait for workflow to complete (with timeout)
-      const WORKFLOW_TIMEOUT_MS = 60_000;
-      try {
-        const discovery = (await Promise.race([
-          this.temporalService.getWorkflowResult({
-            workflowId: workflowResult.workflowId,
-          }),
-          new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error('Connection test timed out after 60 seconds')),
-              WORKFLOW_TIMEOUT_MS,
-            ),
-          ),
-        ])) as {
-          status?: string;
-          tools?: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
-          toolCount?: number;
-          error?: string;
-        };
-
-        if (discovery.status !== 'completed') {
-          await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
-          return {
-            success: false,
-            message: `Connection test failed: ${discovery.error || 'discovery workflow failed'}`,
-          };
-        }
-
-        const discoveredTools = Array.isArray(discovery.tools) ? discovery.tools : [];
-        await this.repository.upsertTools(id, this.mapDiscoveredTools(discoveredTools));
-
-        await this.repository.updateHealthStatus(id, 'healthy', { organizationId });
-        return {
-          success: true,
-          message: `Connection successful (${discoveredTools.length} tools discovered)`,
-          toolCount: discoveredTools.length,
-        };
-      } catch (workflowError) {
-        await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
-        const errorMessage =
-          workflowError instanceof Error ? workflowError.message : 'Connection test failed';
-        const isTimeout = errorMessage.includes('timed out');
-        return {
-          success: false,
-          message: isTimeout ? errorMessage : 'Connection test failed - check server configuration',
-        };
-      }
+      await this.repository.updateHealthStatus(id, 'healthy', { organizationId });
+      return {
+        success: true,
+        message: `Connection successful (${discoveredTools.length} tools discovered)`,
+        toolCount: discoveredTools.length,
+      };
     } catch (error) {
       // Update health status to unhealthy (configuration is invalid or test failed)
       await this.repository.updateHealthStatus(id, 'unhealthy', { organizationId });
@@ -699,56 +688,6 @@ export class McpServersService {
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Connection test failed',
-      };
-    }
-  }
-
-  /**
-   * Direct HTTP connection test
-   */
-  private async testHttpConnectionDirect(
-    server: McpServerRecord,
-    organizationId: string,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    toolCount?: number;
-  }> {
-    try {
-      // Decrypt headers
-      let headers: Record<string, string> | null = null;
-      if (server.headers) {
-        headers = await this.encryption.decryptHeaders({
-          ciphertext: server.headers.ciphertext,
-          iv: server.headers.iv,
-          authTag: server.headers.authTag,
-          keyId: server.headers.keyId,
-        });
-      }
-
-      if (!server.endpoint) {
-        throw new Error('Endpoint is required for HTTP transport');
-      }
-
-      const tools = await this.discoverHttpTools(server.endpoint, headers ?? undefined);
-      await this.repository.upsertTools(server.id, this.mapDiscoveredTools(tools));
-
-      // Update health status to healthy
-      await this.repository.updateHealthStatus(server.id, 'healthy', { organizationId });
-
-      return {
-        success: true,
-        message: `Connection successful (${tools.length} tools available)`,
-        toolCount: tools.length,
-      };
-    } catch (error) {
-      // Update health status to unhealthy
-      await this.repository.updateHealthStatus(server.id, 'unhealthy', { organizationId });
-
-      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
-      return {
-        success: false,
-        message: `Connection failed: ${errorMessage}`,
       };
     }
   }
@@ -765,42 +704,6 @@ export class McpServersService {
       description: tool.description ?? null,
       inputSchema: tool.inputSchema ?? null,
     }));
-  }
-
-  private async discoverHttpTools(
-    endpoint: string,
-    headers?: Record<string, string>,
-  ): Promise<{ name: string; description?: string; inputSchema?: Record<string, unknown> }[]> {
-    const [{ Client }, { StreamableHTTPClientTransport }] = await Promise.all([
-      import('@modelcontextprotocol/sdk/client/index.js'),
-      import('@modelcontextprotocol/sdk/client/streamableHttp.js'),
-    ]);
-
-    const transport = new StreamableHTTPClientTransport(new URL(endpoint), {
-      requestInit: {
-        headers: {
-          Accept: 'application/json, text/event-stream',
-          ...(headers || {}),
-        },
-      },
-    });
-
-    const client = new Client(
-      { name: 'sentris-flow-mcp-library', version: '1.0.0' },
-      { capabilities: {} },
-    );
-
-    try {
-      await client.connect(transport);
-      const result = await client.listTools();
-      return (result.tools ?? []).map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
-      }));
-    } finally {
-      await client.close().catch(() => {});
-    }
   }
 
   private validateTransportConfig(config: {

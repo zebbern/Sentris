@@ -43,10 +43,12 @@ import {
 import { readActiveInstance } from './lib/local-script-runtime';
 
 const require = createRequire(import.meta.url);
-const { createPm2AppNames, resolvePm2Command } = require('./lib/dev-instance-runtime.js') as {
-  createPm2AppNames: (instance: string | number) => string[];
-  resolvePm2Command: () => { command: string; argsPrefix: string[]; displayName: string };
-};
+const { createPm2AppNames, getInstanceWorkerHealthPort, resolvePm2Command } =
+  require('./lib/dev-instance-runtime.js') as {
+    createPm2AppNames: (instance: string | number) => string[];
+    getInstanceWorkerHealthPort: (instance: string | number) => number;
+    resolvePm2Command: () => { command: string; argsPrefix: string[]; displayName: string };
+  };
 
 type JsonObject = Record<string, unknown>;
 
@@ -368,9 +370,7 @@ function captureAuditRuntimeSnapshot(): TemplateAuditRuntimeSnapshot | null {
       };
     }>;
     const appsByName = new Map(
-      rawApps
-        .filter((app) => typeof app.name === 'string')
-        .map((app) => [String(app.name), app]),
+      rawApps.filter((app) => typeof app.name === 'string').map((app) => [String(app.name), app]),
     );
 
     return {
@@ -421,7 +421,7 @@ async function waitForAuditRuntimeHealth(): Promise<void> {
   await apiFetch('/health');
   await apiFetch('/health/ready');
 
-  const workerHealthPort = 9100 + Number(AUDIT_INSTANCE) * 100;
+  const workerHealthPort = getInstanceWorkerHealthPort(AUDIT_INSTANCE);
   await waitForUrlHealth(`http://127.0.0.1:${workerHealthPort}/health`);
 }
 
@@ -940,7 +940,9 @@ async function auditTemplateWithRuntimeRestartRetries(
     console.warn(
       `  Runtime restart detected while auditing ${template.name}: ${restartDecision.rationale}`,
     );
-    console.warn(`  Retrying ${template.name} after runtime health recovers (${attempt + 1}/${maxRetries}).`);
+    console.warn(
+      `  Retrying ${template.name} after runtime health recovers (${attempt + 1}/${maxRetries}).`,
+    );
     await waitForAuditRuntimeHealth();
   }
 
@@ -1014,7 +1016,9 @@ async function main() {
         })
       : [];
   if (seedCatalogCoverageFailures.length > 0 && !LEDGER_CHECK_ONLY) {
-    throw new Error(`Template catalog seed/API mismatch:\n- ${seedCatalogCoverageFailures.join('\n- ')}`);
+    throw new Error(
+      `Template catalog seed/API mismatch:\n- ${seedCatalogCoverageFailures.join('\n- ')}`,
+    );
   }
 
   if (LEDGER_CHECK_ONLY) {

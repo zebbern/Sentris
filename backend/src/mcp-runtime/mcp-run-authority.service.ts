@@ -27,7 +27,12 @@ export class McpRunAuthorityService {
     allowedNodeIds: readonly string[];
   }): Promise<StoredMcpAuthority> {
     const allowedNodeIds = normalizeAllowedNodeIds(input.allowedNodeIds);
-    const built = await this.catalog.build({ runId: input.runId, allowedNodeIds });
+    const built = await this.catalog.build({
+      runId: input.runId,
+      organizationId: input.organizationId,
+      ...(input.invokingNodeId !== undefined && { invokingNodeId: input.invokingNodeId }),
+      allowedNodeIds,
+    });
     const authorityKey = sha256([
       MCP_CAPABILITY_CONTRACT_VERSION,
       {
@@ -49,7 +54,14 @@ export class McpRunAuthorityService {
       capabilityGrantId: grantId,
       ...(input.invokingNodeId !== undefined && { invokingNodeId: input.invokingNodeId }),
     };
-    const sourceIds = [...new Set(built.tools.map((tool) => tool.source.sourceId))].sort();
+    const sourceIds = [
+      ...new Set([
+        ...built.tools.map((tool) => tool.source.sourceId),
+        ...built.resources.map((resource) => resource.sourceId),
+        ...built.resourceTemplates.map((template) => template.sourceId),
+        ...built.prompts.map((prompt) => prompt.sourceId),
+      ]),
+    ].sort();
     const grant: CapabilityGrant = CapabilityGrantSchema.parse({
       id: grantId,
       organizationId: input.organizationId,
@@ -66,9 +78,9 @@ export class McpRunAuthorityService {
       version: MCP_CAPABILITY_CONTRACT_VERSION,
       configFingerprint: built.configFingerprint,
       tools: built.tools,
-      resources: [],
-      resourceTemplates: [],
-      prompts: [],
+      resources: built.resources,
+      resourceTemplates: built.resourceTemplates,
+      prompts: built.prompts,
       createdAt,
     });
     const manifest = buildInvocationManifest(snapshot, grant);

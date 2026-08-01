@@ -11,8 +11,12 @@ import Redis from 'ioredis';
 import { Kafka, logLevel as KafkaLogLevel } from 'kafkajs';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'minio';
-import { ConfigurationError, resolveDockerResourceScope } from '@sentris/component-sdk';
-import type { McpRuntimeAcquireRequest } from '@sentris/shared';
+import {
+  ConfigurationError,
+  resolveDockerResourceScope,
+  type DockerResourceScope,
+} from '@sentris/component-sdk';
+import { resolveSentrisTrustProfile, type McpRuntimeAcquireRequest } from '@sentris/shared';
 import { getTopicResolver } from '../../common/kafka-topic-resolver';
 import * as schema from '../../adapters/schema';
 import {
@@ -35,6 +39,26 @@ import {
 } from '../../mcp-runtime/mcp-runtime-identity';
 import { McpRuntimeLeaseRepository } from '../../mcp-runtime/mcp-runtime-lease.repository';
 import { createMcpRuntimeRedisClient } from '../../mcp-runtime/mcp-runtime-redis';
+import { McpClientFactory } from '../../mcp-runtime/mcp-client-factory';
+import {
+  McpRuntimeDriverRegistry,
+  type McpRuntimeDriver,
+} from '../../mcp-runtime/mcp-runtime-driver';
+import { BackendMcpRuntimeDefinitionResolver } from '../../mcp-runtime/mcp-runtime-definition.resolver';
+import { McpRuntimeInternalClient } from '../../mcp-runtime/mcp-runtime-internal.client';
+import {
+  startMcpRuntimeInternalServer,
+  type McpRuntimeInternalServerHandle,
+} from '../../mcp-runtime/mcp-runtime-internal.server';
+import { McpRuntimeManager } from '../../mcp-runtime/mcp-runtime-manager';
+import {
+  startMcpRuntimeReconciler,
+  type McpRuntimeReconcilerHandle,
+} from '../../mcp-runtime/mcp-runtime-reconciler';
+import { McpRuntimeRouter } from '../../mcp-runtime/mcp-runtime-router';
+import { DockerRuntimeDriver } from '../../mcp-runtime/drivers/docker-runtime.driver';
+import { HostStdioRuntimeDriver } from '../../mcp-runtime/drivers/host-stdio-runtime.driver';
+import { RemoteHttpRuntimeDriver } from '../../mcp-runtime/drivers/remote-http-runtime.driver';
 import { resolveWorkerRuntimeTimeouts } from './runtime-timeouts';
 
 // ── MCP runtime lease composition seam ────────────────────────────────
@@ -48,6 +72,8 @@ export interface McpRuntimeLeaseServiceFactoryOptions {
 export interface McpRuntimeLeaseServices {
   leaseRepository: McpRuntimeLeaseRepository;
   processIdentity: McpRuntimeAcquireRequest['candidateOwner'];
+  resourceScope: DockerResourceScope;
+  checkReadiness: () => Promise<void>;
   close: () => Promise<void>;
 }
 
@@ -60,31 +86,32 @@ export interface McpRuntimeLeaseServices {
 export async function createMcpRuntimeLeaseServices(
   options: McpRuntimeLeaseServiceFactoryOptions = {},
 ): Promise<McpRuntimeLeaseServices> {
-  const config = mcpRuntimeEnvSchema.parse(process.env);
-  const configuredRedisUrl = config.MCP_RUNTIME_REDIS_URL ?? process.env.TERMINAL_REDIS_URL;
+  const configuredRedisUrl = process.env.MCP_RUNTIME_REDIS_URL ?? process.env.TERMINAL_REDIS_URL;
   if (!configuredRedisUrl) {
     throw new ConfigurationError(
       'MCP runtime Redis requires MCP_RUNTIME_REDIS_URL or TERMINAL_REDIS_URL',
       { configKey: 'MCP_RUNTIME_REDIS_URL' },
     );
   }
-  const redisUrl = mcpRuntimeRedisUrlSchema.parse(configuredRedisUrl);
-  if (!config.MCP_RUNTIME_OWNER_ID) {
+  if (!process.env.MCP_RUNTIME_OWNER_ID) {
     throw new ConfigurationError(
       'MCP_RUNTIME_OWNER_ID is required to create MCP runtime lease services',
       { configKey: 'MCP_RUNTIME_OWNER_ID' },
     );
   }
-  if (!config.MCP_RUNTIME_OWNER_URL) {
+  if (!process.env.MCP_RUNTIME_OWNER_URL) {
     throw new ConfigurationError(
       'MCP_RUNTIME_OWNER_URL is required to create MCP runtime lease services',
       { configKey: 'MCP_RUNTIME_OWNER_URL' },
     );
   }
+  const config = mcpRuntimeEnvSchema.parse(process.env);
+  const redisUrl = mcpRuntimeRedisUrlSchema.parse(configuredRedisUrl);
+  const resourceScope = resolveDockerResourceScope();
 
   const processIdentity = createMcpRuntimeProcessIdentity({
-    ownerId: config.MCP_RUNTIME_OWNER_ID,
-    ownerAddress: config.MCP_RUNTIME_OWNER_URL,
+    ownerId: config.MCP_RUNTIME_OWNER_ID!,
+    ownerAddress: config.MCP_RUNTIME_OWNER_URL!,
   });
   const redisClientFactory = options.redisClientFactory ?? createMcpRuntimeRedisClient;
   const redis = redisClientFactory(redisUrl, config.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS);
@@ -97,7 +124,7 @@ export async function createMcpRuntimeLeaseServices(
     }
 
     const leaseRepository = new McpRuntimeLeaseRepository(redis, {
-      keyPrefix: createMcpRuntimeLeaseKeyPrefix(resolveDockerResourceScope()),
+      keyPrefix: createMcpRuntimeLeaseKeyPrefix(resourceScope),
       startingTtlMs: config.MCP_RUNTIME_STARTING_TTL_MS,
       readyTtlMs: config.MCP_RUNTIME_LEASE_TTL_MS,
     });
@@ -106,6 +133,13 @@ export async function createMcpRuntimeLeaseServices(
     return {
       leaseRepository,
       processIdentity,
+      resourceScope,
+      checkReadiness: async () => {
+        const response = await redis.ping();
+        if (response !== 'PONG') {
+          throw new Error('MCP runtime Redis ping returned an unexpected response');
+        }
+      },
       close: () => {
         closePromise ??= (async () => {
           try {
@@ -120,6 +154,150 @@ export async function createMcpRuntimeLeaseServices(
   } catch (error: unknown) {
     redis.disconnect(false);
     throw error;
+  }
+}
+
+export interface McpRuntimeServicesFactoryOptions {
+  onHealthChange?: (message: string | undefined) => void;
+}
+
+export interface McpRuntimeServices {
+  router: McpRuntimeRouter;
+  checkReadiness(): Promise<void>;
+  beginShutdown(): void;
+  close(): Promise<void>;
+}
+
+/**
+ * Builds the complete process-owned MCP runtime control plane. No runtime
+ * connection or secret-bearing definition exists before this factory starts,
+ * and every resource it creates is closed through the returned owner handle.
+ */
+export async function createMcpRuntimeServices(
+  options: McpRuntimeServicesFactoryOptions = {},
+): Promise<McpRuntimeServices> {
+  const config = mcpRuntimeEnvSchema.parse(process.env);
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
+  if (!internalToken) {
+    throw new ConfigurationError('INTERNAL_SERVICE_TOKEN is required for MCP runtimes', {
+      configKey: 'INTERNAL_SERVICE_TOKEN',
+    });
+  }
+
+  const leaseServices = await createMcpRuntimeLeaseServices();
+  const clientFactory = new McpClientFactory();
+  const drivers: McpRuntimeDriver[] = [
+    new RemoteHttpRuntimeDriver(clientFactory),
+    new DockerRuntimeDriver(clientFactory, {
+      maxInventory: config.MCP_RUNTIME_RECONCILE_MAX_RESOURCES,
+      resourceScope: leaseServices.resourceScope,
+    }),
+  ];
+  if (resolveSentrisTrustProfile(process.env) === 'trusted-local') {
+    drivers.push(new HostStdioRuntimeDriver(clientFactory));
+  }
+  const driverRegistry = new McpRuntimeDriverRegistry(drivers);
+  const manager = new McpRuntimeManager({
+    processIdentity: leaseServices.processIdentity,
+    repository: leaseServices.leaseRepository,
+    definitionResolver: new BackendMcpRuntimeDefinitionResolver({
+      internalToken,
+      timeoutMs: config.MCP_RUNTIME_CONNECT_TIMEOUT_MS,
+    }),
+    drivers: driverRegistry,
+    connectTimeoutMs: config.MCP_RUNTIME_CONNECT_TIMEOUT_MS,
+    discoveryIdleTimeoutMs: config.MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS,
+    discoveryTotalTimeoutMs: config.MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS,
+    startingObserveTimeoutMs: config.MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS,
+    startingPollIntervalMs: config.MCP_RUNTIME_STARTING_POLL_INTERVAL_MS,
+    renewalIntervalMs: config.MCP_RUNTIME_RENEWAL_INTERVAL_MS,
+    holderIdleTimeoutMs: config.MCP_RUNTIME_LEASE_TTL_MS,
+    drainTimeoutMs: config.MCP_RUNTIME_DRAIN_TIMEOUT_MS,
+  });
+
+  let reconciler: McpRuntimeReconcilerHandle | undefined;
+  let internalServer: McpRuntimeInternalServerHandle | undefined;
+  let reconciliationError: string | undefined;
+  try {
+    reconciler = await startMcpRuntimeReconciler({
+      drivers: driverRegistry,
+      leaseRepository: leaseServices.leaseRepository,
+      maxResources: config.MCP_RUNTIME_RECONCILE_MAX_RESOURCES,
+      intervalMs: config.MCP_RUNTIME_RECONCILE_INTERVAL_MS,
+      onHealthChange: (message) => {
+        reconciliationError = message;
+        options.onHealthChange?.(message);
+      },
+    });
+    internalServer = await startMcpRuntimeInternalServer({
+      manager,
+      token: internalToken,
+      host: config.MCP_RUNTIME_LISTEN_HOST,
+      port: config.MCP_RUNTIME_LISTEN_PORT,
+      requestTimeoutMs: config.MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS,
+    });
+  } catch (error: unknown) {
+    manager.beginShutdown();
+    await closeMcpRuntimeParts(manager, internalServer, reconciler, leaseServices.close).catch(
+      () => undefined,
+    );
+    throw error;
+  }
+
+  const router = new McpRuntimeRouter(
+    manager,
+    new McpRuntimeInternalClient({
+      token: internalToken,
+      requestTimeoutMs: config.MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS,
+    }),
+  );
+  let closeFlight: Promise<void> | undefined;
+  return {
+    router,
+    checkReadiness: async () => {
+      if (reconciliationError) throw new Error(reconciliationError);
+      manager.checkReadiness();
+      await Promise.all([leaseServices.checkReadiness(), internalServer!.checkReadiness()]);
+    },
+    beginShutdown: () => manager.beginShutdown(),
+    close: () => {
+      closeFlight ??= closeMcpRuntimeParts(
+        manager,
+        internalServer,
+        reconciler,
+        leaseServices.close,
+      );
+      return closeFlight;
+    },
+  };
+}
+
+export async function closeMcpRuntimeParts(
+  manager: McpRuntimeManager,
+  internalServer: McpRuntimeInternalServerHandle | undefined,
+  reconciler: McpRuntimeReconcilerHandle | undefined,
+  closeLeaseServices: () => Promise<void>,
+): Promise<void> {
+  manager.beginShutdown();
+  const ownershipOutcomes = await Promise.allSettled([
+    internalServer?.close(),
+    manager.close(),
+    reconciler?.close(),
+  ]);
+  const leaseOutcome = await settledOutcome(closeLeaseServices());
+  const failures = [...ownershipOutcomes, leaseOutcome]
+    .filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
+    .map((outcome) => outcome.reason);
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'Failed to close MCP runtime services');
+  }
+}
+
+async function settledOutcome<T>(promise: Promise<T>): Promise<PromiseSettledResult<T>> {
+  try {
+    return { status: 'fulfilled', value: await promise };
+  } catch (reason: unknown) {
+    return { status: 'rejected', reason };
   }
 }
 

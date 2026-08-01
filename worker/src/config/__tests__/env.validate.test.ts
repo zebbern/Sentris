@@ -73,7 +73,7 @@ describe('workerEnvSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS).toBe(5_000);
-      expect(result.data.MCP_RUNTIME_STARTING_TTL_MS).toBe(120_000);
+      expect(result.data.MCP_RUNTIME_STARTING_TTL_MS).toBe(180_000);
       expect(result.data.MCP_RUNTIME_LEASE_TTL_MS).toBe(60_000);
       expect(result.data.MCP_RUNTIME_RENEWAL_INTERVAL_MS).toBe(15_000);
       expect(result.data.MCP_RUNTIME_REDIS_URL).toBeUndefined();
@@ -87,7 +87,8 @@ describe('workerEnvSchema', () => {
       validEnv({
         MCP_RUNTIME_REDIS_URL: 'rediss://redis.internal:6380/2',
         MCP_RUNTIME_OWNER_ID: 'worker-instance-7',
-        MCP_RUNTIME_OWNER_URL: 'https://worker-7.internal:9200',
+        MCP_RUNTIME_OWNER_URL: 'https://worker-7.internal:9301',
+        INTERNAL_SERVICE_TOKEN: 'internal-service-token',
       }),
     );
 
@@ -95,7 +96,7 @@ describe('workerEnvSchema', () => {
     if (result.success) {
       expect(result.data.MCP_RUNTIME_REDIS_URL).toBe('rediss://redis.internal:6380/2');
       expect(result.data.MCP_RUNTIME_OWNER_ID).toBe('worker-instance-7');
-      expect(result.data.MCP_RUNTIME_OWNER_URL).toBe('https://worker-7.internal:9200');
+      expect(result.data.MCP_RUNTIME_OWNER_URL).toBe('https://worker-7.internal:9301');
     }
   });
 
@@ -106,12 +107,17 @@ describe('workerEnvSchema', () => {
     ).toBe(false);
     expect(
       workerEnvSchema.safeParse(
-        validEnv({ MCP_RUNTIME_OWNER_URL: 'redis://worker-7.internal:9200' }),
+        validEnv({ MCP_RUNTIME_OWNER_URL: 'redis://worker-7.internal:9301' }),
       ).success,
     ).toBe(false);
     expect(
       workerEnvSchema.safeParse(
-        validEnv({ MCP_RUNTIME_OWNER_URL: 'https://user:secret@worker-7.internal:9200' }),
+        validEnv({ MCP_RUNTIME_OWNER_URL: 'https://user:secret@worker-7.internal:9301' }),
+      ).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({ MCP_RUNTIME_OWNER_URL: 'https://worker-7.internal:9301/runtime?token=x' }),
       ).success,
     ).toBe(false);
   });
@@ -149,6 +155,61 @@ describe('workerEnvSchema', () => {
         }),
       ).success,
     ).toBe(false);
+  });
+
+  it('requires the starting lease to outlive the complete startup budget and Redis margin', () => {
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '120000',
+          MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '5000',
+          MCP_RUNTIME_STARTING_TTL_MS: '154999',
+        }),
+      ).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '120000',
+          MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '5000',
+          MCP_RUNTIME_STARTING_TTL_MS: '155000',
+        }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it('keeps the reconciliation bound within the Docker driver inventory ceiling', () => {
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_RECONCILE_MAX_RESOURCES: '1024' })).success,
+    ).toBe(true);
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_RECONCILE_MAX_RESOURCES: '1025' })).success,
+    ).toBe(false);
+  });
+
+  it('rejects a runtime budget that cannot finish within saved-discovery activity ownership', () => {
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '900000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '800000',
+          MCP_RUNTIME_STARTING_TTL_MS: '1710000',
+          MCP_RUNTIME_DRAIN_TIMEOUT_MS: '100000',
+        }),
+      ).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '800000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '800000',
+          MCP_RUNTIME_STARTING_TTL_MS: '1610000',
+          MCP_RUNTIME_DRAIN_TIMEOUT_MS: '100000',
+        }),
+      ).success,
+    ).toBe(true);
   });
 
   it('rejects zero or negative orphan reconciliation bounds', () => {

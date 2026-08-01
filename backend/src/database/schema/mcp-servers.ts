@@ -76,6 +76,12 @@ export const mcpServers = pgTable(
       } | null>()
       .default(null),
 
+    // Secret dependency metadata only; values remain encrypted in the secrets store.
+    // Null marks a legacy source that has not yet been indexed by the application.
+    // Separate columns keep partial header/argument updates concurrency-safe.
+    headerSecretReferences: jsonb('header_secret_references').$type<string[] | null>(),
+    argSecretReferences: jsonb('arg_secret_references').$type<string[] | null>(),
+
     // Status and settings
     enabled: boolean('enabled').notNull().default(true),
     healthCheckUrl: text('health_check_url'), // Optional custom health endpoint

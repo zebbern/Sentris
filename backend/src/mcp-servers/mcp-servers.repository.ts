@@ -33,6 +33,8 @@ export interface McpServerUpdateData {
     authTag: string;
     keyId: string;
   } | null;
+  headerSecretReferences?: string[] | null;
+  argSecretReferences?: string[] | null;
   enabled?: boolean;
   healthCheckUrl?: string | null;
   lastHealthCheck?: Date;
@@ -236,7 +238,6 @@ export class McpServersRepository {
       .set({
         lastHealthCheck: sql`now()`,
         lastHealthStatus: status,
-        updatedAt: sql`now()`,
       })
       .where(and(...conditions.filter((c): c is SQL => c !== undefined)));
   }

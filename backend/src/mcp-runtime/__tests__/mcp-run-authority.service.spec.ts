@@ -33,6 +33,42 @@ describe('McpRunAuthorityService', () => {
       {
         build: vi.fn(async () => ({
           tools: [componentTool(configFingerprint)],
+          resources: [
+            {
+              sourceId: 'external-node',
+              uri: 'sentris://events/latest',
+              name: 'Latest events',
+              title: 'Latest security events',
+              description: 'The latest normalized events',
+              mimeType: 'application/json',
+              size: 42,
+              icons: [{ src: 'https://example.test/resource.svg', theme: 'dark' as const }],
+              annotations: { audience: ['assistant'] },
+              meta: { retention: 'short' },
+            },
+          ],
+          resourceTemplates: [
+            {
+              sourceId: 'external-node',
+              uriTemplate: 'sentris://events/{eventId}',
+              name: 'Event by ID',
+              title: 'Security event',
+              description: 'Loads one event',
+              mimeType: 'application/json',
+              meta: { stable: true },
+            },
+          ],
+          prompts: [
+            {
+              sourceId: 'external-node',
+              name: 'investigate-event',
+              title: 'Investigate event',
+              description: 'Build an investigation plan',
+              arguments: [{ name: 'eventId', description: 'Event identifier', required: true }],
+              annotations: { audience: ['assistant'] },
+              meta: { category: 'investigation' },
+            },
+          ],
           configFingerprint,
         })),
       } as never,
@@ -67,6 +103,35 @@ describe('McpRunAuthorityService', () => {
     });
     expect(first.grant.sources).toEqual([
       { sourceId: 'component-node', toolAccess: { mode: 'all' } },
+      { sourceId: 'external-node', toolAccess: { mode: 'all' } },
+    ]);
+    expect(first.snapshot.resources).toEqual([
+      expect.objectContaining({
+        sourceId: 'external-node',
+        uri: 'sentris://events/latest',
+        title: 'Latest security events',
+        icons: [{ src: 'https://example.test/resource.svg', theme: 'dark' }],
+        annotations: { audience: ['assistant'] },
+        meta: { retention: 'short' },
+      }),
+    ]);
+    expect(first.snapshot.resourceTemplates).toEqual([
+      expect.objectContaining({
+        sourceId: 'external-node',
+        uriTemplate: 'sentris://events/{eventId}',
+        title: 'Security event',
+        meta: { stable: true },
+      }),
+    ]);
+    expect(first.snapshot.prompts).toEqual([
+      expect.objectContaining({
+        sourceId: 'external-node',
+        name: 'investigate-event',
+        title: 'Investigate event',
+        arguments: [{ name: 'eventId', description: 'Event identifier', required: true }],
+        annotations: { audience: ['assistant'] },
+        meta: { category: 'investigation' },
+      }),
     ]);
     expect(first.manifest.entries).toEqual([
       {

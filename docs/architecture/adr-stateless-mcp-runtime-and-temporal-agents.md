@@ -66,12 +66,15 @@ that branch only after every such pre-deployment Workflow is terminal or retired
 Redis contains no unexpired `mcp:session:*` record without `capabilitySnapshotId` (the
 last such token has a maximum three-hour TTL). It must not receive new behavior.
 
-External snapshot tools still call through the named backend v1 compatibility pool,
-using the immutable snapshot source ID and upstream name. Remaining work is canonical
-outbound runtime ownership, durable external invocation attempts, resources/prompts
-runtime behavior, Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks,
-and workflow-granular durable agent turns. Studio also remains on its separately bounded
-v1 sessionful path.
+Saved-server discovery now crosses a secret-free Temporal boundary and uses the canonical
+worker-owned runtime manager plus the official v2 client. It returns a complete catalog
+containing tools, resources, resource templates, and prompts. External snapshot tool
+calls still use the named backend v1 compatibility pool and immutable snapshot source ID;
+moving those calls onto durable runtime-backed attempts is the next migration boundary.
+Remaining work is durable external invocation dispatch, resources/prompts execution
+behavior, Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks, and
+workflow-granular durable agent turns. Studio also remains on its separately bounded v1
+sessionful path.
 
 ### Protocol boundary
 
@@ -104,6 +107,14 @@ The backend owns OAuth authorization, encrypted refresh persistence, and saved s
 references. Runtime leases carry only credential references/versions; a scoped worker
 provider resolves and attaches required material without forwarding ambient backend or
 worker credentials to an MCP server.
+
+Saved-server credential generations are derived from persisted secret dependency IDs
+and current active-version metadata, independently of health timestamps and tool-cache
+updates. Header and argument dependencies are indexed separately so partial edits remain
+precise without decrypting unchanged configuration. Rows from before the dependency-index
+migration use the organization credential-version set as a conservative compatibility
+boundary until they are re-saved; remove that fallback after an upgrade audit finds no
+unindexed rows.
 
 ### Domain boundary
 
@@ -152,6 +163,19 @@ child/container, and live resource. A crash window may briefly leave a non-routa
 duplicate resource; only one generation becomes routable, and owner-local tracking plus
 reconciliation reaps the rest. The owner uses fenced heartbeats, self-fences/refuses new
 calls after renewal loss, and drains before rolling shutdown.
+
+A successful acquire returns a ready reference plus a caller-supplied holder ID. The
+exact owner retains that holder before the acquisition becomes usable, validates the
+holder and full fence on every operation, and drains only after the final holder releases.
+Release is idempotent for the same holder and fence. Durable callers derive a stable
+holder ID from their execution identity so Temporal retries reclaim and release the same
+ownership instead of accumulating process-local references. A cross-worker retain with
+an ambiguous response performs a bounded best-effort release using that same holder.
+
+Docker inventory and reconciliation use the same deployment, local-instance, Temporal
+namespace, and task-queue scope as Redis lease keys. A worker may therefore reap only
+resources from its exact ownership domain, not another local instance or deployment that
+shares the Docker daemon.
 
 Runtime leases are correctness-critical coordination and do not fall back to
 process-local state when Redis cannot confirm ownership. This intentionally narrows the

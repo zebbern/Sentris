@@ -268,6 +268,79 @@ describe('package development scripts', () => {
     }
   });
 
+  it('assigns direct, non-conflicting MCP runtime owner listeners to PM2 workers', () => {
+    const probe = [
+      "const config = require('./pm2.config.cjs');",
+      'const workers = config.apps.filter(',
+      "(app) => app.name === 'sentris-worker-3' || app.name === 'sentris-test-worker',",
+      ');',
+      'process.stdout.write(JSON.stringify(workers.map(({ name, env }) => ({ name, env }))));',
+    ].join('');
+    const childEnv = {
+      ...process.env,
+      SENTRIS_INSTANCE: '3',
+      SENTRIS_ENV: 'development',
+      NODE_ENV: 'development',
+    };
+    for (const key of [
+      'MCP_RUNTIME_OWNER_ID',
+      'MCP_RUNTIME_OWNER_URL',
+      'MCP_RUNTIME_LISTEN_HOST',
+      'MCP_RUNTIME_LISTEN_PORT',
+      'MCP_DOCKER_PROXY_PORT',
+      'MCP_DOCKER_PROXY_PUBLIC_BASE_URL',
+      'TERMINAL_REDIS_URL',
+    ]) {
+      delete childEnv[key];
+    }
+
+    const result = spawnSync(process.execPath, ['-e', probe], {
+      cwd: process.cwd(),
+      env: childEnv,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(0);
+    const workers = JSON.parse(result.stdout) as Array<{
+      name: string;
+      env: Record<string, string>;
+    }>;
+    const instanceWorker = workers.find((worker) => worker.name === 'sentris-worker-3');
+    const testWorker = workers.find((worker) => worker.name === 'sentris-test-worker');
+
+    expect(instanceWorker?.env.MCP_RUNTIME_OWNER_ID).toBe('sentris-worker-3');
+    expect(instanceWorker?.env.MCP_RUNTIME_OWNER_URL).toBe('http://127.0.0.1:18032');
+    expect(instanceWorker?.env.MCP_RUNTIME_LISTEN_HOST).toBe('127.0.0.1');
+    expect(instanceWorker?.env.MCP_RUNTIME_LISTEN_PORT).toBe('18032');
+    expect(instanceWorker?.env.WORKER_HEALTH_PORT).toBe(18030);
+    expect(instanceWorker?.env.MCP_DOCKER_PROXY_PORT).toBe('18031');
+    expect(instanceWorker?.env.MCP_DOCKER_PROXY_PUBLIC_BASE_URL).toBe('http://127.0.0.1:18031');
+    expect(testWorker?.env.MCP_RUNTIME_OWNER_ID).toBe('sentris-test-worker');
+    expect(testWorker?.env.MCP_RUNTIME_OWNER_URL).toBe('http://127.0.0.1:18102');
+    expect(testWorker?.env.MCP_RUNTIME_LISTEN_PORT).toBe('18102');
+    expect(testWorker?.env.WORKER_HEALTH_PORT).toBe('18100');
+    expect(testWorker?.env.MCP_DOCKER_PROXY_PORT).toBe('18101');
+    expect(testWorker?.env.TERMINAL_REDIS_URL).toBe('redis://localhost:6379');
+  });
+
+  it('runs the Nest backend through its decorator-metadata bundle', () => {
+    const dockerfile = readFileSync(join(process.cwd(), 'Dockerfile'), 'utf8');
+    const buildScript = readFileSync(
+      join(process.cwd(), 'backend', 'scripts', 'build-app.ts'),
+      'utf8',
+    );
+
+    expect(backendPackageJson.scripts.build).toBe('bun scripts/build-app.ts');
+    expect(backendPackageJson.scripts.dev).toContain('bun run build');
+    expect(backendPackageJson.scripts.dev).toContain('bun run build/main.js');
+    expect(backendPackageJson.scripts.dev).not.toContain('src/main.ts');
+    expect(backendPackageJson.scripts['start:prod']).toContain('bun run build/main.js');
+    expect(buildScript).toContain("'@temporalio/client'");
+    expect(buildScript).toContain('external: [...BUNDLE_EXTERNALS]');
+    expect(dockerfile).toContain('RUN bun run build');
+    expect(dockerfile).toContain('CMD ["bun", "run", "start:prod"]');
+  });
+
   it('rejects unknown E2E runner options before forwarding Bun test args', () => {
     const result = spawnSync(process.execPath, ['scripts/e2e-test.js', '--unknown', '--dry-run'], {
       cwd: process.cwd(),

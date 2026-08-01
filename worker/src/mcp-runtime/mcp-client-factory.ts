@@ -182,8 +182,9 @@ export class McpClientFactory {
 
     let finalNonOk: CapturedHttpResponse | undefined;
     let captureConnectResponse = true;
+    const upstreamFetch = input.fetch ?? globalThis.fetch;
     const fetch: FetchLike = async (request, init) => {
-      const response = await globalThis.fetch(request, init);
+      const response = await upstreamFetch(request, init);
       if (captureConnectResponse && !response.ok) {
         finalNonOk = { status: response.status, body: await response.clone().text() };
       }

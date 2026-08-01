@@ -23,6 +23,15 @@ export interface DockerResourceScopeEnv {
   TEMPORAL_TASK_QUEUE?: string;
 }
 
+export function normalizeDockerResourceScope(scope: DockerResourceScope): DockerResourceScope {
+  return Object.freeze({
+    deploymentId: requireLabelValue(scope.deploymentId, 'deploymentId'),
+    instanceId: requireLabelValue(scope.instanceId, 'instanceId'),
+    temporalNamespace: requireLabelValue(scope.temporalNamespace, 'temporalNamespace'),
+    temporalTaskQueue: requireLabelValue(scope.temporalTaskQueue, 'temporalTaskQueue'),
+  });
+}
+
 function requireLabelValue(value: string, name: string): string {
   if (!SAFE_LABEL_VALUE.test(value)) {
     throw new Error(`${name} must be a non-empty Docker label value without control characters`);
@@ -33,7 +42,7 @@ function requireLabelValue(value: string, name: string): string {
 export function resolveDockerResourceScope(
   env: DockerResourceScopeEnv = process.env as DockerResourceScopeEnv,
 ): DockerResourceScope {
-  return {
+  return normalizeDockerResourceScope({
     deploymentId: requireLabelValue(env.SENTRIS_DEPLOYMENT_ID ?? 'local', 'SENTRIS_DEPLOYMENT_ID'),
     instanceId: requireLabelValue(env.SENTRIS_INSTANCE ?? '0', 'SENTRIS_INSTANCE'),
     temporalNamespace: requireLabelValue(
@@ -44,26 +53,30 @@ export function resolveDockerResourceScope(
       env.TEMPORAL_TASK_QUEUE ?? 'sentris-default',
       'TEMPORAL_TASK_QUEUE',
     ),
+  });
+}
+
+export function createDockerResourceScopeLabels(
+  scopeInput: DockerResourceScope,
+): Record<string, string> {
+  const scope = normalizeDockerResourceScope(scopeInput);
+  return {
+    [DOCKER_RESOURCE_LABELS.deploymentId]: scope.deploymentId,
+    [DOCKER_RESOURCE_LABELS.instanceId]: scope.instanceId,
+    [DOCKER_RESOURCE_LABELS.temporalNamespace]: scope.temporalNamespace,
+    [DOCKER_RESOURCE_LABELS.temporalTaskQueue]: scope.temporalTaskQueue,
   };
 }
 
 export function createManagedDockerLabels(
   runId: string,
-  scope: DockerResourceScope = resolveDockerResourceScope(),
+  scopeInput: DockerResourceScope = resolveDockerResourceScope(),
 ): Record<string, string> {
+  const scopeLabels = createDockerResourceScopeLabels(scopeInput);
   return {
     [DOCKER_RESOURCE_LABELS.managed]: 'true',
     [DOCKER_RESOURCE_LABELS.runId]: requireLabelValue(runId, 'runId'),
-    [DOCKER_RESOURCE_LABELS.deploymentId]: requireLabelValue(scope.deploymentId, 'deploymentId'),
-    [DOCKER_RESOURCE_LABELS.instanceId]: requireLabelValue(scope.instanceId, 'instanceId'),
-    [DOCKER_RESOURCE_LABELS.temporalNamespace]: requireLabelValue(
-      scope.temporalNamespace,
-      'temporalNamespace',
-    ),
-    [DOCKER_RESOURCE_LABELS.temporalTaskQueue]: requireLabelValue(
-      scope.temporalTaskQueue,
-      'temporalTaskQueue',
-    ),
+    ...scopeLabels,
   };
 }
 
@@ -83,10 +96,7 @@ export function managedDockerLabelFilters(scope: DockerResourceScope, runId?: st
     ? createManagedDockerLabels(runId, scope)
     : {
         [DOCKER_RESOURCE_LABELS.managed]: 'true',
-        [DOCKER_RESOURCE_LABELS.deploymentId]: scope.deploymentId,
-        [DOCKER_RESOURCE_LABELS.instanceId]: scope.instanceId,
-        [DOCKER_RESOURCE_LABELS.temporalNamespace]: scope.temporalNamespace,
-        [DOCKER_RESOURCE_LABELS.temporalTaskQueue]: scope.temporalTaskQueue,
+        ...createDockerResourceScopeLabels(scope),
       };
   return Object.entries(labels).flatMap(([key, value]) => ['--filter', `label=${key}=${value}`]);
 }

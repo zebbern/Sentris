@@ -5,14 +5,20 @@ import type { AuthContext } from '../../auth/types';
 
 // Mock SecretsService
 class MockSecretsService {
-  private secrets = new Map<string, { value: string }>();
+  private secrets = new Map<string, Map<number, { value: string }>>();
+  private activeVersions = new Map<string, number>();
 
-  setSecret(id: string, value: string) {
-    this.secrets.set(id, { value });
+  setSecret(id: string, value: string, version = 1) {
+    const versions = this.secrets.get(id) ?? new Map<number, { value: string }>();
+    versions.set(version, { value });
+    this.secrets.set(id, versions);
+    this.activeVersions.set(id, version);
   }
 
-  async getSecretValue(_auth: AuthContext | null, secretId: string) {
-    const secret = this.secrets.get(secretId);
+  async getSecretValue(_auth: AuthContext | null, secretId: string, version?: number) {
+    const resolvedVersion = version ?? this.activeVersions.get(secretId);
+    const secret =
+      resolvedVersion === undefined ? undefined : this.secrets.get(secretId)?.get(resolvedVersion);
     if (!secret) {
       throw new Error(`Secret ${secretId} not found`);
     }
@@ -83,10 +89,30 @@ describe('SecretResolver', () => {
       expect(result).toBe('This is {{malformed}}');
     });
 
-    it('replaces with empty string when secret not found', async () => {
+    it('fails explicitly when a referenced secret cannot be resolved', async () => {
       const input = 'Bearer {{secret:00000000000000000000000000000000}}';
-      const result = await resolver.resolveString(input, { auth });
-      expect(result).toBe('Bearer ');
+      await expect(resolver.resolveString(input, { auth })).rejects.toThrow('not found');
+    });
+
+    it('resolves the exact pinned version even after the active version rotates', async () => {
+      mockSecretsService.setSecret(SECRET_1, 'value-one-v1', 1);
+      mockSecretsService.setSecret(SECRET_1, 'value-one-v2', 2);
+
+      const result = await resolver.resolveString(`Bearer {{secret:${SECRET_1}}}`, {
+        auth,
+        secretVersions: new Map([[SECRET_1, 1]]),
+      });
+
+      expect(result).toBe('Bearer value-one-v1');
+    });
+
+    it('rejects a reference omitted from the pinned runtime identity', async () => {
+      await expect(
+        resolver.resolveString(`Bearer {{secret:${SECRET_1}}}`, {
+          auth,
+          secretVersions: new Map(),
+        }),
+      ).rejects.toThrow('missing from the pinned runtime identity');
     });
   });
 

@@ -8,6 +8,11 @@ import {
   McpRuntimeOwnerAddressSchema,
   resolveSentrisTrustProfile,
 } from '@sentris/shared';
+import {
+  MCP_RUNTIME_MAX_DOCKER_INVENTORY,
+  SAVED_MCP_RUNTIME_DISCOVERY_FIXED_OVERHEAD_MS,
+  SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
+} from '../mcp-runtime/mcp-runtime-limits';
 
 const MCP_RUNTIME_MAX_COMMAND_TIMEOUT_MS = 60_000;
 const MCP_RUNTIME_MAX_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -32,7 +37,7 @@ const mcpRuntimeEnvShape = {
     .positive()
     .max(MCP_RUNTIME_MAX_TTL_MS)
     .optional()
-    .default(120_000),
+    .default(180_000),
   MCP_RUNTIME_LEASE_TTL_MS: z.coerce
     .number()
     .int()
@@ -49,11 +54,80 @@ const mcpRuntimeEnvShape = {
     .default(15_000),
   MCP_RUNTIME_OWNER_ID: z.string().min(1).optional(),
   MCP_RUNTIME_OWNER_URL: McpRuntimeOwnerAddressSchema.optional(),
+  MCP_RUNTIME_LISTEN_HOST: z.string().min(1).optional().default('127.0.0.1'),
+  MCP_RUNTIME_LISTEN_PORT: z.coerce.number().int().positive().max(65_535).optional().default(9301),
+  MCP_RUNTIME_CONNECT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(30_000),
+  MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(30_000),
+  MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(120_000),
+  MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(120_000),
+  MCP_RUNTIME_STARTING_POLL_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(60_000)
+    .optional()
+    .default(250),
+  MCP_RUNTIME_DRAIN_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(30_000),
+  MCP_RUNTIME_RECONCILE_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(MCP_RUNTIME_MAX_TTL_MS)
+    .optional()
+    .default(60_000),
+  MCP_RUNTIME_RECONCILE_MAX_RESOURCES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_DOCKER_INVENTORY)
+    .optional()
+    .default(256),
 };
 
 interface McpRuntimeTimingConfig {
+  MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: number;
+  MCP_RUNTIME_STARTING_TTL_MS: number;
   MCP_RUNTIME_LEASE_TTL_MS: number;
   MCP_RUNTIME_RENEWAL_INTERVAL_MS: number;
+  MCP_RUNTIME_CONNECT_TIMEOUT_MS: number;
+  MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS: number;
+  MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: number;
+  MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS: number;
+  MCP_RUNTIME_STARTING_POLL_INTERVAL_MS: number;
+  MCP_RUNTIME_DRAIN_TIMEOUT_MS: number;
+  MCP_RUNTIME_LISTEN_PORT: number;
+  MCP_RUNTIME_OWNER_ID?: string;
+  MCP_RUNTIME_OWNER_URL?: string;
 }
 
 function validateMcpRuntimeTiming(data: McpRuntimeTimingConfig, ctx: z.RefinementCtx): void {
@@ -63,6 +137,70 @@ function validateMcpRuntimeTiming(data: McpRuntimeTimingConfig, ctx: z.Refinemen
       path: ['MCP_RUNTIME_RENEWAL_INTERVAL_MS'],
       message: 'MCP runtime renewal interval must be at most one third of the lease TTL',
     });
+  }
+  if (data.MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS > data.MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS'],
+      message: 'MCP runtime discovery idle timeout must not exceed its total timeout',
+    });
+  }
+  if (data.MCP_RUNTIME_STARTING_POLL_INTERVAL_MS > data.MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_STARTING_POLL_INTERVAL_MS'],
+      message: 'MCP runtime starting poll interval must not exceed its observation timeout',
+    });
+  }
+  const startupBudgetMs =
+    data.MCP_RUNTIME_CONNECT_TIMEOUT_MS + data.MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS;
+  if (
+    data.MCP_RUNTIME_STARTING_TTL_MS <
+    startupBudgetMs + data.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_STARTING_TTL_MS'],
+      message:
+        'MCP runtime starting TTL must cover connect, discovery, and one Redis command budget',
+    });
+  }
+  if (data.MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS > data.MCP_RUNTIME_STARTING_TTL_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS'],
+      message: 'MCP runtime starting observation timeout must not exceed the starting TTL',
+    });
+  }
+  const savedDiscoveryBudgetMs =
+    startupBudgetMs +
+    data.MCP_RUNTIME_DRAIN_TIMEOUT_MS +
+    4 * data.MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS +
+    SAVED_MCP_RUNTIME_DISCOVERY_FIXED_OVERHEAD_MS;
+  if (savedDiscoveryBudgetMs > SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS'],
+      message: 'MCP runtime startup and cleanup budget exceeds saved-discovery activity ownership',
+    });
+  }
+  if (Boolean(data.MCP_RUNTIME_OWNER_ID) !== Boolean(data.MCP_RUNTIME_OWNER_URL)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: [data.MCP_RUNTIME_OWNER_ID ? 'MCP_RUNTIME_OWNER_URL' : 'MCP_RUNTIME_OWNER_ID'],
+      message: 'MCP runtime owner ID and URL must be configured together',
+    });
+  }
+  if (data.MCP_RUNTIME_OWNER_URL) {
+    const url = new URL(data.MCP_RUNTIME_OWNER_URL);
+    const advertisedPort = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+    if (advertisedPort !== data.MCP_RUNTIME_LISTEN_PORT) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MCP_RUNTIME_OWNER_URL'],
+        message: 'MCP runtime owner URL port must match MCP_RUNTIME_LISTEN_PORT',
+      });
+    }
   }
 }
 
@@ -79,6 +217,7 @@ export const workerEnvSchema = z
 
     // --- With defaults ---
     BACKEND_URL: z.string().optional().default('http://localhost:3211'),
+    INTERNAL_SERVICE_TOKEN: z.string().min(16).optional(),
     SENTRIS_PUBLIC_API_BASE_URL: z.url().optional(),
     NODE_ENV: z.string().optional().default('development'),
     SENTRIS_TRUST_PROFILE: z.string().optional(),
@@ -176,6 +315,14 @@ export const workerEnvSchema = z
         path: ['MCP_DISCOVERY_TRUSTED_LOCAL_STDIO'],
         message:
           'MCP_DISCOVERY_TRUSTED_LOCAL_STDIO cannot be enabled when SENTRIS_TRUST_PROFILE=hardened',
+      });
+    }
+
+    if ((data.MCP_RUNTIME_OWNER_ID || data.MCP_RUNTIME_OWNER_URL) && !data.INTERNAL_SERVICE_TOKEN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['INTERNAL_SERVICE_TOKEN'],
+        message: 'INTERNAL_SERVICE_TOKEN is required when MCP runtime ownership is configured',
       });
     }
 

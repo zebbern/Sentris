@@ -16,6 +16,7 @@ import { McpGroupsService } from '../../mcp-groups/mcp-groups.service';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from '../tool-registry.service';
 import { InternalOnlyGuard } from '../../auth/internal-only.guard';
 import { McpInvocationService } from '../../mcp-runtime/mcp-invocation.service';
+import { McpServerRuntimeConfigService } from '../../mcp-servers/mcp-server-runtime-config.service';
 
 // Simple Mock Redis
 class MockRedis {
@@ -56,6 +57,14 @@ describe('MCP Internal API (Integration)', () => {
   let controller: InternalMcpController;
   let toolRegistryService: ToolRegistryService;
   const generateSessionToken = vi.fn(async () => 'mock-token');
+  const resolveRuntimeDefinition = vi.fn(async () => ({
+    sourceId: 'server-1',
+    configFingerprint: 'a'.repeat(64),
+    bindingFingerprint: 'a'.repeat(64),
+    kind: 'remote-http' as const,
+    endpoint: 'https://mcp.example.test/mcp',
+    headers: { Authorization: 'Bearer resolved-secret' },
+  }));
   const cleanedOutboundRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
   const preparedRef = {
@@ -165,6 +174,10 @@ describe('MCP Internal API (Integration)', () => {
         },
         { provide: TOOL_REGISTRY_REDIS, useValue: mockRedis },
         { provide: McpInvocationService, useValue: invocationService },
+        {
+          provide: McpServerRuntimeConfigService,
+          useValue: { resolveDefinition: resolveRuntimeDefinition },
+        },
         InternalOnlyGuard,
         {
           provide: AuthService,
@@ -197,6 +210,11 @@ describe('MCP Internal API (Integration)', () => {
       toolRegistryService;
     (controller as unknown as { invocationService: typeof invocationService }).invocationService =
       invocationService;
+    (
+      controller as unknown as {
+        runtimeConfigService: { resolveDefinition: typeof resolveRuntimeDefinition };
+      }
+    ).runtimeConfigService = { resolveDefinition: resolveRuntimeDefinition };
     (
       controller as unknown as {
         mcpAuthService: { generateSessionToken: typeof generateSessionToken };
@@ -271,6 +289,34 @@ describe('MCP Internal API (Integration)', () => {
       900,
       'agent-node',
     );
+  });
+
+  it('resolves an exact runtime key through the authenticated internal boundary', async () => {
+    const runtimeKey = {
+      sourceId: 'server-1',
+      transport: 'http',
+      configFingerprint: 'a'.repeat(64),
+      organizationId: 'org-1',
+      principalPartitionHash: 'b'.repeat(64),
+      credentialReference: 'mcp-server:server-1',
+      credentialGeneration: 1,
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/internal/mcp/runtime-definition')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ runtimeKey });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      sourceId: 'server-1',
+      configFingerprint: 'a'.repeat(64),
+      bindingFingerprint: 'a'.repeat(64),
+      kind: 'remote-http',
+      endpoint: 'https://mcp.example.test/mcp',
+      headers: { Authorization: 'Bearer resolved-secret' },
+    });
+    expect(resolveRuntimeDefinition).toHaveBeenCalledWith(runtimeKey);
   });
 
   it('registers an MCP server with pre-discovered tools', async () => {

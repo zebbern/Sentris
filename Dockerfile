@@ -44,6 +44,9 @@ USER sentris
 # Set working directory for backend
 WORKDIR /app/backend
 
+# Bun's bundler emits the legacy decorator metadata required by NestJS.
+RUN bun run build
+
 # Expose port
 EXPOSE 3211
 
@@ -51,8 +54,8 @@ EXPOSE 3211
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:3211/api/v1/health || exit 1
 
-# Run migrations first, then start backend
-CMD ["sh", "-c", "bun run migration:run && bun src/main.ts"]
+# Run migrations first, then start the verified bundle.
+CMD ["bun", "run", "start:prod"]
 
 # ============================================================================
 # WORKER SERVICE
@@ -66,7 +69,7 @@ USER sentris
 WORKDIR /app/worker
 
 # Worker liveness/readiness endpoint
-EXPOSE 9100 9101
+EXPOSE 9100 9101 9301
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

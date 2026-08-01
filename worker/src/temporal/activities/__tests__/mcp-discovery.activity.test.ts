@@ -1,8 +1,24 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test, vi } from 'bun:test';
+import type {
+  McpCatalog,
+  McpRuntimeAcquisition,
+  McpRuntimeKey,
+  McpRuntimeRef,
+} from '@sentris/shared';
+import type { McpRuntimeRouter } from '../../../mcp-runtime/mcp-runtime-router';
 
 const redisSetex = vi.fn(async (_key: string, _ttlSeconds: number, _value: string) => 'OK');
 const redisGet = vi.fn(async (_key: string): Promise<string | null> => null);
 const mockHeartbeat = vi.fn();
+let mockCancellationSignal = new AbortController().signal;
+const mockActivityInfo = {
+  activityId: 'saved-mcp-discovery-activity',
+  attempt: 1,
+  workflowExecution: {
+    workflowId: 'saved-mcp-discovery-workflow',
+    runId: '44444444-4444-4444-8444-444444444444',
+  },
+};
 
 interface MockMcpDockerServerInput {
   context: {
@@ -82,6 +98,8 @@ mock.module('@temporalio/activity', () => ({
   Context: {
     current: () => ({
       heartbeat: mockHeartbeat,
+      cancellationSignal: mockCancellationSignal,
+      info: mockActivityInfo,
     }),
   },
 }));
@@ -115,8 +133,89 @@ const originalTrustedLocalStdio = process.env.MCP_DISCOVERY_TRUSTED_LOCAL_STDIO;
 const originalTrustProfile = process.env.SENTRIS_TRUST_PROFILE;
 const originalFetch = globalThis.fetch;
 let cacheDiscoveryResultActivity: typeof import('../mcp-discovery.activity').cacheDiscoveryResultActivity;
+let discoverSavedMcpRuntimeActivity: typeof import('../mcp-discovery.activity').discoverSavedMcpRuntimeActivity;
 let discoverMcpToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpToolsActivity;
 let discoverMcpGroupToolsActivity: typeof import('../mcp-discovery.activity').discoverMcpGroupToolsActivity;
+let initializeMcpRuntimeDiscoveryActivities: typeof import('../mcp-discovery.activity').initializeMcpRuntimeDiscoveryActivities;
+
+const savedRuntimeKey: McpRuntimeKey = {
+  sourceId: 'mcp-server:server-1',
+  transport: 'http',
+  configFingerprint: 'a'.repeat(64),
+  organizationId: 'organization-a',
+  principalPartitionHash: 'b'.repeat(64),
+  credentialReference: 'mcp-server:server-1',
+  credentialGeneration: 7,
+};
+
+const savedRuntimeRef: McpRuntimeRef = {
+  state: 'ready',
+  fence: {
+    runtimeId: '11111111-1111-4111-8111-111111111111',
+    ownerId: 'worker-owner-a',
+    ownerEpoch: '22222222-2222-4222-8222-222222222222',
+    leaseGeneration: 3,
+  },
+  ownerAddress: 'http://worker-owner-a:9301',
+  leaseExpiresAt: '2099-08-01T12:00:00.000Z',
+  protocolEra: 'modern',
+  protocolVersion: '2026-07-28',
+  capabilityFingerprint: 'c'.repeat(64),
+};
+const savedRuntimeAcquisition: McpRuntimeAcquisition = {
+  ref: savedRuntimeRef as McpRuntimeAcquisition['ref'],
+  holderId: '33333333-3333-4333-8333-333333333333',
+};
+
+const savedCatalog: McpCatalog = {
+  protocolEra: 'modern',
+  protocolVersion: '2026-07-28',
+  capabilityFingerprint: 'c'.repeat(64),
+  tools: [
+    {
+      canonicalName: 'mcp_server_1.search',
+      displayName: 'Search',
+      description: 'Search the upstream service',
+      inputSchema: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+      },
+      source: {
+        kind: 'mcp',
+        sourceId: 'mcp-server:server-1',
+        serverId: 'server-1',
+        upstreamName: 'search',
+        bindingFingerprint: 'd'.repeat(64),
+      },
+      effects: 'read-only',
+      effectsSource: 'mcp-annotation',
+      retryPolicy: 'reviewed-idempotent',
+    },
+  ],
+  resources: [
+    {
+      sourceId: 'mcp-server:server-1',
+      uri: 'sentris://reports/latest',
+      name: 'Latest report',
+      mimeType: 'application/json',
+    },
+  ],
+  resourceTemplates: [
+    {
+      sourceId: 'mcp-server:server-1',
+      uriTemplate: 'sentris://reports/{id}',
+      name: 'Report',
+      mimeType: 'application/json',
+    },
+  ],
+  prompts: [
+    {
+      sourceId: 'mcp-server:server-1',
+      name: 'summarize_report',
+      arguments: [{ name: 'reportId', required: true }],
+    },
+  ],
+};
 
 function createJsonResponse(body: unknown): Response {
   return {
@@ -143,11 +242,18 @@ async function prepareDiscoveryFetch(): Promise<typeof fetch> {
 
 describe('MCP discovery activity diagnostics', () => {
   beforeAll(async () => {
-    ({ cacheDiscoveryResultActivity, discoverMcpToolsActivity, discoverMcpGroupToolsActivity } =
-      await import('../mcp-discovery.activity'));
+    ({
+      cacheDiscoveryResultActivity,
+      discoverSavedMcpRuntimeActivity,
+      discoverMcpToolsActivity,
+      discoverMcpGroupToolsActivity,
+      initializeMcpRuntimeDiscoveryActivities,
+    } = await import('../mcp-discovery.activity'));
   });
 
   beforeEach(() => {
+    mockCancellationSignal = new AbortController().signal;
+    mockActivityInfo.attempt = 1;
     delete process.env.SENTRIS_DEBUG_WORKFLOW;
     delete process.env.MCP_DISCOVERY_TRUSTED_LOCAL_STDIO;
     delete process.env.SENTRIS_TRUST_PROFILE;
@@ -209,6 +315,210 @@ describe('MCP discovery activity diagnostics', () => {
     }
   });
 
+  test('discovers a saved server through the runtime router without leaking runtime ownership', async () => {
+    const acquire = vi.fn(
+      async (_runtimeKey: McpRuntimeKey, _holderId: string, _signal: AbortSignal) => ({
+        ...savedRuntimeAcquisition,
+        testOnlySecret: 'must-not-cross-the-activity-boundary',
+      }),
+    );
+    const execute = vi.fn(async (_ref: McpRuntimeAcquisition, operation: { kind: string }) =>
+      operation.kind === 'discover' ? savedCatalog : undefined,
+    );
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    const result = await discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey });
+
+    expect(acquire).toHaveBeenCalledWith(
+      savedRuntimeKey,
+      expect.any(String),
+      mockCancellationSignal,
+    );
+    expect(execute).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining(savedRuntimeAcquisition),
+      { kind: 'discover' },
+      mockCancellationSignal,
+    );
+    expect(execute).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining(savedRuntimeAcquisition),
+      { kind: 'release' },
+      expect.any(AbortSignal),
+    );
+    expect(mockHeartbeat.mock.calls).toEqual([
+      ['mcp-runtime:acquire'],
+      ['mcp-runtime:discover'],
+      ['mcp-runtime:catalog-ready'],
+      ['mcp-runtime:release'],
+    ]);
+    expect(result).toEqual({ catalog: savedCatalog });
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('worker-owner-a');
+    expect(serialized).not.toContain('11111111-1111-4111-8111-111111111111');
+    expect(serialized).not.toContain('must-not-cross-the-activity-boundary');
+    expect(result).not.toHaveProperty('runtimeRef');
+    expect(result).not.toHaveProperty('ownerAddress');
+    expect(result).not.toHaveProperty('fence');
+  });
+
+  test('passes Temporal activity cancellation to saved-server discovery', async () => {
+    const cancellation = new Error('Temporal activity cancelled');
+    const controller = new AbortController();
+    mockCancellationSignal = controller.signal;
+    controller.abort(cancellation);
+    const acquire = vi.fn(
+      async (_runtimeKey: McpRuntimeKey, _holderId: string, signal: AbortSignal) => {
+        if (signal.aborted) throw signal.reason;
+        return savedRuntimeAcquisition;
+      },
+    );
+    const execute = vi.fn(async () => savedCatalog);
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    await expect(discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey })).rejects.toBe(
+      cancellation,
+    );
+
+    expect(acquire).toHaveBeenCalledWith(savedRuntimeKey, expect.any(String), controller.signal);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  test('releases each successful saved discovery so repeated checks do not accumulate runtimes', async () => {
+    const acquire = vi.fn(
+      async (_runtimeKey: McpRuntimeKey, _holderId: string, _signal: AbortSignal) =>
+        savedRuntimeAcquisition,
+    );
+    const operations: string[] = [];
+    const execute = vi.fn(async (_ref: McpRuntimeAcquisition, operation: { kind: string }) => {
+      operations.push(operation.kind);
+      return operation.kind === 'discover' ? savedCatalog : undefined;
+    });
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    await discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey });
+    await discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey });
+
+    expect(operations).toEqual(['discover', 'release', 'discover', 'release']);
+    expect(acquire.mock.calls[0]?.[1]).toBe(acquire.mock.calls[1]?.[1]);
+  });
+
+  test('uses a new holder incarnation when Temporal retries after a lost release response', async () => {
+    const holderIds: string[] = [];
+    const acquire = vi.fn(
+      async (_runtimeKey: McpRuntimeKey, holderId: string, _signal: AbortSignal) => {
+        holderIds.push(holderId);
+        return { ...savedRuntimeAcquisition, holderId };
+      },
+    );
+    let releaseCalls = 0;
+    const execute = vi.fn(async (_ref: McpRuntimeAcquisition, operation: { kind: string }) => {
+      if (operation.kind === 'discover') return savedCatalog;
+      releaseCalls += 1;
+      if (releaseCalls === 1) throw new Error('release response was lost');
+      return undefined;
+    });
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    await expect(discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey })).rejects.toThrow(
+      'release response was lost',
+    );
+    mockActivityInfo.attempt = 2;
+    await expect(discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey })).resolves.toEqual(
+      { catalog: savedCatalog },
+    );
+
+    expect(holderIds).toHaveLength(2);
+    expect(holderIds[0]).not.toBe(holderIds[1]);
+  });
+
+  test('serializes holder keepalives and stops them before fenced release', async () => {
+    const discoveryStarted = testDeferred<undefined>();
+    const finishDiscovery = testDeferred<McpCatalog>();
+    const operations: string[] = [];
+    let touchInFlight = false;
+    let overlappingTouches = false;
+    const shortLeaseAcquisition: McpRuntimeAcquisition = {
+      ...savedRuntimeAcquisition,
+      ref: {
+        ...savedRuntimeAcquisition.ref,
+        leaseExpiresAt: new Date(Date.now() + 45).toISOString(),
+      },
+    };
+    const acquire = vi.fn(async () => shortLeaseAcquisition);
+    const execute = vi.fn(
+      async (_ref: McpRuntimeAcquisition, operation: { kind: string }): Promise<unknown> => {
+        operations.push(operation.kind);
+        if (operation.kind === 'discover') {
+          discoveryStarted.resolve(undefined);
+          return finishDiscovery.promise;
+        }
+        if (operation.kind === 'touch') {
+          if (touchInFlight) overlappingTouches = true;
+          touchInFlight = true;
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          touchInFlight = false;
+          return {
+            ...shortLeaseAcquisition.ref,
+            leaseExpiresAt: new Date(Date.now() + 45).toISOString(),
+          };
+        }
+        return undefined;
+      },
+    );
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    const activity = discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey });
+    await discoveryStarted.promise;
+    try {
+      await waitForTestCondition(() => operations.includes('touch'));
+    } finally {
+      finishDiscovery.resolve(savedCatalog);
+    }
+    const activityOutcome = await Promise.race([
+      activity,
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(
+          () => reject(new Error(`activity did not settle; operations=${operations.join(',')}`)),
+          500,
+        ),
+      ),
+    ]);
+    expect(activityOutcome).toEqual({ catalog: savedCatalog });
+    const operationsAtCompletion = [...operations];
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(overlappingTouches).toBe(false);
+    expect(operationsAtCompletion.at(-1)).toBe('release');
+    expect(operations).toEqual(operationsAtCompletion);
+  });
+
+  test('does not mask a discovery failure when fenced release also fails', async () => {
+    const primaryFailure = new Error('catalog discovery failed');
+    const cleanupFailure = new Error('fenced release failed');
+    const acquire = vi.fn(async () => savedRuntimeAcquisition);
+    const execute = vi.fn(async (_ref: McpRuntimeAcquisition, operation: { kind: string }) => {
+      if (operation.kind === 'discover') throw primaryFailure;
+      throw cleanupFailure;
+    });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    initializeMcpRuntimeDiscoveryActivities({ acquire, execute } as unknown as McpRuntimeRouter);
+
+    try {
+      await expect(discoverSavedMcpRuntimeActivity({ runtimeKey: savedRuntimeKey })).rejects.toBe(
+        primaryFailure,
+      );
+      expect(execute.mock.calls.map(([, operation]) => operation)).toEqual([
+        { kind: 'discover' },
+        { kind: 'release' },
+      ]);
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   test('discoverMcpToolsActivity uses the MCP SDK for HTTP tool discovery', async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new Error('raw MCP fetch should not be used for HTTP discovery');
@@ -225,7 +535,7 @@ describe('MCP discovery activity diagnostics', () => {
 
     const result = await discoverMcpToolsActivity({
       transport: 'http',
-      endpoint: 'https://example.test/mcp',
+      endpoint: 'http://93.184.216.34/mcp',
       headers: { Authorization: 'Bearer token' },
     });
 
@@ -238,7 +548,7 @@ describe('MCP discovery activity diagnostics', () => {
     ]);
     expect(mockMcpTransport).toHaveBeenCalledTimes(1);
     const [url, options] = mockMcpTransport.mock.calls[0];
-    expect(String(url)).toBe('https://example.test/mcp');
+    expect(String(url)).toBe('http://93.184.216.34/mcp');
     expect(options).toMatchObject({
       requestInit: {
         headers: {
@@ -635,3 +945,19 @@ describe('MCP discovery activity diagnostics', () => {
     }
   });
 });
+
+function testDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+async function waitForTestCondition(predicate: () => boolean, timeoutMs = 200): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error('Timed out waiting for activity test condition');
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+}

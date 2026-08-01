@@ -28,6 +28,10 @@ export interface KafkaReadiness {
   close?(): Promise<void>;
 }
 
+export interface McpRuntimeReadiness {
+  check(): Promise<void>;
+}
+
 interface BackendReadiness {
   apiBaseUrl: string;
   internalToken?: string;
@@ -37,6 +41,7 @@ interface BackendReadiness {
 export interface WorkerReadinessState {
   acceptingTasks: boolean;
   maintenanceError?: string;
+  mcpRuntimeError?: string;
   telemetryError?: string;
 }
 
@@ -58,6 +63,7 @@ export interface WorkerReadinessDeps {
   minio: MinioLike;
   redis?: RedisLike;
   kafka: KafkaReadiness;
+  mcpRuntime?: McpRuntimeReadiness;
   backend?: BackendReadiness;
   dockerExec?: DockerExec;
   dockerEnv?: NodeJS.ProcessEnv;
@@ -111,6 +117,12 @@ export function createWorkerReadinessChecks(
       deps.workerState.maintenanceError
         ? { status: 'unhealthy', message: deps.workerState.maintenanceError }
         : { status: 'ok' },
+    mcpRuntime: async () => {
+      if (deps.workerState.mcpRuntimeError) {
+        return { status: 'unhealthy', message: deps.workerState.mcpRuntimeError };
+      }
+      return deps.mcpRuntime ? check(() => deps.mcpRuntime!.check()) : { status: 'ok' };
+    },
     telemetry: async () =>
       deps.workerState.telemetryError
         ? { status: 'unhealthy', message: deps.workerState.telemetryError }

@@ -18,6 +18,8 @@ import {
   ReconcileMcpInvocationBodySchema,
   ReconcileRunMcpInvocationsBody,
   ReconcileRunMcpInvocationsBodySchema,
+  ResolveMcpRuntimeDefinitionBody,
+  ResolveMcpRuntimeDefinitionBodySchema,
   RegisterComponentToolInput,
   RegisterGroupServerInput,
   RegisterMcpServerInput,
@@ -27,6 +29,7 @@ import {
 } from './dto/mcp.dto';
 import { InternalOnlyGuard } from '../auth/internal-only.guard';
 import { McpInvocationService } from '../mcp-runtime/mcp-invocation.service';
+import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 
 @ApiExcludeController()
 @Controller('internal/mcp')
@@ -38,7 +41,16 @@ export class InternalMcpController {
     private readonly legacyOutbound: McpLegacyOutboundCompatibilityService,
     private readonly mcpAuthService: McpAuthService,
     private readonly invocationService: McpInvocationService,
+    private readonly runtimeConfigService: McpServerRuntimeConfigService,
   ) {}
+
+  @Post('runtime-definition')
+  resolveRuntimeDefinition(
+    @Body(new ZodValidationPipe(ResolveMcpRuntimeDefinitionBodySchema))
+    body: ResolveMcpRuntimeDefinitionBody,
+  ) {
+    return this.runtimeConfigService.resolveDefinition(body.runtimeKey);
+  }
 
   @Post('generate-token')
   async generateToken(@Body() body: GenerateTokenInput) {

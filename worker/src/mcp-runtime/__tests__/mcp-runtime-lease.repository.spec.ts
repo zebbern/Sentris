@@ -8,6 +8,7 @@ import type {
 } from '@sentris/shared';
 
 import { McpRuntimeLeaseRepository } from '../mcp-runtime-lease.repository';
+import { hashMcpRuntimeKey } from '../mcp-runtime-identity';
 import {
   createRedisIntegrationFixture,
   type RedisIntegrationFixture,
@@ -89,6 +90,38 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
       expect(await repository.compareAndDelete(key, staleFence)).toBe(false);
     }
     expect(await repository.read(key)).toEqual(ready);
+  });
+
+  test('matches a live lease by canonical runtime-key hash only when every fence field is current', async () => {
+    const repository = createRepository(requiredFixture(fixture));
+    const key = runtimeKey();
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9122/runtime');
+    const reserved = await repository.reserve(key, owner);
+    const runtimeKeyHash = hashMcpRuntimeKey(key);
+
+    expect(await repository.matchesFenceByHash(runtimeKeyHash, reserved.ref.fence)).toBe(true);
+    for (const staleFence of staleFences(reserved.ref.fence)) {
+      expect(await repository.matchesFenceByHash(runtimeKeyHash, staleFence)).toBe(false);
+    }
+
+    expect(await repository.compareAndDelete(key, reserved.ref.fence)).toBe(true);
+    expect(await repository.matchesFenceByHash(runtimeKeyHash, reserved.ref.fence)).toBe(false);
+  });
+
+  test('fails closed when a hash lookup finds a lease that has lost its required expiry', async () => {
+    const activeFixture = requiredFixture(fixture);
+    const repository = createRepository(activeFixture);
+    const key = runtimeKey();
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9123/runtime');
+    const reserved = await repository.reserve(key, owner);
+    const leaseKey = await onlyKeyContaining(activeFixture, ':lease:');
+    expect(await activeFixture.redis.persist(leaseKey)).toBe(1);
+
+    const [lookup] = await Promise.allSettled([
+      repository.matchesFenceByHash(hashMcpRuntimeKey(key), reserved.ref.fence),
+    ]);
+
+    expect(lookup?.status).toBe('rejected');
   });
 
   test('exposes the retained direct owner address only through a matching ready publication', async () => {

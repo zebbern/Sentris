@@ -78,6 +78,13 @@
       "when": 1785531563948,
       "tag": "0010_mcp_runtime_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1785572153145,
+      "tag": "0011_mcp_server_secret_references",
+      "breakpoints": true
     }
   ]
 }
