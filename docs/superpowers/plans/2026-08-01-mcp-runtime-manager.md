@@ -4,7 +4,7 @@
 
 **Goal:** Replace Sentris's duplicated outbound MCP clients and process-local bridges with one official-v2 client adapter and one worker-owned, lease-fenced runtime manager that durably executes tools, resource reads, and prompt expansion across multiple workers.
 
-**Architecture:** A Temporal activity may land on any worker. It asks the local `McpRuntimeRouter` for an auth-partitioned runtime; the router uses an in-process fast path when the local process owns the matching epoch/generation and otherwise makes one authenticated request to the lease's instance-unique owner address. Redis contains only fenced lease/routing metadata. The owner alone resolves credential references, owns the official MCP client/transport and any stdio/Docker process, and renews or self-fences the lease. Postgres and the run Workflow continue to own immutable authority plus durable operation attempts. Modern `2026-07-28` HTTP is request-stateless; legacy session behavior remains only inside a bounded compatibility adapter until its measured deletion condition is satisfied.
+**Architecture:** A Temporal activity may land on any worker. Its first `acquire` supplies an auth-partitioned runtime key plus a candidate owner identity/address and atomically receives the current ready runtime reference or a newly reserved owner epoch/lease generation; no pre-existing fence is required to acquire. Every later state-changing or upstream operation supplies that returned fence. The local `McpRuntimeRouter` uses an in-process fast path when the process owns the matching epoch/lease generation and otherwise makes one authenticated request to the lease's instance-unique owner address. Redis contains only ephemeral fenced lease/routing metadata. The owner alone resolves credential references, owns the official MCP client/transport and any stdio/Docker process, and renews or self-fences the lease. Postgres and the run Workflow continue to own immutable authority/catalog identity plus durable operation attempts; owner failover changes only the lease fence, not unchanged authority. Modern `2026-07-28` HTTP is request-stateless; legacy session behavior remains only inside a bounded compatibility adapter until its measured deletion condition is satisfied.
 
 **Tech Stack:** TypeScript, Zod 4, NestJS 10, Drizzle/PostgreSQL, Redis/ioredis, Temporal TypeScript SDK 1.14.1, `@modelcontextprotocol/client` 2.0.0, `@modelcontextprotocol/node` 2.0.0, legacy `@modelcontextprotocol/sdk` 1.30.0 only at the compatibility seam, Docker/DIND, Bun.
 
@@ -18,18 +18,18 @@
 - Modern `2026-07-28` HTTP has independent requests: no initialize exchange, transport session, GET event stream, resume token, affinity, or sticky routing. Never project the legacy transport's `sessionId`, `resumeStream`, or reconnect behavior onto a modern runtime.
 - The official SDK owns MCP negotiation, validation, HTTP/stdio framing, cancellation, progress callbacks, and response caching. Sentris owns leases, epoch/generation fencing, process/container supervision, durable attempts, cross-worker routing, and unknown-outcome classification.
 - Redis and Postgres may contain credential references and credential versions, but never resolved tokens, plaintext headers, OAuth values, stdio environment secrets, tool arguments/results, or child-process environment. Resolved credentials exist only in the current owner process and are cleared on release/fence.
-- Partition runtime reuse, negotiation verdicts, response caches (`cachePartition`), subscriptions, and immutable discovery by organization/principal plus credential reference and generation. Credential rotation always produces a new runtime key and generation; it must not mutate a live runtime in place.
+- Partition runtime reuse, negotiation verdicts, response caches (`cachePartition`), subscriptions, and immutable discovery by organization/principal plus credential reference and credential generation. Credential rotation produces a different runtime key/config identity; it must not mutate a live runtime in place. This credential generation is immutable configuration input and is not the ephemeral Redis lease generation.
 - Use both idle timeout and `maxTotalTimeout`; progress may reset the idle deadline but never extend the total deadline indefinitely. Map Temporal cancellation to an operation-scoped `AbortSignal`. Do not close a shared modern HTTP transport to cancel one request.
 - Do not configure anonymous process-local `inputRequired` callbacks. Until workflow-granular durable human/model input exists, return a typed non-retryable `input-required-unsupported` result and keep that future work behind the existing agent-turn boundary.
 - MCP Tasks are explicitly out of scope. The installed TypeScript SDK 2.0.0 does not implement the current `io.modelcontextprotocol/tasks` extension. Do not recreate the draft or call the deprecated v1 `experimental.tasks`; add support only after maintained official TypeScript support, a pinned extension version, and conformance tests exist.
 - A runtime operation must persist and claim an attempt before network/process dispatch. Once marked `dispatched`, owner loss, timeout, or lost response is `ambiguous` unless a provider-specific reconciliation proves the result. Automatic retry is allowed only before dispatch or under the existing reviewed-idempotent policy.
 - Redis uncertainty fails closed. A worker that cannot prove lease ownership must stop accepting calls, abort what can safely be aborted, mark already-dispatched calls ambiguous through the durable repository, and reap its resources. It must not continue on a locally cached lease.
-- `ownerEpoch` is a random process-incarnation UUID generated at worker boot; `generation` is monotonically advanced under Redis CAS for a runtime key. Every acquire/discover/invoke/read/getPrompt/renew/release/health request carries and validates runtime ID, owner ID, owner epoch, and generation.
+- `ownerEpoch` is a random process-incarnation UUID generated at worker boot; `leaseGeneration` is monotonically advanced under Redis CAS for a runtime key. `acquire(runtimeKey, candidateOwner)` has no fence input and returns the current or newly created `McpRuntimeRef`. Every subsequent discover/invoke/read/getPrompt/renew/release/health/state-changing request carries and validates that reference's runtime ID, owner ID, owner epoch, and lease generation.
 - Publish an instance-unique direct owner URL only after the runtime is ready. Never publish `worker`, a load-balanced service name, or the old generic proxy base URL as a runtime address. The internal listener is network-private and requires the existing internal service credential.
 - Preserve the in-process owner fast path. Cross-owner routing may add exactly one direct internal hop; backend or Temporal callers must not bounce through a generic worker and then a second owner lookup.
 - Host stdio uses the official `StdioClientTransport`. Docker stdio uses that same transport with a bounded `docker run --rm -i` command and Sentris labels; Docker HTTP uses a labeled container plus an owner-private direct endpoint. Reconciliation remains responsible for containers left by a dead CLI/worker. Delete the handwritten stdio/Docker HTTP bridges and their process-local target maps after cutover.
 - Discovery materializes every advertised family: tools, concrete resources, resource templates, and prompts. `resources/read` and `prompts/get` are runtime operations, not discovery. Cap automatic pagination at the installed client's `listMaxPages: 64` and fail a catalog that exceeds it rather than silently truncating.
-- Preserve the current immutable grant/snapshot and binding-fingerprint rules. A runtime generation, credential generation, protocol era/version, or capability fingerprint mismatch mints a new authority/snapshot; it never changes an existing snapshot.
+- Preserve the current immutable grant/snapshot and binding-fingerprint rules. Authority/config identity is derived only from execution scope, source binding/config fingerprint, auth partition, credential reference/generation, negotiated protocol identity, and the complete capability fingerprint. Owner ID/address/epoch, lease generation/state/expiry, PID, and container identity are excluded. Owner failover increments only `leaseGeneration` and reuses unchanged authority/snapshot IDs after rediscovery confirms the same capability fingerprint. A real credential/config/protocol/capability change mints new authority; it never changes an existing snapshot.
 - Keep the v1 SDK only inside `LegacyMcpClientCompatibilityAdapter`, selected by explicit negotiated/pinned legacy behavior. Very old HTTP+SSE fallback creates a fresh client and transport. Do not let compatibility session objects escape the adapter.
 - No mandatory managed service may be introduced. Use the existing Redis, Postgres, Temporal, and worker processes for the normal locally hosted path.
 - Use TDD for each behavior change: focused test first, observe the intended RED, implement the smallest complete behavior, rerun GREEN, then typecheck the affected package. Do not update snapshots merely to make failures disappear.
@@ -52,12 +52,12 @@
 
 **Interfaces:**
 
-- Produces `McpRuntimeKey`, `McpRuntimeRef`, `McpRuntimeFence`, `McpRuntimeHealth`, `McpCatalog`, and a discriminated `McpOperation` (`tool-call | resource-read | prompt-get`) with bounded JSON request/result schemas.
+- Produces `McpRuntimeKey`, unfenced `McpRuntimeAcquireRequest`, `McpRuntimeRef`, `McpRuntimeFence`, `McpRuntimeHealth`, `McpCatalog`, and a discriminated `McpOperation` (`tool-call | resource-read | prompt-get`) with bounded JSON request/result schemas.
 - Keeps `ToolInvocationRequest` and `executeToolInvocation` as compatibility projections for already-running Workflow histories; new generic fields do not remove or reinterpret old serialized fields.
 
 - [ ] **Step 1: Write RED contract tests**
 
-  Test strict parsing, nullable organization scope, 64-hex hashes, epoch UUID, positive generation, direct owner URL, operation discriminants, resource URI/prompt arguments, and secret rejection. Assert JSON serialization contains credential reference/version but not any resolved header/token field. Add operation result variants for completed, remote failure, cancellation, ambiguity, and input-required-unsupported.
+  Test strict parsing, nullable organization scope, 64-hex hashes, epoch UUID, positive lease generation, direct owner URL, operation discriminants, resource URI/prompt arguments, and secret rejection. Prove `McpRuntimeAcquireRequest` contains a runtime key and candidate owner ID/epoch/address but cannot contain a fence; prove all post-acquire operation requests require the returned fence. Assert JSON serialization contains credential reference/version but not any resolved header/token field. Add operation result variants for completed, remote failure, cancellation, ambiguity, and input-required-unsupported.
 
 - [ ] **Step 2: Run RED**
 
@@ -76,7 +76,7 @@
     runtimeId: string;
     ownerId: string;
     ownerEpoch: string;
-    generation: number;
+    leaseGeneration: number;
   };
 
   type McpOperation =
@@ -85,7 +85,7 @@
     | { kind: 'prompt-get'; name: string; arguments: Record<string, string> };
   ```
 
-  `McpRuntimeKey` must include source/transport/config fingerprint, organization/principal partition hash, credential reference, and credential generation. `McpRuntimeRef` adds protocol era/version, instance-unique `ownerAddress`, state (`starting | ready | draining`), lease expiry, and capability fingerprint, but no process ID, container endpoint, or secret. Export all schemas through `packages/shared/src/index.ts`.
+  `McpRuntimeKey` must include source/transport/config fingerprint, organization/principal partition hash, credential reference, and credential generation. Define `McpRuntimeAcquireRequest` as `{ runtimeKey, candidateOwner: { ownerId, ownerEpoch, ownerAddress } }`; it deliberately has no fence. `McpRuntimeRef` returns the new/current fence and adds protocol era/version, instance-unique `ownerAddress`, state (`starting | ready | draining`), lease expiry, and capability fingerprint, but no process ID, container endpoint, or secret. Keep immutable authority/config fingerprints structurally separate from `McpRuntimeFence`; the latter must never be accepted by authority/snapshot hashing helpers. Export all schemas through `packages/shared/src/index.ts`.
 
   Add exact `2.0.0` worker dependencies for `@modelcontextprotocol/client` and `@modelcontextprotocol/node`; retain `@modelcontextprotocol/sdk` 1.30.0 temporarily for the compatibility adapter:
 
@@ -177,12 +177,12 @@
 
 **Interfaces:**
 
-- `reserve`, `publishReady`, `read`, `renew`, `beginDrain`, `compareAndDelete`, and `listOwned` are atomic fenced operations.
-- Lease state is `starting -> ready -> draining`; generation only increases. `ownerEpoch` identifies one worker process incarnation, not a stable PM2/container name.
+- `reserve(runtimeKey, candidateOwner)` is an atomic unfenced acquisition operation that returns either the existing ready reference or a new reservation/fence. `publishReady`, `renew`, `beginDrain`, `compareAndDelete`, and every later mutation require that returned fence; `read(runtimeKey)` and `listOwned` are read-only.
+- Lease state is `starting -> ready -> draining`; `leaseGeneration` only increases. `ownerEpoch` identifies one worker process incarnation, not a stable PM2/container name. Neither value participates in immutable authority/snapshot identity.
 
 - [ ] **Step 1: Write RED lease race tests**
 
-  With the existing Redis test fixture, race two owners for the same runtime key and assert one reservation. Prove a stale epoch/generation cannot publish, renew, drain, or delete; `publishReady` alone exposes the direct address; expired owners can be replaced only with a greater generation; nullable-tenant keys do not collide; Redis errors fail closed.
+  With the existing Redis test fixture, race two unfenced candidate owners for the same runtime key and assert one new reservation while the loser receives the resulting current reference. Prove first acquisition succeeds without a pre-existing fence, while a stale epoch/lease generation cannot publish, renew, drain, or delete; `publishReady` alone exposes the direct address; expired owners can be replaced only with a greater lease generation; nullable-tenant keys do not collide; Redis errors fail closed. Prove failover changes the fence but leaves a separately supplied immutable authority/config fingerprint unchanged.
 
 - [ ] **Step 2: Run RED**
 
@@ -192,7 +192,7 @@
 
 - [ ] **Step 3: Implement Lua-backed CAS transitions**
 
-  Store one bounded JSON/hash record at `mcp:runtime:lease:{sha256(runtimeKey)}` plus an owner index. Each Lua script compares runtime ID, owner ID, epoch, and generation before mutation. Reservation advances generation and sets a short `starting` deadline without an address. Ready publication requires the same fence and adds the instance-unique URL, protocol era/version, capability fingerprint, and normal lease expiry. Renewal cannot revive an expired or draining record. Compare-and-delete removes both lease and owner index.
+  Store one bounded JSON/hash record at `mcp:runtime:lease:{sha256(runtimeKey)}` plus an owner index. The reservation Lua script accepts only the hashed runtime key plus candidate owner identity/address: it returns a live matching reference or atomically creates a `starting` reservation with a fresh runtime ID and next lease generation. It does not compare a caller-supplied fence. Every later mutation script compares runtime ID, owner ID, epoch, and lease generation. Ready publication requires the returned fence and adds the validated instance-unique URL, protocol era/version, capability fingerprint, and normal lease expiry. Renewal cannot revive an expired or draining record. Compare-and-delete removes both lease and owner index.
 
   Generate `ownerEpoch` once during worker boot with `randomUUID()`. Add bounded env values for lease TTL, starting TTL, renewal interval, and owner direct URL; validate renewal interval is comfortably below lease TTL.
 
@@ -231,12 +231,12 @@
 
 **Interfaces:**
 
-- `McpRuntimeManager.acquire`, `discover`, `invoke`, `read`, `getPrompt`, `renew`, `release`, `health`, `reconcile`, and `close` all require the current fence.
-- The manager's in-memory map is an owner cache, never authority. Every operation validates the live Redis fence before dispatch.
+- `McpRuntimeManager.acquire(runtimeKey, candidateOwner)` requires no pre-existing fence and returns `McpRuntimeRef`; `discover`, `invoke`, `read`, `getPrompt`, `renew`, `release`, and state-changing `health`/`reconcile` actions require its current fence.
+- The manager's in-memory map is an owner cache, never authority. Every post-acquire operation validates the live Redis fence before dispatch. Immutable authority/config identity is passed and compared separately from the ephemeral fence.
 
 - [ ] **Step 1: Write RED lifecycle tests**
 
-  Prove one concurrent acquire creates one routable runtime; startup failure never publishes an address; host stdio uses the official owned child; Docker resources carry runtime ID/owner epoch/generation labels; credentials are resolved only after reservation on the owner and absent from lease/log/returned ref; renewal loss self-fences; release is idempotent and fenced; shutdown drains; health combines lease age, transport state, and child/container state.
+  Prove one concurrent unfenced acquire creates one routable runtime; startup failure never publishes an address; host stdio uses the official owned child; Docker resources carry runtime ID/owner epoch/lease-generation labels; credentials are resolved only after reservation on the owner and absent from lease/log/returned ref; renewal loss self-fences; release is idempotent and fenced; shutdown drains; health combines lease age, transport state, and child/container state. Kill the owner between calls, reacquire with a new owner, and assert the lease generation increases while the unchanged config/capability fingerprint and authority/snapshot identity remain stable.
 
   Simulate a worker crash between Docker creation and ready publication and prove reconciliation reaps the labeled orphan. Simulate owner loss after dispatch and assert the callback classifies the durable attempt ambiguous rather than retrying.
 
@@ -250,7 +250,7 @@
 
   Remote HTTP owns a v2 adapter/transport but no process. Host stdio passes only the executable, bounded arguments, approved cwd, and an allowlisted environment to `StdioClientTransport`. Docker stdio launches a labeled `docker run --rm -i` through `StdioClientTransport`; Docker HTTP launches a labeled container on the configured DIND network and connects from the owner to its private endpoint. Do not start an HTTP bridge for stdio and do not publish container endpoints outside owner memory.
 
-  `acquire` reserves, resolves credentials, starts/connects, discovers, computes the complete capability fingerprint, then publishes ready. Any error closes/reaps before compare-and-delete. Renewal checks Redis; failure transitions the local record to draining and rejects new work. Reconciliation enumerates local child/container labels and owned leases, reaps resources with no exact live fence, and never deletes another generation.
+  `acquire` sends the runtime key plus local candidate owner identity/address to `reserve`; it never fabricates or requires a prior fence. If a matching ready lease exists, return it. If the candidate wins a new reservation, use its returned fence to resolve credentials, start/connect, discover, compute the complete capability fingerprint, and publish ready. Any error closes/reaps before fenced compare-and-delete. Renewal checks Redis; failure transitions the local record to draining and rejects new work. Reconciliation enumerates local child/container labels and owned leases, reaps resources with no exact live fence, and never deletes another lease generation. Redis failover is accepted only after rediscovery matches the immutable capability fingerprint; it does not mint authority merely because ownership changed.
 
 - [ ] **Step 4: Run GREEN**
 
@@ -286,11 +286,11 @@
 **Interfaces:**
 
 - `McpRuntimeRouter.execute(ref, operation)` calls the manager directly when owner ID/epoch match; otherwise it sends one bounded authenticated request to `ref.ownerAddress`.
-- Internal routes expose acquire/discover/invoke/read/getPrompt/renew/release/health only on the private runtime listener and reject any stale or mismatched fence before touching a client.
+- Internal routes expose acquire/discover/invoke/read/getPrompt/renew/release/health only on the private runtime listener. `acquire` validates an unfenced runtime key plus candidate owner and returns a current/new reference; every other route rejects a missing, stale, or mismatched returned fence before touching a client.
 
 - [ ] **Step 1: Write RED routing/auth tests**
 
-  Assert local ownership performs zero HTTP calls; remote ownership performs exactly one call to the persisted direct address; the configured generic/load-balanced worker alias and non-private/invalid addresses are rejected; internal auth is mandatory; request bodies reject resolved credentials; stale generation receives conflict/fenced status; cancellation disconnects only the target operation.
+  Assert initial acquisition contains no fence and can atomically return a new ready reference. Assert local post-acquire ownership performs zero HTTP calls; remote ownership performs exactly one call to the persisted direct address; the configured generic/load-balanced worker alias and non-private/invalid addresses are rejected; internal auth is mandatory; request bodies reject resolved credentials; missing/stale lease generation on post-acquire calls receives conflict/fenced status; cancellation disconnects only the target operation.
 
 - [ ] **Step 2: Run RED**
 
@@ -341,7 +341,7 @@
 
 - [ ] **Step 1: Write RED complete-catalog and secret-boundary tests**
 
-  Assert tools, resources, templates, and prompts survive worker normalization and backend persistence with metadata. Verify resource contents and expanded prompts are absent from discovery. Rotate credential generation and prove a new runtime/snapshot is created. Assert no resolved secret, endpoint authorization header, owner address, PID, or container ID appears in workflow inputs/results or persisted snapshot.
+  Assert tools, resources, templates, and prompts survive worker normalization and backend persistence with metadata. Verify resource contents and expanded prompts are absent from discovery. Rotate credential generation and prove a new runtime/config identity and snapshot are created. Separately fail over an unchanged runtime to a new owner epoch/lease generation and prove the existing grant, snapshot ID, config fingerprint, and capability fingerprint remain unchanged. Assert no resolved secret, endpoint authorization header, owner address, owner epoch, lease generation, PID, or container ID appears in workflow inputs/results or persisted snapshot.
 
 - [ ] **Step 2: Run RED**
 
@@ -351,7 +351,7 @@
 
 - [ ] **Step 3: Cut discovery callers over**
 
-  Replace the v1 client bodies in worker discovery and backend onboarding with the runtime workflow. Make `server/discover` decide which family lists run, preserve all normalized descriptors, compute the binding/capability fingerprint from the full sorted catalog and credential/config generation, and retain immutable grant/snapshot semantics. Cache only by the complete auth partition; a catalog from one principal must never satisfy another.
+  Replace the v1 client bodies in worker discovery and backend onboarding with the runtime workflow. Make `server/discover` decide which family lists run, preserve all normalized descriptors, compute the binding/capability fingerprint from the full sorted catalog and credential/config generation, and retain immutable grant/snapshot semantics. Explicitly omit owner address/ID/epoch, lease generation/state/expiry, and process/container data from authority-key and config-fingerprint projections. Cache only by the complete auth partition; a catalog from one principal must never satisfy another.
 
 - [ ] **Step 4: Run GREEN and regenerate route artifacts if onboarding routes change**
 
@@ -398,7 +398,7 @@
 
 - [ ] **Step 1: Write RED migration, repository, Workflow, and gateway tests**
 
-  Cover generic operation kind/target persistence, old tool-row backfill, nullable `tool_name` compatibility, exact run/org/snapshot/grant scope, duplicate Update replay, stale refs, resource/prompt authorization from the immutable snapshot, cancellation, and handler draining. Verify an owner death after `dispatched` becomes ambiguous and does not produce attempt 2; a pre-dispatch owner failure may safely reacquire between calls.
+  Cover generic operation kind/target persistence, old tool-row backfill, nullable `tool_name` compatibility, exact run/org/snapshot/grant scope, duplicate Update replay, stale refs, resource/prompt authorization from the immutable snapshot, cancellation, and handler draining. Verify each attempt records the exact runtime ID, owner ID, owner epoch, and lease generation used for dispatch, separately from grant/snapshot/config identity. An owner death after `dispatched` becomes ambiguous and does not produce attempt 2; a pre-dispatch owner failure may safely reacquire between calls with a greater lease generation while retaining the unchanged snapshot.
 
   Gateway tests must prove external tools no longer call the backend v1 pool, `registerResource`/resource-template callbacks authorize and dispatch `resource-read`, and `registerPrompt` dispatches `prompt-get`. All three reject a changed live binding fingerprint before the Workflow Update.
 
@@ -410,9 +410,9 @@
 
 - [ ] **Step 3: Generalize persistence without breaking old histories**
 
-  Migration `0011` adds `operation_kind` and `operation_target`, backfills every existing row as `tool-call` from `tool_name`, then makes the new fields non-null. Drop only the `tool_name NOT NULL` constraint; retain/populate `tool_name` for tool calls until all histories that serialize `PreparedInvocationRef.toolName` are retired. Add a kind check and bounded target validation in Zod/service code. Generate and seal the migration using the repository command; do not hand-edit metadata after generation.
+  Migration `0011` adds `operation_kind` and `operation_target`, backfills every existing row as `tool-call` from `tool_name`, then makes the new fields non-null. It also adds nullable current-attempt fence columns (`runtime_id`, `owner_id`, `owner_epoch`, `lease_generation`) to `mcp_invocation_attempts`; they are null while prepared and written atomically by dispatch claim. Drop only the `tool_name NOT NULL` constraint; retain/populate `tool_name` for tool calls until all histories that serialize `PreparedInvocationRef.toolName` are retired. Add a kind check, bounded target validation, and positive lease-generation check in schema/service code. Generate and seal the migration using the repository command; do not hand-edit metadata after generation.
 
-  The dispatch activity resolves no credentials itself. It passes the persisted runtime key/fence and snapshotted capability definition to the router, marks `dispatched` before the first possible upstream byte, maps cancellation/deadline/remote/input-required failures, and settles bounded JSON only. Progress is activity-heartbeated/rate-limited and does not flood Workflow history.
+  The dispatch activity resolves no credentials itself. It first acquires by persisted runtime key plus its local candidate-owner identity, then passes the returned runtime reference and snapshotted capability definition to the dispatch-claim CAS. That CAS writes the exact fence to the current attempt and marks it `dispatched` before the first possible upstream byte. The router invokes only with the same returned fence. Settlement and ambiguity reconciliation compare the attempt-captured fence; a later owner fence cannot settle an earlier attempt. Map cancellation/deadline/remote/input-required failures and settle bounded JSON only. Progress is activity-heartbeated/rate-limited and does not flood Workflow history.
 
 - [ ] **Step 4: Register full facade behavior**
 
@@ -520,6 +520,11 @@
 - Create: `e2e-tests/fixtures/mcp-runtime-fixture.ts`
 - Create: `e2e-tests/mcp-runtime-manager.e2e.test.ts`
 - Create: `e2e-tests/mcp-runtime-owner-loss.e2e.test.ts`
+- Create: `worker/src/temporal/activities/mcp-runtime-placement-test.activity.ts`
+- Create: `worker/src/temporal/workflows/mcp-runtime-placement-test.workflow.ts`
+- Create: `worker/src/temporal/activities/__tests__/mcp-runtime-placement-test.activity.test.ts`
+- Modify: `worker/src/temporal/workers/dev.worker.ts`
+- Modify: `worker/src/temporal/workflows/index.ts`
 - Create: `scripts/mcp-runtime-benchmark.ts`
 - Create: `scripts/mcp-runtime-performance-pair.ts`
 - Create: `scripts/__tests__/mcp-runtime-performance-pair.test.ts`
@@ -530,12 +535,12 @@
 
 **Interfaces:**
 
-- The Compose override runs two workers on the same Temporal queue with distinct stable owner IDs, random process epochs, and unique network aliases/direct addresses (`http://sentris-worker-a:9200` and `http://sentris-worker-b:9200`); neither address is a load-balanced alias.
+- The Compose override runs two ordinary workers plus acceptance-only, worker-specific Temporal activity queues (`sentris-mcp-runtime-test-a` and `sentris-mcp-runtime-test-b`) with distinct stable owner IDs, random process epochs, and unique network aliases/direct addresses (`http://sentris-worker-a:9200` and `http://sentris-worker-b:9200`); neither address is a load-balanced alias. The placement workflow targets these queues explicitly and every activity result reports its observed executor owner ID/epoch.
 - Benchmark artifacts use the existing schema-v2 host/instance/revision identity and fixed 10% comparison function with MCP-specific required metrics.
 
 - [ ] **Step 1: Write RED acceptance and benchmark-runner tests**
 
-  The two-worker test must: acquire on A; execute from an activity on B through one direct hop; exercise complete discovery, tool call, resource read, and prompt get; kill A after a mutating call is marked dispatched; observe ambiguity and no blind retry; reject A's stale epoch after restart; reacquire on B only between calls with a greater generation; rotate credentials and prove cache/runtime isolation; release on B without wrong-worker cleanup.
+  The placement workflow accepts an explicit activity task queue. The acquire activity reports `{ executorOwnerId, executorOwnerEpoch, runtimeRef }`; the invoke activity reports `{ executorOwnerId, executorOwnerEpoch, routedOwnerId, routedOwnerEpoch, route: 'in-process' | 'direct' }`. The two-worker test targets `sentris-mcp-runtime-test-a` to acquire and asserts executor/owner A, then targets `sentris-mcp-runtime-test-b` to execute and asserts executor B, routed owner A, and one direct hop. Exercise complete discovery, tool call, resource read, and prompt get. Block a mutating fixture call after its attempt is marked dispatched, kill A, observe ambiguity and no blind retry, and reject A's stale epoch after restart. With A unavailable and the lease expired, target B's queue for unfenced reacquisition; assert executor/owner B and a greater lease generation while grant/snapshot/config/capability identity is unchanged. Rotate credentials separately and prove cache/runtime isolation; release from an activity explicitly placed on B without wrong-worker cleanup.
 
   Add modern stateless HTTP, legacy sessionful HTTP, host stdio, and Docker/DIND fixtures. Add cancellation, total timeout despite progress, and unknown-outcome cases. The benchmark runner test rejects mismatched host/instance/trust profile/sample counts and fails exactly above 10%.
 
@@ -548,7 +553,7 @@
 
 - [ ] **Step 3: Implement deterministic full-Compose harness**
 
-  Extend `docker/docker-compose.full.yml` only through the new override: give the existing `worker` the unique `sentris-worker-a` network alias and add `worker-b` with `sentris-worker-b`; both use shared Redis/Postgres/Temporal/DIND and separate direct runtime listener addresses. Health waits for both listeners. Do not use `container_name` scaling tricks or expose the runtime listener publicly.
+  Extend `docker/docker-compose.full.yml` only through the new override: give the existing `worker` the unique `sentris-worker-a` network alias and add `worker-b` with `sentris-worker-b`; both use shared Redis/Postgres/Temporal/DIND and separate direct runtime listener addresses. Under an explicit E2E-only environment flag, A starts an activity-only Temporal worker polling `sentris-mcp-runtime-test-a` and B starts one polling `sentris-mcp-runtime-test-b`; production/default startup does not create these queues. The deterministic placement workflow uses its input queue in `proxyActivities({ taskQueue })`, and placement activities read the boot-generated owner identity from the real runtime manager rather than accepting an asserted ID from test input. Health waits for both listeners and both test pollers. Do not use `container_name` scaling tricks or expose the runtime listener publicly.
 
   `scripts/mcp-runtime-performance-pair.ts` follows the existing safe paired-checkout runner: exact clean baseline and candidate SHAs, two separate source roots, same host fingerprint/instance/trust profile, Compose cleanup, and artifacts outside both worktrees. Collect at least 50 warmups plus 500 measured serial samples for `mcp.catalog`, `mcp.tool_call`, `mcp.resource_read`, `mcp.prompt_get`, and the existing representative agent-turn path, with median and p95 metrics. Use the same deterministic fixture and payload in both revisions.
 
@@ -562,7 +567,7 @@
   docker compose -f docker/docker-compose.full.yml -f docker/docker-compose.mcp-runtime-two-worker.yml down
   ```
 
-  Expected: both workers healthy; direct cross-owner call succeeds; stale epoch/generation fails; killed-owner call is ambiguous exactly once; all capability families work; no resolved secret appears in Redis/Postgres/Temporal payload inspection.
+  Expected: both workers and both placement queues are healthy; observed acquire executor/owner is A; observed invoke executor is B and routed owner is A through exactly one direct hop; stale epoch/lease generation fails; killed-owner call is ambiguous exactly once; observed reacquire executor/owner is B with a higher lease generation and unchanged authority/snapshot identity; all capability families work; no resolved secret appears in Redis/Postgres/Temporal payload inspection.
 
 - [ ] **Step 5: Run the paired performance gate**
 
@@ -579,7 +584,7 @@
 - [ ] **Step 6: Commit**
 
   ```powershell
-  git add docker/docker-compose.mcp-runtime-two-worker.yml e2e-tests scripts package.json worker/src/mcp-runtime/mcp-runtime-metrics.ts docs/MULTI-INSTANCE-DEV.mdx
+  git add docker/docker-compose.mcp-runtime-two-worker.yml e2e-tests scripts package.json worker/src/mcp-runtime/mcp-runtime-metrics.ts worker/src/temporal/activities/mcp-runtime-placement-test.activity.ts worker/src/temporal/activities/__tests__/mcp-runtime-placement-test.activity.test.ts worker/src/temporal/workflows/mcp-runtime-placement-test.workflow.ts worker/src/temporal/workflows/index.ts worker/src/temporal/workers/dev.worker.ts docs/MULTI-INSTANCE-DEV.mdx
   git commit -s -m "test: verify distributed MCP runtime ownership"
   ```
 
