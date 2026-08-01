@@ -14,6 +14,7 @@ export type AgentReadinessState =
   | 'error';
 
 export interface AgentReadinessRow {
+  id?: string;
   kind: AgentReadinessKind;
   state: AgentReadinessState;
   label: string;

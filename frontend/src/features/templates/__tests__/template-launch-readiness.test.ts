@@ -313,6 +313,50 @@ describe('template launch readiness', () => {
     });
   });
 
+  it('blocks mixed Claude Code and generic OAuth configurations regardless of node order', () => {
+    const claude = agent('core.ai.claude-code');
+    const generic = agent('core.ai.agent');
+    const nodeFor = (id: string, type: string) => ({
+      id,
+      type,
+      data: {
+        config: {
+          inputOverrides: {
+            chatModel: {
+              provider: 'anthropic',
+              modelId: 'claude-sonnet-5',
+              authMode: 'subscription_oauth',
+            },
+          },
+        },
+      },
+    });
+    const evaluateOrder = (nodes: Record<string, unknown>[]) =>
+      evaluate(parse({ nodes, edges: [] }, [claude, generic, customMcp])).find(
+        (row) => row.kind === 'model',
+      );
+
+    const claudeFirst = evaluateOrder([
+      nodeFor('claude', claude.id),
+      nodeFor('generic', generic.id),
+    ]);
+    const genericFirst = evaluateOrder([
+      nodeFor('generic', generic.id),
+      nodeFor('claude', claude.id),
+    ]);
+
+    expect(claudeFirst).toMatchObject({
+      state: 'error',
+      blocksCreation: true,
+      label: 'Anthropic · claude-sonnet-5 (2 agents)',
+    });
+    expect(genericFirst).toMatchObject({
+      state: 'error',
+      blocksCreation: true,
+      label: 'Anthropic · claude-sonnet-5 (2 agents)',
+    });
+  });
+
   it('extracts use-all, explicit server, exclusion, and target-agent policy settings', () => {
     const graph = {
       nodes: [

@@ -172,6 +172,11 @@ export function UseTemplateModal({
       return;
     }
 
+    if (isLoading || blocksCreation) {
+      setError('Resolve run readiness issues before creating this workflow.');
+      return;
+    }
+
     try {
       const result = await useTemplateMutation.mutateAsync({
         templateId: template.id,

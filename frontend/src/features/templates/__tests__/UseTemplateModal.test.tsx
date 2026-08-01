@@ -353,6 +353,55 @@ describe('UseTemplateModal', () => {
     });
   });
 
+  it('blocks direct submission when model readiness is unavailable', async () => {
+    mockComponentIndex = undefined;
+    mockComponentsError = Error('offline');
+    renderModal({ graph: modelGraph() });
+
+    fireEvent.submit(screen.getByRole('button', { name: 'Create & Run' }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Resolve run readiness issues/)).toBeTruthy();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('blocks direct submission when required MCP tools are unavailable', async () => {
+    renderModal({ graph: mcpGraph('required') });
+
+    fireEvent.submit(screen.getByRole('button', { name: 'Create & Run' }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Resolve run readiness issues/)).toBeTruthy();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('blocks direct submission when a selected secret mapping is stale', async () => {
+    const rendered = renderModal({ requiredSecrets: [{ name: 'API_KEY', type: 'string' }] });
+
+    fireEvent.change(screen.getByLabelText('API_KEY'), { target: { value: 'secret-api' } });
+    mockSecrets = [
+      {
+        id: 'secret-db',
+        name: 'Database password',
+        createdAt: '2025-01-01T00:00:00Z',
+        updatedAt: '2025-01-01T00:00:00Z',
+      },
+    ];
+    rendered.rerender(
+      <MemoryRouter>
+        <UseTemplateModal {...rendered.props} />
+      </MemoryRouter>,
+    );
+    fireEvent.submit(screen.getByRole('button', { name: 'Create & Run' }).closest('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Resolve run readiness issues/)).toBeTruthy();
+    });
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+  });
+
   it('sends stored secret IDs rather than raw credential values', async () => {
     renderModal({
       requiredSecrets: [{ name: 'API_KEY', type: 'string' }],
@@ -432,6 +481,60 @@ describe('UseTemplateModal', () => {
     expect(screen.getByLabelText('Configuration readiness').textContent).toContain(
       'OpenAI · gpt-5 (2 agents)',
     );
+  });
+
+  it('renders distinct model and MCP readiness rows without duplicate-key warnings', () => {
+    const originalConsoleError = console.error;
+    const consoleError = mock((..._args: unknown[]) => {});
+    console.error = consoleError as typeof console.error;
+
+    try {
+      renderModal({
+        graph: {
+          nodes: [
+            {
+              id: 'mcp-1',
+              type: 'mcp.custom',
+              data: { config: { params: { useAllEnabled: true }, inputOverrides: {} } },
+            },
+            {
+              id: 'openai-agent',
+              type: 'core.ai.agent',
+              data: {
+                config: {
+                  inputOverrides: { chatModel: { provider: 'openai', modelId: 'gpt-5' } },
+                },
+              },
+            },
+            {
+              id: 'gemini-agent',
+              type: 'core.ai.agent',
+              data: {
+                config: {
+                  inputOverrides: {
+                    chatModel: { provider: 'gemini', modelId: 'gemini-3.5-flash' },
+                  },
+                },
+              },
+            },
+          ],
+          edges: [
+            { source: 'mcp-1', target: 'openai-agent', targetHandle: 'tools' },
+            { source: 'mcp-1', target: 'gemini-agent', targetHandle: 'tools' },
+          ],
+        },
+      });
+
+      const readiness = screen.getByLabelText('Configuration readiness').textContent ?? '';
+      expect(readiness).toContain('OpenAI · gpt-5');
+      expect(readiness).toContain('Gemini · gemini-3.5-flash');
+      expect(readiness.match(/MCP tools/g)).toHaveLength(2);
+      expect(
+        consoleError.mock.calls.some((call) => String(call[0]).includes('same key')),
+      ).toBeFalse();
+    } finally {
+      console.error = originalConsoleError;
+    }
   });
 
   it('shows required credentials as needing mapping and disables creation', () => {

@@ -17,10 +17,13 @@ const iconByState = {
 export function ReadinessSummary({ rows }: ReadinessSummaryProps) {
   return (
     <div aria-label="Configuration readiness" className="space-y-1.5 rounded-md border p-2">
-      {rows.map((row) => {
+      {rows.map((row, index) => {
         const Icon = iconByState[row.state];
         return (
-          <div key={row.kind} className="flex items-start gap-2 text-xs">
+          <div
+            key={row.id ?? `${row.kind}:${row.label}:${row.detail}:${index}`}
+            className="flex items-start gap-2 text-xs"
+          >
             <Icon
               aria-hidden="true"
               className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${

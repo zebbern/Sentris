@@ -22,6 +22,14 @@ export interface TemplateModelRequirement {
   rawValue: Record<string, unknown>;
   nodeCount: number;
   supportedAuthModes: readonly LlmAuthMode[];
+  members: readonly TemplateModelRequirementMember[];
+}
+
+interface TemplateModelRequirementMember {
+  componentId: string;
+  inputId: string;
+  rawValue: Record<string, unknown>;
+  supportedAuthModes: readonly LlmAuthMode[];
 }
 
 export interface TemplateMcpRequirement {
@@ -132,9 +140,16 @@ export function parseTemplateLaunchRequirements(
     if (typeof provider !== 'string' || !modelId) continue;
 
     const key = `${provider}\u0000${modelId}`;
+    const member: TemplateModelRequirementMember = {
+      componentId: component.id,
+      inputId: llmInput.id,
+      rawValue,
+      supportedAuthModes: supportedAuthModes(component.id),
+    };
     const existing = models.get(key);
     if (existing) {
-      existing.nodeCount += 1;
+      existing.members = [...existing.members, member];
+      existing.nodeCount = existing.members.length;
       continue;
     }
 
@@ -145,7 +160,8 @@ export function parseTemplateLaunchRequirements(
       modelId,
       rawValue,
       nodeCount: 1,
-      supportedAuthModes: supportedAuthModes(component.id),
+      supportedAuthModes: member.supportedAuthModes,
+      members: [member],
     });
   }
 
@@ -187,6 +203,7 @@ function providerLabel(provider: string): string {
 function modelCatalogRow(state: 'loading' | 'error'): AgentReadinessRow {
   return state === 'loading'
     ? {
+        id: 'template:model-catalog',
         kind: 'model',
         state,
         label: 'Model status unavailable',
@@ -195,6 +212,7 @@ function modelCatalogRow(state: 'loading' | 'error'): AgentReadinessRow {
         blocksExecution: false,
       }
     : {
+        id: 'template:model-catalog',
         kind: 'model',
         state,
         label: 'Model status unavailable',
@@ -264,12 +282,16 @@ export function evaluateTemplateLaunchReadiness(input: {
     : input.componentCatalog.error
       ? [modelCatalogRow('error')]
       : input.requirements.models.map((requirement) => {
-          const readiness = evaluateLlmModelReadiness({
-            value: requirement.rawValue,
-            supportedAuthModes: requirement.supportedAuthModes,
-          });
+          const memberReadiness = requirement.members.map((member) =>
+            evaluateLlmModelReadiness({
+              value: member.rawValue,
+              supportedAuthModes: member.supportedAuthModes,
+            }),
+          );
+          const readiness = memberReadiness.find((row) => row.blocksCreation) ?? memberReadiness[0];
           return {
             ...readiness,
+            id: `template:model:${requirement.provider}\u0000${requirement.modelId}`,
             label: `${providerLabel(requirement.provider)} · ${requirement.modelId}${
               requirement.nodeCount > 1 ? ` (${requirement.nodeCount} agents)` : ''
             }`,
@@ -282,11 +304,14 @@ export function evaluateTemplateLaunchReadiness(input: {
           };
         });
 
-  const credentials = evaluateCredentialMappingReadiness({
-    requiredNames: input.requiredSecretNames,
-    mappings: input.secretMappings,
-    secrets: input.secrets,
-  });
+  const credentials = {
+    ...evaluateCredentialMappingReadiness({
+      requiredNames: input.requiredSecretNames,
+      mappings: input.secretMappings,
+      secrets: input.secrets,
+    }),
+    id: 'template:credentials',
+  };
 
   const mcp = input.requirements.mcp.map((requirement) => {
     const readiness = evaluateMcpToolsReadiness({
@@ -298,6 +323,7 @@ export function evaluateTemplateLaunchReadiness(input: {
     });
     return {
       ...readiness,
+      id: `template:mcp:${requirement.mcpNodeId}\u0000${requirement.agentNodeId}`,
       label: requirement.policy === 'best-effort' ? 'MCP tools (optional)' : 'MCP tools',
       detail: mcpDetail({
         requirement,
