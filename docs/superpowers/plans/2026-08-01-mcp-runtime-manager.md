@@ -4,7 +4,7 @@
 
 **Goal:** Replace Sentris's duplicated outbound MCP clients and process-local bridges with one official-v2 client adapter and one worker-owned, lease-fenced runtime manager that durably executes tools, resource reads, and prompt expansion across multiple workers.
 
-**Architecture:** A Temporal activity may land on any worker. Its first `acquire` supplies an auth-partitioned runtime key plus a candidate owner identity/address and atomically receives the current ready runtime reference or a newly reserved owner epoch/lease generation; no pre-existing fence is required to acquire. Every later state-changing or upstream operation supplies that returned fence. The local `McpRuntimeRouter` uses an in-process fast path when the process owns the matching epoch/lease generation and otherwise makes one authenticated request to the lease's instance-unique owner address. Redis contains only ephemeral fenced lease/routing metadata. The owner alone resolves credential references, owns the official MCP client/transport and any stdio/Docker process, and renews or self-fences the lease. Postgres and the run Workflow continue to own immutable authority/catalog identity plus durable operation attempts; owner failover changes only the lease fence, not unchanged authority. Modern `2026-07-28` HTTP is request-stateless. The canonical v2 client also owns initialize-era Streamable HTTP, while any recognized very-old HTTP+SSE fallback remains private to a fresh v2 client/transport.
+**Architecture:** A Temporal activity may land on any worker. Its first `acquire` supplies an auth-partitioned runtime key plus a candidate owner identity/address and atomically receives the current ready runtime reference or a newly reserved owner epoch/lease generation; no pre-existing fence is required to acquire. Every later state-changing or upstream operation supplies that returned fence. The local `McpRuntimeRouter` uses an in-process fast path when the process owns the matching epoch/lease generation and otherwise makes one authenticated request to the lease's instance-unique owner address. Redis lease/routing metadata is ephemeral, while the separate generation counter/tombstone persists for the Redis data epoch to preserve monotonic fencing. The owner alone resolves credential references, owns the official MCP client/transport and any stdio/Docker process, and renews or self-fences the lease. Postgres and the run Workflow continue to own immutable authority/catalog identity plus durable operation attempts; owner failover changes only the lease fence, not unchanged authority. Modern `2026-07-28` HTTP is request-stateless. The canonical v2 client also owns initialize-era Streamable HTTP, while any recognized very-old HTTP+SSE fallback remains private to a fresh v2 client/transport.
 
 **Tech Stack:** TypeScript, Zod 4, NestJS 10, Drizzle/PostgreSQL, Redis 7.4/ioredis, Temporal TypeScript SDK 1.14.1, exact worker dependency `@modelcontextprotocol/client` 2.0.0, backend `@modelcontextprotocol/server`/`@modelcontextprotocol/node` 2.0.0 for the inbound facade, Docker/DIND, Bun.
 
@@ -31,7 +31,7 @@
 - Discovery materializes every advertised family: tools, concrete resources, resource templates, and prompts. `resources/read` and `prompts/get` are runtime operations, not discovery. Cap automatic pagination at the installed client's `listMaxPages: 64` and fail a catalog that exceeds it rather than silently truncating.
 - Preserve the current immutable grant/snapshot and binding-fingerprint rules. Authority/config identity is derived only from execution scope, source binding/config fingerprint, auth partition, credential reference/generation, negotiated protocol identity, and the complete capability fingerprint. Owner ID/address/epoch, lease generation/state/expiry, PID, and container identity are excluded. Owner failover increments only `leaseGeneration` and reuses unchanged authority/snapshot IDs after rediscovery confirms the same capability fingerprint. A real credential/config/protocol/capability change mints new authority; it never changes an existing snapshot.
 - Use the canonical v2 client for modern and initialize-era Streamable HTTP. An HTTP `400`, `404`, or `405` whose body is empty or is not a recognized modern JSON-RPC error may create a fresh v2 `Client` with the deprecated v2 `SSEClientTransport`; never fall back on authentication failures, timeouts, or arbitrary 5xx responses. Do not add a v1 outbound adapter unless a conformance test proves a supported incompatibility and the user explicitly approves that new seam. Compatibility session objects never escape the adapter.
-- Treat SDK-normalized results as the public contract; do not depend on a visible wire `resultType: 'complete'`. Server self-information is metadata/accessor state and must never become an authentication, authorization, cache, or runtime-identity key.
+- Treat SDK-normalized results as the public contract; do not depend on a visible wire `resultType: 'complete'`. Server self-information is metadata/accessor state and must never determine Sentris authority identity, authorization-partition/cache-store ownership, credential selection, or runtime identity. The SDK may use it internally to namespace entries inside an already authorization-isolated per-client cache store.
 - No mandatory managed service may be introduced. Use the existing Redis, Postgres, Temporal, and worker processes for the normal locally hosted path.
 - Temporal fairness remains optional/preview and is not required for normal local hosting. Preserve organization scope in durable attempt and scheduling contracts so fairness can be enabled later only when measured backlog evidence justifies it.
 - Use TDD for each behavior change: focused test first, observe the intended RED, implement the smallest complete behavior, rerun GREEN, then typecheck the affected package. Do not update snapshots merely to make failures disappear.
@@ -135,7 +135,7 @@
 
   Use official in-process fixtures to prove: explicit auto negotiation reaches modern `2026-07-28`; modern HTTP sends independent requests without session/resume state; the same canonical v2 client handles initialize-era sessionful Streamable HTTP; stdio negotiates once and owns its child; and only HTTP `400`, `404`, or `405` with an empty/unrecognized-modern-error body can create a fresh v2 client with the deprecated v2 `SSEClientTransport`. Prove authentication failures, timeouts, recognized modern JSON-RPC errors, and arbitrary 5xx responses never fall back. Cover all four list families, `callTool` with the snapshotted `toolDefinition`, `readResource`, `getPrompt`, normalized named result variants without relying on a visible wire `resultType: 'complete'`, and the 64-page cap.
 
-  Also test a distinct client and cache store for each complete authorization partition, defense-in-depth `cachePartition`, bounded auth-scoped `prior` expiry, credential-generation invalidation, 401 refresh bounded to one SDK retry, cancellation, idle timeout, `maxTotalTimeout`, Sentris-owned monotonic/rate-limited progress, and typed input-required rejection. Prove server self-information is retained only as metadata and cannot select credentials, authorization, cache partitions, or runtime identity.
+  Also test a distinct client and cache store for each complete authorization partition, defense-in-depth `cachePartition`, bounded auth-scoped `prior` expiry, credential-generation invalidation, 401 refresh bounded to one SDK retry, cancellation, idle timeout, `maxTotalTimeout`, Sentris-owned monotonic/rate-limited progress, and typed input-required rejection. Prove server self-information is retained as metadata and may namespace SDK-internal entries only after the client/cache-store ownership boundary is selected; it cannot select credentials, Sentris authorization partitions/cache ownership, authority, or runtime identity.
 
 - [ ] **Step 2: Run RED**
 
@@ -351,6 +351,16 @@
 
 - [ ] **Step 1: Write RED complete-catalog and secret-boundary tests**
 
+  Before changing a Task 6 path, assert that the index and scoped paths are clean, then persist the exact task-base SHA in the ignored execution-ledger directory. If a scoped path already has user changes, stop and coordinate instead of absorbing them into this task.
+
+  ```powershell
+  $task6BaseFile='.superpowers/sdd/2026-08-01-mcp-runtime-manager/task-6-base.txt'
+  $task6Scope=@('worker/src/temporal/activities/mcp-discovery.activity.ts','worker/src/temporal/workers/dev.worker.ts','worker/src/temporal/workflows/mcp-discovery-workflow.ts','worker/src/temporal/workflows/index.ts','backend/src/mcp-runtime/mcp-run-catalog.service.ts','backend/src/mcp/mcp-discovery-orchestrator.service.ts','backend/src/mcp-servers/mcp-servers.service.ts','packages/shared/src/mcp-capabilities.ts','worker/src/temporal/activities/__tests__/mcp-discovery.activity.test.ts','backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts','backend/src/mcp-servers/__tests__/mcp-servers.service.spec.ts','packages/backend-client')
+  if (@(git diff --cached --name-only).Count -ne 0) { throw 'Task 6 requires a clean index' }
+  if (@(git status --porcelain -- $task6Scope).Count -ne 0) { throw 'Task 6 scoped paths contain pre-existing changes' }
+  git rev-parse HEAD | Set-Content -NoNewline $task6BaseFile
+  ```
+
   Assert tools, resources, templates, and prompts survive worker normalization and backend persistence with metadata. Verify resource contents and expanded prompts are absent from discovery. Rotate credential generation and prove a new runtime/config identity and snapshot are created. Separately fail over an unchanged runtime to a new owner epoch/lease generation and prove the existing grant, snapshot ID, config fingerprint, and capability fingerprint remain unchanged. Assert no resolved secret, endpoint authorization header, owner address, owner epoch, lease generation, PID, or container ID appears in workflow inputs/results or persisted snapshot.
 
 - [ ] **Step 2: Run RED**
@@ -375,8 +385,21 @@
 
 - [ ] **Step 5: Commit**
 
+  Generate the exact Task 6 changed-path manifest from the recorded base and scoped paths. Review its name/status diff, stage only those exact filenames (including deletions), and fail if the cached manifest contains anything else or omits a task change.
+
   ```powershell
-  git add packages/shared/src/mcp-capabilities.ts worker/src/temporal backend/src/mcp-runtime backend/src/mcp backend/src/mcp-servers packages/backend-client
+  $task6BaseFile='.superpowers/sdd/2026-08-01-mcp-runtime-manager/task-6-base.txt'
+  $task6Base=(Get-Content -Raw $task6BaseFile).Trim()
+  if ($task6Base -notmatch '^[0-9a-f]{40}$') { throw 'Invalid Task 6 base SHA' }
+  $task6Scope=@('worker/src/temporal/activities/mcp-discovery.activity.ts','worker/src/temporal/workers/dev.worker.ts','worker/src/temporal/workflows/mcp-discovery-workflow.ts','worker/src/temporal/workflows/index.ts','backend/src/mcp-runtime/mcp-run-catalog.service.ts','backend/src/mcp/mcp-discovery-orchestrator.service.ts','backend/src/mcp-servers/mcp-servers.service.ts','packages/shared/src/mcp-capabilities.ts','worker/src/temporal/activities/__tests__/mcp-discovery.activity.test.ts','backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts','backend/src/mcp-servers/__tests__/mcp-servers.service.spec.ts','packages/backend-client')
+  $task6Manifest=@(git diff --name-only --diff-filter=ACDMRTUXB $task6Base -- $task6Scope | Sort-Object -Unique)
+  if ($task6Manifest.Count -eq 0) { throw 'Task 6 changed-path manifest is empty' }
+  git diff --name-status $task6Base -- $task6Manifest
+  git add -A -- $task6Manifest
+  $cachedManifest=@(git diff --cached --name-only | Sort-Object -Unique)
+  $manifestDelta=@(Compare-Object $task6Manifest $cachedManifest)
+  if ($manifestDelta.Count -ne 0) { $manifestDelta | Format-Table; throw 'Task 6 cached manifest mismatch' }
+  git diff --cached --name-status
   git commit -s -m "feat: discover complete MCP catalogs through runtimes"
   ```
 
@@ -403,7 +426,12 @@
 - Create: `worker/src/temporal/workflows/__tests__/fixtures/mcp-operation-update/pre-task7-patch-true-in-flight.json`
 - Create: `worker/src/temporal/workflows/__tests__/fixtures/mcp-operation-update/candidate-generic-patch-true.json`
 - Modify: `packages/shared/src/mcp-invocation.ts`
-- Modify: focused tests beside every modified service/activity/workflow
+- Modify: `packages/shared/src/__tests__/mcp-invocation.test.ts`
+- Modify: `backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts`
+- Modify: `backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts`
+- Modify: `backend/src/mcp/__tests__/mcp-gateway.spec.ts`
+- Modify: `worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts`
+- Modify: `worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts`
 
 **Interfaces:**
 
@@ -411,6 +439,16 @@
 - Preflight creates/claims one Postgres invocation attempt; dispatch uses `McpRuntimeRouter`; settlement CAS-transitions both logical invocation and current attempt.
 
 - [ ] **Step 1: Write RED migration, repository, Workflow, and gateway tests**
+
+  Before changing a Task 7 path, assert that the index and scoped paths are clean, then persist the exact task-base SHA in the ignored execution-ledger directory. If a scoped path already has user changes, stop and coordinate instead of absorbing them into this task.
+
+  ```powershell
+  $task7BaseFile='.superpowers/sdd/2026-08-01-mcp-runtime-manager/task-7-base.txt'
+  $task7Scope=@('backend/src/database/schema/mcp-runtime.ts','backend/migrations/0011_generalize_mcp_runtime_operations.sql','backend/migrations/meta/_journal.json','backend/migrations/meta/0011_snapshot.json','backend/src/database/__tests__/migration.guard.spec.ts','backend/src/mcp-runtime/mcp-runtime.repository.ts','backend/src/mcp-runtime/mcp-invocation.service.ts','backend/src/mcp/mcp-gateway.service.ts','worker/src/temporal/activities/mcp-invocation.activity.ts','worker/src/temporal/workflows/index.ts','worker/src/temporal/workflows/tool-invocation-update-handler.ts','worker/src/temporal/workflows/__tests__/mcp-operation-update-replay.test.ts','worker/src/temporal/workflows/__tests__/fixtures/mcp-operation-update','packages/shared/src/mcp-invocation.ts','packages/shared/src/__tests__/mcp-invocation.test.ts','backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts','backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts','backend/src/mcp/__tests__/mcp-gateway.spec.ts','worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts','worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts')
+  if (@(git diff --cached --name-only).Count -ne 0) { throw 'Task 7 requires a clean index' }
+  if (@(git status --porcelain -- $task7Scope).Count -ne 0) { throw 'Task 7 scoped paths contain pre-existing changes' }
+  git rev-parse HEAD | Set-Content -NoNewline $task7BaseFile
+  ```
 
   Cover generic operation kind/target persistence, old tool-row backfill, nullable `tool_name` compatibility, exact run/org/snapshot/grant scope, duplicate Update replay, stale refs, resource/prompt authorization from the immutable snapshot, cancellation, and handler draining. Preserve organization scope on attempts and scheduling inputs without requiring Temporal's optional/preview fairness feature. Verify each attempt records the exact runtime ID, owner ID, owner epoch, and lease generation used for dispatch, separately from grant/snapshot/config identity. An owner death after `dispatched` becomes ambiguous and does not produce attempt 2; a pre-dispatch owner failure may safely reacquire between calls with a greater lease generation while retaining the unchanged snapshot.
 
@@ -450,8 +488,21 @@
 
 - [ ] **Step 6: Commit**
 
+  Generate the exact Task 7 changed-path manifest from the recorded base and scoped paths. Review its name/status diff, stage only those exact filenames (including deletions), and fail if the cached manifest contains anything else or omits a task change.
+
   ```powershell
-  git add packages/shared/src/mcp-invocation.ts backend/src/database backend/src/mcp-runtime backend/src/mcp backend/migrations worker/src/temporal
+  $task7BaseFile='.superpowers/sdd/2026-08-01-mcp-runtime-manager/task-7-base.txt'
+  $task7Base=(Get-Content -Raw $task7BaseFile).Trim()
+  if ($task7Base -notmatch '^[0-9a-f]{40}$') { throw 'Invalid Task 7 base SHA' }
+  $task7Scope=@('backend/src/database/schema/mcp-runtime.ts','backend/migrations/0011_generalize_mcp_runtime_operations.sql','backend/migrations/meta/_journal.json','backend/migrations/meta/0011_snapshot.json','backend/src/database/__tests__/migration.guard.spec.ts','backend/src/mcp-runtime/mcp-runtime.repository.ts','backend/src/mcp-runtime/mcp-invocation.service.ts','backend/src/mcp/mcp-gateway.service.ts','worker/src/temporal/activities/mcp-invocation.activity.ts','worker/src/temporal/workflows/index.ts','worker/src/temporal/workflows/tool-invocation-update-handler.ts','worker/src/temporal/workflows/__tests__/mcp-operation-update-replay.test.ts','worker/src/temporal/workflows/__tests__/fixtures/mcp-operation-update','packages/shared/src/mcp-invocation.ts','packages/shared/src/__tests__/mcp-invocation.test.ts','backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts','backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts','backend/src/mcp/__tests__/mcp-gateway.spec.ts','worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts','worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts')
+  $task7Manifest=@(git diff --name-only --diff-filter=ACDMRTUXB $task7Base -- $task7Scope | Sort-Object -Unique)
+  if ($task7Manifest.Count -eq 0) { throw 'Task 7 changed-path manifest is empty' }
+  git diff --name-status $task7Base -- $task7Manifest
+  git add -A -- $task7Manifest
+  $cachedManifest=@(git diff --cached --name-only | Sort-Object -Unique)
+  $manifestDelta=@(Compare-Object $task7Manifest $cachedManifest)
+  if ($manifestDelta.Count -ne 0) { $manifestDelta | Format-Table; throw 'Task 7 cached manifest mismatch' }
+  git diff --cached --name-status
   git commit -s -m "feat: durably dispatch outbound MCP operations"
   ```
 
