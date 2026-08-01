@@ -392,7 +392,12 @@
   $task6Base=(Get-Content -Raw $task6BaseFile).Trim()
   if ($task6Base -notmatch '^[0-9a-f]{40}$') { throw 'Invalid Task 6 base SHA' }
   $task6Scope=@('worker/src/temporal/activities/mcp-discovery.activity.ts','worker/src/temporal/workers/dev.worker.ts','worker/src/temporal/workflows/mcp-discovery-workflow.ts','worker/src/temporal/workflows/index.ts','backend/src/mcp-runtime/mcp-run-catalog.service.ts','backend/src/mcp/mcp-discovery-orchestrator.service.ts','backend/src/mcp-servers/mcp-servers.service.ts','packages/shared/src/mcp-capabilities.ts','worker/src/temporal/activities/__tests__/mcp-discovery.activity.test.ts','backend/src/mcp-runtime/__tests__/mcp-run-catalog.service.spec.ts','backend/src/mcp-servers/__tests__/mcp-servers.service.spec.ts','packages/backend-client')
-  $task6Manifest=@(git diff --name-only --diff-filter=ACDMRTUXB $task6Base -- $task6Scope | Sort-Object -Unique)
+  $task6Manifest=@(
+    @(
+      git diff --name-only --diff-filter=ACDMRTUXB $task6Base -- $task6Scope
+      git ls-files --others --exclude-standard -- $task6Scope
+    ) | Where-Object { $_ } | Sort-Object -Unique
+  )
   if ($task6Manifest.Count -eq 0) { throw 'Task 6 changed-path manifest is empty' }
   git diff --name-status $task6Base -- $task6Manifest
   git add -A -- $task6Manifest
@@ -495,7 +500,12 @@
   $task7Base=(Get-Content -Raw $task7BaseFile).Trim()
   if ($task7Base -notmatch '^[0-9a-f]{40}$') { throw 'Invalid Task 7 base SHA' }
   $task7Scope=@('backend/src/database/schema/mcp-runtime.ts','backend/migrations/0011_generalize_mcp_runtime_operations.sql','backend/migrations/meta/_journal.json','backend/migrations/meta/0011_snapshot.json','backend/src/database/__tests__/migration.guard.spec.ts','backend/src/mcp-runtime/mcp-runtime.repository.ts','backend/src/mcp-runtime/mcp-invocation.service.ts','backend/src/mcp/mcp-gateway.service.ts','worker/src/temporal/activities/mcp-invocation.activity.ts','worker/src/temporal/workflows/index.ts','worker/src/temporal/workflows/tool-invocation-update-handler.ts','worker/src/temporal/workflows/__tests__/mcp-operation-update-replay.test.ts','worker/src/temporal/workflows/__tests__/fixtures/mcp-operation-update','packages/shared/src/mcp-invocation.ts','packages/shared/src/__tests__/mcp-invocation.test.ts','backend/src/mcp-runtime/__tests__/mcp-runtime.repository.spec.ts','backend/src/mcp-runtime/__tests__/mcp-invocation.service.spec.ts','backend/src/mcp/__tests__/mcp-gateway.spec.ts','worker/src/temporal/activities/__tests__/mcp-invocation.activity.test.ts','worker/src/temporal/workflows/__tests__/tool-invocation-update-handler.test.ts')
-  $task7Manifest=@(git diff --name-only --diff-filter=ACDMRTUXB $task7Base -- $task7Scope | Sort-Object -Unique)
+  $task7Manifest=@(
+    @(
+      git diff --name-only --diff-filter=ACDMRTUXB $task7Base -- $task7Scope
+      git ls-files --others --exclude-standard -- $task7Scope
+    ) | Where-Object { $_ } | Sort-Object -Unique
+  )
   if ($task7Manifest.Count -eq 0) { throw 'Task 7 changed-path manifest is empty' }
   git diff --name-status $task7Base -- $task7Manifest
   git add -A -- $task7Manifest
