@@ -79,7 +79,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
         node as Node<FrontendNodeData>,
         edges,
         component,
-        secretsQuery.data,
+        secretsQuery.data ?? [],
       );
 
       warnings.forEach((warning: string) => {

@@ -5,10 +5,17 @@ import type { FrontendNodeData } from '@/schemas/node';
 
 // Control validation warnings per test
 let validationWarningsMap: Record<string, string[]> = {};
-let secretCatalog = { data: [] as { id: string; name: string }[], isLoading: false, error: null };
+let secretCatalog: {
+  data?: { id: string; name: string }[];
+  isLoading: boolean;
+  error: unknown | null;
+} = { data: [], isLoading: false, error: null };
 let mcpServerCatalog = { data: [] as object[], isLoading: false, error: null };
 let mcpToolCatalog = { data: [] as object[], isLoading: false, error: null };
 let mcpQueryEnabledValues: boolean[] = [];
+
+const { getNodeValidationWarnings: realGetNodeValidationWarnings } =
+  await import('@/utils/connectionValidation');
 
 mock.module('@/hooks/queries/useComponentQueries', () => ({
   useComponents: () => ({
@@ -34,6 +41,13 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
           inputs: [],
           outputs: [],
           parameters: [],
+        },
+        'core.secret.consumer': {
+          id: 'core.secret.consumer',
+          name: 'Secret Consumer',
+          inputs: [],
+          outputs: [],
+          parameters: [{ id: 'apiKey', label: 'API Key', type: 'secret' }],
         },
         'core.ai.agent': {
           id: 'core.ai.agent',
@@ -86,8 +100,9 @@ mock.module('@/hooks/useIsMobile', () => ({
 }));
 
 mock.module('@/utils/connectionValidation', () => ({
-  getNodeValidationWarnings: (node: Node<FrontendNodeData>) => {
-    return validationWarningsMap[node.id] || [];
+  getNodeValidationWarnings: (...args: Parameters<typeof realGetNodeValidationWarnings>) => {
+    const [node] = args;
+    return validationWarningsMap[node.id] ?? realGetNodeValidationWarnings(...args);
   },
 }));
 
@@ -131,6 +146,20 @@ describe('ValidationDock', () => {
     render(<ValidationDock nodes={nodes} edges={[]} mode="design" onNodeClick={mock(() => {})} />);
 
     expect(mcpQueryEnabledValues).toEqual([false, false]);
+  });
+
+  it('keeps ordinary missing-secret warnings visible while the secret catalog is loading', () => {
+    secretCatalog = { data: undefined, isLoading: true, error: null };
+    const consumer = createNode('consumer', 'core.secret.consumer', 'Secret Consumer');
+    consumer.data.config.params = { apiKey: 'deleted-secret' };
+
+    render(
+      <ValidationDock nodes={[consumer]} edges={[]} mode="design" onNodeClick={mock(() => {})} />,
+    );
+
+    expect(
+      screen.getByText('· Parameter "API Key" refers to a missing secret'),
+    ).toBeInTheDocument();
   });
 
   it('prompts for a runnable step when the graph only contains the entry point', () => {
