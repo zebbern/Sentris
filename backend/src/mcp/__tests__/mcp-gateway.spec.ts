@@ -12,6 +12,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { z } from 'zod';
 
 import type { StoredMcpAuthority } from '../../mcp-runtime/mcp-runtime.repository';
+import { computeMcpBindingFingerprint } from '../../mcp-runtime/mcp-binding-fingerprint';
 import { McpGatewayService } from '../mcp-gateway.service';
 import type { McpLegacyOutboundCompatibilityService } from '../mcp-legacy-outbound-compatibility.service';
 import type { RunMcpRequestContext } from '../run-mcp-request-context';
@@ -273,8 +274,8 @@ describe('McpGatewayService', () => {
   );
 
   it('calls an external snapshot descriptor through its source mapping and named v1 adapter', async () => {
-    mcpRuntimeRepository.getAuthority.mockResolvedValue(externalAuthority());
-    const immutableSource = externalSource('external-node', 'Renamed Live Source');
+    const immutableSource = externalSource('external-node', 'Snapshot Server');
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(externalAuthority(immutableSource));
     (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
       externalSource('unrelated-node', 'Unrelated'),
       immutableSource,
@@ -314,6 +315,19 @@ describe('McpGatewayService', () => {
     expect(called.content).toEqual([{ type: 'text', text: 'proxied' }]);
     expect(toolRegistry.getServerTools).not.toHaveBeenCalled();
     expect(temporalService.executeWorkflowUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects an external snapshot when its live binding fingerprint changed', async () => {
+    const snapshottedSource = externalSource('external-node', 'Snapshot Server');
+    mcpRuntimeRepository.getAuthority.mockResolvedValue(externalAuthority(snapshottedSource));
+    (toolRegistry.getToolsForRun as ReturnType<typeof jest.fn>).mockResolvedValue([
+      externalSource('external-node', 'Snapshot Server', 'http://127.0.0.1:10/mcp'),
+    ]);
+
+    await expect(service.createServerForRun(DURABLE_RUN_CONTEXT)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(legacyOutbound.callTool).not.toHaveBeenCalled();
   });
 
   it('rejects a snapshot, grant, run, or organization mismatch before tool registration', async () => {
@@ -486,7 +500,15 @@ function externalSource(
   toolName = 'External Server',
   endpoint = 'http://127.0.0.1:9/mcp',
 ) {
-  return { nodeId, toolName, type: 'mcp-server', endpoint, status: 'ready' };
+  return {
+    nodeId,
+    toolName,
+    type: 'mcp-server',
+    endpoint,
+    status: 'ready',
+    description: `MCP server: ${toolName}`,
+    inputSchema: { type: 'object', properties: {} },
+  };
 }
 
 function withRunContext(overrides: Partial<RunMcpRequestContext>): RunMcpRequestContext {
@@ -537,33 +559,44 @@ function componentAuthority(): StoredMcpAuthority {
   ]);
 }
 
-function externalAuthority(): StoredMcpAuthority {
-  return authorityFor([
+function externalAuthority(
+  source = externalSource('external-node', 'Snapshot Server'),
+): StoredMcpAuthority {
+  const tool = {
+    canonicalName: 'Snapshot_Server__lookup_events',
+    displayName: 'Immutable lookup',
+    title: 'Immutable lookup',
+    description: 'Search the snapshotted upstream tool',
+    inputSchema: {
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true },
+    meta: { 'x-source': 'snapshot' },
+    source: {
+      kind: 'mcp',
+      sourceId: 'external-node',
+      nodeId: 'external-node',
+      upstreamName: 'lookup.events',
+      bindingFingerprint: '',
+    },
+    effects: 'read-only',
+    effectsSource: 'mcp-annotation',
+    retryPolicy: 'reviewed-idempotent',
+  } satisfies StoredMcpAuthority['snapshot']['tools'][number];
+  tool.source.bindingFingerprint = computeMcpBindingFingerprint(source, [
     {
-      canonicalName: 'Snapshot_Server__lookup_events',
-      displayName: 'Immutable lookup',
-      title: 'Immutable lookup',
-      description: 'Search the snapshotted upstream tool',
-      inputSchema: {
-        type: 'object',
-        properties: { query: { type: 'string' } },
-        required: ['query'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: true },
-      meta: { 'x-source': 'snapshot' },
-      source: {
-        kind: 'mcp',
-        sourceId: 'external-node',
-        nodeId: 'external-node',
-        upstreamName: 'lookup.events',
-        bindingFingerprint: 'b'.repeat(64),
-      },
-      effects: 'read-only',
-      effectsSource: 'mcp-annotation',
-      retryPolicy: 'reviewed-idempotent',
+      name: tool.source.upstreamName,
+      title: tool.title,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
+      _meta: tool.meta,
     },
   ]);
+  return authorityFor([tool]);
 }
 
 function authorityFor(tools: StoredMcpAuthority['snapshot']['tools']): StoredMcpAuthority {

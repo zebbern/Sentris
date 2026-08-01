@@ -24,6 +24,7 @@ import {
 import { z } from 'zod';
 
 import { McpServersRepository } from '../mcp-servers/mcp-servers.repository';
+import { computeMcpBindingFingerprint } from '../mcp-runtime/mcp-binding-fingerprint';
 import { McpRuntimeRepository } from '../mcp-runtime/mcp-runtime.repository';
 import {
   claimMcpToolName,
@@ -138,6 +139,11 @@ export class McpGatewayService {
     })[],
   ): Promise<Map<string, RegisteredTool>> {
     const requiredSourceIds = new Set(descriptors.map((descriptor) => descriptor.source.sourceId));
+    const descriptorsBySource = new Map<string, typeof descriptors>();
+    for (const descriptor of descriptors) {
+      const sourceId = descriptor.source.sourceId;
+      descriptorsBySource.set(sourceId, [...(descriptorsBySource.get(sourceId) ?? []), descriptor]);
+    }
     const registered = await this.toolRegistry.getToolsForRun(runId);
     const sources = new Map<string, RegisteredTool>();
     for (const source of registered) {
@@ -149,6 +155,30 @@ export class McpGatewayService {
       }
       if (sources.has(source.nodeId)) {
         throw new ForbiddenException(`Duplicate MCP runtime source mapping: ${source.nodeId}`);
+      }
+      const snapshotDescriptors = descriptorsBySource.get(source.nodeId) ?? [];
+      const expectedFingerprint = snapshotDescriptors[0]?.source.bindingFingerprint;
+      if (
+        !expectedFingerprint ||
+        snapshotDescriptors.some(
+          (descriptor) => descriptor.source.bindingFingerprint !== expectedFingerprint,
+        )
+      ) {
+        throw new ForbiddenException(
+          `External MCP source ${source.nodeId} has inconsistent snapshot bindings`,
+        );
+      }
+      const currentFingerprint = computeMcpBindingFingerprint(
+        source,
+        snapshotDescriptors
+          .slice()
+          .sort((left, right) => left.source.upstreamName.localeCompare(right.source.upstreamName))
+          .map(externalSnapshotRegistrationDescriptor),
+      );
+      if (currentFingerprint !== expectedFingerprint) {
+        throw new ForbiddenException(
+          `External MCP source ${source.nodeId} no longer matches its immutable snapshot binding`,
+        );
       }
       sources.set(source.nodeId, source);
     }
@@ -546,6 +576,23 @@ export class McpGatewayService {
       this.logger.error(`Failed to log tool call: ${error}`);
     }
   }
+}
+
+function externalSnapshotRegistrationDescriptor(
+  descriptor: ToolDescriptor & {
+    source: Extract<ToolDescriptor['source'], { kind: 'mcp' }>;
+  },
+): McpToolRegistrationDescriptor {
+  return {
+    name: descriptor.source.upstreamName,
+    ...(descriptor.title !== undefined && { title: descriptor.title }),
+    ...(descriptor.description !== undefined && { description: descriptor.description }),
+    inputSchema: descriptor.inputSchema,
+    ...(descriptor.outputSchema !== undefined && { outputSchema: descriptor.outputSchema }),
+    ...(descriptor.icons !== undefined && { icons: descriptor.icons }),
+    ...(descriptor.annotations !== undefined && { annotations: descriptor.annotations }),
+    ...(descriptor.meta !== undefined && { _meta: descriptor.meta }),
+  };
 }
 
 function isNodeAllowed(nodeId: string, allowedNodeIds: readonly string[]): boolean {
