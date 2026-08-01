@@ -294,7 +294,8 @@ export async function runComponentActivity(
 
     await resolveLlmProviderModelOverrides(resolvedInputs, {
       secrets,
-      componentId: action.componentId,
+      component,
+      resolvedParams,
       organizationId,
     });
 

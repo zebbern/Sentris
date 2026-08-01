@@ -12,6 +12,7 @@ import {
   type ComponentPortMetadata,
   type ISecretsService,
 } from '@sentris/component-sdk';
+import { llmProviderContractName } from '@sentris/contracts';
 import { workflowDiagnosticLog } from '../workflow-diagnostics';
 
 /**
@@ -88,95 +89,124 @@ export async function resolveSecretInputOverrides(
   }
 }
 
-const AGENT_MODEL_COMPONENT_IDS = new Set(['core.ai.opencode', 'core.ai.claude-code']);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
- * Resolve `apiKeySecretId` / `oauthTokenSecretId` on inline LLM provider model overrides for agent nodes.
+ * Resolve `apiKeySecretId` / `oauthTokenSecretId` on every input with the LLM provider contract.
  */
 export async function resolveLlmProviderModelOverrides(
   inputs: Record<string, unknown>,
   options: {
     secrets: ISecretsService | undefined;
-    componentId: string;
+    component: ComponentDefinition;
+    resolvedParams: Record<string, unknown>;
     organizationId?: string | null;
   },
 ): Promise<void> {
-  const { secrets, componentId } = options;
+  const { secrets, component, resolvedParams } = options;
   const scopedSecrets = secrets?.forOrganization(options.organizationId ?? null);
-  if (!scopedSecrets || !AGENT_MODEL_COMPONENT_IDS.has(componentId)) {
+  if (!scopedSecrets) {
     return;
   }
 
-  const model = inputs.model;
-  if (!isRecord(model)) {
-    return;
+  let inputsSchema = component.inputs;
+  if (typeof component.resolvePorts === 'function') {
+    try {
+      const resolved = component.resolvePorts(resolvedParams);
+      if (resolved?.inputs) {
+        inputsSchema = resolved.inputs;
+      }
+    } catch (_err: unknown) {
+      console.warn('[Activity] Failed to resolve ports for LLM provider credential check');
+    }
   }
 
-  const authMode = model.authMode === 'subscription_oauth' ? 'subscription_oauth' : 'api_key';
+  const llmProviderInputs = extractPorts(inputsSchema).filter(
+    (portMeta: ComponentPortMetadata) =>
+      portMeta.connectionType?.kind === 'contract' &&
+      portMeta.connectionType.name === llmProviderContractName,
+  );
 
-  if (authMode === 'subscription_oauth') {
-    const oauthSecretId = model.oauthTokenSecretId;
-    if (typeof oauthSecretId !== 'string' || oauthSecretId.trim().length === 0) {
-      return;
+  for (const portMeta of llmProviderInputs) {
+    const model = inputs[portMeta.id];
+    if (!isRecord(model)) {
+      continue;
     }
 
-    const existingOauthToken = model.oauthToken;
-    if (typeof existingOauthToken === 'string' && existingOauthToken.trim().length > 0) {
-      return;
+    const authMode = model.authMode === 'subscription_oauth' ? 'subscription_oauth' : 'api_key';
+
+    if (authMode === 'subscription_oauth') {
+      const oauthSecretId = model.oauthTokenSecretId;
+      if (typeof oauthSecretId !== 'string' || oauthSecretId.trim().length === 0) {
+        continue;
+      }
+
+      const existingOauthToken = model.oauthToken;
+      if (typeof existingOauthToken === 'string' && existingOauthToken.trim().length > 0) {
+        continue;
+      }
+
+      try {
+        workflowDiagnosticLog(
+          `[Activity] Resolving LLM provider oauthTokenSecretId for input '${portMeta.id}'...`,
+        );
+        const resolved = await scopedSecrets.get(oauthSecretId.trim());
+        if (resolved?.value) {
+          inputs[portMeta.id] = {
+            ...model,
+            oauthToken: resolved.value,
+          };
+          workflowDiagnosticLog(
+            `[Activity] Successfully resolved LLM provider oauthTokenSecretId for input '${portMeta.id}'`,
+          );
+        } else {
+          console.warn(
+            `[Activity] Secret reference not found in store for ${portMeta.id}.oauthTokenSecretId`,
+          );
+        }
+      } catch (err: unknown) {
+        console.warn(
+          `[Activity] Error resolving ${portMeta.id}.oauthTokenSecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
+        );
+      }
+      continue;
+    }
+
+    const secretId = model.apiKeySecretId;
+    if (typeof secretId !== 'string' || secretId.trim().length === 0) {
+      continue;
+    }
+
+    const existingApiKey = model.apiKey;
+    if (typeof existingApiKey === 'string' && existingApiKey.trim().length > 0) {
+      continue;
     }
 
     try {
       workflowDiagnosticLog(
-        '[Activity] Resolving LLM provider oauthTokenSecretId for model input...',
+        `[Activity] Resolving LLM provider apiKeySecretId for input '${portMeta.id}'...`,
       );
-      const resolved = await scopedSecrets.get(oauthSecretId.trim());
+      const resolved = await scopedSecrets.get(secretId.trim());
       if (resolved?.value) {
-        inputs.model = {
+        inputs[portMeta.id] = {
           ...model,
-          oauthToken: resolved.value,
+          apiKey: resolved.value,
         };
-        workflowDiagnosticLog('[Activity] Successfully resolved LLM provider oauthTokenSecretId');
+        workflowDiagnosticLog(
+          `[Activity] Successfully resolved LLM provider apiKeySecretId for input '${portMeta.id}'`,
+        );
       } else {
-        console.warn('[Activity] Secret reference not found in store for model.oauthTokenSecretId');
+        console.warn(
+          `[Activity] Secret reference not found in store for ${portMeta.id}.apiKeySecretId`,
+        );
       }
     } catch (err: unknown) {
       console.warn(
-        `[Activity] Error resolving model.oauthTokenSecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
+        `[Activity] Error resolving ${portMeta.id}.apiKeySecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
       );
     }
-    return;
-  }
-
-  const secretId = model.apiKeySecretId;
-  if (typeof secretId !== 'string' || secretId.trim().length === 0) {
-    return;
-  }
-
-  const existingApiKey = model.apiKey;
-  if (typeof existingApiKey === 'string' && existingApiKey.trim().length > 0) {
-    return;
-  }
-
-  try {
-    workflowDiagnosticLog('[Activity] Resolving LLM provider apiKeySecretId for model input...');
-    const resolved = await scopedSecrets.get(secretId.trim());
-    if (resolved?.value) {
-      inputs.model = {
-        ...model,
-        apiKey: resolved.value,
-      };
-      workflowDiagnosticLog('[Activity] Successfully resolved LLM provider apiKeySecretId');
-    } else {
-      console.warn('[Activity] Secret reference not found in store for model.apiKeySecretId');
-    }
-  } catch (err: unknown) {
-    console.warn(
-      `[Activity] Error resolving model.apiKeySecretId: ${err instanceof Error ? err.message : 'unknown error'}`,
-    );
   }
 }
 

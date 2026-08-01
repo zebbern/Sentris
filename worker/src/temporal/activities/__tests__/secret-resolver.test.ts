@@ -299,10 +299,19 @@ describe('resolveSecretInputOverrides', () => {
 });
 
 describe('resolveLlmProviderModelOverrides', () => {
-  it('resolves apiKeySecretId on model input for agent components', async () => {
+  it('resolves a canonical API-key reference on a nonstandard LLM input ID', async () => {
     const secrets = createMockSecrets({ 'anthropic-key': 'sk-ant-test' });
+    const component = createComponent({
+      inputPorts: [
+        {
+          id: 'providerConfig',
+          connectionKind: 'contract',
+          connectionName: 'core.ai.llm-provider.v1',
+        },
+      ],
+    });
     const inputs: Record<string, unknown> = {
-      model: {
+      providerConfig: {
         provider: 'anthropic',
         modelId: 'claude-sonnet-4-6',
         apiKeySecretId: 'anthropic-key',
@@ -311,10 +320,12 @@ describe('resolveLlmProviderModelOverrides', () => {
 
     await resolveLlmProviderModelOverrides(inputs, {
       secrets,
-      componentId: 'core.ai.claude-code',
+      component,
+      resolvedParams: {},
+      organizationId: 'org-a',
     });
 
-    expect(inputs.model).toEqual({
+    expect(inputs.providerConfig).toEqual({
       provider: 'anthropic',
       modelId: 'claude-sonnet-4-6',
       apiKeySecretId: 'anthropic-key',
@@ -323,23 +334,59 @@ describe('resolveLlmProviderModelOverrides', () => {
     expect(secrets.get).toHaveBeenCalledWith('anthropic-key');
   });
 
-  it('skips non-agent components', async () => {
-    const secrets = createMockSecrets({ key: 'value' });
+  it('resolves every input whose connection contract is core.ai.llm-provider.v1', async () => {
+    const secrets = createMockSecrets({ first: 'first-key', second: 'second-key' });
+    const component = createComponent({
+      inputPorts: [
+        { id: 'primary', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+        { id: 'fallback', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+      ],
+    });
     const inputs: Record<string, unknown> = {
-      model: { provider: 'anthropic', modelId: 'x', apiKeySecretId: 'key' },
+      primary: { provider: 'openai', modelId: 'gpt-4o-mini', apiKeySecretId: 'first' },
+      fallback: { provider: 'gemini', modelId: 'gemini-3.5-flash', apiKeySecretId: 'second' },
     };
 
     await resolveLlmProviderModelOverrides(inputs, {
       secrets,
-      componentId: 'core.transform.echo',
+      component,
+      resolvedParams: {},
+    });
+
+    expect(inputs.primary).toMatchObject({ apiKey: 'first-key', apiKeySecretId: 'first' });
+    expect(inputs.fallback).toMatchObject({ apiKey: 'second-key', apiKeySecretId: 'second' });
+  });
+
+  it('ignores an object named model when its port has no LLM contract', async () => {
+    const secrets = createMockSecrets({ key: 'from-store' });
+    const component = createComponent({
+      inputPorts: [{ id: 'model', connectionKind: 'primitive', connectionName: 'json' }],
+    });
+    const inputs: Record<string, unknown> = {
+      model: {
+        provider: 'anthropic',
+        modelId: 'claude-sonnet-4-6',
+        apiKeySecretId: 'key',
+      },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      component,
+      resolvedParams: {},
     });
 
     expect((inputs.model as Record<string, unknown>).apiKey).toBeUndefined();
     expect(secrets.get).not.toHaveBeenCalled();
   });
 
-  it('does not overwrite an existing inline apiKey', async () => {
+  it('preserves an already activity-local apiKey', async () => {
     const secrets = createMockSecrets({ key: 'from-store' });
+    const component = createComponent({
+      inputPorts: [
+        { id: 'model', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+      ],
+    });
     const inputs: Record<string, unknown> = {
       model: {
         provider: 'anthropic',
@@ -349,17 +396,19 @@ describe('resolveLlmProviderModelOverrides', () => {
       },
     };
 
-    await resolveLlmProviderModelOverrides(inputs, {
-      secrets,
-      componentId: 'core.ai.opencode',
-    });
+    await resolveLlmProviderModelOverrides(inputs, { secrets, component, resolvedParams: {} });
 
     expect((inputs.model as Record<string, unknown>).apiKey).toBe('inline-key');
     expect(secrets.get).not.toHaveBeenCalled();
   });
 
-  it('resolves oauthTokenSecretId for subscription auth mode', async () => {
+  it('resolves Anthropic oauthTokenSecretId in subscription mode', async () => {
     const secrets = createMockSecrets({ 'claude-oauth': 'oauth-token-value' });
+    const component = createComponent({
+      inputPorts: [
+        { id: 'model', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+      ],
+    });
     const inputs: Record<string, unknown> = {
       model: {
         provider: 'anthropic',
@@ -371,7 +420,8 @@ describe('resolveLlmProviderModelOverrides', () => {
 
     await resolveLlmProviderModelOverrides(inputs, {
       secrets,
-      componentId: 'core.ai.claude-code',
+      component,
+      resolvedParams: {},
     });
 
     expect(inputs.model).toEqual({
@@ -385,8 +435,13 @@ describe('resolveLlmProviderModelOverrides', () => {
     expect(secrets.get).toHaveBeenCalledWith('claude-oauth');
   });
 
-  it('does not resolve apiKeySecretId when subscription auth mode is active', async () => {
+  it('does not inject apiKey in subscription mode', async () => {
     const secrets = createMockSecrets({ key: 'sk-ant-test' });
+    const component = createComponent({
+      inputPorts: [
+        { id: 'model', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+      ],
+    });
     const inputs: Record<string, unknown> = {
       model: {
         provider: 'anthropic',
@@ -399,12 +454,76 @@ describe('resolveLlmProviderModelOverrides', () => {
 
     await resolveLlmProviderModelOverrides(inputs, {
       secrets,
-      componentId: 'core.ai.claude-code',
+      component,
+      resolvedParams: {},
     });
 
     expect(secrets.get).toHaveBeenCalledWith('missing-oauth');
     expect(secrets.get).not.toHaveBeenCalledWith('key');
     expect((inputs.model as Record<string, unknown>).apiKey).toBeUndefined();
+  });
+
+  it('scopes every lookup through forOrganization(organizationId)', async () => {
+    const scopedSecrets = createMockSecrets({ first: 'first-key', second: 'second-key' });
+    const secrets = {
+      forOrganization: vi.fn(() => scopedSecrets),
+      get: vi.fn(async () => {
+        throw new Error('unscoped secret access');
+      }),
+      list: vi.fn(async () => []),
+    } as unknown as ISecretsService;
+    const component = createComponent({
+      inputPorts: [
+        { id: 'firstModel', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+        {
+          id: 'secondModel',
+          connectionKind: 'contract',
+          connectionName: 'core.ai.llm-provider.v1',
+        },
+      ],
+    });
+    const inputs: Record<string, unknown> = {
+      firstModel: { provider: 'openai', modelId: 'gpt-4o-mini', apiKeySecretId: 'first' },
+      secondModel: { provider: 'gemini', modelId: 'gemini-3.5-flash', apiKeySecretId: 'second' },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      component,
+      resolvedParams: {},
+      organizationId: 'org-a',
+    });
+
+    expect(secrets.forOrganization).toHaveBeenCalledWith('org-a');
+    expect(scopedSecrets.get).toHaveBeenCalledWith('first');
+    expect(scopedSecrets.get).toHaveBeenCalledWith('second');
+    expect(secrets.get).not.toHaveBeenCalled();
+  });
+
+  it('uses resolved dynamic ports when resolvePorts() supplies them', async () => {
+    const secrets = createMockSecrets({ dynamic: 'dynamic-key' });
+    const dynamicInputs = buildSchema([
+      { id: 'dynamicModel', connectionKind: 'contract', connectionName: 'core.ai.llm-provider.v1' },
+    ]);
+    const resolvePorts = vi.fn(() => ({ inputs: dynamicInputs }));
+    const component = {
+      id: 'dynamic',
+      label: 'Dynamic',
+      inputs: z.object({}),
+      resolvePorts,
+    } as unknown as ComponentDefinition;
+    const inputs: Record<string, unknown> = {
+      dynamicModel: { provider: 'openai', modelId: 'gpt-4o-mini', apiKeySecretId: 'dynamic' },
+    };
+
+    await resolveLlmProviderModelOverrides(inputs, {
+      secrets,
+      component,
+      resolvedParams: { mode: 'advanced' },
+    });
+
+    expect(resolvePorts).toHaveBeenCalledWith({ mode: 'advanced' });
+    expect(inputs.dynamicModel).toMatchObject({ apiKey: 'dynamic-key', apiKeySecretId: 'dynamic' });
   });
 });
 

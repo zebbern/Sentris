@@ -543,9 +543,9 @@
             "inputOverrides": {
               "chatModel": {
                 "provider": "gemini",
-                "modelId": "gemini-3.5-flash"
-              },
-              "modelApiKey": "{{SECRET:GEMINI_API_KEY}}"
+                "modelId": "gemini-3.5-flash",
+                "apiKeySecretId": "{{SECRET:GEMINI_API_KEY}}"
+              }
             }
           }
         }

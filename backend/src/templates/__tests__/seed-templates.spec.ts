@@ -119,9 +119,13 @@ describe('new seed templates', () => {
     );
     expect(agent.type).toBe('core.ai.agent');
     expect(agent.data.config.inputOverrides).toMatchObject({
-      chatModel: { provider: 'gemini', modelId: 'gemini-3.5-flash' },
-      modelApiKey: '{{SECRET:GEMINI_API_KEY}}',
+      chatModel: {
+        provider: 'gemini',
+        modelId: 'gemini-3.5-flash',
+        apiKeySecretId: '{{SECRET:GEMINI_API_KEY}}',
+      },
     });
+    expect(agent.data.config.inputOverrides.modelApiKey).toBeUndefined();
     expect(agent.data.config.params).toMatchObject({
       executionProfile: 'deep',
       toolAvailability: 'best-effort',

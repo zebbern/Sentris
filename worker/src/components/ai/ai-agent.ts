@@ -27,7 +27,11 @@ import {
   port,
   param,
 } from '@sentris/component-sdk';
-import { LLMProviderSchema, llmProviderContractName } from '@sentris/contracts';
+import {
+  LLMProviderSchema,
+  llmProviderContractName,
+  type LlmProviderConfig,
+} from '@sentris/contracts';
 import { LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { AgentStreamRecorder } from './agent-stream-recorder';
 import {
@@ -322,14 +326,30 @@ function ensureModelName(provider: ModelProvider, modelId?: string | null): stri
   return DEFAULT_OPENAI_MODEL;
 }
 
-function resolveApiKey(provider: ModelProvider, overrideKey?: string | null): string {
-  const trimmed = overrideKey?.trim();
-  if (trimmed) {
-    return trimmed;
+function selectAgentApiKey(
+  provider: ModelProvider,
+  chatModel: LlmProviderConfig,
+  legacyModelApiKey?: string,
+): string {
+  const canonical = chatModel.apiKey?.trim();
+  if (canonical) {
+    return canonical;
+  }
+
+  if (chatModel.apiKeySecretId?.trim()) {
+    throw new ConfigurationError(
+      `The stored credential selected for "${provider}" could not be resolved. Reselect it in Model & API Key.`,
+      { configKey: 'apiKeySecretId', details: { provider } },
+    );
+  }
+
+  const legacy = legacyModelApiKey?.trim();
+  if (legacy) {
+    return legacy;
   }
 
   throw new ConfigurationError(
-    `Model provider API key is not configured for "${provider}". Connect a Secret Loader node to the modelApiKey input or supply chatModel.apiKey.`,
+    `No stored credential is configured for "${provider}". Select one in Model & API Key or connect a provider node.`,
     { configKey: 'apiKey', details: { provider } },
   );
 }
@@ -730,13 +750,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
 
       const effectiveProvider: ModelProvider = chatModel?.provider ?? 'openai';
       const effectiveModel = ensureModelName(effectiveProvider, chatModel?.modelId ?? null);
-
-      let overrideApiKey = chatModel?.apiKey ?? null;
-      if (modelApiKey && modelApiKey.trim().length > 0) {
-        overrideApiKey = modelApiKey.trim();
-      }
-
-      const effectiveApiKey = resolveApiKey(effectiveProvider, overrideApiKey);
+      const effectiveApiKey = selectAgentApiKey(effectiveProvider, chatModel, modelApiKey);
       const explicitBaseUrl = chatModel?.baseUrl?.trim();
       const baseUrl =
         explicitBaseUrl && explicitBaseUrl.length > 0

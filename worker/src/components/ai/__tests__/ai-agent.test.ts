@@ -187,6 +187,42 @@ function runAgent(context: ExecutionContext = createTestContext()) {
   );
 }
 
+function runAgentWithCredentials(
+  chatModel: {
+    provider: 'openai';
+    modelId: string;
+    apiKey?: string;
+    apiKeySecretId?: string;
+  },
+  modelApiKey?: string,
+) {
+  const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
+  if (!component) {
+    throw new Error('Expected core.ai.agent to be registered');
+  }
+
+  return runComponentWithRunner(
+    component.runner,
+    component.execute,
+    {
+      inputs: {
+        userInput: 'Investigate the target',
+        conversationState: undefined,
+        chatModel,
+        modelApiKey,
+      },
+      params: {
+        systemPrompt: '',
+        temperature: 0.2,
+        maxTokens: 128,
+        memorySize: 5,
+        stepLimit: 2,
+      },
+    },
+    createTestContext(),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -214,6 +250,48 @@ beforeAll(async () => {
 });
 
 describe('core.ai.agent (refactor)', () => {
+  test('uses the canonical chatModel.apiKey when a legacy modelApiKey is also present', async () => {
+    await runAgentWithCredentials(
+      { provider: 'openai', modelId: 'gpt-4o-mini', apiKey: 'canonical-key' },
+      'legacy-key',
+    );
+
+    expect(createOpenAIMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ apiKey: 'canonical-key' }),
+    );
+  });
+
+  test('accepts the legacy modelApiKey when the canonical contract has no key or key reference', async () => {
+    await runAgentWithCredentials({ provider: 'openai', modelId: 'gpt-4o-mini' }, 'legacy-key');
+
+    expect(createOpenAIMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ apiKey: 'legacy-key' }),
+    );
+  });
+
+  test('rejects an unresolved canonical apiKeySecretId instead of falling back to legacy', async () => {
+    await expect(
+      runAgentWithCredentials(
+        {
+          provider: 'openai',
+          modelId: 'gpt-4o-mini',
+          apiKeySecretId: 'unresolved-credential-id',
+        },
+        'legacy-key',
+      ),
+    ).rejects.toThrow(
+      'The stored credential selected for "openai" could not be resolved. Reselect it in Model & API Key.',
+    );
+  });
+
+  test('reports a clear stored-secret configuration error when neither canonical nor legacy credentials exist', async () => {
+    await expect(
+      runAgentWithCredentials({ provider: 'openai', modelId: 'gpt-4o-mini' }),
+    ).rejects.toThrow(
+      'No stored credential is configured for "openai". Select one in Model & API Key or connect a provider node.',
+    );
+  });
+
   test('runs without tool discovery when no connected tools', async () => {
     const component = componentRegistry.get<AiAgentInput, AiAgentOutput>('core.ai.agent');
     expect(component).toBeDefined();
