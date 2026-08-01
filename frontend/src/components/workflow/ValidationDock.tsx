@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, CirclePlus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSecrets } from '@/hooks/queries/useSecretQueries';
 import { useComponents } from '@/hooks/queries/useComponentQueries';
+import { useMcpAllTools, useMcpServers } from '@/hooks/queries/useMcpServerQueries';
+import {
+  evaluateWorkflowAgentNodeReadiness,
+  hasConnectedWorkflowMcpCustom,
+} from '@/features/agent-readiness/workflowAdapter';
 import { getNodeValidationWarnings } from '@/utils/connectionValidation';
 import type { Node, Edge } from '@xyflow/react';
 import type { NodeData, FrontendNodeData } from '@/schemas/node';
@@ -26,13 +31,16 @@ const COLLAPSE_THRESHOLD = 2; // Collapse when more than 2 issues
 
 export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDockProps) {
   const { data: componentIndex } = useComponents();
-  const getComponent = (ref: string | undefined) => {
-    if (!componentIndex || !ref) return null;
-    if (componentIndex.byId[ref]) return componentIndex.byId[ref];
-    const idFromSlug = componentIndex.slugIndex[ref];
-    if (idFromSlug && componentIndex.byId[idFromSlug]) return componentIndex.byId[idFromSlug];
-    return null;
-  };
+  const getComponent = useCallback(
+    (ref: string | undefined) => {
+      if (!componentIndex || !ref) return null;
+      if (componentIndex.byId[ref]) return componentIndex.byId[ref];
+      const idFromSlug = componentIndex.slugIndex[ref];
+      if (idFromSlug && componentIndex.byId[idFromSlug]) return componentIndex.byId[idFromSlug];
+      return null;
+    },
+    [componentIndex],
+  );
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const isMobile = useIsMobile();
@@ -40,7 +48,19 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
   // Only show validation in design mode
   const isDesignMode = mode === 'design';
 
-  const { data: secrets = [] } = useSecrets();
+  const secretsQuery = useSecrets();
+  const hasConnectedCustomMcp = useMemo(
+    () =>
+      isDesignMode &&
+      hasConnectedWorkflowMcpCustom({
+        nodes: nodes as Node<FrontendNodeData>[],
+        edges,
+        getComponent,
+      }),
+    [edges, getComponent, isDesignMode, nodes],
+  );
+  const mcpServersQuery = useMcpServers({ enabled: hasConnectedCustomMcp });
+  const mcpToolsQuery = useMcpAllTools({ enabled: hasConnectedCustomMcp });
 
   const validationIssues = useMemo<ValidationIssue[]>(() => {
     if (!isDesignMode) return [];
@@ -59,7 +79,7 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
         node as Node<FrontendNodeData>,
         edges,
         component,
-        secrets,
+        secretsQuery.data,
       );
 
       warnings.forEach((warning: string) => {
@@ -69,10 +89,56 @@ export function ValidationDock({ nodes, edges, mode, onNodeClick }: ValidationDo
           message: warning,
         });
       });
+
+      const nodeLabel = nodeData.label || component.name || node.id;
+      const readinessIssues = evaluateWorkflowAgentNodeReadiness({
+        node: node as Node<FrontendNodeData>,
+        component,
+        nodes: nodes as Node<FrontendNodeData>[],
+        edges,
+        getComponent,
+        secrets: {
+          items: secretsQuery.data ?? [],
+          isLoading: secretsQuery.isLoading,
+          error: secretsQuery.error,
+        },
+        mcpServers: {
+          items: mcpServersQuery.data ?? [],
+          isLoading: mcpServersQuery.isLoading,
+          error: mcpServersQuery.error,
+        },
+        mcpTools: {
+          items: mcpToolsQuery.data ?? [],
+          isLoading: mcpToolsQuery.isLoading,
+          error: mcpToolsQuery.error,
+        },
+      })
+        .filter((row) => row.blocksExecution)
+        .map((row) => ({
+          nodeId: node.id,
+          nodeLabel,
+          message: `${row.label}: ${row.detail}`,
+        }));
+      issues.push(...readinessIssues);
     }
 
     return issues;
-  }, [nodes, edges, componentIndex, isDesignMode, secrets]);
+  }, [
+    nodes,
+    edges,
+    componentIndex,
+    isDesignMode,
+    getComponent,
+    secretsQuery.data,
+    secretsQuery.isLoading,
+    secretsQuery.error,
+    mcpServersQuery.data,
+    mcpServersQuery.isLoading,
+    mcpServersQuery.error,
+    mcpToolsQuery.data,
+    mcpToolsQuery.isLoading,
+    mcpToolsQuery.error,
+  ]);
 
   const totalIssues = validationIssues.length;
   const hasIssues = totalIssues > 0;

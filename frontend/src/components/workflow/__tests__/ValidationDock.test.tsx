@@ -5,6 +5,10 @@ import type { FrontendNodeData } from '@/schemas/node';
 
 // Control validation warnings per test
 let validationWarningsMap: Record<string, string[]> = {};
+let secretCatalog = { data: [] as { id: string; name: string }[], isLoading: false, error: null };
+let mcpServerCatalog = { data: [] as object[], isLoading: false, error: null };
+let mcpToolCatalog = { data: [] as object[], isLoading: false, error: null };
+let mcpQueryEnabledValues: boolean[] = [];
 
 mock.module('@/hooks/queries/useComponentQueries', () => ({
   useComponents: () => ({
@@ -31,6 +35,30 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
           outputs: [],
           parameters: [],
         },
+        'core.ai.agent': {
+          id: 'core.ai.agent',
+          slug: 'ai-agent',
+          name: 'AI Agent',
+          inputs: [
+            {
+              id: 'chatModel',
+              label: 'Model',
+              editor: 'llm-provider',
+              connectionType: { kind: 'contract', name: 'core.ai.llm-provider.v1' },
+            },
+            { id: 'tools', label: 'Tools', connectionType: { kind: 'contract', name: 'mcp.tool' } },
+          ],
+          outputs: [],
+          parameters: [],
+        },
+        'mcp.custom': {
+          id: 'mcp.custom',
+          slug: 'mcp.custom',
+          name: 'Custom MCP',
+          inputs: [],
+          outputs: [],
+          parameters: [],
+        },
       },
       slugIndex: {},
     },
@@ -39,7 +67,18 @@ mock.module('@/hooks/queries/useComponentQueries', () => ({
 }));
 
 mock.module('@/hooks/queries/useSecretQueries', () => ({
-  useSecrets: () => ({ data: [], isLoading: false }),
+  useSecrets: () => secretCatalog,
+}));
+
+mock.module('@/hooks/queries/useMcpServerQueries', () => ({
+  useMcpServers: (options?: { enabled?: boolean }) => {
+    mcpQueryEnabledValues.push(options?.enabled ?? true);
+    return mcpServerCatalog;
+  },
+  useMcpAllTools: (options?: { enabled?: boolean }) => {
+    mcpQueryEnabledValues.push(options?.enabled ?? true);
+    return mcpToolCatalog;
+  },
 }));
 
 mock.module('@/hooks/useIsMobile', () => ({
@@ -72,6 +111,10 @@ describe('ValidationDock', () => {
   afterEach(() => {
     cleanup();
     validationWarningsMap = {};
+    secretCatalog = { data: [], isLoading: false, error: null };
+    mcpServerCatalog = { data: [], isLoading: false, error: null };
+    mcpToolCatalog = { data: [], isLoading: false, error: null };
+    mcpQueryEnabledValues = [];
   });
 
   it('shows "All validated" when there are no issues', () => {
@@ -80,6 +123,14 @@ describe('ValidationDock', () => {
     render(<ValidationDock nodes={nodes} edges={[]} mode="design" onNodeClick={mock(() => {})} />);
 
     expect(screen.getByText('All validated')).toBeInTheDocument();
+  });
+
+  it('keeps MCP catalog queries skipped without a connected custom MCP tool edge', () => {
+    const nodes = [createNode('n1', 'core.output.report', 'Report')];
+
+    render(<ValidationDock nodes={nodes} edges={[]} mode="design" onNodeClick={mock(() => {})} />);
+
+    expect(mcpQueryEnabledValues).toEqual([false, false]);
   });
 
   it('prompts for a runnable step when the graph only contains the entry point', () => {
@@ -179,5 +230,150 @@ describe('ValidationDock', () => {
     // Click to collapse
     fireEvent.click(screen.getByText('3 issues'));
     expect(screen.getByText('Expand')).toBeInTheDocument();
+  });
+
+  it('links a missing generic-agent model issue to the agent node', () => {
+    const agent = createNode('agent', 'core.ai.agent', 'Agent');
+    const onNodeClick = mock(() => {});
+
+    render(<ValidationDock nodes={[agent]} edges={[]} mode="design" onNodeClick={onNodeClick} />);
+
+    fireEvent.click(screen.getByText(/Not configured: Choose a supported provider and a model\./));
+    fireEvent.click(
+      screen.getByText(/Needs mapping: Select a stored secret for this credential\./),
+    );
+
+    expect(onNodeClick).toHaveBeenNthCalledWith(1, 'agent');
+    expect(onNodeClick).toHaveBeenNthCalledWith(2, 'agent');
+  });
+
+  it('shows Needs mapping for a deleted agent credential', () => {
+    const agent = createNode('agent', 'core.ai.agent', 'Agent');
+    agent.data.config.inputOverrides = {
+      chatModel: { provider: 'openai', modelId: 'gpt-5', apiKeySecretId: 'deleted-secret' },
+    };
+
+    render(
+      <ValidationDock nodes={[agent]} edges={[]} mode="design" onNodeClick={mock(() => {})} />,
+    );
+
+    expect(
+      screen.getByText(/Needs mapping: The referenced stored secret no longer exists\./),
+    ).toBeInTheDocument();
+  });
+
+  it('does not flag optional degraded MCP tools', () => {
+    secretCatalog = {
+      data: [{ id: 'secret-1', name: 'OPENAI_API_KEY' }],
+      isLoading: false,
+      error: null,
+    };
+    mcpServerCatalog = {
+      data: [
+        {
+          id: 'server-1',
+          name: 'MCP Server',
+          transportType: 'http',
+          hasHeaders: false,
+          enabled: true,
+          lastHealthStatus: 'unhealthy',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    };
+    mcpToolCatalog = {
+      data: [
+        {
+          id: 'tool-1',
+          toolName: 'search',
+          serverId: 'server-1',
+          serverName: 'MCP Server',
+          enabled: true,
+          discoveredAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    };
+    const agent = createNode('agent', 'core.ai.agent', 'Agent');
+    agent.data.config = {
+      params: { toolAvailability: 'best-effort' },
+      inputOverrides: {
+        chatModel: { provider: 'openai', modelId: 'gpt-5', apiKeySecretId: 'secret-1' },
+      },
+    };
+    const mcp = createNode('mcp', 'mcp.custom', 'MCP');
+    mcp.data.config.params = { enabledServers: ['server-1'] };
+
+    render(
+      <ValidationDock
+        nodes={[agent, mcp]}
+        edges={[{ id: 'mcp-tools', source: 'mcp', target: 'agent', targetHandle: 'tools' }]}
+        mode="design"
+        onNodeClick={mock(() => {})}
+      />,
+    );
+
+    expect(screen.getByText('All validated')).toBeInTheDocument();
+  });
+
+  it('flags required MCP with no usable tools', () => {
+    secretCatalog = {
+      data: [{ id: 'secret-1', name: 'OPENAI_API_KEY' }],
+      isLoading: false,
+      error: null,
+    };
+    mcpServerCatalog = {
+      data: [
+        {
+          id: 'server-1',
+          name: 'MCP Server',
+          transportType: 'http',
+          hasHeaders: false,
+          enabled: true,
+          lastHealthStatus: 'healthy',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    };
+    mcpToolCatalog = {
+      data: [
+        {
+          id: 'tool-1',
+          toolName: 'search',
+          serverId: 'server-1',
+          serverName: 'MCP Server',
+          enabled: false,
+          discoveredAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+    };
+    const agent = createNode('agent', 'core.ai.agent', 'Agent');
+    agent.data.config.inputOverrides = {
+      chatModel: { provider: 'openai', modelId: 'gpt-5', apiKeySecretId: 'secret-1' },
+    };
+    const mcp = createNode('mcp', 'mcp.custom', 'MCP');
+    mcp.data.config.params = { enabledServers: ['server-1'] };
+
+    render(
+      <ValidationDock
+        nodes={[agent, mcp]}
+        edges={[{ id: 'mcp-tools', source: 'mcp', target: 'agent', targetHandle: 'tools' }]}
+        mode="design"
+        onNodeClick={mock(() => {})}
+      />,
+    );
+
+    expect(
+      screen.getByText(/Not configured: No selected MCP servers expose usable tools\./),
+    ).toBeInTheDocument();
   });
 });
