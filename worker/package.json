@@ -56,6 +56,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/server-legacy": "2.0.0",
     "@types/adm-zip": "^0.5.7",
     "@types/js-yaml": "^4.0.9",
     "@types/minio": "^7.1.1",
