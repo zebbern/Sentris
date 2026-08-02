@@ -146,8 +146,10 @@ describe('OperatorMcpAuthorityService', () => {
     });
 
     expect(request.invocationId).toBe(ACTION_ID);
-    expect(request.deadlineAt).toBe(
-      authority.snapshot.scope.kind === 'operator' ? authority.snapshot.scope.expiresAt : undefined,
-    );
+    expect(authority.snapshot.scope.kind).toBe('operator');
+    if (authority.snapshot.scope.kind !== 'operator') {
+      throw new Error('Expected Operator capability scope');
+    }
+    expect(request.deadlineAt).toBe(authority.snapshot.scope.expiresAt);
   });
 });
