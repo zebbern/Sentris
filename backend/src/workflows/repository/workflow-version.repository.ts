@@ -15,6 +15,7 @@ interface CreateWorkflowVersionInput {
   workflowId: string;
   graph: WorkflowVersionGraph;
   organizationId?: string | null;
+  mutationIdempotencyKey?: string;
 }
 
 interface FindByWorkflowVersionInput {
@@ -52,6 +53,7 @@ export class WorkflowVersionRepository {
         version: nextVersion,
         graph: input.graph,
         organizationId: input.organizationId ?? null,
+        mutationIdempotencyKey: input.mutationIdempotencyKey ?? null,
       })
       .returning();
 
@@ -75,14 +77,32 @@ export class WorkflowVersionRepository {
 
   async findById(
     id: string,
-    options: { organizationId?: string | null } = {},
+    options: WorkflowVersionRepositoryOptions = {},
   ): Promise<WorkflowVersionRecord | undefined> {
-    const [record] = await this.db
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
       .select()
       .from(workflowVersionsTable)
       .where(this.buildIdFilter(id, options.organizationId))
       .limit(1);
 
+    return record;
+  }
+
+  async findByMutationIdempotencyKey(
+    mutationIdempotencyKey: string,
+    options: WorkflowVersionRepositoryOptions = {},
+  ): Promise<WorkflowVersionRecord | undefined> {
+    const executor = options.executor ?? this.db;
+    const conditions = [eq(workflowVersionsTable.mutationIdempotencyKey, mutationIdempotencyKey)];
+    if (options.organizationId) {
+      conditions.push(eq(workflowVersionsTable.organizationId, options.organizationId));
+    }
+    const [record] = await executor
+      .select()
+      .from(workflowVersionsTable)
+      .where(and(...conditions))
+      .limit(1);
     return record;
   }
 

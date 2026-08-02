@@ -7,6 +7,10 @@ type UpdateWorkflowRequestDto = components['schemas']['UpdateWorkflowRequestDto'
 type WorkflowVersionResponse = components['schemas']['WorkflowVersionResponseDto'];
 type WorkflowVersionSummary = components['schemas']['WorkflowVersionSummaryDto'];
 
+export interface WorkflowUpdateOptions {
+  expectedVersionId?: string;
+}
+
 export interface WorkflowSummary {
   id: string;
   name: string;
@@ -88,10 +92,17 @@ export const workflowsApi = {
     return response.data;
   },
 
-  update: async (id: string, workflow: UpdateWorkflowRequestDto): Promise<WorkflowResponseDto> => {
+  update: async (
+    id: string,
+    workflow: UpdateWorkflowRequestDto,
+    options: WorkflowUpdateOptions = {},
+  ): Promise<WorkflowResponseDto> => {
+    const payload: UpdateWorkflowRequestDto = options.expectedVersionId
+      ? { ...workflow, expectedVersionId: options.expectedVersionId }
+      : workflow;
     const response = (await apiClient.updateWorkflow(
       id,
-      workflow,
+      payload,
     )) as ApiResponse<WorkflowResponseDto>;
     if (response.error) {
       const err = response.error;

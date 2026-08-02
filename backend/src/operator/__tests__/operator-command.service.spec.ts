@@ -6,6 +6,7 @@ import type { FindingTriageService } from '../../findings/finding-triage.service
 import type { WorkflowsService } from '../../workflows/workflows.service';
 import { OperatorCommandService } from '../operator-command.service';
 import type { OperatorMcpAuthorityService } from '../operator-mcp-authority.service';
+import type { OperatorWorkflowAuthoringService } from '../operator-workflow-authoring.service';
 
 const WORKFLOW_ID = '11111111-1111-4111-8111-111111111111';
 const WORKFLOW_VERSION_ID = '66666666-6666-4666-8666-666666666666';
@@ -28,6 +29,7 @@ describe('OperatorCommandService', () => {
   let findings: Record<string, ReturnType<typeof vi.fn>>;
   let triage: Record<string, ReturnType<typeof vi.fn>>;
   let mcpAuthority: Record<string, ReturnType<typeof vi.fn>>;
+  let workflowAuthoring: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorCommandService;
 
   beforeEach(() => {
@@ -60,11 +62,19 @@ describe('OperatorCommandService', () => {
       materialize: vi.fn(),
       createOperationRequest: vi.fn(),
     };
+    workflowAuthoring = {
+      listComponents: vi.fn(),
+      getComponent: vi.fn(),
+      projectGraph: vi.fn((graph) => graph),
+      propose: vi.fn(),
+      apply: vi.fn(),
+    };
     service = new OperatorCommandService(
       workflows as unknown as WorkflowsService,
       findings as unknown as FindingsQueryService,
       triage as unknown as FindingTriageService,
       mcpAuthority as unknown as OperatorMcpAuthorityService,
+      workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
     );
   });
 

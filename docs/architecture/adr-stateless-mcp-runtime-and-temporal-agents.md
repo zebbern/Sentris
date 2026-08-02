@@ -102,6 +102,17 @@ runtime-input descriptors so the model can map user intent to exact input IDs. T
 shared contract is enforced in `WorkflowRunService` for every launch path before persistence
 or Temporal start; an Operator preflight failure is a durable failed tool result that the
 model can correct within the turn rather than a doomed workflow run.
+Workflow authoring uses that same typed command ledger rather than a second agent loop.
+The Operator discovers components from the canonical registry and receives an editable
+graph whose inline and component-declared credentials are opaque placeholders. A proposal
+stores one bounded complete graph in its durable action, compiles it, and returns validation
+plus a graph diff without mutating a workflow. Applying it is a separate consequential
+action: the proposal action ID is the workflow-mutation idempotency key, updates fence on
+the exact immutable base version, and the canonical create/update transaction returns the
+saved version. Durable turns snapshot the initiating actor roles so delayed execution keeps
+the user's workflow authority. The frontend can apply the unchanged proposal directly or
+hydrate it into the Builder as an unsaved draft; update placeholders are materialized only
+from the freshly fetched persisted base graph.
 Postgres stores sessions, messages, action decisions, and results; consequential actions
 honor the session's ask-or-auto approval mode. Operator MCP discovery materializes an
 immutable turn-scoped grant and complete capability snapshot, and tool, resource, and

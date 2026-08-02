@@ -3198,6 +3198,23 @@ export interface paths {
         patch: operations["OperatorController_updateSession"];
         trace?: never;
     };
+    "/api/v1/operator/sessions/{id}/workflow-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List durable workflow drafts for one Operator session */
+        get: operations["OperatorController_listWorkflowDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operator/sessions/{id}/turns": {
         parameters: {
             query?: never;
@@ -3587,6 +3604,8 @@ export interface components {
                 y: number;
                 zoom: number;
             };
+            /** Format: uuid */
+            expectedVersionId?: string;
         };
         UpdateWorkflowMetadataDto: {
             name: string;
@@ -3595,13 +3614,23 @@ export interface components {
         WorkflowRuntimeInputsResponseDto: {
             workflowId: string;
             inputs: {
+                /** @description Unique identifier for this input */
                 id: string;
+                /** @description Display label for the input field */
                 label: string;
-                /** @enum {string} */
-                type: "text" | "string" | "number" | "json" | "array" | "file" | "boolean" | "secret";
-                /** @default true */
+                /**
+                 * @description Type of input data
+                 * @enum {string}
+                 */
+                type: "file" | "text" | "number" | "boolean" | "json" | "array" | "secret";
+                /**
+                 * @description Whether this input is required
+                 * @default true
+                 */
                 required: boolean;
+                /** @description Help text for the input */
                 description?: string;
+                /** @description Default value to use when input is omitted */
                 defaultValue?: unknown;
             }[];
         };
@@ -5577,6 +5606,187 @@ export interface components {
                 baseUrl?: string | null;
             };
         };
+        OperatorWorkflowDraftDetailDto: {
+            /** @enum {string} */
+            kind: "workflow-draft";
+            /** Format: uuid */
+            draftId: string;
+            /** @enum {string} */
+            mode: "create" | "update";
+            /** Format: uuid */
+            workflowId: string | null;
+            /** Format: uuid */
+            baseVersionId: string | null;
+            name: string;
+            digest: string;
+            validation: {
+                valid: boolean;
+                errors: string[];
+            };
+            diff: {
+                metadataChanged: ("name" | "description")[];
+                addedNodeIds: string[];
+                removedNodeIds: string[];
+                changedNodeIds: string[];
+                addedEdgeIds: string[];
+                removedEdgeIds: string[];
+                changedEdgeIds: string[];
+            };
+            /** Format: uuid */
+            proposalActionId: string;
+            /** Format: uuid */
+            sessionId: string;
+            proposedGraph: {
+                id?: string;
+                name: string;
+                description?: string;
+                nodes: {
+                    id: string;
+                    type: string;
+                    position: {
+                        x: number;
+                        y: number;
+                    };
+                    data: {
+                        label: string;
+                        /**
+                         * @default {
+                         *       "params": {},
+                         *       "inputOverrides": {}
+                         *     }
+                         */
+                        config: {
+                            /** @default {} */
+                            params: {
+                                [key: string]: unknown;
+                            };
+                            /** @default {} */
+                            inputOverrides: {
+                                [key: string]: unknown;
+                            };
+                            /** @enum {string} */
+                            joinStrategy?: "all" | "any" | "first";
+                            streamId?: string;
+                            groupId?: string;
+                            maxConcurrency?: number;
+                            /** @enum {string} */
+                            mode?: "normal" | "tool";
+                            toolConfig?: {
+                                /** @default [] */
+                                boundInputIds: string[];
+                                /** @default [] */
+                                exposedInputIds: string[];
+                            };
+                            connectedToolNodeIds?: string[];
+                        };
+                        dynamicInputs?: {
+                            [key: string]: unknown;
+                        }[];
+                        dynamicOutputs?: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                }[];
+                edges: {
+                    id: string;
+                    source: string;
+                    target: string;
+                    sourceHandle?: string;
+                    targetHandle?: string;
+                    /** @enum {string} */
+                    kind?: "success" | "error";
+                    /** @enum {string} */
+                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
+                }[];
+                /**
+                 * @default {
+                 *       "x": 0,
+                 *       "y": 0,
+                 *       "zoom": 1
+                 *     }
+                 */
+                viewport: {
+                    x: number;
+                    y: number;
+                    zoom: number;
+                };
+            };
+            baseGraph: {
+                id?: string;
+                name: string;
+                description?: string;
+                nodes: {
+                    id: string;
+                    type: string;
+                    position: {
+                        x: number;
+                        y: number;
+                    };
+                    data: {
+                        label: string;
+                        /**
+                         * @default {
+                         *       "params": {},
+                         *       "inputOverrides": {}
+                         *     }
+                         */
+                        config: {
+                            /** @default {} */
+                            params: {
+                                [key: string]: unknown;
+                            };
+                            /** @default {} */
+                            inputOverrides: {
+                                [key: string]: unknown;
+                            };
+                            /** @enum {string} */
+                            joinStrategy?: "all" | "any" | "first";
+                            streamId?: string;
+                            groupId?: string;
+                            maxConcurrency?: number;
+                            /** @enum {string} */
+                            mode?: "normal" | "tool";
+                            toolConfig?: {
+                                /** @default [] */
+                                boundInputIds: string[];
+                                /** @default [] */
+                                exposedInputIds: string[];
+                            };
+                            connectedToolNodeIds?: string[];
+                        };
+                        dynamicInputs?: {
+                            [key: string]: unknown;
+                        }[];
+                        dynamicOutputs?: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                }[];
+                edges: {
+                    id: string;
+                    source: string;
+                    target: string;
+                    sourceHandle?: string;
+                    targetHandle?: string;
+                    /** @enum {string} */
+                    kind?: "success" | "error";
+                    /** @enum {string} */
+                    type?: "default" | "smoothstep" | "step" | "straight" | "bezier";
+                }[];
+                /**
+                 * @default {
+                 *       "x": 0,
+                 *       "y": 0,
+                 *       "zoom": 1
+                 *     }
+                 */
+                viewport: {
+                    x: number;
+                    y: number;
+                    zoom: number;
+                };
+            } | null;
+        };
         UpdateOperatorSessionDto: {
             /** @enum {string} */
             approvalMode?: "ask" | "auto";
@@ -5602,6 +5812,13 @@ export interface components {
                 runId?: string;
             };
             directCommand?: {
+                /** @enum {string} */
+                commandName: "apply_workflow_draft";
+                arguments: {
+                    /** Format: uuid */
+                    draftId: string;
+                };
+            } | {
                 /** @enum {string} */
                 commandName: "get_run";
                 arguments: {
@@ -11457,6 +11674,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    OperatorController_listWorkflowDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorWorkflowDraftDetailDto"][];
+                };
             };
         };
     };

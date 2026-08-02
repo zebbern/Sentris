@@ -132,6 +132,7 @@ describe('WorkflowsService', () => {
     graph: sampleGraph,
     compiledDefinition: null,
     organizationId: TEST_ORG,
+    mutationIdempotencyKey: null,
     lastRun: null,
     runCount: 0,
     ...overrides,
@@ -156,6 +157,9 @@ describe('WorkflowsService', () => {
       return makeWorkflowRecord();
     },
     async findById() {
+      return makeWorkflowRecord();
+    },
+    async findByIdForUpdate() {
       return makeWorkflowRecord();
     },
     async delete(id: string) {
@@ -588,6 +592,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      mutationIdempotencyKey: null,
     });
 
     const run = await service.run('workflow-id', { inputs: { message: 'hi' } }, authContext);
@@ -641,6 +646,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      mutationIdempotencyKey: null,
     });
 
     const run = await service.run('workflow-id', { inputs: { foo: 'bar' } }, authContext);
@@ -669,6 +675,7 @@ describe('WorkflowsService', () => {
       lastRun: null,
       runCount: 0,
       organizationId: TEST_ORG,
+      mutationIdempotencyKey: null,
     });
 
     const trigger = {

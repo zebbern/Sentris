@@ -24,3 +24,4 @@ export * from './telemetry.js';
 export * from './ai-model-catalog.js';
 export * from './operator.js';
 export * from './workflow-runtime-inputs.js';
+export * from './workflow-graph.js';

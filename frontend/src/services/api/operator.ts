@@ -7,6 +7,7 @@ import type {
   OperatorSessionSummary,
   OperatorTurnAccepted,
   OperatorUpdateSession,
+  OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 
 import { httpGet, httpPatch, httpPost } from './client';
@@ -20,6 +21,9 @@ export const operatorApi = {
     httpPost<OperatorSessionSummary>('/operator/sessions', input),
 
   getSession: (sessionId: string) => httpGet<OperatorSessionDetail>(sessionPath(sessionId)),
+
+  listWorkflowDrafts: (sessionId: string) =>
+    httpGet<OperatorWorkflowDraftDetail[]>(`${sessionPath(sessionId)}/workflow-drafts`),
 
   updateSession: (sessionId: string, input: OperatorUpdateSession) =>
     httpPatch<OperatorSessionSummary>(sessionPath(sessionId), input),

@@ -8,6 +8,7 @@ import {
   OperatorCreateTurnSchema,
   OperatorTurnStatusSchema,
   OperatorUpdateSessionSchema,
+  OperatorWorkflowDraftDetailSchema,
   McpOperationResultSchema,
 } from '@sentris/shared';
 
@@ -15,6 +16,9 @@ export class CreateOperatorSessionDto extends createZodDto(OperatorCreateSession
 export class UpdateOperatorSessionDto extends createZodDto(OperatorUpdateSessionSchema) {}
 export class CreateOperatorTurnDto extends createZodDto(OperatorCreateTurnSchema) {}
 export class OperatorActionDecisionDto extends createZodDto(OperatorActionDecisionSchema) {}
+export class OperatorWorkflowDraftDetailDto extends createZodDto(
+  OperatorWorkflowDraftDetailSchema,
+) {}
 
 const OrganizationIdSchema = z.string().trim().min(1).max(191);
 

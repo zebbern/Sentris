@@ -83,7 +83,10 @@ export class WorkflowsController {
     @Param('id') id: string,
     @Body() body: UpdateWorkflowRequestDto,
   ): Promise<WorkflowResponseDto> {
-    const serviceResponse = await this.workflowsService.update(id, body, auth);
+    const { expectedVersionId, ...graph } = body;
+    const serviceResponse = await this.workflowsService.update(id, graph, auth, {
+      expectedVersionId,
+    });
     return this.transformServiceResponseToApi(serviceResponse);
   }
 

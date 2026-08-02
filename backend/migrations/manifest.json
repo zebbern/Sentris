@@ -105,6 +105,13 @@
       "sqlSha256": "c112859f8dd58113bd80206f1ba3c5b2921f6c7e2101ff2c06f16b1a35fdea6f",
       "snapshotSha256": "40c3db9c7afb5c0839d66736a8d9700295c65427d92eb2a1abdf88558de8b2c9",
       "contractSha256": "f29513a9c339af04b66b8c2648de3d38f54cbfc12e194d0264eaf54933c2c8fe"
+    },
+    {
+      "idx": 15,
+      "tag": "0015_operator_workflow_authoring",
+      "sqlSha256": "f167cf42c380fbcb9eb85e9f7879c96e0a367fafcf48a044acfe42f3f64d7356",
+      "snapshotSha256": "6d448c0927589af70589331d90eab97554b8b739ec276fbbfb15ce01011d540f",
+      "contractSha256": "00ea21864e3a752b2a03a044a2d57249d83108de5d4af4250026c234971f2f5d"
     }
   ]
 }

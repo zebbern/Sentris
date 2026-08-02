@@ -101,6 +101,7 @@ function makeWorkflowsHarness(auditError?: Error) {
       workflowRecord({ name: metadata.name }),
     ),
     findById: vi.fn(async (..._args: unknown[]) => workflowRecord()),
+    findByIdForUpdate: vi.fn(async (..._args: unknown[]) => workflowRecord()),
     delete: vi.fn(async (..._args: unknown[]) => undefined),
   };
   const versionRepository = {

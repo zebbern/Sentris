@@ -1,4 +1,5 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import {
   TERMINAL_STATUSES,
   type OperatorActionDecision,
@@ -67,6 +68,81 @@ export function useOperatorSession(sessionId: string | undefined) {
       return session && operatorSessionHasActiveTurn(session) ? 1_500 : false;
     },
   });
+}
+
+export function useOperatorWorkflowDrafts(
+  sessionId: string | undefined,
+  pollWhileTurnActive = false,
+  expectedDraftCount = 0,
+) {
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: queryKeys.operator.workflowDrafts(sessionId ?? ''),
+    queryFn: sessionId ? () => api.operator.listWorkflowDrafts(sessionId) : skipToken,
+    staleTime: pollWhileTurnActive ? 0 : 15_000,
+    refetchInterval: pollWhileTurnActive ? 1_500 : false,
+    ...(sessionId ? {} : { gcTime: 0 }),
+  });
+
+  const previousExpectationRef = useRef<{ sessionId: string | undefined; count: number }>({
+    sessionId: undefined,
+    count: 0,
+  });
+  useEffect(() => {
+    const previous = previousExpectationRef.current;
+    const expectationIncreased =
+      sessionId !== undefined &&
+      expectedDraftCount > 0 &&
+      (previous.sessionId !== sessionId || expectedDraftCount > previous.count);
+    previousExpectationRef.current = { sessionId, count: expectedDraftCount };
+
+    if (expectationIncreased && (query.data?.length ?? 0) < expectedDraftCount) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.operator.workflowDrafts(sessionId),
+        exact: true,
+      });
+    }
+  }, [expectedDraftCount, query.data?.length, queryClient, sessionId]);
+
+  return query;
+}
+
+/**
+ * Builder links carry one durable draft identity. A normal query may reuse a
+ * still-fresh cached list that predates that draft, so this wrapper forces one
+ * fresh batch read per requested identity and keeps the loader pending until
+ * that read settles.
+ */
+export function useOperatorWorkflowDraftForBuilder(
+  sessionId: string | undefined,
+  draftId: string | undefined,
+) {
+  const query = useOperatorWorkflowDrafts(sessionId);
+  const expectedReadKey = sessionId && draftId ? `${sessionId}:${draftId}` : null;
+  const activeReadKeyRef = useRef(expectedReadKey);
+  activeReadKeyRef.current = expectedReadKey;
+  const [completedReadKey, setCompletedReadKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!expectedReadKey) return;
+    let cancelled = false;
+
+    void query.refetch().finally(() => {
+      if (!cancelled && activeReadKeyRef.current === expectedReadKey) {
+        setCompletedReadKey(expectedReadKey);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expectedReadKey, query.refetch]);
+
+  return {
+    ...query,
+    draft: draftId ? (query.data?.find((draft) => draft.draftId === draftId) ?? null) : null,
+    isDraftLoading: expectedReadKey !== null && completedReadKey !== expectedReadKey,
+  };
 }
 
 export function useOperatorRunStatus(runId: string | null) {

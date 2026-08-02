@@ -10,6 +10,7 @@ import {
   serializeWorkflowForUpdate,
   deserializeNodes,
   deserializeEdges,
+  deserializeWorkflowGraph,
 } from '../workflowSerializer';
 
 // Helpers
@@ -321,5 +322,33 @@ describe('deserializeEdges', () => {
     };
     const result = deserializeEdges(workflow);
     expect(result[0].type).toBe('smoothstep');
+  });
+});
+
+describe('deserializeWorkflowGraph', () => {
+  it('uses the canonical node and edge conversion together', () => {
+    const result = deserializeWorkflowGraph({
+      nodes: [
+        {
+          id: 'n1',
+          type: 'core.http.request',
+          position: { x: 10, y: 20 },
+          data: { label: 'HTTP request', config: { params: {}, inputOverrides: {} } },
+        },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          source: 'n1',
+          target: 'n2',
+          sourceHandle: 'tool-export',
+          targetHandle: 'tools',
+        },
+      ],
+    });
+
+    expect(result.nodes[0].type).toBe('workflow');
+    expect(result.nodes[0].data.componentId).toBe('core.http.request');
+    expect(result.edges[0].sourceHandle).toBe('tools');
   });
 });

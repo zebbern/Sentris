@@ -18,12 +18,16 @@ beforeEach(() => {
 
 describe('operatorApi', () => {
   it('uses the durable session endpoints', async () => {
-    httpGet.mockResolvedValueOnce([]).mockResolvedValueOnce({ id: 'session/1' });
+    httpGet
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ id: 'session/1' })
+      .mockResolvedValueOnce([]);
     httpPost.mockResolvedValueOnce({ id: 'session-1' });
     httpPatch.mockResolvedValueOnce({ id: 'session-1' });
 
     await operatorApi.listSessions();
     await operatorApi.getSession('session/1');
+    await operatorApi.listWorkflowDrafts('session/1');
     await operatorApi.createSession({
       approvalMode: 'ask',
       model: {
@@ -37,6 +41,7 @@ describe('operatorApi', () => {
 
     expect(httpGet).toHaveBeenNthCalledWith(1, '/operator/sessions');
     expect(httpGet).toHaveBeenNthCalledWith(2, '/operator/sessions/session%2F1');
+    expect(httpGet).toHaveBeenNthCalledWith(3, '/operator/sessions/session%2F1/workflow-drafts');
     expect(httpPost).toHaveBeenCalledWith('/operator/sessions', expect.any(Object));
     expect(httpPatch).toHaveBeenCalledWith('/operator/sessions/session-1', {
       approvalMode: 'auto',

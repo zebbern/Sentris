@@ -41,6 +41,7 @@ function turnRecord(overrides: Partial<OperatorTurnRecord> = {}): OperatorTurnRe
   return {
     id: TURN_ID,
     sessionId: SESSION_ID,
+    actorRoles: ['MEMBER'],
     status: 'queued',
     temporalWorkflowId: null,
     temporalRunId: null,
@@ -213,7 +214,24 @@ describe('OperatorRepository.createTurn', () => {
     ]);
 
     await expect(repository.createTurn(request)).rejects.toThrow(
-      'Turn identifier is already used with different message, context, or command',
+      'Turn identifier is already used with different message, context, command, or authority',
+    );
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replay under changed actor authority', async () => {
+    const { repository, tx } = repositoryWithSelects([
+      [{ id: SESSION_ID }],
+      [replayRow(turnRecord({ actorRoles: ['MEMBER'] }))],
+    ]);
+
+    await expect(
+      repository.createTurn({
+        ...createInput,
+        auth: { ...auth, roles: ['ADMIN'] },
+      }),
+    ).rejects.toThrow(
+      'Turn identifier is already used with different message, context, command, or authority',
     );
     expect(tx.insert).not.toHaveBeenCalled();
   });
@@ -266,9 +284,12 @@ describe('OperatorRepository.createTurn', () => {
       calls.some(
         (call) =>
           call.method === 'values' &&
-          (call.args[0] as { id?: string; context?: unknown }).id === TURN_ID &&
+          (call.args[0] as { id?: string; context?: unknown; actorRoles?: unknown }).id ===
+            TURN_ID &&
           JSON.stringify((call.args[0] as { context?: unknown }).context) ===
-            JSON.stringify(persistedPayload),
+            JSON.stringify(persistedPayload) &&
+          JSON.stringify((call.args[0] as { actorRoles?: unknown }).actorRoles) ===
+            JSON.stringify(['MEMBER']),
       ),
     ).toBe(true);
   });

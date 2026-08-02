@@ -1,8 +1,11 @@
-import type {
-  OperatorActionStatus,
-  OperatorActionView,
-  OperatorCommandName,
-  OperatorMessageView,
+import {
+  OperatorWorkflowApplyResultSchema,
+  OperatorWorkflowDraftResultSchema,
+  type OperatorActionStatus,
+  type OperatorActionView,
+  type OperatorCommandName,
+  type OperatorMessageView,
+  type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 import { Bot, Check, ChevronRight, CircleDot, Clock3, Loader2, ShieldCheck, X } from 'lucide-react';
 
@@ -11,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { MarkdownView } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
 import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
+import { OperatorWorkflowDraftCard } from './OperatorWorkflowDraftCard';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
   proposed: 'Proposed',
@@ -35,6 +39,10 @@ const ACTION_STATUS_STYLES: Record<OperatorActionStatus, string> = {
 const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   list_workflows: 'List workflows',
   get_workflow: 'Inspect workflow',
+  list_components: 'List components',
+  get_component: 'Inspect component',
+  propose_workflow_draft: 'Draft workflow',
+  apply_workflow_draft: 'Save workflow draft',
   list_runs: 'List runs',
   get_run: 'Inspect run',
   run_workflow: 'Run workflow',
@@ -119,6 +127,8 @@ interface ActionEventProps {
   runCommandDisabled: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand: (request: OperatorRunCommandRequest) => void;
+  workflowDrafts: OperatorWorkflowDraftDetail[];
+  appliedDraftIds: ReadonlySet<string>;
 }
 
 function ActionEvent({
@@ -127,10 +137,30 @@ function ActionEvent({
   runCommandDisabled,
   onDecision,
   onRunCommand,
+  workflowDrafts,
+  appliedDraftIds,
 }: ActionEventProps) {
   const argumentsPreview = formatPreview(action.arguments);
-  const resultPreview = action.status === 'failed' ? action.error : formatPreview(action.result);
+  const draftResult = OperatorWorkflowDraftResultSchema.safeParse(action.result);
+  const applyResult = OperatorWorkflowApplyResultSchema.safeParse(action.result);
+  const workflowAuthoringResult = draftResult.success
+    ? draftResult.data
+    : applyResult.success
+      ? applyResult.data
+      : null;
+  const resultPreview =
+    action.status === 'failed'
+      ? action.error
+      : workflowAuthoringResult
+        ? null
+        : formatPreview(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
+  const workflowDraft = draftResult.success
+    ? workflowDrafts.find(
+        (draft) =>
+          draft.draftId === draftResult.data.draftId && draft.proposalActionId === action.id,
+      )
+    : undefined;
 
   return (
     <article
@@ -185,6 +215,25 @@ function ActionEvent({
           </details>
         ) : null}
 
+        {workflowAuthoringResult ? (
+          <OperatorWorkflowDraftCard
+            sessionId={action.sessionId}
+            result={workflowAuthoringResult}
+            detail={workflowDraft}
+            disabled={runCommandDisabled}
+            applied={draftResult.success && appliedDraftIds.has(draftResult.data.draftId)}
+            onApply={(draft) =>
+              onRunCommand({
+                message: `Save workflow draft ${draft.draftId} as a new immutable workflow version`,
+                directCommand: {
+                  commandName: 'apply_workflow_draft',
+                  arguments: { draftId: draft.draftId },
+                },
+              })
+            }
+          />
+        ) : null}
+
         {action.runId ? (
           <OperatorRunActivity
             runId={action.runId}
@@ -231,6 +280,7 @@ interface OperatorTimelineProps {
   isActive: boolean;
   pendingDecisionActionId?: string;
   runCommandDisabled?: boolean;
+  workflowDrafts?: OperatorWorkflowDraftDetail[];
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
   onRunCommand?: (request: OperatorRunCommandRequest) => void;
 }
@@ -241,10 +291,18 @@ export function OperatorTimeline({
   isActive,
   pendingDecisionActionId,
   runCommandDisabled = false,
+  workflowDrafts = [],
   onDecision,
   onRunCommand = () => {},
 }: OperatorTimelineProps) {
   const events = toTimelineEvents(messages, actions);
+  const appliedDraftIds = new Set(
+    actions.flatMap((action) => {
+      if (action.status !== 'succeeded') return [];
+      const parsed = OperatorWorkflowApplyResultSchema.safeParse(action.result);
+      return parsed.success ? [parsed.data.draftId] : [];
+    }),
+  );
 
   return (
     <div className="space-y-3">
@@ -259,6 +317,8 @@ export function OperatorTimeline({
             runCommandDisabled={runCommandDisabled}
             onDecision={onDecision}
             onRunCommand={onRunCommand}
+            workflowDrafts={workflowDrafts}
+            appliedDraftIds={appliedDraftIds}
           />
         ),
       )}

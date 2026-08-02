@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 
 interface PreviewGraphNode {
   id: string;
@@ -14,7 +14,7 @@ interface PreviewGraphEdge {
 }
 
 interface WorkflowPreviewProps {
-  graph?: Record<string, unknown>;
+  graph?: unknown;
   className?: string;
 }
 
@@ -29,6 +29,9 @@ const PAD = 40;
  * Pure SVG — no React Flow dependency, instant render, zero overhead.
  */
 export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
+  const svgIdPrefix = useId().replace(/:/g, '');
+  const markerId = `${svgIdPrefix}-preview-arrow`;
+
   const svgContent = useMemo(() => {
     const graphData = graph as
       | { nodes?: PreviewGraphNode[]; edges?: PreviewGraphEdge[] }
@@ -50,7 +53,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
       maxX = -Infinity,
       maxY = -Infinity;
 
-    const positioned = nodes.map((node) => {
+    const positioned = nodes.map((node, index) => {
       const x = node.position?.x ?? 0;
       const y = node.position?.y ?? 0;
       minX = Math.min(minX, x);
@@ -58,7 +61,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
       maxX = Math.max(maxX, x + NODE_W);
       maxY = Math.max(maxY, y + NODE_H);
 
-      const slug = node.data?.componentId ?? node.data?.componentSlug ?? '';
+      const slug = node.data?.componentId ?? node.data?.componentSlug ?? node.type ?? '';
       const isEntry =
         slug === 'core.workflow.entrypoint' ||
         slug === 'entry-point' ||
@@ -70,6 +73,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
         y,
         label: node.data?.label || 'Node',
         isEntry,
+        clipId: `${svgIdPrefix}-clip-${index}`,
       };
     });
 
@@ -101,7 +105,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
       .filter((edge): edge is { key: string; d: string } => edge !== null);
 
     return { viewBox, positioned, edgePaths };
-  }, [graph]);
+  }, [graph, svgIdPrefix]);
 
   if (!svgContent) return null;
 
@@ -116,7 +120,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
     >
       <defs>
         <marker
-          id="preview-arrow"
+          id={markerId}
           viewBox="0 0 10 10"
           refX="9"
           refY="5"
@@ -140,7 +144,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
           style={{ stroke: 'hsl(var(--muted-foreground) / 0.25)' }}
           strokeWidth={2}
           strokeLinecap="round"
-          markerEnd="url(#preview-arrow)"
+          markerEnd={`url(#${markerId})`}
         />
       ))}
 
@@ -167,7 +171,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
             />
 
             {/* Header band */}
-            <clipPath id={`clip-${node.id}`}>
+            <clipPath id={node.clipId}>
               <rect
                 x={node.x}
                 y={node.y}
@@ -184,7 +188,7 @@ export function WorkflowPreview({ graph, className }: WorkflowPreviewProps) {
               y={node.y}
               width={NODE_W}
               height={HEADER_H}
-              clipPath={`url(#clip-${node.id})`}
+              clipPath={`url(#${node.clipId})`}
               style={{
                 fill: node.isEntry ? 'hsl(var(--primary) / 0.08)' : 'hsl(var(--muted) / 0.5)',
               }}

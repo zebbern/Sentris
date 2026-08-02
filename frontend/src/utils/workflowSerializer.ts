@@ -249,3 +249,19 @@ export function deserializeEdges(workflow: { graph: { edges: BackendEdge[] } }):
     };
   });
 }
+
+/**
+ * Canonical conversion from a persisted backend graph into the two React Flow
+ * collections used by the builder. Keeping this together prevents alternate
+ * load paths (versions, Operator drafts) from accidentally putting backend
+ * node types directly on the canvas.
+ */
+export function deserializeWorkflowGraph(graph: { nodes: BackendNode[]; edges: BackendEdge[] }): {
+  nodes: ReactFlowNode<NodeData>[];
+  edges: ReactFlowEdge[];
+} {
+  return {
+    nodes: deserializeNodes({ graph }),
+    edges: deserializeEdges({ graph }),
+  };
+}

@@ -9,6 +9,8 @@ import * as reactRouterDom from 'react-router-dom';
 const mockRouteState = {
   params: { id: 'wf-123' as string, runId: undefined as string | undefined },
   pathname: '/workflows/wf-123',
+  search: '',
+  hash: '',
 };
 const mockNavigate = mock();
 const mockWorkflowStore: Record<string, unknown> = {
@@ -93,6 +95,12 @@ const mockGraphControllers = {
   },
 };
 let capturedTopBarProps: Record<string, unknown> = {};
+let capturedPersistenceOptions: Record<string, unknown> = {};
+const mockOperatorDraftQueryState: Record<string, unknown> = {
+  draft: null,
+  error: null,
+  isDraftLoading: false,
+};
 
 // --- Module mocks: infrastructure ---
 mock.module('@xyflow/react', () => ({
@@ -107,8 +115,8 @@ mock.module('react-router-dom', () => {
     useParams: () => ({ ...mockRouteState.params }),
     useLocation: () => ({
       pathname: mockRouteState.pathname,
-      search: '',
-      hash: '',
+      search: mockRouteState.search,
+      hash: mockRouteState.hash,
       state: null,
       key: 'default',
     }),
@@ -121,6 +129,9 @@ mock.module('@/utils/auth', () => ({ hasAdminRole: () => true }));
 mock.module('@/hooks/queries/useRunQueries', () => ({ getRunByIdFromCache: () => null }));
 mock.module('@/hooks/queries/useComponentQueries', () => ({
   useComponents: () => ({ data: { byId: {}, slugIndex: {} } }),
+}));
+mock.module('@/hooks/queries/useOperatorQueries', () => ({
+  useOperatorWorkflowDraftForBuilder: () => ({ ...mockOperatorDraftQueryState }),
 }));
 mock.module('@/features/workflow-builder/workflowBuilderUtils', () => ({
   computeGraphSignature: () => 'mock-sig',
@@ -154,7 +165,10 @@ mock.module('@/features/workflow-builder/hooks/useWorkflowHistory', () => ({
   useWorkflowHistory: () => ({ ...mockHistoryState }),
 }));
 mock.module('@/features/workflow-builder/hooks/useDesignWorkflowPersistence', () => ({
-  useDesignWorkflowPersistence: () => ({ ...mockPersistenceState }),
+  useDesignWorkflowPersistence: (options: Record<string, unknown>) => {
+    capturedPersistenceOptions = options;
+    return { ...mockPersistenceState };
+  },
 }));
 mock.module('@/features/workflow-builder/hooks/useWorkflowExecutionLifecycle', () => ({
   useWorkflowExecutionLifecycle: () => ({ ...mockLifecycleState }),
@@ -251,7 +265,12 @@ import { WorkflowBuilder } from '@/features/workflow-builder/WorkflowBuilder';
 // --- Helpers ---
 const resetMockState = (
   o: {
-    route?: { params?: Partial<typeof mockRouteState.params>; pathname?: string };
+    route?: {
+      params?: Partial<typeof mockRouteState.params>;
+      pathname?: string;
+      search?: string;
+      hash?: string;
+    };
     store?: Partial<typeof mockWorkflowStore>;
     ui?: Partial<typeof mockUiStore>;
     timeline?: Partial<typeof mockTimelineStore>;
@@ -264,6 +283,8 @@ const resetMockState = (
 ) => {
   mockRouteState.params = { id: 'wf-123', runId: undefined, ...o.route?.params };
   mockRouteState.pathname = o.route?.pathname ?? '/workflows/wf-123';
+  mockRouteState.search = o.route?.search ?? '';
+  mockRouteState.hash = o.route?.hash ?? '';
   Object.assign(mockWorkflowStore, {
     metadata: { id: 'wf-123', name: 'Test Workflow', currentVersionId: 'v1' },
     isDirty: false,
@@ -293,6 +314,12 @@ const resetMockState = (
   mockGraphControllers.execution.nodes = o.executionNodes ?? [];
   mockGraphControllers.execution.edges = [];
   capturedTopBarProps = {};
+  capturedPersistenceOptions = {};
+  Object.assign(mockOperatorDraftQueryState, {
+    draft: null,
+    error: null,
+    isDraftLoading: false,
+  });
   mockNavigate.mockClear();
 };
 
@@ -308,6 +335,7 @@ const MOCKED = [
   '@/utils/auth',
   '@/hooks/queries/useRunQueries',
   '@/hooks/queries/useComponentQueries',
+  '@/hooks/queries/useOperatorQueries',
   '@/features/workflow-builder/workflowBuilderUtils',
   '@/store/workflowStore',
   '@/store/workflowUiStore',
@@ -531,6 +559,39 @@ describe('WorkflowBuilder', () => {
       expect(capturedTopBarProps.workflowId).toBe('wf-123');
       expect(capturedTopBarProps.canUndo).toBe(true);
       expect(capturedTopBarProps.canRedo).toBe(false);
+    });
+  });
+
+  describe('Operator draft persistence context', () => {
+    it('passes the draft base version and removes only Operator query params after save', () => {
+      const baseVersionId = '11111111-1111-4111-8111-111111111111';
+      resetMockState({
+        route: {
+          search:
+            '?operatorSessionId=22222222-2222-4222-8222-222222222222&draftId=33333333-3333-4333-8333-333333333333&scopeId=scope-1',
+          hash: '#design',
+        },
+      });
+      mockOperatorDraftQueryState.draft = {
+        mode: 'update',
+        baseVersionId,
+      };
+
+      renderBuilder();
+
+      expect(capturedPersistenceOptions.expectedVersionId).toBe(baseVersionId);
+      const clearContext = capturedPersistenceOptions.onExpectedVersionSaveSuccess;
+      expect(clearContext).toBeInstanceOf(Function);
+      (clearContext as () => void)();
+
+      expect(mockNavigate).toHaveBeenCalledWith(
+        {
+          pathname: '/workflows/wf-123',
+          search: '?scopeId=scope-1',
+          hash: '#design',
+        },
+        { replace: true },
+      );
     });
   });
 });

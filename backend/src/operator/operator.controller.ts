@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -23,6 +23,7 @@ import {
   OperatorActionIdParamSchema,
   OperatorIdParamDto,
   OperatorIdParamSchema,
+  OperatorWorkflowDraftDetailDto,
   UpdateOperatorSessionDto,
 } from './dto/operator.dto';
 import { OperatorService } from './operator.service';
@@ -54,6 +55,16 @@ export class OperatorController {
     @Param(new ZodValidationPipe(OperatorIdParamSchema)) params: OperatorIdParamDto,
   ): Promise<OperatorSessionDetail> {
     return this.operatorService.getSession(auth, params.id);
+  }
+
+  @Get('sessions/:id/workflow-drafts')
+  @ApiOperation({ summary: 'List durable workflow drafts for one Operator session' })
+  @ApiOkResponse({ type: [OperatorWorkflowDraftDetailDto] })
+  listWorkflowDrafts(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorIdParamSchema)) params: OperatorIdParamDto,
+  ): Promise<OperatorWorkflowDraftDetailDto[]> {
+    return this.operatorService.listWorkflowDrafts(auth, params.id);
   }
 
   @Patch('sessions/:id')

@@ -50,6 +50,8 @@ interface UseDesignWorkflowPersistenceOptions {
     edgesSnapshot: ReactFlowEdge[] | null,
   ) => string;
   workflowRoutePrefix?: string;
+  expectedVersionId?: string;
+  onExpectedVersionSaveSuccess?: () => void;
 }
 
 interface UseDesignWorkflowPersistenceResult {
@@ -80,6 +82,8 @@ export function useDesignWorkflowPersistence({
   toast,
   computeGraphSignature,
   workflowRoutePrefix = '/workflows',
+  expectedVersionId,
+  onExpectedVersionSaveSuccess,
 }: UseDesignWorkflowPersistenceOptions): UseDesignWorkflowPersistenceResult {
   const [lastSavedGraphSignature, setLastSavedGraphSignature] = useState<string | null>(null);
   const [lastSavedMetadata, setLastSavedMetadata] = useState<SavedMetadata | null>(null);
@@ -174,7 +178,7 @@ export function useDesignWorkflowPersistence({
         const workflowId = metadata.id;
         const metadataChangesOnly = hasMetadataChanges && !hasGraphChanges;
 
-        if (metadataChangesOnly && workflowId && !isNewWorkflow) {
+        if (metadataChangesOnly && workflowId && !isNewWorkflow && !expectedVersionId) {
           const updatedMetadata = await api.workflows.updateMetadata(workflowId, {
             name: metadata.name,
             description: metadata.description ?? '',
@@ -282,7 +286,9 @@ export function useDesignWorkflowPersistence({
             designEdges,
           );
 
-          const updatedWorkflow = await api.workflows.update(workflowId, payload);
+          const updatedWorkflow = await api.workflows.update(workflowId, payload, {
+            expectedVersionId,
+          });
           setMetadata({
             id: updatedWorkflow.id,
             name: updatedWorkflow.name,
@@ -307,6 +313,10 @@ export function useDesignWorkflowPersistence({
             nodes: cloneNodes(designNodesRef.current),
             edges: cloneEdges(designEdgesRef.current),
           };
+
+          if (expectedVersionId) {
+            onExpectedVersionSaveSuccess?.();
+          }
 
           queryClient.invalidateQueries({ queryKey: queryKeys.workflows.summary() });
           queryClient.invalidateQueries({ queryKey: queryKeys.workflows.list() });
@@ -378,6 +388,8 @@ export function useDesignWorkflowPersistence({
       hasGraphChanges,
       hasMetadataChanges,
       workflowRoutePrefix,
+      expectedVersionId,
+      onExpectedVersionSaveSuccess,
     ],
   );
 

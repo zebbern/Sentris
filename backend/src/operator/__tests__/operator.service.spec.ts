@@ -16,6 +16,7 @@ import { WorkflowRuntimeInputValidationException } from '../../workflows/workflo
 import type { OperatorCommandService } from '../operator-command.service';
 import type { OperatorRepository } from '../operator.repository';
 import { OperatorService } from '../operator.service';
+import type { OperatorWorkflowAuthoringService } from '../operator-workflow-authoring.service';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const TURN_ID = '22222222-2222-4222-8222-222222222222';
@@ -51,6 +52,7 @@ function turnRecord(overrides: Partial<OperatorTurnRecord> = {}): OperatorTurnRe
   return {
     id: TURN_ID,
     sessionId: SESSION_ID,
+    actorRoles: ['MEMBER'],
     status: 'running',
     temporalWorkflowId: 'operator-turn:session:turn',
     temporalRunId: 'temporal-run',
@@ -97,6 +99,7 @@ describe('OperatorService', () => {
   let secrets: Record<string, ReturnType<typeof vi.fn>>;
   let temporal: Record<string, ReturnType<typeof vi.fn>>;
   let workflows: Record<string, ReturnType<typeof vi.fn>>;
+  let workflowAuthoring: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorService;
 
   beforeEach(() => {
@@ -155,12 +158,14 @@ describe('OperatorService', () => {
       getRunStatus: vi.fn(),
       getRunResult: vi.fn(),
     };
+    workflowAuthoring = { listDraftDetails: vi.fn().mockResolvedValue([]) };
     service = new OperatorService(
       repository as unknown as OperatorRepository,
       commands as unknown as OperatorCommandService,
       workflows as unknown as WorkflowsService,
       secrets as unknown as SecretsService,
       temporal as unknown as TemporalService,
+      workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
     );
   });
 
@@ -405,6 +410,43 @@ describe('OperatorService', () => {
 
     expect(result.disposition).toBe('already_completed');
     expect(result.action.id).toBe(ACTION_ID);
+  });
+
+  it('executes commands with the ADMIN authority persisted on the durable turn', async () => {
+    const turn = turnRecord({ actorRoles: ['ADMIN', 'MEMBER'] });
+    const approved = {
+      ...actionRecord('auto', 'approved'),
+      commandName: 'apply_workflow_draft' as const,
+      arguments: { draftId: '55555555-5555-4555-8555-555555555555' },
+    };
+    const executing = { ...approved, status: 'executing' as const };
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: approved,
+      turn,
+      session: sessionRecord('auto'),
+    });
+    repository.markActionExecuting.mockResolvedValue(executing);
+    commands.execute.mockResolvedValue({ result: { applied: true } });
+    repository.completeAction.mockResolvedValue({
+      ...executing,
+      status: 'succeeded',
+      result: { applied: true },
+    });
+
+    await service.executeInternalAction(ACTION_ID, 'operator-org');
+
+    expect(commands.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandName: 'apply_workflow_draft',
+        auth: {
+          userId: 'operator-user',
+          organizationId: 'operator-org',
+          roles: ['ADMIN', 'MEMBER'],
+          isAuthenticated: true,
+          provider: 'operator',
+        },
+      }),
+    );
   });
 
   it('signals the exact turn with the pre-decision version expected by the workflow', async () => {

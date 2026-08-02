@@ -1,4 +1,6 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -6,6 +8,7 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 
 import { requireOrganizationId } from '../common/auth/require-organization-id';
@@ -82,6 +85,14 @@ interface FlowContext {
       inputKey: string;
     }[]
   >;
+}
+
+export interface CreateWorkflowMutationOptions {
+  idempotencyKey?: string;
+}
+
+export interface UpdateWorkflowMutationOptions extends CreateWorkflowMutationOptions {
+  expectedVersionId?: string;
 }
 
 const FLOW_CONTEXT_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -188,21 +199,87 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     return this.workflowRunService.ensureRunAccess(runId, auth);
   }
 
-  async create(dto: WorkflowGraphDto, auth?: AuthContext | null): Promise<ServiceWorkflowResponse> {
+  async create(
+    dto: WorkflowGraphDto,
+    auth?: AuthContext | null,
+    options: CreateWorkflowMutationOptions = {},
+  ): Promise<ServiceWorkflowResponse> {
     const input = this.parse(dto);
+    const idempotencyKey = this.normalizeMutationIdempotencyKey(options.idempotencyKey);
 
     // Persistence intentionally accepts incomplete drafts. Execution and explicit
     // commit compile the selected version and surface actionable validation errors.
 
     this.ensureOrganizationAdmin(auth);
     const organizationId = requireOrganizationId(auth);
-    const { response, version } = await this.repository.transaction(async (executor) => {
-      const record = await this.repository.create(input, { organizationId, executor });
+    const { response, version, replayed } = await this.repository.transaction(async (executor) => {
+      if (idempotencyKey) {
+        const existingWorkflow = await this.repository.findByMutationIdempotencyKey(
+          idempotencyKey,
+          { organizationId, executor },
+        );
+        const existingVersion = await this.versionRepository.findByMutationIdempotencyKey(
+          idempotencyKey,
+          { organizationId, executor },
+        );
+        if (existingWorkflow || existingVersion) {
+          if (
+            !existingWorkflow ||
+            !existingVersion ||
+            existingVersion.workflowId !== existingWorkflow.id
+          ) {
+            throw new ConflictException(
+              `Workflow mutation key '${idempotencyKey}' is already used by another mutation`,
+            );
+          }
+          this.assertMutationReplayMatches(existingVersion, input, idempotencyKey);
+          return {
+            response: this.buildWorkflowResponseForVersion(existingWorkflow, existingVersion),
+            version: existingVersion,
+            replayed: true,
+          };
+        }
+      }
+
+      const record = await this.repository.create(input, {
+        organizationId,
+        executor,
+        mutationIdempotencyKey: idempotencyKey,
+      });
+      if (!record) {
+        if (!idempotencyKey) {
+          throw new Error('Workflow creation returned no record');
+        }
+        const existingWorkflow = await this.repository.findByMutationIdempotencyKey(
+          idempotencyKey,
+          { organizationId, executor },
+        );
+        const existingVersion = await this.versionRepository.findByMutationIdempotencyKey(
+          idempotencyKey,
+          { organizationId, executor },
+        );
+        if (
+          !existingWorkflow ||
+          !existingVersion ||
+          existingVersion.workflowId !== existingWorkflow.id
+        ) {
+          throw new ConflictException(
+            `Workflow mutation key '${idempotencyKey}' could not be recovered`,
+          );
+        }
+        this.assertMutationReplayMatches(existingVersion, input, idempotencyKey);
+        return {
+          response: this.buildWorkflowResponseForVersion(existingWorkflow, existingVersion),
+          version: existingVersion,
+          replayed: true,
+        };
+      }
       const createdVersion = await this.versionRepository.create(
         {
           workflowId: record.id,
           graph: input,
           organizationId,
+          mutationIdempotencyKey: idempotencyKey,
         },
         { executor },
       );
@@ -229,11 +306,15 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
           version: createdVersion.version,
         },
       });
-      return { response: createdResponse, version: createdVersion };
+      return { response: createdResponse, version: createdVersion, replayed: false };
     });
-    this.logger.log(
-      `Created workflow ${response.id} version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
-    );
+    if (replayed) {
+      this.logger.debug(`Replayed workflow creation ${response.id} version ${version.version}`);
+    } else {
+      this.logger.log(
+        `Created workflow ${response.id} version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
+      );
+    }
     return response;
   }
 
@@ -241,19 +322,62 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
     id: string,
     dto: WorkflowGraphDto,
     auth?: AuthContext | null,
+    options: UpdateWorkflowMutationOptions = {},
   ): Promise<ServiceWorkflowResponse> {
     const input = this.parse(dto);
+    const idempotencyKey = this.normalizeMutationIdempotencyKey(options.idempotencyKey);
 
     // Keep editing recoverable: validation gates execution/commit, not draft saves.
 
     const organizationId = await this.requireWorkflowAdmin(id, auth);
-    const { response, version } = await this.repository.transaction(async (executor) => {
+    const { response, version, replayed } = await this.repository.transaction(async (executor) => {
+      const lockedWorkflow = await this.repository.findByIdForUpdate(id, {
+        organizationId,
+        executor,
+      });
+      if (!lockedWorkflow) {
+        throw new NotFoundException(`Workflow ${id} not found`);
+      }
+
+      if (idempotencyKey) {
+        const replayVersion = await this.versionRepository.findByMutationIdempotencyKey(
+          idempotencyKey,
+          { organizationId, executor },
+        );
+        if (replayVersion) {
+          if (replayVersion.workflowId !== id) {
+            throw new ConflictException(
+              `Workflow mutation key '${idempotencyKey}' is already used by another workflow`,
+            );
+          }
+          this.assertMutationReplayMatches(replayVersion, input, idempotencyKey);
+          return {
+            response: this.buildWorkflowResponseForVersion(lockedWorkflow, replayVersion),
+            version: replayVersion,
+            replayed: true,
+          };
+        }
+      }
+
+      if (options.expectedVersionId) {
+        const latestVersion = await this.versionRepository.findLatestByWorkflowId(id, {
+          organizationId,
+          executor,
+        });
+        if (latestVersion?.id !== options.expectedVersionId) {
+          throw new ConflictException(
+            `Workflow ${id} changed since version ${options.expectedVersionId}; refresh before saving`,
+          );
+        }
+      }
+
       const record = await this.repository.update(id, input, { organizationId, executor });
       const createdVersion = await this.versionRepository.create(
         {
           workflowId: record.id,
           graph: input,
           organizationId,
+          mutationIdempotencyKey: idempotencyKey,
         },
         { executor },
       );
@@ -269,11 +393,15 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
           version: createdVersion.version,
         },
       });
-      return { response: updatedResponse, version: createdVersion };
+      return { response: updatedResponse, version: createdVersion, replayed: false };
     });
-    this.logger.log(
-      `Updated workflow ${response.id} to version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
-    );
+    if (replayed) {
+      this.logger.debug(`Replayed workflow update ${response.id} version ${version.version}`);
+    } else {
+      this.logger.log(
+        `Updated workflow ${response.id} to version ${version.version} (nodes=${input.nodes.length}, edges=${input.edges.length})`,
+      );
+    }
     return response;
   }
 
@@ -332,6 +460,46 @@ export class WorkflowsService implements OnModuleInit, OnModuleDestroy {
       currentVersionId: version?.id ?? null,
       currentVersion: version?.version ?? null,
     };
+  }
+
+  private buildWorkflowResponseForVersion(
+    record: WorkflowRecord,
+    version: WorkflowVersionRecord,
+  ): ServiceWorkflowResponse {
+    const graph = WorkflowGraphSchema.parse(version.graph);
+    return this.buildWorkflowResponse(
+      {
+        ...record,
+        name: graph.name,
+        description: graph.description ?? null,
+        graph,
+        compiledDefinition: version.compiledDefinition,
+      },
+      version,
+    );
+  }
+
+  private assertMutationReplayMatches(
+    version: WorkflowVersionRecord,
+    requestedGraph: WorkflowGraph,
+    idempotencyKey: string,
+  ): void {
+    const storedGraph = WorkflowGraphSchema.parse(version.graph);
+    const toJsonValue = (value: unknown): unknown => JSON.parse(JSON.stringify(value)) as unknown;
+    if (!isDeepStrictEqual(toJsonValue(storedGraph), toJsonValue(requestedGraph))) {
+      throw new ConflictException(
+        `Workflow mutation key '${idempotencyKey}' was reused with a different graph`,
+      );
+    }
+  }
+
+  private normalizeMutationIdempotencyKey(value: string | undefined): string | undefined {
+    if (value === undefined) return undefined;
+    const normalized = value.trim();
+    if (normalized.length === 0 || normalized.length > 191) {
+      throw new BadRequestException('Workflow mutation idempotency key must be 1-191 characters');
+    }
+    return normalized;
   }
 
   /**

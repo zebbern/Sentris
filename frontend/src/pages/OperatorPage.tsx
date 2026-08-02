@@ -42,6 +42,7 @@ import {
   useDecideOperatorAction,
   useOperatorSession,
   useOperatorSessions,
+  useOperatorWorkflowDrafts,
   useUpdateOperatorSession,
 } from '@/hooks/queries/useOperatorQueries';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ const SUGGESTED_PROMPTS = [
   'Show my workflows',
   'What are my most recent runs?',
   'Summarize the latest failed run',
+  'Build a workflow that scans a domain and summarizes findings',
 ] as const;
 
 function formatUpdatedAt(value: string): string {
@@ -302,6 +304,14 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isActive = operatorSessionHasActiveTurn(session);
   const latestTurnError = getOperatorSessionLatestTurnError(session);
+  const expectedWorkflowDraftCount = session.actions.filter(
+    (action) => action.commandName === 'propose_workflow_draft' && action.status === 'succeeded',
+  ).length;
+  const workflowDraftsQuery = useOperatorWorkflowDrafts(
+    session.id,
+    isActive,
+    expectedWorkflowDraftCount,
+  );
 
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -368,6 +378,7 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
           <OperatorTimeline
             messages={session.messages}
             actions={session.actions}
+            workflowDrafts={workflowDraftsQuery.data ?? []}
             isActive={isActive}
             pendingDecisionActionId={decideAction.variables?.actionId}
             runCommandDisabled={isActive || createTurn.isPending}

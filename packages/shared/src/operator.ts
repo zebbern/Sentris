@@ -5,6 +5,12 @@ import { LLM_PROVIDER_IDS } from './ai-model-catalog.js';
 import { FindingTriageStatusSchema, UpdateFindingTriageSchema } from './finding-triage.js';
 import { FindingObservationSeveritySchema } from './findings/findingObservation.js';
 import type { McpOperationInvocationRequest } from './mcp-invocation.js';
+import {
+  WorkflowEdgeSchema,
+  WorkflowGraphObjectSchema,
+  WorkflowNodeSchema,
+  type WorkflowGraph,
+} from './workflow-graph.js';
 
 export const OPERATOR_APPROVAL_MODES = ['ask', 'auto'] as const;
 export const OperatorApprovalModeSchema = z.enum(OPERATOR_APPROVAL_MODES);
@@ -67,6 +73,9 @@ export type OperatorRouteContext = z.infer<typeof OperatorRouteContextSchema>;
 const WorkflowIdSchema = z.string().uuid();
 const RunIdSchema = z.string().trim().min(1).max(191);
 const FindingIdSchema = z.string().trim().min(1).max(512);
+const MAX_OPERATOR_WORKFLOW_DRAFT_BYTES = 256 * 1024;
+const MAX_OPERATOR_WORKFLOW_DRAFT_NODES = 200;
+const MAX_OPERATOR_WORKFLOW_DRAFT_EDGES = 1_000;
 
 export const OperatorListWorkflowsInputSchema = z
   .object({
@@ -82,6 +91,133 @@ export const OperatorGetWorkflowInputSchema = z
     version: z.number().int().positive().optional(),
   })
   .strict();
+
+export const OperatorListComponentsInputSchema = z
+  .object({
+    search: z.string().trim().min(1).max(191).optional(),
+    category: z.string().trim().min(1).max(64).optional(),
+    limit: z.number().int().min(1).max(100).default(50),
+  })
+  .strict();
+
+export const OperatorGetComponentInputSchema = z
+  .object({ componentId: z.string().trim().min(1).max(191) })
+  .strict();
+
+export const OperatorWorkflowGraphSchema = WorkflowGraphObjectSchema.extend({
+  name: z.string().trim().min(1).max(191),
+  description: z.string().max(8_000).optional(),
+  nodes: z.array(WorkflowNodeSchema).min(1).max(MAX_OPERATOR_WORKFLOW_DRAFT_NODES),
+  edges: z.array(WorkflowEdgeSchema).max(MAX_OPERATOR_WORKFLOW_DRAFT_EDGES),
+}).superRefine((graph, context) => {
+  const portInputs = new Set<string>();
+  for (const edge of graph.edges) {
+    const targetHandle = edge.targetHandle ?? edge.sourceHandle;
+    if (!targetHandle || targetHandle === 'tools') continue;
+    const key = `${edge.target}:${targetHandle}`;
+    if (portInputs.has(key)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Multiple edges cannot connect to the same non-tools input port',
+        path: ['edges'],
+      });
+      break;
+    }
+    portInputs.add(key);
+  }
+
+  const serialized = JSON.stringify(graph);
+  if (new TextEncoder().encode(serialized).byteLength > MAX_OPERATOR_WORKFLOW_DRAFT_BYTES) {
+    context.addIssue({
+      code: 'custom',
+      message: `Workflow draft exceeds ${MAX_OPERATOR_WORKFLOW_DRAFT_BYTES} bytes`,
+      path: [],
+    });
+  }
+});
+
+export const OperatorProposeWorkflowDraftInputSchema = z
+  .object({
+    workflowId: WorkflowIdSchema.optional(),
+    baseVersionId: z.string().uuid().optional(),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    graph: OperatorWorkflowGraphSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (Boolean(value.workflowId) !== Boolean(value.baseVersionId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'workflowId and baseVersionId must either both be provided or both be omitted',
+        path: value.workflowId ? ['baseVersionId'] : ['workflowId'],
+      });
+    }
+  });
+
+export const OperatorApplyWorkflowDraftInputSchema = z
+  .object({ draftId: z.string().uuid() })
+  .strict();
+
+export const OperatorWorkflowDraftValidationSchema = z
+  .object({
+    valid: z.boolean(),
+    errors: z.array(z.string().max(2_000)).max(50),
+  })
+  .strict();
+
+export const OperatorWorkflowGraphDiffSchema = z
+  .object({
+    metadataChanged: z.array(z.enum(['name', 'description'])),
+    addedNodeIds: z.array(z.string()),
+    removedNodeIds: z.array(z.string()),
+    changedNodeIds: z.array(z.string()),
+    addedEdgeIds: z.array(z.string()),
+    removedEdgeIds: z.array(z.string()),
+    changedEdgeIds: z.array(z.string()),
+  })
+  .strict();
+
+export const OperatorWorkflowDraftResultSchema = z
+  .object({
+    kind: z.literal('workflow-draft'),
+    draftId: z.string().uuid(),
+    mode: z.enum(['create', 'update']),
+    workflowId: WorkflowIdSchema.nullable(),
+    baseVersionId: z.string().uuid().nullable(),
+    name: z.string(),
+    digest: z.string().min(1),
+    validation: OperatorWorkflowDraftValidationSchema,
+    diff: OperatorWorkflowGraphDiffSchema,
+  })
+  .strict();
+export type OperatorWorkflowDraftResult = z.infer<typeof OperatorWorkflowDraftResultSchema>;
+
+export const OperatorWorkflowApplyResultSchema = z
+  .object({
+    kind: z.literal('workflow-applied'),
+    draftId: z.string().uuid(),
+    workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid(),
+    version: z.number().int().positive(),
+    created: z.boolean(),
+    name: z.string(),
+  })
+  .strict();
+export type OperatorWorkflowApplyResult = z.infer<typeof OperatorWorkflowApplyResultSchema>;
+
+export const OperatorWorkflowDraftDetailSchema = OperatorWorkflowDraftResultSchema.extend({
+  proposalActionId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  proposedGraph: OperatorWorkflowGraphSchema,
+  baseGraph: OperatorWorkflowGraphSchema.nullable(),
+});
+export type OperatorWorkflowDraftDetail = Omit<
+  z.infer<typeof OperatorWorkflowDraftDetailSchema>,
+  'proposedGraph' | 'baseGraph'
+> & {
+  proposedGraph: WorkflowGraph;
+  baseGraph: WorkflowGraph | null;
+};
 
 export const OperatorListRunsInputSchema = z
   .object({
@@ -187,9 +323,33 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   get_workflow: {
     description:
-      'Inspect one existing workflow version, including its graph summary and exact runtime-input contract. Use this before run_workflow so input IDs and types are not guessed.',
+      'Inspect one existing workflow version, including its editable credential-safe graph, graph summary, and exact runtime-input contract. Use this before proposing a change or running it.',
     effect: 'read',
     inputSchema: OperatorGetWorkflowInputSchema,
+  },
+  list_components: {
+    description:
+      'Search the current Sentris component catalog before authoring a workflow. Returns exact component IDs and compact capabilities.',
+    effect: 'read',
+    inputSchema: OperatorListComponentsInputSchema,
+  },
+  get_component: {
+    description:
+      'Inspect one current component definition, including exact parameters, inputs, outputs, and examples. Use exact IDs and port names in workflow drafts.',
+    effect: 'read',
+    inputSchema: OperatorGetComponentInputSchema,
+  },
+  propose_workflow_draft: {
+    description:
+      'Propose and compile-check a complete new or modified workflow graph without changing the saved workflow. For updates, use the exact workflowId, baseVersionId, and credential-safe graph returned by get_workflow. A valid proposal can then be applied separately.',
+    effect: 'execute',
+    inputSchema: OperatorProposeWorkflowDraftInputSchema,
+  },
+  apply_workflow_draft: {
+    description:
+      'Apply one previously validated workflow draft, creating a workflow or one new immutable version. This is consequential in Ask mode and rejects a stale base version.',
+    effect: 'consequential',
+    inputSchema: OperatorApplyWorkflowDraftInputSchema,
   },
   list_runs: {
     description:
@@ -287,6 +447,10 @@ export type OperatorCommandName = z.infer<typeof OperatorCommandNameSchema>;
 export type OperatorCommandInputMap = {
   list_workflows: z.infer<typeof OperatorListWorkflowsInputSchema>;
   get_workflow: z.infer<typeof OperatorGetWorkflowInputSchema>;
+  list_components: z.infer<typeof OperatorListComponentsInputSchema>;
+  get_component: z.infer<typeof OperatorGetComponentInputSchema>;
+  propose_workflow_draft: z.infer<typeof OperatorProposeWorkflowDraftInputSchema>;
+  apply_workflow_draft: z.infer<typeof OperatorApplyWorkflowDraftInputSchema>;
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
   run_workflow: z.infer<typeof OperatorRunWorkflowInputSchema>;
@@ -303,6 +467,12 @@ export type OperatorCommandInputMap = {
 };
 
 export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
+  z
+    .object({
+      commandName: z.literal('apply_workflow_draft'),
+      arguments: OperatorApplyWorkflowDraftInputSchema,
+    })
+    .strict(),
   z
     .object({
       commandName: z.literal('get_run'),

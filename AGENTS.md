@@ -334,8 +334,14 @@ old-history replay. Explicit run-card inspect, cancel, and retry controls are st
 user-confirmed Operator turns. Retry creates one new run from the original stored version,
 inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
 tool, resource, and prompt calls dispatch through the same canonical runtime and durable
-invocation path. Provider-native tool-call continuation metadata lives in the Temporal turn
-history; Postgres action rows remain provider-neutral audit records.
+invocation path. Workflow authoring also uses typed durable actions: component discovery is
+registry-backed, proposals are credential-safe bounded graphs with compile validation and a
+diff, and apply is a separate consequential action using proposal-ID idempotency plus an exact
+base-version fence. The Builder may hydrate a proposal only as an unsaved draft and restores
+credential placeholders from the freshly fetched persisted graph. Turn records snapshot the
+initiating actor roles so delayed authoring keeps the user's workflow authority. Provider-native
+tool-call continuation metadata lives in the Temporal turn history; Postgres action rows remain
+provider-neutral audit records.
 
 The generic workflow-graph `core.ai.agent` now prepares each turn in an activity and runs
 the loop as a patch-gated Temporal child Workflow. Inline provider keys are sealed with

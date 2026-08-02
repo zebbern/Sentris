@@ -121,6 +121,40 @@ describe('WorkflowPreview', () => {
     expect(rects.length).toBeGreaterThan(0);
   });
 
+  it('recognizes backend graphs whose component reference is stored in node.type', () => {
+    const graph = {
+      nodes: [
+        {
+          id: 'entry',
+          type: 'core.workflow.entrypoint',
+          position: { x: 0, y: 0 },
+          data: { label: 'Entry Point' },
+        },
+      ],
+      edges: [],
+    };
+
+    const { container } = render(<WorkflowPreview graph={graph} />);
+
+    expect(container.querySelector('rect[rx="20"]')).toBeTruthy();
+  });
+
+  it('uses unique marker and clip-path ids when two previews render together', () => {
+    const graph = createMockGraph(2, [[0, 1]]);
+    const { container } = render(
+      <>
+        <WorkflowPreview graph={graph} />
+        <WorkflowPreview graph={graph} />
+      </>,
+    );
+
+    const markerIds = [...container.querySelectorAll('marker')].map((marker) => marker.id);
+    const clipIds = [...container.querySelectorAll('clipPath')].map((clipPath) => clipPath.id);
+
+    expect(new Set(markerIds).size).toBe(markerIds.length);
+    expect(new Set(clipIds).size).toBe(clipIds.length);
+  });
+
   it('renders port dots on nodes', () => {
     const graph = createMockGraph(2, [[0, 1]]);
     const { container } = render(<WorkflowPreview graph={graph} />);

@@ -16,7 +16,7 @@ import type {
   OperatorTurnStatus,
 } from '@sentris/shared';
 
-import type { AuthContext } from '../auth/types';
+import type { AuthContext, AuthRole } from '../auth/types';
 import { AuditLogService } from '../audit/audit-log.service';
 import { DRIZZLE_TOKEN } from '../database/database.module';
 import {
@@ -42,13 +42,22 @@ function assertTurnReplayMatches(
   storedMessage: string | null,
   requestedMessage: string,
   requestedPayload: OperatorPersistedTurnPayload,
+  requestedActorRoles: AuthRole[],
 ): void {
   const storedPayload = readOperatorTurnPayload(turn.context);
-  if (storedMessage !== requestedMessage || !isDeepStrictEqual(storedPayload, requestedPayload)) {
+  if (
+    storedMessage !== requestedMessage ||
+    !isDeepStrictEqual(storedPayload, requestedPayload) ||
+    !isDeepStrictEqual(turn.actorRoles, requestedActorRoles)
+  ) {
     throw new ConflictException(
-      'Turn identifier is already used with different message, context, or command',
+      'Turn identifier is already used with different message, context, command, or authority',
     );
   }
+}
+
+function normalizeActorRoles(roles: readonly AuthRole[]): AuthRole[] {
+  return [...new Set(roles)].sort();
 }
 
 @Injectable()
@@ -226,6 +235,7 @@ export class OperatorRepository {
       routeContext: input.context,
       directCommand: input.directCommand,
     });
+    const actorRoles = normalizeActorRoles(input.auth.roles);
     return this.db.transaction(async (tx) => {
       const [lockedSession] = await tx
         .select({ id: operatorSessionsTable.id })
@@ -254,7 +264,13 @@ export class OperatorRepository {
         if (existing.turn.sessionId !== input.session.id) {
           throw new ConflictException('Turn identifier is already used by another session');
         }
-        assertTurnReplayMatches(existing.turn, existing.message, input.message, persistedPayload);
+        assertTurnReplayMatches(
+          existing.turn,
+          existing.message,
+          input.message,
+          persistedPayload,
+          actorRoles,
+        );
         return { turn: existing.turn, created: false };
       }
 
@@ -277,6 +293,7 @@ export class OperatorRepository {
         .values({
           id: input.id,
           sessionId: input.session.id,
+          actorRoles,
           context: persistedPayload,
         })
         .onConflictDoNothing({ target: operatorTurnsTable.id })
@@ -306,6 +323,7 @@ export class OperatorRepository {
           conflicting.message,
           input.message,
           persistedPayload,
+          actorRoles,
         );
         return { turn: conflicting.turn, created: false };
       }

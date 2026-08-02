@@ -13,6 +13,9 @@ import {
   OperatorStoredTurnContextSchema,
   OperatorCreateTurnSchema,
   OperatorUpdateFindingTriageInputSchema,
+  OperatorProposeWorkflowDraftInputSchema,
+  OperatorWorkflowApplyResultSchema,
+  OperatorWorkflowDraftResultSchema,
 } from '../operator.js';
 
 describe('Operator run controls', () => {
@@ -86,12 +89,104 @@ describe('Operator run controls', () => {
     expect(OperatorPersistedTurnPayloadSchema.parse(payload)).toEqual(payload);
     expect(OperatorStoredTurnContextSchema.parse(routeContext)).toEqual(routeContext);
     expect(OperatorStoredTurnContextSchema.parse(null)).toBeNull();
-    expect(
-      OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 2 }).success,
-    ).toBe(false);
+    expect(OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 2 }).success).toBe(
+      false,
+    );
     expect(
       OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, unexpected: true }).success,
     ).toBe(false);
+  });
+});
+
+describe('Operator workflow authoring commands', () => {
+  const graph = {
+    name: 'Package review',
+    nodes: [
+      {
+        id: 'entry',
+        type: 'core.workflow.entrypoint',
+        position: { x: 0, y: 0 },
+        data: { label: 'Entry Point', config: { params: {}, inputOverrides: {} } },
+      },
+    ],
+    edges: [],
+    viewport: { x: 0, y: 0, zoom: 1 },
+  };
+
+  it('keeps proposal automatic and applying a saved version consequential', () => {
+    expect(OPERATOR_COMMAND_DEFINITIONS.list_components.effect).toBe('read');
+    expect(OPERATOR_COMMAND_DEFINITIONS.get_component.effect).toBe('read');
+    expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.effect).toBe('execute');
+    expect(OPERATOR_COMMAND_DEFINITIONS.apply_workflow_draft.effect).toBe('consequential');
+  });
+
+  it('requires update proposals to pin both workflow and immutable base version', () => {
+    expect(OperatorProposeWorkflowDraftInputSchema.parse({ graph })).toEqual({ graph });
+    expect(
+      OperatorProposeWorkflowDraftInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        graph,
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeWorkflowDraftInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        baseVersionId: '33333333-3333-4333-8333-333333333333',
+        graph,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('keeps compact draft and apply results typed for durable UI rendering', () => {
+    const draftId = '44444444-4444-4444-8444-444444444444';
+    expect(
+      OperatorWorkflowDraftResultSchema.parse({
+        kind: 'workflow-draft',
+        draftId,
+        mode: 'create',
+        workflowId: null,
+        baseVersionId: null,
+        name: graph.name,
+        digest: 'sha256',
+        validation: { valid: true, errors: [] },
+        diff: {
+          metadataChanged: ['name'],
+          addedNodeIds: ['entry'],
+          removedNodeIds: [],
+          changedNodeIds: [],
+          addedEdgeIds: [],
+          removedEdgeIds: [],
+          changedEdgeIds: [],
+        },
+      }).draftId,
+    ).toBe(draftId);
+    expect(
+      OperatorWorkflowApplyResultSchema.parse({
+        kind: 'workflow-applied',
+        draftId,
+        workflowId: '55555555-5555-4555-8555-555555555555',
+        versionId: '66666666-6666-4666-8666-666666666666',
+        version: 1,
+        created: true,
+        name: graph.name,
+      }).created,
+    ).toBe(true);
+  });
+
+  it('accepts an explicit save button as a direct user-confirmed command', () => {
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: '11111111-1111-4111-8111-111111111111',
+        message: 'Save this workflow draft',
+        directCommand: {
+          commandName: 'apply_workflow_draft',
+          arguments: { draftId: '44444444-4444-4444-8444-444444444444' },
+        },
+      }).directCommand,
+    ).toEqual({
+      commandName: 'apply_workflow_draft',
+      arguments: { draftId: '44444444-4444-4444-8444-444444444444' },
+    });
   });
 });
 

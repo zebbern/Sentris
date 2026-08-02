@@ -5,6 +5,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -23,6 +24,7 @@ export const workflowsTable = pgTable(
     description: text('description'),
     graph: jsonb('graph').$type<WorkflowGraph>().notNull(),
     organizationId: varchar('organization_id', { length: 191 }),
+    mutationIdempotencyKey: varchar('mutation_idempotency_key', { length: 191 }),
     compiledDefinition: jsonb('compiled_definition')
       .$type<WorkflowDefinition | null>()
       .default(null),
@@ -38,5 +40,8 @@ export const workflowsTable = pgTable(
       table.createdAt,
     ),
     updatedAtIdx: index('workflows_updated_at_idx').on(table.updatedAt),
+    mutationIdempotencyKeyUniqueIdx: uniqueIndex('workflows_mutation_idempotency_key_uidx').on(
+      table.mutationIdempotencyKey,
+    ),
   }),
 );

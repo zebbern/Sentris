@@ -78,4 +78,63 @@ describe('OperatorTimeline', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     expect(onDecision).toHaveBeenCalledWith(pendingAction, 'rejected');
   });
+
+  it('disables the proposal save action after a succeeded apply for the same draft', () => {
+    const draftId = '11111111-1111-4111-8111-111111111111';
+    const proposalAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'proposal-action',
+      commandName: 'propose_workflow_draft',
+      status: 'succeeded',
+      approvalRequired: false,
+      result: {
+        kind: 'workflow-draft',
+        draftId,
+        mode: 'create',
+        workflowId: null,
+        baseVersionId: null,
+        name: 'Operator workflow',
+        digest: 'Create a workflow',
+        validation: { valid: true, errors: [] },
+        diff: {
+          metadataChanged: ['name'],
+          addedNodeIds: ['entry'],
+          removedNodeIds: [],
+          changedNodeIds: [],
+          addedEdgeIds: [],
+          removedEdgeIds: [],
+          changedEdgeIds: [],
+        },
+      },
+    };
+    const applyAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'apply-action',
+      commandName: 'apply_workflow_draft',
+      status: 'succeeded',
+      approvalRequired: false,
+      result: {
+        kind: 'workflow-applied',
+        draftId,
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        version: 1,
+        created: true,
+        name: 'Operator workflow',
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[proposalAction, applyAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /save version/i })).not.toBeInTheDocument();
+  });
 });

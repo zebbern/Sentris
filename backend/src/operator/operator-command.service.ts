@@ -19,6 +19,10 @@ import { FindingsQueryService } from '../analytics/findings-query.service';
 import { FindingTriageService } from '../findings/finding-triage.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
+import {
+  OPERATOR_PRESERVE_CREDENTIAL,
+  OperatorWorkflowAuthoringService,
+} from './operator-workflow-authoring.service';
 
 const MAX_COMMAND_RESULT_CHARS = 60_000;
 
@@ -46,6 +50,7 @@ export class OperatorCommandService {
     private readonly findingsQueryService: FindingsQueryService,
     private readonly findingTriageService: FindingTriageService,
     private readonly operatorMcpAuthorityService: OperatorMcpAuthorityService,
+    private readonly operatorWorkflowAuthoringService: OperatorWorkflowAuthoringService,
   ) {}
 
   async execute(input: {
@@ -72,6 +77,26 @@ export class OperatorCommandService {
         return this.getWorkflow(
           OPERATOR_COMMAND_DEFINITIONS.get_workflow.inputSchema.parse(input.arguments),
           input.auth,
+        );
+      case 'list_components':
+        return this.listComponents(
+          OPERATOR_COMMAND_DEFINITIONS.list_components.inputSchema.parse(input.arguments),
+        );
+      case 'get_component':
+        return this.getComponent(
+          OPERATOR_COMMAND_DEFINITIONS.get_component.inputSchema.parse(input.arguments),
+        );
+      case 'propose_workflow_draft':
+        return this.proposeWorkflowDraft(
+          OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.inputSchema.parse(input.arguments),
+          input.auth,
+          input.actionId,
+        );
+      case 'apply_workflow_draft':
+        return this.applyWorkflowDraft(
+          OPERATOR_COMMAND_DEFINITIONS.apply_workflow_draft.inputSchema.parse(input.arguments),
+          input.auth,
+          input.sessionId,
         );
       case 'list_runs':
         return this.listRuns(
@@ -183,8 +208,18 @@ export class OperatorCommandService {
     const runtimeInputs = describeWorkflowRuntimeInputs(
       extractWorkflowRuntimeInputDefinitions(definition),
     );
+    let editableGraph: unknown = null;
+    let authoringUnavailable: string | undefined;
+    try {
+      editableGraph = this.operatorWorkflowAuthoringService.projectGraph(graph);
+    } catch (error: unknown) {
+      authoringUnavailable =
+        error instanceof Error
+          ? error.message
+          : 'Workflow graph is too large for Operator authoring';
+    }
     return {
-      result: toBoundedJson({
+      result: {
         id: workflow.id,
         name: workflow.name,
         description: workflow.description,
@@ -193,6 +228,9 @@ export class OperatorCommandService {
         runtimeInputs,
         nodeCount: graph.nodes.length,
         edgeCount: graph.edges.length,
+        editableGraph,
+        credentialPlaceholder: OPERATOR_PRESERVE_CREDENTIAL,
+        ...(authoringUnavailable ? { authoringUnavailable } : {}),
         nodes: graph.nodes.slice(0, 50).map((node) => ({
           id: node.id,
           type: node.type,
@@ -201,6 +239,46 @@ export class OperatorCommandService {
               ? (node.data as { label: string }).label
               : null,
         })),
+      },
+    };
+  }
+
+  private listComponents(input: OperatorCommandInputMap['list_components']): { result: unknown } {
+    return {
+      result: toBoundedJson({
+        components: this.operatorWorkflowAuthoringService.listComponents(input),
+      }),
+    };
+  }
+
+  private getComponent(input: OperatorCommandInputMap['get_component']): { result: unknown } {
+    return { result: toBoundedJson(this.operatorWorkflowAuthoringService.getComponent(input)) };
+  }
+
+  private async proposeWorkflowDraft(
+    input: OperatorCommandInputMap['propose_workflow_draft'],
+    auth: AuthContext,
+    actionId: string,
+  ): Promise<{ result: unknown }> {
+    return {
+      result: await this.operatorWorkflowAuthoringService.propose({
+        arguments: input,
+        auth,
+        actionId,
+      }),
+    };
+  }
+
+  private async applyWorkflowDraft(
+    input: OperatorCommandInputMap['apply_workflow_draft'],
+    auth: AuthContext,
+    sessionId: string,
+  ): Promise<{ result: unknown }> {
+    return {
+      result: await this.operatorWorkflowAuthoringService.apply({
+        arguments: input,
+        auth,
+        sessionId,
       }),
     };
   }

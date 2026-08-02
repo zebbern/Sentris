@@ -34,6 +34,7 @@ type WorkflowGraph = z.infer<typeof WorkflowGraphSchema>;
 
 export interface WorkflowRepositoryOptions extends WorkflowTransactionOptions {
   organizationId?: string | null;
+  mutationIdempotencyKey?: string;
 }
 
 @Injectable()
@@ -52,19 +53,39 @@ export class WorkflowRepository {
   async create(
     input: WorkflowGraph,
     options: WorkflowRepositoryOptions = {},
-  ): Promise<WorkflowRecord> {
+  ): Promise<WorkflowRecord | undefined> {
     const executor = options.executor ?? this.db;
-    const [record] = await executor
-      .insert(workflowsTable)
-      .values({
-        name: input.name,
-        description: input.description ?? null,
-        graph: input,
-        compiledDefinition: null,
-        organizationId: options.organizationId ?? null,
-      })
-      .returning();
+    const query = executor.insert(workflowsTable).values({
+      name: input.name,
+      description: input.description ?? null,
+      graph: input,
+      compiledDefinition: null,
+      organizationId: options.organizationId ?? null,
+      mutationIdempotencyKey: options.mutationIdempotencyKey ?? null,
+    });
+    const [record] = options.mutationIdempotencyKey
+      ? await query
+          .onConflictDoNothing({ target: workflowsTable.mutationIdempotencyKey })
+          .returning()
+      : await query.returning();
 
+    return record;
+  }
+
+  async findByMutationIdempotencyKey(
+    mutationIdempotencyKey: string,
+    options: WorkflowRepositoryOptions = {},
+  ): Promise<WorkflowRecord | undefined> {
+    const executor = options.executor ?? this.db;
+    const conditions = [eq(workflowsTable.mutationIdempotencyKey, mutationIdempotencyKey)];
+    if (options.organizationId) {
+      conditions.push(eq(workflowsTable.organizationId, options.organizationId));
+    }
+    const [record] = await executor
+      .select()
+      .from(workflowsTable)
+      .where(and(...conditions))
+      .limit(1);
     return record;
   }
 
@@ -146,6 +167,20 @@ export class WorkflowRepository {
       .select()
       .from(workflowsTable)
       .where(this.buildIdFilter(id, options.organizationId))
+      .limit(1);
+    return record;
+  }
+
+  async findByIdForUpdate(
+    id: string,
+    options: WorkflowRepositoryOptions = {},
+  ): Promise<WorkflowRecord | undefined> {
+    const executor = options.executor ?? this.db;
+    const [record] = await executor
+      .select()
+      .from(workflowsTable)
+      .where(this.buildIdFilter(id, options.organizationId))
+      .for('update')
       .limit(1);
     return record;
   }

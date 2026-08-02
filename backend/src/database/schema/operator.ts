@@ -22,6 +22,7 @@ import type {
   OperatorStoredTurnContext,
   OperatorTurnStatus,
 } from '@sentris/shared';
+import type { AuthRole } from '../../auth/types';
 
 export const operatorSessionsTable = pgTable(
   'operator_sessions',
@@ -67,6 +68,7 @@ export const operatorTurnsTable = pgTable(
       .default('queued'),
     temporalWorkflowId: text('temporal_workflow_id'),
     temporalRunId: text('temporal_run_id'),
+    actorRoles: jsonb('actor_roles').$type<AuthRole[]>().notNull().default(['MEMBER']),
     context: jsonb('context').$type<OperatorStoredTurnContext>().default(null),
     error: text('error'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

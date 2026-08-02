@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { Node as ReactFlowNode, Edge as ReactFlowEdge } from '@xyflow/react';
+import type { WorkflowGraph } from '@sentris/shared';
 import { useToast } from '@/components/ui/use-toast';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { useWorkflowUiStore } from '@/store/workflowUiStore';
@@ -11,6 +12,7 @@ import { hasAdminRole } from '@/utils/auth';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { getRunByIdFromCache } from '@/hooks/queries/useRunQueries';
+import { useOperatorWorkflowDraftForBuilder } from '@/hooks/queries/useOperatorQueries';
 import type { FrontendNodeData } from '@/schemas/node';
 import { useWorkflowGraphControllers } from './useWorkflowGraphControllers';
 import { useWorkflowHistory } from './useWorkflowHistory';
@@ -26,6 +28,7 @@ import { useWorkflowKeyboardShortcuts } from './useWorkflowKeyboardShortcuts';
 import { computeGraphSignature } from '../workflowBuilderUtils';
 import { consumeScopedLaunchSearch } from '@/lib/targetNavigation';
 import { useScopedWorkflowLaunch } from './useScopedWorkflowLaunch';
+import { deserializeWorkflowGraph } from '@/utils/workflowSerializer';
 
 const BUILDER_ROUTE_PREFIX = '/workflows';
 
@@ -45,6 +48,34 @@ export function useWorkflowBuilderState() {
     () => new URLSearchParams(location.search).get('launch') === '1',
     [location.search],
   );
+  const operatorDraftRequest = useMemo(() => {
+    const search = new URLSearchParams(location.search);
+    const sessionId = search.get('operatorSessionId');
+    const draftId = search.get('draftId');
+    return sessionId && draftId ? { sessionId, draftId } : null;
+  }, [location.search]);
+  const operatorDraftQuery = useOperatorWorkflowDraftForBuilder(
+    operatorDraftRequest?.sessionId,
+    operatorDraftRequest?.draftId,
+  );
+  const operatorDraft = operatorDraftQuery.draft;
+  const expectedWorkflowVersionId =
+    operatorDraft?.mode === 'update' ? (operatorDraft.baseVersionId ?? undefined) : undefined;
+  const clearOperatorDraftQueryContext = useCallback(() => {
+    if (!operatorDraftRequest) return;
+    const search = new URLSearchParams(location.search);
+    search.delete('operatorSessionId');
+    search.delete('draftId');
+    const nextSearch = search.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, location.search, navigate, operatorDraftRequest]);
   const isNewWorkflow = id === 'new';
   const isRunsRoute = location.pathname.includes('/runs') && !routeRunId;
   const isInWorkflowBuilder = location.pathname.match(/^\/workflows\/[^/]/) !== null;
@@ -208,6 +239,8 @@ export function useWorkflowBuilderState() {
       toast,
       computeGraphSignature: buildGraphSignature,
       workflowRoutePrefix: BUILDER_ROUTE_PREFIX,
+      expectedVersionId: expectedWorkflowVersionId,
+      onExpectedVersionSaveSuccess: clearOperatorDraftQueryContext,
     });
 
   // --- Execution lifecycle ---
@@ -267,7 +300,17 @@ export function useWorkflowBuilderState() {
     setMetadata,
     setWorkflowId,
     markClean,
+    markDirty,
     resetWorkflow,
+    operatorDraftRequest,
+    operatorDraft,
+    isOperatorDraftLoading: Boolean(operatorDraftRequest && operatorDraftQuery.isDraftLoading),
+    operatorDraftError:
+      operatorDraftRequest && operatorDraftQuery.error
+        ? operatorDraftQuery.error instanceof Error
+          ? operatorDraftQuery.error
+          : new Error('Failed to load the durable workflow draft.')
+        : null,
     setDesignNodes,
     setDesignEdges,
     designNodesRef,
@@ -371,19 +414,23 @@ export function useWorkflowBuilderState() {
 
   const handleLoadVersion = useCallback(
     (graph: {
-      nodes: unknown[];
-      edges: unknown[];
-      viewport?: { x: number; y: number; zoom: number };
+      nodes: WorkflowGraph['nodes'];
+      edges: WorkflowGraph['edges'];
+      viewport?: WorkflowGraph['viewport'];
     }) => {
-      setDesignNodes(graph.nodes as ReactFlowNode<FrontendNodeData>[]);
-      setDesignEdges(graph.edges as ReactFlowEdge[]);
+      const deserialized = deserializeWorkflowGraph(graph);
+      setDesignNodes(deserialized.nodes);
+      setDesignEdges(deserialized.edges);
       markDirty();
     },
     [setDesignNodes, setDesignEdges, markDirty],
   );
 
   const shouldShowInitialLoader =
-    isLoading && designNodes.length === 0 && executionNodes.length === 0 && !isNewWorkflow;
+    isLoading &&
+    designNodes.length === 0 &&
+    executionNodes.length === 0 &&
+    (!isNewWorkflow || operatorDraftRequest !== null);
 
   return {
     // Route info

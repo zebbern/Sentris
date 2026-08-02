@@ -13,6 +13,7 @@ import { OperatorController } from './operator.controller';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
 import { OperatorRepository } from './operator.repository';
 import { OperatorService } from './operator.service';
+import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.service';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { OperatorService } from './operator.service';
     OperatorService,
     OperatorCommandService,
     OperatorMcpAuthorityService,
+    OperatorWorkflowAuthoringService,
     OperatorRepository,
     InternalOnlyGuard,
   ],

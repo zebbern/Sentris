@@ -6,7 +6,7 @@ import {
   type GraphSnapshot,
 } from '@/features/workflow-builder/hooks/useWorkflowGraphControllers';
 import { ENTRY_COMPONENT_ID, ENTRY_COMPONENT_SLUG } from '@/utils/entryPointUtils';
-import { deserializeNodes, deserializeEdges } from '@/utils/workflowSerializer';
+import { deserializeWorkflowGraph } from '@/utils/workflowSerializer';
 import { useExecutionStore } from '@/store/executionStore';
 import { useExecutionTimelineStore } from '@/store/executionTimelineStore';
 import { api, API_BASE_URL } from '@/services/api';
@@ -20,6 +20,8 @@ import type { FrontendNodeData } from '@/schemas/node';
 import type { ComponentMetadata } from '@/schemas/component';
 import type { ToastContextValue } from '@/components/ui/toast-context';
 import { logger } from '@/lib/logger';
+import type { OperatorWorkflowDraftDetail } from '@sentris/shared';
+import { materializeOperatorDraftGraph } from '../operatorDraftHydration';
 
 interface WorkflowMetadataShape {
   id: string | null;
@@ -41,7 +43,12 @@ interface UseWorkflowLoaderParams {
   setMetadata: (meta: Partial<WorkflowMetadataShape>) => void;
   setWorkflowId: (id: string) => void;
   markClean: () => void;
+  markDirty: () => void;
   resetWorkflow: () => void;
+  operatorDraftRequest: { sessionId: string; draftId: string } | null;
+  operatorDraft: OperatorWorkflowDraftDetail | null;
+  isOperatorDraftLoading: boolean;
+  operatorDraftError: Error | null;
   // Design graph
   setDesignNodes: (nodes: ReactFlowNode<FrontendNodeData>[]) => void;
   setDesignEdges: (edges: ReactFlowEdge[]) => void;
@@ -59,11 +66,39 @@ interface UseWorkflowLoaderParams {
   // History
   initializeHistory: (nodes: ReactFlowNode<FrontendNodeData>[], edges: ReactFlowEdge[]) => void;
   // Execution lifecycle
-  fetchRuns: (params: { workflowId: string }) => Promise<any>;
+  fetchRuns: (params: { workflowId: string }) => Promise<unknown>;
   resetHistoricalTracking: () => void;
   // Component resolution
   getComponent: (ref: string) => ComponentMetadata | null;
 }
+
+export function getOperatorDraftTargetError(
+  draft: OperatorWorkflowDraftDetail,
+  route: {
+    id: string | undefined;
+    isNewWorkflow: boolean;
+    currentVersionId?: string | null;
+  },
+): string | null {
+  if (route.isNewWorkflow) {
+    if (draft.mode !== 'create' || draft.workflowId !== null) {
+      return 'This draft targets an existing workflow and cannot be opened as a new workflow.';
+    }
+    return null;
+  }
+
+  if (!route.id || draft.mode !== 'update' || draft.workflowId !== route.id) {
+    return 'This draft does not belong to the workflow in the current URL.';
+  }
+
+  if (route.currentVersionId !== undefined && draft.baseVersionId !== route.currentVersionId) {
+    return 'The workflow has changed since this draft was proposed. Review the latest version before applying it.';
+  }
+
+  return null;
+}
+
+class OperatorDraftHydrationError extends Error {}
 
 /**
  * Extracted from WorkflowBuilderContent: handles loading a workflow by ID
@@ -81,7 +116,12 @@ export function useWorkflowLoader({
   setMetadata,
   setWorkflowId,
   markClean,
+  markDirty,
   resetWorkflow,
+  operatorDraftRequest,
+  operatorDraft,
+  isOperatorDraftLoading,
+  operatorDraftError,
   setDesignNodes,
   setDesignEdges,
   designNodesRef,
@@ -124,18 +164,51 @@ export function useWorkflowLoader({
     };
   }, [getComponent]);
 
-  // Track previous workflow ID to prevent unnecessary reloads
-  const prevWorkflowIdRef = useRef<string | null | undefined>(undefined);
+  // Track the routed workflow and durable draft together. A draft query can
+  // finish after mount, so the draft identity must participate in the key.
+  const prevLoadKeyRef = useRef<string | undefined>(undefined);
 
   // Load workflow on mount (if not new)
   // Only reload when workflow ID actually changes, not on mode changes
   useEffect(() => {
-    // Skip if workflow ID hasn't changed (prevents reloading on mode switches)
-    // Use undefined check to allow initial load
-    if (prevWorkflowIdRef.current !== undefined && id === prevWorkflowIdRef.current) {
+    if (operatorDraftRequest && isOperatorDraftLoading) {
+      setIsLoading(true);
       return;
     }
-    prevWorkflowIdRef.current = id ?? null;
+
+    const loadKey = `${id ?? 'missing'}:${operatorDraftRequest?.sessionId ?? 'no-session'}:${operatorDraftRequest?.draftId ?? 'no-draft'}`;
+    if (prevLoadKeyRef.current === loadKey) {
+      return;
+    }
+
+    if (operatorDraftRequest && (operatorDraftError || !operatorDraft)) {
+      prevLoadKeyRef.current = loadKey;
+      setIsLoading(false);
+      toast({
+        variant: 'destructive',
+        title: 'Cannot open Operator draft',
+        description: operatorDraftError?.message ?? 'The durable workflow draft was not found.',
+      });
+      navigate(`/operator/${operatorDraftRequest.sessionId}`);
+      return;
+    }
+
+    if (operatorDraft) {
+      const targetError = getOperatorDraftTargetError(operatorDraft, { id, isNewWorkflow });
+      if (targetError) {
+        prevLoadKeyRef.current = loadKey;
+        setIsLoading(false);
+        toast({
+          variant: 'destructive',
+          title: 'Cannot open Operator draft',
+          description: targetError,
+        });
+        navigate(`/operator/${operatorDraft.sessionId}`);
+        return;
+      }
+    }
+
+    prevLoadKeyRef.current = loadKey;
 
     const metadata = useWorkflowStore.getState().metadata;
 
@@ -154,14 +227,33 @@ export function useWorkflowLoader({
       }
 
       if (isNewWorkflow) {
-        if (designNodesRef.current.length === 0) {
+        if (operatorDraft || designNodesRef.current.length === 0) {
           resetWorkflow();
           const entryNode = createEntryPointNode();
+          let proposedGraph = { nodes: [entryNode], edges: [] as ReactFlowEdge[] };
+          if (operatorDraft) {
+            try {
+              proposedGraph = deserializeWorkflowGraph(
+                materializeOperatorDraftGraph(operatorDraft.proposedGraph, null, 'create'),
+              );
+            } catch (error: unknown) {
+              toast({
+                variant: 'destructive',
+                title: 'Cannot open Operator draft',
+                description:
+                  error instanceof Error ? error.message : 'The workflow draft is invalid.',
+              });
+              navigate(`/operator/${operatorDraft.sessionId}`);
+              setIsLoading(false);
+              return;
+            }
+          }
+
           // Initialize both design and execution states with the same initial state
-          setDesignNodes([entryNode]);
-          setDesignEdges([]);
-          setExecutionNodes([entryNode]);
-          setExecutionEdges([]);
+          setDesignNodes(proposedGraph.nodes);
+          setDesignEdges(proposedGraph.edges);
+          setExecutionNodes(cloneNodes(proposedGraph.nodes));
+          setExecutionEdges(cloneEdges(proposedGraph.edges));
           resetHistoricalTracking();
 
           // Initialize saved snapshot for new workflow
@@ -170,8 +262,8 @@ export function useWorkflowLoader({
             edges: cloneEdges([]),
           };
           executionLoadedSnapshotRef.current = {
-            nodes: cloneNodes([entryNode]),
-            edges: cloneEdges([]),
+            nodes: cloneNodes(proposedGraph.nodes),
+            edges: cloneEdges(proposedGraph.edges),
           };
 
           const baseMetadata = useWorkflowStore.getState().metadata;
@@ -182,9 +274,24 @@ export function useWorkflowLoader({
           });
 
           // Initialize undo/redo history with the initial state
-          initializeHistory([entryNode], []);
+          initializeHistory(proposedGraph.nodes, proposedGraph.edges);
+
+          if (operatorDraft) {
+            setMetadata({
+              id: null,
+              name: operatorDraft.proposedGraph.name,
+              description: operatorDraft.proposedGraph.description ?? '',
+              currentVersionId: null,
+              currentVersion: null,
+            });
+            markDirty();
+          }
         }
-        track(Events.WorkflowBuilderLoaded, { is_new: true });
+        setIsLoading(false);
+        track(Events.WorkflowBuilderLoaded, {
+          is_new: true,
+          ...(operatorDraft ? { operator_draft: true } : {}),
+        });
         return;
       }
 
@@ -194,24 +301,38 @@ export function useWorkflowLoader({
       try {
         const workflow = await api.workflows.get(id);
 
-        // Update workflow store
+        const draftTargetError = operatorDraft
+          ? getOperatorDraftTargetError(operatorDraft, {
+              id,
+              isNewWorkflow,
+              currentVersionId: workflow.currentVersionId ?? null,
+            })
+          : null;
+        if (draftTargetError) {
+          throw new OperatorDraftHydrationError(draftTargetError);
+        }
+
+        const savedGraph = deserializeWorkflowGraph(workflow.graph);
+        const designGraph = operatorDraft
+          ? deserializeWorkflowGraph(
+              materializeOperatorDraftGraph(operatorDraft.proposedGraph, workflow.graph, 'update'),
+            )
+          : savedGraph;
+
+        // Keep the persisted target/version identity while showing proposed metadata.
         setMetadata({
           id: workflow.id,
-          name: workflow.name,
-          description: workflow.description ?? '',
+          name: operatorDraft?.proposedGraph.name ?? workflow.name,
+          description: operatorDraft?.proposedGraph.description ?? workflow.description ?? '',
           currentVersionId: workflow.currentVersionId ?? null,
           currentVersion: workflow.currentVersion ?? null,
         });
 
         const hasRunContext = Boolean(routeRunId || selectedRunId);
 
-        // Deserialize and set nodes/edges
-        const workflowEdges = deserializeEdges(workflow);
-        const workflowNodes = deserializeNodes(workflow);
-
         // Initialize design state with the loaded workflow
-        setDesignNodes(workflowNodes);
-        setDesignEdges(workflowEdges);
+        setDesignNodes(designGraph.nodes);
+        setDesignEdges(designGraph.edges);
 
         // Initialize execution state only when there's no run context; otherwise the execution
         // lifecycle hook will load the appropriate version for the routed run.
@@ -221,27 +342,27 @@ export function useWorkflowLoader({
           executionNodesEmpty || (!hasRunContext && executionEdgesRef.current.length === 0);
 
         if (shouldInitializeExecution) {
-          setExecutionNodes(cloneNodes(workflowNodes));
-          setExecutionEdges(cloneEdges(workflowEdges));
+          setExecutionNodes(cloneNodes(savedGraph.nodes));
+          setExecutionEdges(cloneEdges(savedGraph.edges));
         }
 
         resetHistoricalTracking();
 
         // Store saved snapshot (last saved state) for execution mode initialization
         designSavedSnapshotRef.current = {
-          nodes: cloneNodes(workflowNodes),
-          edges: cloneEdges(workflowEdges),
+          nodes: cloneNodes(savedGraph.nodes),
+          edges: cloneEdges(savedGraph.edges),
         };
 
         // Initialize execution loaded snapshot
         executionLoadedSnapshotRef.current = {
-          nodes: cloneNodes(workflowNodes),
-          edges: cloneEdges(workflowEdges),
+          nodes: cloneNodes(savedGraph.nodes),
+          edges: cloneEdges(savedGraph.edges),
         };
 
         // Mark as clean (no unsaved changes)
         markClean();
-        const loadedSignature = computeGraphSignature(workflowNodes, workflowEdges);
+        const loadedSignature = computeGraphSignature(savedGraph.nodes, savedGraph.edges);
         setLastSavedGraphSignature(loadedSignature);
         setLastSavedMetadata({
           name: workflow.name,
@@ -249,13 +370,17 @@ export function useWorkflowLoader({
         });
 
         // Initialize undo/redo history with the loaded workflow
-        initializeHistory(workflowNodes, workflowEdges);
+        initializeHistory(designGraph.nodes, designGraph.edges);
+        if (operatorDraft) {
+          markDirty();
+        }
 
         // Analytics: builder loaded (existing workflow)
         track(Events.WorkflowBuilderLoaded, {
           workflow_id: workflow.id,
           is_new: false,
-          node_count: workflowNodes.length,
+          node_count: designGraph.nodes.length,
+          ...(operatorDraft ? { operator_draft: true } : {}),
         });
 
         // Check for active runs to resume monitoring — only when opened via runs URL
@@ -304,6 +429,16 @@ export function useWorkflowLoader({
       } catch (error: unknown) {
         logger.error('Failed to load workflow:', error);
 
+        if (error instanceof OperatorDraftHydrationError && operatorDraft) {
+          toast({
+            variant: 'destructive',
+            title: 'Cannot open Operator draft',
+            description: error.message,
+          });
+          navigate(`/operator/${operatorDraft.sessionId}`);
+          return;
+        }
+
         // Check if it's a network error (backend not available)
         const isNetworkError =
           error instanceof Error &&
@@ -342,6 +477,7 @@ export function useWorkflowLoader({
     setExecutionEdges,
     resetWorkflow,
     markClean,
+    markDirty,
     setLastSavedGraphSignature,
     setLastSavedMetadata,
     createEntryPointNode,
@@ -350,6 +486,11 @@ export function useWorkflowLoader({
     resetHistoricalTracking,
     initializeHistory,
     fetchRuns,
+    operatorDraftRequest,
+    operatorDraft,
+    isOperatorDraftLoading,
+    operatorDraftError,
+    toast,
   ]);
 
   return { isLoading, setIsLoading };

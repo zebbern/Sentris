@@ -206,6 +206,7 @@ describe('WorkflowsController', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         organizationId,
+        mutationIdempotencyKey: null,
       };
       repositoryStore.set(id, record);
       return record;
@@ -230,6 +231,14 @@ describe('WorkflowsController', () => {
       return updated;
     },
     async findById(id, options: RepositoryOptions = {}) {
+      const record = repositoryStore.get(id);
+      if (!record) return undefined;
+      if (options.organizationId && record.organizationId !== options.organizationId) {
+        return undefined;
+      }
+      return record;
+    },
+    async findByIdForUpdate(id, options: RepositoryOptions = {}) {
       const record = repositoryStore.get(id);
       if (!record) return undefined;
       if (options.organizationId && record.organizationId !== options.organizationId) {
@@ -552,12 +561,26 @@ describe('WorkflowsController', () => {
     expect(list).toHaveLength(1);
     expect(list[0].currentVersion).toBe(1);
 
+    if (!created.currentVersionId) {
+      throw new Error('Expected the created workflow to have a current version');
+    }
+    const baseVersionId = created.currentVersionId;
+
     const updated = await controller.update(authContext, created.id, {
       ...baseGraph,
       name: 'Updated workflow',
+      expectedVersionId: baseVersionId,
     });
     expect(updated.name).toBe('Updated workflow');
     expect(updated.currentVersion).toBeGreaterThanOrEqual(2);
+
+    await expect(
+      controller.update(authContext, created.id, {
+        ...baseGraph,
+        name: 'Stale workflow update',
+        expectedVersionId: baseVersionId,
+      }),
+    ).rejects.toThrow('changed since version');
 
     const fetched = await controller.findOne(authContext, created.id);
     expect(fetched.id).toBe(created.id);

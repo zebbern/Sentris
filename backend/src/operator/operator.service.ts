@@ -25,6 +25,7 @@ import {
   type OperatorTurnStatus,
   type OperatorTurnView,
   type OperatorUpdateSession,
+  type OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
@@ -41,6 +42,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 import { boundOperatorCommandResult, OperatorCommandService } from './operator-command.service';
 import { OperatorRepository } from './operator.repository';
 import { readOperatorTurnPayload } from './operator-turn-payload';
+import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.service';
 
 const OPERATOR_WORKFLOW_TYPE = 'operatorTurnWorkflow';
 const DEFAULT_SESSION_TITLE = 'New Operator session';
@@ -53,6 +55,7 @@ export class OperatorService {
     private readonly workflowsService: WorkflowsService,
     private readonly secretsService: SecretsService,
     private readonly temporalService: TemporalService,
+    private readonly workflowAuthoringService: OperatorWorkflowAuthoringService,
   ) {}
 
   async createSession(
@@ -94,6 +97,16 @@ export class OperatorService {
       messages: messages.map((message) => this.toMessageView(message)),
       actions: actions.map((action) => this.toActionView(action)),
     };
+  }
+
+  async listWorkflowDrafts(
+    auth: AuthContext | null,
+    sessionId: string,
+  ): Promise<OperatorWorkflowDraftDetail[]> {
+    const user = this.requireUserAuth(auth);
+    const session = await this.requireOwnedSession(sessionId, user);
+    const actions = await this.repository.listActions(session.id);
+    return this.workflowAuthoringService.listDraftDetails(actions, user);
   }
 
   async updateSession(
@@ -282,7 +295,7 @@ export class OperatorService {
       definition.effect === 'consequential' &&
       session.approvalMode === 'ask' &&
       !input.userConfirmed;
-    const actor = this.authForSession(session);
+    const actor = this.authForTurn(session, turn);
     const { action } = await this.repository.createAction({
       session,
       turn,
@@ -321,7 +334,7 @@ export class OperatorService {
     if (!context || context.session.organizationId !== organizationId) {
       throw new NotFoundException('Operator action not found');
     }
-    const actor = this.authForSession(context.session);
+    const actor = this.authForTurn(context.session, context.turn);
     if (context.action.status === 'failed') {
       return {
         action: this.toActionView(context.action),
@@ -408,7 +421,7 @@ export class OperatorService {
     const settled = await this.repository.settleMcpAction({
       actionId: input.actionId,
       result: input.result,
-      auth: this.authForSession(context.session),
+      auth: this.authForTurn(context.session, context.turn),
     });
     return this.toActionView(settled);
   }
@@ -418,8 +431,8 @@ export class OperatorService {
     turnId: string;
     organizationId: string;
   }): Promise<OperatorRunObservation> {
-    const { session } = await this.requireInternalTurn(input.turnId, input.organizationId);
-    const auth = this.authForSession(session);
+    const { turn, session } = await this.requireInternalTurn(input.turnId, input.organizationId);
+    const auth = this.authForTurn(session, turn);
     const run = await this.workflowsService.getRun(input.runId, auth);
     const status = await this.workflowsService.getRunStatus(input.runId, run.temporalRunId, auth);
     const terminal = (TERMINAL_STATUSES as readonly string[]).includes(status.status);
@@ -456,7 +469,7 @@ export class OperatorService {
       turn,
       session,
       message: input.message,
-      auth: this.authForSession(session),
+      auth: this.authForTurn(session, turn),
     });
   }
 
@@ -470,7 +483,7 @@ export class OperatorService {
       turn,
       session,
       error: input.error,
-      auth: this.authForSession(session),
+      auth: this.authForTurn(session, turn),
     });
   }
 
@@ -513,11 +526,11 @@ export class OperatorService {
     return auth as AuthContext & { organizationId: string; userId: string };
   }
 
-  private authForSession(session: OperatorSessionRecord): AuthContext {
+  private authForTurn(session: OperatorSessionRecord, turn: OperatorTurnRecord): AuthContext {
     return {
       userId: session.userId,
       organizationId: session.organizationId,
-      roles: ['MEMBER'],
+      roles: turn.actorRoles,
       isAuthenticated: true,
       provider: 'operator',
     };

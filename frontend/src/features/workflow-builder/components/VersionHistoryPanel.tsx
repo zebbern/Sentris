@@ -31,13 +31,14 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useToast } from '@/components/ui/use-toast';
 import { formatTimeAgo } from '@/utils/timeFormat';
 import { cn } from '@/lib/utils';
+import type { WorkflowGraph } from '@sentris/shared';
 
 interface VersionHistoryPanelProps {
   workflowId: string | undefined;
   onLoadVersion: (graph: {
-    nodes: unknown[];
-    edges: unknown[];
-    viewport?: { x: number; y: number; zoom: number };
+    nodes: WorkflowGraph['nodes'];
+    edges: WorkflowGraph['edges'];
+    viewport?: WorkflowGraph['viewport'];
   }) => void;
 }
 
