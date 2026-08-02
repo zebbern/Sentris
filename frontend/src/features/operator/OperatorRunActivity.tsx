@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TERMINAL_STATUSES, type OperatorCreateTurn } from '@sentris/shared';
 import { ExternalLink, Loader2, RefreshCw, Search, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -35,15 +35,22 @@ interface AgentEntry {
 }
 
 export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunActivityProps) {
+  const [agentActivityRequested, setAgentActivityRequested] = useState(false);
   const statusQuery = useOperatorRunStatus(runId);
   const status = readStatus(statusQuery.data);
   const live = Boolean(status && !TERMINAL_RUN_STATUSES.has(status));
-  const traceQuery = useOperatorRunTrace(runId, status, statusQuery.dataUpdatedAt);
+  const traceRequested = live || agentActivityRequested;
+  const statusUpdatedAt = readStatusUpdatedAt(statusQuery.data) ?? statusQuery.dataUpdatedAt;
+  const traceQuery = useOperatorRunTrace(traceRequested ? runId : null, status, statusUpdatedAt);
   const followAgents =
-    getOperatorRunTraceRefetchInterval(status, statusQuery.dataUpdatedAt) !== false;
+    traceRequested && getOperatorRunTraceRefetchInterval(status, statusUpdatedAt) !== false;
   const agents = useMemo(() => extractAgentEntries(traceQuery.data), [traceQuery.data]);
 
   const runAgainLabel = status === 'COMPLETED' ? 'Run again' : 'Retry';
+
+  useEffect(() => {
+    if (live) setAgentActivityRequested(true);
+  }, [live]);
 
   return (
     <div className="space-y-2 rounded-md border border-border/70 bg-background/60 p-2.5">
@@ -138,28 +145,51 @@ export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunA
         ) : null}
       </div>
 
-      {agents.length > 0 ? (
-        <details open={live} className="group border-t border-border/50 pt-2">
+      {live || (status && TERMINAL_RUN_STATUSES.has(status)) ? (
+        <details
+          open={live || undefined}
+          className="group border-t border-border/50 pt-2"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setAgentActivityRequested(true);
+          }}
+        >
           <summary className="cursor-pointer select-none text-[11px] font-medium text-muted-foreground">
-            {agents.length} agent turn{agents.length === 1 ? '' : 's'} {live ? 'live' : 'captured'}
+            {agents.length > 0
+              ? `${agents.length} agent turn${agents.length === 1 ? '' : 's'} ${live ? 'live' : 'captured'}`
+              : live
+                ? 'Agent activity live'
+                : 'Agent activity'}
           </summary>
-          <div className="mt-2 space-y-2">
-            {agents.map((agent) => (
-              <AgentRunCard
-                key={agent.agentRunId}
-                nodeId={agent.nodeId}
-                agentRunId={agent.agentRunId}
-                runId={runId}
-                live={live}
-                follow={followAgents}
-              />
-            ))}
-          </div>
+          {agents.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {agents.map((agent) => (
+                <AgentRunCard
+                  key={agent.agentRunId}
+                  nodeId={agent.nodeId}
+                  agentRunId={agent.agentRunId}
+                  runId={runId}
+                  live={live}
+                  follow={followAgents}
+                />
+              ))}
+            </div>
+          ) : traceQuery.isFetching ? (
+            <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Loading agent activity…
+            </p>
+          ) : traceQuery.isError ? (
+            <p className="mt-2 text-[11px] text-destructive">Could not load agent activity.</p>
+          ) : traceRequested && !live ? (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              No agent activity was recorded for this run.
+            </p>
+          ) : live ? (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Following this run. Agent activity will appear when an AI Agent node starts.
+            </p>
+          ) : null}
         </details>
-      ) : live ? (
-        <p className="border-t border-border/50 pt-2 text-[11px] text-muted-foreground">
-          Following this run. Agent activity will appear here when an AI Agent node starts.
-        </p>
       ) : null}
     </div>
   );
@@ -169,6 +199,14 @@ function readStatus(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const status = (value as { status?: unknown }).status;
   return typeof status === 'string' ? status.toUpperCase() : null;
+}
+
+function readStatusUpdatedAt(value: unknown): number | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const updatedAt = (value as { updatedAt?: unknown }).updatedAt;
+  if (typeof updatedAt !== 'string') return null;
+  const timestamp = Date.parse(updatedAt);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function extractAgentEntries(value: unknown): AgentEntry[] {
