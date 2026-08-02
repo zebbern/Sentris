@@ -10,6 +10,7 @@ export type ExecuteWorkflowActionFn = (
   definition: WorkflowDefinition,
   results: Map<string, unknown>,
   schedulerContext: WorkflowSchedulerRunContext,
+  iteration: { forEachRef: string; index: number; total: number },
 ) => Promise<{ activePorts?: string[] } | null>;
 
 export interface ForEachLoopResult {
@@ -64,6 +65,7 @@ export async function runForEachLoop(options: {
           options.loopBody.definition,
           iterationResults,
           schedulerContext,
+          { forEachRef: options.forEachRef, index, total: cappedItems.length },
         ),
     });
 

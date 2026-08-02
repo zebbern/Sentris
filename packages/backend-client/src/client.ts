@@ -5601,6 +5601,25 @@ export interface components {
                 workflowId?: string;
                 runId?: string;
             };
+            directCommand?: {
+                /** @enum {string} */
+                commandName: "get_run";
+                arguments: {
+                    runId: string;
+                };
+            } | {
+                /** @enum {string} */
+                commandName: "cancel_run";
+                arguments: {
+                    runId: string;
+                };
+            } | {
+                /** @enum {string} */
+                commandName: "retry_run";
+                arguments: {
+                    runId: string;
+                };
+            };
         };
         OperatorActionDecisionDto: {
             /** @enum {string} */

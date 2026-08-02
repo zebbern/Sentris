@@ -8,7 +8,9 @@ import type {
   OperatorApprovalMode,
   OperatorCommandEffect,
   OperatorCommandName,
+  OperatorDirectCommand,
   OperatorModelConfig,
+  OperatorPersistedTurnPayload,
   OperatorRouteContext,
   OperatorRunObservation,
   OperatorTurnStatus,
@@ -27,12 +29,27 @@ import {
   type OperatorSessionRecord,
   type OperatorTurnRecord,
 } from '../database/schema';
+import { buildOperatorTurnPayload, readOperatorTurnPayload } from './operator-turn-payload';
 
 const ACTIVE_OPERATOR_TURN_STATUSES: readonly OperatorTurnStatus[] = [
   'queued',
   'running',
   'awaiting_approval',
 ];
+
+function assertTurnReplayMatches(
+  turn: OperatorTurnRecord,
+  storedMessage: string | null,
+  requestedMessage: string,
+  requestedPayload: OperatorPersistedTurnPayload,
+): void {
+  const storedPayload = readOperatorTurnPayload(turn.context);
+  if (storedMessage !== requestedMessage || !isDeepStrictEqual(storedPayload, requestedPayload)) {
+    throw new ConflictException(
+      'Turn identifier is already used with different message, context, or command',
+    );
+  }
+}
 
 @Injectable()
 export class OperatorRepository {
@@ -202,8 +219,13 @@ export class OperatorRepository {
     session: OperatorSessionRecord;
     message: string;
     context?: OperatorRouteContext;
+    directCommand?: OperatorDirectCommand;
     auth: AuthContext;
   }): Promise<{ turn: OperatorTurnRecord; created: boolean }> {
+    const persistedPayload = buildOperatorTurnPayload({
+      routeContext: input.context,
+      directCommand: input.directCommand,
+    });
     return this.db.transaction(async (tx) => {
       const [lockedSession] = await tx
         .select({ id: operatorSessionsTable.id })
@@ -214,15 +236,26 @@ export class OperatorRepository {
       if (!lockedSession) throw new NotFoundException('Operator session not found');
 
       const [existing] = await tx
-        .select()
+        .select({
+          turn: operatorTurnsTable,
+          message: operatorMessagesTable.content,
+        })
         .from(operatorTurnsTable)
+        .leftJoin(
+          operatorMessagesTable,
+          and(
+            eq(operatorMessagesTable.turnId, operatorTurnsTable.id),
+            eq(operatorMessagesTable.role, 'user'),
+          ),
+        )
         .where(eq(operatorTurnsTable.id, input.id))
         .limit(1);
       if (existing) {
-        if (existing.sessionId !== input.session.id) {
+        if (existing.turn.sessionId !== input.session.id) {
           throw new ConflictException('Turn identifier is already used by another session');
         }
-        return { turn: existing, created: false };
+        assertTurnReplayMatches(existing.turn, existing.message, input.message, persistedPayload);
+        return { turn: existing.turn, created: false };
       }
 
       const [activeTurn] = await tx
@@ -244,26 +277,37 @@ export class OperatorRepository {
         .values({
           id: input.id,
           sessionId: input.session.id,
-          context: input.context ?? null,
+          context: persistedPayload,
         })
         .onConflictDoNothing({ target: operatorTurnsTable.id })
         .returning();
 
       if (!created) {
         const [conflicting] = await tx
-          .select()
+          .select({
+            turn: operatorTurnsTable,
+            message: operatorMessagesTable.content,
+          })
           .from(operatorTurnsTable)
-          .where(
+          .leftJoin(
+            operatorMessagesTable,
             and(
-              eq(operatorTurnsTable.id, input.id),
-              eq(operatorTurnsTable.sessionId, input.session.id),
+              eq(operatorMessagesTable.turnId, operatorTurnsTable.id),
+              eq(operatorMessagesTable.role, 'user'),
             ),
           )
+          .where(eq(operatorTurnsTable.id, input.id))
           .limit(1);
-        if (!conflicting) {
+        if (!conflicting || conflicting.turn.sessionId !== input.session.id) {
           throw new ConflictException('Turn identifier is already used by another session');
         }
-        return { turn: conflicting, created: false };
+        assertTurnReplayMatches(
+          conflicting.turn,
+          conflicting.message,
+          input.message,
+          persistedPayload,
+        );
+        return { turn: conflicting.turn, created: false };
       }
 
       await tx.insert(operatorMessagesTable).values({
@@ -281,7 +325,11 @@ export class OperatorRepository {
         resourceType: 'operator_session',
         resourceId: input.session.id,
         resourceName: input.session.title,
-        metadata: { turnId: created.id, hasRouteContext: Boolean(input.context) },
+        metadata: {
+          turnId: created.id,
+          hasRouteContext: Boolean(input.context),
+          hasDirectCommand: Boolean(input.directCommand),
+        },
       });
       return { turn: created, created: true };
     });

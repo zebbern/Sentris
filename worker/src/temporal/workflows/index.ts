@@ -1,13 +1,16 @@
 import {
   ActivityCancellationType,
   ApplicationFailure,
+  ChildWorkflowCancellationType,
   CancellationScope,
   allHandlersFinished,
   condition,
   currentUpdateInfo,
   defineQuery,
+  executeChild,
   isCancellation,
   patched,
+  ParentClosePolicy,
   proxyActivities,
   setHandler,
   startChild,
@@ -29,6 +32,8 @@ import { handleSubWorkflowCall } from './sub-workflow-handler.js';
 import { handleForEachLoopInWorkflow } from './for-each-workflow-handler.js';
 import { handleToolModeRegistration } from './tool-mode-handler.js';
 import { handleHumanInput } from './human-input-handler.js';
+import { durableAiAgentWorkflow } from './durable-ai-agent-workflow.js';
+export { durableAiAgentWorkflow } from './durable-ai-agent-workflow.js';
 import type { PendingHumanInputOutput } from './human-input-handler.js';
 import {
   registerToolInvocationUpdateHandlers,
@@ -66,6 +71,7 @@ import type {
   RegisterLocalMcpActivityInput,
   PrepareAndRegisterToolActivityInput,
 } from '../types';
+import type { WorkflowAgentActivities } from '../workflow-agent-types';
 
 /** Claude Code and other loop-body Docker agents can exceed the default 10m activity window. */
 const FOR_EACH_BODY_ACTIVITY_TIMEOUT = '135 minutes';
@@ -73,6 +79,7 @@ const PERSIST_CHILD_START_PATCH_ID = 'sentris-persist-child-start-v1';
 const RUN_METADATA_LIFECYCLE_PATCH_ID = 'sentris-run-metadata-lifecycle-v1';
 const TOOL_INVOCATION_UPDATE_PATCH_ID = 'sentris-tool-invocation-update-v1';
 const MCP_OPERATION_UPDATE_PATCH_ID = 'sentris-mcp-operation-update-v1';
+const DURABLE_AI_AGENT_TURN_PATCH_ID = 'sentris-durable-ai-agent-turn-v1';
 
 const {
   runComponentActivity: _runComponentActivity,
@@ -116,6 +123,15 @@ const {
 }>({
   startToCloseTimeout: '10 minutes',
   heartbeatTimeout: '30 seconds',
+});
+
+const { workflowAgentSetupActivity } = proxyActivities<
+  Pick<WorkflowAgentActivities, 'workflowAgentSetupActivity'>
+>({
+  startToCloseTimeout: '3 minutes',
+  heartbeatTimeout: '30 seconds',
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+  retry: { maximumAttempts: 3 },
 });
 
 const { cleanupRunResourcesActivity, finalizeRunActivity } = proxyActivities<{
@@ -207,6 +223,7 @@ export async function sentrisWorkflowRun(
   const durableToolInvocationUpdates = patched(TOOL_INVOCATION_UPDATE_PATCH_ID);
   const durableMcpOperationUpdates =
     durableToolInvocationUpdates && patched(MCP_OPERATION_UPDATE_PATCH_ID);
+  const durableAiAgentTurns = patched(DURABLE_AI_AGENT_TURN_PATCH_ID);
   const results = new Map<string, unknown>();
   const actionsByRef = new Map<string, WorkflowAction>(
     input.definition.actions.map((action) => [action.ref, action]),
@@ -394,7 +411,7 @@ export async function sentrisWorkflowRun(
       return error;
     }
     terminalStatus = 'FAILED';
-    const outputs = Object.fromEntries(results);
+    if (error instanceof ApplicationFailure) return error;
     const normalizedError =
       error instanceof Error
         ? error
@@ -403,7 +420,7 @@ export async function sentrisWorkflowRun(
     return ApplicationFailure.nonRetryable(
       normalizedError.message,
       normalizedError.name ?? 'WorkflowFailure',
-      [{ outputs, error: normalizedError.message }],
+      [{ error: normalizedError.message }],
     );
   };
 
@@ -475,6 +492,46 @@ export async function sentrisWorkflowRun(
       workflowId: input.workflowId,
       organizationId: input.organizationId ?? null,
     });
+  };
+
+  const executeComponentAction = async (
+    action: WorkflowAction,
+    activityInput: RunComponentActivityInput,
+    executionIdentity: string,
+    startToCloseTimeout: ReturnType<typeof getActivityStartToCloseTimeout>,
+  ): Promise<RunComponentActivityOutput> => {
+    if (durableAiAgentTurns && action.componentId === 'core.ai.agent') {
+      const agentRunId = `${input.runId}:${activityInput.action.ref}:${uuid4()}`;
+      const setup = await workflowAgentSetupActivity({
+        component: activityInput,
+        agentRunId,
+        initialStateFileId: uuid4(),
+      });
+      return executeChild(durableAiAgentWorkflow, {
+        workflowId: `sentris-agent:${input.runId}:${executionIdentity}`,
+        args: [
+          {
+            component: compactWorkflowAgentComponentInput(activityInput),
+            agentRunId,
+            setup,
+          },
+        ],
+        cancellationType: ChildWorkflowCancellationType.WAIT_CANCELLATION_COMPLETED,
+        parentClosePolicy: ParentClosePolicy.TERMINATE,
+        retry: { maximumAttempts: 1 },
+      });
+    }
+
+    const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
+      runComponentActivity(
+        componentInput: RunComponentActivityInput,
+      ): Promise<RunComponentActivityOutput>;
+    }>({
+      startToCloseTimeout,
+      heartbeatTimeout: '30 seconds',
+      retry: mapRetryPolicy(action.retryPolicy),
+    });
+    return runComponentWithRetry(activityInput);
   };
 
   try {
@@ -575,18 +632,14 @@ export async function sentrisWorkflowRun(
               runComponentActivityForAction: async (
                 bodyAction: WorkflowAction,
                 activityInput: RunComponentActivityInput,
+                iteration: { forEachRef: string; index: number },
               ) => {
-                const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
-                  runComponentActivity(
-                    input: RunComponentActivityInput,
-                  ): Promise<RunComponentActivityOutput>;
-                }>({
-                  startToCloseTimeout: FOR_EACH_BODY_ACTIVITY_TIMEOUT,
-                  heartbeatTimeout: '30 seconds',
-                  retry: mapRetryPolicy(bodyAction.retryPolicy),
-                });
-
-                return runComponentWithRetry(activityInput);
+                return executeComponentAction(
+                  bodyAction,
+                  activityInput,
+                  `for-each:${iteration.forEachRef}:${iteration.index}:${bodyAction.ref}`,
+                  FOR_EACH_BODY_ACTIVITY_TIMEOUT,
+                );
               },
               recordTraceEventActivity,
             },
@@ -664,18 +717,18 @@ export async function sentrisWorkflowRun(
           );
         }
 
-        const { runComponentActivity: runComponentWithRetry } = proxyActivities<{
-          runComponentActivity(
-            input: RunComponentActivityInput,
-          ): Promise<RunComponentActivityOutput>;
-        }>({
-          startToCloseTimeout: getActivityStartToCloseTimeout(action.componentId, mergedParams),
-          heartbeatTimeout: '30 seconds',
-          retry: retryOptions,
-        });
-
-        // Wait for connected tools to be ready if this node has tool dependencies
-        if (nodeMetadata?.connectedToolNodeIds && nodeMetadata.connectedToolNodeIds.length > 0) {
+        // Wait for required connected tools to be ready if this node has tool dependencies.
+        // Durable best-effort agents intentionally skip the fixed gate and let authority
+        // materialization record a degraded tool status when the optional tools are unavailable.
+        if (
+          !(
+            durableAiAgentTurns &&
+            action.componentId === 'core.ai.agent' &&
+            mergedParams.toolAvailability === 'best-effort'
+          ) &&
+          nodeMetadata?.connectedToolNodeIds &&
+          nodeMetadata.connectedToolNodeIds.length > 0
+        ) {
           workflowDiagnosticLog(
             `[Workflow] Node ${action.ref} has tool dependencies: ${nodeMetadata.connectedToolNodeIds.join(', ')}, waiting for tools to be ready...`,
           );
@@ -724,7 +777,12 @@ export async function sentrisWorkflowRun(
           `[Workflow] Executing component ${action.componentId} (node ${action.ref})${isMcpGroup ? ' [MCP Group]' : ''}${isToolMode ? ' [Tool Mode]' : ''}`,
         );
 
-        const output = await runComponentWithRetry(activityInput);
+        const output = await executeComponentAction(
+          action,
+          activityInput,
+          action.ref,
+          getActivityStartToCloseTimeout(action.componentId, mergedParams),
+        );
 
         // MCP groups in tool mode: NOW register the parent as ready after execution completes.
         // This ensures child servers are discovered and registered before the agent starts.
@@ -795,7 +853,7 @@ export async function sentrisWorkflowRun(
       console.error(`[Workflow] ${errorMessage}`);
 
       throw ApplicationFailure.nonRetryable(errorMessage, 'ComponentFailure', [
-        { outputs, failedComponents },
+        { failedComponents },
       ]);
     }
 
@@ -809,6 +867,32 @@ export async function sentrisWorkflowRun(
   } finally {
     await finalizeLifecycle();
   }
+}
+
+function compactWorkflowAgentComponentInput(
+  input: RunComponentActivityInput,
+): RunComponentActivityInput {
+  const metadata = input.metadata
+    ? {
+        streamId: input.metadata.streamId,
+        joinStrategy: input.metadata.joinStrategy,
+        groupId: input.metadata.groupId,
+        triggeredBy: input.metadata.triggeredBy,
+        failure: input.metadata.failure,
+      }
+    : undefined;
+  return {
+    runId: input.runId,
+    workflowId: input.workflowId,
+    workflowName: input.workflowName,
+    workflowVersionId: input.workflowVersionId,
+    organizationId: input.organizationId,
+    scopeId: input.scopeId,
+    action: input.action,
+    inputs: {},
+    params: {},
+    ...(metadata ? { metadata } : {}),
+  };
 }
 
 export async function minimalWorkflow(): Promise<string> {

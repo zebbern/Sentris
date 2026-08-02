@@ -1,5 +1,8 @@
 import { ToolInputSchema } from '@sentris/component-sdk';
 import {
+  CapabilityGrantSchema,
+  DurableMcpCapabilityCatalogSnapshotSchema,
+  DurableMcpOperationInvocationManifestSchema,
   MAX_TOOL_INVOCATION_ERROR_MESSAGE_CHARS,
   ClaimMcpOperationDispatchRequestSchema,
   McpOperationInvocationRequestSchema,
@@ -116,6 +119,23 @@ export class RegisterGroupServerInput {
   groupSlug!: string;
   serverId!: string;
 }
+
+export const MaterializeRunAuthorityBodySchema = z
+  .object({
+    runId: z.string().min(1),
+    organizationId: z.string().min(1).nullable(),
+    invokingNodeId: z.string().min(1),
+  })
+  .strict();
+export class MaterializeRunAuthorityBody extends createZodDto(MaterializeRunAuthorityBodySchema) {}
+
+export const MaterializeRunAuthorityResponseSchema = z
+  .object({
+    grant: CapabilityGrantSchema,
+    snapshot: DurableMcpCapabilityCatalogSnapshotSchema,
+    manifest: DurableMcpOperationInvocationManifestSchema,
+  })
+  .strict();
 
 export const PrepareMcpInvocationBodySchema = z
   .object({ request: ToolInvocationRequestSchema })

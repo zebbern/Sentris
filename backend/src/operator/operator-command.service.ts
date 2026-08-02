@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 
 import {
   OPERATOR_COMMAND_DEFINITIONS,
   MCP_CAPABILITY_CONTRACT_VERSION,
   McpOperationSchema,
   TERMINAL_STATUSES,
+  describeWorkflowRuntimeInputs,
+  extractWorkflowRuntimeInputDefinitions,
   type McpOperation,
   type McpOperationInvocationRequest,
   type OperatorCommandInputMap,
@@ -93,6 +95,13 @@ export class OperatorCommandService {
           OPERATOR_COMMAND_DEFINITIONS.cancel_run.inputSchema.parse(input.arguments),
           input.auth,
         );
+      case 'retry_run':
+        return this.retryRun(
+          OPERATOR_COMMAND_DEFINITIONS.retry_run.inputSchema.parse(input.arguments),
+          input.auth,
+          input.sessionId,
+          input.actionId,
+        );
       case 'list_findings':
         return this.listFindings(
           OPERATOR_COMMAND_DEFINITIONS.list_findings.inputSchema.parse(input.arguments),
@@ -161,15 +170,27 @@ export class OperatorCommandService {
     input: OperatorCommandInputMap['get_workflow'],
     auth: AuthContext,
   ): Promise<{ result: unknown }> {
-    const workflow = await this.workflowsService.findById(input.workflowId, auth);
-    const graph = workflow.graph;
+    const { workflow, version, definition } =
+      await this.workflowsService.getCompiledWorkflowContext(
+        input.workflowId,
+        {
+          ...(input.versionId ? { versionId: input.versionId } : {}),
+          ...(input.version ? { version: input.version } : {}),
+        },
+        auth,
+      );
+    const graph = version.graph;
+    const runtimeInputs = describeWorkflowRuntimeInputs(
+      extractWorkflowRuntimeInputDefinitions(definition),
+    );
     return {
       result: toBoundedJson({
         id: workflow.id,
         name: workflow.name,
         description: workflow.description,
-        currentVersionId: workflow.currentVersionId,
-        currentVersion: workflow.currentVersion,
+        versionId: version.id,
+        version: version.version,
+        runtimeInputs,
         nodeCount: graph.nodes.length,
         edgeCount: graph.edges.length,
         nodes: graph.nodes.slice(0, 50).map((node) => ({
@@ -219,9 +240,8 @@ export class OperatorCommandService {
       input.workflowId,
       {
         inputs: input.inputs,
-        scopeId: input.scopeId,
         versionId: input.versionId,
-        version: input.version,
+        ...(input.scopeId ? { scopeId: input.scopeId } : {}),
       },
       auth,
       {
@@ -248,6 +268,44 @@ export class OperatorCommandService {
     }
     await this.workflowsService.cancelRun(input.runId, run.temporalRunId, auth);
     return { result: { runId: input.runId, cancelled: true } };
+  }
+
+  private async retryRun(
+    input: OperatorCommandInputMap['retry_run'],
+    auth: AuthContext,
+    sessionId: string,
+    actionId: string,
+  ): Promise<{ result: unknown; runId: string }> {
+    const [original, config] = await Promise.all([
+      this.workflowsService.getRun(input.runId, auth),
+      this.workflowsService.getRunConfig(input.runId, auth),
+    ]);
+    if (!(TERMINAL_STATUSES as readonly string[]).includes(original.status)) {
+      throw new ConflictException(
+        `Workflow run ${input.runId} is still ${original.status}; cancel it or wait for it to finish before retrying`,
+      );
+    }
+    const run = await this.workflowsService.run(
+      config.workflowId,
+      {
+        inputs: config.inputs,
+        ...(config.workflowVersionId ? { versionId: config.workflowVersionId } : {}),
+        ...(original.scopeId ? { scopeId: original.scopeId } : {}),
+      },
+      auth,
+      {
+        idempotencyKey: `operator-retry:${sessionId}:${actionId}`,
+        trigger: {
+          type: 'api',
+          sourceId: actionId,
+          label: 'Sentris Operator retry',
+        },
+      },
+    );
+    return {
+      result: toBoundedJson({ ...run, retryOfRunId: input.runId }),
+      runId: run.runId,
+    };
   }
 
   private async listFindings(

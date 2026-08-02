@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiExcludeController } from '@nestjs/swagger';
+import { ApiExcludeController, ApiExcludeEndpoint } from '@nestjs/swagger';
+import { MCP_CAPABILITY_CONTRACT_VERSION } from '@sentris/shared';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { ToolRegistryService } from './tool-registry.service';
 import { McpLegacyOutboundCompatibilityService } from './mcp-legacy-outbound-compatibility.service';
@@ -14,6 +15,9 @@ import {
   ClaimMcpInvocationBody,
   ClaimMcpInvocationBodySchema,
   GenerateTokenInput,
+  MaterializeRunAuthorityBody,
+  MaterializeRunAuthorityBodySchema,
+  MaterializeRunAuthorityResponseSchema,
   PrepareMcpInvocationBody,
   PrepareMcpInvocationBodySchema,
   PrepareMcpOperationBody,
@@ -37,6 +41,7 @@ import {
 } from './dto/mcp.dto';
 import { InternalOnlyGuard } from '../auth/internal-only.guard';
 import { McpInvocationService } from '../mcp-runtime/mcp-invocation.service';
+import { McpRunAuthorityService } from '../mcp-runtime/mcp-run-authority.service';
 import { McpServerRuntimeConfigService } from '../mcp-servers/mcp-server-runtime-config.service';
 
 @ApiExcludeController()
@@ -49,6 +54,7 @@ export class InternalMcpController {
     private readonly legacyOutbound: McpLegacyOutboundCompatibilityService,
     private readonly mcpAuthService: McpAuthService,
     private readonly invocationService: McpInvocationService,
+    private readonly runAuthorityService: McpRunAuthorityService,
     private readonly runtimeConfigService: McpServerRuntimeConfigService,
   ) {}
 
@@ -58,6 +64,19 @@ export class InternalMcpController {
     body: ResolveMcpRuntimeDefinitionBody,
   ) {
     return this.runtimeConfigService.resolveDefinition(body.runtimeKey);
+  }
+
+  @Post('run-authority')
+  @ApiExcludeEndpoint()
+  async materializeRunAuthority(
+    @Body(new ZodValidationPipe(MaterializeRunAuthorityBodySchema))
+    body: MaterializeRunAuthorityBody,
+  ) {
+    const authority = await this.runAuthorityService.materialize({
+      ...body,
+      contractVersion: MCP_CAPABILITY_CONTRACT_VERSION,
+    });
+    return MaterializeRunAuthorityResponseSchema.parse(authority);
   }
 
   @Post('generate-token')

@@ -95,6 +95,16 @@ import {
   operatorSettleMcpActionActivity,
   operatorSetTurnStatusActivity,
 } from '../activities/operator.activity';
+import {
+  workflowAgentCheckpointActivity,
+  workflowAgentDispatchToolActivity,
+  workflowAgentFailActivity,
+  workflowAgentFinalizeActivity,
+  workflowAgentModelStepActivity,
+  workflowAgentPrepareToolActivity,
+  workflowAgentReconcileToolActivity,
+  workflowAgentSetupActivity,
+} from '../activities/workflow-agent.activity';
 
 // Load environment variables from instance-specific env if set, otherwise fall back
 // to the worker's default `.env`.
@@ -280,6 +290,14 @@ async function main() {
       operatorObserveRunActivity,
       operatorCompleteTurnActivity,
       operatorFailTurnActivity,
+      workflowAgentSetupActivity,
+      workflowAgentModelStepActivity,
+      workflowAgentPrepareToolActivity,
+      workflowAgentDispatchToolActivity,
+      workflowAgentReconcileToolActivity,
+      workflowAgentCheckpointActivity,
+      workflowAgentFinalizeActivity,
+      workflowAgentFailActivity,
     };
 
     console.log(`🏗️ Creating Temporal worker...`);

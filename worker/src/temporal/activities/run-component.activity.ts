@@ -39,7 +39,7 @@ import type { RunFinalizationCallback } from '../../common/run-finalizer';
 import { recordNodeIoWithoutChangingExecution } from '../utils/node-io-delivery';
 import { RequiredPublicationTracker } from '../utils/required-publication-tracker';
 
-interface ComponentActivityServices {
+export interface ComponentActivityServices {
   storage: IFileStorageService | undefined;
   secrets: ISecretsService | undefined;
   artifacts: ArtifactServiceFactory | undefined;
@@ -83,7 +83,7 @@ export function initializeComponentActivityServices(options: {
   });
 }
 
-function getComponentServices(): ComponentActivityServices {
+export function getComponentActivityServices(): ComponentActivityServices {
   if (componentServices === null) {
     throw new Error('Component activity services not initialized');
   }
@@ -100,7 +100,7 @@ export async function setRunMetadataActivity(input: {
   workflowId: string;
   organizationId?: string | null;
 }): Promise<void> {
-  const { trace } = getComponentServices();
+  const { trace } = getComponentActivityServices();
   if (isTraceMetadataAware(trace)) {
     trace.setRunMetadata(input.runId, {
       workflowId: input.workflowId,
@@ -110,7 +110,7 @@ export async function setRunMetadataActivity(input: {
 }
 
 export async function finalizeRunActivity(input: FinalizeRunActivityInput): Promise<void> {
-  const { trace, runFinalizer } = getComponentServices();
+  const { trace, runFinalizer } = getComponentActivityServices();
   if (isTraceMetadataAware(trace) && typeof trace.finalizeRun === 'function') {
     trace.finalizeRun(input.runId);
   }
@@ -146,7 +146,7 @@ export async function runComponentActivity(
   const failure = nodeMetadata.failure;
   const connectedToolNodeIds = nodeMetadata.connectedToolNodeIds;
   const correlationId = `${input.runId}:${action.ref}:${activityInfo.activityId}`;
-  const svc = getComponentServices();
+  const svc = getComponentActivityServices();
   const publications = new RequiredPublicationTracker();
   const organizationId = input.organizationId ?? null;
   const storage = svc.storage?.forOrganization(organizationId);

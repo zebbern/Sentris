@@ -42,13 +42,16 @@ export class McpRunCatalogService {
     organizationId: string | null;
     invokingNodeId?: string;
     allowedNodeIds: readonly string[];
+    /** Explicitly false when an empty allowlist means no sources rather than legacy all-sources. */
+    allowAllSources?: boolean;
   }): Promise<BuiltRunCatalog> {
     const allowedNodeIds = normalizeAllowedNodeIds(input.allowedNodeIds);
     const registered = await this.toolRegistry.getToolsForRun(input.runId, allowedNodeIds);
+    const allowAllSources = allowedNodeIds.length === 0 && input.allowAllSources !== false;
     const sources = registered
       .filter((source) => source.status === 'ready')
       .filter((source) => source.exposedToAgent !== false)
-      .filter((source) => isNodeAllowed(source.nodeId, allowedNodeIds))
+      .filter((source) => allowAllSources || isNodeAllowed(source.nodeId, allowedNodeIds))
       .sort((left, right) => left.nodeId.localeCompare(right.nodeId));
 
     const tools: ToolDescriptor[] = [];
@@ -338,8 +341,5 @@ function normalizeAllowedNodeIds(nodeIds: readonly string[]): string[] {
 }
 
 function isNodeAllowed(nodeId: string, allowedNodeIds: readonly string[]): boolean {
-  return (
-    allowedNodeIds.length === 0 ||
-    allowedNodeIds.some((allowed) => nodeId === allowed || nodeId.startsWith(`${allowed}/`))
-  );
+  return allowedNodeIds.some((allowed) => nodeId === allowed || nodeId.startsWith(`${allowed}/`));
 }

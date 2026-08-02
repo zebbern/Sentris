@@ -75,7 +75,13 @@ export const OperatorListWorkflowsInputSchema = z
   })
   .strict();
 
-export const OperatorGetWorkflowInputSchema = z.object({ workflowId: WorkflowIdSchema }).strict();
+export const OperatorGetWorkflowInputSchema = z
+  .object({
+    workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid().optional(),
+    version: z.number().int().positive().optional(),
+  })
+  .strict();
 
 export const OperatorListRunsInputSchema = z
   .object({
@@ -90,14 +96,15 @@ export const OperatorGetRunInputSchema = z.object({ runId: RunIdSchema }).strict
 export const OperatorRunWorkflowInputSchema = z
   .object({
     workflowId: WorkflowIdSchema,
+    versionId: z.string().uuid(),
     inputs: z.record(z.string(), z.unknown()).default({}),
     scopeId: z.string().uuid().optional(),
-    versionId: z.string().uuid().optional(),
-    version: z.number().int().positive().optional(),
   })
   .strict();
 
 export const OperatorCancelRunInputSchema = z.object({ runId: RunIdSchema }).strict();
+
+export const OperatorRetryRunInputSchema = z.object({ runId: RunIdSchema }).strict();
 
 export const OperatorListFindingsInputSchema = z
   .object({
@@ -180,7 +187,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   get_workflow: {
     description:
-      'Inspect one existing workflow, including its description, current version, and graph summary.',
+      'Inspect one existing workflow version, including its graph summary and exact runtime-input contract. Use this before run_workflow so input IDs and types are not guessed.',
     effect: 'read',
     inputSchema: OperatorGetWorkflowInputSchema,
   },
@@ -198,7 +205,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   run_workflow: {
     description:
-      'Run an existing workflow with optional runtime inputs. Use only when the user explicitly asks to run it.',
+      'Run an existing workflow version with runtime inputs keyed by the exact IDs returned from get_workflow. Pass its returned immutable versionId, and use only when the user explicitly asks to run it.',
     effect: 'execute',
     inputSchema: OperatorRunWorkflowInputSchema,
   },
@@ -207,6 +214,12 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
       'Cancel an active workflow run. This is consequential and may require user approval.',
     effect: 'consequential',
     inputSchema: OperatorCancelRunInputSchema,
+  },
+  retry_run: {
+    description:
+      'Retry a workflow run as a new run using the original workflow version and stored inputs. Use only when the user explicitly asks to retry it.',
+    effect: 'execute',
+    inputSchema: OperatorRetryRunInputSchema,
   },
   list_findings: {
     description:
@@ -278,6 +291,7 @@ export type OperatorCommandInputMap = {
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
   run_workflow: z.infer<typeof OperatorRunWorkflowInputSchema>;
   cancel_run: z.infer<typeof OperatorCancelRunInputSchema>;
+  retry_run: z.infer<typeof OperatorRetryRunInputSchema>;
   list_findings: z.infer<typeof OperatorListFindingsInputSchema>;
   get_finding: z.infer<typeof OperatorGetFindingInputSchema>;
   update_finding_triage: z.infer<typeof OperatorUpdateFindingTriageInputSchema>;
@@ -287,6 +301,47 @@ export type OperatorCommandInputMap = {
   read_mcp_resource: z.infer<typeof OperatorReadMcpResourceInputSchema>;
   get_mcp_prompt: z.infer<typeof OperatorGetMcpPromptInputSchema>;
 };
+
+export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
+  z
+    .object({
+      commandName: z.literal('get_run'),
+      arguments: OperatorGetRunInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      commandName: z.literal('cancel_run'),
+      arguments: OperatorCancelRunInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      commandName: z.literal('retry_run'),
+      arguments: OperatorRetryRunInputSchema,
+    })
+    .strict(),
+]);
+export type OperatorDirectCommand = z.infer<typeof OperatorDirectCommandSchema>;
+
+export const OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION = 1 as const;
+export const OperatorPersistedTurnPayloadSchema = z
+  .object({
+    version: z.literal(OPERATOR_PERSISTED_TURN_PAYLOAD_VERSION),
+    routeContext: OperatorRouteContextSchema.nullable(),
+    directCommand: OperatorDirectCommandSchema.nullable(),
+  })
+  .strict();
+export type OperatorPersistedTurnPayload = z.infer<typeof OperatorPersistedTurnPayloadSchema>;
+
+/**
+ * JSONB compatibility shape for Operator turns. Route-only objects and null predate
+ * structured direct commands; all newly persisted rows use the versioned payload.
+ */
+export const OperatorStoredTurnContextSchema = z
+  .union([OperatorPersistedTurnPayloadSchema, OperatorRouteContextSchema])
+  .nullable();
+export type OperatorStoredTurnContext = z.infer<typeof OperatorStoredTurnContextSchema>;
 
 export const OperatorCreateSessionSchema = z
   .object({
@@ -311,6 +366,7 @@ export const OperatorCreateTurnSchema = z
     clientTurnId: z.string().uuid(),
     message: z.string().trim().min(1).max(20_000),
     context: OperatorRouteContextSchema.optional(),
+    directCommand: OperatorDirectCommandSchema.optional(),
   })
   .strict();
 export type OperatorCreateTurn = z.infer<typeof OperatorCreateTurnSchema>;

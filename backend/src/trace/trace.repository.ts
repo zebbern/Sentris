@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq, and, gt, desc, inArray } from 'drizzle-orm';
@@ -11,7 +12,28 @@ import { Pool } from 'pg';
 import type { OutboxExecutor } from '../outbox/enqueue-outbox-event';
 
 const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const WORKFLOW_RUN_ID_PATTERN = new RegExp(`^(?:sentris-run-)?${UUID_PATTERN}$`, 'i');
+const INLINE_WORKFLOW_RUN_ID_PATTERN = new RegExp(`^(?:sentris-run-)?${UUID_PATTERN}$`, 'i');
+const DERIVED_TRACE_CHANNEL_PREFIX = 'trace_events_h_';
+const POSTGRES_IDENTIFIER_MAX_BYTES = 63;
+const DERIVED_TRACE_CHANNEL_HASH_LENGTH =
+  POSTGRES_IDENTIFIER_MAX_BYTES - DERIVED_TRACE_CHANNEL_PREFIX.length;
+
+function traceChannelForRunId(runId: string): string {
+  if (runId.length === 0) {
+    throw new Error('Invalid runId format: runId must not be empty');
+  }
+
+  // Preserve the existing channel for UUID-shaped IDs so mixed backend versions
+  // continue to exchange notifications during rolling deployments.
+  if (INLINE_WORKFLOW_RUN_ID_PATTERN.test(runId)) {
+    return `trace_events_${runId}`;
+  }
+
+  // PostgreSQL identifiers are limited to 63 bytes. Hash other persisted ID forms,
+  // including deterministic sentris-run-<sha256> IDs, before using them in SQL.
+  const digest = createHash('sha256').update(runId).digest('hex');
+  return `${DERIVED_TRACE_CHANNEL_PREFIX}${digest.slice(0, DERIVED_TRACE_CHANNEL_HASH_LENGTH)}`;
+}
 
 export interface PersistedTraceEvent {
   runId: string;
@@ -58,9 +80,8 @@ export class TraceRepository implements OnModuleDestroy {
     runId: string,
     callback: (payload: string) => void,
   ): Promise<() => Promise<void>> {
-    this.assertValidRunId(runId);
+    const channel = traceChannelForRunId(runId);
     const client = await this.pool.connect();
-    const channel = `trace_events_${runId}`;
 
     try {
       await client.query(`LISTEN "${channel}"`);
@@ -89,8 +110,7 @@ export class TraceRepository implements OnModuleDestroy {
    * Notify subscribers of new trace events
    */
   async notifyRun(runId: string, payload: string): Promise<void> {
-    this.assertValidRunId(runId);
-    const channel = `trace_events_${runId}`;
+    const channel = traceChannelForRunId(runId);
     await this.pool.query('SELECT pg_notify($1, $2)', [channel, payload]);
   }
 
@@ -298,13 +318,5 @@ export class TraceRepository implements OnModuleDestroy {
       return base;
     }
     return and(base, eq(workflowTracesTable.organizationId, organizationId));
-  }
-
-  private assertValidRunId(runId: string): void {
-    // Validate runId to prevent SQL injection via LISTEN/NOTIFY channel names.
-    // Current workflow runs use sentris-run-<uuid>; bare UUIDs remain supported for legacy runs.
-    if (!WORKFLOW_RUN_ID_PATTERN.test(runId)) {
-      throw new Error(`Invalid runId format: expected sentris-run UUID, got "${runId}"`);
-    }
   }
 }

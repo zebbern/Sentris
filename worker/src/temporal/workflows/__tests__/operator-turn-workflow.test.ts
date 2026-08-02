@@ -32,6 +32,7 @@ const activityImplementations = {
 let earlyDecision:
   | { actionId: string; decision: 'approved' | 'rejected'; expectedVersion: number }
   | undefined;
+let detachedRunFollowing = true;
 const allHandlersFinished = vi.fn(() => true);
 const condition = vi.fn(async (predicate: () => boolean, timeout?: string) => {
   if (predicate()) return true;
@@ -55,6 +56,7 @@ mock.module('@temporalio/workflow', () => ({
   currentUpdateInfo: vi.fn(() => undefined),
   defineUpdate: vi.fn((name: string) => name),
   isCancellation: vi.fn(() => false),
+  patched: vi.fn(() => detachedRunFollowing),
   proxyActivities: vi.fn(
     () =>
       new Proxy(
@@ -84,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   events.length = 0;
   earlyDecision = undefined;
+  detachedRunFollowing = true;
   operatorSetTurnStatusActivity.mockImplementation(async () => {
     events.push('status');
   });
@@ -110,7 +113,7 @@ describe('operatorTurnWorkflow', () => {
     expect(condition).toHaveBeenCalledWith(allHandlersFinished);
   });
 
-  test('retains an early approval, executes once, and observes a launched run', async () => {
+  test('retains an early approval and releases the turn after launching a live-followed run', async () => {
     const actionId = '44444444-4444-4444-8444-444444444444';
     earlyDecision = { actionId, decision: 'approved', expectedVersion: 3 };
     operatorModelStepActivity
@@ -144,27 +147,15 @@ describe('operatorTurnWorkflow', () => {
       result: { accepted: true },
       launchedRunId: 'sentris-run-1',
     });
-    operatorObserveRunActivity.mockResolvedValue({
-      runId: 'sentris-run-1',
-      workflowId: '55555555-5555-4555-8555-555555555555',
-      status: 'COMPLETED',
-      terminal: true,
-      result: { findings: 1 },
-    });
-
     await operatorTurnWorkflow(input);
 
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
-    expect(operatorObserveRunActivity).toHaveBeenCalledWith({
-      ...input,
-      runId: 'sentris-run-1',
-    });
+    expect(operatorObserveRunActivity).not.toHaveBeenCalled();
     expect(operatorModelStepActivity).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         ...input,
         step: 1,
-        observations: [expect.objectContaining({ runId: 'sentris-run-1', terminal: true })],
         toolCallHistory: [
           expect.objectContaining({
             toolCallId: `${input.turnId}:0:0`,
@@ -175,6 +166,86 @@ describe('operatorTurnWorkflow', () => {
           }),
         ],
       }),
+    );
+  });
+
+  test('retains blocking run observation only for pre-patch histories', async () => {
+    detachedRunFollowing = false;
+    const actionId = '45454545-4545-4545-8545-454545454545';
+    operatorModelStepActivity
+      .mockResolvedValueOnce({
+        text: '',
+        finishReason: 'tool-calls',
+        toolCalls: [
+          {
+            toolCallId: `${input.turnId}:0:0`,
+            commandName: 'run_workflow',
+            arguments: { workflowId: '55555555-5555-4555-8555-555555555555' },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ text: 'The run completed.', finishReason: 'stop', toolCalls: [] });
+    operatorPrepareActionActivity.mockResolvedValue({
+      actionId,
+      actionVersion: 0,
+      disposition: 'execute',
+    });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId,
+      result: { status: 'RUNNING' },
+      launchedRunId: 'sentris-run-legacy',
+    });
+    operatorObserveRunActivity.mockResolvedValue({
+      runId: 'sentris-run-legacy',
+      workflowId: '55555555-5555-4555-8555-555555555555',
+      status: 'COMPLETED',
+      terminal: true,
+    });
+
+    await operatorTurnWorkflow(input);
+
+    expect(operatorObserveRunActivity).toHaveBeenCalledWith({
+      ...input,
+      runId: 'sentris-run-legacy',
+    });
+  });
+
+  test('executes a user-confirmed direct run control without another approval wait', async () => {
+    const actionId = '56565656-5656-4656-8656-565656565656';
+    operatorPrepareActionActivity.mockResolvedValue({
+      actionId,
+      actionVersion: 0,
+      disposition: 'execute',
+    });
+    operatorExecuteActionActivity.mockResolvedValue({
+      actionId,
+      result: { cancelled: true },
+    });
+    operatorModelStepActivity.mockResolvedValue({
+      text: 'The workflow run was cancelled.',
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+
+    await operatorTurnWorkflow({
+      ...input,
+      directCommand: {
+        toolCallId: `${input.turnId}:direct`,
+        commandName: 'cancel_run',
+        arguments: { runId: 'sentris-run-direct' },
+      },
+    });
+
+    expect(operatorPrepareActionActivity).toHaveBeenCalledWith({
+      ...input,
+      toolCallId: `${input.turnId}:direct`,
+      commandName: 'cancel_run',
+      arguments: { runId: 'sentris-run-direct' },
+      userConfirmed: true,
+    });
+    expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
+    expect(operatorModelStepActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ ...input, step: 1 }),
     );
   });
 
@@ -318,23 +389,15 @@ describe('operatorTurnWorkflow', () => {
       result: { status: 'RUNNING' },
       launchedRunId: 'sentris-run-deduped',
     });
-    operatorObserveRunActivity.mockResolvedValue({
-      runId: 'sentris-run-deduped',
-      workflowId: '55555555-5555-4555-8555-555555555555',
-      status: 'COMPLETED',
-      terminal: true,
-      result: { findings: 5 },
-    });
-
     await operatorTurnWorkflow(input);
 
     expect(operatorExecuteActionActivity).toHaveBeenCalledTimes(1);
-    expect(operatorObserveRunActivity).toHaveBeenCalledTimes(1);
+    expect(operatorObserveRunActivity).not.toHaveBeenCalled();
     expect(operatorModelStepActivity).toHaveBeenCalledTimes(2);
     expect(operatorCompleteTurnActivity).toHaveBeenCalledWith({
       ...input,
       message:
-        'Workflow run sentris-run-deduped completed with status COMPLETED. Its durable result is available above.',
+        'The requested action was already completed in this turn. Its durable result is available above.',
     });
   });
 

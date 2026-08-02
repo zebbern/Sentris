@@ -2,6 +2,7 @@ import {
   LLM_PROVIDER_CATALOG,
   type OperatorActionView,
   type OperatorApprovalMode,
+  type OperatorDirectCommand,
   type OperatorSessionDetail,
 } from '@sentris/shared';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -34,6 +35,7 @@ import {
 } from '@/features/operator/operatorModelDraft';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import {
+  getOperatorSessionLatestTurnError,
   operatorSessionHasActiveTurn,
   useCreateOperatorSession,
   useCreateOperatorTurn,
@@ -299,9 +301,7 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const isActive = operatorSessionHasActiveTurn(session);
-  const latestFailedTurn = [...session.turns]
-    .reverse()
-    .find((turn) => turn.status === 'failed' && turn.error);
+  const latestTurnError = getOperatorSessionLatestTurnError(session);
 
   useEffect(() => {
     const viewport = scrollRef.current;
@@ -309,9 +309,7 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   }, [session.messages.length, session.actions.length, isActive]);
 
-  const submit = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const content = message.trim();
+  const sendTurn = async (content: string, directCommand?: OperatorDirectCommand) => {
     if (!content || isActive || createTurn.isPending) return;
 
     try {
@@ -321,6 +319,7 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
           clientTurnId: crypto.randomUUID(),
           message: content,
           context: { path: location.pathname },
+          ...(directCommand ? { directCommand } : {}),
         },
       });
       setMessage('');
@@ -331,6 +330,11 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
         variant: 'destructive',
       });
     }
+  };
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    await sendTurn(message.trim());
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -366,11 +370,11 @@ function ActiveSession({ session }: { session: OperatorSessionDetail }) {
             actions={session.actions}
             isActive={isActive}
             pendingDecisionActionId={decideAction.variables?.actionId}
+            runCommandDisabled={isActive || createTurn.isPending}
             onDecision={(action, decision) => void decide(action, decision)}
+            onRunCommand={(request) => void sendTurn(request.message, request.directCommand)}
           />
-          {latestFailedTurn?.error ? (
-            <ErrorBanner message={latestFailedTurn.error} className="ml-9 mt-3" />
-          ) : null}
+          {latestTurnError ? <ErrorBanner message={latestTurnError} className="ml-9 mt-3" /> : null}
         </div>
       </div>
 

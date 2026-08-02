@@ -212,6 +212,28 @@ describe('McpRunCatalogService', () => {
     expect(JSON.stringify(catalog)).not.toContain(component.encryptedCredentials);
   });
 
+  it('treats an explicitly scoped empty allowlist as no sources', async () => {
+    const discoverTools = vi.fn(async () => EXTERNAL_TOOLS);
+    const service = createService({
+      sources: [componentSource(), externalSource('external-node', 'External')],
+      discoverTools,
+    });
+
+    const catalog = await service.build({
+      runId: 'run-1',
+      organizationId: 'org-1',
+      invokingNodeId: 'agent-node',
+      allowedNodeIds: [],
+      allowAllSources: false,
+    });
+
+    expect(catalog.tools).toEqual([]);
+    expect(catalog.resources).toEqual([]);
+    expect(catalog.resourceTemplates).toEqual([]);
+    expect(catalog.prompts).toEqual([]);
+    expect(discoverTools).not.toHaveBeenCalled();
+  });
+
   it('filters hierarchical node scope before preserving external names, schemas, and metadata', async () => {
     const included = externalSource('parent/child', 'External Server');
     const excluded = externalSource('sibling/child', 'Other Server');

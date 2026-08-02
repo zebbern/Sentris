@@ -87,6 +87,7 @@ function repositoryWithSelects(selectResults: unknown[][], insertResults: unknow
       return chainable(selectResults[current] ?? [], calls, current);
     }),
     insert: mock(() => chainable(insertResults[insert++] ?? [], calls, query++)),
+    update: mock(() => chainable([], calls, query++)),
   };
   const db = {
     transaction: mock(async (handler: (executor: typeof tx) => Promise<unknown>) => handler(tx)),
@@ -105,6 +106,10 @@ const createInput = {
   message: 'Run my workflow',
   auth,
 };
+
+function replayRow(turn: OperatorTurnRecord, message = createInput.message) {
+  return { turn, message };
+}
 
 function actionRecord(overrides: Partial<OperatorActionRecord> = {}): OperatorActionRecord {
   return {
@@ -167,7 +172,7 @@ describe('OperatorRepository.createTurn', () => {
 
   it('replays the same clientTurnId before applying the active-turn guard', async () => {
     const existing = turnRecord({ status: 'running' });
-    const { repository, tx } = repositoryWithSelects([[{ id: SESSION_ID }], [existing]]);
+    const { repository, tx } = repositoryWithSelects([[{ id: SESSION_ID }], [replayRow(existing)]]);
 
     await expect(repository.createTurn(createInput)).resolves.toEqual({
       turn: existing,
@@ -180,12 +185,92 @@ describe('OperatorRepository.createTurn', () => {
   it('rejects a replay whose clientTurnId belongs to another session', async () => {
     const { repository, tx } = repositoryWithSelects([
       [{ id: SESSION_ID }],
-      [turnRecord({ sessionId: '55555555-5555-4555-8555-555555555555' })],
+      [replayRow(turnRecord({ sessionId: '55555555-5555-4555-8555-555555555555' }))],
     ]);
 
     await expect(repository.createTurn(createInput)).rejects.toBeInstanceOf(ConflictException);
     expect(tx.select).toHaveBeenCalledTimes(2);
     expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['message', { ...createInput, message: 'Run a different workflow' }],
+    ['route context', { ...createInput, context: { path: '/workflows/another' } }],
+    [
+      'direct command',
+      {
+        ...createInput,
+        directCommand: {
+          commandName: 'cancel_run' as const,
+          arguments: { runId: 'sentris-run-1' },
+        },
+      },
+    ],
+  ])('rejects a replay with a different %s', async (_field, request) => {
+    const { repository, tx } = repositoryWithSelects([
+      [{ id: SESSION_ID }],
+      [replayRow(turnRecord())],
+    ]);
+
+    await expect(repository.createTurn(request)).rejects.toThrow(
+      'Turn identifier is already used with different message, context, or command',
+    );
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  it('reads a legacy route-only row as the same request without a direct command', async () => {
+    const context = { path: '/workflows/77777777-7777-4777-8777-777777777777' };
+    const existing = turnRecord({ context });
+    const { repository } = repositoryWithSelects([[{ id: SESSION_ID }], [replayRow(existing)]]);
+
+    await expect(repository.createTurn({ ...createInput, context })).resolves.toEqual({
+      turn: existing,
+      created: false,
+    });
+  });
+
+  it('replays the same versioned direct-command payload', async () => {
+    const directCommand = {
+      commandName: 'get_run' as const,
+      arguments: { runId: 'sentris-run-1' },
+    };
+    const existing = turnRecord({
+      context: { version: 1, routeContext: null, directCommand },
+    });
+    const { repository } = repositoryWithSelects([[{ id: SESSION_ID }], [replayRow(existing)]]);
+
+    await expect(repository.createTurn({ ...createInput, directCommand })).resolves.toEqual({
+      turn: existing,
+      created: false,
+    });
+  });
+
+  it('persists the canonical payload for a new turn', async () => {
+    const context = { path: '/runs/sentris-run-1', runId: 'sentris-run-1' };
+    const directCommand = {
+      commandName: 'get_run' as const,
+      arguments: { runId: 'sentris-run-1' },
+    };
+    const persistedPayload = { version: 1 as const, routeContext: context, directCommand };
+    const created = turnRecord({ context: persistedPayload });
+    const { repository, calls } = repositoryWithSelects(
+      [[{ id: SESSION_ID }], [], []],
+      [[created], []],
+    );
+
+    await expect(
+      repository.createTurn({ ...createInput, context, directCommand }),
+    ).resolves.toEqual({ turn: created, created: true });
+
+    expect(
+      calls.some(
+        (call) =>
+          call.method === 'values' &&
+          (call.args[0] as { id?: string; context?: unknown }).id === TURN_ID &&
+          JSON.stringify((call.args[0] as { context?: unknown }).context) ===
+            JSON.stringify(persistedPayload),
+      ),
+    ).toBe(true);
   });
 });
 

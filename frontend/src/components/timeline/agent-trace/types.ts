@@ -58,8 +58,10 @@ export interface AgentRunCardProps {
   agentRunId: string;
   runId: string;
   live: boolean;
-  isSelected: boolean;
-  onFocus: () => void;
+  /** Keep following a not-yet-finished transcript without presenting the agent as executing. */
+  follow?: boolean;
+  isSelected?: boolean;
+  onFocus?: () => void;
   prompt?: string | null;
   responseText?: string | null;
 }

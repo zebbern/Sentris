@@ -86,6 +86,7 @@ export class InternalOperatorController {
       toolCallId: body.toolCallId,
       commandName: body.commandName,
       arguments: body.arguments,
+      userConfirmed: body.userConfirmed,
     });
   }
 

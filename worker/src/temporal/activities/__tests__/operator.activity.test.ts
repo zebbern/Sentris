@@ -151,6 +151,9 @@ describe('Operator activities', () => {
       'X-Organization-Id': ORGANIZATION_ID,
     });
     expect(generateTextImpl).toHaveBeenCalledTimes(1);
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'inspect the same workflow version with get_workflow',
+    );
   });
 
   test('replays durable command results as native AI SDK tool history', async () => {

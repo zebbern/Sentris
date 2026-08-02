@@ -5,9 +5,12 @@ import {
   condition,
   defineUpdate,
   isCancellation,
+  patched,
   proxyActivities,
   setHandler,
 } from '@temporalio/workflow';
+
+import type { OperatorCommandName } from '@sentris/shared';
 
 import type {
   OperatorActivityInput,
@@ -34,6 +37,11 @@ export interface OperatorTurnWorkflowInput {
   sessionId: string;
   turnId: string;
   organizationId: string;
+  directCommand?: {
+    toolCallId: string;
+    commandName: OperatorCommandName;
+    arguments: Record<string, unknown>;
+  };
 }
 
 export interface OperatorActionDecisionUpdate {
@@ -152,6 +160,7 @@ const mcpOperationActivities: McpOperationWorkflowActivities = {
 };
 
 export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Promise<void> {
+  const detachedRunFollowing = patched('operator-detached-run-following-v1');
   const decisions = new Map<string, OperatorActionDecisionUpdate>();
 
   // Updates can arrive before the workflow reaches its approval wait. Retain the latest
@@ -177,12 +186,19 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
     await shortActivities.operatorSetTurnStatusActivity({ ...base, status: 'running' });
 
     for (let step = 0; step < MAX_OPERATOR_STEPS; step += 1) {
-      const modelStep = await operatorModelStepActivity({
-        ...base,
-        step,
-        ...(observations.length > 0 ? { observations: observations.slice(-4) } : {}),
-        ...(toolCallHistory.length > 0 ? { toolCallHistory: toolCallHistory.slice() } : {}),
-      });
+      const directToolCall = step === 0 ? input.directCommand : undefined;
+      const modelStep = directToolCall
+        ? {
+            text: '',
+            finishReason: 'tool-calls',
+            toolCalls: [directToolCall],
+          }
+        : await operatorModelStepActivity({
+            ...base,
+            step,
+            ...(observations.length > 0 ? { observations: observations.slice(-4) } : {}),
+            ...(toolCallHistory.length > 0 ? { toolCallHistory: toolCallHistory.slice() } : {}),
+          });
       if (modelStep.text.trim()) lastText = modelStep.text.trim();
 
       if (modelStep.toolCalls.length === 0) {
@@ -201,6 +217,7 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
         const prepared = await shortActivities.operatorPrepareActionActivity({
           ...base,
           ...toolCall,
+          ...(directToolCall ? { userConfirmed: true } : {}),
         });
         if (prepared.disposition === 'already_completed') {
           reusedCompletedAction = true;
@@ -267,14 +284,17 @@ export async function operatorTurnWorkflow(input: OperatorTurnWorkflowInput): Pr
           );
         }
         if (executed.launchedRunId) {
-          // Cancellation stops only this observer. The launched workflow run is deliberately
-          // independent and is never cancelled as a side effect of cancelling an Operator turn.
-          observations.push(
-            await operatorObserveRunActivity({
-              ...base,
-              runId: executed.launchedRunId,
-            }),
-          );
+          // New histories follow the run and its durable child agents through the product's
+          // canonical run/trace streams. Only old histories retain the blocking observer.
+          if (!detachedRunFollowing) {
+            // Replay compatibility for histories that began before live Operator run cards.
+            observations.push(
+              await operatorObserveRunActivity({
+                ...base,
+                runId: executed.launchedRunId,
+              }),
+            );
+          }
         }
       }
 

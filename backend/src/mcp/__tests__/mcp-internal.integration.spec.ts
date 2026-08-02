@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException, INestApplication } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MCP_CAPABILITY_CONTRACT_VERSION } from '@sentris/shared';
 import request from 'supertest';
 import { AuthService } from '../../auth/auth.service';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -16,6 +17,7 @@ import { McpGroupsService } from '../../mcp-groups/mcp-groups.service';
 import { ToolRegistryService, TOOL_REGISTRY_REDIS } from '../tool-registry.service';
 import { InternalOnlyGuard } from '../../auth/internal-only.guard';
 import { McpInvocationService } from '../../mcp-runtime/mcp-invocation.service';
+import { McpRunAuthorityService } from '../../mcp-runtime/mcp-run-authority.service';
 import { McpServerRuntimeConfigService } from '../../mcp-servers/mcp-server-runtime-config.service';
 
 // Simple Mock Redis
@@ -65,6 +67,40 @@ describe('MCP Internal API (Integration)', () => {
     endpoint: 'https://mcp.example.test/mcp',
     headers: { Authorization: 'Bearer resolved-secret' },
   }));
+  const runAuthority = {
+    grant: {
+      id: '11111111-1111-4111-8111-111111111111',
+      organizationId: 'org-1',
+      subject: { kind: 'run' as const, runId: 'run-authority-1' },
+      sources: [],
+      createdAt: '2026-08-02T10:00:00.000Z',
+    },
+    snapshot: {
+      id: '22222222-2222-4222-8222-222222222222',
+      scope: {
+        kind: 'run' as const,
+        organizationId: 'org-1',
+        runId: 'run-authority-1',
+        capabilityGrantId: '11111111-1111-4111-8111-111111111111',
+        invokingNodeId: 'agent-node',
+      },
+      version: MCP_CAPABILITY_CONTRACT_VERSION,
+      configFingerprint: 'c'.repeat(64),
+      runtimeBindings: {},
+      tools: [],
+      resources: [],
+      resourceTemplates: [],
+      prompts: [],
+      createdAt: '2026-08-02T10:00:00.000Z',
+    },
+    manifest: {
+      capabilitySnapshotId: '22222222-2222-4222-8222-222222222222',
+      capabilityGrantId: '11111111-1111-4111-8111-111111111111',
+      version: MCP_CAPABILITY_CONTRACT_VERSION,
+      entries: [],
+    },
+  };
+  const materializeRunAuthority = vi.fn(async () => runAuthority);
   const cleanedOutboundRuns: string[] = [];
   const INTERNAL_TOKEN = 'test-internal-token';
   const preparedRef = {
@@ -175,6 +211,10 @@ describe('MCP Internal API (Integration)', () => {
         { provide: TOOL_REGISTRY_REDIS, useValue: mockRedis },
         { provide: McpInvocationService, useValue: invocationService },
         {
+          provide: McpRunAuthorityService,
+          useValue: { materialize: materializeRunAuthority },
+        },
+        {
           provide: McpServerRuntimeConfigService,
           useValue: { resolveDefinition: resolveRuntimeDefinition },
         },
@@ -210,6 +250,11 @@ describe('MCP Internal API (Integration)', () => {
       toolRegistryService;
     (controller as unknown as { invocationService: typeof invocationService }).invocationService =
       invocationService;
+    (
+      controller as unknown as {
+        runAuthorityService: { materialize: typeof materializeRunAuthority };
+      }
+    ).runAuthorityService = { materialize: materializeRunAuthority };
     (
       controller as unknown as {
         runtimeConfigService: { resolveDefinition: typeof resolveRuntimeDefinition };
@@ -317,6 +362,41 @@ describe('MCP Internal API (Integration)', () => {
       headers: { Authorization: 'Bearer resolved-secret' },
     });
     expect(resolveRuntimeDefinition).toHaveBeenCalledWith(runtimeKey);
+  });
+
+  it('materializes only v2 run authority through the strict internal boundary', async () => {
+    const requestBody = {
+      runId: 'run-authority-1',
+      organizationId: 'org-1',
+      invokingNodeId: 'agent-node',
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/internal/mcp/run-authority')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send(requestBody);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual(runAuthority);
+    expect(materializeRunAuthority).toHaveBeenLastCalledWith({
+      ...requestBody,
+      contractVersion: MCP_CAPABILITY_CONTRACT_VERSION,
+    });
+
+    materializeRunAuthority.mockClear();
+    await request(app.getHttpServer())
+      .post('/internal/mcp/run-authority')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ ...requestBody, allowedNodeIds: ['mcp-node'] })
+      .expect(400);
+    expect(materializeRunAuthority).not.toHaveBeenCalled();
+
+    await request(app.getHttpServer())
+      .post('/internal/mcp/run-authority')
+      .set('x-internal-token', INTERNAL_TOKEN)
+      .send({ ...requestBody, contractVersion: '1' })
+      .expect(400);
+    expect(materializeRunAuthority).not.toHaveBeenCalled();
   });
 
   it('registers an MCP server with pre-discovered tools', async () => {

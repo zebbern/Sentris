@@ -106,7 +106,7 @@ interface AiSdkOverrides {
   createMCPClient?: typeof createMCPClient;
 }
 
-const inputSchema = inputs({
+export const aiAgentInputSchema = inputs({
   userInput: port(
     z
       .string()
@@ -170,7 +170,7 @@ const inputSchema = inputs({
   ),
 });
 
-const parameterSchema = parameters({
+export const aiAgentParameterSchema = parameters({
   systemPrompt: param(
     z
       .string()
@@ -276,7 +276,7 @@ const parameterSchema = parameters({
   ),
 });
 
-const outputSchema = outputs({
+export const aiAgentOutputSchema = outputs({
   responseText: port(z.string(), {
     label: 'Agent Response',
     description: 'Final assistant message produced by the agent.',
@@ -306,7 +306,7 @@ const outputSchema = outputs({
   ),
 });
 
-function ensureModelName(provider: ModelProvider, modelId?: string | null): string {
+export function ensureAgentModelName(provider: ModelProvider, modelId?: string | null): string {
   const trimmed = modelId?.trim();
   if (trimmed && trimmed.length > 0) {
     return trimmed;
@@ -327,7 +327,7 @@ function ensureModelName(provider: ModelProvider, modelId?: string | null): stri
   return DEFAULT_OPENAI_MODEL;
 }
 
-function selectAgentApiKey(
+export function selectAgentApiKey(
   provider: ModelProvider,
   chatModel: LlmProviderConfig,
   legacyModelApiKey?: string,
@@ -658,9 +658,9 @@ const definition = defineComponent({
     backoffCoefficient: 2,
     nonRetryableErrorTypes: ['ValidationError', 'ConfigurationError', 'AuthenticationError'],
   } satisfies ComponentRetryPolicy,
-  inputs: inputSchema,
-  outputs: outputSchema,
-  parameters: parameterSchema,
+  inputs: aiAgentInputSchema,
+  outputs: aiAgentOutputSchema,
+  parameters: aiAgentParameterSchema,
   docs: `An AI SDK-powered agent that maintains conversation memory, calls MCP tools via the gateway, and streams progress events.
 
 How it behaves:
@@ -768,7 +768,7 @@ Loop the Conversation State output back into the next agent invocation to keep m
       }
 
       const effectiveProvider: ModelProvider = chatModel?.provider ?? 'openai';
-      const effectiveModel = ensureModelName(effectiveProvider, chatModel?.modelId ?? null);
+      const effectiveModel = ensureAgentModelName(effectiveProvider, chatModel?.modelId ?? null);
       const effectiveApiKey = selectAgentApiKey(effectiveProvider, chatModel, modelApiKey);
       const explicitBaseUrl = chatModel?.baseUrl?.trim();
       const baseUrl =
@@ -969,13 +969,13 @@ Loop the Conversation State output back into the next agent invocation to keep m
 componentRegistry.register(definition);
 
 // Create local type aliases for internal use (inferred types)
-type Input = (typeof inputSchema)['__inferred'];
-type Output = (typeof outputSchema)['__inferred'];
-type Params = (typeof parameterSchema)['__inferred'];
+type Input = (typeof aiAgentInputSchema)['__inferred'];
+type Output = (typeof aiAgentOutputSchema)['__inferred'];
+type Params = (typeof aiAgentParameterSchema)['__inferred'];
 
 // Export schema types for the registry
-export type AiAgentInput = typeof inputSchema;
-export type AiAgentOutput = typeof outputSchema;
-export type AiAgentParams = typeof parameterSchema;
+export type AiAgentInput = typeof aiAgentInputSchema;
+export type AiAgentOutput = typeof aiAgentOutputSchema;
+export type AiAgentParams = typeof aiAgentParameterSchema;
 
 export type { Input as AiAgentInputData, Output as AiAgentOutputData, Params as AiAgentParamsData };

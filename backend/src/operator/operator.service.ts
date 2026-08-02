@@ -36,9 +36,11 @@ import type {
 } from '../database/schema';
 import { SecretsService } from '../secrets/secrets.service';
 import { TemporalService } from '../temporal/temporal.service';
+import { WorkflowRuntimeInputValidationException } from '../workflows/workflow-run.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { boundOperatorCommandResult, OperatorCommandService } from './operator-command.service';
 import { OperatorRepository } from './operator.repository';
+import { readOperatorTurnPayload } from './operator-turn-payload';
 
 const OPERATOR_WORKFLOW_TYPE = 'operatorTurnWorkflow';
 const DEFAULT_SESSION_TITLE = 'New Operator session';
@@ -126,8 +128,10 @@ export class OperatorService {
       session,
       message: input.message,
       context: input.context,
+      directCommand: input.directCommand,
       auth: user,
     });
+    const persistedPayload = readOperatorTurnPayload(turn.context);
 
     if (created && session.title === DEFAULT_SESSION_TITLE) {
       const title = input.message.replace(/\s+/g, ' ').trim().slice(0, 72);
@@ -154,6 +158,15 @@ export class OperatorService {
             sessionId: session.id,
             turnId: turn.id,
             organizationId: session.organizationId,
+            ...(persistedPayload.directCommand
+              ? {
+                  directCommand: {
+                    toolCallId: `${turn.id}:direct`,
+                    commandName: persistedPayload.directCommand.commandName,
+                    arguments: persistedPayload.directCommand.arguments,
+                  },
+                }
+              : {}),
           },
         ],
         workflowExecutionTimeout: '24 hours',
@@ -256,6 +269,7 @@ export class OperatorService {
     toolCallId: string;
     commandName: OperatorCommandName;
     arguments: Record<string, unknown>;
+    userConfirmed?: boolean;
   }): Promise<OperatorPreparedAction> {
     const { turn, session } = await this.requireInternalTurn(input.turnId, input.organizationId);
     const definition = OPERATOR_COMMAND_DEFINITIONS[input.commandName];
@@ -266,7 +280,8 @@ export class OperatorService {
     const approvalRequired =
       parsedArguments.success &&
       definition.effect === 'consequential' &&
-      session.approvalMode === 'ask';
+      session.approvalMode === 'ask' &&
+      !input.userConfirmed;
     const actor = this.authForSession(session);
     const { action } = await this.repository.createAction({
       session,
@@ -307,6 +322,12 @@ export class OperatorService {
       throw new NotFoundException('Operator action not found');
     }
     const actor = this.authForSession(context.session);
+    if (context.action.status === 'failed') {
+      return {
+        action: this.toActionView(context.action),
+        result: { error: context.action.error ?? 'Operator action failed' },
+      };
+    }
     const executing = await this.repository.markActionExecuting(actionId, actor);
     if (executing.status === 'succeeded') {
       return {
@@ -317,20 +338,34 @@ export class OperatorService {
     }
 
     await this.repository.setTurnStatus({ turnId: context.turn.id, status: 'running' });
-    const execution = await this.commandService.execute({
-      commandName: executing.commandName,
-      arguments: executing.arguments,
-      auth: actor,
-      sessionId: context.session.id,
-      turnId: context.turn.id,
-      turnCreatedAt: context.turn.createdAt.toISOString(),
-      actionId: executing.id,
-      actionRequestedAt: (
-        executing.startedAt ??
-        executing.decidedAt ??
-        executing.createdAt
-      ).toISOString(),
-    });
+    let execution: Awaited<ReturnType<OperatorCommandService['execute']>>;
+    try {
+      execution = await this.commandService.execute({
+        commandName: executing.commandName,
+        arguments: executing.arguments,
+        auth: actor,
+        sessionId: context.session.id,
+        turnId: context.turn.id,
+        turnCreatedAt: context.turn.createdAt.toISOString(),
+        actionId: executing.id,
+        actionRequestedAt: (
+          executing.startedAt ??
+          executing.decidedAt ??
+          executing.createdAt
+        ).toISOString(),
+      });
+    } catch (error: unknown) {
+      if (!(error instanceof WorkflowRuntimeInputValidationException)) throw error;
+      const failed = await this.repository.failAction({
+        actionId: executing.id,
+        error: error.message,
+        auth: actor,
+      });
+      return {
+        action: this.toActionView(failed),
+        result: { error: error.message },
+      };
+    }
     if (execution.mcpOperationRequest) {
       return {
         action: this.toActionView(executing),
@@ -506,13 +541,14 @@ export class OperatorService {
   }
 
   private toTurnView(turn: OperatorTurnRecord): OperatorTurnView {
+    const persistedPayload = readOperatorTurnPayload(turn.context);
     return {
       id: turn.id,
       sessionId: turn.sessionId,
       status: turn.status,
       temporalWorkflowId: turn.temporalWorkflowId,
       temporalRunId: turn.temporalRunId,
-      context: turn.context,
+      context: persistedPayload.routeContext,
       error: turn.error,
       createdAt: turn.createdAt.toISOString(),
       startedAt: turn.startedAt?.toISOString() ?? null,

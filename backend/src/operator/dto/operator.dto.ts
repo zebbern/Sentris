@@ -46,6 +46,7 @@ export const InternalPrepareOperatorActionSchema = z
     toolCallId: z.string().trim().min(1).max(191),
     commandName: OperatorCommandNameSchema,
     arguments: z.record(z.string(), z.unknown()),
+    userConfirmed: z.boolean().default(false),
   })
   .strict();
 export class InternalPrepareOperatorActionDto extends createZodDto(

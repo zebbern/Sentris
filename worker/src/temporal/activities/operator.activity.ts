@@ -174,6 +174,7 @@ export interface OperatorPrepareActionInput extends OperatorActivityInput {
   toolCallId: string;
   commandName: OperatorCommandName;
   arguments: Record<string, unknown>;
+  userConfirmed?: boolean;
 }
 
 export interface OperatorPreparedActionOutput {
@@ -393,6 +394,7 @@ export async function operatorPrepareActionActivity(
       toolCallId: input.toolCallId,
       commandName: input.commandName,
       arguments: input.arguments,
+      ...(input.userConfirmed ? { userConfirmed: true } : {}),
     },
   );
   return {
@@ -544,11 +546,13 @@ function buildSystemPrompt(
   return [
     'You are the Sentris Operator. Help the user operate their existing security workflows and inspect results.',
     'Use only the provided typed commands. Never claim a command ran unless its action ledger shows success.',
+    'Before calling run_workflow, inspect the same workflow version with get_workflow unless its exact runtimeInputs contract is already present in this turn. Pass the immutable versionId it returns, map the user request to those exact input IDs and types, and never guess aliases. If a required value is absent, ask the user instead of launching a doomed run.',
     'Call run_workflow only when the user explicitly asks to run an existing workflow.',
+    'Call retry_run only when the user explicitly asks to retry an existing run. It preserves the original workflow version and stored inputs.',
     'Call update_finding_triage only when the user explicitly asks for that finding change.',
     'List MCP capabilities before using them. Capability snapshots belong only to the current turn and must never be reused across turns.',
     'Call invoke_mcp_tool only when the user explicitly asks for the operation it performs. MCP tool annotations are hints, not authority to act.',
-    'Prior command calls and results are supplied as native tool messages. Use them instead of repeating an action. After a launched run reaches a terminal state, summarize its observation clearly.',
+    'Prior command calls and results are supplied as native tool messages. Use them instead of repeating an action. After launching a run, report its run ID and accepted status; if a terminal observation is supplied, summarize it clearly.',
     route,
     `Durable action ledger: ${ledger}`,
   ].join('\n');

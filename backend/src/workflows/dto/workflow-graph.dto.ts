@@ -1,4 +1,8 @@
-import { ExecutionStatusSchema, ExecutionTriggerMetadataSchema } from '@sentris/shared';
+import {
+  ExecutionStatusSchema,
+  ExecutionTriggerMetadataSchema,
+  WorkflowRuntimeInputDefinitionObjectSchema,
+} from '@sentris/shared';
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 
@@ -248,14 +252,7 @@ export const WorkflowVersionSummarySchema = z.object({
 export class WorkflowVersionSummaryDto extends createZodDto(WorkflowVersionSummarySchema) {}
 
 // Runtime input definition for Entry Point
-export const RuntimeInputSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  type: z.enum(['text', 'string', 'number', 'json', 'array', 'file', 'boolean', 'secret']),
-  required: z.boolean().default(true),
-  description: z.string().optional(),
-  defaultValue: z.unknown().optional(),
-});
+export const RuntimeInputSchema = WorkflowRuntimeInputDefinitionObjectSchema;
 
 export type RuntimeInput = z.infer<typeof RuntimeInputSchema>;
 

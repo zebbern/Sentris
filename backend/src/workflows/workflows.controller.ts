@@ -22,6 +22,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { WorkflowRuntimeInputDefinitionsSchema } from '@sentris/shared';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -37,7 +38,6 @@ import {
   WorkflowVersionSummaryDto,
   WorkflowRuntimeInputsResponseDto,
   ENTRY_POINT_COMPONENT_IDS,
-  type RuntimeInput,
 } from './dto/workflow-graph.dto';
 import {
   SetWorkflowTagsDto,
@@ -168,17 +168,7 @@ export class WorkflowsController {
     // Extract runtime inputs from the entry point's config
     const config = entryNode?.data?.config as Record<string, unknown> | undefined;
     const params = config?.params as Record<string, unknown> | undefined;
-    const rawInputs = (params?.runtimeInputs as RuntimeInput[]) || [];
-
-    // Normalize and validate the inputs
-    const inputs: RuntimeInput[] = rawInputs.map((input) => ({
-      id: input.id,
-      label: input.label || input.id,
-      type: input.type === 'string' ? 'text' : input.type,
-      required: input.required ?? true,
-      description: input.description,
-      defaultValue: input.defaultValue,
-    }));
+    const inputs = WorkflowRuntimeInputDefinitionsSchema.parse(params?.runtimeInputs ?? []);
 
     return {
       workflowId: workflow.id,

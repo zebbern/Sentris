@@ -18277,6 +18277,100 @@
               "path"
             ],
             "additionalProperties": false
+          },
+          "directCommand": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "commandName": {
+                    "type": "string",
+                    "enum": [
+                      "get_run"
+                    ]
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 191
+                      }
+                    },
+                    "required": [
+                      "runId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "commandName",
+                  "arguments"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "commandName": {
+                    "type": "string",
+                    "enum": [
+                      "cancel_run"
+                    ]
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 191
+                      }
+                    },
+                    "required": [
+                      "runId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "commandName",
+                  "arguments"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "commandName": {
+                    "type": "string",
+                    "enum": [
+                      "retry_run"
+                    ]
+                  },
+                  "arguments": {
+                    "type": "object",
+                    "properties": {
+                      "runId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 191
+                      }
+                    },
+                    "required": [
+                      "runId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "commandName",
+                  "arguments"
+                ],
+                "additionalProperties": false
+              }
+            ]
           }
         },
         "required": [

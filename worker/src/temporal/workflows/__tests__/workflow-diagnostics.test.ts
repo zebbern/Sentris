@@ -39,7 +39,21 @@ const reconcileRunToolInvocationsActivity = vi.fn(async () => {});
 const prepareMcpOperationActivity = vi.fn();
 const dispatchMcpOperationActivity = vi.fn();
 const reconcileMcpOperationActivity = vi.fn();
+const workflowAgentSetupActivity = vi.fn(async () => ({
+  state: { fileId: 'agent-root', rootFileId: 'agent-root' },
+  stepLimit: 8,
+  toolTimeoutMs: 600_000,
+  modelActivityTimeout: '45 minutes' as const,
+  toolStatus: {
+    requested: false,
+    status: 'not-requested',
+    connectedNodeCount: 0,
+  },
+}));
 const startChild = vi.fn();
+const executeChild = vi.fn(async () => ({
+  output: { responseText: 'durable response' },
+}));
 
 const workflowActivities = {
   runComponentActivity,
@@ -61,6 +75,7 @@ const workflowActivities = {
   prepareMcpOperationActivity,
   dispatchMcpOperationActivity,
   reconcileMcpOperationActivity,
+  workflowAgentSetupActivity,
 };
 
 class MockApplicationFailure extends Error {
@@ -100,6 +115,9 @@ const proxyActivities = vi.fn((options: Record<string, unknown>) => {
 vi.mock('@temporalio/workflow', () => ({
   ActivityCancellationType: { WAIT_CANCELLATION_COMPLETED: 'WAIT_CANCELLATION_COMPLETED' },
   ApplicationFailure: MockApplicationFailure,
+  ChildWorkflowCancellationType: {
+    WAIT_CANCELLATION_COMPLETED: 'WAIT_CANCELLATION_COMPLETED',
+  },
   CancellationScope: { nonCancellable, withTimeout },
   allHandlersFinished,
   condition,
@@ -109,9 +127,11 @@ vi.mock('@temporalio/workflow', () => ({
   defineQuery: vi.fn((name: string) => name),
   defineSignal: vi.fn((name: string) => name),
   defineUpdate: vi.fn((name: string) => name),
+  executeChild,
   getExternalWorkflowHandle: vi.fn(() => ({ cancel: vi.fn(async () => {}) })),
   isCancellation: vi.fn((error: unknown) => error instanceof MockCancelledFailure),
   patched,
+  ParentClosePolicy: { TERMINATE: 'TERMINATE' },
   proxyActivities,
   setHandler,
   sleep: vi.fn(async () => {}),
@@ -172,6 +192,34 @@ function quietWorkflowInput(): RunWorkflowActivityInput {
   };
 }
 
+function aiAgentWorkflowInput(): RunWorkflowActivityInput {
+  const input = quietWorkflowInput();
+  input.definition.title = 'Durable AI Agent workflow';
+  input.inputs = undefined as unknown as Record<string, unknown>;
+  input.definition.entrypoint = { ref: 'agent-1' };
+  input.definition.nodes = { 'agent-1': { ref: 'agent-1' } };
+  input.definition.edges = [];
+  input.definition.dependencyCounts = { 'agent-1': 0 };
+  input.definition.actions = [
+    {
+      ref: 'agent-1',
+      componentId: 'core.ai.agent',
+      params: { executionProfile: 'investigate' },
+      inputOverrides: {
+        userInput: 'Inspect this npm package',
+        chatModel: {
+          provider: 'gemini',
+          modelId: 'gemini-test',
+          apiKeySecretId: '11111111-1111-4111-8111-111111111111',
+        },
+      },
+      dependsOn: [],
+      inputMappings: {},
+    },
+  ];
+  return input;
+}
+
 describe('workflow orchestration diagnostics', () => {
   beforeAll(async () => {
     ({ sentrisWorkflowRun, scheduleTriggerWorkflow } = await import('../index'));
@@ -189,6 +237,9 @@ describe('workflow orchestration diagnostics', () => {
     condition.mockImplementation(async (predicate) => predicate());
     nonCancellable.mockImplementation(async (callback) => callback());
     withTimeout.mockImplementation(async (_timeout, callback) => callback());
+    executeChild.mockResolvedValue({
+      output: { responseText: 'durable response' },
+    });
   });
 
   afterEach(() => {
@@ -222,6 +273,60 @@ describe('workflow orchestration diagnostics', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
+  });
+
+  test('routes the generic AI Agent through one durable child on the patched path', async () => {
+    const result = await sentrisWorkflowRun(aiAgentWorkflowInput());
+
+    expect(executeChild).toHaveBeenCalledTimes(1);
+    expect(workflowAgentSetupActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        component: expect.objectContaining({
+          inputs: expect.objectContaining({ userInput: 'Inspect this npm package' }),
+        }),
+        agentRunId: 'quiet-workflow-run:agent-1:test-uuid',
+        initialStateFileId: 'test-uuid',
+      }),
+    );
+    expect(executeChild).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        workflowId: 'sentris-agent:quiet-workflow-run:agent-1',
+        retry: { maximumAttempts: 1 },
+        args: [
+          expect.objectContaining({
+            agentRunId: 'quiet-workflow-run:agent-1:test-uuid',
+            component: expect.objectContaining({
+              action: { ref: 'agent-1', componentId: 'core.ai.agent' },
+              inputs: {},
+            }),
+            setup: expect.objectContaining({
+              state: { fileId: 'agent-root', rootFileId: 'agent-root' },
+            }),
+          }),
+        ],
+      }),
+    );
+    expect(runComponentActivity).not.toHaveBeenCalled();
+    expect(result.outputs['agent-1']).toEqual({ responseText: 'durable response' });
+    expect(
+      patched.mock.calls.filter(([patchId]) => patchId === 'sentris-durable-ai-agent-turn-v1'),
+    ).toHaveLength(1);
+  });
+
+  test('keeps pre-patch generic AI Agent histories on the legacy component activity', async () => {
+    patched.mockImplementation((patchId) => patchId !== 'sentris-durable-ai-agent-turn-v1');
+
+    await sentrisWorkflowRun(aiAgentWorkflowInput());
+
+    expect(executeChild).not.toHaveBeenCalled();
+    expect(workflowAgentSetupActivity).not.toHaveBeenCalled();
+    expect(runComponentActivity).toHaveBeenCalledTimes(1);
+    expect(runComponentActivity).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: { ref: 'agent-1', componentId: 'core.ai.agent' },
+      }),
+    );
   });
 
   test('registers protocol version 1 and Workflow Updates only on the patched path', async () => {
@@ -537,6 +642,27 @@ describe('workflow orchestration diagnostics', () => {
         status: 'FAILED',
       }),
     );
+  });
+
+  test('keeps workflow failure details compact when successful outputs are large', async () => {
+    runComponentActivity.mockResolvedValueOnce({
+      output: {
+        success: false,
+        error: 'agent setup failed',
+        unrelatedLargeOutput: 'x'.repeat(1_000_000),
+      },
+      activeOutputPorts: [],
+    });
+
+    const failure = await sentrisWorkflowRun(quietWorkflowInput()).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(MockApplicationFailure);
+    expect(failure.details).toEqual([
+      {
+        failedComponents: [{ ref: 'node-1', error: 'agent setup failed' }],
+      },
+    ]);
+    expect(JSON.stringify(failure.details)).not.toContain('unrelatedLargeOutput');
   });
 
   test('preserves the legacy finalize command shape when replaying pre-patch histories', async () => {

@@ -1,6 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'bun:test';
 
+import type { OperatorDirectCommand, OperatorRouteContext } from '@sentris/shared';
+
 import type { AuthContext } from '../../auth/types';
 import type {
   OperatorActionRecord,
@@ -10,6 +12,7 @@ import type {
 import type { SecretsService } from '../../secrets/secrets.service';
 import type { TemporalService } from '../../temporal/temporal.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
+import { WorkflowRuntimeInputValidationException } from '../../workflows/workflow-run.service';
 import type { OperatorCommandService } from '../operator-command.service';
 import type { OperatorRepository } from '../operator.repository';
 import { OperatorService } from '../operator.service';
@@ -99,6 +102,32 @@ describe('OperatorService', () => {
   beforeEach(() => {
     repository = {
       createSession: vi.fn().mockResolvedValue(sessionRecord()),
+      findSession: vi.fn().mockResolvedValue(sessionRecord()),
+      createTurn: vi
+        .fn()
+        .mockImplementation(
+          async (input: {
+            context?: OperatorRouteContext;
+            directCommand?: OperatorDirectCommand;
+          }) => ({
+            turn: turnRecord({
+              status: 'queued',
+              temporalWorkflowId: null,
+              temporalRunId: null,
+              context: {
+                version: 1,
+                routeContext: input.context ?? null,
+                directCommand: input.directCommand ?? null,
+              },
+              startedAt: null,
+            }),
+            created: true,
+          }),
+        ),
+      listTurns: vi.fn().mockResolvedValue([]),
+      listMessages: vi.fn().mockResolvedValue([]),
+      listActions: vi.fn().mockResolvedValue([]),
+      attachTemporal: vi.fn().mockResolvedValue(undefined),
       getTurnWithSession: vi
         .fn()
         .mockResolvedValue({ turn: turnRecord(), session: sessionRecord() }),
@@ -109,11 +138,18 @@ describe('OperatorService', () => {
       markActionExecuting: vi.fn(),
       setTurnStatus: vi.fn(),
       completeAction: vi.fn(),
+      failAction: vi.fn(),
       settleMcpAction: vi.fn(),
     };
     commands = { execute: vi.fn() };
     secrets = { getSecret: vi.fn().mockResolvedValue({ id: SECRET_ID }) };
-    temporal = { executeWorkflowUpdate: vi.fn().mockResolvedValue(undefined) };
+    temporal = {
+      executeWorkflowUpdate: vi.fn().mockResolvedValue(undefined),
+      startWorkflow: vi.fn().mockResolvedValue({
+        workflowId: `operator-turn:${SESSION_ID}:${TURN_ID}`,
+        runId: 'temporal-operator-run',
+      }),
+    };
     workflows = {
       getRun: vi.fn(),
       getRunStatus: vi.fn(),
@@ -168,6 +204,99 @@ describe('OperatorService', () => {
     );
   });
 
+  it('keeps legacy route-only turn rows readable in the public session projection', async () => {
+    const legacyContext = {
+      path: '/workflows/55555555-5555-4555-8555-555555555555',
+      workflowId: '55555555-5555-4555-8555-555555555555',
+    };
+    repository.listTurns.mockResolvedValueOnce([turnRecord({ context: legacyContext })]);
+
+    const result = await service.getSession(auth, SESSION_ID);
+
+    expect(result.turns[0]?.context).toEqual(legacyContext);
+  });
+
+  it('places a structured direct command in the durable turn input', async () => {
+    await service.createTurn(auth, SESSION_ID, {
+      clientTurnId: TURN_ID,
+      message: 'Cancel this run',
+      directCommand: {
+        commandName: 'cancel_run',
+        arguments: { runId: 'sentris-run-1' },
+      },
+    });
+
+    expect(temporal.startWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflowType: 'operatorTurnWorkflow',
+        workflowId: `operator-turn:${SESSION_ID}:${TURN_ID}`,
+        args: [
+          {
+            sessionId: SESSION_ID,
+            turnId: TURN_ID,
+            organizationId: 'operator-org',
+            directCommand: {
+              toolCallId: `${TURN_ID}:direct`,
+              commandName: 'cancel_run',
+              arguments: { runId: 'sentris-run-1' },
+            },
+          },
+        ],
+      }),
+    );
+    expect(repository.createTurn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directCommand: {
+          commandName: 'cancel_run',
+          arguments: { runId: 'sentris-run-1' },
+        },
+      }),
+    );
+  });
+
+  it('starts Temporal from the persisted direct command instead of retry request data', async () => {
+    repository.createTurn.mockResolvedValueOnce({
+      turn: turnRecord({
+        status: 'queued',
+        temporalWorkflowId: null,
+        temporalRunId: null,
+        context: {
+          version: 1,
+          routeContext: null,
+          directCommand: {
+            commandName: 'cancel_run',
+            arguments: { runId: 'sentris-run-stored' },
+          },
+        },
+        startedAt: null,
+      }),
+      created: false,
+    });
+
+    await service.createTurn(auth, SESSION_ID, {
+      clientTurnId: TURN_ID,
+      message: 'Inspect this run',
+      directCommand: {
+        commandName: 'get_run',
+        arguments: { runId: 'sentris-run-request' },
+      },
+    });
+
+    expect(temporal.startWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        args: [
+          expect.objectContaining({
+            directCommand: {
+              toolCallId: `${TURN_ID}:direct`,
+              commandName: 'cancel_run',
+              arguments: { runId: 'sentris-run-stored' },
+            },
+          }),
+        ],
+      }),
+    );
+  });
+
   it.each([
     ['ask', true, 'pending_approval', 'wait_for_approval'],
     ['auto', false, 'approved', 'execute'],
@@ -199,6 +328,29 @@ describe('OperatorService', () => {
       expect(result.disposition).toBe(disposition);
     },
   );
+
+  it('treats a structured run-control click as the user confirmation', async () => {
+    const session = sessionRecord('ask');
+    repository.getTurnWithSession.mockResolvedValue({ turn: turnRecord(), session });
+    repository.createAction.mockImplementation(async (input: { approvalRequired: boolean }) => ({
+      action: actionRecord('ask', input.approvalRequired ? 'pending_approval' : 'approved'),
+      created: true,
+    }));
+
+    const result = await service.prepareInternalAction({
+      turnId: TURN_ID,
+      organizationId: 'operator-org',
+      toolCallId: 'direct-cancel',
+      commandName: 'cancel_run',
+      arguments: { runId: 'sentris-run-1' },
+      userConfirmed: true,
+    });
+
+    expect(repository.createAction).toHaveBeenCalledWith(
+      expect.objectContaining({ approvalRequired: false }),
+    );
+    expect(result.disposition).toBe('execute');
+  });
 
   it('persists invalid model arguments as a failed action for the next model step', async () => {
     repository.createAction.mockImplementation(
@@ -353,6 +505,77 @@ describe('OperatorService', () => {
     expect(result.mcpOperationRequest).toEqual(request);
     expect(result.action.status).toBe('executing');
     expect(repository.completeAction).not.toHaveBeenCalled();
+  });
+
+  it('returns runtime-input preflight failures to the model without failing the turn', async () => {
+    const executing = {
+      ...actionRecord('ask', 'executing'),
+      commandName: 'run_workflow' as const,
+      effect: 'execute' as const,
+      approvalRequired: false,
+      arguments: {
+        workflowId: '55555555-5555-4555-8555-555555555555',
+        inputs: {},
+      },
+    };
+    const validationError = new WorkflowRuntimeInputValidationException({
+      valid: false,
+      issues: [
+        {
+          code: 'missing_required',
+          inputId: 'packageSpec',
+          label: 'npm package and optional version',
+          expectedType: 'text',
+          message:
+            'Required workflow runtime input "npm package and optional version" (packageSpec) was not provided',
+        },
+      ],
+      expectedInputs: [
+        {
+          id: 'packageSpec',
+          label: 'npm package and optional version',
+          type: 'text',
+          required: true,
+          hasDefaultValue: false,
+        },
+      ],
+      receivedInputIds: [],
+    });
+    const failed = {
+      ...executing,
+      status: 'failed' as const,
+      error: validationError.message,
+      completedAt: new Date('2026-08-02T10:02:02Z'),
+    };
+    repository.getActionWithTurnSession
+      .mockResolvedValueOnce({
+        action: executing,
+        turn: turnRecord(),
+        session: sessionRecord(),
+      })
+      .mockResolvedValueOnce({
+        action: failed,
+        turn: turnRecord(),
+        session: sessionRecord(),
+      });
+    repository.markActionExecuting.mockResolvedValue(executing);
+    repository.failAction.mockResolvedValue(failed);
+    commands.execute.mockRejectedValue(validationError);
+
+    const result = await service.executeInternalAction(ACTION_ID, 'operator-org');
+
+    expect(repository.failAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionId: ACTION_ID,
+        error: expect.stringContaining('packageSpec'),
+      }),
+    );
+    expect(result.action.status).toBe('failed');
+    expect(result.result).toEqual({ error: expect.stringContaining('packageSpec') });
+
+    const replayed = await service.executeInternalAction(ACTION_ID, 'operator-org');
+    expect(replayed.action.status).toBe('failed');
+    expect(commands.execute).toHaveBeenCalledTimes(1);
   });
 
   it('settles an MCP action through the idempotent repository transition', async () => {

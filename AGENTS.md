@@ -327,14 +327,28 @@ the full fence. Do not add another backend/worker MCP client or bypass this runt
 boundary.
 
 The in-app Operator now runs each user turn as a Temporal Workflow with durable typed
-actions, ask-or-auto approvals, run observation, and turn-scoped immutable MCP authority.
-Its tool, resource, and prompt calls dispatch through the same canonical runtime and
-durable invocation path. Provider-native tool-call continuation metadata lives in the
-Temporal turn history; Postgres action rows remain provider-neutral audit records.
+actions, ask-or-auto approvals, and turn-scoped immutable MCP authority. New histories
+release the turn after launching a workflow and follow its run and Agent children through
+the canonical run trace/Agent SSE pipeline; a patch-gated blocking observer exists only for
+old-history replay. Explicit run-card inspect, cancel, and retry controls are structured,
+user-confirmed Operator turns. Retry creates one new run from the original stored version,
+inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
+tool, resource, and prompt calls dispatch through the same canonical runtime and durable
+invocation path. Provider-native tool-call continuation metadata lives in the Temporal turn
+history; Postgres action rows remain provider-neutral audit records.
+
+The generic workflow-graph `core.ai.agent` now prepares each turn in an activity and runs
+the loop as a patch-gated Temporal child Workflow. Inline provider keys are sealed with
+the secret-store master key before durable storage, and only a sanitized component input
+plus compact state/authority refs enter the child history. Model steps and canonical MCP
+operations are separate durable activities; native AI SDK continuation messages, tool
+arguments, and tool results are checkpointed in organization-scoped object storage.
+Top-level and For Each nodes share this execution boundary; pre-patch histories retain
+the legacy single-activity loop. Do not add another in-process agent loop or route these
+calls back through the legacy run gateway.
 
 Remaining work is Continue-As-New, MCP Tasks, the Task 8 compatibility cleanup, the
-bounded Studio migration, and moving workflow-graph AI-agent loops to workflow-granular
-durable turns. See
+bounded Studio migration, and complete resources/prompts behavior. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.

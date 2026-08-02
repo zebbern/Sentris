@@ -16,6 +16,7 @@ export interface ForEachWorkflowActivities {
   runComponentActivityForAction(
     action: WorkflowAction,
     input: RunComponentActivityInput,
+    iteration: { forEachRef: string; index: number; total: number },
   ): Promise<RunComponentActivityOutput>;
   recordTraceEventActivity(event: Record<string, unknown>): Promise<void>;
 }
@@ -87,7 +88,13 @@ export async function handleForEachLoopInWorkflow(
         context: { activityId: 'workflow-orchestration', loopForEachRef: action.ref },
       });
     },
-    executeAction: async (bodyActionRef, bodyDefinition, iterationResults, schedulerContext) => {
+    executeAction: async (
+      bodyActionRef,
+      bodyDefinition,
+      iterationResults,
+      schedulerContext,
+      iteration,
+    ) => {
       const bodyAction = bodyActionsByRef(bodyDefinition).get(bodyActionRef);
       if (!bodyAction) {
         throw ApplicationFailure.nonRetryable(
@@ -121,31 +128,35 @@ export async function handleForEachLoopInWorkflow(
         triggeredBy: schedulerContext.triggeredBy,
       });
 
-      const output = await activities.runComponentActivityForAction(bodyAction, {
-        runId: input.runId,
-        workflowId: input.workflowId,
-        workflowName: bodyDefinition.title,
-        workflowVersionId: input.workflowVersionId ?? null,
-        organizationId: input.organizationId ?? null,
-        scopeId: input.scopeId ?? null,
-        action: {
-          ref: bodyAction.ref,
-          componentId: bodyAction.componentId,
+      const output = await activities.runComponentActivityForAction(
+        bodyAction,
+        {
+          runId: input.runId,
+          workflowId: input.workflowId,
+          workflowName: bodyDefinition.title,
+          workflowVersionId: input.workflowVersionId ?? null,
+          organizationId: input.organizationId ?? null,
+          scopeId: input.scopeId ?? null,
+          action: {
+            ref: bodyAction.ref,
+            componentId: bodyAction.componentId,
+          },
+          inputs,
+          params: bodyParams,
+          inputOverrides: bodyAction.inputOverrides,
+          rawParams: bodyAction.params,
+          warnings: bodyWarningsToReport,
+          metadata: {
+            streamId,
+            joinStrategy,
+            groupId: nodeMetadata?.groupId,
+            triggeredBy: schedulerContext.triggeredBy,
+            failure: schedulerContext.failure,
+            connectedToolNodeIds: nodeMetadata?.connectedToolNodeIds,
+          },
         },
-        inputs,
-        params: bodyParams,
-        inputOverrides: bodyAction.inputOverrides,
-        rawParams: bodyAction.params,
-        warnings: bodyWarningsToReport,
-        metadata: {
-          streamId,
-          joinStrategy,
-          groupId: nodeMetadata?.groupId,
-          triggeredBy: schedulerContext.triggeredBy,
-          failure: schedulerContext.failure,
-          connectedToolNodeIds: nodeMetadata?.connectedToolNodeIds,
-        },
-      });
+        iteration,
+      );
 
       iterationResults.set(bodyAction.ref, output.output);
       return { activePorts: output.activeOutputPorts };

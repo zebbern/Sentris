@@ -4,24 +4,13 @@ import type {
   OperatorCommandName,
   OperatorMessageView,
 } from '@sentris/shared';
-import {
-  Bot,
-  Check,
-  ChevronRight,
-  CircleDot,
-  Clock3,
-  ExternalLink,
-  Loader2,
-  Play,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Bot, Check, ChevronRight, CircleDot, Clock3, Loader2, ShieldCheck, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MarkdownView } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
+import { OperatorRunActivity, type OperatorRunCommandRequest } from './OperatorRunActivity';
 
 const ACTION_STATUS_LABELS: Record<OperatorActionStatus, string> = {
   proposed: 'Proposed',
@@ -50,6 +39,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   get_run: 'Inspect run',
   run_workflow: 'Run workflow',
   cancel_run: 'Cancel run',
+  retry_run: 'Retry run',
   list_findings: 'List findings',
   get_finding: 'Inspect finding',
   update_finding_triage: 'Update finding triage',
@@ -98,12 +88,6 @@ function formatPreview(value: unknown): string | null {
   return formatted.length > 600 ? `${formatted.slice(0, 600)}…` : formatted;
 }
 
-function getResultStatus(result: unknown): string | null {
-  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
-  const status = (result as Record<string, unknown>).status;
-  return typeof status === 'string' ? status : null;
-}
-
 function MessageEvent({ message }: { message: OperatorMessageView }) {
   if (message.role === 'user') {
     return (
@@ -132,13 +116,20 @@ function MessageEvent({ message }: { message: OperatorMessageView }) {
 interface ActionEventProps {
   action: OperatorActionView;
   pendingDecision: boolean;
+  runCommandDisabled: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
+  onRunCommand: (request: OperatorRunCommandRequest) => void;
 }
 
-function ActionEvent({ action, pendingDecision, onDecision }: ActionEventProps) {
+function ActionEvent({
+  action,
+  pendingDecision,
+  runCommandDisabled,
+  onDecision,
+  onRunCommand,
+}: ActionEventProps) {
   const argumentsPreview = formatPreview(action.arguments);
   const resultPreview = action.status === 'failed' ? action.error : formatPreview(action.result);
-  const resultStatus = getResultStatus(action.result);
   const isActive = action.status === 'executing' || action.status === 'approved';
 
   return (
@@ -195,24 +186,11 @@ function ActionEvent({ action, pendingDecision, onDecision }: ActionEventProps) 
         ) : null}
 
         {action.runId ? (
-          <Link
-            to={`/runs/${encodeURIComponent(action.runId)}`}
-            className="flex items-center gap-2 rounded-md border border-border/70 bg-background/60 px-2.5 py-2 text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
-          >
-            <Play className="h-3.5 w-3.5 text-primary" />
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium text-foreground">Workflow run</span>
-              <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                {action.runId}
-              </span>
-            </span>
-            {resultStatus ? (
-              <span className="text-[10px] font-medium uppercase text-muted-foreground">
-                {resultStatus}
-              </span>
-            ) : null}
-            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-          </Link>
+          <OperatorRunActivity
+            runId={action.runId}
+            disabled={runCommandDisabled}
+            onCommand={onRunCommand}
+          />
         ) : null}
 
         {action.status === 'pending_approval' ? (
@@ -252,7 +230,9 @@ interface OperatorTimelineProps {
   actions: OperatorActionView[];
   isActive: boolean;
   pendingDecisionActionId?: string;
+  runCommandDisabled?: boolean;
   onDecision: (action: OperatorActionView, decision: 'approved' | 'rejected') => void;
+  onRunCommand?: (request: OperatorRunCommandRequest) => void;
 }
 
 export function OperatorTimeline({
@@ -260,7 +240,9 @@ export function OperatorTimeline({
   actions,
   isActive,
   pendingDecisionActionId,
+  runCommandDisabled = false,
   onDecision,
+  onRunCommand = () => {},
 }: OperatorTimelineProps) {
   const events = toTimelineEvents(messages, actions);
 
@@ -274,7 +256,9 @@ export function OperatorTimeline({
             key={`action-${event.value.id}`}
             action={event.value}
             pendingDecision={pendingDecisionActionId === event.value.id}
+            runCommandDisabled={runCommandDisabled}
             onDecision={onDecision}
+            onRunCommand={onRunCommand}
           />
         ),
       )}

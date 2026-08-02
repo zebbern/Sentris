@@ -18,8 +18,8 @@ import type {
   OperatorCommandEffect,
   OperatorCommandName,
   OperatorMessageRole,
-  OperatorRouteContext,
   OperatorSessionStatus,
+  OperatorStoredTurnContext,
   OperatorTurnStatus,
 } from '@sentris/shared';
 
@@ -67,7 +67,7 @@ export const operatorTurnsTable = pgTable(
       .default('queued'),
     temporalWorkflowId: text('temporal_workflow_id'),
     temporalRunId: text('temporal_run_id'),
-    context: jsonb('context').$type<OperatorRouteContext | null>().default(null),
+    context: jsonb('context').$type<OperatorStoredTurnContext>().default(null),
     error: text('error'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     startedAt: timestamp('started_at', { withTimezone: true }),

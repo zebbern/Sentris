@@ -89,8 +89,19 @@ not as a second permanent invocation architecture. Task 8 must backfill rows wri
 old binaries before enforcing the generic identity `NOT NULL` contract.
 
 The in-app Operator now owns each user turn in a Temporal Workflow. Model steps, typed
-Sentris commands, approval waits, workflow-run observation, and MCP dispatch are separate
-activities or durable Workflow state rather than one retryable model/tool activity.
+Sentris commands, approval waits, and MCP dispatch are separate activities or durable
+Workflow state rather than one retryable model/tool activity. New turn histories release
+the composer after launching a workflow and follow that run through the ordinary run trace
+and Agent SSE projections; the patch-gated blocking run observer remains only for replaying
+older histories. Explicit run-card inspect, cancel, and retry controls enter the same durable
+turn path as user-confirmed structured commands. Retry starts one new run from the original
+stored version, inputs, and scope using the Operator action identity for idempotency; it does
+not mutate or reset a completed Agent child.
+Before a new launch, `get_workflow` exposes the selected compiled version's sanitized
+runtime-input descriptors so the model can map user intent to exact input IDs. The same
+shared contract is enforced in `WorkflowRunService` for every launch path before persistence
+or Temporal start; an Operator preflight failure is a durable failed tool result that the
+model can correct within the turn rather than a doomed workflow run.
 Postgres stores sessions, messages, action decisions, and results; consequential actions
 honor the session's ask-or-auto approval mode. Operator MCP discovery materializes an
 immutable turn-scoped grant and complete capability snapshot, and tool, resource, and
@@ -116,10 +127,12 @@ authority only when the target Workflow advertises the generic protocol. A mixed
 that advertises only the legacy tool protocol receives a v1 authority and continues through
 the legacy activities; a history advertising neither receives no snapshot. This supports
 worker-first/backend-second deployment without routing a v1 manifest through new backend
-operation endpoints. Remaining work is
-Continue-As-New rollover and cross-run-ID deduplication, MCP Tasks, workflow-granular
-durable agent turns, the Task 8 unbound-source migration, and the separately bounded
-Studio v1 sessionful migration.
+operation endpoints. The generic workflow-graph AI Agent now uses patch-gated durable
+child turns over this contract. A true follow-up turn for a completed workflow Agent remains
+separate work: it needs a new child turn, server-owned continuation state, and fresh run
+authority rather than a Signal to the closed child. Remaining work is Continue-As-New rollover and
+cross-run-ID deduplication, MCP Tasks, the Task 8 unbound-source migration, and the
+separately bounded Studio v1 sessionful migration.
 
 ### Protocol boundary
 
@@ -249,9 +262,12 @@ Temporal owns acquire/renew/release sequencing, capability snapshot selection, a
 agent state, human-input waits, cancellation, and Workflow Updates. It never owns live
 MCP sockets or process handles.
 
-The agent loop moves into a deterministic Workflow. Model requests and tool calls become
-separate activities. A model turn may produce zero or more tool calls; independent calls
-run with bounded concurrency and results return in deterministic model-call order.
+The `core.ai.agent` loop runs in a deterministic child Workflow on the
+`sentris-durable-ai-agent-turn-v1` patch path; pre-patch histories retain the original
+single component activity. Top-level nodes and For Each iterations use deterministic,
+collision-free child identities. Model requests and tool calls are separate activities.
+A model turn may produce zero or more tool calls; independent calls run with bounded
+concurrency and results return in deterministic model-call order.
 Exactly-once external effects are impossible without upstream idempotency. Mutating,
 unknown, or unreviewed dispatch activities use `maximumAttempts: 1`; retryable preflight
 is separate, and post-dispatch timeout/worker loss is reported as ambiguous.
@@ -263,10 +279,15 @@ wire owner. If the experimental integration fails those gates, a thin Workflow o
 ordinary activities calling maintained Vercel AI SDK providers implements the same
 boundary. No additional agent framework is added without a concrete missing capability.
 
-Large conversations, source/scanner content, tool results, and artifacts live in
-Postgres/MinIO. Workflow history carries bounded summaries, references, hashes, and
-control state and continues as new before history/payload limits under the same public
-run ID. Global timeouts become workload-specific. Human input uses Temporal signals;
+The graph agent prepares the root state before starting its child Workflow. Inline
+provider keys are sealed with the secret-store master key, the child input is sanitized,
+and immutable native AI SDK response-message checkpoints and tool results live in
+organization-scoped MinIO files. This preserves provider continuation metadata (including
+Gemini thought signatures) while child Workflow history carries compact references and
+control state. Retry attempts use distinct model checkpoint identities so a late attempt
+cannot overwrite the result Temporal accepted. The loop remains bounded to 128 model
+steps; Continue-As-New is still required before unbounded/interactive graph-agent turns
+are introduced. Global timeouts are workload-specific. Human input uses Temporal signals;
 model/MCP cancellation and idle-call heartbeats are acceptance requirements rather than
 assumed upstream behavior.
 
@@ -366,8 +387,8 @@ boundaries rather than by maintaining weaker parallel implementations.
 - A mismatched capability grant/snapshot or unlisted source fails before dispatch.
 - Temporal replay and worker restart do not repeat recorded completed tools; unrecorded
   post-dispatch outcomes remain ambiguous.
-- Long agent runs externalize large content and continue as new before history/payload
-  limits.
+- Bounded graph-agent runs externalize native model messages and tool results before
+  history/payload limits; unbounded turns require Continue-As-New before release.
 - Models can issue multiple bounded-concurrent tool calls with deterministic result
   ordering.
 - Human input and cancellation survive worker/backend restart.

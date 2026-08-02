@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'bun:test';
 
-import { WorkflowRunService } from '../workflow-run.service';
+import {
+  WorkflowRunService,
+  WorkflowRuntimeInputValidationException,
+} from '../workflow-run.service';
 import type { PreparedRunPayload } from '../workflow-run.service';
 import type { WorkflowRepository } from '../repository/workflow.repository';
 import type { WorkflowRunRepository } from '../repository/workflow-run.repository';
@@ -76,6 +79,25 @@ function makeDefinition() {
         ref: 'action-1',
         componentId: 'comp-1',
         params: {},
+        inputOverrides: {},
+        dependsOn: [],
+        inputMappings: {},
+      },
+    ],
+  };
+}
+
+function makeDefinitionWithRuntimeInputs(runtimeInputs: Record<string, unknown>[]) {
+  return {
+    version: 2,
+    title: 'Runtime Input Workflow',
+    description: null,
+    entrypoint: { ref: 'entry' },
+    actions: [
+      {
+        ref: 'entry',
+        componentId: 'core.workflow.entrypoint',
+        params: { runtimeInputs },
         inputOverrides: {},
         dependsOn: [],
         inputMappings: {},
@@ -379,6 +401,148 @@ describe('WorkflowRunService', () => {
       expect(payload.triggerMetadata.type).toBe('manual');
       expect(runRepo.prepare).toHaveBeenCalledWith(
         expect.objectContaining({ workflowId: 'wf-1' }),
+        expect.any(Function),
+      );
+    });
+
+    it('rejects missing required runtime inputs before persisting or starting a run', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      versionSvc.ensureDefinitionForVersion.mockResolvedValue(
+        makeDefinitionWithRuntimeInputs([
+          {
+            id: 'packageSpec',
+            label: 'npm package and optional version',
+            type: 'text',
+            required: true,
+          },
+        ]),
+      );
+
+      const error = await service.run('wf-1', { inputs: {} }, authContext).then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+
+      expect(error).toBeInstanceOf(WorkflowRuntimeInputValidationException);
+      expect((error as WorkflowRuntimeInputValidationException).message).toContain('packageSpec');
+      expect(runRepo.prepare).not.toHaveBeenCalled();
+      expect(auditLogSvc.recordDurableWithExecutor).not.toHaveBeenCalled();
+      expect(analyticsSvc.trackWorkflowStarted).not.toHaveBeenCalled();
+      expect(temporalSvc.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('rejects unknown runtime input IDs without reflecting their values', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      versionSvc.ensureDefinitionForVersion.mockResolvedValue(
+        makeDefinitionWithRuntimeInputs([
+          { id: 'packageSpec', label: 'Package', type: 'text', required: true },
+        ]),
+      );
+
+      const error = await service
+        .run('wf-1', { inputs: { package: 'value-that-must-not-appear-in-errors' } }, authContext)
+        .then(
+          () => null,
+          (cause: unknown) => cause,
+        );
+
+      expect(error).toBeInstanceOf(WorkflowRuntimeInputValidationException);
+      expect((error as WorkflowRuntimeInputValidationException).message).toContain('package');
+      expect((error as WorkflowRuntimeInputValidationException).message).toContain('packageSpec');
+      expect(
+        JSON.stringify((error as WorkflowRuntimeInputValidationException).getResponse()),
+      ).toContain('Unknown workflow runtime input');
+      expect(
+        JSON.stringify((error as WorkflowRuntimeInputValidationException).getResponse()),
+      ).not.toContain('value-that-must-not-appear-in-errors');
+      expect(runRepo.prepare).not.toHaveBeenCalled();
+      expect(temporalSvc.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('rejects type-invalid runtime inputs before persisting or starting a run', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      versionSvc.ensureDefinitionForVersion.mockResolvedValue(
+        makeDefinitionWithRuntimeInputs([
+          { id: 'attempts', label: 'Attempts', type: 'number', required: true },
+        ]),
+      );
+
+      const error = await service.run('wf-1', { inputs: { attempts: 'three' } }, authContext).then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+
+      expect(error).toBeInstanceOf(WorkflowRuntimeInputValidationException);
+      expect((error as WorkflowRuntimeInputValidationException).message).toContain('attempts');
+      expect((error as WorkflowRuntimeInputValidationException).message).toContain(
+        'must be number',
+      );
+      expect(runRepo.prepare).not.toHaveBeenCalled();
+      expect(auditLogSvc.recordDurableWithExecutor).not.toHaveBeenCalled();
+      expect(analyticsSvc.trackWorkflowStarted).not.toHaveBeenCalled();
+      expect(temporalSvc.startWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('accepts an omitted required runtime input when its selected contract has a default', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(null);
+      versionSvc.ensureDefinitionForVersion.mockResolvedValue(
+        makeDefinitionWithRuntimeInputs([
+          {
+            id: 'packageSpec',
+            label: 'Package',
+            type: 'text',
+            required: true,
+            defaultValue: 'minimist@latest',
+          },
+        ]),
+      );
+
+      const run = await service.run('wf-1', { inputs: {} }, authContext);
+
+      expect(run.status).toBe('RUNNING');
+      expect(runRepo.prepare).toHaveBeenCalledWith(
+        expect.objectContaining({ inputs: {} }),
+        expect.any(Function),
+      );
+      expect(temporalSvc.startWorkflow).toHaveBeenCalledTimes(1);
+    });
+
+    it('validates against the exact selected workflow version contract', async () => {
+      workflowRepo.findById.mockResolvedValue(makeWorkflowRecord());
+      runRepo.findByRunId.mockResolvedValue(null);
+      const selectedVersion = makeVersionRecord({ id: 'ver-selected', version: 7 });
+      versionSvc.resolveWorkflowVersion.mockResolvedValue(selectedVersion);
+      versionSvc.ensureDefinitionForVersion.mockResolvedValue(
+        makeDefinitionWithRuntimeInputs([
+          { id: 'packageSpec', label: 'Selected package', type: 'text', required: true },
+        ]),
+      );
+
+      const run = await service.run(
+        'wf-1',
+        { versionId: 'ver-selected', inputs: { packageSpec: 'minimist@1.2.5' } },
+        authContext,
+      );
+
+      expect(versionSvc.resolveWorkflowVersion).toHaveBeenCalledWith(
+        'wf-1',
+        expect.objectContaining({ versionId: 'ver-selected' }),
+        DEFAULT_ORGANIZATION_ID,
+      );
+      expect(versionSvc.ensureDefinitionForVersion).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'wf-1' }),
+        selectedVersion,
+        DEFAULT_ORGANIZATION_ID,
+      );
+      expect(run.workflowVersionId).toBe('ver-selected');
+      expect(run.workflowVersion).toBe(7);
+      expect(runRepo.prepare).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowVersionId: 'ver-selected',
+          workflowVersion: 7,
+          inputs: { packageSpec: 'minimist@1.2.5' },
+        }),
         expect.any(Function),
       );
     });

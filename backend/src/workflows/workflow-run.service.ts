@@ -19,13 +19,17 @@ import { AuditLogService } from '../audit/audit-log.service';
 import {
   ExecutionStatus,
   EXECUTION_STATUS,
+  extractWorkflowRuntimeInputDefinitions,
   FailureSummary,
+  formatWorkflowRuntimeInputValidationError,
   WorkflowRunStatusPayload,
   WorkflowRunConfigPayload,
   ExecutionTriggerType,
   ExecutionInputPreview,
   ExecutionTriggerMetadata,
   TERMINAL_STATUSES,
+  validateWorkflowRuntimeInputs,
+  type WorkflowRuntimeInputValidationResult,
 } from '@sentris/shared';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 import type { AuthContext } from '../auth/types';
@@ -87,6 +91,27 @@ export interface WorkflowRunSummary {
 }
 
 const SENTRIS_WORKFLOW_TYPE = 'sentrisWorkflowRun';
+
+export class WorkflowRuntimeInputValidationException extends BadRequestException {
+  constructor(result: WorkflowRuntimeInputValidationResult) {
+    const message = formatWorkflowRuntimeInputValidationError(result);
+    super({
+      statusCode: 400,
+      error: 'Bad Request',
+      code: 'WORKFLOW_RUNTIME_INPUTS_INVALID',
+      message,
+      details: {
+        // These contract details intentionally contain identifiers and types only. Runtime
+        // input values, including secrets, must never be reflected into an error response.
+        issues: result.issues,
+        expectedInputs: result.expectedInputs,
+        receivedInputIds: result.receivedInputIds,
+      },
+    });
+    this.name = 'WorkflowRuntimeInputValidationException';
+    this.message = message;
+  }
+}
 
 @Injectable()
 export class WorkflowRunService {
@@ -376,6 +401,12 @@ export class WorkflowRunService {
     const nodeOverrides = options.nodeOverrides ?? {};
     let definitionWithOverrides = this.applyNodeOverrides(compiledDefinition, nodeOverrides);
     definitionWithOverrides = this.applyComponentRetryPolicies(definitionWithOverrides);
+    const inputs = request.inputs ?? {};
+    const runtimeInputDefinitions = extractWorkflowRuntimeInputDefinitions(definitionWithOverrides);
+    const runtimeInputValidation = validateWorkflowRuntimeInputs(runtimeInputDefinitions, inputs);
+    if (!runtimeInputValidation.valid) {
+      throw new WorkflowRuntimeInputValidationException(runtimeInputValidation);
+    }
     const normalizedKey = this.normalizeIdempotencyKey(options.idempotencyKey);
     const runId =
       options.runId ??
@@ -383,7 +414,6 @@ export class WorkflowRunService {
         ? this.runIdFromIdempotencyKey(organizationId, workflow.id, normalizedKey)
         : `sentris-run-${randomUUID()}`);
     const triggerMetadata = options.trigger ?? this.buildEntryPointTriggerMetadata(auth);
-    const inputs = request.inputs ?? {};
     const inputPreview = this.buildInputPreview(inputs, nodeOverrides);
     const preparation = await this.runRepository.prepare(
       {

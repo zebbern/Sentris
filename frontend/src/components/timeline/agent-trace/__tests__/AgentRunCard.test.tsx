@@ -11,6 +11,7 @@ let mockCursor = 0;
 let mockMessages: any[] | null = null;
 let mockParts: any[] = [];
 let mockSteps: any[] = [];
+let mockTransport: object | null = null;
 
 mock.module('@/components/timeline/agent-trace/hooks/useAgentTranscript', () => ({
   useAgentTranscript: () => ({
@@ -24,7 +25,7 @@ mock.module('@/components/timeline/agent-trace/hooks/useAgentTranscript', () => 
 }));
 
 mock.module('@/components/timeline/agent-trace/hooks/useAgentChatTransport', () => ({
-  useAgentChatTransport: () => null,
+  useAgentChatTransport: () => mockTransport,
 }));
 
 const mockSendMessage = mock(async () => {});
@@ -116,6 +117,7 @@ function resetMocks() {
   mockMessages = null;
   mockParts = [];
   mockSteps = [];
+  mockTransport = null;
   mockSendMessage.mockClear();
   mockSetMessages.mockClear();
   mockInvalidateQueries.mockClear();
@@ -187,6 +189,62 @@ describe('AgentRunCard', () => {
     render(<AgentRunCard {...makeProps({ live: false })} />);
 
     expect(screen.queryByText('Live')).toBeNull();
+  });
+
+  it('does not stream or show live state when the hydrated transcript already finished', () => {
+    mockCursor = 7;
+    mockMessages = [];
+    mockTransport = {};
+    mockParts = [
+      {
+        sequence: 7,
+        timestamp: '2026-08-02T10:00:00.000Z',
+        chunk: { type: 'finish', finishReason: 'stop' },
+      },
+    ];
+
+    render(<AgentRunCard {...makeProps({ live: true })} />);
+
+    expect(screen.queryByText('Live')).toBeNull();
+    expect(screen.queryByText(/Status:/)).toBeNull();
+    expect(mockSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('resumes streaming after the hydrated cursor while the agent is still active', () => {
+    mockCursor = 7;
+    mockMessages = [];
+    mockTransport = {};
+    mockParts = [
+      {
+        sequence: 7,
+        timestamp: '2026-08-02T10:00:00.000Z',
+        chunk: { type: 'text-delta', id: 'text-1', delta: 'working' },
+      },
+    ];
+
+    render(<AgentRunCard {...makeProps({ live: true })} />);
+
+    expect(screen.getByText('Live')).toBeTruthy();
+    expect(mockSendMessage).toHaveBeenCalledWith(undefined, { body: { cursor: 7 } });
+  });
+
+  it('can settle a terminal run transcript without showing a false live state', () => {
+    mockCursor = 7;
+    mockMessages = [];
+    mockTransport = {};
+    mockParts = [
+      {
+        sequence: 7,
+        timestamp: '2026-08-02T10:00:00.000Z',
+        chunk: { type: 'text-delta', id: 'text-1', delta: 'finishing' },
+      },
+    ];
+
+    render(<AgentRunCard {...makeProps({ live: false, follow: true })} />);
+
+    expect(screen.queryByText('Live')).toBeNull();
+    expect(screen.queryByText(/Status:/)).toBeNull();
+    expect(mockSendMessage).toHaveBeenCalledWith(undefined, { body: { cursor: 7 } });
   });
 
   it('shows "Focused" button text when selected', () => {

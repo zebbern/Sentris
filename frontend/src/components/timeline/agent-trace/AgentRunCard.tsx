@@ -18,7 +18,8 @@ export function AgentRunCard({
   agentRunId,
   runId,
   live,
-  isSelected,
+  follow,
+  isSelected = false,
   onFocus,
   prompt,
   responseText,
@@ -43,6 +44,9 @@ export function AgentRunCard({
   const startedRef = useRef(false);
   const lastReplaySequenceRef = useRef<number | null>(null);
   const previousLiveStateRef = useRef({ agentRunId, live });
+  const transcriptFinished = parts.some((entry) => entry.chunk.type === 'finish');
+  const agentIsLive = live && !transcriptFinished;
+  const shouldFollow = (follow ?? live) && !transcriptFinished;
   const playbackMode = useExecutionTimelineStore((state) => state.playbackMode);
   const timelineStartTime = useExecutionTimelineStore((state) => state.timelineStartTime);
   const timelineCurrentTime = useExecutionTimelineStore((state) => state.currentTime);
@@ -94,14 +98,14 @@ export function AgentRunCard({
   }, [initialMessages, setMessages]);
 
   useEffect(() => {
-    if (!live || startedRef.current || !transport || !hydratedRef.current) {
+    if (!shouldFollow || startedRef.current || !transport || !hydratedRef.current) {
       return;
     }
     startedRef.current = true;
     void sendMessage(undefined, {
       body: cursor > 0 ? { cursor } : undefined,
     });
-  }, [live, cursor, sendMessage, transport]);
+  }, [shouldFollow, cursor, sendMessage, transport]);
 
   useEffect(() => {
     const previous = previousLiveStateRef.current;
@@ -193,14 +197,16 @@ export function AgentRunCard({
           <p className="text-xs text-muted-foreground">Run {agentRunId.slice(-8)}</p>
         </div>
         <div className="flex items-center gap-2">
-          {live && (
+          {agentIsLive ? (
             <Badge variant="default" className="bg-emerald-600 text-white animate-pulse">
               Live
             </Badge>
-          )}
-          <Button size="sm" variant={isSelected ? 'default' : 'outline'} onClick={onFocus}>
-            {isSelected ? 'Focused' : 'Focus in timeline'}
-          </Button>
+          ) : null}
+          {onFocus ? (
+            <Button size="sm" variant={isSelected ? 'default' : 'outline'} onClick={onFocus}>
+              {isSelected ? 'Focused' : 'Focus in timeline'}
+            </Button>
+          ) : null}
         </div>
       </div>
       <div className="space-y-3 p-4">
@@ -217,11 +223,11 @@ export function AgentRunCard({
             }
           />
         )}
-        {live && (
+        {agentIsLive ? (
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
             Status: {status}
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

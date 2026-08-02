@@ -3,12 +3,97 @@ import { describe, expect, it } from 'bun:test';
 import {
   OPERATOR_COMMAND_DEFINITIONS,
   OperatorGetFindingInputSchema,
+  OperatorGetWorkflowInputSchema,
+  OperatorRunWorkflowInputSchema,
   OperatorGetMcpPromptInputSchema,
   OperatorInvokeMcpToolInputSchema,
   OperatorListFindingsInputSchema,
+  OperatorPersistedTurnPayloadSchema,
   OperatorReadMcpResourceInputSchema,
+  OperatorStoredTurnContextSchema,
+  OperatorCreateTurnSchema,
   OperatorUpdateFindingTriageInputSchema,
 } from '../operator.js';
+
+describe('Operator run controls', () => {
+  it('can inspect the exact workflow version before launching it', () => {
+    expect(
+      OperatorGetWorkflowInputSchema.parse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        version: 4,
+      }),
+    ).toEqual({
+      workflowId: '22222222-2222-4222-8222-222222222222',
+      version: 4,
+    });
+    expect(
+      OperatorRunWorkflowInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        inputs: {},
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorRunWorkflowInputSchema.parse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        inputs: { packageSpec: 'minimist@1.2.8' },
+      }),
+    ).toEqual({
+      workflowId: '22222222-2222-4222-8222-222222222222',
+      versionId: '33333333-3333-4333-8333-333333333333',
+      inputs: { packageSpec: 'minimist@1.2.8' },
+    });
+  });
+
+  it('keeps retry explicit and accepts only bounded direct run commands', () => {
+    expect(OPERATOR_COMMAND_DEFINITIONS.retry_run.effect).toBe('execute');
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: '11111111-1111-4111-8111-111111111111',
+        message: 'Retry this run',
+        directCommand: {
+          commandName: 'retry_run',
+          arguments: { runId: 'sentris-run-1' },
+        },
+      }).directCommand,
+    ).toEqual({ commandName: 'retry_run', arguments: { runId: 'sentris-run-1' } });
+    expect(
+      OperatorCreateTurnSchema.safeParse({
+        clientTurnId: '11111111-1111-4111-8111-111111111111',
+        message: 'Run something else',
+        directCommand: {
+          commandName: 'run_workflow',
+          arguments: { workflowId: '22222222-2222-4222-8222-222222222222' },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('defines one strict versioned payload while accepting legacy route-only storage', () => {
+    const routeContext = {
+      path: '/workflows/22222222-2222-4222-8222-222222222222',
+      workflowId: '22222222-2222-4222-8222-222222222222',
+    };
+    const payload = {
+      version: 1 as const,
+      routeContext,
+      directCommand: {
+        commandName: 'get_run' as const,
+        arguments: { runId: 'sentris-run-1' },
+      },
+    };
+
+    expect(OperatorPersistedTurnPayloadSchema.parse(payload)).toEqual(payload);
+    expect(OperatorStoredTurnContextSchema.parse(routeContext)).toEqual(routeContext);
+    expect(OperatorStoredTurnContextSchema.parse(null)).toBeNull();
+    expect(
+      OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, version: 2 }).success,
+    ).toBe(false);
+    expect(
+      OperatorPersistedTurnPayloadSchema.safeParse({ ...payload, unexpected: true }).success,
+    ).toBe(false);
+  });
+});
 
 describe('Operator finding commands', () => {
   it('defaults and bounds finding-list inputs', () => {

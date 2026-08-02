@@ -133,7 +133,9 @@ export class TemporalService implements OnModuleDestroy {
       args: options.args ?? [],
       memo,
       searchAttributes: options.searchAttributes as WorkflowOptions['searchAttributes'],
-      workflowExecutionTimeout: options.workflowExecutionTimeout ?? '2 hours',
+      ...(options.workflowExecutionTimeout === undefined
+        ? {}
+        : { workflowExecutionTimeout: options.workflowExecutionTimeout }),
     });
 
     this.logger.log(

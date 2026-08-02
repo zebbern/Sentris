@@ -83,6 +83,7 @@ describe('handleForEachLoopInWorkflow', () => {
     };
 
     const seenRetryPolicies: WorkflowAction['retryPolicy'][] = [];
+    const seenIterations: { forEachRef: string; index: number; total: number }[] = [];
 
     await handleForEachLoopInWorkflow({
       input: {
@@ -95,7 +96,7 @@ describe('handleForEachLoopInWorkflow', () => {
       },
       action: rootDefinition.actions[0] as WorkflowAction,
       mergedInputs: {
-        items: [{ packageSpec: 'source-map-js' }],
+        items: [{ packageSpec: 'source-map-js' }, { packageSpec: 'minimatch' }],
       },
       mergedParams: {},
       warnings: [],
@@ -104,8 +105,10 @@ describe('handleForEachLoopInWorkflow', () => {
         runComponentActivityForAction: async (
           bodyAction: WorkflowAction,
           activityInput: RunComponentActivityInput,
+          iteration: { forEachRef: string; index: number; total: number },
         ): Promise<RunComponentActivityOutput> => {
           seenRetryPolicies.push(bodyAction.retryPolicy);
+          seenIterations.push(iteration);
           expect(activityInput.action.ref).toBe('agent');
           return {
             output: {
@@ -117,7 +120,11 @@ describe('handleForEachLoopInWorkflow', () => {
       },
     });
 
-    expect(seenRetryPolicies).toEqual([{ maxAttempts: 1 }]);
+    expect(seenRetryPolicies).toEqual([{ maxAttempts: 1 }, { maxAttempts: 1 }]);
+    expect(seenIterations).toEqual([
+      { forEachRef: 'package_loop', index: 0, total: 2 },
+      { forEachRef: 'package_loop', index: 1, total: 2 },
+    ]);
   });
 
   it('runs join-any merge nodes with inputs from the active conditional branch only', async () => {

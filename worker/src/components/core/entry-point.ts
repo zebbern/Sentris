@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import {
+  WorkflowRuntimeInputDefinitionsSchema,
+  hasWorkflowRuntimeInputDefault,
+  workflowRuntimeInputValueSchema,
+  type WorkflowRuntimeInputType,
+} from '@sentris/shared';
+import {
   componentRegistry,
   ValidationError,
   defineComponent,
@@ -11,32 +17,6 @@ import {
   withPortMeta,
 } from '@sentris/component-sdk';
 import type { PortMeta } from '@sentris/component-sdk/port-meta';
-
-// Runtime input definition schema
-const runtimeInputDefinitionSchema = z.preprocess(
-  (value) => {
-    if (typeof value === 'object' && value !== null && 'type' in value) {
-      const typed = value as Record<string, unknown>;
-      if (typed.type === 'string') {
-        return {
-          ...typed,
-          type: 'text',
-        };
-      }
-    }
-    return value;
-  },
-  z.object({
-    id: z.string().describe('Unique identifier for this input'),
-    label: z.string().describe('Display label for the input field'),
-    type: z
-      .enum(['file', 'text', 'number', 'boolean', 'json', 'array', 'secret'])
-      .describe('Type of input data'),
-    required: z.boolean().default(true).describe('Whether this input is required'),
-    description: z.string().optional().describe('Help text for the input'),
-    defaultValue: z.unknown().optional().describe('Default value to use when input is omitted'),
-  }),
-);
 
 const inputSchema = inputs({
   // Runtime data will be injected at execution time.
@@ -53,10 +33,9 @@ const outputSchema = outputs({});
 
 const parameterSchema = parameters({
   runtimeInputs: param(
-    z
-      .array(runtimeInputDefinitionSchema)
-      .default([])
-      .describe('Define inputs to collect when workflow is triggered'),
+    WorkflowRuntimeInputDefinitionsSchema.default([]).describe(
+      'Define inputs to collect when workflow is triggered',
+    ),
     {
       label: 'Runtime Inputs',
       editor: 'json',
@@ -97,7 +76,9 @@ const definition = defineComponent({
     ],
   },
   resolvePorts(params: z.infer<typeof parameterSchema>) {
-    const runtimeInputs = Array.isArray(params.runtimeInputs) ? params.runtimeInputs : [];
+    const runtimeInputs = WorkflowRuntimeInputDefinitionsSchema.parse(
+      Array.isArray(params.runtimeInputs) ? params.runtimeInputs : [],
+    );
 
     const outputShape: Record<string, z.ZodTypeAny> = {};
     for (const input of runtimeInputs) {
@@ -106,7 +87,7 @@ const definition = defineComponent({
         continue;
       }
 
-      const type = typeof input?.type === 'string' ? input.type.toLowerCase() : 'text';
+      const type = input.type;
       const required = input?.required !== undefined ? Boolean(input.required) : true;
       const label = typeof input?.label === 'string' ? input.label : id;
       const description = typeof input?.description === 'string' ? input.description : undefined;
@@ -145,10 +126,7 @@ const definition = defineComponent({
     for (const inputDef of runtimeInputs) {
       const value = __runtimeData?.[inputDef.id];
       const hasValue = value !== undefined && value !== null;
-      const hasDefaultValue =
-        Object.prototype.hasOwnProperty.call(inputDef, 'defaultValue') &&
-        inputDef.defaultValue !== undefined &&
-        inputDef.defaultValue !== null;
+      const hasDefaultValue = hasWorkflowRuntimeInputDefault(inputDef);
       let outputValue = value;
 
       if (!hasValue && hasDefaultValue) {
@@ -197,35 +175,39 @@ type EntryPointOutput = typeof outputSchema;
 
 export type { EntryPointInput, EntryPointParams, EntryPointOutput };
 
-function runtimeInputTypeToSchema(type: string): { schema: z.ZodTypeAny; meta?: PortMeta } {
+function runtimeInputTypeToSchema(type: WorkflowRuntimeInputType): {
+  schema: z.ZodTypeAny;
+  meta?: PortMeta;
+} {
+  const schema = workflowRuntimeInputValueSchema(type);
   switch (type) {
-    case 'number':
-      return { schema: z.number() };
-    case 'boolean':
-      return { schema: z.boolean() };
     case 'file':
       return {
-        schema: z.string(),
+        schema,
         meta: { connectionType: { kind: 'primitive', name: 'file' } },
       };
     case 'json':
       return {
-        schema: z.unknown(),
+        schema,
         meta: {
           allowAny: true,
           reason: 'Runtime JSON inputs can be arbitrary structures.',
           connectionType: { kind: 'primitive', name: 'json' },
         },
       };
-    case 'array':
-      return { schema: z.array(z.string()) };
     case 'secret':
       return {
-        schema: z.string(),
+        schema,
         meta: { connectionType: { kind: 'primitive', name: 'secret' } },
       };
+    case 'number':
+    case 'boolean':
+    case 'array':
     case 'text':
-    default:
-      return { schema: z.string() };
+      return { schema };
+    default: {
+      const exhaustive: never = type;
+      throw new Error(`Unsupported workflow runtime input type: ${String(exhaustive)}`);
+    }
   }
 }

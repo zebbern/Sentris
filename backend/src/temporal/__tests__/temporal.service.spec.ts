@@ -136,6 +136,8 @@ describe('TemporalService', () => {
         'sentrisWorkflowRun',
         expect.any(Object),
       );
+      const startOptions = mockWorkflowClient.start.mock.calls[0][1];
+      expect(startOptions).not.toHaveProperty('workflowExecutionTimeout');
     });
 
     it('uses provided workflowId and taskQueue', async () => {
@@ -149,6 +151,16 @@ describe('TemporalService', () => {
       const args = mockWorkflowClient.start.mock.calls[0][1];
       expect(args.workflowId).toBe('custom-id');
       expect(args.taskQueue).toBe('custom-queue');
+    });
+
+    it('preserves an explicitly supplied workflow execution timeout', async () => {
+      await service.startWorkflow({
+        workflowType: 'sentrisWorkflowRun',
+        workflowExecutionTimeout: '6 hours',
+      });
+
+      const args = mockWorkflowClient.start.mock.calls[0][1];
+      expect(args.workflowExecutionTimeout).toBe('6 hours');
     });
 
     it('passes memo and searchAttributes', async () => {
