@@ -6,7 +6,10 @@ import {
   workflowInfo,
 } from '@temporalio/workflow';
 import type { McpCatalog, McpRuntimeKey } from '@sentris/shared';
-import { SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS } from '../../mcp-runtime/mcp-runtime-limits';
+import {
+  SAVED_MCP_RUNTIME_DISCOVERY_RETRY,
+  SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
+} from '../../mcp-runtime/mcp-runtime-limits';
 import type { McpTool } from '../types';
 
 // Input DTO for MCP discovery workflow
@@ -145,7 +148,7 @@ const { discoverSavedMcpRuntimeActivity } = proxyActivities<{
   startToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
   scheduleToCloseTimeout: SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS * 2,
   heartbeatTimeout: '20 seconds',
-  retry: { maximumAttempts: 2 },
+  retry: { ...SAVED_MCP_RUNTIME_DISCOVERY_RETRY },
 });
 
 /**

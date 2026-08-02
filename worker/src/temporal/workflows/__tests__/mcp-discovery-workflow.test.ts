@@ -130,7 +130,12 @@ describe('mcpDiscoveryWorkflow', () => {
       startToCloseTimeout: 30 * 60 * 1_000,
       scheduleToCloseTimeout: 60 * 60 * 1_000,
       heartbeatTimeout: '20 seconds',
-      retry: { maximumAttempts: 2 },
+      retry: {
+        initialInterval: '30 seconds',
+        backoffCoefficient: 2,
+        maximumInterval: '60 seconds',
+        maximumAttempts: 5,
+      },
     });
   });
 

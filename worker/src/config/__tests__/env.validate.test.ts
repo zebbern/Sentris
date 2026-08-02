@@ -193,20 +193,42 @@ describe('workerEnvSchema', () => {
     expect(
       workerEnvSchema.safeParse(
         validEnv({
-          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '900000',
-          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '800000',
-          MCP_RUNTIME_STARTING_TTL_MS: '1710000',
-          MCP_RUNTIME_DRAIN_TIMEOUT_MS: '100000',
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '120000',
+          MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '5000',
+          MCP_RUNTIME_STARTING_TTL_MS: '155000',
+          MCP_RUNTIME_DRAIN_TIMEOUT_MS: '1700000',
         }),
       ).success,
     ).toBe(false);
     expect(
       workerEnvSchema.safeParse(
         validEnv({
-          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '800000',
-          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '800000',
-          MCP_RUNTIME_STARTING_TTL_MS: '1610000',
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '120000',
+          MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '5000',
+          MCP_RUNTIME_STARTING_TTL_MS: '155000',
           MCP_RUNTIME_DRAIN_TIMEOUT_MS: '100000',
+        }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it('rejects lease TTLs that outlive saved-discovery Temporal retry coverage', () => {
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_STARTING_TTL_MS: '210001' })).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_LEASE_TTL_MS: '210001' })).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: '120000',
+          MCP_RUNTIME_REDIS_COMMAND_TIMEOUT_MS: '5000',
+          MCP_RUNTIME_STARTING_TTL_MS: '210000',
+          MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS: '210000',
         }),
       ).success,
     ).toBe(true);

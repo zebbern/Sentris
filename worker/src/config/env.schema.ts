@@ -9,8 +9,11 @@ import {
   resolveSentrisTrustProfile,
 } from '@sentris/shared';
 import {
+  MCP_RUNTIME_DEFAULT_READY_LEASE_TTL_MS,
+  MCP_RUNTIME_DEFAULT_STARTING_LEASE_TTL_MS,
   MCP_RUNTIME_MAX_DOCKER_INVENTORY,
   SAVED_MCP_RUNTIME_DISCOVERY_FIXED_OVERHEAD_MS,
+  SAVED_MCP_RUNTIME_DISCOVERY_RETRY_COVERAGE_MS,
   SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS,
 } from '../mcp-runtime/mcp-runtime-limits';
 
@@ -37,14 +40,14 @@ const mcpRuntimeEnvShape = {
     .positive()
     .max(MCP_RUNTIME_MAX_TTL_MS)
     .optional()
-    .default(180_000),
+    .default(MCP_RUNTIME_DEFAULT_STARTING_LEASE_TTL_MS),
   MCP_RUNTIME_LEASE_TTL_MS: z.coerce
     .number()
     .int()
     .positive()
     .max(MCP_RUNTIME_MAX_TTL_MS)
     .optional()
-    .default(60_000),
+    .default(MCP_RUNTIME_DEFAULT_READY_LEASE_TTL_MS),
   MCP_RUNTIME_RENEWAL_INTERVAL_MS: z.coerce
     .number()
     .int()
@@ -182,6 +185,22 @@ function validateMcpRuntimeTiming(data: McpRuntimeTimingConfig, ctx: z.Refinemen
       code: 'custom',
       path: ['MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS'],
       message: 'MCP runtime startup and cleanup budget exceeds saved-discovery activity ownership',
+    });
+  }
+  if (data.MCP_RUNTIME_STARTING_TTL_MS > SAVED_MCP_RUNTIME_DISCOVERY_RETRY_COVERAGE_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_STARTING_TTL_MS'],
+      message:
+        'MCP runtime starting TTL must not exceed saved-discovery Temporal retry coverage of hard-crash lease expiry',
+    });
+  }
+  if (data.MCP_RUNTIME_LEASE_TTL_MS > SAVED_MCP_RUNTIME_DISCOVERY_RETRY_COVERAGE_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_LEASE_TTL_MS'],
+      message:
+        'MCP runtime ready lease TTL must not exceed saved-discovery Temporal retry coverage of hard-crash lease expiry',
     });
   }
   if (Boolean(data.MCP_RUNTIME_OWNER_ID) !== Boolean(data.MCP_RUNTIME_OWNER_URL)) {

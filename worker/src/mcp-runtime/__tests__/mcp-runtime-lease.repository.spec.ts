@@ -427,6 +427,100 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     ).toEqual([{ runtimeKey: secondKey, ref: replacement.ref }]);
   });
 
+  test('hard-crash ready orphan: new epoch cannot steal before expiry, then reserves gen+1 and rejects the old fence', async () => {
+    const repository = createRepository(requiredFixture(fixture), { readyTtlMs: 160 });
+    const key = runtimeKey({ sourceId: 'ready-orphan-source' });
+    const deadOwner = candidateOwner('worker-dead', 'http://127.0.0.1:9201');
+    const restartedOwner = candidateOwner('worker-dead', 'http://127.0.0.1:9201');
+    expect(restartedOwner.ownerEpoch).not.toBe(deadOwner.ownerEpoch);
+
+    const reserved = await repository.reserve(key, deadOwner);
+    expect(reserved).toMatchObject({
+      kind: 'created',
+      ref: { fence: { leaseGeneration: 1, ownerEpoch: deadOwner.ownerEpoch } },
+    });
+    const ready = await repository.publishReady(
+      key,
+      reserved.ref.fence,
+      publication(deadOwner.ownerAddress),
+    );
+    expect(ready).not.toBeNull();
+    if (!ready) return;
+
+    const blocked = await repository.reserve(key, restartedOwner);
+    expect(blocked).toEqual({ kind: 'existing', ref: ready });
+    expect(blocked.ref.fence.leaseGeneration).toBe(1);
+    expect(blocked.ref.fence.ownerEpoch).toBe(deadOwner.ownerEpoch);
+    expect(await repository.matchesFenceByHash(hashMcpRuntimeKey(key), ready.fence)).toBe(true);
+
+    await waitUntil(async () => (await repository.read(key)) === null);
+    const reclaimed = await repository.reserve(key, restartedOwner);
+    expect(reclaimed).toMatchObject({
+      kind: 'created',
+      ref: {
+        state: 'starting',
+        fence: {
+          leaseGeneration: 2,
+          ownerId: restartedOwner.ownerId,
+          ownerEpoch: restartedOwner.ownerEpoch,
+        },
+      },
+    });
+    expect(await repository.renew(key, ready.fence)).toBeNull();
+    expect(await repository.compareAndDelete(key, ready.fence)).toBe(false);
+    expect(await repository.matchesFenceByHash(hashMcpRuntimeKey(key), ready.fence)).toBe(false);
+  });
+
+  test('hard-crash starting orphan: new epoch cannot steal before expiry, then reserves gen+1 and rejects the old fence', async () => {
+    const repository = createRepository(requiredFixture(fixture), { startingTtlMs: 160 });
+    const key = runtimeKey({ sourceId: 'starting-orphan-source' });
+    const deadOwner = candidateOwner('worker-dead', 'http://127.0.0.1:9202');
+    const restartedOwner = candidateOwner('worker-dead', 'http://127.0.0.1:9202');
+    expect(restartedOwner.ownerEpoch).not.toBe(deadOwner.ownerEpoch);
+
+    const reserved = await repository.reserve(key, deadOwner);
+    expect(reserved).toMatchObject({
+      kind: 'created',
+      ref: { state: 'starting', fence: { leaseGeneration: 1 } },
+    });
+
+    const blocked = await repository.reserve(key, restartedOwner);
+    expect(blocked).toEqual({ kind: 'existing', ref: reserved.ref });
+    expect(blocked.ref.fence.leaseGeneration).toBe(1);
+    expect(blocked.ref.fence.ownerEpoch).toBe(deadOwner.ownerEpoch);
+    expect(
+      await repository.publishReady(
+        key,
+        {
+          ...reserved.ref.fence,
+          ownerEpoch: restartedOwner.ownerEpoch,
+        },
+        publication(restartedOwner.ownerAddress),
+      ),
+    ).toBeNull();
+
+    await waitUntil(async () => (await repository.read(key)) === null);
+    const reclaimed = await repository.reserve(key, restartedOwner);
+    expect(reclaimed).toMatchObject({
+      kind: 'created',
+      ref: {
+        state: 'starting',
+        fence: {
+          leaseGeneration: 2,
+          ownerId: restartedOwner.ownerId,
+          ownerEpoch: restartedOwner.ownerEpoch,
+        },
+      },
+    });
+    expect(
+      await repository.publishReady(key, reserved.ref.fence, publication(deadOwner.ownerAddress)),
+    ).toBeNull();
+    expect(await repository.compareAndDelete(key, reserved.ref.fence)).toBe(false);
+    expect(await repository.matchesFenceByHash(hashMcpRuntimeKey(key), reserved.ref.fence)).toBe(
+      false,
+    );
+  });
+
   test('changes only the ephemeral fence on failover while preserving immutable authority and config identity', async () => {
     const repository = createRepository(requiredFixture(fixture));
     const key = Object.freeze(runtimeKey({ configFingerprint: HASH_B }));

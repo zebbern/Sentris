@@ -10,6 +10,26 @@ export const SAVED_MCP_RUNTIME_DISCOVERY_START_TO_CLOSE_MS = 30 * 60 * 1_000;
 export const SAVED_MCP_RUNTIME_DISCOVERY_RELEASE_TIMEOUT_MS = 2 * 60 * 1_000;
 export const SAVED_MCP_RUNTIME_DISCOVERY_FIXED_OVERHEAD_MS = 60_000;
 
+/** Default ready-lease TTL mirrored by `MCP_RUNTIME_LEASE_TTL_MS`. */
+export const MCP_RUNTIME_DEFAULT_READY_LEASE_TTL_MS = 60_000;
+/** Default starting-lease TTL mirrored by `MCP_RUNTIME_STARTING_TTL_MS`. */
+export const MCP_RUNTIME_DEFAULT_STARTING_LEASE_TTL_MS = 180_000;
+
+/**
+ * Temporal retry policy for saved MCP discovery.
+ * Cumulative backoff before the final attempt must outwait a hard-crash starting lease
+ * (default 180s) even when each attempt fails in seconds:
+ * 30s + 60s + 60s + 60s = 210s across five attempts.
+ */
+export const SAVED_MCP_RUNTIME_DISCOVERY_RETRY = {
+  initialInterval: '30 seconds',
+  backoffCoefficient: 2,
+  maximumInterval: '60 seconds',
+  maximumAttempts: 5,
+} as const;
+
+export const SAVED_MCP_RUNTIME_DISCOVERY_RETRY_COVERAGE_MS = 210_000;
+
 export interface McpRuntimeOperationTimeoutContext {
   maxTotalTimeoutMs: number;
 }
