@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted; run-gateway and durable component invocation slice implemented, dependent work pending** — 2026-08-01
+**Accepted; run-gateway, durable component invocation, and Operator-turn slices implemented, dependent work pending** — 2026-08-02
 
 ## Context
 
@@ -87,6 +87,19 @@ checks reject partial identities. The nullable legacy `tool_name` projection and
 tool-shaped repository/service methods exist only to replay pre-Task-7 Workflow histories,
 not as a second permanent invocation architecture. Task 8 must backfill rows written by
 old binaries before enforcing the generic identity `NOT NULL` contract.
+
+The in-app Operator now owns each user turn in a Temporal Workflow. Model steps, typed
+Sentris commands, approval waits, workflow-run observation, and MCP dispatch are separate
+activities or durable Workflow state rather than one retryable model/tool activity.
+Postgres stores sessions, messages, action decisions, and results; consequential actions
+honor the session's ask-or-auto approval mode. Operator MCP discovery materializes an
+immutable turn-scoped grant and complete capability snapshot, and tool, resource, and
+prompt operations use the same invocation-ID-keyed preparation, canonical worker runtime,
+fenced dispatch, reconciliation, and settlement path as run-scoped calls. Provider-native
+tool-call IDs and metadata required to continue a model turn are retained in Temporal turn
+history, while the provider-neutral action audit keeps a stable Sentris idempotency key.
+Pre-deployment turn histories without that provider metadata are represented to the model
+as bounded durable observations instead of forged native tool calls.
 
 Two outbound compatibility boundaries remain. Contract-v1 snapshots have no runtime
 bindings and continue through the existing tool-only path owned by the backend MCP

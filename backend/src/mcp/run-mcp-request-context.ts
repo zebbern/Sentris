@@ -66,7 +66,9 @@ export function parseRunMcpRequestContext(extra: unknown): RunMcpRequestContext 
   });
 }
 
-export function toRunExecutionScope(context: RunMcpRequestContext): ExecutionScope {
+export function toRunExecutionScope(
+  context: RunMcpRequestContext,
+): Extract<ExecutionScope, { kind: 'run' }> {
   return Object.freeze({
     kind: 'run',
     runId: context.runId,

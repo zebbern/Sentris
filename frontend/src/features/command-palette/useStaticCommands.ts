@@ -13,6 +13,7 @@ import {
   Zap,
   ServerCog,
   Sparkles,
+  Bot,
 } from 'lucide-react';
 import { env } from '@/config/env';
 import type { Command } from './command-palette-types';
@@ -60,6 +61,16 @@ export function useStaticCommands({
         },
       },
       // Navigation
+      {
+        id: 'nav-operator',
+        type: 'navigation',
+        label: 'Open Operator',
+        description: 'Inspect and run workflows with the in-app Operator',
+        category: 'navigation',
+        icon: Bot,
+        keywords: ['operator', 'agent', 'assistant', 'chat', 'run'],
+        href: '/operator',
+      },
       {
         id: 'nav-workflows',
         type: 'navigation',

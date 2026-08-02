@@ -29,6 +29,7 @@ export interface StartWorkflowOptions {
   searchAttributes?: Record<string, unknown>;
   /** Correlation ID from the originating HTTP request (X-Request-Id). Propagated via workflow memo. */
   correlationId?: string;
+  workflowExecutionTimeout?: WorkflowOptions['workflowExecutionTimeout'];
 }
 
 export interface WorkflowRunReference {
@@ -132,7 +133,7 @@ export class TemporalService implements OnModuleDestroy {
       args: options.args ?? [],
       memo,
       searchAttributes: options.searchAttributes as WorkflowOptions['searchAttributes'],
-      workflowExecutionTimeout: '2 hours',
+      workflowExecutionTimeout: options.workflowExecutionTimeout ?? '2 hours',
     });
 
     this.logger.log(
@@ -154,6 +155,7 @@ export class TemporalService implements OnModuleDestroy {
       case 'mcpDiscoveryWorkflow':
       case 'mcpGroupDiscoveryWorkflow':
       case 'webhookParsingWorkflow':
+      case 'operatorTurnWorkflow':
         return workflowType;
       default:
         throw new Error(`Unknown workflow type: ${workflowType}`);

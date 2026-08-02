@@ -2,6 +2,8 @@ import {
   Client,
   type DiscoverResult,
   InMemoryResponseCacheStore,
+  SdkError,
+  SdkErrorCode,
   SdkHttpError,
   StreamableHTTPClientTransport,
   type FetchLike,
@@ -28,6 +30,7 @@ const CLIENT_INFO = { name: 'sentris-worker-mcp-runtime', version: '1.0.0' };
 
 const DEFAULT_PRIOR_TTL_MS = 5 * 60_000;
 const MAX_PRIOR_TTL_MS = 15 * 60_000;
+const MAX_STDIO_PROBE_TIMEOUT_MS = 60_000;
 
 interface PriorEntry {
   runtimeKey: McpRuntimeKey;
@@ -57,6 +60,7 @@ export class McpClientFactory {
   private readonly closeCleanups = new WeakMap<McpOwnedClient, Set<() => void>>();
   private readonly priors = new Map<string, PriorEntry>();
   private readonly priorTtlMs: number;
+  private readonly stdioProbeTimeoutMs: number | undefined;
   private readonly now: () => number;
   private readonly sseCompatibility: McpSseCompatibilityConnector;
 
@@ -66,6 +70,18 @@ export class McpClientFactory {
       throw new Error(`MCP prior TTL must be between 1 and ${MAX_PRIOR_TTL_MS}ms`);
     }
     this.priorTtlMs = priorTtlMs;
+    const { stdioProbeTimeoutMs } = options;
+    if (
+      stdioProbeTimeoutMs !== undefined &&
+      (!Number.isFinite(stdioProbeTimeoutMs) ||
+        stdioProbeTimeoutMs <= 0 ||
+        stdioProbeTimeoutMs > MAX_STDIO_PROBE_TIMEOUT_MS)
+    ) {
+      throw new Error(
+        `MCP stdio probe timeout must be between 1 and ${MAX_STDIO_PROBE_TIMEOUT_MS}ms`,
+      );
+    }
+    this.stdioProbeTimeoutMs = stdioProbeTimeoutMs;
     this.now = options.now ?? Date.now;
     this.sseCompatibility = options.sseAdapter ?? new McpSseCompatibilityAdapter();
   }
@@ -83,7 +99,12 @@ export class McpClientFactory {
       adapter: new McpClientAdapter(
         new Client(CLIENT_INFO, {
           capabilities: {},
-          versionNegotiation: { mode: 'auto' },
+          versionNegotiation: {
+            mode: 'auto',
+            ...(runtimeKey.transport === 'stdio' && this.stdioProbeTimeoutMs !== undefined
+              ? { probe: { timeoutMs: this.stdioProbeTimeoutMs, maxRetries: 0 } }
+              : {}),
+          },
           listMaxPages: 64,
           cachePartition: partitionFor(runtimeKey),
           responseCacheStore: cacheStore,
@@ -146,7 +167,31 @@ export class McpClientFactory {
     owned: McpOwnedClient,
     lifecycleSignal: AbortSignal,
   ): Promise<McpOwnedClient> {
-    const signal = AbortSignal.any([input.signal, lifecycleSignal]);
+    const deadlineController = new AbortController();
+    const deadline = setTimeout(() => {
+      deadlineController.abort(
+        new SdkError(SdkErrorCode.RequestTimeout, 'MCP connection timed out', {
+          timeout: input.timeout,
+        }),
+      );
+    }, input.timeout);
+    deadline.unref?.();
+    try {
+      return await this.connectOwnedClientWithSignal(
+        input,
+        owned,
+        AbortSignal.any([input.signal, lifecycleSignal, deadlineController.signal]),
+      );
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
+  private async connectOwnedClientWithSignal(
+    input: McpConnectionInput,
+    owned: McpOwnedClient,
+    signal: AbortSignal,
+  ): Promise<McpOwnedClient> {
     if (signal.aborted) {
       await this.discardOwnedClient(input.runtimeKey, owned);
       throw signal.reason ?? new DOMException('MCP connect aborted', 'AbortError');

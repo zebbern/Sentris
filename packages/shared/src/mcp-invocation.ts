@@ -790,6 +790,16 @@ export function assertCapabilityGrantApplies(scope: ExecutionScope, grant: Capab
       ) {
         throw new Error('Capability grant discovery subject does not match the execution scope');
       }
+      return;
+    case 'operator':
+      if (
+        grant.subject.kind !== 'operator' ||
+        scope.sessionId !== grant.subject.sessionId ||
+        scope.turnId !== grant.subject.turnId ||
+        scope.expiresAt !== grant.subject.expiresAt
+      ) {
+        throw new Error('Capability grant Operator subject does not match the execution scope');
+      }
   }
 }
 

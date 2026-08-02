@@ -9593,6 +9593,180 @@
           "Outbox"
         ]
       }
+    },
+    "/api/v1/operator/sessions": {
+      "get": {
+        "operationId": "OperatorController_listSessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List Operator sessions owned by the current user",
+        "tags": [
+          "operator"
+        ]
+      },
+      "post": {
+        "operationId": "OperatorController_createSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperatorSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create an Operator session",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/api/v1/operator/sessions/{id}": {
+      "get": {
+        "operationId": "OperatorController_getSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "x-nestjs_zod-parent-additional-properties": false,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get one durable Operator session projection",
+        "tags": [
+          "operator"
+        ]
+      },
+      "patch": {
+        "operationId": "OperatorController_updateSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "x-nestjs_zod-parent-additional-properties": false,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOperatorSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update an Operator session mode or model",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/api/v1/operator/sessions/{id}/turns": {
+      "post": {
+        "operationId": "OperatorController_createTurn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "x-nestjs_zod-parent-additional-properties": false,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOperatorTurnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Submit a durable Operator turn",
+        "tags": [
+          "operator"
+        ]
+      }
+    },
+    "/api/v1/operator/actions/{actionId}/decision": {
+      "post": {
+        "operationId": "OperatorController_decideAction",
+        "parameters": [
+          {
+            "name": "actionId",
+            "required": true,
+            "in": "path",
+            "x-nestjs_zod-parent-additional-properties": false,
+            "schema": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OperatorActionDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Approve or reject a pending Operator action",
+        "tags": [
+          "operator"
+        ]
+      }
     }
   },
   "info": {
@@ -16879,7 +17053,9 @@
                     "outbox_event",
                     "integration",
                     "file",
-                    "ticketing_connection"
+                    "ticketing_connection",
+                    "operator_session",
+                    "operator_action"
                   ]
                 },
                 "resourceId": {
@@ -17955,6 +18131,181 @@
           "eventId",
           "status"
         ]
+      },
+      "CreateOperatorSessionDto": {
+        "type": "object",
+        "properties": {
+          "approvalMode": {
+            "default": "ask",
+            "type": "string",
+            "enum": [
+              "ask",
+              "auto"
+            ]
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "anthropic",
+                  "openai",
+                  "gemini",
+                  "openrouter",
+                  "zai-coding-plan"
+                ]
+              },
+              "modelId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 191
+              },
+              "apiKeySecretId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "baseUrl": {
+                "type": "string",
+                "maxLength": 2048,
+                "format": "uri",
+                "nullable": true
+              }
+            },
+            "required": [
+              "provider",
+              "modelId",
+              "apiKeySecretId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateOperatorSessionDto": {
+        "type": "object",
+        "properties": {
+          "approvalMode": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "auto"
+            ]
+          },
+          "model": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "enum": [
+                  "anthropic",
+                  "openai",
+                  "gemini",
+                  "openrouter",
+                  "zai-coding-plan"
+                ]
+              },
+              "modelId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 191
+              },
+              "apiKeySecretId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "baseUrl": {
+                "type": "string",
+                "maxLength": 2048,
+                "format": "uri",
+                "nullable": true
+              }
+            },
+            "required": [
+              "provider",
+              "modelId",
+              "apiKeySecretId"
+            ],
+            "additionalProperties": false
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 191
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateOperatorTurnDto": {
+        "type": "object",
+        "properties": {
+          "clientTurnId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          },
+          "context": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "workflowId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "runId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 191
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "clientTurnId",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "OperatorActionDecisionDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "decision",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
       }
     }
   }

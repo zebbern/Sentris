@@ -55,6 +55,7 @@ describe('useStaticCommands', () => {
     expect(ids).toContain('nav-webhooks');
     expect(ids).toContain('nav-action-center');
     expect(ids).toContain('nav-mcp-servers');
+    expect(ids).toContain('nav-operator');
   });
 
   it('includes action commands (new workflow, toggle theme)', () => {

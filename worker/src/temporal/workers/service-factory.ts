@@ -194,7 +194,10 @@ export async function createMcpRuntimeServices(
     }),
   ];
   if (resolveSentrisTrustProfile(process.env) === 'trusted-local') {
-    drivers.push(new HostStdioRuntimeDriver(clientFactory));
+    const hostStdioClientFactory = new McpClientFactory({
+      stdioProbeTimeoutMs: config.MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS,
+    });
+    drivers.push(new HostStdioRuntimeDriver(hostStdioClientFactory));
   }
   const driverRegistry = new McpRuntimeDriverRegistry(drivers);
   const manager = new McpRuntimeManager({

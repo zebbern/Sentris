@@ -1,0 +1,388 @@
+import { ForbiddenException } from '@nestjs/common';
+import { beforeEach, describe, expect, it, vi } from 'bun:test';
+
+import type { AuthContext } from '../../auth/types';
+import type {
+  OperatorActionRecord,
+  OperatorSessionRecord,
+  OperatorTurnRecord,
+} from '../../database/schema';
+import type { SecretsService } from '../../secrets/secrets.service';
+import type { TemporalService } from '../../temporal/temporal.service';
+import type { WorkflowsService } from '../../workflows/workflows.service';
+import type { OperatorCommandService } from '../operator-command.service';
+import type { OperatorRepository } from '../operator.repository';
+import { OperatorService } from '../operator.service';
+
+const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+const TURN_ID = '22222222-2222-4222-8222-222222222222';
+const ACTION_ID = '33333333-3333-4333-8333-333333333333';
+const SECRET_ID = '44444444-4444-4444-8444-444444444444';
+
+const auth: AuthContext = {
+  userId: 'operator-user',
+  organizationId: 'operator-org',
+  roles: ['MEMBER'],
+  isAuthenticated: true,
+  provider: 'local',
+};
+
+function sessionRecord(approvalMode: 'ask' | 'auto' = 'ask'): OperatorSessionRecord {
+  return {
+    id: SESSION_ID,
+    organizationId: 'operator-org',
+    userId: 'operator-user',
+    title: 'Session',
+    approvalMode,
+    status: 'active',
+    modelProvider: 'gemini',
+    modelId: 'gemini-3.5-flash',
+    apiKeySecretId: SECRET_ID,
+    baseUrl: null,
+    createdAt: new Date('2026-08-02T10:00:00Z'),
+    updatedAt: new Date('2026-08-02T10:00:00Z'),
+  };
+}
+
+function turnRecord(overrides: Partial<OperatorTurnRecord> = {}): OperatorTurnRecord {
+  return {
+    id: TURN_ID,
+    sessionId: SESSION_ID,
+    status: 'running',
+    temporalWorkflowId: 'operator-turn:session:turn',
+    temporalRunId: 'temporal-run',
+    context: null,
+    error: null,
+    createdAt: new Date('2026-08-02T10:01:00Z'),
+    startedAt: new Date('2026-08-02T10:01:01Z'),
+    completedAt: null,
+    ...overrides,
+  };
+}
+
+function actionRecord(
+  approvalMode: 'ask' | 'auto',
+  status: OperatorActionRecord['status'],
+): OperatorActionRecord {
+  return {
+    id: ACTION_ID,
+    sessionId: SESSION_ID,
+    turnId: TURN_ID,
+    toolCallId: 'tool-1',
+    commandName: 'cancel_run',
+    effect: 'consequential',
+    approvalMode,
+    approvalRequired: approvalMode === 'ask',
+    status,
+    version: 0,
+    arguments: { runId: 'sentris-run-1' },
+    result: null,
+    error: null,
+    runId: null,
+    decidedBy: null,
+    createdAt: new Date('2026-08-02T10:02:00Z'),
+    decidedAt: null,
+    startedAt:
+      status === 'executing' || status === 'succeeded' ? new Date('2026-08-02T10:02:01Z') : null,
+    completedAt: null,
+  };
+}
+
+describe('OperatorService', () => {
+  let repository: Record<string, ReturnType<typeof vi.fn>>;
+  let commands: Record<string, ReturnType<typeof vi.fn>>;
+  let secrets: Record<string, ReturnType<typeof vi.fn>>;
+  let temporal: Record<string, ReturnType<typeof vi.fn>>;
+  let workflows: Record<string, ReturnType<typeof vi.fn>>;
+  let service: OperatorService;
+
+  beforeEach(() => {
+    repository = {
+      createSession: vi.fn().mockResolvedValue(sessionRecord()),
+      getTurnWithSession: vi
+        .fn()
+        .mockResolvedValue({ turn: turnRecord(), session: sessionRecord() }),
+      createAction: vi.fn(),
+      decideAction: vi.fn(),
+      getActionWithTurnSession: vi.fn(),
+      recordRunObservation: vi.fn(),
+      markActionExecuting: vi.fn(),
+      setTurnStatus: vi.fn(),
+      completeAction: vi.fn(),
+      settleMcpAction: vi.fn(),
+    };
+    commands = { execute: vi.fn() };
+    secrets = { getSecret: vi.fn().mockResolvedValue({ id: SECRET_ID }) };
+    temporal = { executeWorkflowUpdate: vi.fn().mockResolvedValue(undefined) };
+    workflows = {
+      getRun: vi.fn(),
+      getRunStatus: vi.fn(),
+      getRunResult: vi.fn(),
+    };
+    service = new OperatorService(
+      repository as unknown as OperatorRepository,
+      commands as unknown as OperatorCommandService,
+      workflows as unknown as WorkflowsService,
+      secrets as unknown as SecretsService,
+      temporal as unknown as TemporalService,
+    );
+  });
+
+  it('rejects API-key and internal actors before touching session state', async () => {
+    for (const provider of ['api-key', 'internal']) {
+      await expect(
+        service.createSession(
+          { ...auth, provider },
+          {
+            approvalMode: 'ask',
+            model: {
+              provider: 'gemini',
+              modelId: 'gemini-3.5-flash',
+              apiKeySecretId: SECRET_ID,
+            },
+          },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    }
+    expect(secrets.getSecret).not.toHaveBeenCalled();
+    expect(repository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('validates the stored credential in the authenticated organization before creating', async () => {
+    await service.createSession(auth, {
+      approvalMode: 'ask',
+      model: {
+        provider: 'gemini',
+        modelId: 'gemini-3.5-flash',
+        apiKeySecretId: SECRET_ID,
+      },
+    });
+
+    expect(secrets.getSecret).toHaveBeenCalledWith(auth, SECRET_ID);
+    expect(repository.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'operator-org',
+        userId: 'operator-user',
+        auth,
+      }),
+    );
+  });
+
+  it.each([
+    ['ask', true, 'pending_approval', 'wait_for_approval'],
+    ['auto', false, 'approved', 'execute'],
+  ] as const)(
+    'applies %s mode to consequential commands',
+    async (approvalMode, approvalRequired, status, disposition) => {
+      const session = sessionRecord(approvalMode);
+      repository.getTurnWithSession.mockResolvedValue({ turn: turnRecord(), session });
+      repository.createAction.mockImplementation(async (input: { approvalRequired: boolean }) => ({
+        action: actionRecord(
+          approvalMode,
+          input.approvalRequired ? 'pending_approval' : 'approved',
+        ),
+        created: true,
+      }));
+
+      const result = await service.prepareInternalAction({
+        turnId: TURN_ID,
+        organizationId: 'operator-org',
+        toolCallId: 'tool-1',
+        commandName: 'cancel_run',
+        arguments: { runId: 'sentris-run-1' },
+      });
+
+      expect(repository.createAction).toHaveBeenCalledWith(
+        expect.objectContaining({ approvalMode, approvalRequired }),
+      );
+      expect(result.action.status).toBe(status);
+      expect(result.disposition).toBe(disposition);
+    },
+  );
+
+  it('persists invalid model arguments as a failed action for the next model step', async () => {
+    repository.createAction.mockImplementation(
+      async (input: { arguments: Record<string, unknown>; validationError?: string }) => ({
+        action: {
+          ...actionRecord('ask', 'failed'),
+          commandName: 'run_workflow',
+          effect: 'execute',
+          approvalRequired: false,
+          arguments: input.arguments,
+          error: input.validationError ?? null,
+          completedAt: new Date('2026-08-02T10:02:01Z'),
+        },
+        created: true,
+      }),
+    );
+
+    const result = await service.prepareInternalAction({
+      turnId: TURN_ID,
+      organizationId: 'operator-org',
+      toolCallId: 'invalid-tool-1',
+      commandName: 'run_workflow',
+      arguments: { inputs: 'not-an-object' },
+    });
+
+    expect(repository.createAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: 'invalid-tool-1',
+        approvalRequired: false,
+        arguments: { inputs: 'not-an-object' },
+        validationError: expect.stringContaining('Invalid arguments for run_workflow'),
+      }),
+    );
+    expect(result.disposition).toBe('rejected');
+    expect(result.action.status).toBe('failed');
+    expect(result.action.error).toContain('Invalid arguments for run_workflow');
+  });
+
+  it('reuses an already completed equivalent mutation instead of executing it again', async () => {
+    repository.createAction.mockResolvedValue({
+      action: actionRecord('ask', 'succeeded'),
+      created: false,
+    });
+
+    const result = await service.prepareInternalAction({
+      turnId: TURN_ID,
+      organizationId: 'operator-org',
+      toolCallId: 'tool-repeat',
+      commandName: 'cancel_run',
+      arguments: { runId: 'sentris-run-1' },
+    });
+
+    expect(result.disposition).toBe('already_completed');
+    expect(result.action.id).toBe(ACTION_ID);
+  });
+
+  it('signals the exact turn with the pre-decision version expected by the workflow', async () => {
+    const approved = { ...actionRecord('ask', 'approved'), version: 1 };
+    repository.decideAction.mockResolvedValue(approved);
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: approved,
+      turn: turnRecord(),
+      session: sessionRecord(),
+    });
+
+    const result = await service.decideAction(auth, ACTION_ID, {
+      decision: 'approved',
+      expectedVersion: 0,
+    });
+
+    expect(temporal.executeWorkflowUpdate).toHaveBeenCalledWith({
+      workflowId: 'operator-turn:session:turn',
+      temporalRunId: 'temporal-run',
+      updateName: 'operatorActionDecision',
+      updateId: `operator-decision:${ACTION_ID}:1`,
+      args: { actionId: ACTION_ID, decision: 'approved', expectedVersion: 0 },
+    });
+    expect(result.status).toBe('approved');
+  });
+
+  it('persists a terminal launched-run observation for durable reloads', async () => {
+    workflows.getRun.mockResolvedValue({
+      runId: 'sentris-run-1',
+      workflowId: '55555555-5555-4555-8555-555555555555',
+      temporalRunId: 'temporal-child-run',
+    });
+    workflows.getRunStatus.mockResolvedValue({ status: 'COMPLETED' });
+    workflows.getRunResult.mockResolvedValue({ findings: 5 });
+    repository.recordRunObservation.mockResolvedValue(actionRecord('ask', 'succeeded'));
+
+    const result = await service.observeInternalRun({
+      runId: 'sentris-run-1',
+      turnId: TURN_ID,
+      organizationId: 'operator-org',
+    });
+
+    expect(result).toEqual({
+      runId: 'sentris-run-1',
+      workflowId: '55555555-5555-4555-8555-555555555555',
+      status: 'COMPLETED',
+      terminal: true,
+      result: { findings: 5 },
+    });
+    expect(repository.recordRunObservation).toHaveBeenCalledWith({
+      turnId: TURN_ID,
+      runId: 'sentris-run-1',
+      observation: result,
+    });
+  });
+
+  it('keeps a deferred MCP action executing until the durable result is settled', async () => {
+    const executing = {
+      ...actionRecord('ask', 'executing'),
+      commandName: 'invoke_mcp_tool' as const,
+      arguments: {
+        capabilitySnapshotId: '55555555-5555-4555-8555-555555555555',
+        sourceId: 'server-1',
+        name: 'search',
+        arguments: {},
+      },
+    };
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: executing,
+      turn: turnRecord(),
+      session: sessionRecord(),
+    });
+    repository.markActionExecuting.mockResolvedValue(executing);
+    const request = {
+      invocationId: ACTION_ID,
+      scope: {
+        kind: 'operator' as const,
+        organizationId: 'operator-org',
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        capabilityGrantId: '66666666-6666-4666-8666-666666666666',
+        expiresAt: '2099-08-02T11:00:00.000Z',
+      },
+      capabilitySnapshotId: '55555555-5555-4555-8555-555555555555',
+      sourceId: 'server-1',
+      authorizationTarget: 'search',
+      operation: { kind: 'tool-call' as const, name: 'search', arguments: {} },
+      requestedAt: '2099-08-02T10:00:00.000Z',
+      deadlineAt: '2099-08-02T10:10:00.000Z',
+    };
+    commands.execute.mockResolvedValue({
+      result: { kind: 'mcp-operation', state: 'ready_for_dispatch' },
+      mcpOperationRequest: request,
+    });
+
+    const result = await service.executeInternalAction(ACTION_ID, 'operator-org');
+
+    expect(result.mcpOperationRequest).toEqual(request);
+    expect(result.action.status).toBe('executing');
+    expect(repository.completeAction).not.toHaveBeenCalled();
+  });
+
+  it('settles an MCP action through the idempotent repository transition', async () => {
+    const executing = {
+      ...actionRecord('ask', 'executing'),
+      commandName: 'invoke_mcp_tool' as const,
+    };
+    const completed = { ...executing, status: 'succeeded' as const };
+    repository.getActionWithTurnSession.mockResolvedValue({
+      action: executing,
+      turn: turnRecord(),
+      session: sessionRecord(),
+    });
+    repository.settleMcpAction.mockResolvedValue(completed);
+    const mcpResult = {
+      operationId: ACTION_ID,
+      kind: 'completed' as const,
+      output: { matches: 2 },
+      completedAt: '2026-08-02T10:03:00.000Z',
+    };
+
+    const result = await service.settleInternalMcpAction({
+      actionId: ACTION_ID,
+      organizationId: 'operator-org',
+      result: mcpResult,
+    });
+
+    expect(repository.settleMcpAction).toHaveBeenCalledWith(
+      expect.objectContaining({ actionId: ACTION_ID, result: mcpResult }),
+    );
+    expect(result.status).toBe('succeeded');
+  });
+});

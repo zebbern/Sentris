@@ -27,6 +27,13 @@ const ROUTE_CONFIG: RouteEntry[] = [
     subtitle: 'Security automation overview',
   },
   {
+    path: '/operator',
+    prefix: true,
+    title: 'Operator',
+    shortTitle: 'Operator',
+    subtitle: 'Inspect and run workflows with a durable AI operator',
+  },
+  {
     path: '/templates',
     title: 'Template Library',
     shortTitle: 'Templates',

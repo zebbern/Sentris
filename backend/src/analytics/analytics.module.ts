@@ -9,6 +9,7 @@ import { FindingsController } from './findings.controller';
 import { FindingTriageModule } from '../findings/finding-triage.module';
 import { DatabaseModule } from '../database/database.module';
 import { ScopesRepository } from '../scopes/scopes.repository';
+import { FindingsQueryService } from './findings-query.service';
 
 @Module({
   imports: [ConfigModule, DatabaseModule, forwardRef(() => FindingTriageModule)],
@@ -19,12 +20,14 @@ import { ScopesRepository } from '../scopes/scopes.repository';
     OrganizationSettingsService,
     OpenSearchTenantService,
     ScopesRepository,
+    FindingsQueryService,
   ],
   exports: [
     AnalyticsService,
     SecurityAnalyticsService,
     OrganizationSettingsService,
     OpenSearchTenantService,
+    FindingsQueryService,
   ],
 })
 export class AnalyticsModule {}

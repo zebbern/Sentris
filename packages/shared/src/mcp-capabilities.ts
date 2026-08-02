@@ -249,6 +249,16 @@ export const ExecutionScopeSchema = z.discriminatedUnion('kind', [
       expiresAt: z.string().datetime(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal('operator'),
+      organizationId: z.string().min(1),
+      sessionId: z.string().uuid(),
+      turnId: z.string().uuid(),
+      capabilityGrantId: z.string().uuid(),
+      expiresAt: z.string().datetime(),
+    })
+    .strict(),
 ]);
 export type ExecutionScope = z.infer<typeof ExecutionScopeSchema>;
 
@@ -280,6 +290,14 @@ export const CapabilityGrantSchema = z
         .object({
           kind: z.literal('discovery'),
           operationId: z.string().uuid(),
+          expiresAt: z.string().datetime(),
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('operator'),
+          sessionId: z.string().uuid(),
+          turnId: z.string().uuid(),
           expiresAt: z.string().datetime(),
         })
         .strict(),

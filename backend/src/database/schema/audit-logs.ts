@@ -20,6 +20,8 @@ export const AUDIT_RESOURCE_TYPES = [
   'integration',
   'file',
   'ticketing_connection',
+  'operator_session',
+  'operator_action',
 ] as const;
 
 export type AuditResourceType = (typeof AUDIT_RESOURCE_TYPES)[number];

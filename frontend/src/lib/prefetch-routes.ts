@@ -10,6 +10,7 @@ type PrefetchFn = () => void;
 
 const routePrefetchMap: Record<string, PrefetchFn> = {
   '/': () => void import('@/pages/DashboardPage'),
+  '/operator': () => void import('@/pages/OperatorPage'),
   '/workflows': () => void import('@/pages/WorkflowList'),
   '/templates': () => void import('@/pages/TemplateLibraryPage'),
   '/schedules': () => void import('@/pages/SchedulesPage'),

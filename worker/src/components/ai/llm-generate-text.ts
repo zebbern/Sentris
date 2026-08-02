@@ -14,7 +14,8 @@ import {
   port,
   param,
 } from '@sentris/component-sdk';
-import { LLMProviderSchema, type LlmProviderConfig } from '@sentris/contracts';
+import { LLMProviderSchema } from '@sentris/contracts';
+import { createSentrisLanguageModel } from './model-factory';
 
 const inputSchema = inputs({
   userPrompt: port(
@@ -168,7 +169,7 @@ const definition = defineComponent({
     }
 
     const trimmedSystemPrompt = systemPrompt?.trim();
-    const model = buildModelFactory(chatModel, resolvedApiKey, {
+    const model = createSentrisLanguageModel(chatModel, resolvedApiKey, {
       createOpenAI,
       createGoogleGenerativeAI,
       createAnthropic,
@@ -194,40 +195,5 @@ const definition = defineComponent({
     };
   },
 });
-
-function buildModelFactory(
-  config: LlmProviderConfig,
-  apiKey: string,
-  factories: {
-    createOpenAI: typeof createOpenAIImpl;
-    createGoogleGenerativeAI: typeof createGoogleGenerativeAIImpl;
-    createAnthropic: typeof createAnthropicImpl;
-  },
-) {
-  if (config.provider === 'gemini') {
-    const client = factories.createGoogleGenerativeAI({
-      apiKey,
-      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-      ...(config.projectId ? { projectId: config.projectId } : {}),
-    });
-    return client(config.modelId);
-  }
-
-  if (config.provider === 'anthropic') {
-    const client = factories.createAnthropic({
-      apiKey,
-      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-    });
-    return client(config.modelId);
-  }
-
-  const client = factories.createOpenAI({
-    apiKey,
-    ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-    ...(config.headers ? { headers: config.headers } : {}),
-  });
-
-  return client(config.modelId);
-}
 
 componentRegistry.register(definition);

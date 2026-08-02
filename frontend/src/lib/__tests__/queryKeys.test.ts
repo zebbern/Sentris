@@ -58,6 +58,7 @@ describe('queryKeys', () => {
     expect(domains).toContain('analyticsSettings');
     expect(domains).toContain('dashboard');
     expect(domains).toContain('agents');
+    expect(domains).toContain('operator');
   });
 
   // --- Org scope ---
@@ -252,6 +253,19 @@ describe('queryKeys', () => {
       'agentTranscript',
       TEST_ORG,
       'agent-run-1',
+    ]);
+  });
+
+  // --- Dashboard ---
+
+  it('operator sessions are scoped by organization and user', () => {
+    expect(queryKeys.operator.sessions()).toEqual(['operator', TEST_ORG, 'user-1', 'sessions']);
+    expect(queryKeys.operator.session('session-1')).toEqual([
+      'operator',
+      TEST_ORG,
+      'user-1',
+      'sessions',
+      'session-1',
     ]);
   });
 

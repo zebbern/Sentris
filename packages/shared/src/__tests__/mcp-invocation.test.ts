@@ -486,11 +486,9 @@ describe('durable MCP operation dispatch contracts', () => {
   it('carries immutable operation authority to a fence-capturing dispatch claim', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     const preparedSchema = contracts.PrepareMcpOperationOutcomeSchema as
-      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
-      | undefined;
+      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
     const claimSchema = contracts.ClaimMcpOperationDispatchRequestSchema as
-      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
-      | undefined;
+      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
     const prepared = {
       kind: 'prepared' as const,
       plan: {
@@ -560,8 +558,7 @@ describe('durable MCP operation dispatch contracts', () => {
   it('rejects a tool reference whose nullable compatibility projection drifts', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     const schema = contracts.PreparedMcpOperationRefSchema as
-      | { safeParse(value: unknown): { success: boolean } }
-      | undefined;
+      { safeParse(value: unknown): { success: boolean } } | undefined;
     expect(
       schema?.safeParse({
         invocationId: INVOCATION_ID,
@@ -716,6 +713,26 @@ describe('assertCapabilityGrantApplies', () => {
         },
       },
     },
+    {
+      name: 'operator',
+      scope: {
+        kind: 'operator' as const,
+        organizationId: 'org-123',
+        sessionId: '66666666-6666-4666-8666-666666666666',
+        turnId: '77777777-7777-4777-8777-777777777777',
+        capabilityGrantId: GRANT_ID,
+        expiresAt: '2026-08-01T12:00:00.000Z',
+      },
+      grant: {
+        ...grant,
+        subject: {
+          kind: 'operator' as const,
+          sessionId: '66666666-6666-4666-8666-666666666666',
+          turnId: '77777777-7777-4777-8777-777777777777',
+          expiresAt: '2026-08-01T12:00:00.000Z',
+        },
+      },
+    },
   ])('accepts matching $name organization, subject, and expiry bindings', ({ scope, grant }) => {
     expect(() => assertCapabilityGrantApplies(scope, grant)).not.toThrow();
   });
@@ -766,6 +783,26 @@ describe('assertCapabilityGrantApplies', () => {
         subject: {
           kind: 'studio' as const,
           operationId: '44444444-4444-4444-8444-444444444444',
+          expiresAt: '2026-08-01T12:00:00.000Z',
+        },
+      },
+    },
+    {
+      name: 'Operator turn',
+      scope: {
+        kind: 'operator' as const,
+        organizationId: 'org-123',
+        sessionId: '66666666-6666-4666-8666-666666666666',
+        turnId: '77777777-7777-4777-8777-777777777777',
+        capabilityGrantId: GRANT_ID,
+        expiresAt: '2026-08-01T12:00:00.000Z',
+      },
+      grant: {
+        ...grant,
+        subject: {
+          kind: 'operator' as const,
+          sessionId: '66666666-6666-4666-8666-666666666666',
+          turnId: '88888888-8888-4888-8888-888888888888',
           expiresAt: '2026-08-01T12:00:00.000Z',
         },
       },
@@ -868,8 +905,7 @@ describe('buildInvocationManifest', () => {
     const contracts = mcpInvocationContracts as Record<string, unknown>;
     expect(contracts.MCP_OPERATION_UPDATE_NAME).toBe('executeMcpOperation');
     const schema = contracts.McpOperationInvocationRequestSchema as
-      | { safeParse(value: unknown): { success: boolean; data?: unknown } }
-      | undefined;
+      { safeParse(value: unknown): { success: boolean; data?: unknown } } | undefined;
     expect(schema?.safeParse(genericRequest)).toEqual({ success: true, data: genericRequest });
   });
 

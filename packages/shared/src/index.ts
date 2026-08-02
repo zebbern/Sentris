@@ -22,3 +22,4 @@ export * from './csv.js';
 export * from './trust-profile.js';
 export * from './telemetry.js';
 export * from './ai-model-catalog.js';
+export * from './operator.js';

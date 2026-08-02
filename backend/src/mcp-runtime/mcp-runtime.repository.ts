@@ -26,6 +26,7 @@ import {
   assertCapabilityGrantApplies,
   resolveMcpOperationManifestEntry,
   type CapabilityGrant,
+  type ExecutionScope,
   type InvocationManifest,
   type InvocationManifestEntry,
   type ClaimMcpOperationDispatchRequest,
@@ -65,11 +66,60 @@ const GRANT_ID_SENTINEL = '<capability-grant-id>';
 const SNAPSHOT_ID_SENTINEL = '<capability-snapshot-id>';
 const TERMINAL_STATUSES = new Set(['completed', 'failed', 'ambiguous', 'cancelled']);
 
-function runSubjectId(grant: CapabilityGrant): string {
-  if (grant.subject.kind !== 'run') {
-    throw new ConflictException('MCP durable authority must be run-scoped');
+type DurableInvocationScope = Extract<ExecutionScope, { kind: 'run' | 'operator' }>;
+
+function capabilitySubjectId(grant: CapabilityGrant): string {
+  switch (grant.subject.kind) {
+    case 'run':
+      return grant.subject.runId;
+    case 'studio':
+    case 'discovery':
+      return grant.subject.operationId;
+    case 'operator':
+      return grant.subject.turnId;
   }
-  return grant.subject.runId;
+}
+
+function executionSubjectId(scope: ExecutionScope): string {
+  switch (scope.kind) {
+    case 'run':
+      return scope.runId;
+    case 'studio':
+    case 'discovery':
+      return scope.operationId;
+    case 'operator':
+      return scope.turnId;
+  }
+}
+
+function durableInvocationScope(scope: ExecutionScope): DurableInvocationScope {
+  if (scope.kind !== 'run' && scope.kind !== 'operator') {
+    throw new ConflictException('MCP durable operations require run or Operator authority');
+  }
+  return scope;
+}
+
+function invocationSubjectProjection(scope: DurableInvocationScope): {
+  subjectKind: DurableInvocationScope['kind'];
+  subjectId: string;
+  runId: string | null;
+} {
+  return {
+    subjectKind: scope.kind,
+    subjectId: executionSubjectId(scope),
+    runId: scope.kind === 'run' ? scope.runId : null,
+  };
+}
+
+function invocationScopeMatches(invocation: McpInvocationRecord, scope: ExecutionScope): boolean {
+  return (
+    (scope.kind === 'run' || scope.kind === 'operator') &&
+    invocation.subjectKind === scope.kind &&
+    invocation.subjectId === executionSubjectId(scope) &&
+    invocation.runId === (scope.kind === 'run' ? scope.runId : null) &&
+    invocation.organizationId === scope.organizationId &&
+    invocation.capabilityGrantId === scope.capabilityGrantId
+  );
 }
 
 export interface StoredMcpAuthority {
@@ -178,7 +228,7 @@ export class McpRuntimeRepository {
     private readonly db: NodePgDatabase,
   ) {}
 
-  async createOrReadRunAuthority(input: {
+  async createOrReadAuthority(input: {
     authorityKey: string;
     grant: CapabilityGrant;
     snapshot: McpCapabilityCatalogSnapshot;
@@ -188,7 +238,7 @@ export class McpRuntimeRepository {
       throw new Error('MCP authority key must be a lowercase SHA-256 digest');
     }
 
-    const requested = this.parseRunAuthority(input);
+    const requested = this.parseDurableAuthority(input);
     return this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as NodePgDatabase;
       const [insertedGrant] = await tx
@@ -198,7 +248,7 @@ export class McpRuntimeRepository {
           authorityKey: input.authorityKey,
           organizationId: requested.grant.organizationId,
           subjectKind: requested.grant.subject.kind,
-          subjectId: runSubjectId(requested.grant),
+          subjectId: capabilitySubjectId(requested.grant),
           grant: requested.grant,
           createdAt: new Date(requested.grant.createdAt),
         })
@@ -239,16 +289,27 @@ export class McpRuntimeRepository {
     });
   }
 
+  async createOrReadRunAuthority(input: {
+    authorityKey: string;
+    grant: CapabilityGrant;
+    snapshot: McpCapabilityCatalogSnapshot;
+    manifest: InvocationManifest;
+  }): Promise<StoredMcpAuthority> {
+    if (input.grant.subject.kind !== 'run' || input.snapshot.scope.kind !== 'run') {
+      throw new ConflictException('Run authority must be run-scoped');
+    }
+    return this.createOrReadAuthority(input);
+  }
+
   async getAuthority(input: {
     capabilityGrantId: string;
     capabilitySnapshotId: string;
-    runId: string;
-    organizationId: string | null;
+    scope: DurableInvocationScope;
   }): Promise<StoredMcpAuthority | null> {
     const organizationMatches =
-      input.organizationId === null
+      input.scope.organizationId === null
         ? isNull(mcpCapabilityGrantsTable.organizationId)
-        : eq(mcpCapabilityGrantsTable.organizationId, input.organizationId);
+        : eq(mcpCapabilityGrantsTable.organizationId, input.scope.organizationId);
     const [rows] = await this.db
       .select({
         grant: mcpCapabilityGrantsTable,
@@ -263,14 +324,57 @@ export class McpRuntimeRepository {
         and(
           eq(mcpCapabilityGrantsTable.id, input.capabilityGrantId),
           eq(mcpCapabilitySnapshotsTable.id, input.capabilitySnapshotId),
-          eq(mcpCapabilityGrantsTable.subjectKind, 'run'),
-          eq(mcpCapabilityGrantsTable.subjectId, input.runId),
+          eq(mcpCapabilityGrantsTable.subjectKind, input.scope.kind),
+          eq(mcpCapabilityGrantsTable.subjectId, executionSubjectId(input.scope)),
           organizationMatches,
         ),
       )
       .limit(1);
 
     return rows ? this.parseStoredAuthority(rows) : null;
+  }
+
+  async getOperatorAuthority(input: {
+    capabilitySnapshotId: string;
+    organizationId: string;
+    sessionId: string;
+    turnId: string;
+  }): Promise<StoredMcpAuthority | null> {
+    const [rows] = await this.db
+      .select({
+        grant: mcpCapabilityGrantsTable,
+        snapshot: mcpCapabilitySnapshotsTable,
+      })
+      .from(mcpCapabilityGrantsTable)
+      .innerJoin(
+        mcpCapabilitySnapshotsTable,
+        eq(mcpCapabilitySnapshotsTable.capabilityGrantId, mcpCapabilityGrantsTable.id),
+      )
+      .where(
+        and(
+          eq(mcpCapabilitySnapshotsTable.id, input.capabilitySnapshotId),
+          eq(mcpCapabilityGrantsTable.subjectKind, 'operator'),
+          eq(mcpCapabilityGrantsTable.subjectId, input.turnId),
+          eq(mcpCapabilityGrantsTable.organizationId, input.organizationId),
+        ),
+      )
+      .limit(1);
+    if (!rows) return null;
+    const authority = this.parseStoredAuthority(rows);
+    const scope = authority.snapshot.scope;
+    const subject = authority.grant.subject;
+    if (
+      scope.kind !== 'operator' ||
+      subject.kind !== 'operator' ||
+      scope.organizationId !== input.organizationId ||
+      scope.sessionId !== input.sessionId ||
+      scope.turnId !== input.turnId ||
+      subject.sessionId !== input.sessionId ||
+      subject.turnId !== input.turnId
+    ) {
+      return null;
+    }
+    return authority;
   }
 
   async prepareOperation(input: {
@@ -282,6 +386,7 @@ export class McpRuntimeRepository {
     manifest: InvocationManifest;
   }): Promise<PrepareMcpOperationOutcome> {
     const prepared = this.parseMcpOperationPreparation(input);
+    const subject = invocationSubjectProjection(prepared.request.scope);
     return this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as NodePgDatabase;
       const preparedAt = new Date();
@@ -289,7 +394,7 @@ export class McpRuntimeRepository {
         .insert(mcpInvocationsTable)
         .values({
           invocationId: prepared.request.invocationId,
-          runId: prepared.request.scope.runId,
+          ...subject,
           organizationId: prepared.request.scope.organizationId,
           capabilityGrantId: prepared.request.scope.capabilityGrantId,
           capabilitySnapshotId: prepared.request.capabilitySnapshotId,
@@ -558,6 +663,7 @@ export class McpRuntimeRepository {
     manifest: InvocationManifest;
   }): Promise<PrepareToolInvocationOutcome> {
     const prepared = this.parseInvocationPreparation(input);
+    const subject = invocationSubjectProjection(prepared.request.scope);
     return this.db.transaction(async (transaction) => {
       const tx = transaction as unknown as NodePgDatabase;
       const preparedAt = new Date();
@@ -565,7 +671,7 @@ export class McpRuntimeRepository {
         .insert(mcpInvocationsTable)
         .values({
           invocationId: prepared.request.invocationId,
-          runId: prepared.request.scope.runId,
+          ...subject,
           organizationId: prepared.request.scope.organizationId,
           capabilityGrantId: prepared.request.scope.capabilityGrantId,
           capabilitySnapshotId: prepared.request.capabilitySnapshotId,
@@ -866,7 +972,7 @@ export class McpRuntimeRepository {
     }
   }
 
-  private parseRunAuthority(input: {
+  private parseDurableAuthority(input: {
     grant: CapabilityGrant;
     snapshot: McpCapabilityCatalogSnapshot;
     manifest: InvocationManifest;
@@ -876,13 +982,16 @@ export class McpRuntimeRepository {
       snapshot: McpCapabilityCatalogSnapshotSchema.parse(input.snapshot),
       manifest: InvocationManifestSchema.parse(input.manifest),
     };
-    this.assertRunAuthorityRelations(authority);
+    this.assertDurableAuthorityRelations(authority);
     return authority;
   }
 
-  private assertRunAuthorityRelations(authority: StoredMcpAuthority): void {
-    if (authority.grant.subject.kind !== 'run' || authority.snapshot.scope.kind !== 'run') {
-      throw new ConflictException('MCP durable authority must be run-scoped');
+  private assertDurableAuthorityRelations(authority: StoredMcpAuthority): void {
+    if (
+      (authority.grant.subject.kind !== 'run' && authority.grant.subject.kind !== 'operator') ||
+      (authority.snapshot.scope.kind !== 'run' && authority.snapshot.scope.kind !== 'operator')
+    ) {
+      throw new ConflictException('MCP durable authority must be run or Operator scoped');
     }
     assertCapabilityGrantApplies(authority.snapshot.scope, authority.grant);
     if (
@@ -894,7 +1003,7 @@ export class McpRuntimeRepository {
   }
 
   private parseStoredAuthority(rows: StoredAuthorityRows): StoredMcpAuthority {
-    const authority = this.parseRunAuthority({
+    const authority = this.parseDurableAuthority({
       grant: CapabilityGrantSchema.parse(rows.grant.grant),
       snapshot: McpCapabilityCatalogSnapshotSchema.parse(rows.snapshot.snapshot),
       manifest: InvocationManifestSchema.parse(rows.snapshot.invocationManifest),
@@ -903,7 +1012,7 @@ export class McpRuntimeRepository {
       rows.grant.id !== authority.grant.id ||
       rows.grant.organizationId !== authority.grant.organizationId ||
       rows.grant.subjectKind !== authority.grant.subject.kind ||
-      rows.grant.subjectId !== runSubjectId(authority.grant) ||
+      rows.grant.subjectId !== capabilitySubjectId(authority.grant) ||
       rows.grant.createdAt.getTime() !== new Date(authority.grant.createdAt).getTime() ||
       rows.snapshot.id !== authority.snapshot.id ||
       rows.snapshot.capabilityGrantId !== authority.grant.id ||
@@ -943,7 +1052,7 @@ export class McpRuntimeRepository {
     manifest: InvocationManifest;
   }): {
     request: McpOperationInvocationRequest & {
-      scope: Extract<McpOperationInvocationRequest['scope'], { kind: 'run' }>;
+      scope: DurableInvocationScope;
     };
     dispatchOperation: McpOperation;
     entry: McpOperationManifestEntry;
@@ -961,9 +1070,7 @@ export class McpRuntimeRepository {
       input.runtimeBinding === undefined
         ? undefined
         : McpSnapshotRuntimeBindingSchema.parse(input.runtimeBinding);
-    if (request.scope.kind !== 'run') {
-      throw new ConflictException('MCP durable operations must be run-scoped');
-    }
+    const scope = durableInvocationScope(request.scope);
     const authorized = resolveMcpOperationManifestEntry(manifest, request);
     if (
       !isDeepStrictEqual(authorized, entry) ||
@@ -978,9 +1085,7 @@ export class McpRuntimeRepository {
       throw new ConflictException('Component operation cannot claim an MCP runtime binding');
     }
     return {
-      request: request as McpOperationInvocationRequest & {
-        scope: Extract<McpOperationInvocationRequest['scope'], { kind: 'run' }>;
-      },
+      request: { ...request, scope },
       dispatchOperation,
       entry,
       ...(runtimeBinding !== undefined && { runtimeBinding }),
@@ -1022,10 +1127,7 @@ export class McpRuntimeRepository {
       invocation.operationKind === 'tool-call' ? invocation.operationTarget : null;
     if (
       request.invocationId !== invocation.invocationId ||
-      request.scope.kind !== 'run' ||
-      request.scope.runId !== invocation.runId ||
-      request.scope.organizationId !== invocation.organizationId ||
-      request.scope.capabilityGrantId !== invocation.capabilityGrantId ||
+      !invocationScopeMatches(invocation, request.scope) ||
       request.capabilitySnapshotId !== invocation.capabilitySnapshotId ||
       request.operation.kind !== invocation.operationKind ||
       request.authorizationTarget !== invocation.operationTarget ||
@@ -1208,15 +1310,12 @@ export class McpRuntimeRepository {
     }
     if (
       rows.invocation.invocationId !== request.invocationId ||
-      request.scope.kind !== 'run' ||
-      rows.invocation.runId !== request.scope.runId ||
-      rows.invocation.organizationId !== request.scope.organizationId ||
-      rows.invocation.capabilityGrantId !== request.scope.capabilityGrantId ||
+      !invocationScopeMatches(rows.invocation, request.scope) ||
       rows.invocation.capabilitySnapshotId !== request.capabilitySnapshotId ||
       rows.invocation.operationKind !== request.operation.kind ||
       rows.invocation.operationTarget !== request.authorizationTarget
     ) {
-      throw new ConflictException('MCP operation replay crossed its persisted run authority');
+      throw new ConflictException('MCP operation replay crossed its persisted authority');
     }
   }
 

@@ -3162,6 +3162,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operator/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Operator sessions owned by the current user */
+        get: operations["OperatorController_listSessions"];
+        put?: never;
+        /** Create an Operator session */
+        post: operations["OperatorController_createSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operator/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one durable Operator session projection */
+        get: operations["OperatorController_getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an Operator session mode or model */
+        patch: operations["OperatorController_updateSession"];
+        trace?: never;
+    };
+    "/api/v1/operator/sessions/{id}/turns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a durable Operator turn */
+        post: operations["OperatorController_createTurn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operator/actions/{actionId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve or reject a pending Operator action */
+        post: operations["OperatorController_decideAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5231,7 +5301,7 @@ export interface components {
                 actorDisplay: string | null;
                 action: string;
                 /** @enum {string} */
-                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage" | "outbox_event" | "integration" | "file" | "ticketing_connection";
+                resourceType: "workflow" | "secret" | "api_key" | "webhook" | "artifact" | "analytics" | "schedule" | "mcp_server" | "mcp_group" | "human_input" | "notification_channel" | "notification_delivery" | "finding_triage" | "outbox_event" | "integration" | "file" | "ticketing_connection" | "operator_session" | "operator_action";
                 resourceId: string | null;
                 resourceName: string | null;
                 metadata: {
@@ -5490,6 +5560,52 @@ export interface components {
             eventId: string;
             /** @enum {string} */
             status: "pending";
+        };
+        CreateOperatorSessionDto: {
+            /**
+             * @default ask
+             * @enum {string}
+             */
+            approvalMode: "ask" | "auto";
+            model: {
+                /** @enum {string} */
+                provider: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan";
+                modelId: string;
+                /** Format: uuid */
+                apiKeySecretId: string;
+                /** Format: uri */
+                baseUrl?: string | null;
+            };
+        };
+        UpdateOperatorSessionDto: {
+            /** @enum {string} */
+            approvalMode?: "ask" | "auto";
+            model?: {
+                /** @enum {string} */
+                provider: "anthropic" | "openai" | "gemini" | "openrouter" | "zai-coding-plan";
+                modelId: string;
+                /** Format: uuid */
+                apiKeySecretId: string;
+                /** Format: uri */
+                baseUrl?: string | null;
+            };
+            title?: string;
+        };
+        CreateOperatorTurnDto: {
+            /** Format: uuid */
+            clientTurnId: string;
+            message: string;
+            context?: {
+                path: string;
+                /** Format: uuid */
+                workflowId?: string;
+                runId?: string;
+            };
+        };
+        OperatorActionDecisionDto: {
+            /** @enum {string} */
+            decision: "approved" | "rejected";
+            expectedVersion: number;
         };
     };
     responses: never;
@@ -11238,6 +11354,132 @@ export interface operations {
             };
             /** @description Dead-lettered outbox event not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_listSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_createSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOperatorSessionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_updateSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOperatorSessionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_createTurn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOperatorTurnDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    OperatorController_decideAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorActionDecisionDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

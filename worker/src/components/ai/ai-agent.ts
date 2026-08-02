@@ -34,6 +34,7 @@ import {
 } from '@sentris/contracts';
 import { LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { AgentStreamRecorder } from './agent-stream-recorder';
+import { createSentrisLanguageModel } from './model-factory';
 import {
   AGENT_EXECUTION_PROFILE_OPTIONS,
   DEFAULT_AGENT_EXECUTION_PROFILE,
@@ -805,34 +806,25 @@ Loop the Conversation State output back into the next agent invocation to keep m
       const instructions = `${resolvedSystemPrompt}${getToolAvailabilityPrompt(gatewayAccess.toolStatus)}`;
       const messagesForModel = toModelMessages(historyWithUser);
 
-      const openAIOptions = {
-        apiKey: effectiveApiKey,
-        ...(baseUrl ? { baseURL: baseUrl } : {}),
-        ...(sanitizedHeaders && Object.keys(sanitizedHeaders).length > 0
-          ? { headers: sanitizedHeaders }
-          : {}),
-      };
-      const isOpenRouter =
-        effectiveProvider === 'openrouter' ||
-        (typeof baseUrl === 'string' && baseUrl.includes('openrouter.ai'));
-      const openAIProvider = createOpenAIImpl({
-        ...openAIOptions,
-        ...(isOpenRouter ? { name: 'openrouter' } : {}),
-      });
-      const model =
-        effectiveProvider === 'gemini'
-          ? createGoogleGenerativeAIImpl({
-              apiKey: effectiveApiKey,
-              ...(baseUrl ? { baseURL: baseUrl } : {}),
-            })(effectiveModel)
-          : effectiveProvider === 'anthropic'
-            ? createAnthropicImpl({
-                apiKey: effectiveApiKey,
-                ...(baseUrl ? { baseURL: baseUrl } : {}),
-              })(effectiveModel)
-            : isOpenRouter
-              ? openAIProvider.chat(effectiveModel)
-              : openAIProvider(effectiveModel);
+      const model = createSentrisLanguageModel(
+        {
+          provider: effectiveProvider,
+          modelId: effectiveModel,
+          ...(baseUrl ? { baseUrl } : {}),
+          ...(sanitizedHeaders && Object.keys(sanitizedHeaders).length > 0
+            ? { headers: sanitizedHeaders }
+            : {}),
+          openAICompatibleChat:
+            effectiveProvider === 'openrouter' ||
+            (typeof baseUrl === 'string' && baseUrl.includes('openrouter.ai')),
+        },
+        effectiveApiKey,
+        {
+          createOpenAI: createOpenAIImpl,
+          createGoogleGenerativeAI: createGoogleGenerativeAIImpl,
+          createAnthropic: createAnthropicImpl,
+        },
+      );
       const agentSettings: ToolLoopAgentSettings<never, AgentTools> = {
         id: `${sessionId}-agent`,
         model,

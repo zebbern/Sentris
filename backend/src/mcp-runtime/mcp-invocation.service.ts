@@ -84,8 +84,7 @@ export class McpInvocationService {
     const authority = await this.repository.getAuthority({
       capabilityGrantId: request.scope.capabilityGrantId,
       capabilitySnapshotId: request.capabilitySnapshotId,
-      runId: request.scope.runId,
-      organizationId: request.scope.organizationId,
+      scope: request.scope,
     });
     if (!authority) {
       throw new ForbiddenException('Tool invocation authority was not found');
@@ -128,14 +127,22 @@ export class McpInvocationService {
     if (isExpired(request.deadlineAt)) {
       throw new BadRequestException('MCP operation deadline has expired');
     }
-    if (request.scope.kind !== 'run') {
-      throw new ForbiddenException('Durable MCP operation requires run authority');
+    if (request.scope.kind !== 'run' && request.scope.kind !== 'operator') {
+      throw new ForbiddenException('Durable MCP operation requires run or Operator authority');
+    }
+    if (request.scope.kind === 'operator' && isExpired(request.scope.expiresAt)) {
+      throw new ForbiddenException('Operator MCP authority has expired');
+    }
+    if (
+      request.scope.kind === 'operator' &&
+      Date.parse(request.deadlineAt) > Date.parse(request.scope.expiresAt)
+    ) {
+      throw new BadRequestException('MCP operation deadline exceeds Operator authority');
     }
     const authority = await this.repository.getAuthority({
       capabilityGrantId: request.scope.capabilityGrantId,
       capabilitySnapshotId: request.capabilitySnapshotId,
-      runId: request.scope.runId,
-      organizationId: request.scope.organizationId,
+      scope: request.scope,
     });
     if (!authority) {
       throw new ForbiddenException('MCP operation authority was not found');
@@ -190,8 +197,7 @@ export class McpInvocationService {
     const authority = await this.repository.getAuthority({
       capabilityGrantId: stored.request.scope.capabilityGrantId,
       capabilitySnapshotId: stored.request.capabilitySnapshotId,
-      runId: stored.request.scope.runId,
-      organizationId: stored.request.scope.organizationId,
+      scope: stored.request.scope,
     });
     if (!authority) {
       throw new ConflictException('Persisted MCP invocation authority is unavailable');
@@ -316,14 +322,22 @@ export class McpInvocationService {
       });
       return ClaimMcpOperationDispatchOutcomeSchema.parse({ kind: 'terminal', result });
     }
-    if (stored.request.scope.kind !== 'run') {
-      throw new ConflictException('Persisted MCP operation is not run-scoped');
+    if (stored.request.scope.kind === 'operator' && isExpired(stored.request.scope.expiresAt)) {
+      const result = await this.repository.reconcileMcpOperationDispatchFailure({
+        ref: stored.ref,
+        cause: 'deadline',
+        message: 'Operator MCP authority expired before dispatch',
+        completedAt: new Date().toISOString(),
+      });
+      return ClaimMcpOperationDispatchOutcomeSchema.parse({ kind: 'terminal', result });
+    }
+    if (stored.request.scope.kind !== 'run' && stored.request.scope.kind !== 'operator') {
+      throw new ConflictException('Persisted MCP operation has unsupported authority');
     }
     const authority = await this.repository.getAuthority({
       capabilityGrantId: stored.request.scope.capabilityGrantId,
       capabilitySnapshotId: stored.request.capabilitySnapshotId,
-      runId: stored.request.scope.runId,
-      organizationId: stored.request.scope.organizationId,
+      scope: stored.request.scope,
     });
     if (!authority) {
       throw new ConflictException('Persisted MCP operation authority is unavailable');
@@ -578,7 +592,11 @@ export class McpInvocationService {
         }
       }
       if (entry.destination === 'component-activity') {
-        if (externalSource || request.operation.kind !== 'tool-call') {
+        if (
+          request.scope.kind === 'operator' ||
+          externalSource ||
+          request.operation.kind !== 'tool-call'
+        ) {
           throw new Error('Component dispatch authority does not match its capability');
         }
         return { entry, dispatchOperation };

@@ -43,6 +43,18 @@ serveStdio(() => {
 await new Promise(() => {});
 `;
 
+export const LEGACY_STDIO_FIXTURE_SCRIPT = `
+import { Server } from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+await new Promise((resolve) => setTimeout(resolve, Number(process.env.MCP_START_DELAY_MS ?? '0')));
+const server = new Server(
+  { name: 'task-2-legacy-stdio-fixture', version: '1.0.0' },
+  { capabilities: {} },
+);
+await server.connect(new StdioServerTransport());
+await new Promise(() => {});
+`;
+
 export interface HttpFixture {
   endpoint: URL;
   requests: FixtureRequest[];

@@ -18,6 +18,9 @@ function getRouteSegmentKey(pathname: string): string {
 const DashboardPage = lazyWithRetry(() =>
   import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
 );
+const OperatorPage = lazyWithRetry(() =>
+  import('@/pages/OperatorPage').then((m) => ({ default: m.OperatorPage })),
+);
 const WorkflowList = lazyWithRetry(() =>
   import('@/pages/WorkflowList').then((m) => ({ default: m.WorkflowList })),
 );
@@ -101,6 +104,14 @@ export function AnimatedRoutes() {
           element={
             <ErrorBoundary>
               <DashboardPage />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/operator/:sessionId?"
+          element={
+            <ErrorBoundary>
+              <OperatorPage />
             </ErrorBoundary>
           }
         />

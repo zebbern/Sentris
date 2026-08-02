@@ -105,6 +105,7 @@ export interface McpSseCompatibilityConnector {
 
 export interface McpClientFactoryOptions {
   priorTtlMs?: number;
+  stdioProbeTimeoutMs?: number;
   now?: () => number;
   sseAdapter?: McpSseCompatibilityConnector;
 }

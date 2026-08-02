@@ -110,8 +110,7 @@ export class McpGatewayService {
     const authority = await this.mcpRuntimeRepository.getAuthority({
       capabilityGrantId: context.capabilityGrantId,
       capabilitySnapshotId,
-      runId: context.runId,
-      organizationId: context.organizationId,
+      scope: toRunExecutionScope(context),
     });
     if (!authority) {
       throw new ForbiddenException('MCP capability snapshot does not match the run authority');

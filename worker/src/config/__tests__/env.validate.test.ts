@@ -76,6 +76,7 @@ describe('workerEnvSchema', () => {
       expect(result.data.MCP_RUNTIME_STARTING_TTL_MS).toBe(180_000);
       expect(result.data.MCP_RUNTIME_LEASE_TTL_MS).toBe(60_000);
       expect(result.data.MCP_RUNTIME_RENEWAL_INTERVAL_MS).toBe(15_000);
+      expect(result.data.MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS).toBe(10_000);
       expect(result.data.MCP_RUNTIME_REDIS_URL).toBeUndefined();
       expect(result.data.MCP_RUNTIME_OWNER_ID).toBeUndefined();
       expect(result.data.MCP_RUNTIME_OWNER_URL).toBeUndefined();
@@ -154,6 +155,28 @@ describe('workerEnvSchema', () => {
           MCP_RUNTIME_RENEWAL_INTERVAL_MS: '20001',
         }),
       ).success,
+    ).toBe(false);
+  });
+
+  it('keeps the host stdio negotiation probe within the connect budget', () => {
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS: '30000',
+        }),
+      ).success,
+    ).toBe(true);
+    expect(
+      workerEnvSchema.safeParse(
+        validEnv({
+          MCP_RUNTIME_CONNECT_TIMEOUT_MS: '30000',
+          MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS: '30001',
+        }),
+      ).success,
+    ).toBe(false);
+    expect(
+      workerEnvSchema.safeParse(validEnv({ MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS: '0' })).success,
     ).toBe(false);
   });
 

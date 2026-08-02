@@ -34,3 +34,4 @@ export * from './scopes';
 export * from './assets';
 export * from './outbox';
 export * from './mcp-runtime';
+export * from './operator';

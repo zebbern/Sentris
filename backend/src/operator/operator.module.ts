@@ -1,0 +1,36 @@
+import { Module } from '@nestjs/common';
+
+import { InternalOnlyGuard } from '../auth/internal-only.guard';
+import { AnalyticsModule } from '../analytics/analytics.module';
+import { FindingTriageModule } from '../findings/finding-triage.module';
+import { McpRuntimeModule } from '../mcp-runtime/mcp-runtime.module';
+import { McpServersModule } from '../mcp-servers/mcp-servers.module';
+import { SecretsModule } from '../secrets/secrets.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
+import { InternalOperatorController } from './internal-operator.controller';
+import { OperatorCommandService } from './operator-command.service';
+import { OperatorController } from './operator.controller';
+import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
+import { OperatorRepository } from './operator.repository';
+import { OperatorService } from './operator.service';
+
+@Module({
+  imports: [
+    AnalyticsModule,
+    FindingTriageModule,
+    McpRuntimeModule,
+    McpServersModule,
+    SecretsModule,
+    WorkflowsModule,
+  ],
+  controllers: [InternalOperatorController, OperatorController],
+  providers: [
+    OperatorService,
+    OperatorCommandService,
+    OperatorMcpAuthorityService,
+    OperatorRepository,
+    InternalOnlyGuard,
+  ],
+  exports: [OperatorService],
+})
+export class OperatorModule {}

@@ -56,6 +56,14 @@ describe('ExecutionScopeSchema', () => {
       capabilityGrantId: GRANT_ID,
       expiresAt: EXPIRES_AT,
     },
+    {
+      kind: 'operator' as const,
+      organizationId: 'org-123',
+      sessionId: '66666666-6666-4666-8666-666666666666',
+      turnId: '77777777-7777-4777-8777-777777777777',
+      capabilityGrantId: GRANT_ID,
+      expiresAt: EXPIRES_AT,
+    },
   ])('accepts the strict $kind scope variant', (scope) => {
     expect(ExecutionScopeSchema.parse(scope)).toEqual(scope);
   });
@@ -145,6 +153,24 @@ describe('CapabilityGrantSchema', () => {
         createdAt: '2026-07-31T10:00:00.000Z',
       }).success,
     ).toBe(false);
+  });
+
+  it('accepts a strict Operator turn subject', () => {
+    const subject = {
+      kind: 'operator' as const,
+      sessionId: '66666666-6666-4666-8666-666666666666',
+      turnId: '77777777-7777-4777-8777-777777777777',
+      expiresAt: EXPIRES_AT,
+    };
+    expect(
+      CapabilityGrantSchema.parse({
+        id: GRANT_ID,
+        organizationId: 'org-123',
+        subject,
+        sources: [],
+        createdAt: '2026-07-31T10:00:00.000Z',
+      }).subject,
+    ).toEqual(subject);
   });
 });
 

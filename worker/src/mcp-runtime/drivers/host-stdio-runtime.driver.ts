@@ -10,6 +10,7 @@ import type {
   McpRuntimeDriverStartInput,
   McpRuntimeResource,
 } from '../mcp-runtime-driver';
+import { resolveWindowsNpxCommand } from '../windows-npx-command';
 
 const MAX_ARGS = 128;
 const MAX_ARG_LENGTH = 8 * 1024;
@@ -32,12 +33,16 @@ export class HostStdioRuntimeDriver implements McpRuntimeDriver {
     assertConnectTimeout(input.connectTimeoutMs);
     const definition = validateDefinition(input.definition);
     const cwd = await resolveApprovedCwd(definition.cwd, definition.allowedCwdRoots);
+    const launch = resolveWindowsNpxCommand({
+      command: validateExecutable(definition.command),
+      args: validateArgs(definition.args),
+    });
     let closed = false;
     try {
       const owned = await this.clientFactory.connect({
         transport: 'stdio',
-        command: validateExecutable(definition.command),
-        args: validateArgs(definition.args),
+        command: validateExecutable(launch.command),
+        args: validateArgs(launch.args),
         env: validateEnvironment(definition.environment),
         cwd,
         runtimeKey: input.runtimeKey,

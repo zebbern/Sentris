@@ -892,3 +892,13 @@ export { mcpDiscoveryWorkflow, mcpGroupDiscoveryWorkflow } from './mcp-discovery
 
 // Export webhook parsing workflow (Docker execution must run in worker).
 export { webhookParsingWorkflow } from './webhook-parsing-workflow.js';
+
+// Export one durable workflow per Operator user turn.
+export {
+  operatorTurnWorkflow,
+  operatorActionDecisionUpdate,
+  OPERATOR_ACTION_DECISION_UPDATE_NAME,
+  type OperatorActionDecisionUpdate,
+  type OperatorActionDecisionUpdateResult,
+  type OperatorTurnWorkflowInput,
+} from './operator-turn-workflow.js';

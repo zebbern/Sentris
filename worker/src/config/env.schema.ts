@@ -66,6 +66,13 @@ const mcpRuntimeEnvShape = {
     .max(MCP_RUNTIME_MAX_TTL_MS)
     .optional()
     .default(30_000),
+  MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MCP_RUNTIME_MAX_COMMAND_TIMEOUT_MS)
+    .optional()
+    .default(10_000),
   MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS: z.coerce
     .number()
     .int()
@@ -123,6 +130,7 @@ interface McpRuntimeTimingConfig {
   MCP_RUNTIME_LEASE_TTL_MS: number;
   MCP_RUNTIME_RENEWAL_INTERVAL_MS: number;
   MCP_RUNTIME_CONNECT_TIMEOUT_MS: number;
+  MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS: number;
   MCP_RUNTIME_DISCOVERY_IDLE_TIMEOUT_MS: number;
   MCP_RUNTIME_DISCOVERY_TOTAL_TIMEOUT_MS: number;
   MCP_RUNTIME_STARTING_OBSERVE_TIMEOUT_MS: number;
@@ -134,6 +142,13 @@ interface McpRuntimeTimingConfig {
 }
 
 function validateMcpRuntimeTiming(data: McpRuntimeTimingConfig, ctx: z.RefinementCtx): void {
+  if (data.MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS > data.MCP_RUNTIME_CONNECT_TIMEOUT_MS) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['MCP_RUNTIME_HOST_STDIO_PROBE_TIMEOUT_MS'],
+      message: 'MCP host stdio probe timeout must not exceed the connect timeout',
+    });
+  }
   if (data.MCP_RUNTIME_RENEWAL_INTERVAL_MS * 3 > data.MCP_RUNTIME_LEASE_TTL_MS) {
     ctx.addIssue({
       code: 'custom',

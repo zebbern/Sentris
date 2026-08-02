@@ -24,6 +24,10 @@ type UpdateSchedulePayload = components['schemas']['UpdateScheduleRequestDto'];
 type ScheduleStatus = 'active' | 'paused' | 'error';
 type CreateApiKeyPayload = components['schemas']['CreateApiKeyDto'];
 type UpdateApiKeyPayload = components['schemas']['UpdateApiKeyDto'];
+type CreateOperatorSessionPayload = components['schemas']['CreateOperatorSessionDto'];
+type UpdateOperatorSessionPayload = components['schemas']['UpdateOperatorSessionDto'];
+type CreateOperatorTurnPayload = components['schemas']['CreateOperatorTurnDto'];
+type OperatorActionDecisionPayload = components['schemas']['OperatorActionDecisionDto'];
 
 /**
  * Sentris API Client
@@ -287,6 +291,43 @@ export class SentrisApiClient {
       throw new Error(`Failed to download artifact: ${String(response.error)}`);
     }
     return (response?.data ?? response) as Blob;
+  }
+
+  // ===== Operator =====
+
+  async listOperatorSessions() {
+    return this.client.GET('/api/v1/operator/sessions');
+  }
+
+  async createOperatorSession(input: CreateOperatorSessionPayload) {
+    return this.client.POST('/api/v1/operator/sessions', { body: input });
+  }
+
+  async getOperatorSession(id: string) {
+    return this.client.GET('/api/v1/operator/sessions/{id}', {
+      params: { path: { id } },
+    });
+  }
+
+  async updateOperatorSession(id: string, input: UpdateOperatorSessionPayload) {
+    return this.client.PATCH('/api/v1/operator/sessions/{id}', {
+      params: { path: { id } },
+      body: input,
+    });
+  }
+
+  async createOperatorTurn(id: string, input: CreateOperatorTurnPayload) {
+    return this.client.POST('/api/v1/operator/sessions/{id}/turns', {
+      params: { path: { id } },
+      body: input,
+    });
+  }
+
+  async decideOperatorAction(actionId: string, input: OperatorActionDecisionPayload) {
+    return this.client.POST('/api/v1/operator/actions/{actionId}/decision', {
+      params: { path: { actionId } },
+      body: input,
+    });
   }
 
   // ===== Schedules =====

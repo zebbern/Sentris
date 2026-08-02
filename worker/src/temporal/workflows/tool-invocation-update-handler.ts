@@ -8,17 +8,14 @@ import {
 import {
   InstallToolInvocationManifestRequestSchema,
   McpOperationInvocationRequestSchema,
-  McpOperationResultSchema,
   ToolInvocationRequestSchema,
   ToolInvocationResultSchema,
   resolveInvocationManifestEntry,
   resolveMcpOperationManifestEntry,
   type InstallToolInvocationManifestRequest,
   type InvocationManifest,
-  type McpOperationDispatchPlan,
   type McpOperationInvocationRequest,
   type McpOperationResult,
-  type PreparedMcpOperationRef,
   type PreparedInvocationRef,
   type ToolInvocationRequest,
   type ToolInvocationResult,
@@ -30,6 +27,12 @@ import {
   executeToolInvocationUpdate,
   installToolInvocationManifestUpdate,
 } from '../updates.js';
+import {
+  executeDurableMcpOperation,
+  type McpOperationWorkflowActivities,
+} from './mcp-operation-workflow-executor.js';
+
+export type { McpOperationWorkflowActivities } from './mcp-operation-workflow-executor.js';
 
 export interface ToolInvocationWorkflowActivities {
   prepareToolInvocationActivity(
@@ -50,22 +53,6 @@ export interface ToolInvocationWorkflowActivities {
     message: string;
     completedAt: string;
   }): Promise<void>;
-}
-
-export interface McpOperationWorkflowActivities {
-  prepareMcpOperationActivity(
-    request: McpOperationInvocationRequest,
-  ): Promise<
-    | { kind: 'prepared'; plan: McpOperationDispatchPlan }
-    | { kind: 'terminal'; result: McpOperationResult }
-  >;
-  dispatchMcpOperationActivity(plan: McpOperationDispatchPlan): Promise<McpOperationResult>;
-  reconcileMcpOperationActivity(input: {
-    ref: PreparedMcpOperationRef;
-    cause: 'failure' | 'deadline' | 'cancelled';
-    message: string;
-    completedAt: string;
-  }): Promise<McpOperationResult>;
 }
 
 export interface ToolInvocationUpdateController {
@@ -342,76 +329,13 @@ export function createToolInvocationUpdateHandlers(
     } catch {
       throw fail('MCP operation request validation failed', 'McpOperationValidation');
     }
-    const deadline = new Date(request.deadlineAt).getTime();
-    if (deadline <= Date.now()) {
-      return McpOperationResultSchema.parse({
-        operationId: request.invocationId,
-        kind: 'remote-failure',
-        message: 'MCP operation deadline expired before dispatch',
-        retryable: false,
-        completedAt: new Date().toISOString(),
-      });
-    }
-    let prepared:
-      | { kind: 'prepared'; plan: McpOperationDispatchPlan }
-      | { kind: 'terminal'; result: McpOperationResult };
-    try {
-      prepared = await input.operationActivities.prepareMcpOperationActivity(request);
-    } catch {
-      throw fail('MCP operation preflight failed', 'McpOperationPreflightFailure');
-    }
-    if (prepared.kind === 'terminal') {
-      return parseMcpOperationHandlerResult(
-        prepared.result,
-        'MCP operation preflight returned invalid state',
-        fail,
-      );
-    }
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) {
-      return reconcileOperation(prepared.plan.ref, 'deadline');
-    }
-    try {
-      const result = await runtime.withTimeout(remainingMs, () =>
-        input.operationActivities!.dispatchMcpOperationActivity(prepared.plan),
-      );
-      return parseMcpOperationHandlerResult(
-        result,
-        'MCP operation dispatch returned invalid state',
-        fail,
-      );
-    } catch (error: unknown) {
-      const cause =
-        Date.now() >= deadline
-          ? 'deadline'
-          : runtime.isCancellation(error)
-            ? 'cancelled'
-            : 'failure';
-      return reconcileOperation(prepared.plan.ref, cause);
-    }
-  };
-
-  const reconcileOperation = async (
-    ref: PreparedMcpOperationRef,
-    cause: 'failure' | 'deadline' | 'cancelled',
-  ): Promise<McpOperationResult> => {
-    try {
-      const result = await runtime.nonCancellable(() =>
-        input.operationActivities!.reconcileMcpOperationActivity({
-          ref,
-          cause,
-          message: mcpOperationReconciliationMessage(cause),
-          completedAt: new Date().toISOString(),
-        }),
-      );
-      return parseMcpOperationHandlerResult(
-        result,
-        'MCP operation reconciliation returned invalid state',
-        fail,
-      );
-    } catch {
-      throw fail('MCP operation reconciliation failed', 'McpOperationReconciliationFailure');
-    }
+    return executeDurableMcpOperation(request, input.operationActivities, {
+      now: Date.now,
+      withTimeout: runtime.withTimeout,
+      nonCancellable: runtime.nonCancellable,
+      isCancellation: runtime.isCancellation,
+      failure: runtime.applicationFailure,
+    });
   };
 
   const reconcile = async (
@@ -512,17 +436,6 @@ function reconciliationMessage(cause: 'failure' | 'deadline' | 'cancelled'): str
   }
 }
 
-function mcpOperationReconciliationMessage(cause: 'failure' | 'deadline' | 'cancelled'): string {
-  switch (cause) {
-    case 'deadline':
-      return 'MCP operation dispatch exceeded its deadline without a confirmed response';
-    case 'cancelled':
-      return 'MCP operation dispatch was cancelled without a confirmed response';
-    case 'failure':
-      return 'MCP operation dispatch did not confirm a terminal result';
-  }
-}
-
 function deadlineBeforeDispatch(invocationId: string): ToolInvocationResult {
   return ToolInvocationResultSchema.parse({
     invocationId,
@@ -544,18 +457,6 @@ function parseHandlerResult(
   const parsed = ToolInvocationResultSchema.safeParse(result);
   if (!parsed.success) {
     throw failure(message, 'ToolInvocationStateFailure');
-  }
-  return parsed.data;
-}
-
-function parseMcpOperationHandlerResult(
-  result: unknown,
-  message: string,
-  failure: (message: string, type: string) => Error,
-): McpOperationResult {
-  const parsed = McpOperationResultSchema.safeParse(result);
-  if (!parsed.success) {
-    throw failure(message, 'McpOperationStateFailure');
   }
   return parsed.data;
 }

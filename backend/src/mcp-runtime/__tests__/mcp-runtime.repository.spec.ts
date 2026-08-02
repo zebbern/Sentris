@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type {
   CapabilityGrant,
+  ExecutionScope,
   InvocationManifest,
   InvocationManifestEntry,
   McpCapabilityCatalogSnapshot,
@@ -25,6 +26,8 @@ const GRANT_ID = '11111111-1111-4111-8111-111111111111';
 const SNAPSHOT_ID = '22222222-2222-4222-8222-222222222222';
 const INVOCATION_ID = '33333333-3333-4333-8333-333333333333';
 const ATTEMPT_ID = '44444444-4444-4444-8444-444444444444';
+const OPERATOR_SESSION_ID = '77777777-7777-4777-8777-777777777777';
+const OPERATOR_TURN_ID = '88888888-8888-4888-8888-888888888888';
 
 const grant: CapabilityGrant = {
   id: GRANT_ID,
@@ -250,16 +253,19 @@ function authorityRows(overrides?: {
 }) {
   const storedGrant = { ...grant, ...overrides?.grant };
   const storedSnapshot = { ...snapshot, ...overrides?.snapshot };
+  const subjectId =
+    storedGrant.subject.kind === 'run'
+      ? storedGrant.subject.runId
+      : storedGrant.subject.kind === 'operator'
+        ? storedGrant.subject.turnId
+        : storedGrant.subject.operationId;
   return {
     grant: {
       id: storedGrant.id,
       authorityKey: AUTHORITY_KEY,
       organizationId: storedGrant.organizationId,
       subjectKind: storedGrant.subject.kind,
-      subjectId:
-        storedGrant.subject.kind === 'run'
-          ? storedGrant.subject.runId
-          : storedGrant.subject.operationId,
+      subjectId,
       grant: storedGrant,
       createdAt: new Date(storedGrant.createdAt),
     },
@@ -285,6 +291,8 @@ function invocationRows(
   return {
     invocation: {
       invocationId: INVOCATION_ID,
+      subjectKind: 'run',
+      subjectId: 'run-1',
       runId: 'run-1',
       organizationId: 'org-1',
       capabilityGrantId: GRANT_ID,
@@ -321,6 +329,8 @@ function operationRows(
   return {
     invocation: {
       invocationId: INVOCATION_ID,
+      subjectKind: 'run',
+      subjectId: 'run-1',
       runId: 'run-1',
       organizationId: 'org-1',
       capabilityGrantId: GRANT_ID,
@@ -492,6 +502,9 @@ describe('McpRuntimeRepository', () => {
       const values = calls.filter((call) => call.method === 'values').map((call) => call.args[0]);
       expect(values[0]).toEqual(
         expect.objectContaining({
+          subjectKind: 'run',
+          subjectId: 'run-1',
+          runId: 'run-1',
           operationKind: 'resource-read',
           operationTarget: 'repo://{path}',
           toolName: null,
@@ -504,6 +517,49 @@ describe('McpRuntimeRepository', () => {
           ownerId: null,
           ownerEpoch: null,
           leaseGeneration: null,
+        }),
+      );
+    });
+
+    it('persists Operator operations under the turn subject without a fake run projection', async () => {
+      const operatorRequest: McpOperationInvocationRequest = {
+        ...operationRequest,
+        scope: {
+          kind: 'operator',
+          organizationId: 'org-1',
+          sessionId: OPERATOR_SESSION_ID,
+          turnId: OPERATOR_TURN_ID,
+          capabilityGrantId: GRANT_ID,
+          expiresAt: '2026-08-01T12:00:00.000Z',
+        },
+      };
+      const rows = operationRows('prepared');
+      Object.assign(rows.invocation, {
+        subjectKind: 'operator',
+        subjectId: OPERATOR_TURN_ID,
+        runId: null,
+        request: operatorRequest,
+      });
+      const { db, calls } = createMockDb({
+        insert: [[rows.invocation], [rows.attempt]],
+      });
+
+      await new McpRuntimeRepository(db).prepareOperation({
+        request: operatorRequest,
+        dispatchOperation: operatorRequest.operation,
+        requestHash: REQUEST_HASH,
+        entry: operationEntry,
+        runtimeBinding,
+        manifest: { ...manifest, version: '2', entries: [operationEntry] },
+      });
+
+      const values = calls.filter((call) => call.method === 'values').map((call) => call.args[0]);
+      expect(values[0]).toEqual(
+        expect.objectContaining({
+          subjectKind: 'operator',
+          subjectId: OPERATOR_TURN_ID,
+          runId: null,
+          organizationId: 'org-1',
         }),
       );
     });
@@ -701,9 +757,15 @@ describe('McpRuntimeRepository', () => {
         ...grant,
         organizationId: null,
       };
+      const publicScope: Extract<ExecutionScope, { kind: 'run' }> = {
+        kind: 'run',
+        organizationId: null,
+        runId: 'run-1',
+        capabilityGrantId: GRANT_ID,
+      };
       const publicSnapshot: McpCapabilityCatalogSnapshot = {
         ...snapshot,
-        scope: { ...snapshot.scope, organizationId: null },
+        scope: publicScope,
       };
       const { db, calls } = createMockDb({
         select: [[authorityRows({ grant: publicGrant, snapshot: publicSnapshot })]],
@@ -713,8 +775,7 @@ describe('McpRuntimeRepository', () => {
         new McpRuntimeRepository(db).getAuthority({
           capabilityGrantId: GRANT_ID,
           capabilitySnapshotId: SNAPSHOT_ID,
-          runId: 'run-1',
-          organizationId: null,
+          scope: publicScope,
         }),
       ).resolves.toEqual({
         grant: publicGrant,

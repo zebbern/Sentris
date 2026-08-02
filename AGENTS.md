@@ -326,9 +326,15 @@ so retries reuse the same holder, and every operation/release must carry that ho
 the full fence. Do not add another backend/worker MCP client or bypass this runtime
 boundary.
 
-Remaining work is durable external invocation dispatch through this runtime,
-resources/prompts execution behavior, Continue-As-New, MCP Tasks, and workflow-granular
-agent turns. See
+The in-app Operator now runs each user turn as a Temporal Workflow with durable typed
+actions, ask-or-auto approvals, run observation, and turn-scoped immutable MCP authority.
+Its tool, resource, and prompt calls dispatch through the same canonical runtime and
+durable invocation path. Provider-native tool-call continuation metadata lives in the
+Temporal turn history; Postgres action rows remain provider-neutral audit records.
+
+Remaining work is Continue-As-New, MCP Tasks, the Task 8 compatibility cleanup, the
+bounded Studio migration, and moving workflow-graph AI-agent loops to workflow-granular
+durable turns. See
 `docs/architecture/adr-stateless-mcp-runtime-and-temporal-agents.md` and the linked
 design spec. Do not expand the legacy session architecture while this migration is in
 progress.

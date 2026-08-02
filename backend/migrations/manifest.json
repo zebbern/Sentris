@@ -91,6 +91,20 @@
       "sqlSha256": "67458b51c4ccc7b9915ffb72575057fe9d845d42b1f04b1a4d2ac3ac1d735b1c",
       "snapshotSha256": "d4194d195f5f9318de40092f8b18408b2f8c06a16bbe1d9f2017b3690c35a8a0",
       "contractSha256": "393918ab6f05a5a33b7c970c09ecece4801ee3949d4321164950b04bdd04e289"
+    },
+    {
+      "idx": 13,
+      "tag": "0013_operator_durable_turns",
+      "sqlSha256": "cc3d95fd26614cf82a61a485748b3ea478a5b91bb65c40d5523433a2d686894a",
+      "snapshotSha256": "39b2657e30d0c1eab5a46bf9f5db866a2a52c785ef0027e221dfa8c900693c6e",
+      "contractSha256": "f1ffcb5b2e4a4da1c3a3f8f011cce912fb9e90635ac7cd133090ceef8df9d0c0"
+    },
+    {
+      "idx": 14,
+      "tag": "0014_operator_mcp_subjects",
+      "sqlSha256": "c112859f8dd58113bd80206f1ba3c5b2921f6c7e2101ff2c06f16b1a35fdea6f",
+      "snapshotSha256": "40c3db9c7afb5c0839d66736a8d9700295c65427d92eb2a1abdf88558de8b2c9",
+      "contractSha256": "f29513a9c339af04b66b8c2648de3d38f54cbfc12e194d0264eaf54933c2c8fe"
     }
   ]
 }

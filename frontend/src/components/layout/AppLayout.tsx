@@ -35,6 +35,7 @@ import {
   Search,
   LayoutList,
   Columns3,
+  Bot,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
@@ -62,6 +63,7 @@ import { useIsMobile, useIsTablet } from '@/hooks/useIsMobile';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { parseLibraryTab } from '@/pages/template-library';
 import { parseFindingsView } from '@/pages/findings/findingsView';
+import { OperatorTopBarActions } from '@/features/operator/OperatorTopBarActions';
 
 const TOP_BAR_CONTROL = 'h-8';
 const TOP_BAR_BUTTON = 'h-8 gap-1.5';
@@ -510,6 +512,7 @@ const SETTINGS_HREFS = settingsItems.map((item) => item.href);
 
 const navigationItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Operator', href: '/operator', icon: Bot },
   { name: 'Workflows', href: '/workflows', icon: Workflow },
   { name: 'Template Library', href: '/templates', icon: Package },
   { name: 'Schedules', href: '/schedules', icon: CalendarClock },
@@ -584,6 +587,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   );
 
   const getPageActions = () => {
+    if (location.pathname === '/operator' || location.pathname.startsWith('/operator/')) {
+      const sessionId = location.pathname.match(/^\/operator\/([^/]+)$/)?.[1];
+      return <OperatorTopBarActions sessionId={sessionId} />;
+    }
     if (location.pathname === '/workflows') {
       return (
         <Button

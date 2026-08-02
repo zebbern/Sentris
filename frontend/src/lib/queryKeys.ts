@@ -120,6 +120,11 @@ export const queryKeys = {
   agents: {
     transcript: (agentRunId: string) => ['agentTranscript', getOrgScope(), agentRunId] as const,
   },
+  operator: {
+    root: () => ['operator', getOrgScope(), getUserScope()] as const,
+    sessions: () => [...queryKeys.operator.root(), 'sessions'] as const,
+    session: (sessionId: string) => [...queryKeys.operator.root(), 'sessions', sessionId] as const,
+  },
   workflows: {
     list: () => ['workflows', getOrgScope()] as const,
     summary: (filters?: Record<string, unknown>) => {

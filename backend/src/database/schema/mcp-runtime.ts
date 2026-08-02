@@ -75,7 +75,9 @@ export const mcpInvocationsTable = pgTable(
   'mcp_invocations',
   {
     invocationId: uuid('invocation_id').primaryKey(),
-    runId: text('run_id').notNull(),
+    subjectKind: varchar('subject_kind', { length: 32 }).notNull(),
+    subjectId: text('subject_id').notNull(),
+    runId: text('run_id'),
     organizationId: varchar('organization_id', { length: 191 }),
     capabilityGrantId: uuid('capability_grant_id')
       .notNull()
@@ -97,6 +99,11 @@ export const mcpInvocationsTable = pgTable(
   },
   (table) => ({
     runCreatedAtIdx: index('mcp_invocations_run_created_at_idx').on(table.runId, table.createdAt),
+    subjectCreatedAtIdx: index('mcp_invocations_subject_created_at_idx').on(
+      table.subjectKind,
+      table.subjectId,
+      table.createdAt,
+    ),
     organizationCreatedAtIdx: index('mcp_invocations_organization_created_at_idx').on(
       table.organizationId,
       table.createdAt,
@@ -108,6 +115,14 @@ export const mcpInvocationsTable = pgTable(
     requestHashCheck: check(
       'mcp_invocations_request_hash_check',
       sql`${table.requestHash} ~ '^[a-f0-9]{64}$'`,
+    ),
+    subjectKindCheck: check(
+      'mcp_invocations_subject_kind_check',
+      sql`${table.subjectKind} IN ('run', 'operator')`,
+    ),
+    runProjectionCheck: check(
+      'mcp_invocations_run_projection_check',
+      sql`${table.subjectKind} = 'run' AND ${table.runId} = ${table.subjectId} OR ${table.subjectKind} <> 'run' AND ${table.runId} IS NULL`,
     ),
     operationKindCheck: check(
       'mcp_invocations_operation_kind_check',

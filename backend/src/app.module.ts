@@ -69,6 +69,7 @@ import { ProvisioningLockService } from './common/redis/provisioning-lock.servic
 import { InstanceHeartbeatModule } from './common/redis/instance-heartbeat.module';
 import { AdminInstancesController } from './common/redis/admin-instances.controller';
 import { OutboxModule } from './outbox/outbox.module';
+import { OperatorModule } from './operator/operator.module';
 
 const coreModules = [
   AgentsModule,
@@ -101,6 +102,7 @@ const coreModules = [
   AssetsModule,
   AiModule,
   OutboxModule,
+  OperatorModule,
 ];
 
 const testingModules = process.env.NODE_ENV === 'production' ? [] : [TestingSupportModule];

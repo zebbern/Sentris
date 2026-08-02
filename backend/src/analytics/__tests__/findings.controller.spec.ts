@@ -9,6 +9,7 @@ import { InvalidFindingPageCursorError } from '../finding-pagination';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 
 import { FindingsController } from '../findings.controller';
+import { FindingsQueryService } from '../findings-query.service';
 import type { SecurityAnalyticsService } from '../security-analytics.service';
 import type { AuditLogService } from '../../audit/audit-log.service';
 import type { AuthContext } from '../../auth/types';
@@ -180,13 +181,14 @@ function createController(
   const findingTriage = overrides.findingTriage ?? makeFindingTriageService();
   const outbox = overrides.outbox ?? makeOutboxRepository();
   const scopesRepository = overrides.scopesRepository ?? makeScopesRepository();
-  const controller = new FindingsController(
+  const findingsQueryService = new FindingsQueryService(
     securityAnalytics,
     auditLog,
     findingTriage,
     outbox,
     scopesRepository,
   );
+  const controller = new FindingsController(securityAnalytics, auditLog, findingsQueryService);
   return { controller, securityAnalytics, auditLog, findingTriage, outbox, scopesRepository };
 }
 

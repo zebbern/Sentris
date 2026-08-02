@@ -84,6 +84,17 @@ import {
   startMcpDockerProxy,
 } from '../../components/core/mcp-docker-proxy';
 import { drainAllRequiredPublications } from '../utils/required-publication-tracker';
+import {
+  initializeOperatorActivities,
+  operatorCompleteTurnActivity,
+  operatorExecuteActionActivity,
+  operatorFailTurnActivity,
+  operatorModelStepActivity,
+  operatorObserveRunActivity,
+  operatorPrepareActionActivity,
+  operatorSettleMcpActionActivity,
+  operatorSetTurnStatusActivity,
+} from '../activities/operator.activity';
 
 // Load environment variables from instance-specific env if set, otherwise fall back
 // to the worker's default `.env`.
@@ -174,6 +185,7 @@ async function main() {
       runFinalizer: notifyBackendRunFinalized,
       onRequiredTelemetryFailure,
     });
+    initializeOperatorActivities({ secrets: adapters.secrets });
 
     initializeHumanInputActivity({
       database: db,
@@ -260,6 +272,14 @@ async function main() {
       dispatchMcpOperationActivity,
       reconcileMcpOperationActivity,
       reconcileRunToolInvocationsActivity,
+      operatorSetTurnStatusActivity,
+      operatorModelStepActivity,
+      operatorPrepareActionActivity,
+      operatorExecuteActionActivity,
+      operatorSettleMcpActionActivity,
+      operatorObserveRunActivity,
+      operatorCompleteTurnActivity,
+      operatorFailTurnActivity,
     };
 
     console.log(`🏗️ Creating Temporal worker...`);

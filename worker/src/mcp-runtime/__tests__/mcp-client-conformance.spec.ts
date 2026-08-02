@@ -20,6 +20,7 @@ import {
   startHangingLegacySseFixture,
   startLegacySseFixture,
   startPaginationFixture,
+  LEGACY_STDIO_FIXTURE_SCRIPT,
   STDIO_FIXTURE_SCRIPT,
 } from './fixtures/mcp-conformance-servers';
 
@@ -437,6 +438,48 @@ describe('official v2 Streamable HTTP fixtures', () => {
 });
 
 describe('official v2 stdio fixture', () => {
+  test('bounds the disposable stdio probe independently of the live session startup', async () => {
+    const runtime = { ...runtimeKey(), transport: 'stdio' as const };
+    const factory = new McpClientFactory({ stdioProbeTimeoutMs: 25 });
+    try {
+      const owned = await factory.connect({
+        transport: 'stdio',
+        command: process.execPath,
+        args: ['-e', LEGACY_STDIO_FIXTURE_SCRIPT],
+        cwd: `${process.cwd()}/worker`,
+        env: { ...definedProcessEnvironment(), MCP_START_DELAY_MS: '100' },
+        runtimeKey: runtime,
+        signal: AbortSignal.timeout(5_000),
+        timeout: 1_000,
+      });
+      const discovered = await owned.adapter.discover('source', 'c'.repeat(64), operationContext());
+      expect(discovered.metadata).toMatchObject({ protocolEra: 'legacy' });
+    } finally {
+      await factory.close(runtime);
+    }
+  });
+
+  test('enforces one wall-clock budget across stdio probe and legacy initialization', async () => {
+    const runtime = { ...runtimeKey(), transport: 'stdio' as const };
+    const factory = new McpClientFactory({ stdioProbeTimeoutMs: 25 });
+    try {
+      await expect(
+        factory.connect({
+          transport: 'stdio',
+          command: process.execPath,
+          args: ['-e', LEGACY_STDIO_FIXTURE_SCRIPT],
+          cwd: `${process.cwd()}/worker`,
+          env: { ...definedProcessEnvironment(), MCP_START_DELAY_MS: '500' },
+          runtimeKey: runtime,
+          signal: AbortSignal.timeout(5_000),
+          timeout: 75,
+        }),
+      ).rejects.toMatchObject({ code: SdkErrorCode.RequestTimeout });
+    } finally {
+      await factory.close(runtime);
+    }
+  });
+
   test('auto negotiation disposes one probe sibling and owns one live session child', async () => {
     const runtime = { ...runtimeKey(), transport: 'stdio' as const };
     const factory = new McpClientFactory();
