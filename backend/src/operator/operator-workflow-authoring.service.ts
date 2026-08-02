@@ -3,10 +3,13 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  OperatorProposeWorkflowEditsInputSchema,
   OperatorProposeWorkflowDraftInputSchema,
   OperatorWorkflowDraftResultSchema,
   OperatorWorkflowGraphSchema,
+  TERMINAL_STATUSES,
   type OperatorCommandInputMap,
+  type OperatorWorkflowEditOperation,
   type OperatorWorkflowApplyResult,
   type OperatorWorkflowDraftDetail,
   type OperatorWorkflowDraftResult,
@@ -32,6 +35,20 @@ import { OperatorRepository } from './operator.repository';
 export const OPERATOR_PRESERVE_CREDENTIAL = '__SENTRIS_PRESERVE_CREDENTIAL__';
 
 type JsonRecord = Record<string, unknown>;
+
+type StoredWorkflowProposal =
+  | {
+      kind: 'graph';
+      action: OperatorActionRecord;
+      arguments: OperatorCommandInputMap['propose_workflow_draft'];
+      result: OperatorWorkflowDraftResult;
+    }
+  | {
+      kind: 'edits';
+      action: OperatorActionRecord;
+      arguments: OperatorCommandInputMap['propose_workflow_edits'];
+      result: OperatorWorkflowDraftResult;
+    };
 
 function isRecord(value: unknown): value is JsonRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -391,6 +408,169 @@ function buildGraphDiff(base: WorkflowGraph | null, proposed: WorkflowGraph) {
   };
 }
 
+function graphDiffHasChanges(diff: ReturnType<typeof buildGraphDiff>): boolean {
+  return (
+    diff.metadataChanged.length > 0 ||
+    diff.addedNodeIds.length > 0 ||
+    diff.removedNodeIds.length > 0 ||
+    diff.changedNodeIds.length > 0 ||
+    diff.addedEdgeIds.length > 0 ||
+    diff.removedEdgeIds.length > 0 ||
+    diff.changedEdgeIds.length > 0
+  );
+}
+
+function mergeJsonValue(base: unknown, patch: unknown): unknown {
+  if (!isRecord(base) || !isRecord(patch)) return cloneJsonValue(patch);
+  const keys = new Set([...Object.keys(base), ...Object.keys(patch)]);
+  return Object.fromEntries(
+    [...keys].map((key) => [
+      key,
+      Object.hasOwn(patch, key) ? mergeJsonValue(base[key], patch[key]) : cloneJsonValue(base[key]),
+    ]),
+  );
+}
+
+function requireWorkflowEditField<T>(
+  value: T | undefined,
+  operation: OperatorWorkflowEditOperation['operation'],
+  field: string,
+): T {
+  if (value === undefined) throw new Error(`${operation} requires ${field}`);
+  return value;
+}
+
+function applyWorkflowEdit(
+  graph: WorkflowGraph,
+  edit: OperatorWorkflowEditOperation,
+): WorkflowGraph {
+  const candidate = OperatorWorkflowGraphSchema.parse(graph);
+  switch (edit.operation) {
+    case 'set_workflow_metadata':
+      if (edit.name !== undefined) candidate.name = edit.name;
+      if (edit.description !== undefined) {
+        candidate.description = edit.description ?? undefined;
+      }
+      return candidate;
+    case 'patch_node': {
+      const nodeId = requireWorkflowEditField(edit.nodeId, edit.operation, 'nodeId');
+      const node = candidate.nodes.find((entry) => entry.id === nodeId);
+      if (!node) throw new Error(`node ${nodeId} does not exist`);
+      if (edit.label !== undefined) node.data.label = edit.label;
+      if (edit.position !== undefined) node.position = edit.position;
+      if (edit.setParameters) {
+        for (const [id, value] of Object.entries(edit.setParameters)) {
+          node.data.config.params[id] = mergeJsonValue(node.data.config.params[id], value);
+        }
+      }
+      const removedParameterIds = new Set(edit.removeParameterIds ?? []);
+      if (removedParameterIds.size > 0) {
+        node.data.config.params = Object.fromEntries(
+          Object.entries(node.data.config.params).filter(([id]) => !removedParameterIds.has(id)),
+        );
+      }
+      if (edit.setInputOverrides) {
+        for (const [id, value] of Object.entries(edit.setInputOverrides)) {
+          node.data.config.inputOverrides[id] = mergeJsonValue(
+            node.data.config.inputOverrides[id],
+            value,
+          );
+        }
+      }
+      const removedInputOverrideIds = new Set(edit.removeInputOverrideIds ?? []);
+      if (removedInputOverrideIds.size > 0) {
+        node.data.config.inputOverrides = Object.fromEntries(
+          Object.entries(node.data.config.inputOverrides).filter(
+            ([id]) => !removedInputOverrideIds.has(id),
+          ),
+        );
+      }
+      return candidate;
+    }
+    case 'add_node': {
+      const addedNode = requireWorkflowEditField(edit.node, edit.operation, 'node');
+      if (candidate.nodes.some((node) => node.id === addedNode.id)) {
+        throw new Error(`node ${addedNode.id} already exists`);
+      }
+      candidate.nodes.push(cloneJsonValue(addedNode) as WorkflowGraph['nodes'][number]);
+      return candidate;
+    }
+    case 'replace_node': {
+      const nodeId = requireWorkflowEditField(edit.nodeId, edit.operation, 'nodeId');
+      const replacementNode = requireWorkflowEditField(edit.node, edit.operation, 'node');
+      const index = candidate.nodes.findIndex((node) => node.id === nodeId);
+      if (index === -1) throw new Error(`node ${nodeId} does not exist`);
+      candidate.nodes[index] = cloneJsonValue(replacementNode) as WorkflowGraph['nodes'][number];
+      return candidate;
+    }
+    case 'remove_node': {
+      const nodeId = requireWorkflowEditField(edit.nodeId, edit.operation, 'nodeId');
+      const index = candidate.nodes.findIndex((node) => node.id === nodeId);
+      if (index === -1) throw new Error(`node ${nodeId} does not exist`);
+      if (candidate.nodes.length === 1) {
+        throw new Error('a workflow must retain at least one node');
+      }
+      candidate.nodes.splice(index, 1);
+      candidate.edges = candidate.edges.filter(
+        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+      );
+      return candidate;
+    }
+    case 'add_edge': {
+      const addedEdge = requireWorkflowEditField(edit.edge, edit.operation, 'edge');
+      if (candidate.edges.some((edge) => edge.id === addedEdge.id)) {
+        throw new Error(`edge ${addedEdge.id} already exists`);
+      }
+      candidate.edges.push(cloneJsonValue(addedEdge) as WorkflowGraph['edges'][number]);
+      return candidate;
+    }
+    case 'replace_edge': {
+      const edgeId = requireWorkflowEditField(edit.edgeId, edit.operation, 'edgeId');
+      const replacementEdge = requireWorkflowEditField(edit.edge, edit.operation, 'edge');
+      const index = candidate.edges.findIndex((edge) => edge.id === edgeId);
+      if (index === -1) throw new Error(`edge ${edgeId} does not exist`);
+      candidate.edges[index] = cloneJsonValue(replacementEdge) as WorkflowGraph['edges'][number];
+      return candidate;
+    }
+    case 'remove_edge': {
+      const edgeId = requireWorkflowEditField(edit.edgeId, edit.operation, 'edgeId');
+      const index = candidate.edges.findIndex((edge) => edge.id === edgeId);
+      if (index === -1) throw new Error(`edge ${edgeId} does not exist`);
+      candidate.edges.splice(index, 1);
+      return candidate;
+    }
+    default: {
+      const unsupported: never = edit.operation;
+      throw new Error(`Unsupported workflow edit: ${String(unsupported)}`);
+    }
+  }
+}
+
+function materializeWorkflowEdits(
+  base: WorkflowGraph,
+  edits: OperatorWorkflowEditOperation[],
+): { graph: WorkflowGraph; errors: string[] } {
+  let graph = OperatorWorkflowGraphSchema.parse(base);
+  const errors: string[] = [];
+  for (const [index, edit] of edits.entries()) {
+    try {
+      const candidate = applyWorkflowEdit(graph, edit);
+      const parsed = OperatorWorkflowGraphSchema.safeParse(candidate);
+      if (!parsed.success) {
+        errors.push(
+          ...validationErrors(parsed.error).map((error) => `operations.${index}: ${error}`),
+        );
+        continue;
+      }
+      graph = parsed.data;
+    } catch (error: unknown) {
+      errors.push(`operations.${index}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (errors.length >= 50) break;
+  }
+  return { graph, errors: errors.slice(0, 50) };
+}
+
 function validationErrors(error: unknown): string[] {
   const issues = isRecord(error) && Array.isArray(error.issues) ? error.issues : [];
   const formattedIssues = issues.flatMap((issue) => {
@@ -468,6 +648,68 @@ export class OperatorWorkflowAuthoringService {
     return projectCredentialValues(graph, base);
   }
 
+  private async assertSourceRunLineage(input: {
+    sourceRunId: string | undefined;
+    workflowId: string | undefined;
+    auth: AuthContext;
+  }): Promise<void> {
+    if (!input.sourceRunId) return;
+    if (!input.workflowId) {
+      throw new ConflictException('Source-run lineage requires an existing workflow');
+    }
+    const sourceRun = await this.workflowsService.getRun(input.sourceRunId, input.auth);
+    if (sourceRun.workflowId !== input.workflowId) {
+      throw new ConflictException(
+        `Workflow run ${input.sourceRunId} does not belong to workflow ${input.workflowId}`,
+      );
+    }
+    if (!(TERMINAL_STATUSES as readonly string[]).includes(sourceRun.status)) {
+      throw new ConflictException(
+        `Workflow run ${input.sourceRunId} is still ${sourceRun.status}; wait for it to finish before proposing an improvement`,
+      );
+    }
+  }
+
+  private buildProposalResult(input: {
+    actionId: string;
+    workflowId: string | undefined;
+    baseVersionId: string | undefined;
+    sourceRunId: string | undefined;
+    proposedGraph: WorkflowGraph;
+    persistedBaseGraph: WorkflowGraph | undefined;
+    initialErrors?: string[];
+    requireChanges?: boolean;
+  }): OperatorWorkflowDraftResult {
+    const baseGraph = input.persistedBaseGraph ? this.projectGraph(input.persistedBaseGraph) : null;
+    let errors = [...(input.initialErrors ?? [])];
+    let effectiveGraph = input.proposedGraph;
+    try {
+      effectiveGraph = restoreCredentialValues(input.proposedGraph, input.persistedBaseGraph);
+      compileWorkflowGraph(effectiveGraph);
+    } catch (error: unknown) {
+      errors.push(...validationErrors(error));
+    }
+
+    const projectedGraph = this.projectGraph(effectiveGraph, input.persistedBaseGraph);
+    const diff = buildGraphDiff(baseGraph, projectedGraph);
+    if (input.requireChanges && !graphDiffHasChanges(diff)) {
+      errors.push('Workflow edit proposal does not change the workflow');
+    }
+    errors = errors.slice(0, 50);
+    return OperatorWorkflowDraftResultSchema.parse({
+      kind: 'workflow-draft',
+      draftId: input.actionId,
+      mode: input.workflowId ? 'update' : 'create',
+      workflowId: input.workflowId ?? null,
+      baseVersionId: input.baseVersionId ?? null,
+      ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      name: projectedGraph.name,
+      digest: createHash('sha256').update(JSON.stringify(projectedGraph)).digest('hex'),
+      validation: { valid: errors.length === 0, errors },
+      diff,
+    });
+  }
+
   async propose(input: {
     arguments: OperatorCommandInputMap['propose_workflow_draft'];
     auth: AuthContext;
@@ -484,28 +726,52 @@ export class OperatorWorkflowAuthoringService {
         `Workflow version ${parsed.baseVersionId} not found for workflow ${parsed.workflowId}`,
       );
     }
+    await this.assertSourceRunLineage({
+      sourceRunId: parsed.sourceRunId,
+      workflowId: parsed.workflowId,
+      auth: input.auth,
+    });
+    return this.buildProposalResult({
+      actionId: input.actionId,
+      workflowId: parsed.workflowId,
+      baseVersionId: parsed.baseVersionId,
+      sourceRunId: parsed.sourceRunId,
+      proposedGraph: parsed.graph,
+      persistedBaseGraph: baseRecord?.graph,
+    });
+  }
 
-    const baseGraph = baseRecord ? this.projectGraph(baseRecord.graph) : null;
-    let errors: string[] = [];
-    let effectiveGraph: WorkflowGraph = parsed.graph;
-    try {
-      effectiveGraph = restoreCredentialValues(parsed.graph, baseRecord?.graph);
-      compileWorkflowGraph(effectiveGraph);
-    } catch (error: unknown) {
-      errors = validationErrors(error);
+  async proposeEdits(input: {
+    arguments: OperatorCommandInputMap['propose_workflow_edits'];
+    auth: AuthContext;
+    actionId: string;
+  }): Promise<OperatorWorkflowDraftResult> {
+    const parsed = OperatorProposeWorkflowEditsInputSchema.parse(input.arguments);
+    const baseRecord = await this.workflowVersionRepository.findById(parsed.baseVersionId, {
+      organizationId: input.auth.organizationId,
+    });
+    if (!baseRecord || baseRecord.workflowId !== parsed.workflowId) {
+      throw new NotFoundException(
+        `Workflow version ${parsed.baseVersionId} not found for workflow ${parsed.workflowId}`,
+      );
     }
+    await this.assertSourceRunLineage({
+      sourceRunId: parsed.sourceRunId,
+      workflowId: parsed.workflowId,
+      auth: input.auth,
+    });
 
-    const projectedGraph = this.projectGraph(effectiveGraph, baseRecord?.graph);
-    return OperatorWorkflowDraftResultSchema.parse({
-      kind: 'workflow-draft',
-      draftId: input.actionId,
-      mode: parsed.workflowId ? 'update' : 'create',
-      workflowId: parsed.workflowId ?? null,
-      baseVersionId: parsed.baseVersionId ?? null,
-      name: projectedGraph.name,
-      digest: createHash('sha256').update(JSON.stringify(projectedGraph)).digest('hex'),
-      validation: { valid: errors.length === 0, errors },
-      diff: buildGraphDiff(baseGraph, projectedGraph),
+    const baseGraph = this.projectGraph(baseRecord.graph);
+    const materialized = materializeWorkflowEdits(baseGraph, parsed.operations);
+    return this.buildProposalResult({
+      actionId: input.actionId,
+      workflowId: parsed.workflowId,
+      baseVersionId: parsed.baseVersionId,
+      sourceRunId: parsed.sourceRunId,
+      proposedGraph: materialized.graph,
+      persistedBaseGraph: baseRecord.graph,
+      initialErrors: materialized.errors,
+      requireChanges: true,
     });
   }
 
@@ -518,33 +784,67 @@ export class OperatorWorkflowAuthoringService {
     if (!context || context.session.id !== input.sessionId) {
       throw new NotFoundException('Operator workflow draft not found');
     }
-    if (
-      context.action.commandName !== 'propose_workflow_draft' ||
-      context.action.status !== 'succeeded'
-    ) {
+    if (context.action.status !== 'succeeded') {
       throw new ConflictException('Operator workflow draft is not a completed proposal');
     }
-    const proposal = OperatorProposeWorkflowDraftInputSchema.parse(context.action.arguments);
+    const proposal =
+      context.action.commandName === 'propose_workflow_draft'
+        ? {
+            kind: 'graph' as const,
+            input: OperatorProposeWorkflowDraftInputSchema.parse(context.action.arguments),
+          }
+        : context.action.commandName === 'propose_workflow_edits'
+          ? {
+              kind: 'edits' as const,
+              input: OperatorProposeWorkflowEditsInputSchema.parse(context.action.arguments),
+            }
+          : null;
+    if (!proposal) {
+      throw new ConflictException('Operator workflow draft is not a completed proposal');
+    }
     const proposalResult = OperatorWorkflowDraftResultSchema.parse(context.action.result);
     if (!proposalResult.validation.valid) {
       throw new ConflictException('Operator workflow draft must validate before it can be applied');
     }
 
-    const baseRecord = proposal.baseVersionId
-      ? await this.workflowVersionRepository.findById(proposal.baseVersionId, {
+    const baseRecord = proposal.input.baseVersionId
+      ? await this.workflowVersionRepository.findById(proposal.input.baseVersionId, {
           organizationId: input.auth.organizationId,
         })
       : undefined;
-    if (proposal.workflowId && (!baseRecord || baseRecord.workflowId !== proposal.workflowId)) {
+    if (
+      proposal.input.workflowId &&
+      (!baseRecord || baseRecord.workflowId !== proposal.input.workflowId)
+    ) {
       throw new NotFoundException('Operator workflow draft base version no longer exists');
     }
-    const effectiveGraph = restoreCredentialValues(proposal.graph, baseRecord?.graph);
+    let proposedGraph: WorkflowGraph;
+    if (proposal.kind === 'graph') {
+      proposedGraph = proposal.input.graph;
+    } else {
+      if (!baseRecord) {
+        throw new NotFoundException('Operator workflow draft base version no longer exists');
+      }
+      const baseGraph = this.projectGraph(baseRecord.graph);
+      const materialized = materializeWorkflowEdits(baseGraph, proposal.input.operations);
+      const diff = buildGraphDiff(baseGraph, materialized.graph);
+      if (materialized.errors.length > 0 || !graphDiffHasChanges(diff)) {
+        throw new ConflictException(
+          `Operator workflow edits no longer materialize cleanly: ${[
+            ...materialized.errors,
+            ...(!graphDiffHasChanges(diff) ? ['proposal does not change the workflow'] : []),
+          ].join('; ')}`,
+        );
+      }
+      proposedGraph = materialized.graph;
+    }
+    const effectiveGraph = restoreCredentialValues(proposedGraph, baseRecord?.graph);
     compileWorkflowGraph(effectiveGraph);
 
     const idempotencyKey = `operator-draft:${context.action.id}`;
-    const saved = proposal.workflowId
-      ? await this.workflowsService.update(proposal.workflowId, effectiveGraph, input.auth, {
-          expectedVersionId: proposal.baseVersionId,
+    const saved = proposal.input.workflowId
+      ? await this.workflowsService.update(proposal.input.workflowId, effectiveGraph, input.auth, {
+          expectedVersionId: proposal.input.baseVersionId,
           idempotencyKey,
         })
       : await this.workflowsService.create(effectiveGraph, input.auth, { idempotencyKey });
@@ -557,8 +857,9 @@ export class OperatorWorkflowAuthoringService {
       workflowId: saved.id,
       versionId: saved.currentVersionId,
       version: saved.currentVersion,
-      created: !proposal.workflowId,
+      created: !proposal.input.workflowId,
       name: saved.name,
+      ...(proposal.input.sourceRunId ? { sourceRunId: proposal.input.sourceRunId } : {}),
     };
   }
 
@@ -567,15 +868,37 @@ export class OperatorWorkflowAuthoringService {
     auth: AuthContext,
   ): Promise<OperatorWorkflowDraftDetail[]> {
     const proposals = actions.filter(
-      (action) => action.commandName === 'propose_workflow_draft' && action.status === 'succeeded',
+      (action) =>
+        (action.commandName === 'propose_workflow_draft' ||
+          action.commandName === 'propose_workflow_edits') &&
+        action.status === 'succeeded',
     );
-    const parsed = proposals.flatMap((action) => {
-      const argumentsResult = OperatorProposeWorkflowDraftInputSchema.safeParse(action.arguments);
+    const parsed: StoredWorkflowProposal[] = [];
+    for (const action of proposals) {
       const result = OperatorWorkflowDraftResultSchema.safeParse(action.result);
-      return argumentsResult.success && result.success
-        ? [{ action, arguments: argumentsResult.data, result: result.data }]
-        : [];
-    });
+      if (!result.success) continue;
+      if (action.commandName === 'propose_workflow_draft') {
+        const argumentsResult = OperatorProposeWorkflowDraftInputSchema.safeParse(action.arguments);
+        if (argumentsResult.success) {
+          parsed.push({
+            kind: 'graph',
+            action,
+            arguments: argumentsResult.data,
+            result: result.data,
+          });
+        }
+        continue;
+      }
+      const argumentsResult = OperatorProposeWorkflowEditsInputSchema.safeParse(action.arguments);
+      if (argumentsResult.success) {
+        parsed.push({
+          kind: 'edits',
+          action,
+          arguments: argumentsResult.data,
+          result: result.data,
+        });
+      }
+    }
     const baseVersionIds = parsed.flatMap(({ arguments: value }) =>
       value.baseVersionId ? [value.baseVersionId] : [],
     );
@@ -584,26 +907,43 @@ export class OperatorWorkflowAuthoringService {
     });
     const baseById = new Map(baseVersions.map((version) => [version.id, version]));
 
-    return parsed.map(({ action, arguments: value, result }) => {
+    const details: OperatorWorkflowDraftDetail[] = [];
+    for (const { kind, action, arguments: value, result } of parsed) {
       const baseVersion = value.baseVersionId ? baseById.get(value.baseVersionId) : undefined;
+      if (kind === 'edits' && !baseVersion) continue;
       let proposedGraph: WorkflowGraph;
-      try {
-        proposedGraph = this.projectGraph(
-          restoreCredentialValues(value.graph, baseVersion?.graph),
-          baseVersion?.graph,
-        );
-      } catch {
-        // Invalid proposals still need a safe preview. Their validation result
-        // prevents apply, so fall back to redacting the stored arguments.
-        proposedGraph = this.projectGraph(value.graph, baseVersion?.graph);
+      if (kind === 'graph') {
+        try {
+          proposedGraph = this.projectGraph(
+            restoreCredentialValues(value.graph, baseVersion?.graph),
+            baseVersion?.graph,
+          );
+        } catch {
+          // Invalid proposals still need a safe preview. Their validation result
+          // prevents apply, so fall back to redacting the stored arguments.
+          proposedGraph = this.projectGraph(value.graph, baseVersion?.graph);
+        }
+      } else {
+        if (!baseVersion) continue;
+        const projectedBase = this.projectGraph(baseVersion.graph);
+        const materialized = materializeWorkflowEdits(projectedBase, value.operations);
+        try {
+          proposedGraph = this.projectGraph(
+            restoreCredentialValues(materialized.graph, baseVersion.graph),
+            baseVersion.graph,
+          );
+        } catch {
+          proposedGraph = this.projectGraph(materialized.graph, baseVersion.graph);
+        }
       }
-      return {
+      details.push({
         ...result,
         proposalActionId: action.id,
         sessionId: action.sessionId,
         proposedGraph,
         baseGraph: baseVersion ? this.projectGraph(baseVersion.graph) : null,
-      };
-    });
+      });
+    }
+    return details;
   }
 }

@@ -18,6 +18,7 @@ const DRAFT_ID = '11111111-1111-4111-8111-111111111111';
 const WORKFLOW_ID = '22222222-2222-4222-8222-222222222222';
 const VERSION_ID = '33333333-3333-4333-8333-333333333333';
 const ACTION_ID = '44444444-4444-4444-8444-444444444444';
+const SOURCE_RUN_ID = 'sentris-run-source';
 
 function graph(name: string, nodeLabel: string): WorkflowGraph {
   return {
@@ -138,6 +139,44 @@ describe('OperatorWorkflowDraftCard', () => {
       'href',
       `/workflows/${WORKFLOW_ID}`,
     );
+    expect(screen.queryByRole('button', { name: /run improved version/i })).not.toBeInTheDocument();
+  });
+
+  it('offers an explicit rerun for a saved improvement while preserving the source run', () => {
+    const result: OperatorWorkflowApplyResult = {
+      kind: 'workflow-applied',
+      draftId: DRAFT_ID,
+      workflowId: WORKFLOW_ID,
+      versionId: VERSION_ID,
+      version: 5,
+      created: false,
+      name: 'NPM package investigation',
+      sourceRunId: SOURCE_RUN_ID,
+    };
+    const onRunImprovedVersion = mock(() => {});
+
+    const { rerender } = renderWithProviders(
+      <OperatorWorkflowDraftCard
+        sessionId={SESSION_ID}
+        result={result}
+        onApply={mock(() => {})}
+        onRunImprovedVersion={onRunImprovedVersion}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /run improved version/i }));
+    expect(onRunImprovedVersion).toHaveBeenCalledWith(result);
+
+    rerender(
+      <OperatorWorkflowDraftCard
+        sessionId={SESSION_ID}
+        result={result}
+        disabled
+        onApply={mock(() => {})}
+        onRunImprovedVersion={onRunImprovedVersion}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /run improved version/i })).toBeDisabled();
   });
 
   it('replaces the proposal save action with a disabled Saved state after apply', () => {

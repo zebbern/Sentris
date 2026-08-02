@@ -56,6 +56,7 @@ import {
   resolveSentrisProviderBaseUrl,
   type SentrisModelFactories,
 } from '../../components/ai/model-factory';
+import { assertProviderModelFinished } from '../../components/ai/model-finish';
 import { buildBackendApiUrl } from '../../common/backend-url';
 import {
   createLightweightSummary,
@@ -472,12 +473,14 @@ async function runWorkflowAgentModelStep(
     });
   }
 
-  const [responseText, finishReason, response, rawToolCalls] = await Promise.all([
+  const [responseText, finishReason, rawFinishReason, response, rawToolCalls] = await Promise.all([
     result.text,
     result.finishReason,
+    result.rawFinishReason,
     result.response,
     result.toolCalls,
   ]);
+  assertProviderModelFinished({ finishReason: String(finishReason), rawFinishReason }, 'AI Agent');
   if (rawToolCalls.length > MAX_TOOL_CALLS_PER_MODEL_STEP) {
     throw new ValidationError(
       `AI Agent requested ${rawToolCalls.length} tools in one model step; the maximum is ${MAX_TOOL_CALLS_PER_MODEL_STEP}.`,

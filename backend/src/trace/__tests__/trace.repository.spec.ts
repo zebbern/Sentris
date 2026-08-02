@@ -1,5 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
+import type { WorkflowTraceRecord } from '../../database/schema';
 import { TraceRepository } from '../trace.repository';
 
 const SENTRIS_RUN_ID = 'sentris-run-123e4567-e89b-12d3-a456-426614174000';
@@ -7,9 +9,9 @@ const UUID_RUN_ID = '123e4567-e89b-12d3-a456-426614174000';
 const DETERMINISTIC_RUN_ID = `sentris-run-${'a'.repeat(64)}`;
 const DETERMINISTIC_CHANNEL = 'trace_events_h_d6ed1d9f2dd4092a8434c9bf1e75891a8ea392eab0569875';
 
-function makeRepository(pool: unknown) {
+function makeRepository(pool: unknown, db: unknown = {}) {
   const repository = new TraceRepository(
-    {} as any,
+    db as any,
     {
       get: mock(() => 'postgres://sentris:test@localhost:5432/sentris_test'),
     } as any,
@@ -17,6 +19,61 @@ function makeRepository(pool: unknown) {
 
   (repository as any).pool = pool;
   return repository;
+}
+
+interface QueryCall {
+  query: number;
+  method: string;
+  args: unknown[];
+}
+
+function summaryDb(selectResults: unknown[][]) {
+  const calls: QueryCall[] = [];
+  let query = 0;
+
+  const db = {
+    select: mock((...selectArgs: unknown[]) => {
+      const queryIndex = query++;
+      calls.push({ query: queryIndex, method: 'select', args: selectArgs });
+      const rows = selectResults[queryIndex] ?? [];
+      const builder = new Proxy(
+        {},
+        {
+          get(_target, property: string) {
+            if (property === 'then') {
+              return (resolve: (value: unknown) => void) => resolve(rows);
+            }
+            return (...args: unknown[]) => {
+              calls.push({ query: queryIndex, method: property, args });
+              return builder;
+            };
+          },
+        },
+      );
+      return builder;
+    }),
+  };
+
+  return { db, calls };
+}
+
+function traceRecord(sequence: number, type: WorkflowTraceRecord['type']): WorkflowTraceRecord {
+  return {
+    id: sequence,
+    runId: 'run-summary',
+    workflowId: 'workflow-id',
+    organizationId: 'org-summary',
+    type,
+    nodeRef: `node-${sequence}`,
+    timestamp: new Date(`2026-08-02T10:00:${String(sequence).padStart(2, '0')}.000Z`),
+    message: null,
+    error: null,
+    outputSummary: null,
+    level: type === 'NODE_FAILED' ? 'error' : 'info',
+    data: null,
+    sequence,
+    createdAt: new Date('2026-08-02T10:01:00.000Z'),
+  };
 }
 
 describe('TraceRepository run notification channels', () => {
@@ -124,5 +181,70 @@ describe('TraceRepository run notification channels', () => {
 
     await expect(repository.notifyRun('', '{}')).rejects.toThrow('runId must not be empty');
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('TraceRepository bounded run summaries', () => {
+  it('counts the run while fetching only the requested latest failed and recent rows', async () => {
+    const failedNewestFirst = [traceRecord(25, 'NODE_FAILED'), traceRecord(20, 'NODE_FAILED')];
+    const recentNewestFirst = [
+      traceRecord(25, 'NODE_FAILED'),
+      traceRecord(24, 'NODE_COMPLETED'),
+      traceRecord(23, 'NODE_PROGRESS'),
+    ];
+    const { db, calls } = summaryDb([
+      [{ value: 25 }],
+      [{ value: 11 }],
+      failedNewestFirst,
+      recentNewestFirst,
+    ]);
+    const repository = makeRepository({ end: mock(async () => undefined) }, db);
+
+    const summary = await repository.summarizeRun(
+      'run-summary',
+      { failedLimit: 2, recentLimit: 3 },
+      'org-summary',
+    );
+
+    expect(summary.totalEvents).toBe(25);
+    expect(summary.failedEventCount).toBe(11);
+    expect(summary.failed.map((event) => event.sequence)).toEqual([20, 25]);
+    expect(summary.recent.map((event) => event.sequence)).toEqual([23, 24, 25]);
+    expect(
+      calls
+        .filter((call) => call.method === 'limit')
+        .map((call) => ({ query: call.query, limit: call.args[0] })),
+    ).toEqual([
+      { query: 2, limit: 2 },
+      { query: 3, limit: 3 },
+    ]);
+
+    const failedWhere = calls.find((call) => call.query === 2 && call.method === 'where');
+    const compiled = new PgDialect().sqlToQuery(
+      (failedWhere?.args[0] as { getSQL(): unknown }).getSQL() as never,
+    );
+    expect(compiled.sql).toContain('"workflow_traces"."run_id" = $');
+    expect(compiled.sql).toContain('"workflow_traces"."organization_id" = $');
+    expect(compiled.sql).toContain('"workflow_traces"."level" = $');
+    expect(compiled.sql).toMatch(/"workflow_traces"\."type" in \(\$\d+, \$\d+\)/);
+    expect(compiled.params).toEqual(
+      expect.arrayContaining([
+        'run-summary',
+        'org-summary',
+        'error',
+        'NODE_FAILED',
+        'HTTP_REQUEST_ERROR',
+      ]),
+    );
+  });
+
+  it('rejects limits that could turn a diagnostic request into an unbounded read', async () => {
+    const { db, calls } = summaryDb([]);
+    const repository = makeRepository({ end: mock(async () => undefined) }, db);
+
+    await expect(
+      repository.summarizeRun('run-summary', { failedLimit: 101, recentLimit: 3 }, 'org-summary'),
+    ).rejects.toThrow('failedLimit must be an integer between 1 and 100');
+    expect(calls).toHaveLength(0);
   });
 });

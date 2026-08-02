@@ -19,6 +19,7 @@ const PROPOSAL_ACTION_ID = '44444444-4444-4444-8444-444444444444';
 const WORKFLOW_ID = '55555555-5555-4555-8555-555555555555';
 const BASE_VERSION_ID = '66666666-6666-4666-8666-666666666666';
 const SAVED_VERSION_ID = '77777777-7777-4777-8777-777777777777';
+const SOURCE_RUN_ID = 'sentris-run-source';
 const INLINE_API_KEY = 'sk-inline-value-that-must-never-reach-the-model';
 
 const auth: AuthContext = {
@@ -173,7 +174,12 @@ function proposalResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function proposalContext(input: { graph: WorkflowGraph; sessionId?: string; create?: boolean }) {
+function proposalContext(input: {
+  graph: WorkflowGraph;
+  sessionId?: string;
+  create?: boolean;
+  sourceRunId?: string;
+}) {
   const create = input.create ?? false;
   return {
     action: {
@@ -186,6 +192,7 @@ function proposalContext(input: { graph: WorkflowGraph; sessionId?: string; crea
         graph: input.graph,
         summary: create ? 'Create a workflow' : 'Update the workflow',
         ...(create ? {} : { workflowId: WORKFLOW_ID, baseVersionId: BASE_VERSION_ID }),
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
       },
       result: proposalResult(
         create
@@ -200,7 +207,9 @@ function proposalContext(input: { graph: WorkflowGraph; sessionId?: string; crea
                 changedNodeIds: [],
               },
             }
-          : {},
+          : input.sourceRunId
+            ? { sourceRunId: input.sourceRunId }
+            : {},
       ),
     },
     turn: { id: TURN_ID, sessionId: input.sessionId ?? SESSION_ID },
@@ -208,10 +217,35 @@ function proposalContext(input: { graph: WorkflowGraph; sessionId?: string; crea
   };
 }
 
+function editProposalContext(input: {
+  operations: Record<string, unknown>[];
+  sourceRunId?: string;
+}) {
+  return {
+    action: {
+      id: PROPOSAL_ACTION_ID,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      commandName: 'propose_workflow_edits',
+      status: 'succeeded',
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        baseVersionId: BASE_VERSION_ID,
+        operations: input.operations,
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      },
+      result: proposalResult(input.sourceRunId ? { sourceRunId: input.sourceRunId } : undefined),
+    },
+    turn: { id: TURN_ID, sessionId: SESSION_ID },
+    session: { id: SESSION_ID, organizationId: ORGANIZATION_ID },
+  };
+}
+
 describe('OperatorWorkflowAuthoringService', () => {
   let workflows: {
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
+    getRun: ReturnType<typeof vi.fn>;
   };
   let versions: {
     findById: ReturnType<typeof vi.fn>;
@@ -226,6 +260,7 @@ describe('OperatorWorkflowAuthoringService', () => {
     workflows = {
       create: vi.fn(),
       update: vi.fn(),
+      getRun: vi.fn(),
     };
     versions = {
       findById: vi.fn(),
@@ -293,6 +328,135 @@ describe('OperatorWorkflowAuthoringService', () => {
     expect(JSON.stringify(result)).not.toContain(INLINE_API_KEY);
   });
 
+  it('materializes compact ID-based edits against the exact credential-safe base graph', async () => {
+    const baseGraph = makeCredentialGraph({
+      name: 'Base workflow',
+      credential: INLINE_API_KEY,
+    });
+    versions.findById.mockResolvedValue(versionRecord(baseGraph));
+
+    const result = await service.proposeEdits({
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        baseVersionId: BASE_VERSION_ID,
+        summary: 'Use POST and clarify the request node',
+        operations: [
+          { operation: 'set_workflow_metadata', name: 'Updated workflow' },
+          {
+            operation: 'patch_node',
+            nodeId: 'request',
+            label: 'Updated request',
+            setParameters: { method: 'POST' },
+          },
+        ],
+      },
+      auth,
+      actionId: PROPOSAL_ACTION_ID,
+    });
+
+    expect(result).toMatchObject({
+      kind: 'workflow-draft',
+      mode: 'update',
+      workflowId: WORKFLOW_ID,
+      baseVersionId: BASE_VERSION_ID,
+      name: 'Updated workflow',
+      validation: { valid: true, errors: [] },
+      diff: {
+        metadataChanged: ['name'],
+        changedNodeIds: ['request'],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(INLINE_API_KEY);
+  });
+
+  it('returns invalid compact edits for missing IDs and no-op proposals without changing the base', async () => {
+    const baseGraph = makeGraph({ name: 'Base workflow' });
+    versions.findById.mockResolvedValue(versionRecord(baseGraph));
+
+    const result = await service.proposeEdits({
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        baseVersionId: BASE_VERSION_ID,
+        operations: [
+          {
+            operation: 'patch_node',
+            nodeId: 'missing-node',
+            setParameters: { modelId: 'gemini-2.5-pro' },
+          },
+        ],
+      },
+      auth,
+      actionId: PROPOSAL_ACTION_ID,
+    });
+
+    expect(result.validation.valid).toBe(false);
+    expect(result.validation.errors).toEqual([
+      expect.stringContaining('operations.0: node missing-node does not exist'),
+      expect.stringContaining('does not change the workflow'),
+    ]);
+    expect(result.diff).toEqual({
+      metadataChanged: [],
+      addedNodeIds: [],
+      removedNodeIds: [],
+      changedNodeIds: [],
+      addedEdgeIds: [],
+      removedEdgeIds: [],
+      changedEdgeIds: [],
+    });
+  });
+
+  it('validates and preserves terminal source-run lineage on an update proposal', async () => {
+    const baseGraph = makeGraph({ name: 'Base workflow' });
+    versions.findById.mockResolvedValue(versionRecord(baseGraph));
+    workflows.getRun.mockResolvedValue({
+      id: SOURCE_RUN_ID,
+      workflowId: WORKFLOW_ID,
+      status: 'FAILED',
+    });
+
+    const result = await service.propose({
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        baseVersionId: BASE_VERSION_ID,
+        sourceRunId: SOURCE_RUN_ID,
+        graph: { ...baseGraph, name: 'Improved workflow' },
+      },
+      auth,
+      actionId: PROPOSAL_ACTION_ID,
+    });
+
+    expect(workflows.getRun).toHaveBeenCalledWith(SOURCE_RUN_ID, auth);
+    expect(result.sourceRunId).toBe(SOURCE_RUN_ID);
+  });
+
+  it('rejects source-run lineage from another workflow or an active run', async () => {
+    versions.findById.mockResolvedValue(versionRecord(makeGraph()));
+    workflows.getRun.mockResolvedValueOnce({
+      id: SOURCE_RUN_ID,
+      workflowId: '99999999-9999-4999-8999-999999999999',
+      status: 'FAILED',
+    });
+    const argumentsWithSource = {
+      workflowId: WORKFLOW_ID,
+      baseVersionId: BASE_VERSION_ID,
+      sourceRunId: SOURCE_RUN_ID,
+      graph: makeGraph(),
+    };
+
+    await expect(
+      service.propose({ arguments: argumentsWithSource, auth, actionId: PROPOSAL_ACTION_ID }),
+    ).rejects.toThrow('does not belong to workflow');
+
+    workflows.getRun.mockResolvedValueOnce({
+      id: SOURCE_RUN_ID,
+      workflowId: WORKFLOW_ID,
+      status: 'RUNNING',
+    });
+    await expect(
+      service.propose({ arguments: argumentsWithSource, auth, actionId: PROPOSAL_ACTION_ID }),
+    ).rejects.toThrow('is still RUNNING');
+  });
+
   it('returns compile failures as validation errors instead of throwing away the proposal', async () => {
     const result = await service.propose({
       arguments: {
@@ -358,6 +522,33 @@ describe('OperatorWorkflowAuthoringService', () => {
       auth,
     );
 
+    expect(readCredential(detail!.proposedGraph)).toBe(OPERATOR_PRESERVE_CREDENTIAL);
+    expect(JSON.stringify(detail)).not.toContain(INLINE_API_KEY);
+  });
+
+  it('returns the materialized credential-safe graph for compact edit draft previews', async () => {
+    const baseGraph = makeCredentialGraph({
+      name: 'Base workflow',
+      credential: INLINE_API_KEY,
+    });
+    versions.findByIds.mockResolvedValue([versionRecord(baseGraph)]);
+    const context = editProposalContext({
+      operations: [
+        { operation: 'set_workflow_metadata', name: 'Updated workflow' },
+        {
+          operation: 'patch_node',
+          nodeId: 'request',
+          setParameters: { method: 'POST' },
+        },
+      ],
+    });
+
+    const [detail] = await service.listDraftDetails([context.action] as never, auth);
+
+    expect(detail!.proposedGraph.name).toBe('Updated workflow');
+    expect(
+      detail!.proposedGraph.nodes.find((node) => node.id === 'request')?.data.config.params.method,
+    ).toBe('POST');
     expect(readCredential(detail!.proposedGraph)).toBe(OPERATOR_PRESERVE_CREDENTIAL);
     expect(JSON.stringify(detail)).not.toContain(INLINE_API_KEY);
   });
@@ -435,7 +626,7 @@ describe('OperatorWorkflowAuthoringService', () => {
       name: 'Updated workflow',
     };
     operatorRepository.getActionWithTurnSession.mockResolvedValue(
-      proposalContext({ graph: proposedGraph }),
+      proposalContext({ graph: proposedGraph, sourceRunId: SOURCE_RUN_ID }),
     );
     versions.findById.mockResolvedValue(versionRecord(baseGraph));
     workflows.update.mockResolvedValue({
@@ -468,6 +659,93 @@ describe('OperatorWorkflowAuthoringService', () => {
       version: 4,
       created: false,
       name: 'Updated workflow',
+      sourceRunId: SOURCE_RUN_ID,
+    });
+  });
+
+  it('re-materializes and applies a compact edit proposal through the same version fence', async () => {
+    const baseGraph = makeCredentialGraph({
+      name: 'Base workflow',
+      credential: INLINE_API_KEY,
+    });
+    operatorRepository.getActionWithTurnSession.mockResolvedValue(
+      editProposalContext({
+        sourceRunId: SOURCE_RUN_ID,
+        operations: [
+          { operation: 'set_workflow_metadata', name: 'Updated workflow' },
+          {
+            operation: 'patch_node',
+            nodeId: 'request',
+            setParameters: { method: 'POST' },
+          },
+        ],
+      }),
+    );
+    versions.findById.mockResolvedValue(versionRecord(baseGraph));
+    workflows.update.mockResolvedValue({
+      id: WORKFLOW_ID,
+      name: 'Updated workflow',
+      currentVersionId: SAVED_VERSION_ID,
+      currentVersion: 4,
+    });
+
+    const result = await service.apply({
+      arguments: { draftId: PROPOSAL_ACTION_ID },
+      auth,
+      sessionId: SESSION_ID,
+    });
+
+    const [workflowId, effectiveGraph, actor, options] = workflows.update.mock.calls[0]!;
+    expect(workflowId).toBe(WORKFLOW_ID);
+    expect(readCredential(effectiveGraph as WorkflowGraph)).toBe(INLINE_API_KEY);
+    expect(
+      (effectiveGraph as WorkflowGraph).nodes.find((node) => node.id === 'request')?.data.config
+        .params.method,
+    ).toBe('POST');
+    expect(actor).toEqual(auth);
+    expect(options).toEqual({
+      expectedVersionId: BASE_VERSION_ID,
+      idempotencyKey: `operator-draft:${PROPOSAL_ACTION_ID}`,
+    });
+    expect(result.sourceRunId).toBe(SOURCE_RUN_ID);
+  });
+
+  it('deep-merges compact structured edits so omitted nested credentials remain unchanged', async () => {
+    const nestedApiKey = 'nested-chat-model-secret';
+    const baseGraph = makeAgentGraph(nestedApiKey);
+    const operations = [
+      {
+        operation: 'patch_node',
+        nodeId: 'agent',
+        setInputOverrides: {
+          chatModel: { provider: 'gemini', modelId: 'gemini-3.6-flash' },
+        },
+      },
+    ];
+    operatorRepository.getActionWithTurnSession.mockResolvedValue(
+      editProposalContext({ operations }),
+    );
+    versions.findById.mockResolvedValue(versionRecord(baseGraph));
+    workflows.update.mockResolvedValue({
+      id: WORKFLOW_ID,
+      name: baseGraph.name,
+      currentVersionId: SAVED_VERSION_ID,
+      currentVersion: 4,
+    });
+
+    await service.apply({
+      arguments: { draftId: PROPOSAL_ACTION_ID },
+      auth,
+      sessionId: SESSION_ID,
+    });
+
+    const effectiveGraph = workflows.update.mock.calls[0]![1] as WorkflowGraph;
+    const effectiveModel = effectiveGraph.nodes.find((node) => node.id === 'agent')?.data.config
+      .inputOverrides.chatModel as Record<string, unknown>;
+    expect(effectiveModel).toEqual({
+      provider: 'gemini',
+      modelId: 'gemini-3.6-flash',
+      apiKey: nestedApiKey,
     });
   });
 

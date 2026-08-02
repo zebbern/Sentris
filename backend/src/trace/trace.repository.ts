@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq, and, gt, desc, inArray } from 'drizzle-orm';
+import { eq, and, gt, desc, inArray, or } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { workflowTracesTable, type WorkflowTraceRecord } from '../database/schema';
@@ -17,6 +17,7 @@ const DERIVED_TRACE_CHANNEL_PREFIX = 'trace_events_h_';
 const POSTGRES_IDENTIFIER_MAX_BYTES = 63;
 const DERIVED_TRACE_CHANNEL_HASH_LENGTH =
   POSTGRES_IDENTIFIER_MAX_BYTES - DERIVED_TRACE_CHANNEL_PREFIX.length;
+const MAX_TRACE_SUMMARY_EVENTS = 100;
 
 function traceChannelForRunId(runId: string): string {
   if (runId.length === 0) {
@@ -48,6 +49,13 @@ export interface PersistedTraceEvent {
   error?: unknown;
   outputSummary?: unknown;
   data?: Record<string, unknown> | null;
+}
+
+export interface TraceRunSummaryRecords {
+  totalEvents: number;
+  failedEventCount: number;
+  failed: WorkflowTraceRecord[];
+  recent: WorkflowTraceRecord[];
 }
 
 @Injectable()
@@ -168,6 +176,53 @@ export class TraceRepository implements OnModuleDestroy {
       .from(workflowTracesTable)
       .where(and(runFilter, gt(workflowTracesTable.sequence, sequence)))
       .orderBy(workflowTracesTable.sequence);
+  }
+
+  async summarizeRun(
+    runId: string,
+    options: { failedLimit: number; recentLimit: number },
+    organizationId?: string | null,
+  ): Promise<TraceRunSummaryRecords> {
+    const failedLimit = this.requireSummaryLimit(options.failedLimit, 'failedLimit');
+    const recentLimit = this.requireSummaryLimit(options.recentLimit, 'recentLimit');
+    const runFilter = this.buildRunFilter(runId, organizationId);
+    const failedFilter = and(
+      runFilter,
+      or(
+        eq(workflowTracesTable.level, 'error'),
+        inArray(workflowTracesTable.type, ['NODE_FAILED', 'HTTP_REQUEST_ERROR']),
+      ),
+    );
+
+    const [totalRows, failedCountRows, failedDescending, recentDescending] = await Promise.all([
+      this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(workflowTracesTable)
+        .where(runFilter),
+      this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(workflowTracesTable)
+        .where(failedFilter),
+      this.db
+        .select()
+        .from(workflowTracesTable)
+        .where(failedFilter)
+        .orderBy(desc(workflowTracesTable.sequence))
+        .limit(failedLimit),
+      this.db
+        .select()
+        .from(workflowTracesTable)
+        .where(runFilter)
+        .orderBy(desc(workflowTracesTable.sequence))
+        .limit(recentLimit),
+    ]);
+
+    return {
+      totalEvents: Number(totalRows[0]?.value ?? 0),
+      failedEventCount: Number(failedCountRows[0]?.value ?? 0),
+      failed: [...failedDescending].reverse(),
+      recent: [...recentDescending].reverse(),
+    };
   }
 
   async countByRunId(runId: string, organizationId?: string | null): Promise<number> {
@@ -318,5 +373,12 @@ export class TraceRepository implements OnModuleDestroy {
       return base;
     }
     return and(base, eq(workflowTracesTable.organizationId, organizationId));
+  }
+
+  private requireSummaryLimit(limit: number, name: string): number {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_TRACE_SUMMARY_EVENTS) {
+      throw new RangeError(`${name} must be an integer between 1 and ${MAX_TRACE_SUMMARY_EVENTS}`);
+    }
+    return limit;
   }
 }

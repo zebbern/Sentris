@@ -12,6 +12,13 @@ import {
 import type { AuthContext } from '../auth/types';
 import { requireOrganizationId } from '../common/auth/require-organization-id';
 
+export interface TraceRunSummary {
+  totalEvents: number;
+  failedEventCount: number;
+  failed: TraceEventPayload[];
+  recent: TraceEventPayload[];
+}
+
 @Injectable()
 export class TraceService {
   constructor(private readonly repository: TraceRepository) {}
@@ -41,6 +48,21 @@ export class TraceService {
     const events = records.map((record) => this.mapRecordToEvent(record));
     const cursor = events.length > 0 ? events[events.length - 1].id : undefined;
     return { events, cursor };
+  }
+
+  async summarizeRun(
+    runId: string,
+    options: { failedLimit: number; recentLimit: number },
+    auth?: AuthContext | null,
+  ): Promise<TraceRunSummary> {
+    const organizationId = requireOrganizationId(auth);
+    const summary = await this.repository.summarizeRun(runId, options, organizationId);
+    return {
+      totalEvents: summary.totalEvents,
+      failedEventCount: summary.failedEventCount,
+      failed: summary.failed.map((record) => this.mapRecordToEvent(record)),
+      recent: summary.recent.map((record) => this.mapRecordToEvent(record)),
+    };
   }
 
   private mapRecordToEvent(record: {

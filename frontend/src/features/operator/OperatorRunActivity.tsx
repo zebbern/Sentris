@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   getOperatorRunTraceRefetchInterval,
-  useOperatorRunStatus,
+  useOperatorRunQueryStream,
   useOperatorRunTrace,
 } from '@/hooks/queries/useOperatorQueries';
 import { cn } from '@/lib/utils';
@@ -36,15 +36,24 @@ interface AgentEntry {
 
 export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunActivityProps) {
   const [agentActivityRequested, setAgentActivityRequested] = useState(false);
-  const statusQuery = useOperatorRunStatus(runId);
+  const { statusQuery, streamState } = useOperatorRunQueryStream(runId);
   const status = readStatus(statusQuery.data);
   const live = Boolean(status && !TERMINAL_RUN_STATUSES.has(status));
   const traceRequested = live || agentActivityRequested;
   const statusUpdatedAt = readStatusUpdatedAt(statusQuery.data) ?? statusQuery.dataUpdatedAt;
-  const traceQuery = useOperatorRunTrace(traceRequested ? runId : null, status, statusUpdatedAt);
+  const traceQuery = useOperatorRunTrace(
+    traceRequested ? runId : null,
+    status,
+    statusUpdatedAt,
+    streamState,
+  );
   const followAgents =
-    traceRequested && getOperatorRunTraceRefetchInterval(status, statusUpdatedAt) !== false;
+    traceRequested &&
+    getOperatorRunTraceRefetchInterval(status, statusUpdatedAt, Date.now(), streamState) !== false;
   const agents = useMemo(() => extractAgentEntries(traceQuery.data), [traceQuery.data]);
+  const currentStep = useMemo(() => readCurrentStep(traceQuery.data), [traceQuery.data]);
+  const progress = readProgress(statusQuery.data);
+  const failureReason = readFailureReason(statusQuery.data);
 
   const runAgainLabel = status === 'COMPLETED' ? 'Run again' : 'Retry';
 
@@ -88,6 +97,65 @@ export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunA
         ) : null}
       </div>
 
+      {live ? (
+        <div
+          className="space-y-1.5 rounded border border-border/60 bg-card/40 px-2 py-1.5"
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+            <span>{status === 'QUEUED' ? 'Preparing workflow' : 'Workflow in progress'}</span>
+            <span className="flex shrink-0 items-center gap-1">
+              {streamState === 'live' ? (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+              ) : streamState === 'connecting' ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
+              ) : null}
+              {streamState === 'live'
+                ? 'Live updates'
+                : streamState === 'connecting'
+                  ? 'Connecting'
+                  : 'Updating every few seconds'}
+            </span>
+          </div>
+          {progress ? (
+            <>
+              <div
+                role="progressbar"
+                aria-label="Workflow progress"
+                aria-valuemin={0}
+                aria-valuemax={progress.totalActions}
+                aria-valuenow={progress.completedActions}
+                className="h-1 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (progress.completedActions / progress.totalActions) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {progress.completedActions} of {progress.totalActions} steps complete
+              </p>
+            </>
+          ) : null}
+          {currentStep ? (
+            <p className="truncate text-[11px] text-foreground" title={currentStep}>
+              {currentStep}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {failureReason ? (
+        <p className="rounded border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
+          {failureReason}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-1.5">
         {live ? (
           <Button
@@ -117,13 +185,13 @@ export function OperatorRunActivity({ runId, disabled, onCommand }: OperatorRunA
               disabled={disabled}
               onClick={() =>
                 onCommand({
-                  message: `Inspect run ${runId} and summarize its result and useful next steps`,
+                  message: `Inspect run ${runId}, diagnose failures or weak results, and propose a workflow draft revision when a concrete improvement is justified. Do not apply it yet.`,
                   directCommand: { commandName: 'get_run', arguments: { runId } },
                 })
               }
             >
               <Search className="h-3 w-3" />
-              Review result
+              Review &amp; improve
             </Button>
             <Button
               type="button"
@@ -207,6 +275,73 @@ function readStatusUpdatedAt(value: unknown): number | null {
   if (typeof updatedAt !== 'string') return null;
   const timestamp = Date.parse(updatedAt);
   return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function readProgress(value: unknown): { completedActions: number; totalActions: number } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const progress = (value as { progress?: unknown }).progress;
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) return null;
+  const { completedActions, totalActions } = progress as {
+    completedActions?: unknown;
+    totalActions?: unknown;
+  };
+  if (
+    typeof completedActions !== 'number' ||
+    !Number.isFinite(completedActions) ||
+    typeof totalActions !== 'number' ||
+    !Number.isFinite(totalActions) ||
+    totalActions <= 0
+  ) {
+    return null;
+  }
+  return {
+    completedActions: Math.max(0, Math.min(completedActions, totalActions)),
+    totalActions,
+  };
+}
+
+function readFailureReason(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const failure = (value as { failure?: unknown }).failure;
+  if (!failure || typeof failure !== 'object' || Array.isArray(failure)) return null;
+  const reason = (failure as { reason?: unknown }).reason;
+  return typeof reason === 'string' && reason.trim() ? reason : null;
+}
+
+function readCurrentStep(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const events = (value as { events?: unknown }).events;
+  if (!Array.isArray(events)) return null;
+
+  const active = new Map<string, string>();
+  for (const event of events) {
+    if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+    const record = event as { nodeId?: unknown; type?: unknown; message?: unknown };
+    if (typeof record.nodeId !== 'string' || typeof record.type !== 'string') continue;
+    switch (record.type) {
+      case 'STARTED':
+      case 'PROGRESS':
+      case 'AWAITING_INPUT': {
+        const label =
+          typeof record.message === 'string' && record.message.trim()
+            ? record.message
+            : record.nodeId;
+        active.delete(record.nodeId);
+        active.set(record.nodeId, label);
+        break;
+      }
+      case 'COMPLETED':
+      case 'FAILED':
+      case 'SKIPPED':
+        active.delete(record.nodeId);
+        break;
+      default:
+        break;
+    }
+  }
+
+  const activeSteps = [...active.values()];
+  return activeSteps[activeSteps.length - 1] ?? null;
 }
 
 function extractAgentEntries(value: unknown): AgentEntry[] {

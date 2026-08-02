@@ -37,6 +37,23 @@ function createSSEResponse(chunks: string[], status = 200): Response {
   });
 }
 
+function createControlledSSEStream(): {
+  stream: ReadableStream<Uint8Array>;
+  close: () => void;
+} {
+  let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller;
+    },
+  });
+
+  return {
+    stream,
+    close: () => streamController?.close(),
+  };
+}
+
 describe('FetchEventSource', () => {
   const originalFetch = globalThis.fetch;
 
@@ -223,6 +240,53 @@ describe('FetchEventSource', () => {
     expect(listenerB.mock.calls[0][0].data).toBe('second');
 
     source.close();
+  });
+
+  it('retains event type, id, and data across stream chunks', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        createSSEResponse(['event:status\nid:7\ndata:first line\n', 'data:second line\n', '\n']),
+      );
+    (globalThis as any).fetch = mockFetch;
+
+    const listener = vi.fn();
+    const source: any = new FetchEventSource('http://localhost/events');
+    source.addEventListener('status', listener);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const event = listener.mock.calls[0][0] as MessageEvent;
+    expect(event.data).toBe('first line\nsecond line');
+    expect(event.lastEventId).toBe('7');
+  });
+
+  it('reports a clean stream EOF as a transport error', async () => {
+    const controlled = createControlledSSEStream();
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(controlled.stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    (globalThis as any).fetch = mockFetch;
+
+    const onerror = vi.fn();
+    const errorListener = vi.fn();
+    const source = new FetchEventSource('http://localhost/events');
+    source.onerror = onerror;
+    source.addEventListener('error', errorListener);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(source.readyState).toBe(FetchEventSource.OPEN);
+
+    controlled.close();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(source.readyState).toBe(FetchEventSource.CLOSED);
+    expect(onerror).toHaveBeenCalledTimes(1);
+    expect(errorListener).toHaveBeenCalledTimes(1);
   });
 
   it('sets withCredentials from options', () => {

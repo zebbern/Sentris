@@ -1,6 +1,9 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import {
+  OperatorSessionStreamErrorSchema,
+  OperatorSessionStreamReadySchema,
+  OperatorSessionStreamSnapshotSchema,
   TERMINAL_STATUSES,
   type OperatorActionDecision,
   type OperatorCreateSession,
@@ -11,12 +14,39 @@ import {
 
 import { queryKeys } from '@/lib/queryKeys';
 import { executionStatusOptions, executionTraceOptions } from '@/lib/executionQueryOptions';
+import { logger } from '@/lib/logger';
+import {
+  ExecutionStatusResponseSchema,
+  TraceStreamEnvelopeSchema,
+  type ExecutionTraceStream,
+} from '@/schemas/execution';
 import { api } from '@/services/api';
+import { mergeEvents } from '@/store/execution/helpers';
 
 const ACTIVE_TURN_STATUSES = new Set(['queued', 'running', 'awaiting_approval']);
 const TERMINAL_RUN_STATUSES = new Set<string>(TERMINAL_STATUSES);
 const OPERATOR_RUN_POLL_INTERVAL_MS = 1_500;
+const OPERATOR_LIVE_BACKUP_POLL_INTERVAL_MS = 5_000;
+const OPERATOR_STREAM_RECONNECT_MS = 5_000;
 export const OPERATOR_RUN_TRACE_SETTLE_MS = 30_000;
+
+export type OperatorStreamState = 'connecting' | 'live' | 'polling' | 'closed';
+
+export function getOperatorPollInterval(streamState: OperatorStreamState): number {
+  return streamState === 'live'
+    ? OPERATOR_LIVE_BACKUP_POLL_INTERVAL_MS
+    : OPERATOR_RUN_POLL_INTERVAL_MS;
+}
+
+function readEventPayload(event: Event): unknown {
+  const data = (event as MessageEvent).data;
+  if (typeof data !== 'string') return null;
+  try {
+    return JSON.parse(data) as unknown;
+  } catch {
+    return null;
+  }
+}
 
 function readRunStatus(value: unknown): string | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -28,13 +58,15 @@ export function getOperatorRunTraceRefetchInterval(
   status: string | null,
   statusUpdatedAt: number,
   now = Date.now(),
+  streamState: OperatorStreamState = 'polling',
 ): number | false {
   if (!status) return false;
-  if (!TERMINAL_RUN_STATUSES.has(status)) return OPERATOR_RUN_POLL_INTERVAL_MS;
+  const interval = getOperatorPollInterval(streamState);
+  if (!TERMINAL_RUN_STATUSES.has(status)) return interval;
 
   const remainingSettleMs = statusUpdatedAt + OPERATOR_RUN_TRACE_SETTLE_MS - now;
   if (remainingSettleMs <= 0) return false;
-  return Math.min(OPERATOR_RUN_POLL_INTERVAL_MS, remainingSettleMs);
+  return Math.min(interval, remainingSettleMs);
 }
 
 export function operatorSessionHasActiveTurn(session: OperatorSessionDetail): boolean {
@@ -58,16 +90,111 @@ export function useOperatorSessions() {
   });
 }
 
-export function useOperatorSession(sessionId: string | undefined) {
+function useOperatorSessionQuery(
+  sessionId: string | undefined,
+  streamState: OperatorStreamState | null,
+) {
   return useQuery({
     queryKey: queryKeys.operator.session(sessionId ?? ''),
     queryFn: sessionId ? () => api.operator.getSession(sessionId) : skipToken,
     ...(sessionId ? {} : { gcTime: 0 }),
     refetchInterval: (query) => {
       const session = query.state.data;
-      return session && operatorSessionHasActiveTurn(session) ? 1_500 : false;
+      return streamState && session && operatorSessionHasActiveTurn(session)
+        ? getOperatorPollInterval(streamState)
+        : false;
     },
   });
+}
+
+export function useOperatorSession(sessionId: string | undefined) {
+  return useOperatorSessionQuery(sessionId, null);
+}
+
+export function useOperatorSessionStream(sessionId: string | undefined) {
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<OperatorStreamState>(
+    sessionId ? 'connecting' : 'closed',
+  );
+  const query = useOperatorSessionQuery(sessionId, streamState);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setStreamState('closed');
+      return;
+    }
+    const activeSessionId = sessionId;
+
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    setStreamState('connecting');
+
+    const fallBackToPolling = () => {
+      if (disposed) return;
+      source?.close();
+      source = null;
+      setStreamState('polling');
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (disposed) return;
+          setStreamState('connecting');
+          connect();
+        }, OPERATOR_STREAM_RECONNECT_MS);
+      }
+    };
+
+    function connect() {
+      void api.operator
+        .streamSession(activeSessionId)
+        .then((nextSource) => {
+          if (disposed) {
+            nextSource.close();
+            return;
+          }
+          source = nextSource;
+          source.addEventListener('ready', (event) => {
+            const parsed = OperatorSessionStreamReadySchema.safeParse(readEventPayload(event));
+            if (parsed.success && parsed.data.sessionId === sessionId) {
+              setStreamState('live');
+            }
+          });
+          source.addEventListener('snapshot', (event) => {
+            const parsed = OperatorSessionStreamSnapshotSchema.safeParse(readEventPayload(event));
+            if (!parsed.success || parsed.data.session.id !== sessionId) return;
+            const sessionKey = queryKeys.operator.session(sessionId);
+            void queryClient.cancelQueries({ queryKey: sessionKey, exact: true });
+            queryClient.setQueryData(sessionKey, parsed.data.session);
+          });
+          source.addEventListener('error', (event) => {
+            const payload = readEventPayload(event);
+            if (payload !== null) {
+              const parsed = OperatorSessionStreamErrorSchema.safeParse(payload);
+              if (!parsed.success) {
+                logger.warn('Ignored malformed Operator session stream error', parsed.error);
+              }
+            }
+            fallBackToPolling();
+          });
+          source.onerror = fallBackToPolling;
+        })
+        .catch((error: unknown) => {
+          logger.warn('Failed to open Operator session stream', error);
+          fallBackToPolling();
+        });
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      source?.close();
+    };
+  }, [queryClient, sessionId]);
+
+  return { ...query, streamState };
 }
 
 export function useOperatorWorkflowDrafts(
@@ -145,7 +272,113 @@ export function useOperatorWorkflowDraftForBuilder(
   };
 }
 
-export function useOperatorRunStatus(runId: string | null) {
+export function useOperatorRunQueryStream(runId: string | null) {
+  const queryClient = useQueryClient();
+  const [streamState, setStreamState] = useState<OperatorStreamState>('closed');
+  const statusQuery = useOperatorRunStatus(runId, streamState);
+  const status = readRunStatus(statusQuery.data);
+  const shouldStream = Boolean(status && !TERMINAL_RUN_STATUSES.has(status));
+
+  useEffect(() => {
+    if (!runId || !shouldStream) {
+      setStreamState('closed');
+      return;
+    }
+    const activeRunId = runId;
+
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    setStreamState('connecting');
+
+    const fallBackToPolling = () => {
+      if (disposed) return;
+      source?.close();
+      source = null;
+      setStreamState('polling');
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (disposed) return;
+          setStreamState('connecting');
+          connect();
+        }, OPERATOR_STREAM_RECONNECT_MS);
+      }
+    };
+    const finish = () => {
+      if (disposed) return;
+      source?.close();
+      setStreamState('closed');
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.executions.status(runId),
+        exact: true,
+      });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.executions.trace(runId),
+        exact: true,
+      });
+    };
+
+    function connect() {
+      const cachedTrace = queryClient.getQueryData<ExecutionTraceStream>(
+        queryKeys.executions.trace(activeRunId),
+      );
+      void api.executions
+        .stream(activeRunId, cachedTrace?.cursor ? { cursor: cachedTrace.cursor } : undefined)
+        .then((nextSource) => {
+          if (disposed) {
+            nextSource.close();
+            return;
+          }
+          source = nextSource;
+          source.onopen = () => setStreamState('live');
+          source.addEventListener('ready', () => setStreamState('live'));
+          source.addEventListener('status', (event) => {
+            const parsed = ExecutionStatusResponseSchema.safeParse(readEventPayload(event));
+            if (!parsed.success || parsed.data.runId !== runId) return;
+            const statusKey = queryKeys.executions.status(runId);
+            void queryClient.cancelQueries({ queryKey: statusKey, exact: true });
+            queryClient.setQueryData(statusKey, parsed.data);
+          });
+          source.addEventListener('trace', (event) => {
+            const payload = readEventPayload(event);
+            if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
+            const parsed = TraceStreamEnvelopeSchema.safeParse({ ...payload, runId });
+            if (!parsed.success || parsed.data.runId !== runId) return;
+            const traceKey = queryKeys.executions.trace(runId);
+            void queryClient.cancelQueries({ queryKey: traceKey, exact: true });
+            queryClient.setQueryData<ExecutionTraceStream>(traceKey, (existing) => ({
+              runId,
+              events: mergeEvents(existing?.events ?? [], parsed.data.events),
+              cursor: parsed.data.cursor ?? existing?.cursor,
+            }));
+          });
+          source.addEventListener('complete', finish);
+          source.addEventListener('error', fallBackToPolling);
+          source.onerror = fallBackToPolling;
+        })
+        .catch((error: unknown) => {
+          logger.warn('Failed to open Operator run stream', error);
+          fallBackToPolling();
+        });
+    }
+
+    connect();
+
+    return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      source?.close();
+    };
+  }, [queryClient, runId, shouldStream]);
+
+  return { statusQuery, streamState };
+}
+
+export function useOperatorRunStatus(
+  runId: string | null,
+  streamState: OperatorStreamState = 'polling',
+) {
   return useQuery({
     ...(runId ? executionStatusOptions(runId) : {}),
     queryKey: queryKeys.executions.status(runId ?? ''),
@@ -153,7 +386,9 @@ export function useOperatorRunStatus(runId: string | null) {
     ...(!runId && { gcTime: 0 }),
     refetchInterval: (query) => {
       const status = readRunStatus(query.state.data);
-      return status && TERMINAL_RUN_STATUSES.has(status) ? false : OPERATOR_RUN_POLL_INTERVAL_MS;
+      return status && TERMINAL_RUN_STATUSES.has(status)
+        ? false
+        : getOperatorPollInterval(streamState);
     },
   });
 }
@@ -162,13 +397,15 @@ export function useOperatorRunTrace(
   runId: string | null,
   status: string | null,
   statusUpdatedAt: number,
+  streamState: OperatorStreamState = 'polling',
 ) {
   return useQuery({
     ...(runId ? executionTraceOptions(runId) : {}),
     queryKey: queryKeys.executions.trace(runId ?? ''),
     queryFn: runId ? executionTraceOptions(runId).queryFn : skipToken,
     ...(!runId && { gcTime: 0 }),
-    refetchInterval: () => getOperatorRunTraceRefetchInterval(status, statusUpdatedAt),
+    refetchInterval: () =>
+      getOperatorRunTraceRefetchInterval(status, statusUpdatedAt, Date.now(), streamState),
   });
 }
 

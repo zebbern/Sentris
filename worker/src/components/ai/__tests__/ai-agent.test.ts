@@ -108,6 +108,7 @@ function createStreamResult(
     text?: string;
     toolResults?: StreamToolResult[];
     finishReason?: FinishReason;
+    rawFinishReason?: string;
   } = {},
 ): StreamTextResult<ToolSet, never> {
   const text = options.text ?? 'Agent final answer';
@@ -120,7 +121,7 @@ function createStreamResult(
         {
           type: 'finish',
           finishReason: options.finishReason ?? 'stop',
-          rawFinishReason: 'stop',
+          rawFinishReason: options.rawFinishReason ?? options.finishReason ?? 'stop',
           totalUsage: createUsage(),
         },
       ],
@@ -128,6 +129,7 @@ function createStreamResult(
     text: Promise.resolve(text),
     toolResults: Promise.resolve(options.toolResults ?? []),
     finishReason: Promise.resolve(options.finishReason ?? 'stop'),
+    rawFinishReason: Promise.resolve(options.rawFinishReason ?? options.finishReason ?? 'stop'),
   } as unknown as StreamTextResult<ToolSet, never>;
 }
 
@@ -1011,6 +1013,29 @@ describe('core.ai.agent (refactor)', () => {
       type: 'finish',
       finishReason: 'error',
       responseText: 'provider stream failed',
+    });
+  });
+
+  test('rejects a provider-declared error when the stream itself completes cleanly', async () => {
+    const published: AgentTraceEvent[] = [];
+    vi.spyOn(MockToolLoopAgent.prototype, 'stream').mockResolvedValue(
+      createStreamResult({
+        parts: [],
+        text: '',
+        finishReason: 'error',
+        rawFinishReason: 'MALFORMED_FUNCTION_CALL',
+      }),
+    );
+
+    await expect(runAgent(contextWithTracePublisher(published))).rejects.toThrow(
+      'MALFORMED_FUNCTION_CALL',
+    );
+
+    const finishes = published.filter((event) => event.part.type === 'finish');
+    expect(finishes).toHaveLength(1);
+    expect(finishes[0]!.part).toMatchObject({
+      type: 'finish',
+      finishReason: 'error',
     });
   });
 

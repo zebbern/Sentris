@@ -3,7 +3,7 @@ import type {
   OperatorWorkflowDraftDetail,
   OperatorWorkflowDraftResult,
 } from '@sentris/shared';
-import { AlertCircle, ArrowRight, Check, ExternalLink, Save, Workflow } from 'lucide-react';
+import { AlertCircle, ArrowRight, Check, ExternalLink, Play, Save, Workflow } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,7 @@ interface OperatorWorkflowDraftCardProps {
   disabled?: boolean;
   applied?: boolean;
   onApply: (draft: OperatorWorkflowDraftResult) => void;
+  onRunImprovedVersion?: (result: OperatorWorkflowApplyResult) => void;
 }
 
 function buildDraftBuilderPath(
@@ -74,8 +75,12 @@ export function OperatorWorkflowDraftCard({
   disabled = false,
   applied = false,
   onApply,
+  onRunImprovedVersion,
 }: OperatorWorkflowDraftCardProps) {
   if (result.kind === 'workflow-applied') {
+    const canRunImprovedVersion =
+      !result.created && Boolean(result.sourceRunId) && Boolean(onRunImprovedVersion);
+
     return (
       <div className="rounded-md border border-emerald-500/30 bg-emerald-500/[0.05] p-2.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -88,12 +93,26 @@ export function OperatorWorkflowDraftCard({
             {result.created ? 'Created' : `Saved as v${result.version}`}
           </Badge>
         </div>
-        <Button asChild variant="outline" size="sm" className="mt-2 h-7 gap-1.5 px-2 text-[11px]">
-          <Link to={`/workflows/${encodeURIComponent(result.workflowId)}`}>
-            <ExternalLink className="h-3 w-3" />
-            Open saved workflow
-          </Link>
-        </Button>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Button asChild variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-[11px]">
+            <Link to={`/workflows/${encodeURIComponent(result.workflowId)}`}>
+              <ExternalLink className="h-3 w-3" />
+              Open saved workflow
+            </Link>
+          </Button>
+          {canRunImprovedVersion ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              disabled={disabled}
+              onClick={() => onRunImprovedVersion?.(result)}
+            >
+              <Play className="h-3 w-3" />
+              Run improved version
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }

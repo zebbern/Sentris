@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { OperatorSessionDetail } from '@sentris/shared';
 
 import {
+  getOperatorPollInterval,
   getOperatorSessionLatestTurnError,
   getOperatorRunTraceRefetchInterval,
   OPERATOR_RUN_TRACE_SETTLE_MS,
@@ -117,5 +118,12 @@ describe('getOperatorRunTraceRefetchInterval', () => {
 
   it('does not poll trace repeatedly before a run status is known', () => {
     expect(getOperatorRunTraceRefetchInterval(null, 0, 10_000)).toBe(false);
+  });
+
+  it('uses a slower safety poll while SSE is live and the normal interval after fallback', () => {
+    expect(getOperatorPollInterval('live')).toBe(5_000);
+    expect(getOperatorPollInterval('polling')).toBe(1_500);
+    expect(getOperatorRunTraceRefetchInterval('RUNNING', 10_000, 20_000, 'live')).toBe(5_000);
+    expect(getOperatorRunTraceRefetchInterval('RUNNING', 10_000, 20_000, 'polling')).toBe(1_500);
   });
 });

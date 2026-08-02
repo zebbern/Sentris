@@ -10,7 +10,7 @@ import type {
   OperatorWorkflowDraftDetail,
 } from '@sentris/shared';
 
-import { httpGet, httpPatch, httpPost } from './client';
+import { API_V1_URL, getAuthHeaders, httpGet, httpPatch, httpPost } from './client';
 
 const sessionPath = (sessionId: string) => `/operator/sessions/${encodeURIComponent(sessionId)}`;
 
@@ -21,6 +21,15 @@ export const operatorApi = {
     httpPost<OperatorSessionSummary>('/operator/sessions', input),
 
   getSession: (sessionId: string) => httpGet<OperatorSessionDetail>(sessionPath(sessionId)),
+
+  streamSession: async (sessionId: string): Promise<EventSource> => {
+    const { FetchEventSource } = await import('@/utils/sse-client');
+    const headers = await getAuthHeaders();
+    return new FetchEventSource(`${API_V1_URL}${sessionPath(sessionId)}/stream`, {
+      headers,
+      withCredentials: true,
+    });
+  },
 
   listWorkflowDrafts: (sessionId: string) =>
     httpGet<OperatorWorkflowDraftDetail[]>(`${sessionPath(sessionId)}/workflow-drafts`),

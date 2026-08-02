@@ -271,6 +271,47 @@ describe('workflow Agent activities', () => {
     );
   });
 
+  test('rejects a provider-declared model error before checkpointing model state', async () => {
+    const setup = await agentActivities.workflowAgentSetupActivity({
+      ...input,
+      initialStateFileId: ROOT_ID,
+    });
+    const streamTextImpl = vi.fn(() => ({
+      fullStream: (async function* () {})(),
+      text: Promise.resolve(''),
+      finishReason: Promise.resolve('error'),
+      rawFinishReason: Promise.resolve('MALFORMED_FUNCTION_CALL'),
+      response: Promise.resolve({ messages: [] }),
+      toolCalls: Promise.resolve([]),
+    }));
+    const model = vi.fn(() => ({ provider: 'gemini', modelId: 'gemini-test' }));
+    agentActivities.initializeWorkflowAgentActivityOverrides({
+      streamTextImpl: streamTextImpl as any,
+      modelFactories: {
+        createOpenAI: vi.fn() as any,
+        createAnthropic: vi.fn() as any,
+        createGoogleGenerativeAI: vi.fn(() => model) as any,
+      },
+    });
+
+    await expect(
+      agentActivities.workflowAgentModelStepActivity({
+        ...input,
+        state: setup.state,
+        outputStateFileId: MODEL_ID,
+        step: 0,
+      }),
+    ).rejects.toThrow('MALFORMED_FUNCTION_CALL');
+
+    expect(storage.files.has(MODEL_ID)).toBe(false);
+    expect(storage.uploadFile).toHaveBeenCalledTimes(2);
+    expect(
+      agentTracePublisher.publish.mock.calls.some(
+        ([event]) => event.part.type === 'tool-input-available',
+      ),
+    ).toBe(false);
+  });
+
   test('reuses a completed setup checkpoint without redelivering its start events', async () => {
     const first = await agentActivities.workflowAgentSetupActivity({
       ...input,

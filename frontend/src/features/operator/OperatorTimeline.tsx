@@ -42,6 +42,7 @@ const COMMAND_LABELS: Record<OperatorCommandName, string> = {
   list_components: 'List components',
   get_component: 'Inspect component',
   propose_workflow_draft: 'Draft workflow',
+  propose_workflow_edits: 'Draft workflow edits',
   apply_workflow_draft: 'Save workflow draft',
   list_runs: 'List runs',
   get_run: 'Inspect run',
@@ -228,6 +229,20 @@ function ActionEvent({
                 directCommand: {
                   commandName: 'apply_workflow_draft',
                   arguments: { draftId: draft.draftId },
+                },
+              })
+            }
+            onRunImprovedVersion={(savedWorkflow) =>
+              onRunCommand({
+                message: `Run improved workflow version ${savedWorkflow.versionId} using inputs from run ${savedWorkflow.sourceRunId}`,
+                directCommand: {
+                  commandName: 'run_workflow',
+                  arguments: {
+                    workflowId: savedWorkflow.workflowId,
+                    versionId: savedWorkflow.versionId,
+                    sourceRunId: savedWorkflow.sourceRunId,
+                    inputs: {},
+                  },
                 },
               })
             }

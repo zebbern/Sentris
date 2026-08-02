@@ -154,6 +154,167 @@ describe('Operator activities', () => {
     expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
       'inspect the same workflow version with get_workflow',
     );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'call propose_workflow_edits with only the smallest ID-based operations',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'use operation patch_node with nodeId and setParameters and/or setInputOverrides',
+    );
+    expect(generateTextImpl.mock.calls[0]?.[0]?.tools).toHaveProperty('propose_workflow_edits');
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'get_run returns bounded failed/recent trace evidence and run-scoped findings',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'only for an evidence-supported graph or component-configuration defect',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'do not weaken a valid workflow contract by adding aliases',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'Include sourceRunId on an update proposal derived from a run',
+    );
+    expect(String(generateTextImpl.mock.calls[0]?.[0]?.system)).toContain(
+      'call run_workflow with sourceRunId only when the user explicitly requests',
+    );
+  });
+
+  test('recovers a provider-declared tool generation error with a text-only diagnosis', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-02T00:00:00.000Z',
+          updatedAt: '2026-08-02T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: null,
+        },
+        messages: [{ role: 'user', content: 'Review the failed run' }],
+        actions: [
+          {
+            id: ACTION_ID,
+            toolCallId: `${TURN_ID}:1:0`,
+            commandName: 'get_run',
+            status: 'succeeded',
+            arguments: { runId: 'failed-run' },
+            result: {
+              status: 'FAILED',
+              failedTraceEvents: [
+                {
+                  error:
+                    "Required runtime input 'npm package and optional version' (packageSpec) was not provided",
+                },
+              ],
+            },
+            error: null,
+            runId: 'failed-run',
+          },
+        ],
+      }),
+    );
+    generateTextImpl
+      .mockResolvedValueOnce({
+        text: '',
+        finishReason: 'error',
+        rawFinishReason: 'MALFORMED_FUNCTION_CALL',
+        toolCalls: [],
+      })
+      .mockResolvedValueOnce({
+        text: 'The run failed because the required packageSpec input was missing.',
+        finishReason: 'stop',
+        toolCalls: [],
+      });
+
+    const result = await activities.operatorModelStepActivity({
+      ...base,
+      step: 2,
+      toolCallHistory: [
+        {
+          toolCallId: `${TURN_ID}:1:0`,
+          modelToolCallId: 'provider-get-run-id',
+          commandName: 'get_run',
+          arguments: { runId: 'failed-run' },
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      text: expect.stringContaining('required packageSpec input was missing'),
+      finishReason: 'stop',
+      toolCalls: [],
+    });
+    expect(result.text).toContain(
+      'No workflow draft was proposed or applied by this recovery response.',
+    );
+    expect(generateTextImpl).toHaveBeenCalledTimes(2);
+    expect(generateTextImpl.mock.calls[1]?.[0]).not.toHaveProperty('tools');
+    expect(generateTextImpl.mock.calls[1]?.[0]).not.toHaveProperty('toolChoice');
+    expect(String(generateTextImpl.mock.calls[1]?.[0]?.system)).toContain(
+      'text-only recovery response',
+    );
+    const recoveryMessages = generateTextImpl.mock.calls[1]?.[0]?.messages;
+    expect(recoveryMessages).toHaveLength(1);
+    expect(recoveryMessages?.[0]).toMatchObject({ role: 'user' });
+    expect(String(recoveryMessages?.[0]?.content)).toContain('packageSpec');
+    expect(JSON.stringify(recoveryMessages)).not.toContain('tool-call');
+    expect(JSON.stringify(recoveryMessages)).not.toContain('tool-result');
+  });
+
+  test('fails the activity when the text-only recovery also returns a provider error', async () => {
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        session: {
+          id: SESSION_ID,
+          title: 'Session',
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          approvalMode: 'ask',
+          status: 'active',
+          model: {
+            provider: 'openai',
+            modelId: 'gpt-test',
+            apiKeySecretId: SECRET_ID,
+            baseUrl: null,
+          },
+          createdAt: '2026-08-02T00:00:00.000Z',
+          updatedAt: '2026-08-02T00:00:00.000Z',
+        },
+        turn: {
+          id: TURN_ID,
+          sessionId: SESSION_ID,
+          status: 'running',
+          context: null,
+        },
+        messages: [{ role: 'user', content: 'Review the failed run' }],
+        actions: [],
+      }),
+    );
+    generateTextImpl
+      .mockResolvedValueOnce({ text: '', finishReason: 'error', toolCalls: [] })
+      .mockResolvedValueOnce({
+        text: '',
+        finishReason: 'error',
+        rawFinishReason: 'RECOVERY_FAILED',
+        toolCalls: [],
+      });
+
+    await expect(activities.operatorModelStepActivity({ ...base, step: 2 })).rejects.toThrow(
+      'Operator model generation failed (RECOVERY_FAILED)',
+    );
   });
 
   test('replays durable command results as native AI SDK tool history', async () => {
@@ -298,7 +459,18 @@ describe('Operator activities', () => {
       toolCalls: [],
     });
 
-    await activities.operatorModelStepActivity({ ...base, step: 1 });
+    await activities.operatorModelStepActivity({
+      ...base,
+      step: 1,
+      toolCallHistory: [
+        {
+          toolCallId,
+          modelToolCallId: 'provider-call-without-continuation-metadata',
+          commandName: 'list_mcp_capabilities',
+          arguments: { serverId: 'server-1' },
+        },
+      ],
+    });
 
     const messages = generateTextImpl.mock.calls[0]?.[0].messages;
     expect(messages).toHaveLength(2);

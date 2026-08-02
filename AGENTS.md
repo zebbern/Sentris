@@ -335,13 +335,18 @@ user-confirmed Operator turns. Retry creates one new run from the original store
 inputs, and scope with action-ID idempotency; it never mutates a completed Agent child. Its
 tool, resource, and prompt calls dispatch through the same canonical runtime and durable
 invocation path. Workflow authoring also uses typed durable actions: component discovery is
-registry-backed, proposals are credential-safe bounded graphs with compile validation and a
-diff, and apply is a separate consequential action using proposal-ID idempotency plus an exact
-base-version fence. The Builder may hydrate a proposal only as an unsaved draft and restores
+registry-backed, new-workflow proposals use credential-safe bounded graphs, and existing-workflow
+proposals use bounded operations keyed by stable node and edge IDs. The backend materializes
+those operations against the exact immutable base; both paths share compile validation and a
+graph diff, and apply is a separate consequential action using proposal-ID idempotency plus an
+exact base-version fence. The Builder may hydrate a proposal only as an unsaved draft and restores
 credential placeholders from the freshly fetched persisted graph. Turn records snapshot the
 initiating actor roles so delayed authoring keeps the user's workflow authority. Provider-native
 tool-call continuation metadata lives in the Temporal turn history; Postgres action rows remain
-provider-neutral audit records.
+provider-neutral audit records. Run-derived update proposals carry their validated source-run
+identity through apply, and a separate explicit `run_workflow` turn may run the newly saved
+version with that source run's stored inputs and scope. Keep this distinct from Retry, which
+continues to select the original immutable version.
 
 The generic workflow-graph `core.ai.agent` now prepares each turn in an activity and runs
 the loop as a patch-gated Temporal child Workflow. Inline provider keys are sealed with
@@ -350,8 +355,10 @@ plus compact state/authority refs enter the child history. Model steps and canon
 operations are separate durable activities; native AI SDK continuation messages, tool
 arguments, and tool results are checkpointed in organization-scoped object storage.
 Top-level and For Each nodes share this execution boundary; pre-patch histories retain
-the legacy single-activity loop. Do not add another in-process agent loop or route these
-calls back through the legacy run gateway.
+the legacy single-activity loop. Provider-declared model finish errors are classified at one
+worker-local boundary before either durable or legacy Agent paths can record success; Operator's
+single text-only recovery remains the only caller-specific behavior. Do not add another
+in-process agent loop or route these calls back through the legacy run gateway.
 
 Remaining work is Continue-As-New, MCP Tasks, the Task 8 compatibility cleanup, the
 bounded Studio migration, and complete resources/prompts behavior. See

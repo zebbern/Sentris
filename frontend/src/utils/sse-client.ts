@@ -117,7 +117,8 @@ export class FetchEventSource implements EventSource {
       return;
     }
 
-    this.controller = new AbortController();
+    const controller = new AbortController();
+    this.controller = controller;
     this.readyState = FetchEventSource.CONNECTING;
 
     try {
@@ -129,7 +130,7 @@ export class FetchEventSource implements EventSource {
           // Including it causes CORS issues
           ...headers,
         },
-        signal: this.controller.signal,
+        signal: controller.signal,
         credentials: this.withCredentials ? 'include' : 'same-origin',
       });
 
@@ -153,11 +154,19 @@ export class FetchEventSource implements EventSource {
       this.reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let eventType = 'message';
+      let eventData = '';
+      let eventId = '';
 
       while (this.readyState === FetchEventSource.OPEN) {
         const { done, value } = await this.reader.read();
 
         if (done) {
+          if (this.readyState === FetchEventSource.OPEN) {
+            this.reader = null;
+            if (this.controller === controller) this.controller = null;
+            this.fireError();
+          }
           break;
         }
 
@@ -165,11 +174,8 @@ export class FetchEventSource implements EventSource {
         const lines = buffer.split('\n');
         buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-        let eventType = 'message';
-        let eventData = '';
-        let eventId = '';
-
-        for (const line of lines) {
+        for (const rawLine of lines) {
+          const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
           if (line.startsWith('event:')) {
             eventType = line.substring(6).trim();
           } else if (line.startsWith('data:')) {
@@ -206,19 +212,25 @@ export class FetchEventSource implements EventSource {
         }
       }
     } catch (_error: unknown) {
-      if (this.controller?.signal.aborted) {
+      if (controller.signal.aborted || this.readyState === FetchEventSource.CLOSED) {
         // Connection was intentionally closed
         return;
       }
 
-      this.readyState = FetchEventSource.CLOSED;
-      const errorEvent = new Event('error');
-
-      if (this.onerrorHandler) {
-        this.onerrorHandler(errorEvent);
-      }
-      this.fireEvent('error', errorEvent);
+      this.reader = null;
+      if (this.controller === controller) this.controller = null;
+      this.fireError();
     }
+  }
+
+  private fireError(): void {
+    this.readyState = FetchEventSource.CLOSED;
+    const errorEvent = new Event('error');
+
+    if (this.onerrorHandler) {
+      this.onerrorHandler(errorEvent);
+    }
+    this.fireEvent('error', errorEvent);
   }
 
   private fireEvent(type: string, event: Event | MessageEvent): void {

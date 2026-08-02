@@ -11,12 +11,14 @@ import {
   type McpOperationInvocationRequest,
   type OperatorCommandInputMap,
   type OperatorCommandName,
+  type TraceEventPayload,
 } from '@sentris/shared';
 
 import type { AuthContext } from '../auth/types';
 import { FindingsQuerySchema } from '../analytics/dto/findings-query.dto';
 import { FindingsQueryService } from '../analytics/findings-query.service';
 import { FindingTriageService } from '../findings/finding-triage.service';
+import { TraceService } from '../trace/trace.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
 import {
@@ -25,18 +27,87 @@ import {
 } from './operator-workflow-authoring.service';
 
 const MAX_COMMAND_RESULT_CHARS = 60_000;
+const MAX_RUN_FAILED_TRACE_EVENTS = 8;
+const MAX_RUN_RECENT_TRACE_EVENTS = 8;
+const MAX_RUN_FINDINGS = 10;
+const MAX_RUN_RESULT_CHARS = 10_000;
+const MAX_RUN_FINDING_CHARS = 1_000;
+const MAX_EVIDENCE_TEXT_CHARS = 400;
+const MAX_EVIDENCE_VALUE_CHARS = 600;
 
-function toBoundedJson(value: unknown): unknown {
+function toBoundedJson(value: unknown, maxCharacters = MAX_COMMAND_RESULT_CHARS): unknown {
   const serialized = JSON.stringify(value);
   if (serialized === undefined) return null;
-  if (serialized.length <= MAX_COMMAND_RESULT_CHARS) {
+  if (serialized.length <= maxCharacters) {
     return JSON.parse(serialized) as unknown;
   }
   return {
     truncated: true,
     originalCharacters: serialized.length,
-    preview: serialized.slice(0, MAX_COMMAND_RESULT_CHARS),
+    preview: serialized.slice(0, maxCharacters),
   };
+}
+
+function truncateEvidenceText(value: string | undefined): string | undefined {
+  if (value === undefined || value.length <= MAX_EVIDENCE_TEXT_CHARS) return value;
+  return `${value.slice(0, MAX_EVIDENCE_TEXT_CHARS)}…`;
+}
+
+function toBoundedEvidenceValue(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  const serialized = JSON.stringify(value);
+  if (serialized === undefined) return null;
+  if (serialized.length <= MAX_EVIDENCE_VALUE_CHARS) {
+    return JSON.parse(serialized) as unknown;
+  }
+  return {
+    truncated: true,
+    originalCharacters: serialized.length,
+    preview: serialized.slice(0, MAX_EVIDENCE_VALUE_CHARS),
+  };
+}
+
+function compactTraceEvent(
+  event: TraceEventPayload,
+  includeDiagnosticDetails = true,
+): Record<string, unknown> {
+  return {
+    sequence: event.id,
+    nodeId: event.nodeId,
+    type: event.type,
+    level: event.level,
+    timestamp: event.timestamp,
+    ...(event.message && { message: truncateEvidenceText(event.message) }),
+    ...(event.error && {
+      error: {
+        message: truncateEvidenceText(event.error.message),
+        ...(event.error.type && { type: event.error.type }),
+        ...(event.error.code && { code: event.error.code }),
+        ...(includeDiagnosticDetails &&
+          event.error.details && {
+            details: toBoundedEvidenceValue(event.error.details),
+          }),
+        ...(includeDiagnosticDetails &&
+          event.error.fieldErrors && {
+            fieldErrors: toBoundedEvidenceValue(event.error.fieldErrors),
+          }),
+      },
+    }),
+    ...(includeDiagnosticDetails &&
+      event.metadata?.failure && {
+        failure: toBoundedEvidenceValue(event.metadata.failure),
+      }),
+    ...(includeDiagnosticDetails &&
+      event.outputSummary && {
+        outputSummary: toBoundedEvidenceValue(event.outputSummary),
+      }),
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return (
+    truncateEvidenceText(error instanceof Error ? error.message : String(error)) ?? 'Unknown error'
+  );
 }
 
 function assertNever(value: never): never {
@@ -51,6 +122,7 @@ export class OperatorCommandService {
     private readonly findingTriageService: FindingTriageService,
     private readonly operatorMcpAuthorityService: OperatorMcpAuthorityService,
     private readonly operatorWorkflowAuthoringService: OperatorWorkflowAuthoringService,
+    private readonly traceService: TraceService,
   ) {}
 
   async execute(input: {
@@ -89,6 +161,12 @@ export class OperatorCommandService {
       case 'propose_workflow_draft':
         return this.proposeWorkflowDraft(
           OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.inputSchema.parse(input.arguments),
+          input.auth,
+          input.actionId,
+        );
+      case 'propose_workflow_edits':
+        return this.proposeWorkflowEdits(
+          OPERATOR_COMMAND_DEFINITIONS.propose_workflow_edits.inputSchema.parse(input.arguments),
           input.auth,
           input.actionId,
         );
@@ -269,6 +347,20 @@ export class OperatorCommandService {
     };
   }
 
+  private async proposeWorkflowEdits(
+    input: OperatorCommandInputMap['propose_workflow_edits'],
+    auth: AuthContext,
+    actionId: string,
+  ): Promise<{ result: unknown }> {
+    return {
+      result: await this.operatorWorkflowAuthoringService.proposeEdits({
+        arguments: input,
+        auth,
+        actionId,
+      }),
+    };
+  }
+
   private async applyWorkflowDraft(
     input: OperatorCommandInputMap['apply_workflow_draft'],
     auth: AuthContext,
@@ -302,10 +394,79 @@ export class OperatorCommandService {
     const run = await this.workflowsService.getRun(input.runId, auth);
     const status = await this.workflowsService.getRunStatus(input.runId, run.temporalRunId, auth);
     const terminal = (TERMINAL_STATUSES as readonly string[]).includes(status.status);
-    const result = terminal
-      ? await this.workflowsService.getRunResult(input.runId, run.temporalRunId, auth)
-      : undefined;
-    return { result: toBoundedJson({ run, status, terminal, ...(terminal && { result }) }) };
+    if (!terminal) {
+      return { result: toBoundedJson({ run, status, terminal }) };
+    }
+
+    const [result, trace, findings] = await Promise.all([
+      this.workflowsService.getRunResult(input.runId, run.temporalRunId, auth),
+      this.getRunTraceEvidence(input.runId, auth),
+      this.getRunFindingEvidence(input.runId, auth),
+    ]);
+    return {
+      result: toBoundedJson({
+        run,
+        status,
+        terminal,
+        result: toBoundedJson(result, MAX_RUN_RESULT_CHARS),
+        diagnostics: { trace, findings },
+      }),
+    };
+  }
+
+  private async getRunTraceEvidence(runId: string, auth: AuthContext): Promise<unknown> {
+    try {
+      const summary = await this.traceService.summarizeRun(
+        runId,
+        {
+          failedLimit: MAX_RUN_FAILED_TRACE_EVENTS,
+          recentLimit: MAX_RUN_RECENT_TRACE_EVENTS,
+        },
+        auth,
+      );
+      return {
+        availability: 'available',
+        totalEvents: summary.totalEvents,
+        failedEventCount: summary.failedEventCount,
+        failed: summary.failed.map((event) => compactTraceEvent(event)),
+        recent: summary.recent.map((event) => compactTraceEvent(event, false)),
+      };
+    } catch (error) {
+      return {
+        availability: 'unavailable',
+        error: errorMessage(error),
+      };
+    }
+  }
+
+  private async getRunFindingEvidence(runId: string, auth: AuthContext): Promise<unknown> {
+    try {
+      const page = await this.findingsQueryService.listFindings(
+        auth,
+        FindingsQuerySchema.parse({
+          runId,
+          page: 1,
+          pageSize: MAX_RUN_FINDINGS,
+          sortOrder: 'desc',
+          paginationMode: 'offset',
+        }),
+      );
+      return {
+        availability: page.availability,
+        total: page.total,
+        degradedReasons: page.degradedReasons,
+        items: page.items.map(({ raw: _raw, ...finding }) =>
+          toBoundedJson(finding, MAX_RUN_FINDING_CHARS),
+        ),
+      };
+    } catch (error) {
+      return {
+        availability: 'unavailable',
+        total: null,
+        items: [],
+        error: errorMessage(error),
+      };
+    }
   }
 
   private async runWorkflow(
@@ -314,12 +475,36 @@ export class OperatorCommandService {
     sessionId: string,
     actionId: string,
   ): Promise<{ result: unknown; runId: string }> {
+    let inputs = input.inputs;
+    let scopeId = input.scopeId;
+    if (input.sourceRunId) {
+      const [sourceRun, sourceConfig] = await Promise.all([
+        this.workflowsService.getRun(input.sourceRunId, auth),
+        this.workflowsService.getRunConfig(input.sourceRunId, auth),
+      ]);
+      if (!(TERMINAL_STATUSES as readonly string[]).includes(sourceRun.status)) {
+        throw new ConflictException(
+          `Workflow run ${input.sourceRunId} is still ${sourceRun.status}; wait for it to finish before running the improved version`,
+        );
+      }
+      if (
+        sourceRun.workflowId !== input.workflowId ||
+        sourceConfig.workflowId !== input.workflowId
+      ) {
+        throw new ConflictException(
+          `Workflow run ${input.sourceRunId} does not belong to workflow ${input.workflowId}`,
+        );
+      }
+      inputs = sourceConfig.inputs;
+      scopeId = sourceRun.scopeId ?? undefined;
+    }
+
     const run = await this.workflowsService.run(
       input.workflowId,
       {
-        inputs: input.inputs,
+        inputs,
         versionId: input.versionId,
-        ...(input.scopeId ? { scopeId: input.scopeId } : {}),
+        ...(scopeId ? { scopeId } : {}),
       },
       auth,
       {
@@ -331,7 +516,13 @@ export class OperatorCommandService {
         },
       },
     );
-    return { result: toBoundedJson(run), runId: run.runId };
+    return {
+      result: toBoundedJson({
+        ...run,
+        ...(input.sourceRunId ? { sourceRunId: input.sourceRunId } : {}),
+      }),
+      runId: run.runId,
+    };
   }
 
   private async cancelRun(

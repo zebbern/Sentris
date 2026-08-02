@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import { z } from 'zod';
 
 import {
+  OPERATOR_WORKFLOW_EDIT_OPERATIONS,
   OPERATOR_COMMAND_DEFINITIONS,
   OperatorGetFindingInputSchema,
   OperatorGetWorkflowInputSchema,
@@ -10,13 +12,19 @@ import {
   OperatorListFindingsInputSchema,
   OperatorPersistedTurnPayloadSchema,
   OperatorReadMcpResourceInputSchema,
+  OperatorSessionStreamErrorSchema,
+  OperatorSessionStreamReadySchema,
+  OperatorSessionStreamSnapshotSchema,
   OperatorStoredTurnContextSchema,
   OperatorCreateTurnSchema,
   OperatorUpdateFindingTriageInputSchema,
+  OperatorProposeWorkflowEditsInputSchema,
   OperatorProposeWorkflowDraftInputSchema,
   OperatorWorkflowApplyResultSchema,
   OperatorWorkflowDraftResultSchema,
 } from '../operator.js';
+
+const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('Operator run controls', () => {
   it('can inspect the exact workflow version before launching it', () => {
@@ -46,6 +54,34 @@ describe('Operator run controls', () => {
       versionId: '33333333-3333-4333-8333-333333333333',
       inputs: { packageSpec: 'minimist@1.2.8' },
     });
+    expect(
+      OperatorRunWorkflowInputSchema.parse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
+      }),
+    ).toEqual({
+      workflowId: '22222222-2222-4222-8222-222222222222',
+      versionId: '33333333-3333-4333-8333-333333333333',
+      inputs: {},
+      sourceRunId: 'sentris-run-original',
+    });
+    expect(
+      OperatorRunWorkflowInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
+        inputs: { packageSpec: 'different-input' },
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorRunWorkflowInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
+        scopeId: '44444444-4444-4444-8444-444444444444',
+      }).success,
+    ).toBe(false);
   });
 
   it('keeps retry explicit and accepts only bounded direct run commands', () => {
@@ -70,6 +106,28 @@ describe('Operator run controls', () => {
         },
       }).success,
     ).toBe(false);
+    expect(
+      OperatorCreateTurnSchema.parse({
+        clientTurnId: '11111111-1111-4111-8111-111111111111',
+        message: 'Run the improved version',
+        directCommand: {
+          commandName: 'run_workflow',
+          arguments: {
+            workflowId: '22222222-2222-4222-8222-222222222222',
+            versionId: '33333333-3333-4333-8333-333333333333',
+            sourceRunId: 'sentris-run-original',
+          },
+        },
+      }).directCommand,
+    ).toEqual({
+      commandName: 'run_workflow',
+      arguments: {
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        versionId: '33333333-3333-4333-8333-333333333333',
+        inputs: {},
+        sourceRunId: 'sentris-run-original',
+      },
+    });
   });
 
   it('defines one strict versioned payload while accepting legacy route-only storage', () => {
@@ -98,6 +156,73 @@ describe('Operator run controls', () => {
   });
 });
 
+describe('Operator session stream contracts', () => {
+  const session = {
+    id: SESSION_ID,
+    title: 'Investigation',
+    approvalMode: 'ask' as const,
+    status: 'active' as const,
+    model: {
+      provider: 'gemini' as const,
+      modelId: 'gemini-3.5-flash',
+      apiKeySecretId: '22222222-2222-4222-8222-222222222222',
+      baseUrl: null,
+    },
+    createdAt: '2026-08-02T10:00:00.000Z',
+    updatedAt: '2026-08-02T10:00:00.000Z',
+    turns: [],
+    messages: [],
+    actions: [],
+  };
+
+  it('accepts strict v1 ready and full-snapshot envelopes', () => {
+    expect(
+      OperatorSessionStreamReadySchema.parse({
+        version: 1,
+        sessionId: SESSION_ID,
+        mode: 'polling',
+        intervalMs: 750,
+      }),
+    ).toEqual({ version: 1, sessionId: SESSION_ID, mode: 'polling', intervalMs: 750 });
+    expect(OperatorSessionStreamSnapshotSchema.parse({ version: 1, session })).toEqual({
+      version: 1,
+      session,
+    });
+  });
+
+  it('rejects unknown versions and unrecognized envelope fields', () => {
+    expect(
+      OperatorSessionStreamReadySchema.safeParse({
+        version: 2,
+        sessionId: SESSION_ID,
+        mode: 'polling',
+        intervalMs: 750,
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorSessionStreamSnapshotSchema.safeParse({
+        version: 1,
+        session,
+        cursor: 'not-supported',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('exposes a bounded transient read error without implementation details', () => {
+    expect(
+      OperatorSessionStreamErrorSchema.parse({
+        version: 1,
+        code: 'session_read_failed',
+        message: 'Operator session update could not be read',
+      }),
+    ).toEqual({
+      version: 1,
+      code: 'session_read_failed',
+      message: 'Operator session update could not be read',
+    });
+  });
+});
+
 describe('Operator workflow authoring commands', () => {
   const graph = {
     name: 'Package review',
@@ -117,6 +242,7 @@ describe('Operator workflow authoring commands', () => {
     expect(OPERATOR_COMMAND_DEFINITIONS.list_components.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.get_component.effect).toBe('read');
     expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_draft.effect).toBe('execute');
+    expect(OPERATOR_COMMAND_DEFINITIONS.propose_workflow_edits.effect).toBe('execute');
     expect(OPERATOR_COMMAND_DEFINITIONS.apply_workflow_draft.effect).toBe('consequential');
   });
 
@@ -135,6 +261,81 @@ describe('Operator workflow authoring commands', () => {
         graph,
       }).success,
     ).toBe(true);
+    expect(
+      OperatorProposeWorkflowDraftInputSchema.safeParse({
+        sourceRunId: 'sentris-run-original',
+        graph,
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeWorkflowDraftInputSchema.safeParse({
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        baseVersionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
+        graph,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts bounded ID-based edits only for an immutable existing workflow version', () => {
+    const input = {
+      workflowId: '22222222-2222-4222-8222-222222222222',
+      baseVersionId: '33333333-3333-4333-8333-333333333333',
+      sourceRunId: 'sentris-run-original',
+      summary: 'Use the configured Gemini model',
+      operations: [
+        {
+          operation: 'patch_node' as const,
+          nodeId: 'agent',
+          setParameters: { modelId: 'gemini-2.5-pro' },
+        },
+        {
+          operation: 'remove_edge' as const,
+          edgeId: 'obsolete-edge',
+        },
+      ],
+    };
+
+    expect(OperatorProposeWorkflowEditsInputSchema.parse(input)).toEqual(input);
+    expect(
+      OperatorProposeWorkflowEditsInputSchema.safeParse({
+        ...input,
+        operations: [{ operation: 'patch_node', nodeId: 'agent' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeWorkflowEditsInputSchema.safeParse({
+        ...input,
+        operations: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeWorkflowEditsInputSchema.safeParse({
+        baseVersionId: input.baseVersionId,
+        operations: input.operations,
+      }).success,
+    ).toBe(false);
+    expect(
+      OperatorProposeWorkflowEditsInputSchema.safeParse({
+        ...input,
+        operations: [
+          {
+            operation: 'patch_node_config',
+            nodeId: 'agent',
+            params: { modelId: 'gemini-2.5-pro' },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('publishes provider-compatible edit operations as one explicit enum', () => {
+    const schema = z.toJSONSchema(OperatorProposeWorkflowEditsInputSchema) as any;
+
+    expect(schema.properties.operations.items.properties.operation.enum).toEqual(
+      OPERATOR_WORKFLOW_EDIT_OPERATIONS,
+    );
+    expect(schema.properties.operations.items).not.toHaveProperty('oneOf');
   });
 
   it('keeps compact draft and apply results typed for durable UI rendering', () => {
@@ -143,9 +344,10 @@ describe('Operator workflow authoring commands', () => {
       OperatorWorkflowDraftResultSchema.parse({
         kind: 'workflow-draft',
         draftId,
-        mode: 'create',
-        workflowId: null,
-        baseVersionId: null,
+        mode: 'update',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        baseVersionId: '33333333-3333-4333-8333-333333333333',
+        sourceRunId: 'sentris-run-original',
         name: graph.name,
         digest: 'sha256',
         validation: { valid: true, errors: [] },
@@ -158,8 +360,8 @@ describe('Operator workflow authoring commands', () => {
           removedEdgeIds: [],
           changedEdgeIds: [],
         },
-      }).draftId,
-    ).toBe(draftId);
+      }).sourceRunId,
+    ).toBe('sentris-run-original');
     expect(
       OperatorWorkflowApplyResultSchema.parse({
         kind: 'workflow-applied',
@@ -169,8 +371,9 @@ describe('Operator workflow authoring commands', () => {
         version: 1,
         created: true,
         name: graph.name,
-      }).created,
-    ).toBe(true);
+        sourceRunId: 'sentris-run-original',
+      }).sourceRunId,
+    ).toBe('sentris-run-original');
   });
 
   it('accepts an explicit save button as a direct user-confirmed command', () => {

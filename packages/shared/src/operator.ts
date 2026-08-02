@@ -74,8 +74,10 @@ const WorkflowIdSchema = z.string().uuid();
 const RunIdSchema = z.string().trim().min(1).max(191);
 const FindingIdSchema = z.string().trim().min(1).max(512);
 const MAX_OPERATOR_WORKFLOW_DRAFT_BYTES = 256 * 1024;
+const MAX_OPERATOR_WORKFLOW_EDIT_BYTES = 128 * 1024;
 const MAX_OPERATOR_WORKFLOW_DRAFT_NODES = 200;
 const MAX_OPERATOR_WORKFLOW_DRAFT_EDGES = 1_000;
+const MAX_OPERATOR_WORKFLOW_EDIT_OPERATIONS = 100;
 
 export const OperatorListWorkflowsInputSchema = z
   .object({
@@ -136,10 +138,192 @@ export const OperatorWorkflowGraphSchema = WorkflowGraphObjectSchema.extend({
   }
 });
 
+const OperatorWorkflowEntityIdSchema = z.string().trim().min(1).max(191);
+
+export const OPERATOR_WORKFLOW_EDIT_OPERATIONS = [
+  'set_workflow_metadata',
+  'patch_node',
+  'add_node',
+  'replace_node',
+  'remove_node',
+  'add_edge',
+  'replace_edge',
+  'remove_edge',
+] as const;
+
+const OPERATOR_WORKFLOW_EDIT_FIELDS = {
+  set_workflow_metadata: ['operation', 'name', 'description'],
+  patch_node: [
+    'operation',
+    'nodeId',
+    'label',
+    'position',
+    'setParameters',
+    'removeParameterIds',
+    'setInputOverrides',
+    'removeInputOverrideIds',
+  ],
+  add_node: ['operation', 'node'],
+  replace_node: ['operation', 'nodeId', 'node'],
+  remove_node: ['operation', 'nodeId'],
+  add_edge: ['operation', 'edge'],
+  replace_edge: ['operation', 'edgeId', 'edge'],
+  remove_edge: ['operation', 'edgeId'],
+} as const satisfies Record<
+  (typeof OPERATOR_WORKFLOW_EDIT_OPERATIONS)[number],
+  readonly string[]
+>;
+
+export const OperatorWorkflowEditOperationSchema = z
+  .object({
+    operation: z.enum(OPERATOR_WORKFLOW_EDIT_OPERATIONS),
+    name: z.string().trim().min(1).max(191).optional(),
+    description: z.string().max(8_000).nullable().optional(),
+    nodeId: OperatorWorkflowEntityIdSchema.optional(),
+    label: z.string().trim().min(1).max(191).optional(),
+    position: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+    setParameters: z.record(z.string().trim().min(1).max(191), z.unknown()).optional(),
+    removeParameterIds: z.array(OperatorWorkflowEntityIdSchema).max(100).optional(),
+    setInputOverrides: z.record(z.string().trim().min(1).max(191), z.unknown()).optional(),
+    removeInputOverrideIds: z.array(OperatorWorkflowEntityIdSchema).max(100).optional(),
+    node: WorkflowNodeSchema.optional(),
+    edgeId: OperatorWorkflowEntityIdSchema.optional(),
+    edge: WorkflowEdgeSchema.optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const requireField = (field: keyof typeof value): void => {
+      if (value[field] === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: `${value.operation} requires ${field}`,
+          path: [field],
+        });
+      }
+    };
+
+    switch (value.operation) {
+      case 'set_workflow_metadata':
+        if (value.name === undefined && value.description === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: 'set_workflow_metadata requires name or description',
+          });
+        }
+        break;
+      case 'patch_node':
+        requireField('nodeId');
+        if (
+          value.label === undefined &&
+          value.position === undefined &&
+          value.setParameters === undefined &&
+          value.removeParameterIds === undefined &&
+          value.setInputOverrides === undefined &&
+          value.removeInputOverrideIds === undefined
+        ) {
+          context.addIssue({
+            code: 'custom',
+            message: 'patch_node requires at least one node change',
+          });
+        }
+        for (const [setValues, removedIds, path] of [
+          [value.setParameters, value.removeParameterIds, 'removeParameterIds'],
+          [value.setInputOverrides, value.removeInputOverrideIds, 'removeInputOverrideIds'],
+        ] as const) {
+          if (!setValues || !removedIds) continue;
+          const duplicate = removedIds.find((id) => Object.hasOwn(setValues, id));
+          if (duplicate) {
+            context.addIssue({
+              code: 'custom',
+              message: `${duplicate} cannot be set and removed in the same node patch`,
+              path: [path],
+            });
+          }
+        }
+        break;
+      case 'add_node':
+        requireField('node');
+        break;
+      case 'replace_node':
+        requireField('nodeId');
+        requireField('node');
+        if (value.node && value.nodeId && value.node.id !== value.nodeId) {
+          context.addIssue({
+            code: 'custom',
+            message: 'replacement node id must match nodeId',
+            path: ['node', 'id'],
+          });
+        }
+        break;
+      case 'remove_node':
+        requireField('nodeId');
+        break;
+      case 'add_edge':
+        requireField('edge');
+        break;
+      case 'replace_edge':
+        requireField('edgeId');
+        requireField('edge');
+        if (value.edge && value.edgeId && value.edge.id !== value.edgeId) {
+          context.addIssue({
+            code: 'custom',
+            message: 'replacement edge id must match edgeId',
+            path: ['edge', 'id'],
+          });
+        }
+        break;
+      case 'remove_edge':
+        requireField('edgeId');
+        break;
+      default: {
+        const unsupported: never = value.operation;
+        throw new Error(`Unsupported workflow edit operation: ${String(unsupported)}`);
+      }
+    }
+
+    const allowedFields = new Set<string>(OPERATOR_WORKFLOW_EDIT_FIELDS[value.operation]);
+    for (const field of Object.keys(value)) {
+      if (!allowedFields.has(field)) {
+        context.addIssue({
+          code: 'custom',
+          message: `${field} is not valid for ${value.operation}`,
+          path: [field],
+        });
+      }
+    }
+  });
+export type OperatorWorkflowEditOperation = z.infer<
+  typeof OperatorWorkflowEditOperationSchema
+>;
+
+export const OperatorProposeWorkflowEditsInputSchema = z
+  .object({
+    workflowId: WorkflowIdSchema,
+    baseVersionId: z.string().uuid(),
+    sourceRunId: RunIdSchema.optional(),
+    summary: z.string().trim().min(1).max(2_000).optional(),
+    operations: z
+      .array(OperatorWorkflowEditOperationSchema)
+      .min(1)
+      .max(MAX_OPERATOR_WORKFLOW_EDIT_OPERATIONS),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const serialized = JSON.stringify(value);
+    if (new TextEncoder().encode(serialized).byteLength > MAX_OPERATOR_WORKFLOW_EDIT_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: `Workflow edits exceed ${MAX_OPERATOR_WORKFLOW_EDIT_BYTES} bytes`,
+        path: ['operations'],
+      });
+    }
+  });
+
 export const OperatorProposeWorkflowDraftInputSchema = z
   .object({
     workflowId: WorkflowIdSchema.optional(),
     baseVersionId: z.string().uuid().optional(),
+    sourceRunId: RunIdSchema.optional(),
     summary: z.string().trim().min(1).max(2_000).optional(),
     graph: OperatorWorkflowGraphSchema,
   })
@@ -150,6 +334,13 @@ export const OperatorProposeWorkflowDraftInputSchema = z
         code: 'custom',
         message: 'workflowId and baseVersionId must either both be provided or both be omitted',
         path: value.workflowId ? ['baseVersionId'] : ['workflowId'],
+      });
+    }
+    if (value.sourceRunId && (!value.workflowId || !value.baseVersionId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'sourceRunId is only valid for an update draft',
+        path: ['sourceRunId'],
       });
     }
   });
@@ -184,6 +375,7 @@ export const OperatorWorkflowDraftResultSchema = z
     mode: z.enum(['create', 'update']),
     workflowId: WorkflowIdSchema.nullable(),
     baseVersionId: z.string().uuid().nullable(),
+    sourceRunId: RunIdSchema.optional(),
     name: z.string(),
     digest: z.string().min(1),
     validation: OperatorWorkflowDraftValidationSchema,
@@ -201,6 +393,7 @@ export const OperatorWorkflowApplyResultSchema = z
     version: z.number().int().positive(),
     created: z.boolean(),
     name: z.string(),
+    sourceRunId: RunIdSchema.optional(),
   })
   .strict();
 export type OperatorWorkflowApplyResult = z.infer<typeof OperatorWorkflowApplyResultSchema>;
@@ -235,8 +428,26 @@ export const OperatorRunWorkflowInputSchema = z
     versionId: z.string().uuid(),
     inputs: z.record(z.string(), z.unknown()).default({}),
     scopeId: z.string().uuid().optional(),
+    sourceRunId: RunIdSchema.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.sourceRunId) return;
+    if (Object.keys(value.inputs).length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'inputs must be empty when sourceRunId reuses the source run inputs',
+        path: ['inputs'],
+      });
+    }
+    if (value.scopeId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'scopeId must be omitted when sourceRunId reuses the source run scope',
+        path: ['scopeId'],
+      });
+    }
+  });
 
 export const OperatorCancelRunInputSchema = z.object({ runId: RunIdSchema }).strict();
 
@@ -341,9 +552,15 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   propose_workflow_draft: {
     description:
-      'Propose and compile-check a complete new or modified workflow graph without changing the saved workflow. For updates, use the exact workflowId, baseVersionId, and credential-safe graph returned by get_workflow. A valid proposal can then be applied separately.',
+      'Propose and compile-check a complete new workflow graph without saving it. Existing workflows should use propose_workflow_edits so unchanged graph data is not regenerated. A valid proposal can then be applied separately.',
     effect: 'execute',
     inputSchema: OperatorProposeWorkflowDraftInputSchema,
+  },
+  propose_workflow_edits: {
+    description:
+      `Propose and compile-check bounded ID-based changes to an existing immutable workflow version without saving it. Use the exact workflowId, baseVersionId, node IDs, and edge IDs returned by get_workflow. Allowed operation values are: ${OPERATOR_WORKFLOW_EDIT_OPERATIONS.join(', ')}. For node configuration use patch_node with setParameters and/or setInputOverrides; structured values are recursively merged so omitted nested fields remain unchanged. For example, setInputOverrides: { chatModel: { provider: 'gemini', modelId: 'gemini-3.6-flash' } }. The backend materializes the full graph and returns the normal draft diff for review.`,
+    effect: 'execute',
+    inputSchema: OperatorProposeWorkflowEditsInputSchema,
   },
   apply_workflow_draft: {
     description:
@@ -359,7 +576,7 @@ export const OPERATOR_COMMAND_DEFINITIONS = {
   },
   get_run: {
     description:
-      'Inspect one workflow run. Terminal runs include their bounded result; active runs include current status.',
+      'Inspect one workflow run. Terminal runs include a bounded result, failed/recent trace evidence, and run-scoped findings; active runs include current status.',
     effect: 'read',
     inputSchema: OperatorGetRunInputSchema,
   },
@@ -450,6 +667,7 @@ export type OperatorCommandInputMap = {
   list_components: z.infer<typeof OperatorListComponentsInputSchema>;
   get_component: z.infer<typeof OperatorGetComponentInputSchema>;
   propose_workflow_draft: z.infer<typeof OperatorProposeWorkflowDraftInputSchema>;
+  propose_workflow_edits: z.infer<typeof OperatorProposeWorkflowEditsInputSchema>;
   apply_workflow_draft: z.infer<typeof OperatorApplyWorkflowDraftInputSchema>;
   list_runs: z.infer<typeof OperatorListRunsInputSchema>;
   get_run: z.infer<typeof OperatorGetRunInputSchema>;
@@ -477,6 +695,12 @@ export const OperatorDirectCommandSchema = z.discriminatedUnion('commandName', [
     .object({
       commandName: z.literal('get_run'),
       arguments: OperatorGetRunInputSchema,
+    })
+    .strict(),
+  z
+    .object({
+      commandName: z.literal('run_workflow'),
+      arguments: OperatorRunWorkflowInputSchema,
     })
     .strict(),
   z
@@ -607,6 +831,102 @@ export interface OperatorSessionDetail extends OperatorSessionSummary {
   messages: OperatorMessageView[];
   actions: OperatorActionView[];
 }
+
+export const OPERATOR_SESSION_STREAM_VERSION = 1 as const;
+
+const OperatorSessionSummaryStreamSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string(),
+    approvalMode: OperatorApprovalModeSchema,
+    status: OperatorSessionStatusSchema,
+    model: OperatorModelConfigSchema,
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .strict();
+
+const OperatorTurnStreamSchema = z
+  .object({
+    id: z.string().uuid(),
+    sessionId: z.string().uuid(),
+    status: OperatorTurnStatusSchema,
+    temporalWorkflowId: z.string().nullable(),
+    temporalRunId: z.string().nullable(),
+    context: OperatorRouteContextSchema.nullable(),
+    error: z.string().nullable(),
+    createdAt: z.string(),
+    startedAt: z.string().nullable(),
+    completedAt: z.string().nullable(),
+  })
+  .strict();
+
+const OperatorMessageStreamSchema = z
+  .object({
+    id: z.string().uuid(),
+    sessionId: z.string().uuid(),
+    turnId: z.string().uuid(),
+    sequence: z.number().int().nonnegative(),
+    role: OperatorMessageRoleSchema,
+    content: z.string(),
+    createdAt: z.string(),
+  })
+  .strict();
+
+const OperatorActionStreamSchema = z
+  .object({
+    id: z.string().uuid(),
+    sessionId: z.string().uuid(),
+    turnId: z.string().uuid(),
+    toolCallId: z.string(),
+    commandName: OperatorCommandNameSchema,
+    effect: OperatorCommandEffectSchema,
+    approvalMode: OperatorApprovalModeSchema,
+    approvalRequired: z.boolean(),
+    status: OperatorActionStatusSchema,
+    version: z.number().int().nonnegative(),
+    arguments: z.record(z.string(), z.unknown()),
+    result: z.unknown(),
+    error: z.string().nullable(),
+    runId: z.string().nullable(),
+    createdAt: z.string(),
+    decidedAt: z.string().nullable(),
+    completedAt: z.string().nullable(),
+  })
+  .strict();
+
+const OperatorSessionDetailStreamSchema = OperatorSessionSummaryStreamSchema.extend({
+  turns: z.array(OperatorTurnStreamSchema),
+  messages: z.array(OperatorMessageStreamSchema),
+  actions: z.array(OperatorActionStreamSchema),
+}).strict();
+
+export const OperatorSessionStreamReadySchema = z
+  .object({
+    version: z.literal(OPERATOR_SESSION_STREAM_VERSION),
+    sessionId: z.string().uuid(),
+    mode: z.literal('polling'),
+    intervalMs: z.number().int().min(750).max(1_000),
+  })
+  .strict();
+export type OperatorSessionStreamReady = z.infer<typeof OperatorSessionStreamReadySchema>;
+
+export const OperatorSessionStreamSnapshotSchema = z
+  .object({
+    version: z.literal(OPERATOR_SESSION_STREAM_VERSION),
+    session: OperatorSessionDetailStreamSchema,
+  })
+  .strict();
+export type OperatorSessionStreamSnapshot = z.infer<typeof OperatorSessionStreamSnapshotSchema>;
+
+export const OperatorSessionStreamErrorSchema = z
+  .object({
+    version: z.literal(OPERATOR_SESSION_STREAM_VERSION),
+    code: z.literal('session_read_failed'),
+    message: z.literal('Operator session update could not be read'),
+  })
+  .strict();
+export type OperatorSessionStreamError = z.infer<typeof OperatorSessionStreamErrorSchema>;
 
 export interface OperatorTurnAccepted {
   turnId: string;

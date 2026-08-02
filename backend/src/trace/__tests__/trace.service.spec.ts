@@ -6,6 +6,11 @@ import type { AuthContext } from '../../auth/types';
 
 class FakeTraceRepository {
   public events: WorkflowTraceRecord[] = [];
+  public summaryRequests: {
+    runId: string;
+    options: { failedLimit: number; recentLimit: number };
+    organizationId?: string | null;
+  }[] = [];
 
   async listByRunId(runId: string): Promise<WorkflowTraceRecord[]> {
     return this.events
@@ -17,6 +22,29 @@ class FakeTraceRepository {
     return this.events
       .filter((event) => event.runId === runId && event.sequence > sequence)
       .sort((a, b) => a.sequence - b.sequence);
+  }
+
+  async summarizeRun(
+    runId: string,
+    options: { failedLimit: number; recentLimit: number },
+    organizationId?: string | null,
+  ) {
+    this.summaryRequests.push({ runId, options, organizationId });
+    const events = this.events
+      .filter((event) => event.runId === runId)
+      .sort((a, b) => a.sequence - b.sequence);
+    const failed = events.filter(
+      (event) =>
+        event.level === 'error' ||
+        event.type === 'NODE_FAILED' ||
+        event.type === 'HTTP_REQUEST_ERROR',
+    );
+    return {
+      totalEvents: events.length,
+      failedEventCount: failed.length,
+      failed: failed.slice(-options.failedLimit),
+      recent: events.slice(-options.recentLimit),
+    };
   }
 }
 
@@ -157,6 +185,28 @@ describe('TraceService', () => {
   it('lists events after a sequence cursor', async () => {
     const { events } = await service.listSince(runId, 2, authContext);
     expect(events.map((event) => event.id)).toEqual(['3', '4']);
+  });
+
+  it('maps a tenant-scoped bounded run summary without loading the full trace', async () => {
+    const summary = await service.summarizeRun(
+      runId,
+      { failedLimit: 1, recentLimit: 2 },
+      authContext,
+    );
+
+    expect(repository.summaryRequests.at(-1)).toEqual({
+      runId,
+      options: { failedLimit: 1, recentLimit: 2 },
+      organizationId: 'test-org',
+    });
+    expect(summary).toEqual(
+      expect.objectContaining({
+        totalEvents: 4,
+        failedEventCount: 1,
+      }),
+    );
+    expect(summary.failed.map((event) => event.id)).toEqual(['4']);
+    expect(summary.recent.map((event) => event.id)).toEqual(['3', '4']);
   });
 
   it('extracts metadata and payload when stored in packed form', async () => {

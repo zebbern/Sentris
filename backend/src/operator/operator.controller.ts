@@ -1,5 +1,16 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Res,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 
 import {
@@ -26,12 +37,16 @@ import {
   OperatorWorkflowDraftDetailDto,
   UpdateOperatorSessionDto,
 } from './dto/operator.dto';
+import { OperatorSessionStreamService } from './operator-session-stream.service';
 import { OperatorService } from './operator.service';
 
 @ApiTags('operator')
 @Controller('operator')
 export class OperatorController {
-  constructor(private readonly operatorService: OperatorService) {}
+  constructor(
+    private readonly operatorService: OperatorService,
+    private readonly operatorSessionStreamService: OperatorSessionStreamService,
+  ) {}
 
   @Get('sessions')
   @ApiOperation({ summary: 'List Operator sessions owned by the current user' })
@@ -46,6 +61,17 @@ export class OperatorController {
     @Body(new ZodValidationPipe(OperatorCreateSessionSchema)) body: CreateOperatorSessionDto,
   ): Promise<OperatorSessionSummary> {
     return this.operatorService.createSession(auth, body);
+  }
+
+  @Get('sessions/:id/stream')
+  @ApiOperation({ summary: 'Stream one durable Operator session projection via SSE' })
+  @ApiOkResponse({ description: 'Server-sent Operator session snapshots' })
+  streamSession(
+    @CurrentAuth() auth: AuthContext | null,
+    @Param(new ZodValidationPipe(OperatorIdParamSchema)) params: OperatorIdParamDto,
+    @Res() response: Response,
+  ): Promise<void> {
+    return this.operatorSessionStreamService.streamSession(auth, params.id, response);
   }
 
   @Get('sessions/:id')

@@ -97,6 +97,19 @@ older histories. Explicit run-card inspect, cancel, and retry controls enter the
 turn path as user-confirmed structured commands. Retry starts one new run from the original
 stored version, inputs, and scope using the Operator action identity for idempotency; it does
 not mutate or reset a completed Agent child.
+The selected session is projected to the browser through a versioned SSE stream of complete
+Postgres-backed snapshots. TanStack Query remains the frontend cache, with periodic REST
+reads only as a connection fallback; the stream is not a second event store and does not
+query Temporal from the browser. Launched run cards continue to use the existing run SSE for
+status and trace updates rather than multiplexing run data into the Operator stream. Terminal
+`get_run` results include separately bounded failure/recent trace evidence and run-scoped
+finding summaries, so the explicit Review action can diagnose a result and propose a new
+workflow draft without making the original turn block on the run.
+Run-derived update proposals persist the reviewed run identity only after organization and
+workflow validation. Applying a valid proposal carries that lineage onto the new immutable
+version, and a separate user-confirmed `run_workflow` turn may select that version while
+reusing the reviewed run's stored inputs and scope. This does not change Retry: Retry still
+replays the original version, inputs, and scope.
 Before a new launch, `get_workflow` exposes the selected compiled version's sanitized
 runtime-input descriptors so the model can map user intent to exact input IDs. The same
 shared contract is enforced in `WorkflowRunService` for every launch path before persistence
@@ -104,15 +117,21 @@ or Temporal start; an Operator preflight failure is a durable failed tool result
 model can correct within the turn rather than a doomed workflow run.
 Workflow authoring uses that same typed command ledger rather than a second agent loop.
 The Operator discovers components from the canonical registry and receives an editable
-graph whose inline and component-declared credentials are opaque placeholders. A proposal
-stores one bounded complete graph in its durable action, compiles it, and returns validation
-plus a graph diff without mutating a workflow. Applying it is a separate consequential
-action: the proposal action ID is the workflow-mutation idempotency key, updates fence on
-the exact immutable base version, and the canonical create/update transaction returns the
-saved version. Durable turns snapshot the initiating actor roles so delayed execution keeps
-the user's workflow authority. The frontend can apply the unchanged proposal directly or
-hydrate it into the Builder as an unsaved draft; update placeholders are materialized only
-from the freshly fetched persisted base graph.
+graph whose inline and component-declared credentials are opaque placeholders. Creating a
+workflow stores one bounded complete graph in its proposal action. Updating an existing
+workflow instead stores bounded domain operations keyed by stable node and edge IDs; the
+backend materializes them against the exact immutable base graph. Structured node patches
+merge recursively so an update to one nested value retains unrelated credential placeholders;
+explicit remove operations remain top-level and full-graph proposals retain replacement
+semantics. Both proposal forms use
+the same credential restoration, compilation, validation, and graph-diff path without
+mutating a workflow. Applying either is a separate consequential action: the proposal action
+ID is the workflow-mutation idempotency key, updates fence on the exact immutable base
+version, and the canonical create/update transaction returns the saved version. Durable
+turns snapshot the initiating actor roles so delayed execution keeps the user's workflow
+authority. The frontend can apply the materialized proposal directly or hydrate it into the
+Builder as an unsaved draft; update placeholders are materialized only from the freshly
+fetched persisted base graph.
 Postgres stores sessions, messages, action decisions, and results; consequential actions
 honor the session's ask-or-auto approval mode. Operator MCP discovery materializes an
 immutable turn-scoped grant and complete capability snapshot, and tool, resource, and
@@ -301,6 +320,11 @@ steps; Continue-As-New is still required before unbounded/interactive graph-agen
 are introduced. Global timeouts are workload-specific. Human input uses Temporal signals;
 model/MCP cancellation and idle-call heartbeats are acceptance requirements rather than
 assumed upstream behavior.
+The worker classifies the AI SDK's normalized provider-declared `error` finish reason at one
+provider-neutral boundary before graph-Agent state is checkpointed. Operator may make one
+text-only recovery call from bounded durable action evidence; graph Agents fail the model
+step instead of recording an empty success. Opaque provider finish details are bounded
+diagnostics only and never drive provider-specific control flow.
 
 Before Continue-As-New, a Workflow marks itself draining, rejects new invocation Updates
 with a retryable rollover response, and waits for accepted handlers to finish. The next

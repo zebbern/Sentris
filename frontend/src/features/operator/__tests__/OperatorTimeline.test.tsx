@@ -137,4 +137,103 @@ describe('OperatorTimeline', () => {
     expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /save version/i })).not.toBeInTheDocument();
   });
+
+  it('renders a compact edit proposal through the existing draft review card', () => {
+    const draftId = '11111111-1111-4111-8111-111111111111';
+    const proposalAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'edit-proposal-action',
+      commandName: 'propose_workflow_edits',
+      status: 'succeeded',
+      approvalRequired: false,
+      arguments: {
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        baseVersionId: '33333333-3333-4333-8333-333333333333',
+        operations: [
+          {
+            operation: 'patch_node',
+            nodeId: 'agent',
+            setParameters: { modelId: 'gemini-2.5-pro' },
+          },
+        ],
+      },
+      result: {
+        kind: 'workflow-draft',
+        draftId,
+        mode: 'update',
+        workflowId: '22222222-2222-4222-8222-222222222222',
+        baseVersionId: '33333333-3333-4333-8333-333333333333',
+        name: 'Operator workflow',
+        digest: 'edit-digest',
+        validation: { valid: true, errors: [] },
+        diff: {
+          metadataChanged: [],
+          addedNodeIds: [],
+          removedNodeIds: [],
+          changedNodeIds: ['agent'],
+          addedEdgeIds: [],
+          removedEdgeIds: [],
+          changedEdgeIds: [],
+        },
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[proposalAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(screen.getByText('Draft workflow edits')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save version/i })).toBeEnabled();
+  });
+
+  it('starts the saved improved version with the original run inputs only after a click', () => {
+    const onRunCommand = mock(() => {});
+    const sourceRunId = 'sentris-run-source';
+    const workflowId = '22222222-2222-4222-8222-222222222222';
+    const versionId = '33333333-3333-4333-8333-333333333333';
+    const applyAction: OperatorActionView = {
+      ...pendingAction,
+      id: 'apply-improvement-action',
+      commandName: 'apply_workflow_draft',
+      status: 'succeeded',
+      approvalRequired: false,
+      result: {
+        kind: 'workflow-applied',
+        draftId: '11111111-1111-4111-8111-111111111111',
+        workflowId,
+        versionId,
+        version: 2,
+        created: false,
+        name: 'Improved workflow',
+        sourceRunId,
+      },
+    };
+
+    renderWithProviders(
+      <OperatorTimeline
+        messages={[]}
+        actions={[applyAction]}
+        isActive={false}
+        onDecision={mock(() => {})}
+        onRunCommand={onRunCommand}
+      />,
+      { initialEntries: ['/operator/session-1'] },
+    );
+
+    expect(onRunCommand).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /run improved version/i }));
+    expect(onRunCommand).toHaveBeenCalledWith({
+      message: `Run improved workflow version ${versionId} using inputs from run ${sourceRunId}`,
+      directCommand: {
+        commandName: 'run_workflow',
+        arguments: { workflowId, versionId, sourceRunId, inputs: {} },
+      },
+    });
+  });
 });

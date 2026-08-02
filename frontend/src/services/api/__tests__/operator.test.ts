@@ -3,17 +3,39 @@ import { beforeEach, describe, expect, it, mock, vi } from 'bun:test';
 const httpGet = vi.fn();
 const httpPatch = vi.fn();
 const httpPost = vi.fn();
+const getAuthHeaders = vi.fn().mockResolvedValue({
+  'X-Organization-Id': 'org-b',
+});
+
+let latestStreamUrl: string | null = null;
+let latestStreamOptions: { headers?: Record<string, string>; withCredentials?: boolean } | null =
+  null;
+
+class MockFetchEventSource {
+  constructor(
+    url: string,
+    options: { headers?: Record<string, string>; withCredentials?: boolean },
+  ) {
+    latestStreamUrl = url;
+    latestStreamOptions = options;
+  }
+}
 
 mock.module('@/services/api/client', () => ({
   httpGet,
   httpPatch,
   httpPost,
+  getAuthHeaders,
+  API_V1_URL: 'http://localhost:3211/api/v1',
 }));
+mock.module('@/utils/sse-client', () => ({ FetchEventSource: MockFetchEventSource }));
 
 import { operatorApi } from '../operator';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  latestStreamUrl = null;
+  latestStreamOptions = null;
 });
 
 describe('operatorApi', () => {
@@ -69,6 +91,19 @@ describe('operatorApi', () => {
     expect(httpPost).toHaveBeenNthCalledWith(2, '/operator/actions/action%2F1/decision', {
       decision: 'approved',
       expectedVersion: 3,
+    });
+  });
+
+  it('opens the session stream with the same authenticated local-session transport', async () => {
+    await operatorApi.streamSession('session/1');
+
+    expect(getAuthHeaders).toHaveBeenCalledTimes(1);
+    expect(latestStreamUrl).toBe(
+      'http://localhost:3211/api/v1/operator/sessions/session%2F1/stream',
+    );
+    expect(latestStreamOptions).toEqual({
+      headers: { 'X-Organization-Id': 'org-b' },
+      withCredentials: true,
     });
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'bun:test';
 import type { AuthContext } from '../../auth/types';
 import type { FindingsQueryService } from '../../analytics/findings-query.service';
 import type { FindingTriageService } from '../../findings/finding-triage.service';
+import type { TraceService } from '../../trace/trace.service';
 import type { WorkflowsService } from '../../workflows/workflows.service';
 import { OperatorCommandService } from '../operator-command.service';
 import type { OperatorMcpAuthorityService } from '../operator-mcp-authority.service';
@@ -30,6 +31,7 @@ describe('OperatorCommandService', () => {
   let triage: Record<string, ReturnType<typeof vi.fn>>;
   let mcpAuthority: Record<string, ReturnType<typeof vi.fn>>;
   let workflowAuthoring: Record<string, ReturnType<typeof vi.fn>>;
+  let trace: Record<string, ReturnType<typeof vi.fn>>;
   let service: OperatorCommandService;
 
   beforeEach(() => {
@@ -67,7 +69,16 @@ describe('OperatorCommandService', () => {
       getComponent: vi.fn(),
       projectGraph: vi.fn((graph) => graph),
       propose: vi.fn(),
+      proposeEdits: vi.fn(),
       apply: vi.fn(),
+    };
+    trace = {
+      summarizeRun: vi.fn().mockResolvedValue({
+        totalEvents: 0,
+        failedEventCount: 0,
+        failed: [],
+        recent: [],
+      }),
     };
     service = new OperatorCommandService(
       workflows as unknown as WorkflowsService,
@@ -75,6 +86,7 @@ describe('OperatorCommandService', () => {
       triage as unknown as FindingTriageService,
       mcpAuthority as unknown as OperatorMcpAuthorityService,
       workflowAuthoring as unknown as OperatorWorkflowAuthoringService,
+      trace as unknown as TraceService,
     );
   });
 
@@ -104,6 +116,145 @@ describe('OperatorCommandService', () => {
       },
     );
     expect(result.runId).toBe('sentris-run-1');
+  });
+
+  it('dispatches compact workflow edits through the canonical authoring service', async () => {
+    const proposal = {
+      kind: 'workflow-draft',
+      draftId: ACTION_ID,
+      mode: 'update',
+      workflowId: WORKFLOW_ID,
+      baseVersionId: WORKFLOW_VERSION_ID,
+      name: 'Updated workflow',
+      digest: 'digest',
+      validation: { valid: true, errors: [] },
+      diff: {
+        metadataChanged: [],
+        addedNodeIds: [],
+        removedNodeIds: [],
+        changedNodeIds: ['agent'],
+        addedEdgeIds: [],
+        removedEdgeIds: [],
+        changedEdgeIds: [],
+      },
+    };
+    workflowAuthoring.proposeEdits.mockResolvedValue(proposal);
+    const argumentsValue = {
+      workflowId: WORKFLOW_ID,
+      baseVersionId: WORKFLOW_VERSION_ID,
+      operations: [
+        {
+          operation: 'patch_node' as const,
+          nodeId: 'agent',
+          setParameters: { modelId: 'gemini-2.5-pro' },
+        },
+      ],
+    };
+
+    const result = await service.execute({
+      commandName: 'propose_workflow_edits',
+      arguments: argumentsValue,
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(workflowAuthoring.proposeEdits).toHaveBeenCalledWith({
+      arguments: argumentsValue,
+      auth,
+      actionId: ACTION_ID,
+    });
+    expect(result.result).toEqual(proposal);
+  });
+
+  it('runs an improved version with the terminal source run inputs and scope', async () => {
+    const sourceRunId = 'sentris-run-source';
+    const scopeId = '77777777-7777-4777-8777-777777777777';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      status: 'FAILED',
+      scopeId,
+    });
+    workflows.getRunConfig = vi.fn().mockResolvedValue({
+      runId: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      workflowVersionId: '88888888-8888-4888-8888-888888888888',
+      workflowVersion: 3,
+      inputs: { packageSpec: 'minimist@1.2.8' },
+    });
+
+    const result = await service.execute({
+      commandName: 'run_workflow',
+      arguments: {
+        workflowId: WORKFLOW_ID,
+        versionId: WORKFLOW_VERSION_ID,
+        sourceRunId,
+        inputs: {},
+      },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(workflows.getRun).toHaveBeenCalledWith(sourceRunId, auth);
+    expect(workflows.getRunConfig).toHaveBeenCalledWith(sourceRunId, auth);
+    expect(workflows.run).toHaveBeenCalledWith(
+      WORKFLOW_ID,
+      {
+        inputs: { packageSpec: 'minimist@1.2.8' },
+        versionId: WORKFLOW_VERSION_ID,
+        scopeId,
+      },
+      auth,
+      {
+        idempotencyKey: `operator:${SESSION_ID}:${ACTION_ID}`,
+        trigger: { type: 'api', sourceId: ACTION_ID, label: 'Sentris Operator' },
+      },
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        runId: 'sentris-run-1',
+        result: expect.objectContaining({ sourceRunId }),
+      }),
+    );
+  });
+
+  it('rejects an active source run before launching an improved version', async () => {
+    const sourceRunId = 'sentris-run-active-source';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      status: 'RUNNING',
+      scopeId: null,
+    });
+    workflows.getRunConfig = vi.fn().mockResolvedValue({
+      runId: sourceRunId,
+      workflowId: WORKFLOW_ID,
+      workflowVersionId: WORKFLOW_VERSION_ID,
+      workflowVersion: 3,
+      inputs: { target: 'example.com' },
+    });
+
+    await expect(
+      service.execute({
+        commandName: 'run_workflow',
+        arguments: { workflowId: WORKFLOW_ID, versionId: WORKFLOW_VERSION_ID, sourceRunId },
+        auth,
+        sessionId: SESSION_ID,
+        turnId: TURN_ID,
+        turnCreatedAt: '2026-08-02T10:00:00.000Z',
+        actionId: ACTION_ID,
+        actionRequestedAt: '2026-08-02T10:01:00.000Z',
+      }),
+    ).rejects.toThrow('is still RUNNING');
+    expect(workflows.run).not.toHaveBeenCalled();
   });
 
   it('returns the exact selected-version runtime input contract before a run', async () => {
@@ -266,6 +417,177 @@ describe('OperatorCommandService', () => {
       }),
     ).rejects.toThrow('is still RUNNING');
     expect(workflows.run).not.toHaveBeenCalled();
+  });
+
+  it('returns bounded terminal trace and run-scoped finding evidence', async () => {
+    const runId = 'sentris-run-failed';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: runId,
+      workflowId: WORKFLOW_ID,
+      temporalRunId: 'temporal-failed',
+      status: 'FAILED',
+    });
+    workflows.getRunStatus = vi.fn().mockResolvedValue({ status: 'FAILED' });
+    workflows.getRunResult = vi.fn().mockResolvedValue({ status: 'FAILED', result: null });
+    const traceEvents = Array.from({ length: 14 }, (_, index) => ({
+      id: String(index + 1),
+      runId,
+      nodeId: `node-${index + 1}`,
+      type: 'FAILED',
+      level: 'error',
+      timestamp: `2026-08-02T10:00:${String(index).padStart(2, '0')}.000Z`,
+      message: index === 13 ? 'x'.repeat(3_000) : `Failure ${index + 1}`,
+      error: {
+        message: `Component failure ${index + 1}`,
+        stack: 'stack-must-not-enter-operator-context',
+        details: { response: 'y'.repeat(5_000) },
+      },
+      outputSummary: { statusCode: 500 },
+    }));
+    trace.summarizeRun.mockResolvedValue({
+      totalEvents: 14,
+      failedEventCount: 14,
+      failed: traceEvents.slice(-8),
+      recent: traceEvents.slice(-8),
+    });
+    findings.listFindings.mockResolvedValue({
+      items: [
+        {
+          id: FINDING_ID,
+          name: 'Exposed package token',
+          severity: 'high',
+          run_id: runId,
+          raw: { credential: 'raw-must-not-enter-operator-context' },
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      availability: 'available',
+      paginationMode: 'offset',
+      currentCursor: null,
+      nextCursor: null,
+      schemaCoverage: { canonical: 1, legacy: 0, invalid: 0 },
+      degradedReasons: [],
+    });
+
+    const response = await service.execute({
+      commandName: 'get_run',
+      arguments: { runId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+    const result = response.result as any;
+
+    expect(trace.summarizeRun).toHaveBeenCalledWith(
+      runId,
+      { failedLimit: 8, recentLimit: 8 },
+      auth,
+    );
+    expect(findings.listFindings).toHaveBeenCalledWith(
+      auth,
+      expect.objectContaining({
+        runId,
+        page: 1,
+        pageSize: 10,
+        sortOrder: 'desc',
+        paginationMode: 'offset',
+      }),
+    );
+    expect(result.diagnostics.trace).toEqual(
+      expect.objectContaining({
+        availability: 'available',
+        totalEvents: 14,
+        failedEventCount: 14,
+      }),
+    );
+    expect(result.diagnostics.trace.failed).toHaveLength(8);
+    expect(result.diagnostics.trace.recent).toHaveLength(8);
+    expect(result.diagnostics.trace.recent.at(-1).message).toEndWith('…');
+    expect(result.diagnostics.findings).toEqual(
+      expect.objectContaining({
+        availability: 'available',
+        total: 1,
+        items: [expect.objectContaining({ id: FINDING_ID })],
+      }),
+    );
+    expect(JSON.stringify(result)).not.toContain('stack-must-not-enter-operator-context');
+    expect(JSON.stringify(result)).not.toContain('raw-must-not-enter-operator-context');
+  });
+
+  it('keeps terminal run inspection available when diagnostic sources are unavailable', async () => {
+    const runId = 'sentris-run-diagnostics-unavailable';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: runId,
+      workflowId: WORKFLOW_ID,
+      temporalRunId: 'temporal-failed',
+      status: 'FAILED',
+    });
+    workflows.getRunStatus = vi.fn().mockResolvedValue({ status: 'FAILED' });
+    workflows.getRunResult = vi.fn().mockResolvedValue({ status: 'FAILED', result: null });
+    trace.summarizeRun.mockRejectedValue(new Error('trace store unavailable'));
+    findings.listFindings.mockRejectedValue(new Error('finding index unavailable'));
+
+    const response = await service.execute({
+      commandName: 'get_run',
+      arguments: { runId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(response.result).toEqual(
+      expect.objectContaining({
+        terminal: true,
+        result: { status: 'FAILED', result: null },
+        diagnostics: {
+          trace: { availability: 'unavailable', error: 'trace store unavailable' },
+          findings: {
+            availability: 'unavailable',
+            total: null,
+            items: [],
+            error: 'finding index unavailable',
+          },
+        },
+      }),
+    );
+  });
+
+  it('does not load terminal diagnostics for an active run', async () => {
+    const runId = 'sentris-run-active';
+    workflows.getRun = vi.fn().mockResolvedValue({
+      id: runId,
+      workflowId: WORKFLOW_ID,
+      temporalRunId: 'temporal-active',
+      status: 'RUNNING',
+    });
+    workflows.getRunStatus = vi.fn().mockResolvedValue({ status: 'RUNNING' });
+    workflows.getRunResult = vi.fn();
+
+    const response = await service.execute({
+      commandName: 'get_run',
+      arguments: { runId },
+      auth,
+      sessionId: SESSION_ID,
+      turnId: TURN_ID,
+      turnCreatedAt: '2026-08-02T10:00:00.000Z',
+      actionId: ACTION_ID,
+      actionRequestedAt: '2026-08-02T10:01:00.000Z',
+    });
+
+    expect(response.result).toEqual(
+      expect.objectContaining({ terminal: false, status: { status: 'RUNNING' } }),
+    );
+    expect(workflows.getRunResult).not.toHaveBeenCalled();
+    expect(trace.summarizeRun).not.toHaveBeenCalled();
+    expect(findings.listFindings).not.toHaveBeenCalled();
   });
 
   it('uses the canonical findings query with bounded Operator filters', async () => {

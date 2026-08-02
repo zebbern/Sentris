@@ -40,7 +40,7 @@ import {
   useCreateOperatorSession,
   useCreateOperatorTurn,
   useDecideOperatorAction,
-  useOperatorSession,
+  useOperatorSessionStream,
   useOperatorSessions,
   useOperatorWorkflowDrafts,
   useUpdateOperatorSession,
@@ -443,7 +443,7 @@ export function OperatorPage() {
   useDocumentTitle('Operator');
   const { sessionId } = useParams<{ sessionId?: string }>();
   const sessionsQuery = useOperatorSessions();
-  const sessionQuery = useOperatorSession(sessionId);
+  const sessionQuery = useOperatorSessionStream(sessionId);
 
   return (
     <div className="flex h-full min-h-[calc(100vh-2.5rem)] bg-background">

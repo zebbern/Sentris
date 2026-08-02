@@ -12,6 +12,7 @@ import { OperatorCommandService } from './operator-command.service';
 import { OperatorController } from './operator.controller';
 import { OperatorMcpAuthorityService } from './operator-mcp-authority.service';
 import { OperatorRepository } from './operator.repository';
+import { OperatorSessionStreamService } from './operator-session-stream.service';
 import { OperatorService } from './operator.service';
 import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.service';
 
@@ -29,6 +30,7 @@ import { OperatorWorkflowAuthoringService } from './operator-workflow-authoring.
     OperatorService,
     OperatorCommandService,
     OperatorMcpAuthorityService,
+    OperatorSessionStreamService,
     OperatorWorkflowAuthoringService,
     OperatorRepository,
     InternalOnlyGuard,

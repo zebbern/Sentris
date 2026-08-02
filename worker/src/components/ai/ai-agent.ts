@@ -35,6 +35,7 @@ import {
 import { LLM_PROVIDER_CATALOG, type LlmModelProvider } from '@sentris/shared';
 import { AgentStreamRecorder } from './agent-stream-recorder';
 import { createSentrisLanguageModel } from './model-factory';
+import { assertProviderModelFinished } from './model-finish';
 import {
   AGENT_EXECUTION_PROFILE_OPTIONS,
   DEFAULT_AGENT_EXECUTION_PROFILE,
@@ -877,11 +878,16 @@ Loop the Conversation State output back into the next agent invocation to keep m
         }
       }
 
-      const [responseText, toolResults, finishReason] = await Promise.all([
+      const [responseText, toolResults, finishReason, rawFinishReason] = await Promise.all([
         streamingResult.text,
         streamingResult.toolResults,
         streamingResult.finishReason,
+        streamingResult.rawFinishReason,
       ]);
+      assertProviderModelFinished(
+        { finishReason: String(finishReason), rawFinishReason },
+        'AI Agent',
+      );
 
       const toolMessages: AgentMessage[] = toolResults.map((toolResult) => ({
         role: 'tool',

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'bun:test';
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { OperatorRunActivity } from '../OperatorRunActivity';
 import { queryKeys } from '@/lib/queryKeys';
@@ -11,12 +11,46 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderRun(status: string, options: { seedTrace?: boolean } = {}) {
+class TestEventSource {
+  onopen: ((event: Event) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  close = vi.fn();
+  private readonly listeners = new Map<string, Set<EventListenerOrEventListenerObject>>();
+
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  emit(type: string, payload: unknown) {
+    const event = new MessageEvent(type, { data: JSON.stringify(payload) });
+    for (const listener of this.listeners.get(type) ?? []) {
+      if (typeof listener === 'function') listener(event);
+      else listener.handleEvent(event);
+    }
+  }
+}
+
+function renderRun(
+  status: string,
+  options: {
+    seedTrace?: boolean;
+    statusData?: Record<string, unknown>;
+    traceEvents?: Record<string, unknown>[];
+  } = {},
+) {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.executions.status('sentris-run-1'), { status });
+  const statusData = {
+    status,
+    ...options.statusData,
+  };
+  vi.spyOn(api.executions, 'getStatus').mockResolvedValue(statusData as never);
+  queryClient.setQueryData(queryKeys.executions.status('sentris-run-1'), statusData);
   if (options.seedTrace !== false) {
     queryClient.setQueryData(queryKeys.executions.trace('sentris-run-1'), {
-      events: [
+      runId: 'sentris-run-1',
+      events: options.traceEvents ?? [
         {
           nodeId: 'agent-node',
           data: { agentRunId: 'sentris-run-1:agent-node:agent-turn-1' },
@@ -24,12 +58,14 @@ function renderRun(status: string, options: { seedTrace?: boolean } = {}) {
       ],
     });
   }
+  const source = new TestEventSource();
+  vi.spyOn(api.executions, 'stream').mockResolvedValue(source as unknown as EventSource);
   const onCommand = vi.fn();
   renderWithProviders(
     <OperatorRunActivity runId="sentris-run-1" disabled={false} onCommand={onCommand} />,
     { initialEntries: ['/operator/session-1'], queryClient },
   );
-  return { onCommand, queryClient };
+  return { onCommand, queryClient, source };
 }
 
 describe('OperatorRunActivity', () => {
@@ -49,9 +85,20 @@ describe('OperatorRunActivity', () => {
   });
 
   it('offers durable review and retry controls after the run is terminal', () => {
-    const { onCommand } = renderRun('FAILED');
+    const { onCommand } = renderRun('FAILED', {
+      statusData: { failure: { reason: 'The scanner exited unexpectedly.' } },
+    });
 
-    expect(screen.getByRole('button', { name: 'Review result' })).toBeInTheDocument();
+    expect(screen.getByText('The scanner exited unexpectedly.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review & improve' }));
+    expect(onCommand).toHaveBeenCalledWith({
+      message:
+        'Inspect run sentris-run-1, diagnose failures or weak results, and propose a workflow draft revision when a concrete improvement is justified. Do not apply it yet.',
+      directCommand: {
+        commandName: 'get_run',
+        arguments: { runId: 'sentris-run-1' },
+      },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onCommand).toHaveBeenCalledWith({
       message: 'Retry run sentris-run-1 with the same workflow version and inputs',
@@ -78,5 +125,36 @@ describe('OperatorRunActivity', () => {
     expect(
       await screen.findByText('No agent activity was recorded for this run.'),
     ).toBeInTheDocument();
+  });
+
+  it('shows compact streamed progress, current work, and polling fallback state', async () => {
+    const { source } = renderRun('RUNNING', {
+      statusData: { progress: { completedActions: 1, totalActions: 3 } },
+      traceEvents: [
+        {
+          id: 'trace-1',
+          runId: 'sentris-run-1',
+          nodeId: 'nuclei-scan',
+          type: 'PROGRESS',
+          level: 'info',
+          timestamp: '2026-08-02T10:00:00.000Z',
+          message: 'Checking target templates',
+        },
+      ],
+    });
+
+    await waitFor(() => expect(api.executions.stream).toHaveBeenCalled());
+    act(() => source.emit('ready', { mode: 'realtime', runId: 'sentris-run-1' }));
+
+    expect(screen.getByText('Live updates')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3 steps complete')).toBeInTheDocument();
+    expect(screen.getByText('Checking target templates')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Workflow progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '1',
+    );
+
+    act(() => source.emit('error', { message: 'status_fetch_failed' }));
+    expect(screen.getByText('Updating every few seconds')).toBeInTheDocument();
   });
 });
