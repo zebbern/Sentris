@@ -190,6 +190,12 @@ routable address, generation, health, and expiry. The address is published only 
 listener readiness and is never a generic load-balanced worker alias. Every invoke,
 renew, release, and readiness transition checks the lease, owner epoch, and generation.
 
+The Redis lease wire record stores the canonical runtime key as an opaque JSON string
+plus its hash. Lua may rewrite mutable lease metadata but never parses that identity,
+because Redis cjson cannot round-trip every JavaScript-safe integer. Readers accept the
+bounded v1 lease format while new writers emit v2; multi-worker rolling deployments must
+use an expand/contract release or a coordinated worker restart before enabling v2 writes.
+
 Acquire reserves a `starting` generation before spawning and tags every probe,
 child/container, and live resource. A crash window may briefly leave a non-routable
 duplicate resource; only one generation becomes routable, and owner-local tracking plus

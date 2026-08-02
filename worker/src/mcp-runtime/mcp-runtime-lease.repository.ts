@@ -23,6 +23,7 @@ import {
 import { defineMcpRuntimeRedisCommands, type McpRuntimeRedisCommands } from './mcp-runtime-redis';
 
 const Sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/);
+const MAX_RESERVE_ATTEMPTS = 4;
 const OwnerLookupSchema = z
   .object({
     ownerId: z.string().min(1),
@@ -72,7 +73,7 @@ const StoredRefSchema = z.discriminatedUnion('state', [
     })
     .strict(),
 ]);
-const StoredLeaseSchema = z
+const StoredLeaseV1Schema = z
   .object({
     version: z.literal(1),
     runtimeKey: McpRuntimeKeySchema,
@@ -80,6 +81,19 @@ const StoredLeaseSchema = z
     ref: StoredRefSchema,
   })
   .strict();
+const StoredLeaseV2Schema = z
+  .object({
+    version: z.literal(2),
+    runtimeKeyHash: Sha256HexSchema,
+    runtimeKeyJson: z.string().min(2),
+    retainedOwnerAddress: McpRuntimeOwnerAddressSchema,
+    ref: StoredRefSchema,
+  })
+  .strict();
+const StoredLeaseSchema = z.discriminatedUnion('version', [
+  StoredLeaseV1Schema,
+  StoredLeaseV2Schema,
+]);
 
 export type McpRuntimeReadyPublication = z.infer<typeof PublicationSchema>;
 export type McpRuntimeReservation =
@@ -88,6 +102,11 @@ export type McpRuntimeReservation =
 export interface McpOwnedRuntimeLease {
   runtimeKey: McpRuntimeKey;
   ref: McpRuntimeRef;
+}
+
+interface DecodedMcpRuntimeLease extends McpOwnedRuntimeLease {
+  storageVersion: 1 | 2;
+  runtimeKeyHash: string;
 }
 
 export interface McpRuntimeLeaseRepositoryOptions {
@@ -133,25 +152,42 @@ export class McpRuntimeLeaseRepository {
       candidateOwner: candidateOwnerInput,
     });
     const hash = hashMcpRuntimeKey(runtimeKey);
-    const raw = await this.commands.reserve(
-      this.leaseKey(hash),
-      this.generationKey(hash),
-      this.ownerIndexKey(candidateOwner.ownerId, candidateOwner.ownerEpoch),
-      hash,
-      createMcpRuntimeId(),
-      candidateOwner.ownerId,
-      candidateOwner.ownerEpoch,
-      candidateOwner.ownerAddress,
-      JSON.stringify(runtimeKey),
-      this.startingTtlMs,
-    );
-    const [status, encoded] = parseScriptTuple(raw);
-    if ((status !== 0 && status !== 1) || encoded === undefined) {
-      throw new Error('Redis returned an invalid MCP runtime reservation result');
+    for (let attempt = 0; attempt < MAX_RESERVE_ATTEMPTS; attempt += 1) {
+      const raw = await this.commands.reserve(
+        this.leaseKey(hash),
+        this.generationKey(hash),
+        this.ownerIndexKey(candidateOwner.ownerId, candidateOwner.ownerEpoch),
+        hash,
+        createMcpRuntimeId(),
+        candidateOwner.ownerId,
+        candidateOwner.ownerEpoch,
+        candidateOwner.ownerAddress,
+        JSON.stringify(runtimeKey),
+        this.startingTtlMs,
+      );
+      const [status, encoded] = parseScriptTuple(raw);
+      if ((status !== 0 && status !== 1) || encoded === undefined) {
+        throw new Error('Redis returned an invalid MCP runtime reservation result');
+      }
+      const stored = decodeStoredLease(encoded);
+      if (runtimeIdentityMatches(stored, runtimeKey, hash)) {
+        return { kind: status === 1 ? 'created' : 'existing', ref: stored.ref };
+      }
+      if (!isPotentiallyRoundedV1StartingLease(stored, runtimeKey)) {
+        assertRuntimeIdentity(stored, runtimeKey, hash);
+      }
+      const deleted = await this.commands.deleteExactLegacyStarting(
+        this.leaseKey(hash),
+        this.ownerIndexKey(stored.ref.fence.ownerId, stored.ref.fence.ownerEpoch),
+        hash,
+        encoded,
+        JSON.stringify(runtimeKey),
+      );
+      if (deleted !== 0 && deleted !== 1) {
+        throw new Error('Redis returned an invalid legacy MCP runtime cleanup result');
+      }
     }
-    const stored = decodeStoredLease(encoded);
-    assertRuntimeIdentity(stored.runtimeKey, runtimeKey, hash);
-    return { kind: status === 1 ? 'created' : 'existing', ref: stored.ref };
+    throw new Error('MCP runtime reservation did not settle after legacy lease recovery');
   }
 
   async read(runtimeKeyInput: McpRuntimeKey): Promise<McpRuntimeRef | null> {
@@ -160,7 +196,7 @@ export class McpRuntimeLeaseRepository {
     const encoded = await this.redis.get(this.leaseKey(hash));
     if (encoded === null) return null;
     const stored = decodeStoredLease(encoded);
-    assertRuntimeIdentity(stored.runtimeKey, runtimeKey, hash);
+    assertRuntimeIdentity(stored, runtimeKey, hash);
     return stored.ref;
   }
 
@@ -180,7 +216,7 @@ export class McpRuntimeLeaseRepository {
     }
 
     const stored = decodeStoredLease(encoded);
-    if (hashMcpRuntimeKey(stored.runtimeKey) !== runtimeKeyHash) {
+    if (stored.runtimeKeyHash !== runtimeKeyHash) {
       throw new Error('Stored MCP runtime key does not match its lease key');
     }
     return completeFenceEquals(stored.ref.fence, fence);
@@ -296,14 +332,14 @@ export class McpRuntimeLeaseRepository {
       if (encoded === null || encoded === undefined) continue;
       const stored = decodeStoredLease(encoded);
       const hash = hashes[index]!;
-      if (hashMcpRuntimeKey(stored.runtimeKey) !== hash) {
+      if (stored.runtimeKeyHash !== hash) {
         throw new Error('Stored MCP runtime key does not match its owner index');
       }
       if (stored.ref.fence.ownerId !== ownerId || stored.ref.fence.ownerEpoch !== ownerEpoch) {
         continue;
       }
       if (Date.parse(stored.ref.leaseExpiresAt) <= nowMs) continue;
-      owned.push(stored);
+      owned.push({ runtimeKey: stored.runtimeKey, ref: stored.ref });
     }
     return owned.sort((left, right) =>
       serializeMcpRuntimeKey(left.runtimeKey).localeCompare(
@@ -342,7 +378,7 @@ export class McpRuntimeLeaseRepository {
   }
 }
 
-function decodeStoredLease(encoded: string): McpOwnedRuntimeLease {
+function decodeStoredLease(encoded: string): DecodedMcpRuntimeLease {
   let raw: unknown;
   try {
     raw = JSON.parse(encoded);
@@ -355,7 +391,27 @@ function decodeStoredLease(encoded: string): McpOwnedRuntimeLease {
     ...storedRef,
     leaseExpiresAt: new Date(leaseExpiresAtMs).toISOString(),
   });
-  return { runtimeKey: stored.runtimeKey, ref };
+  if (stored.version === 1) {
+    return {
+      storageVersion: 1,
+      runtimeKey: stored.runtimeKey,
+      runtimeKeyHash: hashMcpRuntimeKey(stored.runtimeKey),
+      ref,
+    };
+  }
+
+  let runtimeKeyRaw: unknown;
+  try {
+    runtimeKeyRaw = JSON.parse(stored.runtimeKeyJson);
+  } catch (error: unknown) {
+    throw new Error('Stored MCP runtime key is not valid JSON', { cause: error });
+  }
+  const runtimeKey = McpRuntimeKeySchema.parse(runtimeKeyRaw);
+  const runtimeKeyHash = hashMcpRuntimeKey(runtimeKey);
+  if (runtimeKeyHash !== stored.runtimeKeyHash) {
+    throw new Error('Stored MCP runtime key does not match its declared hash');
+  }
+  return { storageVersion: 2, runtimeKey, runtimeKeyHash, ref };
 }
 
 function expectedState(
@@ -365,7 +421,7 @@ function expectedState(
   state: 'ready' | 'draining',
 ): McpRuntimeRef {
   const stored = decodeStoredLease(encoded);
-  assertRuntimeIdentity(stored.runtimeKey, runtimeKey, hash);
+  assertRuntimeIdentity(stored, runtimeKey, hash);
   if (stored.ref.state !== state) {
     throw new Error(`Redis returned an MCP runtime lease in unexpected state ${stored.ref.state}`);
   }
@@ -373,16 +429,45 @@ function expectedState(
 }
 
 function assertRuntimeIdentity(
-  stored: McpRuntimeKey,
+  stored: DecodedMcpRuntimeLease,
   expected: McpRuntimeKey,
   expectedHash: string,
 ): void {
-  if (
-    hashMcpRuntimeKey(stored) !== expectedHash ||
-    serializeMcpRuntimeKey(stored) !== serializeMcpRuntimeKey(expected)
-  ) {
+  if (!runtimeIdentityMatches(stored, expected, expectedHash)) {
     throw new Error('Stored MCP runtime key does not match the requested lease identity');
   }
+}
+
+function runtimeIdentityMatches(
+  stored: DecodedMcpRuntimeLease,
+  expected: McpRuntimeKey,
+  expectedHash: string,
+): boolean {
+  return (
+    stored.runtimeKeyHash === expectedHash &&
+    serializeMcpRuntimeKey(stored.runtimeKey) === serializeMcpRuntimeKey(expected)
+  );
+}
+
+function isPotentiallyRoundedV1StartingLease(
+  stored: DecodedMcpRuntimeLease,
+  expected: McpRuntimeKey,
+): boolean {
+  // The v1 writer threw before runtime startup after producing this exact rounded shape.
+  if (stored.storageVersion !== 1 || stored.ref.state !== 'starting') return false;
+  const expectedGeneration = expected.credentialGeneration;
+  const storedGeneration = stored.runtimeKey.credentialGeneration;
+  if (
+    expectedGeneration === null ||
+    storedGeneration === null ||
+    storedGeneration === expectedGeneration
+  ) {
+    return false;
+  }
+  return (
+    serializeMcpRuntimeKey(stored.runtimeKey) ===
+    serializeMcpRuntimeKey({ ...expected, credentialGeneration: storedGeneration })
+  );
 }
 
 function completeFenceEquals(left: McpRuntimeFence, right: McpRuntimeFence): boolean {

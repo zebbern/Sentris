@@ -3,6 +3,7 @@ import Redis from 'ioredis';
 import {
   MCP_RUNTIME_BEGIN_DRAIN_LUA,
   MCP_RUNTIME_COMPARE_AND_DELETE_LUA,
+  MCP_RUNTIME_DELETE_EXACT_LEGACY_STARTING_LUA,
   MCP_RUNTIME_PUBLISH_READY_LUA,
   MCP_RUNTIME_RENEW_LUA,
   MCP_RUNTIME_RESERVE_LUA,
@@ -12,7 +13,8 @@ type RedisScriptArgument = string | number | Buffer;
 type DefinedScript = (...args: RedisScriptArgument[]) => Promise<unknown>;
 
 interface McpRuntimeScriptRedis extends Redis {
-  sentrisMcpRuntimeReserveV1: DefinedScript;
+  sentrisMcpRuntimeReserveV2: DefinedScript;
+  sentrisMcpRuntimeDeleteExactLegacyStartingV1: DefinedScript;
   sentrisMcpRuntimePublishReadyV1: DefinedScript;
   sentrisMcpRuntimeRenewV1: DefinedScript;
   sentrisMcpRuntimeBeginDrainV1: DefinedScript;
@@ -31,6 +33,13 @@ export interface McpRuntimeRedisCommands {
     retainedOwnerAddress: string,
     runtimeKeyJson: string,
     startingTtlMs: number,
+  ): Promise<unknown>;
+  deleteExactLegacyStarting(
+    leaseKey: string,
+    ownerIndexKey: string,
+    runtimeKeyHash: string,
+    expectedEncodedLease: string,
+    expectedRuntimeKeyJson: string,
   ): Promise<unknown>;
   publishReady(
     leaseKey: string,
@@ -77,9 +86,13 @@ export interface McpRuntimeRedisCommands {
 }
 
 export function defineMcpRuntimeRedisCommands(redis: Redis): McpRuntimeRedisCommands {
-  redis.defineCommand('sentrisMcpRuntimeReserveV1', {
+  redis.defineCommand('sentrisMcpRuntimeReserveV2', {
     numberOfKeys: 3,
     lua: MCP_RUNTIME_RESERVE_LUA,
+  });
+  redis.defineCommand('sentrisMcpRuntimeDeleteExactLegacyStartingV1', {
+    numberOfKeys: 2,
+    lua: MCP_RUNTIME_DELETE_EXACT_LEGACY_STARTING_LUA,
   });
   redis.defineCommand('sentrisMcpRuntimePublishReadyV1', {
     numberOfKeys: 2,
@@ -101,7 +114,10 @@ export function defineMcpRuntimeRedisCommands(redis: Redis): McpRuntimeRedisComm
   const scripts = redis as McpRuntimeScriptRedis;
   return {
     reserve: (...args: Parameters<McpRuntimeRedisCommands['reserve']>) =>
-      scripts.sentrisMcpRuntimeReserveV1(...args),
+      scripts.sentrisMcpRuntimeReserveV2(...args),
+    deleteExactLegacyStarting: (
+      ...args: Parameters<McpRuntimeRedisCommands['deleteExactLegacyStarting']>
+    ) => scripts.sentrisMcpRuntimeDeleteExactLegacyStartingV1(...args),
     publishReady: (...args: Parameters<McpRuntimeRedisCommands['publishReady']>) =>
       scripts.sentrisMcpRuntimePublishReadyV1(...args),
     renew: (...args: Parameters<McpRuntimeRedisCommands['renew']>) =>

@@ -33,9 +33,11 @@ local generation = redis.call('INCR', KEYS[2])
 redis.call('PERSIST', KEYS[2])
 local current_ms = now_ms()
 local expires_at_ms = current_ms + tonumber(ARGV[7])
+-- Keep immutable identity opaque: Redis cjson rounds large JavaScript-safe integers.
 local record = {
-  version = 1,
-  runtimeKey = cjson.decode(ARGV[6]),
+  version = 2,
+  runtimeKeyHash = ARGV[1],
+  runtimeKeyJson = ARGV[6],
   retainedOwnerAddress = ARGV[5],
   ref = {
     fence = {
@@ -57,6 +59,32 @@ redis.call('SET', KEYS[1], encoded, 'PX', ARGV[7])
 redis.call('ZADD', KEYS[3], expires_at_ms, ARGV[1])
 refresh_owner_index(KEYS[3], current_ms)
 return { 1, encoded }
+`;
+
+export const MCP_RUNTIME_DELETE_EXACT_LEGACY_STARTING_LUA = `${LUA_HELPERS}
+local encoded = redis.call('GET', KEYS[1])
+if not encoded or encoded ~= ARGV[2] then return 0 end
+local record = cjson.decode(encoded)
+if tonumber(record.version) ~= 1 or record.ref.state ~= 'starting' then return 0 end
+local expected_runtime_key = cjson.decode(cjson.encode(cjson.decode(ARGV[3])))
+local stored_runtime_key = record.runtimeKey
+local function scalar_equals(left, right)
+  return left == right or (left == cjson.null and right == cjson.null)
+end
+if not (
+  scalar_equals(stored_runtime_key.sourceId, expected_runtime_key.sourceId)
+  and scalar_equals(stored_runtime_key.transport, expected_runtime_key.transport)
+  and scalar_equals(stored_runtime_key.configFingerprint, expected_runtime_key.configFingerprint)
+  and scalar_equals(stored_runtime_key.organizationId, expected_runtime_key.organizationId)
+  and scalar_equals(stored_runtime_key.principalPartitionHash, expected_runtime_key.principalPartitionHash)
+  and scalar_equals(stored_runtime_key.credentialReference, expected_runtime_key.credentialReference)
+  and scalar_equals(stored_runtime_key.credentialGeneration, expected_runtime_key.credentialGeneration)
+) then return 0 end
+
+redis.call('DEL', KEYS[1])
+redis.call('ZREM', KEYS[2], ARGV[1])
+refresh_owner_index(KEYS[2], now_ms())
+return 1
 `;
 
 export const MCP_RUNTIME_PUBLISH_READY_LUA = `${LUA_HELPERS}

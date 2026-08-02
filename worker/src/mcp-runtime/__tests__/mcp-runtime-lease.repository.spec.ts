@@ -38,8 +38,8 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
   test('atomically creates one reservation and returns that current ref to every racing caller', async () => {
     const repository = createRepository(requiredFixture(fixture));
     const key = runtimeKey();
-    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9111/runtime');
-    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9112/runtime');
+    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9111');
+    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9112');
 
     const outcomes = await Promise.all([
       repository.reserve(key, firstOwner),
@@ -64,10 +64,130 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     expect(await repository.read(key)).toEqual(created.ref);
   });
 
+  test('preserves the complete runtime identity when Redis stores a large credential generation', async () => {
+    const activeFixture = requiredFixture(fixture);
+    const repository = createRepository(activeFixture);
+    const key = runtimeKey({
+      credentialReference: 'credential-a',
+      credentialGeneration: 4_503_599_627_370_495,
+    });
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9113');
+
+    const reserved = await repository.reserve(key, owner);
+
+    expect(reserved.kind).toBe('created');
+    expect(await repository.read(key)).toEqual(reserved.ref);
+    const ready = await repository.publishReady(
+      key,
+      reserved.ref.fence,
+      publication(owner.ownerAddress),
+    );
+    expect(ready).not.toBeNull();
+    const renewed = await repository.renew(key, reserved.ref.fence);
+    expect(renewed).not.toBeNull();
+    if (!renewed) throw new Error('Expected the large-generation lease to renew');
+    expect(await repository.listOwned(owner.ownerId, owner.ownerEpoch)).toEqual([
+      { runtimeKey: key, ref: renewed },
+    ]);
+    const draining = await repository.beginDrain(key, reserved.ref.fence);
+    expect(draining).toMatchObject({ state: 'draining', fence: reserved.ref.fence });
+    const leaseKey = await onlyKeyContaining(activeFixture, ':lease:');
+    const encoded = await activeFixture.redis.get(leaseKey);
+    expect(encoded).not.toBeNull();
+    const stored = JSON.parse(encoded!);
+    expect(stored.version).toBe(2);
+    expect(JSON.parse(stored.runtimeKeyJson)).toEqual(key);
+    expect(await repository.compareAndDelete(key, reserved.ref.fence)).toBe(true);
+    expect(await repository.read(key)).toBeNull();
+  });
+
+  test('replaces a legacy starting lease whose credential generation was rounded by Redis cjson', async () => {
+    const activeFixture = requiredFixture(fixture);
+    const repository = createRepository(activeFixture);
+    const credentialGeneration = 1_059_316_145_061_650;
+    const key = runtimeKey({ credentialReference: 'credential-a', credentialGeneration });
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9114');
+    const staleFence: McpRuntimeFence = {
+      runtimeId: randomUUID(),
+      ownerId: 'worker-before-restart',
+      ownerEpoch: randomUUID(),
+      leaseGeneration: 1,
+    };
+    const runtimeKeyHash = hashMcpRuntimeKey(key);
+    const leaseKey = `${activeFixture.keyPrefix}:lease:{${runtimeKeyHash}}`;
+    const generationKey = `${activeFixture.keyPrefix}:generation:{${runtimeKeyHash}}`;
+    await activeFixture.redis.set(generationKey, '1');
+    await activeFixture.redis.set(
+      leaseKey,
+      JSON.stringify({
+        version: 1,
+        runtimeKey: {
+          ...key,
+          credentialGeneration: 1_059_316_145_061_600,
+        },
+        retainedOwnerAddress: 'http://127.0.0.1:9110',
+        ref: {
+          fence: staleFence,
+          state: 'starting',
+          leaseExpiresAtMs: Date.now() + 5_000,
+          protocolEra: null,
+          protocolVersion: null,
+          ownerAddress: null,
+          capabilityFingerprint: null,
+        },
+      }),
+      'PX',
+      5_000,
+    );
+
+    const reserved = await repository.reserve(key, owner);
+
+    expect(reserved).toMatchObject({
+      kind: 'created',
+      ref: { fence: { leaseGeneration: 2, ownerId: owner.ownerId } },
+    });
+    expect(reserved.ref.fence.runtimeId).not.toBe(staleFence.runtimeId);
+    expect(await repository.read(key)).toEqual(reserved.ref);
+  });
+
+  test('continues to read valid v1 leases during the bounded storage migration', async () => {
+    const activeFixture = requiredFixture(fixture);
+    const repository = createRepository(activeFixture);
+    const key = runtimeKey({ credentialReference: 'credential-a', credentialGeneration: 7 });
+    const fence: McpRuntimeFence = {
+      runtimeId: randomUUID(),
+      ownerId: 'worker-v1',
+      ownerEpoch: randomUUID(),
+      leaseGeneration: 1,
+    };
+    const runtimeKeyHash = hashMcpRuntimeKey(key);
+    await activeFixture.redis.set(
+      `${activeFixture.keyPrefix}:lease:{${runtimeKeyHash}}`,
+      JSON.stringify({
+        version: 1,
+        runtimeKey: key,
+        retainedOwnerAddress: 'http://127.0.0.1:9115',
+        ref: {
+          fence,
+          state: 'starting',
+          leaseExpiresAtMs: Date.now() + 5_000,
+          protocolEra: null,
+          protocolVersion: null,
+          ownerAddress: null,
+          capabilityFingerprint: null,
+        },
+      }),
+      'PX',
+      5_000,
+    );
+
+    expect(await repository.read(key)).toMatchObject({ state: 'starting', fence });
+  });
+
   test('compares every fence field before every post-reservation mutation', async () => {
     const repository = createRepository(requiredFixture(fixture));
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9121/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9121');
     const reserved = await repository.reserve(key, owner);
 
     for (const staleFence of staleFences(reserved.ref.fence)) {
@@ -95,7 +215,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
   test('matches a live lease by canonical runtime-key hash only when every fence field is current', async () => {
     const repository = createRepository(requiredFixture(fixture));
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9122/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9122');
     const reserved = await repository.reserve(key, owner);
     const runtimeKeyHash = hashMcpRuntimeKey(key);
 
@@ -112,7 +232,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     const activeFixture = requiredFixture(fixture);
     const repository = createRepository(activeFixture);
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9123/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9123');
     const reserved = await repository.reserve(key, owner);
     const leaseKey = await onlyKeyContaining(activeFixture, ':lease:');
     expect(await activeFixture.redis.persist(leaseKey)).toBe(1);
@@ -127,7 +247,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
   test('exposes the retained direct owner address only through a matching ready publication', async () => {
     const repository = createRepository(requiredFixture(fixture));
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9131/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9131');
     const reserved = await repository.reserve(key, owner);
 
     expect(reserved.ref.ownerAddress).toBeNull();
@@ -136,11 +256,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
       (await repository.listOwned(owner.ownerId, owner.ownerEpoch))[0]?.ref.ownerAddress,
     ).toBeNull();
     const [mismatchedPublication] = await Promise.allSettled([
-      repository.publishReady(
-        key,
-        reserved.ref.fence,
-        publication('http://127.0.0.1:9132/runtime'),
-      ),
+      repository.publishReady(key, reserved.ref.fence, publication('http://127.0.0.1:9132')),
     ]);
     expect(mismatchedPublication?.status).toBe('rejected');
     expect((await repository.read(key))?.state).toBe('starting');
@@ -163,7 +279,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     ).toEqual(ready);
     const loser = await repository.reserve(
       key,
-      candidateOwner('worker-b', 'http://127.0.0.1:9133/runtime'),
+      candidateOwner('worker-b', 'http://127.0.0.1:9133'),
     );
     expect(loser).toEqual({ kind: 'existing', ref: ready });
   });
@@ -172,7 +288,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     const activeFixture = requiredFixture(fixture);
     const repository = createRepository(activeFixture, { readyTtlMs: 240 });
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9141/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9141');
     const reserved = await repository.reserve(key, owner);
 
     expect(await repository.renew(key, reserved.ref.fence)).toBeNull();
@@ -214,7 +330,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     const activeFixture = requiredFixture(fixture);
     const repository = createRepository(activeFixture, { readyTtlMs: 120 });
     const key = runtimeKey();
-    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9151/runtime');
+    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9151');
     const first = await repository.reserve(key, firstOwner);
     expect(first.ref.fence.leaseGeneration).toBe(1);
     const generationKey = await onlyKeyContaining(activeFixture, ':generation:');
@@ -224,7 +340,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     expect(await activeFixture.redis.get(generationKey)).toBe('1');
     expect(await activeFixture.redis.pttl(generationKey)).toBe(-1);
 
-    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9152/runtime');
+    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9152');
     const second = await repository.reserve(key, secondOwner);
     expect(second).toMatchObject({ kind: 'created', ref: { fence: { leaseGeneration: 2 } } });
     const secondReady = await repository.publishReady(
@@ -239,7 +355,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
 
     const third = await repository.reserve(
       key,
-      candidateOwner('worker-c', 'http://127.0.0.1:9153/runtime'),
+      candidateOwner('worker-c', 'http://127.0.0.1:9153'),
     );
     expect(third).toMatchObject({ kind: 'created', ref: { fence: { leaseGeneration: 3 } } });
     expect(await activeFixture.redis.get(generationKey)).toBe('3');
@@ -247,7 +363,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
 
   test('isolates every complete runtime-key field including nullable tenant and credential identities', async () => {
     const repository = createRepository(requiredFixture(fixture));
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9161/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9161');
     const keys: McpRuntimeKey[] = [
       runtimeKey(),
       runtimeKey({ sourceId: 'other-source' }),
@@ -275,8 +391,8 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     const repository = createRepository(activeFixture, { startingTtlMs: 140 });
     const epochOne = randomUUID();
     const epochTwo = randomUUID();
-    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9171/runtime', epochOne);
-    const reincarnatedOwner = candidateOwner('worker-a', 'http://127.0.0.1:9172/runtime', epochTwo);
+    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9171', epochOne);
+    const reincarnatedOwner = candidateOwner('worker-a', 'http://127.0.0.1:9172', epochTwo);
     const firstKey = runtimeKey({ sourceId: 'first-source' });
     const secondKey = runtimeKey({ sourceId: 'second-source' });
     const thirdKey = runtimeKey({ sourceId: 'third-source' });
@@ -302,7 +418,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     await waitUntil(async () => (await repository.read(secondKey)) === null);
     expect(await repository.listOwned(firstOwner.ownerId, epochOne)).toEqual([]);
 
-    const replacementOwner = candidateOwner('worker-b', 'http://127.0.0.1:9173/runtime');
+    const replacementOwner = candidateOwner('worker-b', 'http://127.0.0.1:9173');
     const replacement = await repository.reserve(secondKey, replacementOwner);
     expect(replacement.kind).toBe('created');
     expect(await repository.listOwned(firstOwner.ownerId, epochOne)).toEqual([]);
@@ -320,7 +436,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
       configFingerprint: HASH_B,
       capabilityFingerprint: HASH_D,
     });
-    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9181/runtime');
+    const firstOwner = candidateOwner('worker-a', 'http://127.0.0.1:9181');
     const first = await repository.reserve(key, firstOwner);
     const firstReady = await repository.publishReady(
       key,
@@ -330,7 +446,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
     expect(firstReady).not.toBeNull();
     expect(await repository.compareAndDelete(key, first.ref.fence)).toBe(true);
 
-    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9182/runtime');
+    const secondOwner = candidateOwner('worker-b', 'http://127.0.0.1:9182');
     const second = await repository.reserve(key, secondOwner);
     const secondReady = await repository.publishReady(
       key,
@@ -356,7 +472,7 @@ describe.skipIf(!REDIS_INTEGRATION_ENABLED)('McpRuntimeLeaseRepository (Redis 7.
   test('fails closed for unavailable Redis and schema-invalid stored lease data', async () => {
     const activeFixture = requiredFixture(fixture);
     const key = runtimeKey();
-    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9191/runtime');
+    const owner = candidateOwner('worker-a', 'http://127.0.0.1:9191');
     const repository = createRepository(activeFixture);
     const reserved = await repository.reserve(key, owner);
     const leaseKey = await onlyKeyContaining(activeFixture, ':lease:');
